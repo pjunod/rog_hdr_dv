@@ -102,3 +102,25 @@ exports are the API addition and its test-fixture correction on each source base
 The final repository integrity check passed for 32 patches, five series and
 documentation links. Both owned library build containers were removed after
 retaining source-bound receipts; source checkouts remain for consumer work.
+
+## Fourth batch — native target feedback and reference preparation
+
+Independent adversarial review of PR 4 requested three corrections in the
+Mutter candidate before runtime tests:
+
+| Finding | Required correction | State |
+|---|---|---|
+| Primary/topology changes can leave an unmapped surface's preferred target stale | Refresh records and preferred feedback after the Wayland output table changes; cover primary switch and removal | In progress |
+| Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | In progress |
+| A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | In progress |
+
+No additional actionable issues were found in the Wine wrapper/export,
+synthetic corpus encoding, immutable description ownership, v2 identity
+allocation or narrowly scoped public-certificate scan exception. The Mutter
+runner is also being made explicitly UID 1000; lack of Docker privileged mode
+alone does not mean a process has a non-root UID.
+
+Focused runtime tests remain held until the findings are addressed and their
+correction delta reviewed. Dolby executables have separately returned their
+versions in an isolated CPU environment following the owner's installer action;
+no reference frames have been processed.
