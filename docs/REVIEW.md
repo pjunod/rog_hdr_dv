@@ -1,7 +1,7 @@
 # Review — adversarial findings and the current implementation batch
 
-**Updated:** 2026-10-08 · **State:** initial review findings addressed in source;
-final candidate review and fast lane pending.
+**Updated:** 2026-10-09 UTC · **State:** findings addressed; candidate reviewed
+and affected fast lane passed.
 
 Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
@@ -16,6 +16,24 @@ pre-merge-only review workflow. Future batches use that workflow.
 The reviewer found no claim that the existing PQ sample qualifies full Dolby
 Vision. Missing display management and optical measurements remain explicitly
 open implementation/acceptance, not resolved by documentation corrections.
+
+## Premerge review and validation
+
+The independent adversarial review approved candidate `856e39c` after these
+additional fixes:
+
+| Finding | Resolution |
+|---|---|
+| Mutation fixtures omitted newly linked source files | Copy all tracked inputs, preserving symlinks and excluding untracked captures. |
+| Unexpected dictionary-shaped D-Bus replies could raise `KeyError` | Validate outer and nested response shapes; add synthetic regressions. |
+| Probe recipe could continue after network-disconnect failure | Fail closed on isolation assertions, require zero network attachments, use a non-root runtime UID, and stop the container on exit. |
+
+`python3 scripts/check_repository.py` passed for 28 patches and five series.
+`python3 -m unittest discover -s tests -v` passed all 45 tests in one run.
+The probe's recorded warnings-as-errors build matches the reviewed source.
+No imported patch bytes or compiler inputs changed after those checks.
+Subsequent receipt/status documentation receives the repository/link check;
+unchanged test suites are not rerun.
 
 ## Publication audit
 
@@ -34,6 +52,6 @@ rewriting that existing public metadata is pending. New agent commits use
 The imported userspace series were previously checked for exact source-tree
 reconstruction. Kernel import verification remains partial as documented in
 [provenance](PROVENANCE.md). The current batch does not alter those C patches.
-New Python tool regressions will run after final adversarial review. The
+New Python tool regressions passed after final adversarial review. The
 Windows probe compiler loop is isolated; activation is a separate experiment
 and is not evidence of full playback or colour fidelity.

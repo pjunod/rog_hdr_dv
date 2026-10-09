@@ -118,3 +118,20 @@ permission failures, malformed interfaces, subprocess time/output limits,
 profile read failures and private output creation. They do not qualify a live
 Linux desktop. Run them at the repository's agreed review/test stage; then
 capture the laptop baseline separately without changing its display.
+
+## Live receipt — separate configured state from active output
+
+On 2026-10-09 UTC the reviewed inspector ran read-only on the target laptop,
+using the previously verified owner's session bus explicitly supplied by the
+caller. It created its private report with mode `0600`; kernel, DRM, package,
+GNOME and colord collection succeeded. GNOME reported eDP-2 at 2560×1600 and
+approximately 240 Hz, with colour mode `1` (BT.2100), and colord returned one
+display device.
+
+At that capture, DRM reported the internal connector connected but disabled,
+and Intel `actual_brightness` was zero despite requested/max values of 400.
+This is consistent with inactive scanout, but the inspector does not determine
+why it was inactive. Do not classify it as a brightness bug or a physical HDR
+failure. An awake, enabled-output observation is still needed to bind logical
+colour state to the actual scanout and optical measurements. No display was
+woken, reconfigured or restarted for this capture.

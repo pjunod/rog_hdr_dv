@@ -1,6 +1,6 @@
 # Dolby activation probe — find the first compatibility boundary
 
-**Status:** cross-compiled; runtime execution waits for premerge review ·
+**Status:** cross-compiled and probed; Wine API-set load boundary identified ·
 **Written:** 2026-10-08.
 
 Companion to [Dolby Vision and quality](DOLBY_VISION_AND_QUALITY.md): this
@@ -63,16 +63,15 @@ container's source, build script and executable hashes were recorded:
 | `dolby-activation-probe.exe` | `06975793c115c3bceab8acecb33c791355d719a98ab078feb2a0e5fdbe78e8cd` |
 
 The receipt describes the container build at `/probe/build/`; it is
-compile-only evidence, with no runtime or repository tests executed.
+compiler evidence; the separate runtime receipt follows below.
 
 Only the agent-owned `rog-dv-agent-probe` container was created. It has no
 host filesystem mounts, Docker socket, credentials, GPU devices, display
 sockets, or privileged mode. Compiler/Wine packages were installed inside
 that container from Ubuntu repositories; no host packages were installed.
 Source arrived by a tar stream containing this probe directory only. The
-recovered DLL has not been copied into it and Wine has not initialized a
-prefix or executed this probe. An installed Wine package is not compatibility
-evidence.
+exact recovered DLL was later copied privately for the bounded experiment
+below. An installed Wine package alone is not compatibility evidence.
 
 Reproduce compilation after installing the listed tools in a disposable
 environment:
@@ -89,9 +88,8 @@ timestamp disabled to avoid a changing timestamp in compiler receipts.
 
 ## Run after review — keep the execution private and bounded
 
-Premerge review is the next step. The commands below are the proposed
-experiment, not an executed runtime receipt. On the laptop, the reviewer
-first rechecks the source and compilation, then supplies the DLL from the
+The commands below document the reviewed experiment. For a new execution,
+first recheck the source and compilation, then supply the DLL from the
 private recovered inventory. Copy the exact approved DLL into
 `/private/oem/DolbyVisionPlugin.dll` inside this own container, without mounting
 its host directory. Record its SHA-256 and executable SHA-256 separately.
@@ -177,6 +175,37 @@ Remove only this own container when finished:
 ```bash
 docker rm -f rog-dv-agent-probe  # Deletes its compiler, prefix and OEM copy.
 ```
+
+## Runtime receipt — a missing Wine API-set stops DLL loading
+
+On 2026-10-09 UTC, after adversarial review and the 45-test fast lane, the
+exact compiled executable and recovered DLL hashes above were checked and
+the complete isolated recipe was executed. No network attachments, host
+mounts, display sockets or GPU access were provided; Wine ran as UID/GID
+65534. The supervisor returned exit 2 before its deadline. The exit trap
+stopped the container; private results were recovered with mode `0600`.
+The agent-owned container was then removed, deleting its Wine prefix and OEM
+copy. The compiled executable was retained with the private receipts.
+
+| Step | Result |
+|---|---|
+| COM MTA initialization | `S_OK` |
+| WinRT MTA initialization | `S_FALSE` (successful existing initialization) |
+| Media Foundation startup | `S_OK` |
+| Exact OEM DLL load | `0x8007007E` (`ERROR_MOD_NOT_FOUND`) |
+| Media Foundation shutdown | `S_OK` |
+
+Private loader diagnostics identify the missing import as
+`api-ms-win-core-file-fromapp-l1-1-0.dll`. This is a concrete Wine 9.0 API-set
+compatibility boundary. The class factory and `ActivateInstance` were never
+reached. It does not establish that a newer Wine can activate the processor,
+nor that rendering, licensing, panel configuration or full DV are supported.
+
+The next experiment must establish which imported functions are needed and
+whether an official newer Wine implements this contract, then repeat bounded
+activation in a fresh isolated environment. Do not substitute a guessed DLL
+or claim processor activation based on Media Foundation startup alone. Raw
+Wine logs, OEM files and the runtime prefix remain outside the repository.
 
 ## Read the JSONL — an HRESULT belongs to one call
 
