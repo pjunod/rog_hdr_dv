@@ -107,19 +107,61 @@ access absent, and use a prefix inside the container:
 
 ```bash
 # Run on the laptop only after review. No X11/Wayland/GPU access is supplied.
-docker network disconnect bridge rog-dv-agent-probe  # Remove package network.
-docker exec rog-dv-agent-probe mkdir -p /probe/results
-docker exec rog-dv-agent-probe sh -c '
+set -eu
+probe_container=rog-dv-agent-probe
+# Fail before native code if the owned container or isolation has changed.
+[ "$(docker inspect -f '{{.Name}}' "$probe_container")" = /rog-dv-agent-probe ]
+[ "$(docker inspect -f '{{index .Config.Labels "purpose"}}' "$probe_container")" = rog-dv-activation-probe ]
+[ "$(docker inspect -f '{{.State.Running}}' "$probe_container")" = true ]
+[ "$(docker inspect -f '{{len .Mounts}}' "$probe_container")" = 0 ]
+[ "$(docker inspect -f '{{.HostConfig.Privileged}}' "$probe_container")" = false ]
+[ "$(docker inspect -f '{{len .HostConfig.Devices}}' "$probe_container")" = 0 ]
+[ "$(docker inspect -f '{{len .HostConfig.DeviceRequests}}' "$probe_container")" = 0 ]
+[ "$(docker inspect -f '{{len .HostConfig.CapAdd}}' "$probe_container")" = 0 ]
+# Require exactly the setup bridge; an unexpected attachment stops this recipe.
+[ "$(docker inspect -f '{{len .NetworkSettings.Networks}}' "$probe_container")" = 1 ]
+[ -n "$(docker inspect -f '{{with index .NetworkSettings.Networks "bridge"}}{{.EndpointID}}{{end}}' "$probe_container")" ]
+docker network disconnect bridge "$probe_container"  # Must succeed.
+[ "$(docker inspect -f '{{len .NetworkSettings.Networks}}' "$probe_container")" = 0 ]
+# Stop the entire owned container on every subsequent exit, including errors.
+trap 'docker stop "$probe_container" >/dev/null' EXIT
+docker exec "$probe_container" install -d -m 0700 -o 65534 -g 65534 \
+  /probe/results /probe/wine-prefix
+[ "$(docker inspect -f '{{len .NetworkSettings.Networks}}' "$probe_container")" = 0 ]
+probe_exit=0
+if docker exec --user 65534:65534 "$probe_container" sh -c '
+  set -eu
+  umask 077
   export WINEPREFIX=/probe/wine-prefix WINEARCH=win64
   unset DISPLAY WAYLAND_DISPLAY
   timeout --signal=TERM --kill-after=5s 30s /usr/lib/wine/wine64 \
     /probe/build/dolby-activation-probe.exe \
     "Z:\\private\\oem\\DolbyVisionPlugin.dll" \
     >/probe/results/activation.jsonl 2>/probe/results/wine.stderr
-'
-# Record the docker-exec exit status immediately and copy private results out.
-docker stop rog-dv-agent-probe  # Terminate remaining Wine processes too.
+'; then
+  probe_exit=0
+else
+  probe_exit=$?
+fi
+printf 'probe_exit=%s\n' "$probe_exit"  # Preserve supervisor/runtime exit status.
+# Copy private results out with docker cp, including after the EXIT trap stops it.
+exit "$probe_exit"
 ```
+
+Run the complete block in its own shell. Any failed assertion, inspection or
+disconnect terminates setup before the DLL is invoked; the recipe also rejects
+unexpected additional networks rather than disconnecting them and continuing.
+After a failed or already-completed disconnect, inspect the state and prepare
+a reviewed replacement recipe instead of deleting the assertions. No other
+operator should alter the container's network while this block runs.
+
+Wine and the DLL run as container UID/GID 65534, with private writable result
+and prefix directories and files created under `umask 077`. The executable
+and supplied DLL must be readable by that user. Root is used only inside the
+container to prepare those directories; the recipe does not install anything
+on the host or run the DLL as host/container root. The exit trap stops this
+owned container to terminate lingering Wine processes; `docker cp` can recover
+its private results after it stops.
 
 The supervisor bounds hangs/crashes in DLL entry points; stream/type counts
 alone cannot bound a foreign function's duration. Exit 124 from GNU `timeout`
