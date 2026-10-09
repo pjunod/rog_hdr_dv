@@ -41,6 +41,8 @@ function correction and its desktop-only compatibility evidence.
 synthetic PQ inputs and the separate official-reference workflow.
 [Panel measurement](docs/PANEL_MEASUREMENT.md) defines the optical procedure,
 initial accuracy targets and evidence required before calibration claims.
+[Native target gamut](docs/NATIVE_TARGET_GAMUT.md) specifies lossless physical
+chromaticity declarations and independent compositor feedback.
 
 ## Work with the repository
 

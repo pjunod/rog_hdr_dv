@@ -17,7 +17,7 @@ factory request stops when the component asks for the missing Windows
 records the exact scope. Object activation and frame processing remain open.
 
 Work continues on a generic monitor contract backed by actual display data,
-native physical-target gamut reporting, and matching amd64/i386 library plus
+native [physical-target gamut reporting](NATIVE_TARGET_GAMUT.md), and matching amd64/i386 library plus
 amd64 compositor packages. Packaging uses isolated source-only builds; no host
 installation or live display change is implied. The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
 initial accuracy goals and held-out validation; this unit has not been measured.
