@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-09 UTC · **State:** HDR10 operational by owner report;
+**Updated:** 2026-10-09 (America/New_York) · **State:** HDR10 operational by owner report;
 full DV and measured image-quality acceptance open.
 
 This is the current ledger. [Provenance](PROVENANCE.md) identifies inherited
@@ -22,15 +22,43 @@ and Media Foundation but stopped at DLL loading: Wine 9.0 lacks the imported
 The reviewed experiment changed no live display settings; raw results are
 private. Full Dolby Vision remains unimplemented/unqualified.
 
+## Second batch — reviewed tools and concrete remaining contracts
+
+The [ICC inspector](ICC_CHARACTERISATION.md) parsed all four factory profile
+variants privately. Both CMDEF files contain identity MHC2 matrix/LUTs and
+616 cd/m² peak metadata; their standard ICC characterisation is nontrivial
+and differs by GPU route. These are data findings, not activated calibration.
+
+The [Wine API diagnostic](WINE_API_CONTRACT.md) ran on stock Wine 11.0:
+API-set loading succeeds, but `CreateFileFromAppW` lookup fails with Win32
+127. The required function contract remains unimplemented in that runtime.
+The disposable container was removed after saving private receipts.
+
+The [compositor audit](COLOUR_PIPELINE_AUDIT.md) identifies separate output
+target-volume reporting, display characterisation and mapping gaps in the
+exact Ubuntu source candidate. The first correction should carry physical
+target data separately from PQ encoding normalization. KMS content metadata
+must not be populated with a guessed panel peak.
+
+Adversarial review found no actionable defects. The repository check passed;
+all 16 new ICC tests passed across the initial run and a focused retry after
+correcting one malformed fixture. Unchanged suites were not rerun. The
+[review ledger](REVIEW.md) records the exact CI receipts.
+
+Mutter's `PowerSaveMode` returned `3` (off), consistent with the prior disabled
+scanout capture. Awake-output and optical acceptance remain open. Availability
+of a measurement instrument and official reference-tool package is unanswered;
+software source corrections can proceed independently.
+
 | Component | State | Remaining evidence/work |
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware/upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and mode coverage |
 | Library | hdr6 amd64/i386 delivered | Revalidate future dependency upgrades against unpublished APIs |
 | Mutter | nativehdr2 delivered | Physical colour-path audit; unresolved historical flaky batch failure |
-| Full Dolby Vision | First compatibility boundary identified | Resolve the Wine API-set contract, then qualify activation, processing and display management |
-| General colour quality | Requirements and initial source audit | Trace transformations and fix gaps across applications and composition |
-| Exact-panel tuning | OEM data recovered | Validate profile interpretation, implement calibration path, measure this unit |
+| Full Dolby Vision | Missing function confirmed on stock Wine 11.0 | Implement the required file API semantics; continue native reference and processor routes |
+| General colour quality | Delivered-source audit complete | Separate physical target feedback from encoding, then implement and qualify mapping/calibration |
+| Exact-panel tuning | Factory ICC/MHC2 structures inspected | Implement the correct characterisation/calibration path and measure this unit |
 | Plurx | Independent downstream integration | Browser/native rendering route, metadata preservation and physical playback |
 
 ## Installed baseline

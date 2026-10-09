@@ -26,6 +26,11 @@ the imported work came from and how to interpret its evidence.
 Linux inspector and how to interpret its privacy-filtered report.
 [The Dolby activation probe](docs/DOLBY_ACTIVATION_PROBE.md) documents the
 isolated Windows API experiment, compiler receipt and remaining contracts.
+[Wine API contract](docs/WINE_API_CONTRACT.md) isolates the missing file API
+from Dolby activation. [ICC characterisation](docs/ICC_CHARACTERISATION.md)
+explains private inspection of factory profile data.
+[The colour pipeline audit](docs/COLOUR_PIPELINE_AUDIT.md) traces encoding,
+target-volume reporting, calibration and KMS metadata in pinned source.
 
 ## Work with the repository
 

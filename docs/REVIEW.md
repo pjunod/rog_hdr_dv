@@ -55,3 +55,25 @@ reconstruction. Kernel import verification remains partial as documented in
 New Python tool regressions passed after final adversarial review. The
 Windows probe compiler loop is isolated; activation is a separate experiment
 and is not evidence of full playback or colour fidelity.
+
+## Second batch — profile interpretation and Wine API isolation
+
+Independent adversarial review approved `efcfcef` with no actionable findings.
+It inspected ICC bounds/privacy and MHC2 semantics, the fixed API-only probe
+and isolation recipe, and checked core colour-audit claims against the pinned
+Ubuntu source. The coordinator verified the official Dolby product pages.
+
+[Initial CI run](https://github.com/pjunod/rog_hdr_dv/actions/runs/37881782924)
+passed repository integrity and 15 of 16 new ICC tests. The truncation fixture
+mistakenly left enough bytes for its tag table, reaching a different valid
+bounds rejection. Commit `ecc8215` physically removes the missing record word;
+the parser and other tests are unchanged. The coordinator reviewed that delta.
+[Focused CI retry](https://github.com/pjunod/rog_hdr_dv/actions/runs/37881876877)
+passed only `test_inspect_icc.ProfileTests.test_header_and_tag_table_corruption_is_controlled`.
+Every new test is green; the previously green suites were not rerun.
+
+The source-bound API diagnostic compiled with warnings as errors and ran once
+in the reviewed offline, non-root environment. Its documented missing-export
+exit `3` is an observed compatibility boundary, not a successful Dolby result.
+All four private OEM profile inspections succeeded. Only sanitized receipts
+were added afterward; the documentation/link check covers those receipt edits.

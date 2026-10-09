@@ -52,6 +52,26 @@ luminance and small-window peak are different quantities.
    player integration remain in Plurx; the shared display solution belongs
    here and must be exercised by more than one application.
 
+## Characterisation and target mapping are separate contracts
+
+Profile inspection preserves the difference between PCS-adapted ICC
+characterisation, standard calibration tags and opaque OEM processor data.
+Parsing a matrix or luminance field does not apply it, and applying a file
+association does not establish that the compositor consumes its fields.
+The [ICC inspector](ICC_CHARACTERISATION.md) records these inputs privately.
+
+The [source audit](COLOUR_PIPELINE_AUDIT.md) distinguishes PQ's encoding
+range from a physical display target. A corrective implementation needs
+explicit target-volume provenance, a transform owner, and metadata consistent
+with the pixels actually emitted. A panel's peak must not be substituted for
+an encoding normalization constant. Generic source fixes and panel-specific
+calibration data remain separate deliverables.
+
+The [Wine API diagnostic](WINE_API_CONTRACT.md) likewise distinguishes an
+API-set name, an exported function, a working function and an activated Dolby
+processor. Each is a separate observable boundary. None alone qualifies full
+Dolby Vision display management or an accurate image on the panel.
+
 ## Scope limits
 
 This repository does not certify Dolby conformance, claim that all Linux apps
