@@ -16,11 +16,17 @@ factory request stops when the component asks for the missing Windows
 [activation evidence](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
 records the exact scope. Object activation and frame processing remain open.
 
-Work continues on a generic monitor contract backed by actual display data,
+Work continues on a [generic monitor contract](WINE_DISPLAY_MONITOR.md) backed by actual display data,
 native [physical-target gamut reporting](NATIVE_TARGET_GAMUT.md), and matching amd64/i386 library plus
 amd64 compositor packages. Packaging uses isolated source-only builds; no host
 installation or live display change is implied. The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
 initial accuracy goals and held-out validation; this unit has not been measured.
+
+The exact qualified hdr7 library source has produced amd64 and i386 packages
+in the isolated native builder. Matching compositor packaging is in progress.
+The current installed recovery packages were located and hashed privately.
+New gamut and monitor implementations still require their own final review and
+affected runtime qualification; package compilation does not replace those.
 
 ## Fourth batch — native target feedback and processor prerequisites
 

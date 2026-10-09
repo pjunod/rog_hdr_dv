@@ -43,6 +43,8 @@ synthetic PQ inputs and the separate official-reference workflow.
 initial accuracy targets and evidence required before calibration claims.
 [Native target gamut](docs/NATIVE_TARGET_GAMUT.md) specifies lossless physical
 chromaticity declarations and independent compositor feedback.
+[Wine monitor discovery](docs/WINE_DISPLAY_MONITOR.md) defines the next
+activation prerequisite, truthful topology and descriptor handling.
 
 ## Work with the repository
 
