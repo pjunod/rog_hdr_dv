@@ -1,6 +1,6 @@
 # Mutter target luminance — independent output feedback
 
-**Status:** accepted design; implementation in progress. **Date:** 2026-10-09.
+**Status:** implemented source candidate; compilation of focused regressions in progress. **Date:** 2026-10-09.
 The coordinator owns design and integration; the implementation agent owns its
 independent source clone. [Status](STATUS.md) records current qualification.
 
@@ -92,3 +92,11 @@ immutability, both identity versions, preferred/output agreement, primary
 fallback surfaces and output completion. Rebuilds and test receipts must bind
 the final source tree. Package delivery and physical qualification follow as
 separate steps with compatible recovery packages ready.
+
+## Source identities
+
+The Ubuntu series appends the implementation and focused regressions after the
+delivered five-patch nativehdr2 prefix. `sources.json` preserves both delivered
+and candidate identities. The candidate is nativehdr3, marked UNRELEASED, and
+requires the unpublished hdr7 luminance API at link time. The upstream Mutter
+series is unchanged; this batch does not claim an upstream port.
