@@ -1,0 +1,114 @@
+{
+  "scope": "Native firmware-declared HDR target luminance; ARM64 compile only",
+  "status": "candidate_compiled_tests_held",
+  "tests_executed": false,
+  "host_packages_installed": false,
+  "live_display_changes": false,
+  "source_transfer": "git archive only; no repository metadata, credentials or OEM data",
+  "image": "ubuntu@sha256:73b76549166d2d32444ccbd2b79b34381a1b3e25fd150cdd7fb12383fe7ebdc2",
+  "architecture": "aarch64",
+  "distribution": "Ubuntu 26.10 stonking",
+  "mutter": {
+    "base_commit": "f8b71478843220c0de2d68b73add82231c6f3909",
+    "commit": "dea8fd02b7540cee5c499fbd44cf312ba7e2456e",
+    "tree": "6569f7243c189d4220b30a72db2977ebe979f59f",
+    "archive_sha256": "0e69451caa427bd027a31bc15c9939c4634a9e444467e333102ad1c816733077",
+    "branch": "codex/output-target-volume",
+    "commits": [
+      "384ac30",
+      "122d37d",
+      "dea8fd0"
+    ],
+    "configure": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled LD_LIBRARY_PATH=/work/build/libdisplay-physical meson setup /work/build/mutter-target /work/source/mutter-baseline -Dremote_desktop=true -Dwerror=true",
+    "compile": "ninja -j2 -C /work/build/mutter-target src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
+    "compile_exit": 0,
+    "compile_started_utc": "2026-10-09T04:56:07Z",
+    "compile_finished_utc": "2026-10-09T04:56:07Z",
+    "integrity": {
+      "files_verified": 2302,
+      "exact_final_archive": true,
+      "binaries": {
+        "src/libmutter-51.so.0.0.0": "e69a2aff6d772e689ac064eeef54295171eea9ef21731fe0054c48a6c512c354",
+        "src/tests/mutter-native-hdr": "9cb1d1148723bf88a38d7628ae9ee7f0920b4d95c51c6557a3a5dc15c27799d1",
+        "src/tests/mutter-wayland-color-management": "c188ee6c23af2776033a7c3958f36e4cdbec8f3f6d00df238095a838459cfbe0",
+        "src/tests/wayland-test-clients/color-management": "6466e720f0f3bdbe1ffdd2118e820a08cd1cef71e48d9993e7770edfa2bf97cd"
+      }
+    }
+  },
+  "library": {
+    "commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+    "tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
+    "archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c",
+    "configure": "meson setup /work/build/libdisplay-physical /work/source/libdisplay-physical -Dwerror=true",
+    "compile": "ninja -j2 -C /work/build/libdisplay-physical libdisplay-info.so.0.3.0",
+    "compile_exit": 0,
+    "targets": 15,
+    "selection": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled; LD_LIBRARY_PATH=/work/build/libdisplay-physical",
+    "runtime_resolution": "ELF RPATH and ldd resolve /work/build/libdisplay-physical/libdisplay-info.so.3",
+    "build_layout_correction": "generated uninstalled.pc requires build/include -> source/include symlink"
+  },
+  "gvdb_commit": "b54bc5da25127ef416858a3ad92e57159ff565b3",
+  "compiler": "cc (Ubuntu 15.3.0-4ubuntu1) 15.3.0",
+  "linker": "GNU ld 2.47",
+  "meson": "1.10.1",
+  "ninja": "1.13.2",
+  "effective_options": {
+    "buildtype": "debug",
+    "werror": true,
+    "b_ndebug": false,
+    "optimization": "0",
+    "remote_desktop": true
+  },
+  "dependency_preparation": {
+    "authentication": "default Ubuntu signed apt metadata, no authentication bypass",
+    "command": "DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends build-dep mutter",
+    "extra_build_inputs": [
+      "hwdata",
+      "git"
+    ],
+    "dependency_inventory": "dependencies.tsv",
+    "versions": {
+      "glib": "2.90.0",
+      "schemas": "51.0",
+      "wayland": "1.26.0",
+      "wayland_protocols": "1.49",
+      "libinput": "1.31.3",
+      "libei": "1.5.0",
+      "pipewire": "1.6.8"
+    }
+  },
+  "limitations": [
+    "ARM64 compile evidence only; no amd64 package qualification",
+    "No test binaries executed; commands held for adversarial review",
+    "No optical measurements or calibration claims",
+    "No live display, host packages, credentials, OEM data or owner source changes"
+  ],
+  "formatting": {
+    "tool": "Uncrustify-0.78.1_f",
+    "check": "python3 check-style.py --dry-run --sha HEAD^",
+    "exit": 0,
+    "source": "independent source-only disposable git checkout, base f8b7147 overlay 122d37d, formatter output applied as dea8fd0",
+    "token_sequences_unchanged": true
+  },
+  "new_exports": {
+    "meta_color_device_get_color_state": "51.0-1ubuntu3+nativehdr3~",
+    "meta_color_device_get_target_luminance": "51.0-1ubuntu3+nativehdr3~",
+    "meta_color_device_update": "51.0-1ubuntu3+nativehdr3~",
+    "meta_color_target_luminance_init": "51.0-1ubuntu3+nativehdr3~"
+  },
+  "held_regressions": [
+    "/native-hdr/complete-tuple-and-kms-gates",
+    "/native-hdr/cta-authority",
+    "/native-hdr/diagnostics",
+    "/native-hdr/scoped-extension-failures",
+    "/native-hdr/fatal-base",
+    "/native-hdr/cta-preserved-with-extension-failure",
+    "/native-hdr/physical-luminance",
+    "/native-hdr/target-luminance-policy",
+    "/wayland/color-management",
+    "/wayland/target-luminance/v1",
+    "/wayland/target-luminance/v2"
+  ],
+  "date": "2026-10-09",
+  "schema_version": 1
+}

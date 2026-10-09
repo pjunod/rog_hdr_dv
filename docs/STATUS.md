@@ -40,7 +40,9 @@ for the missing `CreateFileFromAppW` function, plus a generic synthetic HDR
 compiled in an isolated, resource-limited native amd64 environment. Runtime
 behaviour remains untested pending review.
 
-Review and focused checks will follow the completed candidate.
+Both candidates, including their focused regression binaries, now compile.
+[PR 4](https://github.com/pjunod/rog_hdr_dv/pull/4) is published and under
+independent adversarial review. Focused checks follow resolved findings.
 
 ## Third batch — native physical-luminance API merged
 

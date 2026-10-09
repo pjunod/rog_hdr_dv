@@ -1,6 +1,6 @@
 # Mutter target luminance — independent output feedback
 
-**Status:** implemented source candidate; compilation of focused regressions in progress. **Date:** 2026-10-09.
+**Status:** implemented and compiled; adversarial review in progress. **Date:** 2026-10-09.
 The coordinator owns design and integration; the implementation agent owns its
 independent source clone. [Status](STATUS.md) records current qualification.
 
@@ -81,11 +81,11 @@ calibration or Dolby display management. Those remain explicit acceptance work.
 ## Qualification and delivery boundary
 
 The pinned Ubuntu Mutter baseline compiled with warnings as errors in an owned
-Ubuntu ARM64 container before source edits. The new library will be linked from
+Ubuntu ARM64 container before source edits. The candidate links the new library from
 a separate source build; stock library version numbers cannot prove availability
 of the unpublished API. No host package or live display state is changed.
 
-After implementation, independent adversarial review precedes focused tests.
+Independent adversarial review now precedes focused tests.
 Regressions must cover valid and absent/conflicting data, route eligibility,
 unchanged encoding and reference white, target-only notification, old snapshot
 immutability, both identity versions, preferred/output agreement, primary
@@ -100,3 +100,9 @@ delivered five-patch nativehdr2 prefix. `sources.json` preserves both delivered
 and candidate identities. The candidate is nativehdr3, marked UNRELEASED, and
 requires the unpublished hdr7 luminance API at link time. The upstream Mutter
 series is unchanged; this batch does not claim an upstream port.
+
+The [compiler receipt](../evidence/mutter-target-compile.json) records the
+exact source tree, archive and binary hashes, warnings-as-errors build, linked
+hdr7 source, exported symbols and compile-only boundary. The current candidate
+is ARM64 source qualification; amd64/i386 library packaging and amd64 Mutter
+package qualification remain separate.
