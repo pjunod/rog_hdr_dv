@@ -1,7 +1,6 @@
 # Wine API contract — separate module resolution from function support
 
-**Status:** cross-compiled; Wine 11.0 prepared; runtime awaits final adversarial
-review · **Written:** 2026-10-09 UTC.
+**Status:** reviewed and executed; Wine 11.0 export absence confirmed · **Written:** 2026-10-09 UTC.
 
 Companion to [the Dolby activation probe](DOLBY_ACTIVATION_PROBE.md): this
 diagnostic answers whether stock Wine resolves the one API-set import that
@@ -47,7 +46,7 @@ It was not run. The diagnostic then compiled with C++17, optimization,
 warnings-as-errors, static runtime libraries and no PE timestamp using the
 [build script](../probes/wine_api_contract/build.sh). Its only import modules
 are `KERNEL32.dll` and `msvcrt.dll`. Compilation completed with exit 0 and no
-compiler diagnostics. No probe, Wine initialization or tests ran in this batch.
+compiler diagnostics. No runtime was executed before review; the subsequent receipt is below.
 
 | Dependency | Exact prepared environment |
 |---|---|
@@ -113,12 +112,13 @@ docker exec rog-wine-api-contract sh \
 The prepared container has no host mounts, credentials, Docker socket, GPU
 devices, display sockets or privileged mode. Only this new container was
 changed; the preceding OEM probe container was not restarted or modified.
-Its network was disconnected after package installation and no Wine prefix
-exists yet. No OEM binary/profile belongs in this diagnostic environment.
+Its network was disconnected after package installation, before any Wine
+execution. The completed container was removed after recovering the private
+receipts below. No OEM binary/profile belongs in this diagnostic environment.
 
 ## One bounded run after final adversarial review
 
-The following is the proposed execution, not a runtime receipt. Run the whole
+The following is the reviewed execution recipe. Run the whole
 block in its own shell only after the final review and required fast lane.
 It requires the prepared container to be running with zero network
 attachments, rejects changed isolation, creates private output/prefix
@@ -176,6 +176,34 @@ Remove only this owned container after saving results:
 ```bash
 docker rm -f rog-wine-api-contract  # Removes packages, prefix and private logs.
 ```
+
+## Runtime receipt — API-set resolves, required export does not
+
+After adversarial review and the affected fast lane, the complete recipe ran
+on the pinned stock Wine 11.0 package set. Source/executable hashes were
+rechecked; zero network attachments and zero mounts were verified. No OEM
+component or discovered function was invoked.
+
+| Call | Result |
+|---|---|
+| `LoadLibraryExW` for the fixed API-set | Success; Win32 `0` / `0x00000000` |
+| `GetProcAddress(CreateFileFromAppW)` | Failure; Win32 `127` (`ERROR_PROC_NOT_FOUND`) / `0x8007007F` |
+| `FreeLibrary` | Success; Win32 `0` / `0x00000000` |
+
+The executable returned `3`, its documented missing-export outcome, before
+the supervisor deadline. Module mapping has progressed beyond Wine 9.0's
+missing-module result, but the required function is still absent. This
+runtime confirms the pinned source finding; a stock runtime upgrade alone
+does not supply that contract. It says nothing about other activation or
+processing prerequisites.
+
+The next compatibility implementation must supply and validate the actual
+file API contract in Wine, including its security semantics; an export alias
+is not evidence of equivalence. The independent native reference-tool route
+remains in [the quality plan](DOLBY_VISION_AND_QUALITY.md#41-use-an-official-linux-reference-for-display-management-validation).
+Raw logs, executable and package manifest were retained privately with mode
+`0600`. The agent-owned container, prefix and package installation were
+removed. No host package or display configuration changed.
 
 ## Read the JSONL and exit code
 

@@ -102,3 +102,29 @@ MHC2 identity and nonidentity transforms, malformed structure, private output,
 nonregular input and source-file preservation. Run the checks after the
 repository's adversarial review boundary; collect OEM evidence privately
 after that review. Fixture results do not qualify a physical panel.
+
+## Factory-profile receipt — identity MHC2 does not erase characterisation
+
+After review and the affected synthetic tests, all four recovered factory
+profiles parsed successfully. Each report was created privately with mode
+`0600`; no profile was installed or associated with a display. Only this
+summary is published; complete reports, payloads and per-profile fingerprints
+remain private.
+
+| Factory variant | Parsed structure |
+|---|---|
+| Intel standard and CMDEF | Three 256-entry nondecreasing sampled TRCs, with channel-specific nonzero low endpoints; `lumi` Y approximately 294.65 cd/m²; no VCGT |
+| NVIDIA standard and CMDEF | Three 256-entry nondecreasing sampled TRCs, with channel-specific nonzero low endpoints; `lumi` Y approximately 373.12 cd/m²; no VCGT |
+| Both CMDEF variants | MHC2 minimum approximately 0.005005 cd/m² and peak 616 cd/m²; effective matrix is identity; each channel's two-entry LUT is exactly identity at its knots |
+| Both CMDEF variants | A 6,460-byte `DVB1` block is present; its proprietary contents remain uninterpreted |
+
+The profiles contain meaningful standard characterisation, including different
+GPU-route tone curves. Their MHC2 blocks do not contain a nonidentity
+matrix/LUT calibration to copy into Linux. That does not make their standard
+ICC curves identity, explain the proprietary block, establish their operating
+conditions or prove which factory component consumes each field. Never apply
+these TRCs directly to an arbitrary PQ-encoded KMS stage.
+
+The source audit's missing display-characterisation/target-volume contracts
+remain relevant. Optical measurement and an active-output trace are still
+required before selecting or qualifying tuning for this physical unit.

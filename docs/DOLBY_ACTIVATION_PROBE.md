@@ -201,9 +201,10 @@ compatibility boundary. The class factory and `ActivateInstance` were never
 reached. It does not establish that a newer Wine can activate the processor,
 nor that rendering, licensing, panel configuration or full DV are supported.
 
-The next experiment must establish which imported functions are needed and
-whether an official newer Wine implements this contract, then repeat bounded
-activation in a fresh isolated environment. Do not substitute a guessed DLL
+The follow-up [API contract probe](WINE_API_CONTRACT.md) identified the sole
+required function as `CreateFileFromAppW`. Stock Wine 11.0 loads the API-set
+but lacks that export, confirmed by runtime error 127. Implementing and
+validating that contract remains necessary before claiming it is resolved. Do not substitute a guessed DLL
 or claim processor activation based on Media Foundation startup alone. Raw
 Wine logs, OEM files and the runtime prefix remain outside the repository.
 
