@@ -1,0 +1,67 @@
+From 4db354c816e7ac72091a246b7b2eb8adee9a9412 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 01:21:41 -0400
+Subject: [PATCH] test(color): retain native fixture mode during forced policy
+ comparison
+
+---
+ src/tests/wayland-color-management-test.c | 30 +++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 1ee1ca0..2e3be0b 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -193,6 +193,30 @@ set_test_color_mode (MetaOutput    *output,
+   meta_output_assign_crtc (output, crtc, &assignment);
+ }
+ 
++static void
++set_fixture_force_hdr (MetaDebugControl   *debug,
++                       MetaMonitorManager *monitor_manager,
++                       gboolean            forced)
++{
++  GSignalMatchType match =
++    G_SIGNAL_MATCH_ID | G_SIGNAL_MATCH_DETAIL | G_SIGNAL_MATCH_DATA;
++  guint notify_signal = g_signal_lookup ("notify", G_OBJECT_TYPE (debug));
++  GQuark detail = g_quark_from_static_string ("force-hdr");
++
++  /* Compare policy with the synthetic output's manually selected HDR state.
++   * This does not qualify real monitor reconfiguration. Suppress only that
++   * manager's configuration callback; all color-device notifications remain. */
++  g_assert_cmpuint (g_signal_handlers_block_matched (debug, match,
++                                                     notify_signal, detail,
++                                                     NULL, NULL,
++                                                     monitor_manager), ==, 1);
++  g_object_set (debug, "force-hdr", forced, NULL);
++  g_assert_cmpuint (g_signal_handlers_unblock_matched (debug, match,
++                                                       notify_signal, detail,
++                                                       NULL, NULL,
++                                                       monitor_manager), ==, 1);
++}
++
+ static void
+ target_luminance (gconstpointer data)
+ {
+@@ -255,14 +279,16 @@ target_luminance (gconstpointer data)
+   emit_sync_event (1);
+ 
+   wait_for_sync_point (2);
+-  g_object_set (debug, "force-hdr", TRUE, NULL);
++  set_fixture_force_hdr (debug, monitor_manager, TRUE);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, encoding_luminance->max);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+   emit_sync_event (2);
+ 
+   wait_for_sync_point (3);
+-  g_object_set (debug, "force-hdr", FALSE, NULL);
++  set_fixture_force_hdr (debug, monitor_manager, FALSE);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 700);
++  g_assert_true (meta_color_device_get_color_state (device) == encoding);
++  g_assert_cmpuint (color_changes, ==, 0);
+   emit_sync_event (3);
+ 
+   wait_for_sync_point (4);
+-- 
+2.54.0 (Apple Git-157)
+
