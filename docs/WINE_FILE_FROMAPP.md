@@ -1,7 +1,7 @@
 # Wine file API — desktop compatibility for processor investigation
 
-**State:** source candidate compiled; adversarial review and runtime checks
-pending. Companion to the historical [API diagnostic](WINE_API_CONTRACT.md).
+**State:** source candidate compiled, independently reviewed and focused
+runtime contract passed. Companion to the historical [API diagnostic](WINE_API_CONTRACT.md).
 This implements a missing Wine function; it does not qualify Dolby activation
 or full Dolby Vision.
 
@@ -47,8 +47,8 @@ network access is disconnected after authenticated dependency installation.
 Source archives carry no repository metadata or credentials.
 
 The PE export set adds one name and removes none; no ordinal-stability claim
-is made. Compiler and artifact hashes will accompany the final validation
-receipt. Native Windows execution is unavailable and remains a distinct
+is made. Compiler and artifact hashes are recorded in the validation
+receipts. Native Windows execution is unavailable and remains a distinct
 qualification limit.
 
 ## Focused runtime and evidence limits
@@ -68,13 +68,23 @@ run with a fresh private prefix, no network or display access, an unprivileged
 UID and a bounded deadline. This is a component test fixture, not a distributed
 Wine runtime or host package installation.
 
-Run the focused check only after final adversarial review. Passing file-API
-behaviour would remove one demonstrated compatibility boundary; it would not
-prove that the OEM component can activate or process frames. A subsequent
-bounded [activation experiment](DOLBY_ACTIVATION_PROBE.md) must record its own
+The focused check passed after final adversarial review: 123 assertions, no
+failures or skips. Both entry paths resolved the same loaded candidate module
+and the expected function offset. This removes one demonstrated compatibility
+boundary; it does not prove that the OEM component can activate or process
+frames. A subsequent bounded [activation experiment](DOLBY_ACTIVATION_PROBE.md) must record its own
 next boundary. Keep OEM components, raw logs and all proprietary tools private.
 
 The [compile receipt](../evidence/wine-file-fromapp-compile.json) binds the
 final source, DLL and test executable hashes. It records the complete signed
-WineHQ runtime fixture and static import/export comparison. Runtime tests are
-held until independent review; compilation alone does not prove API behaviour.
+WineHQ runtime fixture and static import/export comparison. The
+[runtime receipt](../evidence/wine-file-fromapp-runtime.json) records the passing desktop API contract, artifact identity and isolated runtime.
+
+The test fixture requires an available UTF-8 locale (`LC_ALL=C.UTF-8`). The
+container defaulted to ASCII: ordinary `CreateFileW` and the new entry point
+both failed to create the same Unicode filename. A focused diagnostic verified
+correct UTF-16 bytes, an existing parent directory and successful ASCII creation
+before changing the locale. An earlier runner also imposed a process-wide file
+size cap that truncated Wine prefix files. Bounded log drainers replaced that
+cap. These were private harness corrections; the reviewed source, DLL and test
+executable remained unchanged. Failed attempts remain in private evidence.

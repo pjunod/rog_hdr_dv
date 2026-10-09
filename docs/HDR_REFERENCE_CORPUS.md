@@ -62,8 +62,8 @@ processing options separately from this generic input manifest.
 
 Official tools, documentation, generated processing metadata and reference
 outputs remain private. Public repository code supplies generic inputs and
-sanitized evidence only. The first proposed experiment compares explicit
-reference targets while holding source encoding constant. A single target
+sanitized evidence only. The first private reference experiment completed
+successfully with explicit target comparisons and fixed source encoding. A single target
 peak is not a model of the panel's complete area-dependent luminance response.
 Tool-based numerical comparisons and physical calibration are separate stages.
 
@@ -80,5 +80,10 @@ python3 -B -m unittest discover -s tests -p test_generate_hdr_corpus.py
 
 All 11 focused tests passed on the first run after independent review; the
 [test receipt](../evidence/hdr-corpus-tests.json) binds the checked source.
-Actual reference-tool processing is a separate private experiment. [Status](STATUS.md) records the current
-acceptance boundary. No reference output has been produced or compared yet.
+The separate private reference experiment has completed. Its tool-generated
+metadata and rendered outputs were retained with source and artifact hashes;
+the owned processing container and runtime image were removed. Proprietary
+processing details, outputs and numerical comparisons remain private. This
+establishes a reference workflow, not a real-time playback processor, creative
+trim qualification or measured panel accuracy. [Status](STATUS.md) records the
+current acceptance boundary.

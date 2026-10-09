@@ -1,131 +1,73 @@
 {
-  "scope": "Native firmware-declared HDR target luminance; ARM64 compile only",
-  "status": "wayland_root_cause_fixed_compiled_review_retries_held",
-  "tests_executed": true,
-  "host_packages_installed": false,
-  "live_display_changes": false,
-  "source_transfer": "git archive only; no repository metadata, credentials or OEM data",
-  "image": "ubuntu@sha256:73b76549166d2d32444ccbd2b79b34381a1b3e25fd150cdd7fb12383fe7ebdc2",
-  "architecture": "aarch64",
-  "distribution": "Ubuntu 26.10 stonking",
+  "status": "PASS",
+  "scope": "Linux ARM64 source-only compilation; production and focused regression binaries; no package delivery claim",
   "mutter": {
     "base_commit": "f8b71478843220c0de2d68b73add82231c6f3909",
-    "commit": "113f7f4330f9a49e9f6f4be254f111ee2443b8fb",
-    "tree": "d55c5d37e76b0181ae5158adb5be18b55295becc",
-    "archive_sha256": "2691d92070ace4aa4e0b54ae00a9315a76369c9791aea996312e19e66dbbd901",
-    "branch": "codex/output-target-volume",
-    "commits": [
-      "384ac30",
-      "122d37d",
-      "dea8fd0",
-      "9c10145",
-      "a04bc3e",
-      "113f7f4"
-    ],
-    "configure": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled LD_LIBRARY_PATH=/work/build/libdisplay-physical meson setup /work/build/mutter-target /work/source/mutter-baseline -Dremote_desktop=true -Dwerror=true",
-    "compile": "ninja -j2 -C /work/build/mutter-target src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
-    "compile_exit": 0,
-    "compile_started_utc": "2026-10-09T05:16:30Z",
-    "compile_finished_utc": "2026-10-09T05:16:31Z",
-    "integrity": {
-      "files_verified": 2302,
-      "exact_final_archive": true,
-      "binaries": {
-        "src/libmutter-51.so.0.0.0": "c685dd28e157c4113f536b176b4c14ad9dd118955b656a9fcb0565b191eaebfd",
-        "src/tests/mutter-native-hdr": "44e441e63ed6de6034628b0c98d996184ab1f9e98834b674269612c4b93a04d4",
-        "src/tests/mutter-wayland-color-management": "314ce35862bc01a375dbf6aed9b2287be57d73b9fefec07c243d7281a44fdfbd",
-        "src/tests/wayland-test-clients/color-management": "ea584c9f6fc89af2179cf565aa8c65174b055646f6e7adf43dba08d59bd3f85c"
-      }
-    },
-    "archive_path": "/private/tmp/mutter-target-teardown-final.tar"
+    "commit": "4db354c816e7ac72091a246b7b2eb8adee9a9412",
+    "tree": "08611d1053a276779b47f8f9151dd528f51a653e",
+    "source_archive_sha256": "da0783d410f948b95c06a2a9d1603f536e8ec476a65c92dd417571b2021c99b2",
+    "tracked_files_and_symlinks_verified": 2302
   },
   "library": {
     "commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
     "tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
-    "archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c",
-    "configure": "meson setup /work/build/libdisplay-physical /work/source/libdisplay-physical -Dwerror=true",
-    "compile": "ninja -j2 -C /work/build/libdisplay-physical libdisplay-info.so.0.3.0",
-    "compile_exit": 0,
-    "targets": 15,
-    "selection": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled; LD_LIBRARY_PATH=/work/build/libdisplay-physical",
-    "runtime_resolution": "ELF RPATH and ldd resolve /work/build/libdisplay-physical/libdisplay-info.so.3",
-    "build_layout_correction": "generated uninstalled.pc requires build/include -> source/include symlink"
+    "source_archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c",
+    "linkage": "Source-built shared library; explicit new-function API configure/link requirement, not numeric version alone",
+    "configure_command": "meson setup /work/build/libdisplay-physical /work/source/libdisplay-physical -Dwerror=true",
+    "compile_command": "ninja -j2 -C /work/build/libdisplay-physical libdisplay-info.so.0.3.0",
+    "runtime_resolution": "ELF RPATH and ldd resolve /work/build/libdisplay-physical/libdisplay-info.so.3"
   },
-  "gvdb_commit": "b54bc5da25127ef416858a3ad92e57159ff565b3",
-  "compiler": "cc (Ubuntu 15.3.0-4ubuntu1) 15.3.0",
-  "linker": "GNU ld 2.47",
-  "meson": "1.10.1",
-  "ninja": "1.13.2",
-  "effective_options": {
-    "buildtype": "debug",
+  "environment": {
+    "distribution": "Ubuntu26.10 stonking ARM64",
+    "image_digest": "sha256:73b76549166d2d32444ccbd2b79b34381a1b3e25fd150cdd7fb12383fe7ebdc2",
+    "compiler": "GCC15.3.0 Ubuntu15.3.0-4ubuntu1",
+    "linker": "GNU ld2.47",
+    "meson": "1.10.1",
+    "ninja": "1.13.2",
+    "authenticated_guest_dependencies": true
+  },
+  "options": {
     "werror": true,
-    "b_ndebug": false,
-    "optimization": "0",
-    "remote_desktop": true
+    "buildtype": "debug",
+    "assertions_enabled": true,
+    "parallel_jobs": 2
   },
-  "dependency_preparation": {
-    "authentication": "default Ubuntu signed apt metadata, no authentication bypass",
-    "command": "DEBIAN_FRONTEND=noninteractive apt-get -y --no-install-recommends build-dep mutter",
-    "extra_build_inputs": [
-      "hwdata",
-      "git"
-    ],
-    "dependency_inventory": "dependencies.tsv",
-    "versions": {
-      "glib": "2.90.0",
-      "schemas": "51.0",
-      "wayland": "1.26.0",
-      "wayland_protocols": "1.49",
-      "libinput": "1.31.3",
-      "libei": "1.5.0",
-      "pipewire": "1.6.8"
-    }
-  },
-  "limitations": [
-    "ARM64 compile evidence only; no amd64 package qualification",
-    "No test binaries executed; commands held for adversarial review",
-    "No optical measurements or calibration claims",
-    "No live display, host packages, credentials, OEM data or owner source changes"
-  ],
-  "formatting": {
-    "tool": "Uncrustify-0.78.1_f",
-    "check": "python3 check-style.py --dry-run --sha HEAD^",
-    "exit": 0,
-    "source": "teardown correction official formatter unchanged; dry-run exit0",
-    "token_sequences_unchanged": true
-  },
-  "new_exports": {
+  "configure_command": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled LD_LIBRARY_PATH=/work/build/libdisplay-physical meson setup /work/build/mutter-target /work/source/mutter-baseline -Dremote_desktop=true -Dwerror=true",
+  "compile_command": "ninja -j2 -C /work/build/mutter-target src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
+  "exit": 0,
+  "new_symbols": {
     "meta_color_device_get_color_state": "51.0-1ubuntu3+nativehdr3~",
     "meta_color_device_get_target_luminance": "51.0-1ubuntu3+nativehdr3~",
     "meta_color_device_update": "51.0-1ubuntu3+nativehdr3~",
     "meta_color_target_luminance_init": "51.0-1ubuntu3+nativehdr3~"
   },
-  "held_regressions": [
-    "/native-hdr/complete-tuple-and-kms-gates",
-    "/native-hdr/cta-authority",
-    "/native-hdr/diagnostics",
-    "/native-hdr/scoped-extension-failures",
-    "/native-hdr/fatal-base",
-    "/native-hdr/cta-preserved-with-extension-failure",
-    "/native-hdr/physical-luminance",
-    "/native-hdr/target-luminance-policy",
-    "/wayland/color-management",
-    "/wayland/target-luminance/v1",
-    "/wayland/target-luminance/v2"
-  ],
-  "correction": "After output table refresh/removal inerting, refresh all immutable output records before preferences; primary-only fallback switch/removal regression; fallback assertions reference exact encoding max; wire-width equality boundary rejects min>=floor(max).",
-  "fixture_correction": "Global force-HDR phases explicitly expect second-output changes/done; native-only phases retain quiet checks. Fresh other-output current snapshot immediately before primary topology; original snapshot retained and repeatedly checked immutable.",
-  "focused_results": "focused-receipt-a04bc3e.json: 8nativePASS, 3WaylandFAIL first attempts; initial8preflight invocations and one diagnostic separate. No qualification retries yet.",
-  "diagnostic": {
-    "authorization": "One bounded rerun of FAILED existing Wayland path only; diagnostic, not qualification",
-    "source_commit": "a04bc3ecde3f425cd90d4017c57ad2840475682f",
-    "gdb": "17.2-1ubuntu1 installed guest-only using authenticated Ubuntu apt",
-    "trace_file": "diagnostic-teardown-full.txt",
-    "trace_sha256": "e6968d96918548dfbb16a4a226186de95d0ec5174b259b9036bd9169f28ae34a",
-    "runner_log_sha256": "c098669e127e4013308a39109b249b99774f55ed82b00c44bae832503c9e5a23",
-    "result": "Confirmed SIGSEGV in g_signal_handler_disconnect from output_free during color_manager_dispose invoked after compositor outputs finalized."
+  "compiled_binary_sha256": {
+    "src/libmutter-51.so.0.0.0": "c685dd28e157c4113f536b176b4c14ad9dd118955b656a9fcb0565b191eaebfd",
+    "src/tests/mutter-native-hdr": "44e441e63ed6de6034628b0c98d996184ab1f9e98834b674269612c4b93a04d4",
+    "src/tests/mutter-wayland-color-management": "d9b10e7fc9b6cc1567cf3d8eb34a77727d621b048acb2d3a3093ee5b3dd9a03f",
+    "src/tests/wayland-test-clients/color-management": "ea584c9f6fc89af2179cf565aa8c65174b055646f6e7adf43dba08d59bd3f85c"
   },
-  "root_cause_fix": "Explicit color-management finalization before outputs destruction; manager owns/destroys protocol global. Fixture sync helper remains strict, serials consecutive0..9.",
+  "formatting": {
+    "uncrustify": "0.78.1_f",
+    "project_check_style_exit": 0,
+    "final_delta_from_reviewed_922fcac": "Formatting only; identical C token sequences including literals/comments"
+  },
+  "runtime_receipt": "mutter-target-runtime.json",
+  "limitations": [
+    "ARM64 compile evidence is not amd64 package qualification",
+    "No physical measurements, calibration, installation or live-display changes",
+    "No credentials, repository metadata or OEM data transferred"
+  ],
+  "schema_version": 1,
   "date": "2026-10-09",
-  "schema_version": 1
+  "gvdb_commit": "b54bc5da25127ef416858a3ad92e57159ff565b3",
+  "dependency_versions": {
+    "glib": "2.90.0",
+    "schemas": "51.0",
+    "wayland": "1.26.0",
+    "wayland_protocols": "1.49",
+    "libinput": "1.31.3",
+    "libei": "1.5.0",
+    "pipewire": "1.6.8"
+  }
 }

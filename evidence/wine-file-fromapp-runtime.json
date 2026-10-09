@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "source_commit": "68c5cce867c8c5dc7e318eefc4c13f832d0471fa",
+  "source_tree": "387cfcb18f0870100227fe059d804f2c16249c89",
+  "runtime": "WineHQ11.0.0.0~noble-1 complete signed-package fixture",
+  "platform": "native-linux-amd64",
+  "test_entry": "kernelbase_test.exe file_fromapp",
+  "result": "PASS",
+  "wine_exit_status": 0,
+  "assertions": 123,
+  "failures": 0,
+  "skips": 0,
+  "todo": 0,
+  "flaky": 0,
+  "module_proof": {
+    "entry_paths": [
+      "kernelbase.dll",
+      "api-ms-win-core-file-fromapp-l1-1-0.dll"
+    ],
+    "same_module": true,
+    "resolved_function_rva": "0x13f00",
+    "loaded_path": "C:\\windows\\system32\\kernelbase.dll",
+    "loaded_kind": "builtin",
+    "kernelbase_sha256": "deb6b2218e05cca05319140a6a35cec1d2a90e1c45b16828e192d7456f223b32",
+    "test_exe_sha256": "f5a59ee7e9aea85ea3e7f2eda7352593f21e6b85816fb40a309e99b262de9055",
+    "pre_post_hashes_match": true
+  },
+  "isolation": {
+    "host": "lab5",
+    "uid": 1000,
+    "network_count": 0,
+    "mount_count": 0,
+    "gpu_devices": false,
+    "privileged": false,
+    "max_cpus": 1,
+    "max_memory_gib": 2,
+    "extra_swap_gib": 0,
+    "nice": 10,
+    "whole_experiment_deadline_seconds": 120,
+    "force_kill_grace_seconds": 5,
+    "wine_deadline_seconds": 90,
+    "capture_limit_bytes_per_stream": 2097152,
+    "locale": "C.UTF-8",
+    "owned_prefix_server_stopped": true
+  },
+  "fixture_failures_preserved": {
+    "preflight": "dash ulimit short-option syntax, before runtime",
+    "startup": "global RLIMIT_FSIZE truncated fresh-prefix files; no API assertions",
+    "first_assertion_run": "51 checks/28 failures/0skips under ASCII C locale; ordinary CreateFileW Unicode reference also failed"
+  },
+  "corrections": "private runner only; source/DLL/testPE unchanged",
+  "raw_logs": "private; not for publication",
+  "limits": [
+    "Wine desktop process-model API compatibility only",
+    "native Windows baseline unavailable",
+    "no AppContainer-security qualification",
+    "no i386 runtime qualification",
+    "no OEM processor execution",
+    "no Dolby Vision qualification"
+  ]
+}

@@ -1,6 +1,6 @@
 # Mutter target luminance — independent output feedback
 
-**Status:** implemented and compiled; adversarial review in progress. **Date:** 2026-10-09.
+**Status:** implemented, compiled, independently reviewed; all eleven selected checks passed. **Date:** 2026-10-09.
 The coordinator owns design and integration; the implementation agent owns its
 independent source clone. [Status](STATUS.md) records current qualification.
 
@@ -88,8 +88,8 @@ Ubuntu ARM64 container before source edits. The candidate links the new library 
 a separate source build; stock library version numbers cannot prove availability
 of the unpublished API. No host package or live display state is changed.
 
-Independent adversarial review now precedes focused tests.
-Regressions must cover valid and absent/conflicting data, route eligibility,
+Independent adversarial review preceded focused tests.
+The selected regressions cover valid and absent/conflicting data, route eligibility,
 unchanged encoding and reference white, target-only notification, old snapshot
 immutability, both identity versions, preferred/output agreement, primary
 fallback surfaces and output completion. Rebuilds and test receipts must bind
@@ -106,6 +106,23 @@ series is unchanged; this batch does not claim an upstream port.
 
 The [compiler receipt](../evidence/mutter-target-compile.json) records the
 exact source tree, archive and binary hashes, warnings-as-errors build, linked
-hdr7 source, exported symbols and compile-only boundary. The current candidate
+hdr7 source and exported symbols. The separate
+[runtime receipt](../evidence/mutter-target-runtime.json) records all eleven
+selected passing paths and their source identities. The current candidate
 is ARM64 source qualification; amd64/i386 library packaging and amd64 Mutter
 package qualification remain separate.
+
+Eight native paths passed on the initial runtime candidate. The first Wayland
+run exposed a shutdown lifetime bug; its backtrace identified output-signal
+disconnection after output objects were freed. Explicit colour-manager
+finalization now precedes output teardown, after canonical client shutdown.
+The existing Wayland regression then passed, including teardown.
+
+The new version 1/2 fixtures required consecutive synchronization serials and
+isolation of synthetic manually assigned HDR mode from real monitor-manager
+reconfiguration. Only the exact reconfiguration handler is blocked during each
+synchronous force-HDR setting change and immediately restored. Device
+notifications remain active. These tests qualify target policy on a fixed
+synthetic route, not real mode changes. Both passed after independent delta
+review. Earlier passing paths were preserved where subsequent changes did not
+alter their tested behavior; the receipt records this scope explicitly.
