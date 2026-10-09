@@ -33,8 +33,8 @@ source trees. The source-only candidate is not installed on the host.
 | Identity | Value |
 |---|---|
 | Base | Wine `wine-11.0`, `db11d0fe6a169c457e23d007e20404643d067aa8` |
-| Candidate | `c9e7fcb1ba29cd64c5f50f4c0ccc6f0fc74461a6` |
-| Candidate tree | `1167392e749db729ac002ac62f068a50932db6d2` |
+| Candidate | `68c5cce867c8c5dc7e318eefc4c13f832d0471fa` |
+| Candidate tree | `387cfcb18f0870100227fe059d804f2c16249c89` |
 | Build | Native Linux amd64, GCC 13.3.0 and MinGW GCC 13 win32 |
 | Configure | `--enable-win64 --enable-werror --without-x --without-wayland` |
 | Targets | `make -j1 dlls/kernelbase/all dlls/kernelbase/tests/all` |
