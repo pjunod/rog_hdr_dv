@@ -60,6 +60,7 @@ any live compositor or kernel update.
   local changes from authenticated Ubuntu source imports, including the
   delivered prefixes and explicitly marked unreleased candidates. These are alternative packaging paths to the upstream series.
 - `patches/linux/` — four native luminance/backlight/parser-test patches.
+- `patches/wine/` — bounded Windows API compatibility work for processor investigation.
 - `sources.json` · `SHA256SUMS` — source identities and patch integrity.
 - `docs/` — maintained technical documentation, indexed above.
 - `evidence/` — small reproducible migration/validation receipts. Large or

@@ -1,0 +1,283 @@
+From c9e7fcb1ba29cd64c5f50f4c0ccc6f0fc74461a6 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 00:37:37 -0400
+Subject: [PATCH] kernelbase: implement CreateFileFromAppW for desktop
+ processes
+
+---
+ dlls/kernelbase/file.c               |  11 ++
+ dlls/kernelbase/kernelbase.spec      |   1 +
+ dlls/kernelbase/tests/Makefile.in    |   1 +
+ dlls/kernelbase/tests/file_fromapp.c | 214 +++++++++++++++++++++++++++
+ 4 files changed, 227 insertions(+)
+ create mode 100644 dlls/kernelbase/tests/file_fromapp.c
+
+diff --git a/dlls/kernelbase/file.c b/dlls/kernelbase/file.c
+index e271b03..bab8d1f 100644
+--- a/dlls/kernelbase/file.c
++++ b/dlls/kernelbase/file.c
+@@ -745,6 +745,17 @@ HANDLE WINAPI DECLSPEC_HOTPATCH CreateFile2( LPCWSTR name, DWORD access, DWORD s
+ }
+ 
+ 
++/*************************************************************************
++ *	CreateFileFromAppW   (kernelbase.@)
++ */
++HANDLE WINAPI DECLSPEC_HOTPATCH CreateFileFromAppW( LPCWSTR name, DWORD access, DWORD sharing,
++                                                    LPSECURITY_ATTRIBUTES sa, DWORD creation,
++                                                    DWORD attributes, HANDLE template )
++{
++    /* AppContainer file-access brokerage is not implemented. */
++    return CreateFileW( name, access, sharing, sa, creation, attributes, template );
++}
++
+ /*************************************************************************
+  *	CreateFileA   (kernelbase.@)
+  */
+diff --git a/dlls/kernelbase/kernelbase.spec b/dlls/kernelbase/kernelbase.spec
+index 28c5376..00429f1 100644
+--- a/dlls/kernelbase/kernelbase.spec
++++ b/dlls/kernelbase/kernelbase.spec
+@@ -192,6 +192,7 @@
+ @ stdcall CreateFiberEx(long long long ptr ptr)
+ @ stdcall CreateFile2(wstr long long long ptr)
+ @ stdcall CreateFileA(str long long ptr long long long)
++@ stdcall CreateFileFromAppW(wstr long long ptr long long long)
+ @ stdcall CreateFileMapping2(long ptr long long long int64 wstr ptr long)
+ @ stdcall CreateFileMappingFromApp(long ptr long int64 wstr)
+ @ stdcall CreateFileMappingNumaW(long ptr long long long wstr long)
+diff --git a/dlls/kernelbase/tests/Makefile.in b/dlls/kernelbase/tests/Makefile.in
+index 5362d96..b42385e 100644
+--- a/dlls/kernelbase/tests/Makefile.in
++++ b/dlls/kernelbase/tests/Makefile.in
+@@ -2,6 +2,7 @@ TESTDLL   = kernelbase.dll
+ 
+ SOURCES = \
+ 	file.c \
++	file_fromapp.c \
+ 	memory.c \
+ 	path.c \
+ 	process.c \
+diff --git a/dlls/kernelbase/tests/file_fromapp.c b/dlls/kernelbase/tests/file_fromapp.c
+new file mode 100644
+index 0000000..c0362b6
+--- /dev/null
++++ b/dlls/kernelbase/tests/file_fromapp.c
+@@ -0,0 +1,214 @@
++/*
++ * Tests for desktop CreateFileFromAppW compatibility
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#include <stdarg.h>
++#include <string.h>
++#include <wchar.h>
++
++#include "windef.h"
++#include "winbase.h"
++#include "winerror.h"
++#include "wine/test.h"
++
++typedef HANDLE (WINAPI *create_file_from_app)(LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES,
++                                             DWORD, DWORD, HANDLE);
++
++static const char contents[] = {'a', 0, (char)0xfe, 'z'};
++
++static void test_dispositions(create_file_from_app create_file, const WCHAR *path)
++{
++    static const struct
++    {
++        DWORD creation;
++        BOOL exists, success;
++        DWORD error, size;
++    } cases[] =
++    {
++        {CREATE_NEW,        FALSE, TRUE,  0,                    0},
++        {CREATE_NEW,        TRUE,  FALSE, ERROR_FILE_EXISTS,     sizeof(contents)},
++        {CREATE_ALWAYS,     FALSE, TRUE,  0,                    0},
++        {CREATE_ALWAYS,     TRUE,  TRUE,  ERROR_ALREADY_EXISTS,  0},
++        {OPEN_EXISTING,     FALSE, FALSE, ERROR_FILE_NOT_FOUND,  0},
++        {OPEN_EXISTING,     TRUE,  TRUE,  0,                     sizeof(contents)},
++        {OPEN_ALWAYS,       FALSE, TRUE,  0,                    0},
++        {OPEN_ALWAYS,       TRUE,  TRUE,  ERROR_ALREADY_EXISTS,  sizeof(contents)},
++        {TRUNCATE_EXISTING, FALSE, FALSE, ERROR_FILE_NOT_FOUND,  0},
++        {TRUNCATE_EXISTING, TRUE,  TRUE,  0,                    0},
++    };
++    HANDLE file;
++    DWORD error, written;
++    unsigned int i;
++    BOOL ret;
++
++    for (i = 0; i < ARRAY_SIZE(cases); ++i)
++    {
++        winetest_push_context("creation %lu, exists %d", cases[i].creation, cases[i].exists);
++        DeleteFileW(path);
++        if (cases[i].exists)
++        {
++            file = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
++                               NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++            ok(file != INVALID_HANDLE_VALUE, "Failed to prepare file, error %lu.\n", GetLastError());
++            if (file == INVALID_HANDLE_VALUE)
++            {
++                winetest_pop_context();
++                continue;
++            }
++            ret = WriteFile(file, contents, sizeof(contents), &written, NULL);
++            ok(ret && written == sizeof(contents), "Failed to prepare contents, error %lu.\n", GetLastError());
++            CloseHandle(file);
++        }
++        SetLastError(0xdeadbeef);
++        file = create_file(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
++                           NULL, cases[i].creation, FILE_ATTRIBUTE_NORMAL, NULL);
++        error = GetLastError();
++        ok((file != INVALID_HANDLE_VALUE) == cases[i].success,
++           "Unexpected handle %p, error %lu.\n", file, error);
++        /* Last-error on other successful dispositions is not specified here. */
++        if (!cases[i].success || cases[i].creation == CREATE_ALWAYS || cases[i].creation == OPEN_ALWAYS)
++            ok(error == cases[i].error, "Expected error %lu, got %lu.\n", cases[i].error, error);
++        if (file != INVALID_HANDLE_VALUE)
++        {
++            DWORD size = GetFileSize(file, NULL);
++            ok(size == cases[i].size, "Expected size %lu, got %lu.\n", cases[i].size, size);
++            CloseHandle(file);
++        }
++        ok((GetFileAttributesW(path) != INVALID_FILE_ATTRIBUTES) == (cases[i].exists || cases[i].success),
++           "Unexpected file existence.\n");
++        winetest_pop_context();
++    }
++    DeleteFileW(path);
++    SetLastError(0xdeadbeef);
++    file = create_file(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, 0, FILE_ATTRIBUTE_NORMAL, NULL);
++    error = GetLastError();
++    ok(file == INVALID_HANDLE_VALUE, "Invalid creation returned handle %p.\n", file);
++    ok(error == ERROR_INVALID_PARAMETER, "Expected invalid parameter, got %lu.\n", error);
++    if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
++    ok(GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES, "Invalid creation created a file.\n");
++    DeleteFileW(path);
++}
++
++static void test_access_and_flags(create_file_from_app create_file, const WCHAR *path)
++{
++    SECURITY_ATTRIBUTES sa = {sizeof(sa), NULL, TRUE};
++    HANDLE file, other;
++    DWORD flags, count, error;
++    char buffer[sizeof(contents)];
++    BOOL ret;
++
++    file = create_file(path, GENERIC_READ | GENERIC_WRITE, 0, &sa, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "Create failed, error %lu.\n", GetLastError());
++    if (file == INVALID_HANDLE_VALUE) return;
++    flags = 0;
++    ret = GetHandleInformation(file, &flags);
++    ok(ret && (flags & HANDLE_FLAG_INHERIT), "Expected inheritable handle, flags %#lx.\n", flags);
++    ret = WriteFile(file, contents, sizeof(contents), &count, NULL);
++    ok(ret && count == sizeof(contents), "Write failed, error %lu.\n", GetLastError());
++    SetFilePointer(file, 0, NULL, FILE_BEGIN);
++    memset(buffer, 0, sizeof(buffer));
++    ret = ReadFile(file, buffer, sizeof(buffer), &count, NULL);
++    ok(ret && count == sizeof(contents) && !memcmp(buffer, contents, sizeof(contents)),
++       "Unexpected contents, error %lu.\n", GetLastError());
++    SetLastError(0xdeadbeef);
++    /* A valid template handle is ignored when opening an existing file. */
++    other = create_file(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
++                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, file);
++    error = GetLastError();
++    ok(other == INVALID_HANDLE_VALUE, "Exclusive sharing returned handle %p.\n", other);
++    ok(error == ERROR_SHARING_VIOLATION, "Expected sharing violation, got %lu.\n", error);
++    if (other != INVALID_HANDLE_VALUE) CloseHandle(other);
++    CloseHandle(file);
++
++    file = create_file(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "Read-only open failed, error %lu.\n", GetLastError());
++    if (file != INVALID_HANDLE_VALUE)
++    {
++        flags = HANDLE_FLAG_INHERIT;
++        ret = GetHandleInformation(file, &flags);
++        ok(ret && !(flags & HANDLE_FLAG_INHERIT), "Unexpected inheritable handle, flags %#lx.\n", flags);
++        SetLastError(0xdeadbeef);
++        ret = WriteFile(file, contents, sizeof(contents), &count, NULL);
++        error = GetLastError();
++        ok(!ret, "Write through read-only handle succeeded.\n");
++        ok(error == ERROR_ACCESS_DENIED, "Expected access denied, got %lu.\n", error);
++        CloseHandle(file);
++    }
++    DeleteFileW(path);
++    file = create_file(path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
++                       NULL, CREATE_NEW, FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE, NULL);
++    ok(file != INVALID_HANDLE_VALUE, "Delete-on-close create failed, error %lu.\n", GetLastError());
++    if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
++    ok(GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES, "File survived closing its handle.\n");
++    DeleteFileW(path);
++}
++
++START_TEST(file_fromapp)
++{
++    static const char *modules[] = {"kernelbase.dll", "api-ms-win-core-file-fromapp-l1-1-0.dll"};
++    WCHAR temp_path[MAX_PATH], directory[MAX_PATH], path[MAX_PATH];
++    create_file_from_app create_file;
++    HMODULE module;
++    unsigned int i;
++    DWORD length;
++    BOOL ret;
++
++    /* These ordinary desktop tests do not qualify AppContainer brokerage. */
++    length = GetTempPathW(ARRAY_SIZE(temp_path), temp_path);
++    ok(length && length < ARRAY_SIZE(temp_path), "Unexpected temporary path length %lu.\n", length);
++    if (!length || length >= ARRAY_SIZE(temp_path)) return;
++    ret = GetTempFileNameW(temp_path, L"wfa", 0, directory);
++    ok(ret, "Failed to reserve temporary directory, error %lu.\n", GetLastError());
++    if (!ret) return;
++    ret = DeleteFileW(directory);
++    ok(ret, "Failed to remove temporary reservation, error %lu.\n", GetLastError());
++    if (!ret) return;
++    ret = CreateDirectoryW(directory, NULL);
++    ok(ret, "Failed to create temporary directory, error %lu.\n", GetLastError());
++    if (!ret) return;
++    if (wcslen(directory) + ARRAY_SIZE(L"\\file-\x00e9-\x03bb.tmp") > ARRAY_SIZE(path))
++    {
++        skip("Temporary path is too long.\n");
++        RemoveDirectoryW(directory);
++        return;
++    }
++    wcscpy(path, directory);
++    wcscat(path, L"\\file-\x00e9-\x03bb.tmp");
++    for (i = 0; i < ARRAY_SIZE(modules); ++i)
++    {
++        winetest_push_context("%s", modules[i]);
++        module = LoadLibraryA(modules[i]);
++        if (!module)
++            win_skip("Module unavailable, error %lu.\n", GetLastError());
++        else
++        {
++            create_file = (void *)GetProcAddress(module, "CreateFileFromAppW");
++            if (!create_file)
++                win_skip("CreateFileFromAppW unavailable, error %lu.\n", GetLastError());
++            else
++            {
++                test_dispositions(create_file, path);
++                test_access_and_flags(create_file, path);
++            }
++            FreeLibrary(module);
++        }
++        DeleteFileW(path);
++        winetest_pop_context();
++    }
++    ret = RemoveDirectoryW(directory);
++    ok(ret, "Failed to remove temporary directory, error %lu.\n", GetLastError());
++}
+-- 
+2.54.0 (Apple Git-157)
+
