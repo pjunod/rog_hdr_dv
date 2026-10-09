@@ -34,7 +34,13 @@ and renderer state; earlier image descriptions must remain immutable.
 This first compositor slice leaves CTA target policy, colour primaries, tone
 mapping, ICC application and KMS content metadata for their own evidence-based
 changes. Source compilation is not a live display update or optical result.
-Review and focused compositor checks will follow the completed candidate.
+The same source batch includes a [normal Wine file-API implementation](WINE_FILE_FROMAPP.md)
+for the missing `CreateFileFromAppW` function, plus a generic synthetic HDR
+reference-corpus generator in development. The Wine baseline and candidate
+compiled in an isolated, resource-limited native amd64 environment. Runtime
+behaviour remains untested pending review.
+
+Review and focused checks will follow the completed candidate.
 
 ## Third batch — native physical-luminance API merged
 

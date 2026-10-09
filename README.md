@@ -35,6 +35,8 @@ target-volume reporting, calibration and KMS metadata in pinned source.
 physical-declaration API and its source-only qualification boundary.
 [Mutter target feedback](docs/MUTTER_TARGET_LUMINANCE.md) specifies independent
 physical-target state, immutable descriptions and their qualification.
+[Wine file API implementation](docs/WINE_FILE_FROMAPP.md) scopes the missing
+function correction and its desktop-only compatibility evidence.
 
 ## Work with the repository
 
