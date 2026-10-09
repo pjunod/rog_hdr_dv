@@ -1,0 +1,424 @@
+From 0444a7b1e66cea60ed17e2cf893e8a2784da8a8f Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 02:18:55 -0400
+Subject: [PATCH 7/8] Add lossless native DisplayID2 chromaticity declarations
+
+---
+ displayid2.c                            |  58 ++++++
+ include/displayid2.h                    |   2 +
+ include/libdisplay-info/displayid2.h    |  44 +++++
+ test/displayid2-native-chromaticities.c | 241 ++++++++++++++++++++++++
+ test/meson.build                        |   7 +
+ 5 files changed, 352 insertions(+)
+ create mode 100644 test/displayid2-native-chromaticities.c
+
+diff --git a/displayid2.c b/displayid2.c
+index dfd46df..4d295de 100644
+--- a/displayid2.c
++++ b/displayid2.c
+@@ -169,6 +169,54 @@ parse_luminance(struct di_displayid2_data_block *block,
+ 		decode_luminance(data + 0x1C, &luminance->min_luminance);
+ }
+ 
++static void
++decode_chromaticity(struct di_displayid2_chromaticity_point *point,
++		   const uint8_t data[3], bool cie1976)
++{
++	int32_t denominator;
++
++	point->a = (uint16_t) (data[0] | ((data[1] & 0x0F) << 8));
++	point->b = (uint16_t) ((data[1] >> 4) | (data[2] << 4));
++	if (!cie1976) {
++		point->valid = point->b > 0 && point->a + point->b <= 4096;
++		return;
++	}
++
++	/* xy = (9u', 4v') / (6u' - 16v' + 12). Keep domain checks
++	 * integral, including exact x+y=1 boundaries. */
++	denominator = 6 * point->a - 16 * point->b + 12 * 4096;
++	point->valid = denominator > 0 && point->b > 0 &&
++		9 * point->a + 4 * point->b <= denominator;
++}
++
++static void
++parse_native_chromaticities(struct di_displayid2_data_block *block,
++			    const uint8_t *data, size_t size)
++{
++	struct di_displayid2_native_chromaticities *chromaticities =
++		&block->native_chromaticities;
++	bool cie1976;
++	size_t i;
++
++	/* Format corroborated by edid-decode at 1316a80455ef70889bea89491f37cd69170f3ee7
++	 * and NVIDIA's parser at 61dcc93722ecb418bb5f2e00923f05b4b8051dd1.
++	 * Complete independent VESA-standard verification remains open. Feature
++	 * bit 5 is not understood; keep that boundary local and without new
++	 * legacy diagnostics. Luminance class is independent of chromaticity. */
++	if (size != DISPLAYID2_DATA_BLOCK_HEADER_SIZE + 29 ||
++	    (data[1] & 0x7F) > 1 || (data[0x0B] & 0x20))
++		return;
++
++	block->has_native_chromaticities_format = true;
++	cie1976 = (data[0x0B] & 0x40) != 0;
++	chromaticities->revision = data[1] & 7;
++	chromaticities->coordinates = cie1976 ? DI_DISPLAYID2_CHROMATICITY_CIE1976 :
++		DI_DISPLAYID2_CHROMATICITY_CIE1931;
++	for (i = 0; i < 3; i++)
++		decode_chromaticity(&chromaticities->primaries[i], data + 0x0C + 3 * i, cie1976);
++	decode_chromaticity(&chromaticities->white_point, data + 0x15, cie1976);
++}
++
+ static ssize_t
+ parse_data_block(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		 size_t size)
+@@ -208,6 +256,7 @@ parse_data_block(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		break;
+ 	case DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS:
+ 		parse_luminance(data_block, data, data_block_size);
++		parse_native_chromaticities(data_block, data, data_block_size);
+ 		break;
+ 	case DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID:
+ 	case DI_DISPLAYID2_DATA_BLOCK_TYPE_VII_TIMING:
+@@ -429,3 +478,12 @@ di_displayid2_data_block_get_luminance(const struct di_displayid2_data_block *da
+ 		return NULL;
+ 	return &data_block->luminance;
+ }
++
++const struct di_displayid2_native_chromaticities *
++di_displayid2_data_block_get_native_chromaticities(const struct di_displayid2_data_block *data_block)
++{
++	if (data_block->tag != DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS ||
++	    !data_block->has_native_chromaticities_format)
++		return NULL;
++	return &data_block->native_chromaticities;
++}
+diff --git a/include/displayid2.h b/include/displayid2.h
+index 78b4761..07cfd0f 100644
+--- a/include/displayid2.h
++++ b/include/displayid2.h
+@@ -51,6 +51,8 @@ struct di_displayid2_data_block {
+ 	/* Optional known-format Display Parameters physical luminance. */
+ 	struct di_displayid2_luminance luminance;
+ 	bool has_luminance_format;
++	struct di_displayid2_native_chromaticities native_chromaticities;
++	bool has_native_chromaticities_format;
+ 
+ 	/* Used for DI_DISPLAYID2_DATA_BLOCK_CTA861 */
+ 	struct {
+diff --git a/include/libdisplay-info/displayid2.h b/include/libdisplay-info/displayid2.h
+index 594379c..c842750 100644
+--- a/include/libdisplay-info/displayid2.h
++++ b/include/libdisplay-info/displayid2.h
+@@ -155,6 +155,50 @@ struct di_displayid2_luminance {
+ const struct di_displayid2_luminance *
+ di_displayid2_data_block_get_luminance(const struct di_displayid2_data_block *data_block);
+ 
++/** Coordinate system of a native chromaticity declaration. */
++enum di_displayid2_chromaticity_coordinates {
++	DI_DISPLAYID2_CHROMATICITY_CIE1931,
++	DI_DISPLAYID2_CHROMATICITY_CIE1976,
++};
++
++/**
++ * Exact unsigned 12-bit binary fractions, with denominator 4096.
++ * a/b mean x/y for CIE 1931 and u'/v' for CIE 1976. Raw counts are
++ * retained even when valid is false. valid means only mathematical usability:
++ * interpreted xy has x >= 0, y > 0 and x + y <= 1. It does not mean presence,
++ * a consistent RGB gamut, measured accuracy, or calibration. Individual zero
++ * counts are not treated as an unavailable-value sentinel.
++ */
++struct di_displayid2_chromaticity_point {
++	uint16_t a, b;
++	bool valid;
++};
++
++/** Firmware-declared native RGB primaries and white point. */
++struct di_displayid2_native_chromaticities {
++	uint8_t revision;
++	enum di_displayid2_chromaticity_coordinates coordinates;
++	struct di_displayid2_chromaticity_point primaries[3]; /* R, G, B */
++	struct di_displayid2_chromaticity_point white_point;
++};
++
++/**
++ * Get native chromaticities from a Display Parameters Data Block.
++ *
++ * Supports the 29-byte payload, revisions 0/1 and image-size unit flag.
++ * Unknown header flags and feature bit 5 are unsupported. Known orientation,
++ * audio and luminance-class fields do not affect chromaticity interpretation.
++ * Returns NULL for another tag or an unsupported format. Individual unusable
++ * points retain their counts and only clear valid; a recognized declaration
++ * is returned even if all four points are unusable. Gamut validation is the
++ * caller's responsibility. These declarations do not imply HDR support.
++ *
++ * The pointer is owned by the parsed DisplayID object for its lifetime.
++ * Existing default-signal primaries and legacy diagnostics are unaffected.
++ */
++const struct di_displayid2_native_chromaticities *
++di_displayid2_data_block_get_native_chromaticities(const struct di_displayid2_data_block *data_block);
++
+ /** Supported RGB/YCbCr 4:4:4 bit-depth flags. */
+ enum di_displayid2_bit_depth_444 {
+ 	DI_DISPLAYID2_BIT_DEPTH_444_6 = 1 << 0,
+diff --git a/test/displayid2-native-chromaticities.c b/test/displayid2-native-chromaticities.c
+new file mode 100644
+index 0000000..ed1cef1
+--- /dev/null
++++ b/test/displayid2-native-chromaticities.c
+@@ -0,0 +1,241 @@
++/* Synthetic declarations exercise the public production-parser API. */
++#include <assert.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#include <libdisplay-info/displayid2.h>
++#include <libdisplay-info/edid.h>
++#include <libdisplay-info/info.h>
++
++static uint8_t base[128];
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static struct di_info *
++parse(const uint8_t *block, size_t size)
++{
++	uint8_t edid[256] = {0}, *ext = edid + 128;
++	struct di_info *info;
++
++	assert(size <= 121);
++	memcpy(edid, base, sizeof(base));
++	edid[126] = 1;
++	checksum(edid, 128);
++	ext[0] = 0x70;
++	ext[1] = 0x20;
++	ext[2] = (uint8_t) size;
++	ext[3] = 2;
++	memcpy(ext + 5, block, size);
++	checksum(ext + 1, size + 5);
++	checksum(ext, 128);
++	info = di_info_parse_edid(edid, sizeof(edid));
++	assert(info);
++	return info;
++}
++
++static const struct di_displayid2_data_block *
++get_block(const struct di_info *info)
++{
++	const struct di_edid_ext *const *exts = di_edid_get_extensions(di_info_get_edid(info));
++	const struct di_displayid2 *d = di_edid_ext_get_displayid2(exts[0]);
++	const struct di_displayid2_data_block *const *blocks;
++
++	assert(d && !exts[1]);
++	blocks = di_displayid2_get_data_blocks(d);
++	return blocks[0];
++}
++
++static void
++put_point(uint8_t *data, uint16_t a, uint16_t b)
++{
++	assert(a < 4096 && b < 4096);
++	data[0] = (uint8_t) a;
++	data[1] = (uint8_t) ((a >> 8) | ((b & 15) << 4));
++	data[2] = (uint8_t) (b >> 4);
++}
++
++static void
++parameters(uint8_t data[33])
++{
++	static const uint16_t points[4][2] = {
++		{2816, 1280}, {1024, 2816}, {512, 256}, {1280, 1344},
++	};
++	size_t i;
++
++	memset(data, 0, 33);
++	data[0] = 0x21;
++	data[2] = 29;
++	for (i = 0; i < 4; i++)
++		put_point(data + 0x0C + 3 * i, points[i][0], points[i][1]);
++	data[0x19] = 0x5E; /* Independent finite luminance. */
++}
++
++static void
++check_known(void)
++{
++	uint8_t data[33];
++	struct di_info *info;
++	const struct di_displayid2_native_chromaticities *c;
++	size_t revision;
++
++	for (revision = 0; revision < 2; revision++) {
++		parameters(data);
++		data[1] = (uint8_t) (revision | 0x80);
++		info = parse(data, 32);
++		assert(!di_info_get_failure_msg(info));
++		c = di_displayid2_data_block_get_native_chromaticities(get_block(info));
++		assert(c && c->revision == revision);
++		assert(c->coordinates == DI_DISPLAYID2_CHROMATICITY_CIE1931);
++		assert(c->primaries[0].a == 2816 && c->primaries[0].b == 1280);
++		assert(c->primaries[0].valid); /* Exact x+y=1 is usable. */
++		assert(c->primaries[1].a == 1024 && c->primaries[1].b == 2816);
++		assert(c->primaries[2].a == 512 && c->primaries[2].b == 256);
++		assert(c->white_point.a == 1280 && c->white_point.b == 1344);
++		assert(c->white_point.valid);
++		assert(c == di_displayid2_data_block_get_native_chromaticities(get_block(info)));
++		di_info_destroy(info);
++	}
++	parameters(data);
++	memset(data + 0x0C, 0, 12);
++	info = parse(data, 32);
++	c = di_displayid2_data_block_get_native_chromaticities(get_block(info));
++	assert(c && !c->white_point.valid);
++	assert(!c->primaries[0].valid && !c->primaries[1].valid && !c->primaries[2].valid);
++	assert(!di_info_get_failure_msg(info));
++	di_info_destroy(info);
++}
++
++static void
++check_domain(void)
++{
++	static const struct {
++		uint16_t a, b;
++		bool cie1976, valid;
++	} cases[] = {
++		{0, 0, false, false}, {0, 4095, false, true},
++		{4095, 1, false, true}, {4095, 2, false, false},
++		{4095, 0, false, false}, {0xABC, 0x123, false, true},
++		{0, 0, true, false}, {0, 4095, true, false},
++		{1024, 2304, true, true}, /* Converted xy=(0.5,0.5). */
++		{1024, 2305, true, false}, {0, 2048, true, true},
++		{1846, 2142, true, true},
++	};
++	uint8_t data[33];
++	struct di_info *info;
++	const struct di_displayid2_native_chromaticities *c;
++	size_t i;
++
++	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
++		parameters(data);
++		data[0x0B] = cases[i].cie1976 ? 0x40 : 0;
++		put_point(data + 0x0C, cases[i].a, cases[i].b);
++		info = parse(data, 32);
++		assert(!di_info_get_failure_msg(info));
++		c = di_displayid2_data_block_get_native_chromaticities(get_block(info));
++		assert(c && c->primaries[0].a == cases[i].a && c->primaries[0].b == cases[i].b);
++		assert(c->primaries[0].valid == cases[i].valid);
++		assert(c->coordinates == (cases[i].cie1976 ?
++			DI_DISPLAYID2_CHROMATICITY_CIE1976 : DI_DISPLAYID2_CHROMATICITY_CIE1931));
++		/* An invalid point never erases unrelated raw points or luminance. */
++		assert(c->white_point.a == 1280 && c->white_point.b == 1344);
++		assert(di_displayid2_data_block_get_luminance(get_block(info)));
++		di_info_destroy(info);
++	}
++}
++
++static void
++check_formats(void)
++{
++	uint8_t data[35] = {0};
++	struct di_info *info;
++	const struct di_displayid2_data_block *block;
++	size_t n;
++
++	for (n = 0; n < 32; n++) {
++		parameters(data);
++		data[2] = (uint8_t) n;
++		info = parse(data, n + 3);
++		block = get_block(info);
++		assert(block);
++		assert((di_displayid2_data_block_get_native_chromaticities(block) != NULL) == (n == 29));
++		assert(!di_edid_has_extension_failures(di_info_get_edid(info)));
++		di_info_destroy(info);
++	}
++	for (n = 0; n < 3; n++) {
++		parameters(data);
++		if (n == 0) data[1] = 2;
++		if (n == 1) data[1] = 8;
++		if (n == 2) data[0x0B] = 0x20; /* Meaning not independently established. */
++		info = parse(data, 32);
++		assert(!di_info_get_failure_msg(info));
++		assert(!di_displayid2_data_block_get_native_chromaticities(get_block(info)));
++		di_info_destroy(info);
++	}
++	parameters(data);
++	info = parse(data, 31); /* Declared payload exceeds its envelope. */
++	assert(di_edid_has_extension_failures(di_info_get_edid(info)));
++	assert(!get_block(info));
++	di_info_destroy(info);
++	data[0] = 0x20;
++	data[2] = 0;
++	info = parse(data, 3);
++	assert(!di_displayid2_data_block_get_native_chromaticities(get_block(info)));
++	di_info_destroy(info);
++}
++
++static void
++check_independence(void)
++{
++	uint8_t data[33];
++	struct di_info *info, *reference;
++	const struct di_color_primaries *a, *b;
++	size_t flags;
++
++	parameters(data);
++	reference = parse(data, 32);
++	for (flags = 0; flags < 256; flags++) {
++		if (flags & 0x20) continue;
++		data[0x0B] = (uint8_t) flags;
++		info = parse(data, 32);
++		assert(!di_info_get_failure_msg(info));
++		assert(di_displayid2_data_block_get_native_chromaticities(get_block(info)));
++		a = di_info_get_default_color_primaries(info);
++		b = di_info_get_default_color_primaries(reference);
++		assert(a->has_primaries == b->has_primaries && a->has_default_white_point == b->has_default_white_point);
++		assert(a->primary[0].x == b->primary[0].x && a->primary[0].y == b->primary[0].y);
++		assert(a->primary[1].x == b->primary[1].x && a->primary[1].y == b->primary[1].y);
++		assert(a->primary[2].x == b->primary[2].x && a->primary[2].y == b->primary[2].y);
++		assert(a->default_white.x == b->default_white.x && a->default_white.y == b->default_white.y);
++		assert((di_displayid2_data_block_get_luminance(get_block(info)) != NULL) == !(flags & 0x18));
++		di_info_destroy(info);
++	}
++	di_info_destroy(reference);
++}
++
++int
++main(int argc, char **argv)
++{
++	FILE *f;
++
++	assert(argc == 3);
++	f = fopen(argv[1], "rb");
++	assert(f && fread(base, sizeof(base), 1, f) == 1);
++	fclose(f);
++	if (!strcmp(argv[2], "known")) check_known();
++	else if (!strcmp(argv[2], "domain")) check_domain();
++	else if (!strcmp(argv[2], "formats")) check_formats();
++	else if (!strcmp(argv[2], "independence")) check_independence();
++	else assert(false);
++	return 0;
++}
+diff --git a/test/meson.build b/test/meson.build
+index 8293245..7fe64f3 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -153,3 +153,10 @@ test('edid-extension-failures', extension_failures, args: files('data/qemu.edid'
+ luminance = executable('displayid2-luminance', 'displayid2-luminance.c',
+ 	dependencies: di_dep)
+ test('displayid2-luminance', luminance, args: files('data/qemu.edid'))
++
++native_chromaticities = executable('displayid2-native-chromaticities',
++	'displayid2-native-chromaticities.c', dependencies: di_dep)
++foreach case : ['known', 'domain', 'formats', 'independence']
++	test('displayid2-native-chromaticities-' + case, native_chromaticities,
++		args: [files('data/qemu.edid'), case])
++endforeach

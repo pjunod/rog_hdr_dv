@@ -1,6 +1,7 @@
 # Native target gamut — retain physical colour declarations
 
-**Status:** design accepted; implementation and qualification in progress.
+**Status:** library implementations compiled; compositor integration and final
+review/runtime qualification in progress.
 **Date:** 2026-10-09.
 
 Companion to [target luminance](MUTTER_TARGET_LUMINANCE.md) and the
@@ -143,3 +144,18 @@ acceptance must later verify the actual output descriptions on the laptop.
 Tone/gamut mapping, ICC output characterization, HLG and optical calibration
 remain separate implementation and measurement work. This correction supplies
 target information to consumers; it does not claim those consumers use it.
+
+## Current implementation receipt
+
+The Ubuntu hdr8 candidate is `805d07b9116cd1fc7bcc7446617ef13f92857b9c`;
+the upstream candidate is `1462cebeac89a5f5f5b7fa475b7501eb21158b53`. Both
+production libraries and synthetic test binaries compile on native amd64 with
+GCC 15.3.0, Meson 1.10.1 and warnings as errors. No new runtime checks have
+executed yet. The appended patches and updated hashes preserve all earlier
+series bytes.
+
+The public header, new test source and added parsing functions agree across
+these candidates, but their surrounding parser implementations differ. Final
+qualification therefore runs the four new test groups on both source series
+and verifies previous consumer binaries against the new libraries. A literal
+packed-byte fixture provides a check independent of the fixture encoder.

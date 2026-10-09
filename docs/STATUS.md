@@ -22,9 +22,18 @@ amd64 compositor packages. Packaging uses isolated source-only builds; no host
 installation or live display change is implied. The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
 initial accuracy goals and held-out validation; this unit has not been measured.
 
-The exact qualified hdr7 library source has produced amd64 and i386 packages
-in the isolated native builder. Matching compositor packaging is in progress.
-The current installed recovery packages were located and hashed privately.
+The exact qualified hdr7 library source has produced amd64 and i386 packages,
+and nativehdr3 compositor packaging has completed in the isolated native
+builder. The [package receipt](../evidence/baseline-native-packages.json)
+records source identities and the six runtime artifacts. Read-only APT
+simulations found a coherent six-package upgrade and modeled six-package
+rollback, with no additions or removals. Recovery artifacts are hashed and
+retained privately; the live installation is unchanged.
+
+The new hdr8/upstream native-chromaticity implementations compile with warnings
+as errors. Their append-only patch series preserve the delivered prefixes.
+Mutter consumption and a bounded read-only Wayland colour inspector are in
+progress.
 New gamut and monitor implementations still require their own final review and
 affected runtime qualification; package compilation does not replace those.
 
@@ -69,8 +78,8 @@ Mutter and matching amd64/i386 library packaging.
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
-| Physical luminance library | hdr6 delivered; additive hdr7 source qualified | Matching packages and compositor consumer delivery |
-| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified | Package and verify active output |
+| Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built | Deliver matching compositor/library set; hdr8 gamut candidate awaits review and runtime checks |
+| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built | Finish target gamut, deliver reviewed set and verify active output |
 | Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
 | General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |

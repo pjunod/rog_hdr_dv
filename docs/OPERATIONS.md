@@ -68,3 +68,32 @@ badge, successful P5 reshape or PQ output alone is insufficient.
 Use the staged [quality acceptance criteria](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance)
 for calibration. Do not assign the recovered OEM CMDEF file globally until
 its expected display mode and the Linux transform path are understood.
+
+## 4. Prepared userspace package transaction
+
+The [native package receipt](../evidence/baseline-native-packages.json) covers
+the qualified hdr7 library and nativehdr3 compositor source. Both library
+architectures and the compositor packages built in an isolated Ubuntu 26.10
+environment with authenticated dependencies and tests disabled deliberately.
+This is packaging evidence; it does not qualify active scanout or the later
+gamut implementation. No package from this build is installed on the laptop.
+
+The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
+`libdisplay-info3:i386`, `libmutter-51-0`, `gir1.2-mutter-51`, `mutter-common`
+and `mutter-common-bin`. The two library architectures require the same
+version, and GIR requires the exact matching Mutter library. The current
+GNOME Shell satisfies the candidate package compatibility bounds. APT
+simulation reports six upgrades, zero additions and zero removals.
+
+A private copy of the installed package database, with only those six candidate
+control records substituted, also resolves the six saved recovery packages as
+six downgrades without additions or removals. This is a modeled rollback, not
+an executed recovery. Artifact hashes and exact local commands are retained
+with the private delivery proposal. Reverify them against the final source and
+current installed state before the coordinated maintenance window.
+
+Log out of the Wayland GNOME session before replacement and start a fresh
+session to load the new compositor library. Retain an independent text-console
+or SSH recovery route; do not terminate the desktop automatically. The final
+transaction must include the reviewed gamut implementation rather than
+installing this intermediate baseline and immediately replacing it again.

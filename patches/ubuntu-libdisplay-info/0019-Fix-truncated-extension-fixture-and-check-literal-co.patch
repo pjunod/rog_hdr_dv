@@ -1,0 +1,40 @@
+From 805d07b9116cd1fc7bcc7446617ef13f92857b9c Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 02:21:24 -0400
+Subject: [PATCH 19/19] Fix truncated extension fixture and check literal
+ coordinate packing
+
+---
+ test/displayid2-native-chromaticities.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/test/displayid2-native-chromaticities.c b/test/displayid2-native-chromaticities.c
+index ed1cef1..3ef0425 100644
+--- a/test/displayid2-native-chromaticities.c
++++ b/test/displayid2-native-chromaticities.c
+@@ -106,6 +106,16 @@ check_known(void)
+ 		assert(c == di_displayid2_data_block_get_native_chromaticities(get_block(info)));
+ 		di_info_destroy(info);
+ 	}
++	/* Literal packed bytes independently check the shared middle nibble. */
++	parameters(data);
++	data[0x0C] = 0xBC;
++	data[0x0D] = 0x3A;
++	data[0x0E] = 0x12;
++	info = parse(data, 32);
++	c = di_displayid2_data_block_get_native_chromaticities(get_block(info));
++	assert(c && c->primaries[0].a == 0xABC && c->primaries[0].b == 0x123);
++	assert(c->primaries[0].valid);
++	di_info_destroy(info);
+ 	parameters(data);
+ 	memset(data + 0x0C, 0, 12);
+ 	info = parse(data, 32);
+@@ -185,7 +195,7 @@ check_formats(void)
+ 	parameters(data);
+ 	info = parse(data, 31); /* Declared payload exceeds its envelope. */
+ 	assert(di_edid_has_extension_failures(di_info_get_edid(info)));
+-	assert(!get_block(info));
++	assert(!di_edid_get_extensions(di_info_get_edid(info))[0]);
+ 	di_info_destroy(info);
+ 	data[0] = 0x20;
+ 	data[2] = 0;
