@@ -80,8 +80,8 @@ correcting one malformed fixture. Unchanged suites were not rerun. The
 [review ledger](REVIEW.md) records the exact CI receipts.
 
 Mutter's `PowerSaveMode` returned `3` (off), consistent with the prior disabled
-scanout capture. Awake-output and optical acceptance remain open. Availability
-of an official reference-tool package is unanswered. The owner currently has
+scanout capture. Awake-output and optical acceptance remain open. The owner is downloading official Dolby documentation and tools; exact package
+identity and processing contracts will be checked when available. The owner currently has
 no colourimeter or spectrophotometer and is open to obtaining one. Define the
 measurement procedure before selecting equipment; software corrections proceed
 independently.
