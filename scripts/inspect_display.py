@@ -31,6 +31,13 @@ def problem(reason, status="error"):
     return {"status": status, "reason": reason}
 
 
+def response_fields(value, count):
+    """GVariant tuples/arrays parse as lists; dictionaries never stand in."""
+    if not isinstance(value, list) or len(value) != count:
+        raise ValueError("unexpected response fields")
+    return value
+
+
 def run_command(argv, timeout):
     """Bound both time and output; never invoke a shell or return stderr."""
     try:
@@ -330,19 +337,25 @@ class Inspector:
         if result["status"] != "ok":
             return result
         try:
-            state = result["value"]
-            if len(state) != 4:
-                raise ValueError("unexpected state")
+            state = response_fields(result["value"], 4)
+            if not (type(state[0]) is int and isinstance(state[1], list)
+                    and isinstance(state[2], list) and isinstance(state[3], dict)):
+                raise ValueError("unexpected state fields")
             monitors = []
-            for spec, modes, properties in state[1]:
+            for monitor in state[1]:
+                spec, modes, properties = response_fields(monitor, 3)
+                spec = response_fields(spec, 4)
+                if not (all(isinstance(value, str) for value in spec) and isinstance(modes, list)
+                        and isinstance(properties, dict)):
+                    raise ValueError("unexpected monitor fields")
                 connector = spec[0]
                 if not re.fullmatch(r"[A-Za-z]+[A-Za-z0-9-]*-\d+", connector):
                     connector = "[private-connector]"
                 current = []
                 for mode in modes:
-                    if len(mode) != 7:
-                        raise ValueError("unexpected mode")
-                    _, width, height, rate, scale, _, flags = mode
+                    _, width, height, rate, scale, _, flags = response_fields(mode, 7)
+                    if not isinstance(flags, dict):
+                        raise ValueError("unexpected mode properties")
                     if flags.get("is-current") is True:
                         if not all(type(v) in (int, float) for v in (width, height, rate, scale)):
                             raise ValueError("unexpected numeric mode")
@@ -411,7 +424,7 @@ class Inspector:
             return result
         devices = []
         try:
-            paths = result["value"][0]
+            paths, = response_fields(result["value"], 1)
             if not isinstance(paths, list) or len(paths) > MAX_DEVICES:
                 raise ValueError("invalid devices")
             for index, path in enumerate(paths):
@@ -423,7 +436,7 @@ class Inspector:
                 if profiles["status"] != "ok":
                     device["profiles"] = profiles
                 else:
-                    profile_paths = profiles["value"][0]
+                    profile_paths, = response_fields(profiles["value"], 1)
                     if not isinstance(profile_paths, list) or len(profile_paths) > MAX_DEVICES:
                         raise ValueError("invalid profiles")
                     for profile_path in profile_paths:
@@ -432,12 +445,17 @@ class Inspector:
                         title = self.dbus("system", dest, profile_path, "org.freedesktop.DBus.Properties.Get", dest + ".Profile", "Title")
                         filename = self.dbus("system", dest, profile_path, "org.freedesktop.DBus.Properties.Get", dest + ".Profile", "Filename")
                         if title["status"] == "ok":
-                            value = title["value"][0]
+                            value, = response_fields(title["value"], 1)
                             if not isinstance(value, str):
                                 raise ValueError("invalid title")
                             title = {"status": "ok", "sha256": hashlib.sha256(value.encode()).hexdigest()}
-                        file_hash = (self.profile_hash(filename["value"][0])
-                                     if filename["status"] == "ok" else filename)
+                        if filename["status"] == "ok":
+                            value, = response_fields(filename["value"], 1)
+                            if not isinstance(value, str):
+                                raise ValueError("invalid filename")
+                            file_hash = self.profile_hash(value)
+                        else:
+                            file_hash = filename
                         device["profiles"].append({"name_hash": title, "file": file_hash})
                 devices.append(device)
         except (ValueError, TypeError, IndexError):

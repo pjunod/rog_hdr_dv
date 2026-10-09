@@ -194,6 +194,36 @@ class EvidenceTests(Fixture):
         self.inspector.runner = lambda argv, timeout: success("(uint32 7, [], {})")
         self.assertEqual(self.inspector.gnome()["reason"], "unexpected_display_state_shape")
 
+    def test_gnome_wrong_map_containers_return_shape_error_without_private_data(self):
+        responses = (
+            # Four entries previously passed the length check, then raised KeyError.
+            "{'a': <1>, 'b': <2>, 'c': <3>, 'private-user': <4>}",
+            "(uint32 7, {'private-user': <1>}, [], {})",
+            "(uint32 7, [{'a': <1>, 'b': <2>, 'private-user': <3>}], [], {})",
+            "(uint32 7, [({'a': <1>, 'b': <2>, 'c': <3>, 'private-user': <4>}, [], {})], [], {})",
+        )
+        for response in responses:
+            with self.subTest(response=response):
+                self.inspector.runner = lambda argv, timeout: success(response)
+                result = self.inspector.gnome()
+                self.assertEqual(result, {"status": "error", "reason": "unexpected_display_state_shape"})
+                self.assertNotIn("private-user", json.dumps(result))
+
+    def test_colord_wrong_map_outer_replies_return_shape_error_at_each_query(self):
+        normal_runner = self.runner
+        for stage in ("GetDevicesByKind", "Profiles", "Title", "Filename"):
+            with self.subTest(stage=stage):
+                def malformed_runner(argv, timeout):
+                    method = argv[argv.index("--method") + 1]
+                    if (stage == "GetDevicesByKind" and method.endswith(stage)) or argv[-1] == stage:
+                        return success("{'private-user': <'SERIAL_PRIVATE'>}")
+                    return normal_runner(argv, timeout)
+                self.inspector.runner = malformed_runner
+                result = self.inspector.colord()
+                self.assertEqual(result, {"status": "error", "reason": "unexpected_colord_response_shape"})
+                self.assertNotIn("private-user", json.dumps(result))
+                self.assertNotIn("SERIAL_PRIVATE", json.dumps(result))
+
     def test_profile_read_failure_is_reported_without_filename(self):
         self.profile.unlink()
         result = self.inspector.colord()
