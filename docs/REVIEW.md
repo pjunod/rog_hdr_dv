@@ -114,6 +114,13 @@ Mutter candidate before runtime tests:
 | Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | Addressed; delta review pending |
 | A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | Addressed; delta review pending |
 
+A correction-delta review also caught a fixture assumption: the global force-HDR
+setting changes the second output. The fixture now expects those events and
+uses a fresh second-output identity before topology changes, while retaining
+the original immutable snapshot and unrelated-output silence checks for native
+target-only updates. No test execution was needed to identify either fixture
+issue. Final delta review is pending.
+
 No additional actionable issues were found in the Wine wrapper/export,
 synthetic corpus encoding, immutable description ownership, v2 identity
 allocation or narrowly scoped public-certificate scan exception. The Mutter

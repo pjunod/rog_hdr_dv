@@ -1,0 +1,105 @@
+From a04bc3ecde3f425cd90d4017c57ad2840475682f Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 01:07:24 -0400
+Subject: [PATCH] test(color): account for global force HDR output changes
+
+---
+ .../wayland-test-clients/color-management.c   | 25 +++++++++++++------
+ 1 file changed, 18 insertions(+), 7 deletions(-)
+
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 970377a..8cc2c2c 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -630,7 +630,8 @@ static const struct wp_color_management_surface_feedback_v1_listener target_feed
+ static void
+ check_target_events (TargetClient *client,
+                      TargetOutput *target,
+-                     unsigned int  count)
++                     unsigned int  count,
++                     unsigned int  other_count)
+ {
+   unsigned int i;
+ 
+@@ -644,8 +645,9 @@ check_target_events (TargetClient *client,
+ 
+       if (output != target)
+         {
+-          g_assert_cmpuint (output->changed, ==, 0);
+-          g_assert_cmpuint (output->done, ==, 0);
++          g_assert_cmpuint (output->changed, ==, other_count);
++          g_assert_cmpuint (output->done, ==, other_count);
++          g_assert_false (output->awaiting_done);
+         }
+       output->changed = output->done = 0;
+     }
+@@ -676,7 +678,8 @@ target_luminance_client (WaylandDisplay *display,
+   struct wl_surface *surface = wl_compositor_create_surface (display->compositor);
+   struct wp_color_management_surface_feedback_v1 *feedback;
+   TargetOutput *target = NULL, *other = NULL;
+-  TargetSnapshot snapshots[8] = { 0 }, preferred = { 0 }, other_snapshot = { 0 };
++  TargetSnapshot snapshots[8] = { 0 }, preferred = { 0 };
++  TargetSnapshot other_snapshot = { 0 }, current_other = { 0 };
+   TargetInfo info;
+   unsigned int i, phase;
+   const uint32_t maxima[] = { 700, 700, 10000, 700, 10000, 10000, 80 };
+@@ -730,15 +733,19 @@ target_luminance_client (WaylandDisplay *display,
+   for (phase = 0; phase < G_N_ELEMENTS (maxima); phase++)
+     {
+       unsigned int changed = phase == 1 || phase == 5 ? 0 : 1;
++      /* Force-HDR is global; native-only updates still leave this output quiet. */
++      unsigned int other_changed = phase == 2 || phase == 3 ? 1 : 0;
+ 
+       if (phase == 6)
+         {
+           unsigned int topology_phase;
+ 
++          current_other.description = wp_color_management_output_v1_get_image_description (other->color_output);
++          wait_target_snapshot (display, &current_other);
+           for (topology_phase = 0; topology_phase < 2; topology_phase++)
+             {
+               uint64_t expected_identity = topology_phase == 0 ?
+-                                           other_snapshot.identity : snapshots[phase].identity;
++                                           current_other.identity : snapshots[phase].identity;
+ 
+               test_driver_sync_point (display->test_driver, 18 + topology_phase, NULL);
+               wait_for_sync_event (display, 18 + topology_phase);
+@@ -754,7 +761,7 @@ target_luminance_client (WaylandDisplay *display,
+               g_assert_cmpuint (info.target_max, ==, topology_phase == 0 ? 80 : 10000);
+               wp_image_description_v1_destroy (preferred.description);
+               /* The removed primary's old description remains readable. */
+-              info = read_target_info (display, &other_snapshot);
++              info = read_target_info (display, &current_other);
+               g_assert_cmpuint (info.target_max, ==, 80);
+             }
+         }
+@@ -762,7 +769,7 @@ target_luminance_client (WaylandDisplay *display,
+       test_driver_sync_point (display->test_driver, 10 + phase, NULL);
+       wait_for_sync_event (display, 10 + phase);
+       wl_display_roundtrip (display->display);
+-      check_target_events (&client, target, changed);
++      check_target_events (&client, target, changed, other_changed);
+       snapshots[phase + 1].description = wp_color_management_output_v1_get_image_description (target->color_output);
+       wait_target_snapshot (display, &snapshots[phase + 1]);
+       preferred = (TargetSnapshot) {
+@@ -783,6 +790,9 @@ target_luminance_client (WaylandDisplay *display,
+       info = read_target_info (display, &snapshots[0]);
+       g_assert_cmpuint (info.target_min, ==, 5);
+       g_assert_cmpuint (info.target_max, ==, 616);
++      info = read_target_info (display, &other_snapshot);
++      g_assert_cmpuint (info.encoding_max, ==, 80);
++      g_assert_cmpuint (info.target_max, ==, 80);
+     }
+ 
+   test_driver_sync_point (display->test_driver, 17, NULL);
+@@ -793,6 +803,7 @@ target_luminance_client (WaylandDisplay *display,
+   for (i = 0; i < G_N_ELEMENTS (snapshots); i++)
+     wp_image_description_v1_destroy (snapshots[i].description);
+   wp_image_description_v1_destroy (other_snapshot.description);
++  wp_image_description_v1_destroy (current_other.description);
+   wp_color_management_surface_feedback_v1_destroy (feedback);
+   wl_surface_destroy (surface);
+   for (i = 0; i < client.n_outputs; i++)
+-- 
+2.54.0 (Apple Git-157)
+
