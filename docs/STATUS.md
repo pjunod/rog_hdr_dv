@@ -87,9 +87,9 @@ correcting one malformed fixture. Unchanged suites were not rerun. The
 
 Mutter's `PowerSaveMode` returned `3` (off), consistent with the prior disabled
 scanout capture. Awake-output and optical acceptance remain open. Official Dolby Professional Tools v5.6.4 documentation and the Linux installer
-are available privately. The installer requires the owner’s license acceptance;
-no official tool has been executed. File-based reference processing can proceed
-after that action, while desktop processor integration remains separate. The owner currently has
+are available privately. The owner completed the installer license prompt;
+an isolated Linux CPU reference environment is being prepared. No reference
+frames have been processed. Desktop processor integration remains separate. The owner currently has
 no colourimeter or spectrophotometer and is open to obtaining one. Define the
 measurement procedure before selecting equipment; software corrections proceed
 independently.
