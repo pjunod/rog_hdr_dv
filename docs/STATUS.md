@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-09 UTC · **State:** HDR10 operational by owner report;
+**Updated:** 2026-10-08 (America/New_York) · **State:** HDR10 operational by owner report;
 full DV and measured image-quality acceptance open.
 
 This is the current ledger. [Provenance](PROVENANCE.md) identifies inherited
@@ -21,6 +21,19 @@ and Media Foundation but stopped at DLL loading: Wine 9.0 lacks the imported
 `api-ms-win-core-file-fromapp-l1-1-0.dll`. Processor activation was not reached.
 The reviewed experiment changed no live display settings; raw results are
 private. Full Dolby Vision remains unimplemented/unqualified.
+
+## Active batch — processor contracts and profile interpretation
+
+The next batch implements a bounded Wine API-resolution diagnostic and a
+private ICC/MHC2 inspector, and traces the exact installed Mutter colour
+pipeline. It will distinguish API-set loading from a working function,
+profile data from applied calibration, and PQ encoding range from physical
+target luminance. Review and fast-lane validation happen at the end of the
+batch. No live display change is planned for these investigations.
+
+A follow-up read of Mutter's `PowerSaveMode` returned `3` (off), consistent
+with the prior disabled-scanout capture. An awake observation is still needed
+for physical output acceptance; software inspection continues meanwhile.
 
 | Component | State | Remaining evidence/work |
 |---|---|---|
