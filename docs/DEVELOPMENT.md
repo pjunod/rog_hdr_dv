@@ -20,7 +20,7 @@ under `patches/` has a `series` file. Apply files in that order.
 
 | Series | Base | Purpose |
 |---|---|---|
-| libdisplay-info | Upstream `62a9346c3dce2bddba1d4dc186949e4320d6f801` | Five additive native parser/API proposals |
+| libdisplay-info | Upstream `62a9346c3dce2bddba1d4dc186949e4320d6f801` | Six native parser/API and regression patches |
 | mutter | Upstream `d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7` | Native DisplayID eDP capability recognition |
 | ubuntu-libdisplay-info | Authenticated Ubuntu `0.3.0-1` source import | Delivered hdr6 prefix plus source-only hdr7 candidate |
 | ubuntu-mutter | Authenticated Ubuntu `51.0-1ubuntu3` source import | Complete downstream changes through nativehdr2 |

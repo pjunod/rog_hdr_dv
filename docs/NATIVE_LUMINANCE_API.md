@@ -40,7 +40,8 @@ function are added. The existing `di_*` export map covers the new function.
 ## Source and package boundaries
 
 [sources.json](../sources.json) pins the complete alternative series. The
-upstream candidate adds patch 5; the Ubuntu candidate adds patch 15. All 28
+upstream candidate adds API patch 5 and fixture correction 6; the Ubuntu
+candidate adds corresponding patches 15 and 16. All 28
 original imported patch files remain byte-identical. Their import receipt
 continues to describe those historical candidates.
 
@@ -52,8 +53,8 @@ the manifest. Neither new candidate is installed or package-qualified.
 
 | Source | Candidate commit | Candidate tree |
 |---|---|---|
-| Upstream | `0fdd92514cb8643884310988e3ccd33abe88e180` | `71e919e553b56a2ec3b3b13b42a87f80e423ccaa` |
-| Ubuntu | `d067382c8ee9d13ce197751048601781df8b1a76` | `c958469da131fcf0ca81e501bee707b602dc893e` |
+| Upstream | `1ddb6ea03a59d2758d28c994eb5d91f969f36314` | `b9bb408efc36d2c139141a9d57af6800543eac43` |
+| Ubuntu | `051af9ad21839a017f9fcc6d2f291902eb82136e` | `dd88089aed845002aae17b08ca4cbc9939f3a476` |
 
 ## Qualification
 
