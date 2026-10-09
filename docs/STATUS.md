@@ -1,11 +1,26 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-08 · **State:** HDR10 operational by owner report;
+**Updated:** 2026-10-09 UTC · **State:** HDR10 operational by owner report;
 full DV and measured image-quality acceptance open.
 
 This is the current ledger. [Provenance](PROVENANCE.md) identifies inherited
 evidence; [development](DEVELOPMENT.md) defines new checks. Importing patches
 into this repository is not a fresh build or hardware qualification.
+
+See [the visual status page](STATUS.html) for the current workboard and
+[the review ledger](REVIEW.md) for findings. The first implementation batch
+adds reproducible read-only diagnostics and an isolated OEM activation probe.
+Adversarial findings are resolved; all 45 Python tests and the repository
+integrity check passed. Live collection and bounded activation were executed.
+
+The [display inspector](DISPLAY_DIAGNOSTICS.md) captured the configured
+2560×1600/240 Hz BT.2100 output and one colord display association. Scanout was
+disabled at capture time, so active-output colour qualification remains open.
+The [Dolby activation probe](DOLBY_ACTIVATION_PROBE.md) initialized COM, WinRT
+and Media Foundation but stopped at DLL loading: Wine 9.0 lacks the imported
+`api-ms-win-core-file-fromapp-l1-1-0.dll`. Processor activation was not reached.
+The reviewed experiment changed no live display settings; raw results are
+private. Full Dolby Vision remains unimplemented/unqualified.
 
 | Component | State | Remaining evidence/work |
 |---|---|---|
@@ -13,7 +28,7 @@ into this repository is not a fresh build or hardware qualification.
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and mode coverage |
 | Library | hdr6 amd64/i386 delivered | Revalidate future dependency upgrades against unpublished APIs |
 | Mutter | nativehdr2 delivered | Physical colour-path audit; unresolved historical flaky batch failure |
-| Full Dolby Vision | Investigation | Qualify a complete processor/display-management route and supported profiles |
+| Full Dolby Vision | First compatibility boundary identified | Resolve the Wine API-set contract, then qualify activation, processing and display management |
 | General colour quality | Requirements and initial source audit | Trace transformations and fix gaps across applications and composition |
 | Exact-panel tuning | OEM data recovered | Validate profile interpretation, implement calibration path, measure this unit |
 | Plurx | Independent downstream integration | Browser/native rendering route, metadata preservation and physical playback |

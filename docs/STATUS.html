@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>rog_hdr_dv — project status</title>
+<style>
+:root{color-scheme:dark;background:#10151d;color:#e8eef5;font:16px/1.6 system-ui,sans-serif}
+body{max-width:1040px;margin:auto;padding:40px 24px}h1{font-size:2.5rem;line-height:1.15;margin-bottom:12px}
+h2{margin-top:32px}p{max-width:80ch}.muted{color:#a9b8ca}a{color:#8dcbff}table{width:100%;border-collapse:collapse}
+th,td{text-align:left;vertical-align:top;padding:13px 14px;border-bottom:1px solid #2c394b}th{color:#a9b8ca}
+.state{white-space:nowrap;font-weight:650}.done{color:#83dbb2}.active{color:#ffd17f}.pending{color:#b9c3d1}
+.callout{background:#192536;border-left:3px solid #8dcbff;padding:16px 20px;margin:24px 0}
+code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px){body{padding:24px 12px}th,td{padding:10px 7px}h1{font-size:2rem}}
+</style>
+<header><p class="muted">LINUX DISPLAY STACK · ASUS GU605MZ</p>
+<h1>HDR, Dolby Vision<br>and display quality</h1>
+<p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
+Vision and tuning for the internal OLED.</p>
+<p class="muted">Updated October 9, 2026 UTC · first batch reviewed and validated</p></header>
+<div class="callout"><strong>Current physical result:</strong> the owner reports
+working HDR10 on the patched stack with Secure Boot enabled. Full Dolby Vision
+and measured calibration are not yet qualified.</div>
+<h2>Workboard</h2>
+<table><thead><tr><th>Work</th><th>State</th><th>Evidence or next step</th></tr></thead><tbody>
+<tr><td>Existing HDR stack</td><td class="state done">Implemented</td><td>28 imported patches; library, compositor and kernel baseline recorded. Transition/resume acceptance remains.</td></tr>
+<tr><td>Public repository and provenance</td><td class="state active">Validated</td><td>Ordered series, public source URLs/hashes and pre-merge workflow. Adversarial findings resolved; 45 tests and integrity checks passed.</td></tr>
+<tr><td>Display-path diagnostic</td><td class="state active">Live capture complete</td><td>BT.2100, 2560×1600 at 240 Hz reported. Scanout disabled at capture; active-output quality qualification remains.</td></tr>
+<tr><td>Dolby processor feasibility</td><td class="state active">Load boundary found</td><td>COM/WinRT/MF initialized. Wine 9.0 lacks an imported file-from-app API-set; processor activation was not reached.</td></tr>
+<tr><td>General colour correctness</td><td class="state pending">Audit next</td><td>Trace transform ownership, reference white, gamut and physical peak before choosing a correction.</td></tr>
+<tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>OEM profile inputs recovered; exact-unit optical measurements and mode-specific validation remain.</td></tr>
+<tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
+</tbody></table>
+<h2>Current batch</h2>
+<p>The initial adversarial review found three issues: patch-order validation,
+incomplete public source-reconstruction inputs, and an incorrect base/candidate
+description. Those fixes and three further premerge findings are resolved. All 45 tests passed in one run; the source-bound probe compiled with warnings as errors.</p>
+<p>Independent review runs when the PR is ready, followed by one affected fast
+lane. Failed or invalidated checks are rerun individually. No automatic public
+CI job changes the laptop or runs proprietary components.</p>
+<h2>Decisions and limits</h2>
+<ul><li>Keep system display work in this repository; Plurx is an independent consumer.</li>
+<li>Use GPT-6.1 Sol agents for specified implementation; coordinating review owns integration.</li>
+<li>Do not replace full Dolby Vision with a DV-to-HDR10 result.</li>
+<li>Use root-cause evidence before output changes; no forced capability claims or watchdog workarounds.</li>
+<li>Keep OEM payloads, raw captures, credentials and signing material private. Publication scans run before pushes.</li></ul>
+<footer><a href="STATUS.md">Detailed ledger</a> · <a href="DOLBY_VISION_AND_QUALITY.md">Plan and acceptance</a> ·
+<a href="../README.md">Repository guide</a></footer>
+</html>

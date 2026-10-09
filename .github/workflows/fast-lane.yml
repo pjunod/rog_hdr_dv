@@ -1,0 +1,48 @@
+name: Fast lane
+
+on:
+  workflow_dispatch:
+    inputs:
+      repository_check:
+        description: Run repository integrity and documentation checks
+        type: boolean
+        default: true
+      test_target:
+        description: "all, none, or a failed unittest module.Class.method"
+        type: string
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  fast-lane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Repository integrity
+        if: inputs.repository_check
+        run: python3 scripts/check_repository.py
+      - name: Selected Python checks
+        if: ${{ always() && inputs.test_target != 'none' }}
+        env:
+          TEST_TARGET: ${{ inputs.test_target }}
+          PYTHONPATH: tests
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+          import sys
+          target = os.environ['TEST_TARGET']
+          if target == 'all':
+              args = ['discover', '-s', 'tests', '-v']
+          elif re.fullmatch(r'test_[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+){0,2}', target):
+              args = ['-v', target]
+          else:
+              raise SystemExit('Invalid unittest target')
+          raise SystemExit(subprocess.call([sys.executable, '-m', 'unittest', *args]))
+          PY

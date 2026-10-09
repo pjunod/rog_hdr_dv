@@ -20,6 +20,12 @@ Start with [status](docs/STATUS.md) for what is proven, then
 investigation and staged plan. [Provenance](docs/PROVENANCE.md) records where
 the imported work came from and how to interpret its evidence.
 [Licensing and attribution](LICENSES.md) explains the retained upstream terms.
+[The status page](docs/STATUS.html) shows the active workboard;
+[review findings](docs/REVIEW.md) records review dispositions and validation.
+[Display diagnostics](docs/DISPLAY_DIAGNOSTICS.md) explains the read-only
+Linux inspector and how to interpret its privacy-filtered report.
+[The Dolby activation probe](docs/DOLBY_ACTIVATION_PROBE.md) documents the
+isolated Windows API experiment, compiler receipt and remaining contracts.
 
 ## Work with the repository
 
