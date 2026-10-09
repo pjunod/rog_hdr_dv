@@ -19,15 +19,18 @@ class RepositoryIntegrityTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name) / "repository"
         self.root.mkdir()
-        for directory in ("patches", "docs", "evidence"):
-            shutil.copytree(REPOSITORY / directory, self.root / directory, symlinks=True)
-        for path in REPOSITORY.glob("*.md"):
-            shutil.copy2(path, self.root / path.name)
-        for name in ("sources.json", "SHA256SUMS"):
-            shutil.copy2(REPOSITORY / name, self.root / name)
-        (self.root / "scripts").mkdir()
-        shutil.copy2(REPOSITORY / "scripts/check_repository.py",
-                     self.root / "scripts/check_repository.py")
+        # Preserve every tracked link target, while excluding .git and untracked
+        # private captures, build outputs and logs. Copy current working bytes
+        # so the fixture checks the candidate under review, including edits.
+        tracked = subprocess.run(["git", "ls-files", "-z"], cwd=REPOSITORY,
+                                 check=True, capture_output=True).stdout
+        for name in tracked.decode("utf-8").split("\0"):
+            if not name:
+                continue
+            source = REPOSITORY / name
+            destination = self.root / name
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination, follow_symlinks=False)
         self.sources = json.loads((self.root / "sources.json").read_text())
         self.library = next(item for item in self.sources["series"]
                             if item["component"] == "libdisplay-info")
