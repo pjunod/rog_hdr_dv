@@ -355,3 +355,42 @@ for the destination before composition, and apply output characterization once.
 It must cover alpha, cross-monitor movement, HDR/SDR mixing and scanout parity.
 Algorithm selection and measured target parameters remain open; no placeholder
 mapper or guessed panel curve is introduced by the current feedback work.
+
+### Next bounded implementation batch
+
+After target-gamut integration, correct the two demonstrated input defects in
+one source batch. Preserve the ordinary named-colour paths and keep this work
+independent of physical target selection.
+
+For custom primaries, use signed conversions in both directions and remove
+the normalization clamp. Validate the matrices the actual renderer needs,
+including white-point adaptation and inverse conversion, before accepting the
+state. Share that calculation with transform construction so validation and
+rendering cannot drift into two definitions of supported colourimetry.
+Singular or nonfinite transforms must produce an unsupported image-description
+result, never an identity matrix masquerading as the requested space. Ensure
+protocol serialization cannot perform an out-of-range float-to-integer cast.
+The [protocol creation contract](https://github.com/wayland-mirror/wayland-protocols/blob/1.48/staging/color-management/color-management-v1.xml)
+provides this asynchronous failure path.
+
+The regression should pass a legitimate synthetic encoding gamut with a
+negative coordinate through the real client-to-surface path, inspect retained
+state and compare a transformed colour against independently calculated matrix
+values. Cover degenerate RGB columns, an unusable white point and signed
+serialization boundaries separately. A physical gamut's positive-coordinate
+rules do not define the domain of an encoding gamut.
+
+For ICC input, keep the existing `-1` unset sentinel; descriptor zero must
+count as set. Compute requested file-end bounds in a wide unsigned type only
+after rejecting negative file sizes, and preserve descriptor ownership on every
+rejection. Distinguish file-read errors from unsupported profile content.
+Protocol regressions must exercise a wrapping offset, an exact end-of-file
+range, a repeated set when the stored descriptor is zero, and connection
+survival after an unsupported image description. The zero-descriptor test
+needs a controlled compositor-side fixture: the client's descriptor number
+is not preserved across descriptor passing.
+
+Compiler qualification precedes edits. Final adversarial review precedes the
+affected runtime checks. No live profile assignment, mode switch or compositor
+replacement is part of this source batch. HLG, output characterization and
+physical mapping remain subsequent changes with their own contracts.
