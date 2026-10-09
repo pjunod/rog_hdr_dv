@@ -1,6 +1,6 @@
 # Dolby activation probe — find the first compatibility boundary
 
-**Status:** cross-compiled and probed; Wine API-set load boundary identified ·
+**Status:** DLL loading passed; internal DisplayMonitor activation boundary identified ·
 **Written:** 2026-10-08.
 
 Companion to [Dolby Vision and quality](DOLBY_VISION_AND_QUALITY.md): this
@@ -206,10 +206,42 @@ required function as `CreateFileFromAppW`. Stock Wine 11.0 loads the API-set
 but lacks that export, confirmed by runtime error 127. Implementing and
 validating that contract was the next prerequisite. The reviewed
 [Wine implementation](WINE_FILE_FROMAPP.md) now passes 123 focused desktop API
-assertions in an isolated Wine 11 runtime. Processor activation has not yet
-been repeated with that candidate. Do not substitute a guessed DLL
+assertions in an isolated Wine 11 runtime. The follow-up experiment below
+uses that qualified candidate. Do not substitute a guessed DLL
 or claim processor activation based on Media Foundation startup alone. Raw
 Wine logs, OEM files and the runtime prefix remain outside the repository.
+
+## Wine 11 follow-up — the DLL loads; DisplayMonitor activation is missing
+
+After the file API passed its focused contract, the same verified probe and
+inventoried OEM DLL ran once in an isolated Wine 11 fixture. The fresh prefix
+used a UTF-8 locale, the source-built kernelbase candidate and an unprivileged
+UID. There was no network, host mount, GPU or display connection. Input and
+module hashes were checked before and after execution. The owned container
+was stopped and removed after private evidence export.
+
+[The sanitized receipt](../evidence/dolby-displaymonitor-boundary.json) binds
+the source, input identities, isolation and observed call sequence:
+
+| Contract | Observed result |
+|---|---|
+| COM/WinRT/Media Foundation initialization | Successful |
+| Exact OEM DLL load and factory export lookup | Successful |
+| Factory request for `DolbyVisionPlugin.RendererEffect` | `0x80040154`, `REGDB_E_CLASSNOTREG` |
+| Internal request immediately associated with that failure | `Windows.Devices.Display.DisplayMonitor`, IID `6eae698f-a228-4c05-821d-b695d667de8e`; Wine could not find its implementation library |
+| Object activation, transform discovery and frames | Not reached |
+
+The package's renderer-effect manifest matches the requested class and x64 DLL.
+This does not establish that registering the OEM class would resolve the failure:
+the loader trace identifies an internal Windows runtime dependency. Earlier
+system-product/manufacturer information accessors also reach Wine stubs; no
+replacement identifiers were supplied.
+
+The next work is a generic display-monitor contract implementation backed by
+real platform data, including explicit unavailable or virtual cases. Returning
+invented panel identifiers, physical primaries or Dolby capability flags would
+make subsequent processor results unreliable. No later package, panel,
+licensing, rendering or metadata requirement has been qualified yet.
 
 ## Read the JSONL — an HRESULT belongs to one call
 

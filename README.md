@@ -39,6 +39,8 @@ physical-target state, immutable descriptions and their qualification.
 function correction and its desktop-only compatibility evidence.
 [HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) defines reproducible
 synthetic PQ inputs and the separate official-reference workflow.
+[Panel measurement](docs/PANEL_MEASUREMENT.md) defines the optical procedure,
+initial accuracy targets and evidence required before calibration claims.
 
 ## Work with the repository
 
