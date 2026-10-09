@@ -22,6 +22,26 @@ and Media Foundation but stopped at DLL loading: Wine 9.0 lacks the imported
 The reviewed experiment changed no live display settings; raw results are
 private. Full Dolby Vision remains unimplemented/unqualified.
 
+## Third batch — native physical-luminance API ready
+
+An additive [libdisplay-info low-level API](NATIVE_LUMINANCE_API.md) is implemented for the native
+DisplayID 2 display-parameters luminance fields. It preserves fractional
+physical minimum/full-frame/small-window data and distinguishes absent fields
+from zero. It leaves legacy CTA desired-content metadata unchanged, so a
+future compositor target policy can use physical declarations explicitly.
+
+The work uses independent source clones and a disposable compiler environment.
+It is source work only: no package installation or display change on the host.
+Both final source candidates compiled with warnings as errors on Linux ARM64
+and emulated x86-64. Independent review approved the change. All 12 selected
+checks passed across the initial run and focused retries after correcting a
+reserved bit in synthetic CTA data. Both previous binaries passed against the
+new libraries; final series reconstruction matches both source trees.
+
+The compositor target-volume correction is next. Its separate Ubuntu ARM64
+compiler environment is being prepared. No new package is delivered: hdr6
+remains installed, while hdr7 is explicitly an unreleased source candidate.
+
 ## Second batch — reviewed tools and concrete remaining contracts
 
 The [ICC inspector](ICC_CHARACTERISATION.md) parsed all four factory profile
@@ -54,7 +74,7 @@ software source corrections can proceed independently.
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware/upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and mode coverage |
-| Library | hdr6 amd64/i386 delivered | Revalidate future dependency upgrades against unpublished APIs |
+| Library | hdr6 delivered; additive hdr7 source qualified | i386/full packaging and compositor consumer integration remain |
 | Mutter | nativehdr2 delivered | Physical colour-path audit; unresolved historical flaky batch failure |
 | Full Dolby Vision | Missing function confirmed on stock Wine 11.0 | Implement the required file API semantics; continue native reference and processor routes |
 | General colour quality | Delivered-source audit complete | Separate physical target feedback from encoding, then implement and qualify mapping/calibration |
@@ -85,8 +105,8 @@ These are scoped historical results, not newly rerun here.
 
 ## Next work
 
-1. Trace actual SDR/PQ encoding, reference white, physical peak and calibration
-   ownership through the current compositor and panel.
+1. Implement separate physical-target feedback in Mutter using the newly
+   qualified library API; preserve PQ encoding and immutable Wayland descriptions.
 2. Probe the OEM processor contract and evaluate a native/open full-DV route.
 3. Implement generic colour corrections and panel characterisation separately.
 4. Qualify multiple applications, including Plurx, then measure and package.

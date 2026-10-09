@@ -77,3 +77,28 @@ in the reviewed offline, non-root environment. Its documented missing-export
 exit `3` is an observed compatibility boundary, not a successful Dolby result.
 All four private OEM profile inspections succeeded. Only sanitized receipts
 were added afterward; the documentation/link check covers those receipt edits.
+
+## Third batch — additive native luminance API
+
+Independent adversarial review approved `6c23e7f` with no findings. It checked
+binary16 decoding, format bounds, per-field presence, lifetime and ABI scope,
+Ubuntu hdr7 provenance, regression coverage and publication evidence. A focused
+followup approved the fixture-only source commits recorded in the
+[native API document](NATIVE_LUMINANCE_API.md).
+
+Ten existing focused tests passed initially. The new regression failed in each
+source variant because its synthetic CTA colourimetry byte set reserved MD0.
+The parser correctly diagnosed that fixture; the product code was unchanged.
+After correcting the byte and strengthening assertions, only the two failed
+tests were rerun, once each, and passed. Both previously compiled consumers
+also passed against the new libraries. Final complete-series reconstruction
+matched both candidate trees. Compiler, test, legacy and reconstruction receipts
+are linked from the native API document.
+
+No i386 package build, install, live display change or optical qualification is
+claimed. The original 28 imported patches remain byte-identical. The four new
+exports are the API addition and its test-fixture correction on each source base.
+
+The final repository integrity check passed for 32 patches, five series and
+documentation links. Both owned library build containers were removed after
+retaining source-bound receipts; source checkouts remain for consumer work.

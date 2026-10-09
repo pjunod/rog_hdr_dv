@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "tools": {
+    "gcc": "12.2.0-14+deb12u1",
+    "meson": "1.0.1",
+    "ninja": "1.11.1",
+    "hwdata": "0.368"
+  },
+  "compile": {
+    "result": "passed",
+    "architectures": [
+      "aarch64",
+      "x86_64 (Docker emulated)"
+    ],
+    "meson_options": [
+      "-Dwerror=true"
+    ],
+    "source_transport": "git archive HEAD; no .git, credentials, OEM or host mounts",
+    "tests_executed": false,
+    "focused_test_name": "displayid2-luminance",
+    "scope": "Initial source compilation; final fixture-only candidates also compiled as recorded below"
+  },
+  "pending": [
+    "i386 and full package qualification",
+    "physical output acceptance"
+  ],
+  "date": "2026-10-09",
+  "limits": "Source compilation only; x86-64 uses Docker emulation. No i386, package delivery or physical acceptance.",
+  "images": {
+    "arm64": {
+      "image_id": "sha256:72db5382ffef4a5dbf89a125ee07bf0073404cee718902ed4ef0d6da99b0261a",
+      "repo_digest": "rust@sha256:0e2bcaef56d041a486784e54104a81aebe0da44bd03019bd70bc0401e42e4a97"
+    },
+    "amd64": {
+      "image_id": "sha256:897e260d0a1a5a5146433bdb73f62bd84f5f47e846d3485e5f70f63912b5917d",
+      "repo_digest": "rust@sha256:408fe88047cef61a2087653b0c5255fa51c0f2d6d94ddedd7a2562a9b91a46f6",
+      "execution": "Docker emulation; no laptop receipt"
+    }
+  },
+  "exported_symbol_inventory": {
+    "upstream": {
+      "baseline_architecture": "aarch64",
+      "baseline_symbol_count": 99,
+      "candidate_symbol_count": 100,
+      "added": [
+        "di_displayid2_data_block_get_luminance"
+      ],
+      "removed": [],
+      "x86_64_same_exported_symbol_names": true
+    },
+    "ubuntu": {
+      "baseline_architecture": "aarch64",
+      "baseline_symbol_count": 91,
+      "candidate_symbol_count": 92,
+      "added": [
+        "di_displayid2_data_block_get_luminance"
+      ],
+      "removed": [],
+      "x86_64_same_exported_symbol_names": true
+    }
+  },
+  "commands": [
+    "meson setup BUILD SOURCE -Dwerror=true",
+    "meson compile -C BUILD",
+    "nm -D --defined-only BUILD/libdisplay-info.so.VERSION"
+  ],
+  "symbol_limit": "Exported symbol names only, not full ABI or legacy consumer execution qualification.",
+  "original_candidates": {
+    "upstream": {
+      "base": "ce64f8f904243d6efed1365a7201f786757fa0b0",
+      "candidate": "0fdd92514cb8643884310988e3ccd33abe88e180",
+      "tree": "71e919e553b56a2ec3b3b13b42a87f80e423ccaa",
+      "archive_sha256": "2eea8fe7ab05e2cb6e122377ee764262a8f084bebc629daf8e529568eb5d5629"
+    },
+    "ubuntu": {
+      "base": "e1e1ddf4270db27acf984ab1f005daf64e9f0038",
+      "candidate": "d067382c8ee9d13ce197751048601781df8b1a76",
+      "tree": "c958469da131fcf0ca81e501bee707b602dc893e",
+      "archive_sha256": "75379c68537a464a793e7567efd2f1e3498eadd4358a86b4f0e4b603c325849b"
+    }
+  },
+  "final_candidates": {
+    "upstream": {
+      "candidate": "1ddb6ea03a59d2758d28c994eb5d91f969f36314",
+      "tree": "b9bb408efc36d2c139141a9d57af6800543eac43",
+      "archive_sha256": "1f7508beddddd81bcc7f39a55151b96e4196d6fdead26273e2a1389a7a143ac8"
+    },
+    "ubuntu": {
+      "candidate": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+      "tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
+      "archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c"
+    }
+  },
+  "fixture_correction": {
+    "scope": "Test-only CTA fixture and assertions; production source unchanged",
+    "compile_result": "PASS on aarch64 and Docker-emulated x86_64",
+    "meson_options": [
+      "-Dwerror=true"
+    ],
+    "focused_tests": "Recorded separately in native-luminance-tests.json"
+  }
+}

@@ -1,0 +1,54 @@
+From 1ddb6ea03a59d2758d28c994eb5d91f969f36314 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 00:22:26 -0400
+Subject: [PATCH] test: clear reserved CTA colorimetry bits in luminance
+ fixture
+
+---
+ test/displayid2-luminance.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/test/displayid2-luminance.c b/test/displayid2-luminance.c
+index 9bf5f1d..c899aa5 100644
+--- a/test/displayid2-luminance.c
++++ b/test/displayid2-luminance.c
+@@ -47,7 +47,7 @@ parse(const uint8_t *blocks, size_t size, bool cta, bool reverse)
+ {
+ 	static const uint8_t metadata[] = {
+ 		0xE6, 0x06, 0x05, 0x01, 0x80, 0x70, 0x20,
+-		0xE3, 0x05, 0xE0, 0x01,
++		0xE3, 0x05, 0xE0, 0x80, /* ST2113 RGB; MD0-MD3 reserved bits stay clear. */
+ 	};
+ 	uint8_t edid[384] = {0}, *ext;
+ 	struct di_info *info;
+@@ -124,6 +124,7 @@ check_known(void)
+ 	struct di_info *info, *reference;
+ 	const struct di_displayid2_luminance *luminance;
+ 	const struct di_hdr_static_metadata *hdr;
++	const struct di_supported_signal_colorimetry *colorimetry;
+ 	size_t cta, reverse;
+ 
+ 	parameters(data);
+@@ -132,6 +133,7 @@ check_known(void)
+ 			info = parse(data, 32, cta != 0, reverse != 0);
+ 			reference = parse(NULL, 0, cta != 0, reverse != 0);
+ 			assert(!di_info_get_failure_msg(info));
++			assert(!di_info_get_failure_msg(reference));
+ 			assert(!di_edid_has_extension_failures(di_info_get_edid(info)));
+ 			luminance = di_displayid2_data_block_get_luminance(get_block(info));
+ 			assert(luminance && luminance->has_min_luminance);
+@@ -145,6 +147,11 @@ check_known(void)
+ 			hdr = di_info_get_hdr_static_metadata(info);
+ 			assert(hdr->type1 == (cta != 0) && hdr->pq == (cta != 0));
+ 			assert((hdr->desired_content_max_luminance > 0) == (cta != 0));
++			colorimetry = di_info_get_supported_signal_colorimetry(info);
++			assert(colorimetry->bt2020_cycc == (cta != 0));
++			assert(colorimetry->bt2020_ycc == (cta != 0));
++			assert(colorimetry->bt2020_rgb == (cta != 0));
++			assert(colorimetry->st2113_rgb == (cta != 0));
+ 			di_info_destroy(reference);
+ 			di_info_destroy(info);
+ 		}
+-- 
+2.54.0 (Apple Git-157)
+
