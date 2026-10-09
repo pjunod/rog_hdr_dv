@@ -16,7 +16,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>HDR, Dolby Vision<br>and display quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 9, 2026 · native physical-luminance API compiled; review next</p></header>
+<p class="muted">Updated October 9, 2026 · native physical-luminance API reviewed and source-qualified</p></header>
 <div class="callout"><strong>Current physical result:</strong> the owner reports
 working HDR10 on the patched stack with Secure Boot enabled. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
@@ -26,7 +26,7 @@ and measured calibration are not yet qualified.</div>
 <tr><td>Public repository and provenance</td><td class="state active">Validated</td><td>Ordered series, public source URLs/hashes and pre-merge workflow. Adversarial findings resolved; 45 tests and integrity checks passed.</td></tr>
 <tr><td>Display-path diagnostic</td><td class="state active">Live capture complete</td><td>BT.2100, 2560×1600 at 240 Hz reported. Scanout disabled at capture; active-output quality qualification remains.</td></tr>
 <tr><td>Dolby processor feasibility</td><td class="state active">Load boundary found</td><td>COM/WinRT/MF initialized. Wine 11.0 resolves the API-set but lacks the required CreateFileFromAppW export. Processor activation remains open.</td></tr>
-<tr><td>General colour correctness</td><td class="state active">Source compiled</td><td>Delivered-source audit complete. Additive library physical-luminance API compiled on ARM64 and emulated x86-64; review and focused checks next; compositor target reporting follows without changing PQ normalization.</td></tr>
+<tr><td>General colour correctness</td><td class="state active">API qualified</td><td>Delivered-source audit complete. Additive library API reviewed, compiled and focused checks passed. Separate compositor build preparation is underway; physical target reporting follows without changing PQ normalization.</td></tr>
 <tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>Four factory profiles parsed privately. MHC2 transforms are identity; standard ICC characterisation differs by GPU route. Optical acceptance remains.</td></tr>
 <tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
 </tbody></table>
@@ -35,6 +35,7 @@ and measured calibration are not yet qualified.</div>
 incomplete public source-reconstruction inputs, and an incorrect base/candidate
 description. Those fixes and three further premerge findings are resolved. All 45 tests passed in one run; the source-bound probe compiled with warnings as errors.</p>
 <p>The second batch passed independent review and all 16 new ICC tests, with only one corrected fixture retried. Wine and profile experiments ran privately; the disposable container was removed.</p>
+<p>The third batch adds physical luminance without changing CTA metadata. All 12 selected checks passed with only the corrected fixture retried; previous consumer binaries also passed against the new libraries. No laptop packages changed.</p>
 <p>Independent review runs when the PR is ready, followed by one affected fast
 lane. Failed or invalidated checks are rerun individually. No automatic public
 CI job changes the laptop or runs proprietary components.</p>

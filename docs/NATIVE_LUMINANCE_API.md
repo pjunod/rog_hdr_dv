@@ -66,14 +66,24 @@ The compiler used `-Wall -Wextra -Wpedantic -Werror -std=c11 -Wconversion`.
 Only source archives entered the disposable containers; no credentials,
 repository metadata or OEM payloads were transferred.
 
-Final adversarial review and fast-lane execution are pending. The focused
+Independent adversarial review approved the API and the subsequent fixture-only
+correction with no findings. The [focused test receipt](../evidence/native-luminance-tests.json)
+records all 12 selected tests passing across the initial run and two failed-test-only
+retries. The synthetic CTA fixture initially set a reserved colourimetry bit;
+the fix changes test data and assertions only. The focused
 `displayid2-luminance` regression exercises the production parser/public API
 with synthetic EDID, including fractional and exceptional values, independent
 field presence, supported/unknown formats, truncation, object lifetime and
 unchanged high-level CTA semantics with either extension order. Existing
 parser, legacy-consumer and ABI regressions accompany it on each source base.
-No tests have run during implementation. i386, full Debian packaging and
-physical-output acceptance are separate outstanding qualifications.
+The [legacy binary receipt](../evidence/native-luminance-legacy.json) records
+both consumers built against the previous libraries passing against the new
+libraries on ARM64. These production library inputs are unchanged by the fixture
+correction. The [reconstruction receipt](../evidence/native-luminance-reconstruction.json)
+records complete patch-series equality with both final candidate trees. No
+passing suite was rerun for the fixture correction. i386, full Debian packaging
+and physical-output acceptance remain outstanding. The two owned library build
+containers were removed after retaining receipts.
 
 ## Next consumer boundary
 

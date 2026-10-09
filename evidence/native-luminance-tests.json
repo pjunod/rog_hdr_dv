@@ -1,0 +1,99 @@
+{
+  "date": "2026-10-09",
+  "reviewed_repository_commit": "6c23e7f9736d42076c737dcc261b690f3e5dc13b",
+  "fixture_delta_review": "Approved both final source candidates; no findings",
+  "architecture": "Linux x86_64 under Docker emulation",
+  "initial": {
+    "upstream": [
+      {
+        "name": "displayid2-interface",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "displayid2-luminance",
+        "result": "FAIL",
+        "exit_code": -6
+      },
+      {
+        "name": "displayid2-bounds",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "native-api-consumer",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "edid-extension-failures",
+        "result": "OK",
+        "exit_code": 0
+      }
+    ],
+    "ubuntu": [
+      {
+        "name": "native-hdr-abi",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "displayid2-bounds",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "displayid2-luminance",
+        "result": "FAIL",
+        "exit_code": -6
+      },
+      {
+        "name": "displayid2-private",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "displayid2-allocation",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "native-api-consumer",
+        "result": "OK",
+        "exit_code": 0
+      },
+      {
+        "name": "edid-extension-failures",
+        "result": "OK",
+        "exit_code": 0
+      }
+    ]
+  },
+  "focused_retries": {
+    "upstream": {
+      "candidate": "1ddb6ea03a59d2758d28c994eb5d91f969f36314",
+      "command": "meson test -C /work/fixed-build-upstream displayid2-luminance --print-errorlogs",
+      "tests": [
+        {
+          "name": "displayid2-luminance",
+          "result": "OK",
+          "exit_code": 0
+        }
+      ]
+    },
+    "ubuntu": {
+      "candidate": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+      "command": "meson test -C /work/fixed-build-ubuntu displayid2-luminance --print-errorlogs",
+      "tests": [
+        {
+          "name": "displayid2-luminance",
+          "result": "OK",
+          "exit_code": 0
+        }
+      ]
+    }
+  },
+  "result": "PASS: all 12 selected tests green across initial run and failed-test-only retries",
+  "failure_cause": "Synthetic CTA Colorimetry block set reserved MD0 bit (0x01). Corrected to valid ST2113 RGB flag (0x80), with reference and nonempty-colourimetry assertions. Production parser unchanged.",
+  "limits": "Synthetic parser/consumer tests, not package or physical qualification; unchanged Python and full library suites not rerun."
+}

@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-09",
+  "reviewed_repository_commit": "6c23e7f9736d42076c737dcc261b690f3e5dc13b",
+  "architecture": "Linux ARM64",
+  "method": "Execute binaries compiled from each previous candidate against the corresponding new library with explicit LD_LIBRARY_PATH",
+  "results": [
+    {
+      "component": "libdisplay-info",
+      "consumer_source_commit": "ce64f8f904243d6efed1365a7201f786757fa0b0",
+      "library_source_commit": "0fdd92514cb8643884310988e3ccd33abe88e180",
+      "command": "LD_LIBRARY_PATH=/work/final-build-upstream /work/build-upstream/test/native-api-consumer /work/final-upstream/test/data/qemu.edid",
+      "exit_code": 0,
+      "result": "PASS"
+    },
+    {
+      "component": "ubuntu-libdisplay-info",
+      "consumer_source_commit": "e1e1ddf4270db27acf984ab1f005daf64e9f0038",
+      "library_source_commit": "d067382c8ee9d13ce197751048601781df8b1a76",
+      "command": "LD_LIBRARY_PATH=/work/final-build-ubuntu /work/build-ubuntu/test/old-header-consumer /work/final-ubuntu/test/data/qemu.edid patched",
+      "exit_code": 0,
+      "result": "PASS",
+      "reported_loaded_library": "/work/final-build-ubuntu/libdisplay-info.so.0.3.0",
+      "reported_struct_sizes": {
+        "HDR": 20,
+        "signal": 5
+      }
+    }
+  ],
+  "limits": "Focused old-binary/new-library boundary check; not exhaustive ABI, i386 or package qualification."
+}
