@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import select
+import shutil
 import subprocess
 import tempfile
 import time
@@ -20,13 +21,14 @@ class ProtocolTests(unittest.TestCase):
             os.chmod(runtime, 0o700)
             env = dict(os.environ, XDG_RUNTIME_DIR=runtime, WAYLAND_DISPLAY='fixture')
             env.pop('WAYLAND_SOCKET', None)
+            env.pop('WAYLAND_DEBUG', None)
             server = subprocess.Popen([str(build / 'color-info-fixture'), scenario, str(version)],
                                       env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             try:
                 self.assertTrue(select.select([server.stdout], [], [], 2)[0], 'fixture startup timeout')
                 self.assertEqual(server.stdout.readline().strip(), 'READY')
                 started = time.monotonic()
-                probe = subprocess.run([str(build / 'wayland-color-info')], env=env,
+                probe = subprocess.run([str(build / 'wayland-color-info')], env=dict(env, WAYLAND_DEBUG='1'),
                                        capture_output=True, text=True, timeout=7)
                 elapsed = time.monotonic() - started
                 data = json.loads(probe.stdout)
@@ -45,6 +47,26 @@ class ProtocolTests(unittest.TestCase):
                     server.kill()
                     server.communicate()
 
+    def test_rejected_build_path_creates_nothing(self):
+        source = Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory(prefix='color-info-build-guard-') as tmp:
+            root = Path(tmp) / 'checkout'
+            probe = root / 'probes' / 'wayland_color_info'
+            probe.mkdir(parents=True)
+            (root / 'AGENTS.md').write_text('Synthetic checkout marker')
+            shutil.copyfile(source / 'build.sh', probe / 'build.sh')
+            output = root / 'not-created' / 'build'
+            result = subprocess.run(['sh', str(probe / 'build.sh'), str(output)],
+                                    capture_output=True, text=True, timeout=2)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(output.parent.exists())
+            alias = Path(tmp) / 'alias'
+            alias.symlink_to(root, target_is_directory=True)
+            result = subprocess.run(['sh', str(probe / 'build.sh'), str(alias / 'not-created')],
+                                    capture_output=True, text=True, timeout=2)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((root / 'not-created').exists())
+
     def test_versions_and_global_order(self):
         for version in (1, 2):
             for scenario in ('normal', 'manager-first', 'output-v1'):
@@ -59,11 +81,13 @@ class ProtocolTests(unittest.TestCase):
                     self.assertEqual(o['target_luminance']['raw'], [100, 616])
                     self.assertNotEqual(o['primaries']['raw'], o['target_primaries']['raw'])
                     self.assertTrue(o['tf_power']['present'] and o['tf_named']['present'])
+                    self.assertEqual(o['tf_named']['raw'], [2])
+                    self.assertEqual(o['tf_pair_consistency'], 'consistent')
                     self.assertEqual(o['target_max_cll']['raw'], [600])
                     self.assertEqual(o['target_max_fall']['raw'], [300])
 
     def test_non_success_protocol_cases(self):
-        for scenario in ('absent', 'duplicate', 'incomplete', 'remove', 'changed', 'failed', 'overflow', 'disconnect'):
+        for scenario in ('absent', 'duplicate', 'incomplete', 'remove', 'changed', 'failed', 'overflow', 'disconnect', 'contradictory-tf', 'manager-remove'):
             with self.subTest(scenario=scenario):
                 code, data, _ = self.capture(scenario)
                 self.assertNotEqual(code, 0)

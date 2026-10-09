@@ -10,7 +10,7 @@
 #include <wayland-server.h>
 #include "color-management-server.h"
 
-struct fixture { struct wl_display *display; struct wl_global *output; const char *scenario; unsigned version; int icc_write; };
+struct fixture { struct wl_display *display; struct wl_global *output, *manager; const char *scenario; unsigned version; int icc_write; };
 static void destroy(struct wl_client *client, struct wl_resource *resource) { (void)client; wl_resource_destroy(resource); }
 static const struct wl_output_interface output_impl={.release=destroy};
 static void bind_output(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
@@ -44,7 +44,8 @@ static void information(struct wl_client *client, struct wl_resource *descriptio
     } else {
         wp_image_description_info_v1_send_primaries(r,640000,330000,300000,600000,150000,60000,312700,329000);
         wp_image_description_info_v1_send_primaries_named(r,1);
-        wp_image_description_info_v1_send_tf_named(r,9);
+        wp_image_description_info_v1_send_tf_named(r, !strcmp(f->scenario,"contradictory-tf") ?
+            WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ : WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22);
         wp_image_description_info_v1_send_tf_power(r,22000);
         wp_image_description_info_v1_send_luminances(r,500,1000,203);
         if (!strcmp(f->scenario,"duplicate")) wp_image_description_info_v1_send_luminances(r,0,999,200);
@@ -64,6 +65,7 @@ static void get_description(struct wl_client *client, struct wl_resource *color,
     struct wl_resource *r=wl_resource_create(client,&wp_image_description_v1_interface,wl_resource_get_version(color),id);
     wl_resource_set_implementation(r,&description_impl,f,NULL);
     if (!strcmp(f->scenario,"hang")) return;
+    if (!strcmp(f->scenario,"manager-remove")) { wl_global_destroy(f->manager); f->manager=NULL; return; }
     if (!strcmp(f->scenario,"disconnect")) { wl_client_destroy(client); return; }
     if (!strcmp(f->scenario,"remove")) {
         wl_global_destroy(f->output); f->output=NULL;
@@ -86,7 +88,7 @@ static void bind_manager(struct wl_client *client, void *data, uint32_t version,
     struct wl_resource *r=wl_resource_create(client,&wp_color_manager_v1_interface,version,id);
     wl_resource_set_implementation(r,&manager_impl,data,NULL);
     wp_color_manager_v1_send_supported_primaries_named(r,1);
-    wp_color_manager_v1_send_supported_tf_named(r,9);
+    wp_color_manager_v1_send_supported_tf_named(r,WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22);
     wp_color_manager_v1_send_done(r);
 }
 int main(int argc, char **argv) {
@@ -96,11 +98,11 @@ int main(int argc, char **argv) {
     f.display=wl_display_create();
     if (!f.display || wl_display_add_socket(f.display,"fixture")) return 2;
     bool manager_first=!strcmp(f.scenario,"manager-first");
-    if (manager_first) wl_global_create(f.display,&wp_color_manager_v1_interface,f.version,&f,bind_manager);
+    if (manager_first) f.manager=wl_global_create(f.display,&wp_color_manager_v1_interface,f.version,&f,bind_manager);
     unsigned count=!strcmp(f.scenario,"overflow")?33:1;
     for (unsigned i=0;i<count;i++) f.output=wl_global_create(f.display,&wl_output_interface,
         !strcmp(f.scenario,"output-v1")?1:2,&f,bind_output);
-    if (!manager_first && strcmp(f.scenario,"absent")) wl_global_create(f.display,&wp_color_manager_v1_interface,f.version,&f,bind_manager);
+    if (!manager_first && strcmp(f.scenario,"absent")) f.manager=wl_global_create(f.display,&wp_color_manager_v1_interface,f.version,&f,bind_manager);
     puts("READY"); fflush(stdout);
     wl_display_run(f.display);
     wl_display_destroy_clients(f.display); wl_display_destroy(f.display);

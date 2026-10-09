@@ -74,6 +74,29 @@ static void save(struct output *o, enum field_id id, unsigned n, const int64_t *
     f->present = true; f->count = n;
     memcpy(f->raw, values, n * sizeof(*values));
 }
+/* Report only limited, explicit semantic checks, preserving unknown future enums. */
+static const char *tf_pair_status(struct output *o) {
+    struct field *named=&o->fields[TF_NAMED], *power=&o->fields[TF_POWER];
+    if (!named->present || !power->present) return "single_representation";
+    int64_t expected=0;
+    switch (named->raw[0]) {
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22: expected=22000; break;
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA28: expected=28000; break;
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR: expected=10000; break;
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST240:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_LOG_100:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_LOG_316:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_XVYCC:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG:
+    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4:
+        return "contradictory";
+    default: return "unverified";
+    }
+    return power->raw[0]==expected?"consistent":"contradictory";
+}
 static void info_done(void *data, struct wp_image_description_info_v1 *proxy) {
     struct output *o = data;
     event(o->app, 8);
@@ -81,6 +104,8 @@ static void info_done(void *data, struct wp_image_description_info_v1 *proxy) {
     o->info_done = true;
     wp_image_description_info_v1_destroy(proxy); /* local destroy: done is a server destructor */
     o->info = NULL;
+    if (!strcmp(tf_pair_status(o),"contradictory") ||
+        (o->fields[TF_NAMED].present && !o->fields[TF_NAMED].raw[0])) o->malformed=true;
     bool parametric=false;
     for (unsigned f=0;f<ICC;f++) parametric |= o->fields[f].present;
     if ((!o->fields[ICC].present || parametric) && !(o->fields[PRIMARIES].present &&
@@ -195,7 +220,9 @@ static void global(void *data, struct wl_registry *registry, uint32_t name, cons
 }
 static void removed(void *data, struct wl_registry *registry, uint32_t name) {
     (void)registry; struct app *a=data; event(a,12);
-    if (name==a->manager_global && a->manager) { a->manager_removed=true; a->unstable=true; }
+    if (name==a->manager_global && a->manager) {
+        a->manager_removed=true; a->unstable=true; if (!a->error) a->error="manager_removed";
+    }
     for (unsigned i=0;i<a->count;i++) if (a->outputs[i].global==name) {
         a->outputs[i].removed=true; a->unstable=true;
     }
@@ -278,7 +305,8 @@ static struct wl_display *connect_display(struct app *a) {
     int flags=fcntl(fd,F_GETFL);
     if (flags<0 || fcntl(fd,F_SETFL,flags|O_NONBLOCK)<0) { close(fd); a->error="connection"; return NULL; }
     struct wl_display *display=wl_display_connect_to_fd(fd);
-    if (!display) { close(fd); a->error="connection"; }
+    /* Pinned libwayland1.26.0 consumes fd on success AND failure. */
+    if (!display) a->error="connection";
     return display;
 }
 static bool finished(struct app *a) {
@@ -297,8 +325,8 @@ static const char *output_status(struct output *o) {
     return "complete";
 }
 static void report(struct app *a, bool success) {
-    printf("{\"schema\":1,\"status\":\"%s\",\"reason\":\"%s\",\"identifier_scope\":\"session_local\","
-        "\"snapshot_consistency\":\"%s\",\"manager_version\":%u,\"manager_done\":%s,"
+    printf("{\"schema\":1,\"status\":\"%s\",\"reason\":\"%s\",\"identifier_scope\":\"session_local\",\"semantic_checks\":\"required_fields_and_known_tf_pairs_only\","
+        "\"snapshot_consistency\":\"%s\",\"manager_version\":%u,\"manager_done\":%s,\"manager_removed\":%s,"
         "\"limits\":{\"outputs\":32,\"events\":8192,\"event_bytes\":1048576,\"deadline_ms\":5000},"
         "\"scales\":{\"chromaticity\":1000000,\"tf_power\":10000,\"minimum_luminance\":10000,"
         "\"other_luminance\":1},\"luminance_unit\":\"cd/m2\","
@@ -307,13 +335,13 @@ static void report(struct app *a, bool success) {
         "\"blue_x\",\"blue_y\",\"white_x\",\"white_y\"],"
         "\"luminances\":[\"min\",\"max\",\"reference\"],\"target_luminance\":[\"min\",\"max\"]},\"outputs\":[",
         success?"complete":"incomplete",a->error?a->error:(a->unstable?"unstable":(success?"none":"output_incomplete")),
-        a->unstable?"unstable":"bounded_observation",a->manager_version,a->manager_done?"true":"false");
+        a->unstable?"unstable":"bounded_observation",a->manager_version,a->manager_done?"true":"false",a->manager_removed?"true":"false");
     for (unsigned i=0;i<a->count;i++) {
         struct output *o=&a->outputs[i];
         printf("%s{\"ordinal\":%u,\"global\":%u,\"wl_output_version\":%u,\"status\":\"%s\","
             "\"description_identity\":{\"present\":%s,\"hi\":%u,\"lo\":%u},\"information_done\":%s,"
-            "\"failure_cause\":%s",i?",":"",i,o->global,o->version,output_status(o),
-            o->ready?"true":"false",o->identity_hi,o->identity_lo,o->info_done?"true":"false",o->failed?"":"null");
+            "\"tf_pair_consistency\":\"%s\",\"failure_cause\":%s",i?",":"",i,o->global,o->version,output_status(o),
+            o->ready?"true":"false",o->identity_hi,o->identity_lo,o->info_done?"true":"false",tf_pair_status(o),o->failed?"":"null");
         if (o->failed) printf("%u",o->failure_cause);
         for (unsigned f=0;f<FIELD_COUNT;f++) {
             struct field *field=&o->fields[f];
@@ -343,6 +371,8 @@ int main(int argc, char **argv) {
     int64_t start=now_ms(); a.deadline=start+DEADLINE_MS;
     if (start<0) a.error="clock";
     wl_log_set_handler_client(quiet_log);
+    /* Debug tracing can include private metadata, independently of error logging. */
+    if (unsetenv("WAYLAND_DEBUG")) a.error="privacy_environment";
     if (!a.error) a.display=connect_display(&a);
     if (a.display) {
         a.registry=wl_display_get_registry(a.display);
