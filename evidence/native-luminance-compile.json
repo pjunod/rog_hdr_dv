@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "upstream": {
+    "base": "ce64f8f904243d6efed1365a7201f786757fa0b0",
+    "candidate": "0fdd92514cb8643884310988e3ccd33abe88e180",
+    "tree": "71e919e553b56a2ec3b3b13b42a87f80e423ccaa",
+    "archive_sha256": "2eea8fe7ab05e2cb6e122377ee764262a8f084bebc629daf8e529568eb5d5629"
+  },
+  "ubuntu": {
+    "base": "e1e1ddf4270db27acf984ab1f005daf64e9f0038",
+    "candidate": "d067382c8ee9d13ce197751048601781df8b1a76",
+    "tree": "c958469da131fcf0ca81e501bee707b602dc893e",
+    "archive_sha256": "75379c68537a464a793e7567efd2f1e3498eadd4358a86b4f0e4b603c325849b"
+  },
+  "tools": {
+    "gcc": "12.2.0-14+deb12u1",
+    "meson": "1.0.1",
+    "ninja": "1.11.1",
+    "hwdata": "0.368"
+  },
+  "compile": {
+    "result": "passed",
+    "architectures": [
+      "aarch64",
+      "x86_64 (Docker emulated)"
+    ],
+    "meson_options": [
+      "-Dwerror=true"
+    ],
+    "source_transport": "git archive HEAD; no .git, credentials, OEM or host mounts",
+    "tests_executed": false,
+    "focused_test_name": "displayid2-luminance"
+  },
+  "pending": [
+    "adversarial review",
+    "focused tests",
+    "ABI and legacy execution checks",
+    "i386 and full package qualification",
+    "physical output acceptance"
+  ],
+  "date": "2026-10-09",
+  "limits": "Source compilation only; x86-64 uses Docker emulation. No i386, package delivery or physical acceptance."
+}

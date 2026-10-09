@@ -1,0 +1,498 @@
+From d067382c8ee9d13ce197751048601781df8b1a76 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 00:13:14 -0400
+Subject: [PATCH] feat(displayid2): backport additive physical luminance API
+ for hdr7
+
+---
+ debian/changelog                     |  12 ++
+ debian/libdisplay-info3.symbols      |   1 +
+ displayid2.c                         |  56 +++++-
+ include/displayid2.h                 |   4 +
+ include/libdisplay-info/displayid2.h |  37 ++++
+ test/displayid2-luminance.c          | 280 +++++++++++++++++++++++++++
+ test/meson.build                     |   4 +
+ 7 files changed, 393 insertions(+), 1 deletion(-)
+ create mode 100644 test/displayid2-luminance.c
+
+diff --git a/debian/changelog b/debian/changelog
+index c526bc8..49c7078 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,15 @@
++libdisplay-info (0.3.0-1ubuntu1~hdr7) UNRELEASED; urgency=medium
++
++  * Add a low-level optional DisplayID2 minimum-guaranteed physical luminance
++    getter, preserving fractional values and independent field presence.
++  * Keep CTA desired-content metadata, existing public layouts and opaque
++    Display Parameters handling unchanged. This source candidate is not an
++    installed or delivered package; packaging qualification remains pending.
++  * Record the new additive symbol's minimum at hdr7~ and add focused synthetic
++    production-parser coverage.
++
++ -- Codex <codex@invalid>  Fri, 09 Oct 2026 00:00:00 +0000
++
+ libdisplay-info (0.3.0-1ubuntu1~hdr6) stonking; urgency=medium
+ 
+   * Mark symbols introduced between private downstream revisions with the
+diff --git a/debian/libdisplay-info3.symbols b/debian/libdisplay-info3.symbols
+index 8d91dfa..570c6fc 100644
+--- a/debian/libdisplay-info3.symbols
++++ b/debian/libdisplay-info3.symbols
+@@ -29,6 +29,7 @@ libdisplay-info.so.3 libdisplay-info3 #MINVER#
+  di_cvt_compute@Base 0.3.0
+  di_displayid2_data_block_get_cta_data_blocks@Base 0.3.0-1ubuntu1~hdr4~
+  di_displayid2_data_block_get_interface_features@Base 0.3.0-1ubuntu1~hdr4~
++ di_displayid2_data_block_get_luminance@Base 0.3.0-1ubuntu1~hdr7~
+  di_displayid2_data_block_get_tag@Base 0.3.0-1ubuntu1~hdr4~
+  di_displayid2_get_data_blocks@Base 0.3.0-1ubuntu1~hdr4~
+  di_displayid2_get_product_primary_use_case@Base 0.3.0
+diff --git a/displayid2.c b/displayid2.c
+index 32ec5b3..14b56c6 100644
+--- a/displayid2.c
++++ b/displayid2.c
+@@ -1,5 +1,6 @@
+ #include <errno.h>
+ #include <inttypes.h>
++#include <math.h>
+ #include <stdlib.h>
+ #include <sys/types.h>
+ 
+@@ -135,6 +136,48 @@ parse_interface_features(struct di_displayid2 *displayid2,
+ 	return true;
+ }
+ 
++static bool
++decode_luminance(const uint8_t data[2], float *value)
++{
++	uint16_t bits = (uint16_t) (data[0] | (data[1] << 8));
++	unsigned int exponent = (bits >> 10) & 0x1F;
++	unsigned int fraction = bits & 0x3FF;
++
++	/* Includes the do-not-use -0 sentinel, all signed values, infinity and NaN. */
++	if ((bits & 0x8000) || exponent == 0x1F)
++		return false;
++
++	if (exponent == 0)
++		*value = ldexpf((float) fraction, -24);
++	else
++		*value = ldexpf((float) (fraction | 0x400), (int) exponent - 25);
++	return true;
++}
++
++static void
++parse_luminance(struct di_displayid2_data_block *block,
++		const uint8_t *data, size_t size)
++{
++	struct di_displayid2_luminance *luminance = &block->luminance;
++
++	/* DisplayID 2.0/2.1 Display Parameters: exactly 29 payload bytes.
++	 * Header bit 7 selects image-size units; bits 6:3 are not understood.
++	 * Feature bits 4:3 must declare minimum-guaranteed physical values.
++	 * Keep unsupported optional data opaque, without new legacy diagnostics.
++	 */
++	if (size != DISPLAYID2_DATA_BLOCK_HEADER_SIZE + 29 ||
++	    (data[1] & 0x7F) > 1 || (data[0x0B] & 0x18))
++		return;
++
++	block->has_luminance_format = true;
++	luminance->has_max_luminance_full =
++		decode_luminance(data + 0x18, &luminance->max_luminance_full);
++	luminance->has_max_luminance_10pct =
++		decode_luminance(data + 0x1A, &luminance->max_luminance_10pct);
++	luminance->has_min_luminance =
++		decode_luminance(data + 0x1C, &luminance->min_luminance);
++}
++
+ static ssize_t
+ parse_data_block(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		 size_t size)
+@@ -176,8 +219,10 @@ parse_data_block(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		if (!parse_interface_features(displayid2, data_block, data, data_block_size))
+ 			goto skip;
+ 		break;
+-	case DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID:
+ 	case DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS:
++		parse_luminance(data_block, data, data_block_size);
++		break;
++	case DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID:
+ 	case DI_DISPLAYID2_DATA_BLOCK_TYPE_VII_TIMING:
+ 	case DI_DISPLAYID2_DATA_BLOCK_TYPE_VIII_TIMING:
+ 	case DI_DISPLAYID2_DATA_BLOCK_TYPE_IX_TIMING:
+@@ -404,3 +449,12 @@ di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_
+ 		return NULL;
+ 	return &data_block->interface_features;
+ }
++
++const struct di_displayid2_luminance *
++di_displayid2_data_block_get_luminance(const struct di_displayid2_data_block *data_block)
++{
++	if (data_block->tag != DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS ||
++	    !data_block->has_luminance_format)
++		return NULL;
++	return &data_block->luminance;
++}
+diff --git a/include/displayid2.h b/include/displayid2.h
+index 3463a0c..5c1b882 100644
+--- a/include/displayid2.h
++++ b/include/displayid2.h
+@@ -51,6 +51,10 @@ struct di_displayid2_data_block {
+ 
+ 	struct di_displayid2_interface_features interface_features;
+ 
++	/* Optional known-format Display Parameters physical luminance. */
++	struct di_displayid2_luminance luminance;
++	bool has_luminance_format;
++
+ 	/* Used for DI_DISPLAYID2_DATA_BLOCK_CTA861 */
+ 	struct {
+ 		/* NULL-terminated */
+diff --git a/include/libdisplay-info/displayid2.h b/include/libdisplay-info/displayid2.h
+index 585189f..594379c 100644
+--- a/include/libdisplay-info/displayid2.h
++++ b/include/libdisplay-info/displayid2.h
+@@ -118,6 +118,43 @@ di_displayid2_get_product_primary_use_case(const struct di_displayid2 *displayid
+ const struct di_cta_data_block *const *
+ di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *data_block);
+ 
++/**
++ * Native physical luminance from a DisplayID v2 Display Parameters Data Block.
++ *
++ * Values are minimum-guaranteed physical declarations in cd/m2, not CTA
++ * desired-content metadata, a selected rendering target, or optical measurements.
++ * Full coverage and 10% rectangular coverage are separate operating conditions.
++ * Individual finite nonnegative binary16 values are preserved, including zero
++ * and subnormal values. A false presence flag means the value is unavailable;
++ * the corresponding scalar is zero and must not be used.
++ *
++ * These independent declarations need not form a physically consistent range.
++ * Callers must validate consistency and choose their own rendering-target policy.
++ * Their presence does not imply HDR or any particular transfer-function support.
++ */
++struct di_displayid2_luminance {
++	float min_luminance;
++	float max_luminance_full;
++	float max_luminance_10pct;
++	bool has_min_luminance;
++	bool has_max_luminance_full;
++	bool has_max_luminance_10pct;
++};
++
++/**
++ * Get native physical luminance from a Display Parameters Data Block.
++ *
++ * Only the 29-byte payload, revisions 0 and 1 (with the image-size unit flag),
++ * and minimum-guaranteed luminance class are supported. Returns NULL for another
++ * block tag or an unsupported format/class. An invalid individual value only
++ * clears its presence flag; it does not discard other fields or reject the block.
++ *
++ * The returned pointer is owned by the parsed DisplayID object and remains valid
++ * for its lifetime. Existing high-level CTA metadata getters are unaffected.
++ */
++const struct di_displayid2_luminance *
++di_displayid2_data_block_get_luminance(const struct di_displayid2_data_block *data_block);
++
+ /** Supported RGB/YCbCr 4:4:4 bit-depth flags. */
+ enum di_displayid2_bit_depth_444 {
+ 	DI_DISPLAYID2_BIT_DEPTH_444_6 = 1 << 0,
+diff --git a/test/displayid2-luminance.c b/test/displayid2-luminance.c
+new file mode 100644
+index 0000000..9bf5f1d
+--- /dev/null
++++ b/test/displayid2-luminance.c
+@@ -0,0 +1,280 @@
++/* Synthetic EDID exercises the production parser and public low-level API. */
++#include <assert.h>
++#include <math.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#include <libdisplay-info/displayid2.h>
++#include <libdisplay-info/edid.h>
++#include <libdisplay-info/info.h>
++
++static uint8_t base[128];
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static void
++put_u16(uint8_t *data, uint16_t value)
++{
++	data[0] = (uint8_t) value;
++	data[1] = (uint8_t) (value >> 8);
++}
++
++static void
++parameters(uint8_t data[33])
++{
++	memset(data, 0, 33);
++	data[0] = 0x21;
++	data[2] = 29;
++	/* Synthetic limits, not a capture of any physical device. */
++	put_u16(data + 0x18, 0x5E40); /* Full coverage: 400 cd/m2. */
++	put_u16(data + 0x1A, 0x60D0); /* 10% coverage: 616 cd/m2. */
++	put_u16(data + 0x1C, 0x1019); /* Fractional minimum. */
++}
++
++static struct di_info *
++parse(const uint8_t *blocks, size_t size, bool cta, bool reverse)
++{
++	static const uint8_t metadata[] = {
++		0xE6, 0x06, 0x05, 0x01, 0x80, 0x70, 0x20,
++		0xE3, 0x05, 0xE0, 0x01,
++	};
++	uint8_t edid[384] = {0}, *ext;
++	struct di_info *info;
++
++	assert(size <= 121);
++	memcpy(edid, base, sizeof(base));
++	edid[126] = cta ? 2 : 1;
++	checksum(edid, 128);
++	ext = edid + (cta && reverse ? 256 : 128);
++	ext[0] = 0x70;
++	ext[1] = 0x20;
++	ext[2] = (uint8_t) size;
++	ext[3] = 2;
++	if (size)
++		memcpy(ext + 5, blocks, size);
++	checksum(ext + 1, size + 5);
++	checksum(ext, 128);
++	if (cta) {
++		ext = edid + (reverse ? 128 : 256);
++		ext[0] = 0x02;
++		ext[1] = 3;
++		ext[2] = 4 + sizeof(metadata);
++		memcpy(ext + 4, metadata, sizeof(metadata));
++		checksum(ext, 128);
++	}
++	info = di_info_parse_edid(edid, cta ? sizeof(edid) : 256);
++	assert(info);
++	return info;
++}
++
++static const struct di_displayid2_data_block *
++get_block(const struct di_info *info)
++{
++	const struct di_edid_ext *const *exts;
++	const struct di_displayid2 *displayid2;
++	const struct di_displayid2_data_block *const *blocks;
++	size_t i;
++
++	exts = di_edid_get_extensions(di_info_get_edid(info));
++	for (i = 0; exts[i]; i++) {
++		displayid2 = di_edid_ext_get_displayid2(exts[i]);
++		if (!displayid2)
++			continue;
++		blocks = di_displayid2_get_data_blocks(displayid2);
++		if (blocks[0]) {
++			assert(!blocks[1]);
++			return blocks[0];
++		}
++	}
++	return NULL;
++}
++
++static void
++legacy_equal(const struct di_info *info, const struct di_info *reference)
++{
++	const struct di_hdr_static_metadata *a = di_info_get_hdr_static_metadata(info);
++	const struct di_hdr_static_metadata *b = di_info_get_hdr_static_metadata(reference);
++	const struct di_supported_signal_colorimetry *c = di_info_get_supported_signal_colorimetry(info);
++	const struct di_supported_signal_colorimetry *d = di_info_get_supported_signal_colorimetry(reference);
++
++	assert(a->type1 == b->type1 && a->traditional_sdr == b->traditional_sdr);
++	assert(a->traditional_hdr == b->traditional_hdr && a->pq == b->pq && a->hlg == b->hlg);
++	assert(a->desired_content_max_luminance == b->desired_content_max_luminance);
++	assert(a->desired_content_max_frame_avg_luminance == b->desired_content_max_frame_avg_luminance);
++	assert(a->desired_content_min_luminance == b->desired_content_min_luminance);
++	assert(c->bt2020_cycc == d->bt2020_cycc && c->bt2020_ycc == d->bt2020_ycc);
++	assert(c->bt2020_rgb == d->bt2020_rgb && c->st2113_rgb == d->st2113_rgb && c->ictcp == d->ictcp);
++}
++
++static void
++check_known(void)
++{
++	uint8_t data[33];
++	struct di_info *info, *reference;
++	const struct di_displayid2_luminance *luminance;
++	const struct di_hdr_static_metadata *hdr;
++	size_t cta, reverse;
++
++	parameters(data);
++	for (cta = 0; cta < 2; cta++) {
++		for (reverse = 0; reverse < 2; reverse++) {
++			info = parse(data, 32, cta != 0, reverse != 0);
++			reference = parse(NULL, 0, cta != 0, reverse != 0);
++			assert(!di_info_get_failure_msg(info));
++			assert(!di_edid_has_extension_failures(di_info_get_edid(info)));
++			luminance = di_displayid2_data_block_get_luminance(get_block(info));
++			assert(luminance && luminance->has_min_luminance);
++			assert(luminance->has_max_luminance_full && luminance->has_max_luminance_10pct);
++			assert(luminance->min_luminance == 1049.0f / 2097152.0f);
++			assert(luminance->max_luminance_full == 400.0f);
++			assert(luminance->max_luminance_10pct == 616.0f);
++			/* Repeated retrieval has parsed-object lifetime, not temporary storage. */
++			assert(luminance == di_displayid2_data_block_get_luminance(get_block(info)));
++			legacy_equal(info, reference);
++			hdr = di_info_get_hdr_static_metadata(info);
++			assert(hdr->type1 == (cta != 0) && hdr->pq == (cta != 0));
++			assert((hdr->desired_content_max_luminance > 0) == (cta != 0));
++			di_info_destroy(reference);
++			di_info_destroy(info);
++		}
++	}
++}
++
++static void
++check_values(void)
++{
++	static const struct {
++		uint16_t bits;
++		bool present;
++		float expected;
++	} cases[] = {
++		{0x0000, true, 0.0f},
++		{0x0001, true, 0x1p-24f},
++		{0x03FF, true, 1023.0f * 0x1p-24f},
++		{0x0400, true, 0x1p-14f},
++		{0x3800, true, 0.5f},
++		{0x7BFF, true, 65504.0f},
++		{0x8000, false, 0.0f}, /* Do not use, not valid positive zero. */
++		{0x8001, false, 0.0f},
++		{0xBC00, false, 0.0f},
++		{0x7C00, false, 0.0f},
++		{0xFC00, false, 0.0f},
++		{0x7E00, false, 0.0f},
++		{0x7FFF, false, 0.0f},
++		{0xFFFF, false, 0.0f},
++	};
++	uint8_t data[33];
++	struct di_info *info;
++	const struct di_displayid2_luminance *luminance;
++	bool presence[3];
++	float values[3];
++	size_t i, field;
++
++	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
++		for (field = 0; field < 3; field++) {
++			parameters(data);
++			put_u16(data + 0x18 + 2 * field, cases[i].bits);
++			info = parse(data, 32, false, false);
++			assert(!di_info_get_failure_msg(info));
++			luminance = di_displayid2_data_block_get_luminance(get_block(info));
++			assert(luminance);
++			presence[0] = luminance->has_max_luminance_full;
++			presence[1] = luminance->has_max_luminance_10pct;
++			presence[2] = luminance->has_min_luminance;
++			values[0] = luminance->max_luminance_full;
++			values[1] = luminance->max_luminance_10pct;
++			values[2] = luminance->min_luminance;
++			assert(presence[field] == cases[i].present);
++			assert(values[field] == cases[i].expected);
++			assert(presence[(field + 1) % 3] && presence[(field + 2) % 3]);
++			/* Raw scalar decoding does not enforce physical range relationships. */
++			di_info_destroy(info);
++		}
++	}
++	parameters(data);
++	for (field = 0; field < 3; field++)
++		put_u16(data + 0x18 + 2 * field, 0x8000);
++	info = parse(data, 32, false, false);
++	luminance = di_displayid2_data_block_get_luminance(get_block(info));
++	assert(luminance && !luminance->has_min_luminance);
++	assert(!luminance->has_max_luminance_full && !luminance->has_max_luminance_10pct);
++	di_info_destroy(info);
++}
++
++static void
++check_format(uint8_t revision, uint8_t features, uint8_t payload, bool known)
++{
++	uint8_t data[33];
++	struct di_info *info, *reference;
++	const struct di_displayid2_data_block *block;
++
++	assert(payload <= 30);
++	parameters(data);
++	data[1] = revision;
++	data[2] = payload;
++	data[0x0B] = features;
++	info = parse(data, (size_t) payload + 3, false, false);
++	reference = parse(NULL, 0, false, false);
++	block = get_block(info);
++	/* Optional format rejection preserves the existing opaque block and status. */
++	assert(block && di_displayid2_data_block_get_tag(block) == DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS);
++	assert((di_displayid2_data_block_get_luminance(block) != NULL) == known);
++	assert(!di_info_get_failure_msg(info));
++	assert(!di_edid_has_extension_failures(di_info_get_edid(info)));
++	legacy_equal(info, reference);
++	di_info_destroy(reference);
++	di_info_destroy(info);
++}
++
++static void
++check_formats(void)
++{
++	uint8_t data[33];
++	struct di_info *info;
++	size_t i;
++
++	for (i = 0; i <= 30; i++)
++		check_format(0, 0, (uint8_t) i, i == 29);
++	for (i = 0; i < 256; i++)
++		check_format((uint8_t) i, 0, 29, i == 0 || i == 1 || i == 0x80 || i == 0x81);
++	for (i = 0; i < 256; i++)
++		check_format(0, (uint8_t) i, 29, !(i & 0x18));
++	parameters(data);
++	data[0] = 0x20;
++	info = parse(data, 32, false, false);
++	assert(get_block(info) && !di_displayid2_data_block_get_luminance(get_block(info)));
++	di_info_destroy(info);
++	parameters(data);
++	info = parse(data, 31, false, false); /* Existing envelope truncation error. */
++	assert(!get_block(info));
++	assert(di_edid_has_extension_failures(di_info_get_edid(info)));
++	assert(di_info_get_failure_msg(info));
++	di_info_destroy(info);
++}
++
++int
++main(int argc, char **argv)
++{
++	FILE *file;
++
++	assert(argc == 2);
++	file = fopen(argv[1], "rb");
++	assert(file && fread(base, sizeof(base), 1, file) == 1);
++	fclose(file);
++	check_known();
++	check_values();
++	check_formats();
++	puts("DisplayID physical luminance, independent presence and legacy CTA semantics: PASS");
++	return 0;
++}
+diff --git a/test/meson.build b/test/meson.build
+index ff06604..47b073b 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -120,3 +120,7 @@ test('native-api-consumer', native_api_consumer, args: files('data/qemu.edid'))
+ extension_failures = executable('edid-extension-failures', 'edid-extension-failures.c',
+ 	dependencies: di_dep)
+ test('edid-extension-failures', extension_failures, args: files('data/qemu.edid'))
++
++luminance = executable('displayid2-luminance', 'displayid2-luminance.c',
++	dependencies: di_dep)
++test('displayid2-luminance', luminance, args: files('data/qemu.edid'))
+-- 
+2.54.0 (Apple Git-157)
+

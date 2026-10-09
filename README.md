@@ -31,6 +31,8 @@ from Dolby activation. [ICC characterisation](docs/ICC_CHARACTERISATION.md)
 explains private inspection of factory profile data.
 [The colour pipeline audit](docs/COLOUR_PIPELINE_AUDIT.md) traces encoding,
 target-volume reporting, calibration and KMS metadata in pinned source.
+[Native luminance API](docs/NATIVE_LUMINANCE_API.md) documents the additive
+physical-declaration API and its source-only qualification boundary.
 
 ## Work with the repository
 
@@ -53,8 +55,8 @@ any live compositor or kernel update.
 - `patches/libdisplay-info/` · `patches/mutter/` — current upstream-facing
   proposals, with exact bases in `sources.json`.
 - `patches/ubuntu-libdisplay-info/` · `patches/ubuntu-mutter/` — complete
-  local changes from authenticated Ubuntu source imports to the delivered
-  package source. These are alternative packaging paths to the upstream series.
+  local changes from authenticated Ubuntu source imports, including the
+  delivered prefixes and explicitly marked unreleased candidates. These are alternative packaging paths to the upstream series.
 - `patches/linux/` — four native luminance/backlight/parser-test patches.
 - `sources.json` · `SHA256SUMS` — source identities and patch integrity.
 - `docs/` — maintained technical documentation, indexed above.

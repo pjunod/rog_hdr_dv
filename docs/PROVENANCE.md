@@ -11,7 +11,7 @@ was not a Git repository; it contains independent upstream/package checkouts,
 patch exports, large build artifacts and historical documentation. It remains
 intact. No source checkout, recovery package or signing key was moved away.
 
-The current upstream library and Mutter exports were copied byte-for-byte.
+The originally imported upstream library and Mutter exports were copied byte-for-byte.
 The four frozen kernel patches were copied byte-for-byte from
 `kernel/candidate/native-hdr1/`. Complete Ubuntu series were exported from
 each authenticated source-import commit to the final delivered package source.
@@ -25,6 +25,11 @@ records exact matches for four affected source files. Its test Makefile hunk
 could not be reapplied because that file is absent from the saved baseline
 subset. This migration check is partial; the earlier full-build receipts
 remain separate evidence. No new Linux compilation or hardware test ran.
+
+Subsequent source changes append separate patches; the original import receipts
+remain historical. The [native luminance API](NATIVE_LUMINANCE_API.md) extends
+both library series beyond those imported candidates. Its qualification is
+recorded separately, and installed hdr6 remains pinned as the delivered prefix.
 
 Only the active source paths were imported. The earlier high-level native
 HDR promotion proposal is superseded by the additive parser/explicit-consumer

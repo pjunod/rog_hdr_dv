@@ -24,7 +24,7 @@ private. Full Dolby Vision remains unimplemented/unqualified.
 
 ## Active source correction — physical luminance without fabricated metadata
 
-An additive libdisplay-info low-level API is in implementation for the native
+An additive [libdisplay-info low-level API](NATIVE_LUMINANCE_API.md) is implemented for the native
 DisplayID 2 display-parameters luminance fields. It preserves fractional
 physical minimum/full-frame/small-window data and distinguishes absent fields
 from zero. It leaves legacy CTA desired-content metadata unchanged, so a
@@ -32,7 +32,8 @@ future compositor target policy can use physical declarations explicitly.
 
 The work uses independent source clones and a disposable compiler environment.
 It is source work only: no package installation or display change on the host.
-Review, focused regression and publication receipts remain pending. The
+Both source candidates compiled with warnings as errors on Linux ARM64 and
+emulated x86-64. Review, focused regression and publication remain pending. The
 compositor target-volume correction follows this data-source boundary.
 
 ## Second batch — reviewed tools and concrete remaining contracts
