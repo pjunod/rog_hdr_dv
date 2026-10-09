@@ -81,8 +81,10 @@ correcting one malformed fixture. Unchanged suites were not rerun. The
 
 Mutter's `PowerSaveMode` returned `3` (off), consistent with the prior disabled
 scanout capture. Awake-output and optical acceptance remain open. Availability
-of a measurement instrument and official reference-tool package is unanswered;
-software source corrections can proceed independently.
+of an official reference-tool package is unanswered. The owner currently has
+no colourimeter or spectrophotometer and is open to obtaining one. Define the
+measurement procedure before selecting equipment; software corrections proceed
+independently.
 
 | Component | State | Remaining evidence/work |
 |---|---|---|

@@ -128,3 +128,11 @@ these TRCs directly to an arbitrary PQ-encoded KMS stage.
 The source audit's missing display-characterisation/target-volume contracts
 remain relevant. Optical measurement and an active-output trace are still
 required before selecting or qualifying tuning for this physical unit.
+
+## Measurement equipment
+
+The owner currently has no colourimeter or spectrophotometer and is open to
+obtaining one. Instrument selection follows the OLED measurement procedure and
+required correction/reference data; no purchase is required for the ongoing
+software work. Factory declarations and parsed profiles remain separate from
+optical calibration of this unit.
