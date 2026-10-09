@@ -16,7 +16,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>HDR, Dolby Vision<br>and display quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 9, 2026 · library API merged; compositor target feedback in implementation</p></header>
+<p class="muted">Updated October 9, 2026 · library API merged; compositor and Wine candidates preparing for review</p></header>
 <div class="callout"><strong>Current physical result:</strong> the owner reports
 working HDR10 on the patched stack with Secure Boot enabled. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
@@ -25,11 +25,12 @@ and measured calibration are not yet qualified.</div>
 <tr><td>Existing HDR stack</td><td class="state done">Implemented</td><td>28 imported patches; library, compositor and kernel baseline recorded. Transition/resume acceptance remains.</td></tr>
 <tr><td>Public repository and provenance</td><td class="state active">Validated</td><td>Ordered series, public source URLs/hashes and pre-merge workflow. Adversarial findings resolved; 45 tests and integrity checks passed.</td></tr>
 <tr><td>Display-path diagnostic</td><td class="state active">Live capture complete</td><td>BT.2100, 2560×1600 at 240 Hz reported. Scanout disabled at capture; active-output quality qualification remains.</td></tr>
-<tr><td>Dolby processor feasibility</td><td class="state active">Load boundary found</td><td>COM/WinRT/MF initialized. Wine 11.0 resolves the API-set but lacks the required CreateFileFromAppW export. Processor activation remains open.</td></tr>
-<tr><td>General colour correctness</td><td class="state active">API qualified</td><td>Delivered-source audit complete. Additive library API reviewed, compiled and focused checks passed. Mutter baseline compiled with warnings as errors; native physical target feedback is in implementation without changing PQ normalization.</td></tr>
+<tr><td>Dolby processor feasibility</td><td class="state active">Load boundary found</td><td>COM/WinRT/MF initialized. Wine 11.0 resolves the API-set but lacks the required CreateFileFromAppW export. The missing function is implemented and compiled; runtime tests await review. Processor activation remains open.</td></tr>
+<tr><td>General colour correctness</td><td class="state active">API qualified</td><td>Delivered-source audit complete. Additive library API reviewed, compiled and focused checks passed. Mutter production target feedback compiled with warnings as errors; focused regressions are being prepared. PQ normalization is unchanged.</td></tr>
 <tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>Four factory profiles parsed privately. MHC2 transforms are identity; standard ICC characterisation differs by GPU route. Optical acceptance remains.</td></tr>
 <tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
 </tbody></table>
+<p>Official Dolby Professional Tools v5.6.4 is available privately; execution awaits the owner’s installer license acceptance. A synthetic PQ corpus generator is implemented for the reference workflow.</p>
 <h2>Validated batches</h2>
 <p>The initial adversarial review found three issues: patch-order validation,
 incomplete public source-reconstruction inputs, and an incorrect base/candidate

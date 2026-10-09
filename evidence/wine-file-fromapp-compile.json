@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "source": {
+    "release": "Wine11.0",
+    "commit": "db11d0fe6a169c457e23d007e20404643d067aa8",
+    "tree": "c143c87e72ecf5e6795b7bd802983bec54c345f4",
+    "archive_sha256": "1f14b50ac8f485b39edb78088c32037da6f3452c31edd2fe970dc8726ce7c99d",
+    "branch": "codex/file-fromapp"
+  },
+  "evidence_limits": [
+    "native Windows behavior baseline unavailable",
+    "desktop Wine process-model compatibility only",
+    "no AppContainer security or Dolby Vision qualification claim"
+  ],
+  "candidate": {
+    "commit": "68c5cce867c8c5dc7e318eefc4c13f832d0471fa",
+    "tree": "387cfcb18f0870100227fe059d804f2c16249c89",
+    "archive_sha256": "8cddc3ebebdf314b84fa369db5354379183312ac728baf5c793bdc72e72d4f7e",
+    "kernelbase_sha256": "deb6b2218e05cca05319140a6a35cec1d2a90e1c45b16828e192d7456f223b32",
+    "test_exe_sha256": "f5a59ee7e9aea85ea3e7f2eda7352593f21e6b85816fb40a309e99b262de9055",
+    "test_entry": "file_fromapp",
+    "tested": false,
+    "wrapper_rva": "0x13f00",
+    "delegate_rva": "0x143f0"
+  },
+  "compile_receipt": {
+    "baseline_seconds": 79,
+    "platform": "native-linux-amd64",
+    "native_gcc": "13.3.0",
+    "mingw_gcc": "13-win32",
+    "warnings_as_errors": true,
+    "baseline_and_candidate": "PASS",
+    "container_image": "sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3",
+    "network_count": 0,
+    "mount_count": 0,
+    "privileged": false,
+    "no_oom": true,
+    "compiled_targets": [
+      "dlls/kernelbase/all",
+      "dlls/kernelbase/tests/all"
+    ],
+    "runtime_executed": false,
+    "commands": {
+      "baseline": [
+        "cd /work/build-baseline",
+        "/work/baseline/configure --enable-win64 --enable-werror --without-x --without-wayland",
+        "make -j1 dlls/kernelbase/all dlls/kernelbase/tests/all"
+      ],
+      "candidate": [
+        "cd /work/build-candidate",
+        "/work/candidate/configure --enable-win64 --enable-werror --without-x --without-wayland",
+        "make -j1 dlls/kernelbase/all dlls/kernelbase/tests/all"
+      ],
+      "execution_context": "docker exec --user 1000:1000 -e HOME=/work/home; timeout1200; nice-n10; offline1CPU/2GiB/no-extra-swap"
+    },
+    "initial_candidate_seconds": 90,
+    "final_candidate_seconds": 93
+  },
+  "runtime_fixture": {
+    "package_version": "11.0.0.0~noble-1",
+    "packages": [
+      "winehq-stable",
+      "wine-stable",
+      "wine-stable-amd64",
+      "wine-stable-i386:i386"
+    ],
+    "apt_authenticated": true,
+    "winehq_key_sha256": "d965d646defe94b3dfba6d5b4406900ac6c81065428bf9d9303ad7a72ee8d1b8",
+    "winehq_source_sha256": "b5962429ece1f831c9f713c13f9f0d26bb367117ef56706648ff385f004779fb",
+    "stock_kernelbase_sha256": "99f180f6951da6a47fd938e49db2f4dafdb0a8c183bfc6e3d960c052c66e8cf0",
+    "stock_backup_retained": true,
+    "overlay_owned_container_only": true,
+    "installed_candidate_hash_matches": true,
+    "candidate_named_import_count": 430,
+    "missing_ntdll_exports": [],
+    "kernelbase_export_names": {
+      "stock": 1426,
+      "candidate": 1427,
+      "added": [
+        "CreateFileFromAppW"
+      ],
+      "removed": []
+    },
+    "network_count": 0,
+    "prefix_created": false,
+    "wine_executed": false,
+    "tests_executed": false,
+    "native_windows_baseline": "unavailable",
+    "i386_qualification": false
+  },
+  "date": "2026-10-09",
+  "scope": "Source compilation and static runtime preparation; no runtime tests executed",
+  "compiler_environment": {
+    "architecture": "native-linux-amd64",
+    "image": "ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3",
+    "max_cpu": 1,
+    "max_memory_gib": 2,
+    "extra_swap_gib": 0,
+    "host_mounts": false,
+    "gpu_devices": false,
+    "privileged": false,
+    "build_as_root": false,
+    "source_only": true,
+    "baseline_commands": [
+      "/work/baseline/configure --enable-win64 --enable-werror --without-x --without-wayland",
+      "make -j1 dlls/kernelbase/all dlls/kernelbase/tests/all"
+    ],
+    "runtime_tests_before_review": false,
+    "state": "baseline and exact committed candidate compiled; no tests executed",
+    "pids_limit": 512,
+    "nice": 10
+  }
+}

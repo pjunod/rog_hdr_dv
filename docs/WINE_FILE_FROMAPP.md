@@ -73,3 +73,8 @@ behaviour would remove one demonstrated compatibility boundary; it would not
 prove that the OEM component can activate or process frames. A subsequent
 bounded [activation experiment](DOLBY_ACTIVATION_PROBE.md) must record its own
 next boundary. Keep OEM components, raw logs and all proprietary tools private.
+
+The [compile receipt](../evidence/wine-file-fromapp-compile.json) binds the
+final source, DLL and test executable hashes. It records the complete signed
+WineHQ runtime fixture and static import/export comparison. Runtime tests are
+held until independent review; compilation alone does not prove API behaviour.

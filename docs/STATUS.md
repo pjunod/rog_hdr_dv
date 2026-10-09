@@ -26,7 +26,7 @@ private. Full Dolby Vision remains unimplemented/unqualified.
 
 The native luminance library work is merged in [PR 3](https://github.com/pjunod/rog_hdr_dv/pull/3).
 A separate Ubuntu ARM64 compiler loop has now built the pinned Mutter baseline
-with warnings as errors. Implementation is beginning for physical target
+with warnings as errors. The production implementation has compiled for physical target
 luminance in output and preferred Wayland descriptions on the existing native
 HDR route. Target snapshots and notifications will be separate from encoding
 and renderer state; earlier image descriptions must remain immutable.
@@ -36,7 +36,7 @@ mapping, ICC application and KMS content metadata for their own evidence-based
 changes. Source compilation is not a live display update or optical result.
 The same source batch includes a [normal Wine file-API implementation](WINE_FILE_FROMAPP.md)
 for the missing `CreateFileFromAppW` function, plus a generic synthetic HDR
-reference-corpus generator in development. The Wine baseline and candidate
+[synthetic HDR reference-corpus generator](HDR_REFERENCE_CORPUS.md). The Wine baseline and candidate
 compiled in an isolated, resource-limited native amd64 environment. Runtime
 behaviour remains untested pending review.
 
@@ -86,8 +86,10 @@ correcting one malformed fixture. Unchanged suites were not rerun. The
 [review ledger](REVIEW.md) records the exact CI receipts.
 
 Mutter's `PowerSaveMode` returned `3` (off), consistent with the prior disabled
-scanout capture. Awake-output and optical acceptance remain open. The owner is downloading official Dolby documentation and tools; exact package
-identity and processing contracts will be checked when available. The owner currently has
+scanout capture. Awake-output and optical acceptance remain open. Official Dolby Professional Tools v5.6.4 documentation and the Linux installer
+are available privately. The installer requires the owner’s license acceptance;
+no official tool has been executed. File-based reference processing can proceed
+after that action, while desktop processor integration remains separate. The owner currently has
 no colourimeter or spectrophotometer and is open to obtaining one. Define the
 measurement procedure before selecting equipment; software corrections proceed
 independently.
