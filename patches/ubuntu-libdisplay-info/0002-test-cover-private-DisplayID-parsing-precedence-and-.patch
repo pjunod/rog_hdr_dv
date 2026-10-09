@@ -1,0 +1,876 @@
+From d683e707b2cb2e54ca68e532ce72d90431c7e275 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 7 Oct 2026 23:08:59 -0400
+Subject: [PATCH 02/14] test: cover private DisplayID parsing, precedence and
+ allocation failure
+
+Port the EDID-only upstream matrix through unchanged 0.3 public headers.
+Pin the documented downstream unusable-CTA difference without erasing
+valid authority. Compile private parser objects statically for effective
+allocation wrapping, and assert successful earlier nested children are
+released when a later child fails, including the EDID extension path.
+---
+ test/displayid2-allocation.c | 145 +++++++++++
+ test/displayid2-bounds.c     |  50 ++++
+ test/displayid2-private.c    | 144 +++++++++++
+ test/meson.build             |  22 ++
+ test/old-header-consumer.c   | 460 +++++++++++++++++++++++++++++++++++
+ 5 files changed, 821 insertions(+)
+ create mode 100644 test/displayid2-allocation.c
+ create mode 100644 test/displayid2-bounds.c
+ create mode 100644 test/displayid2-private.c
+ create mode 100644 test/old-header-consumer.c
+
+diff --git a/test/displayid2-allocation.c b/test/displayid2-allocation.c
+new file mode 100644
+index 0000000..ba2a8db
+--- /dev/null
++++ b/test/displayid2-allocation.c
+@@ -0,0 +1,145 @@
++#include <assert.h>
++#include <errno.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include <libdisplay-info/info.h>
++#include "displayid2.h"
++
++void *__real_calloc(size_t count, size_t size);
++void __real_free(void *ptr);
++void *__wrap_calloc(size_t count, size_t size);
++void __wrap_free(void *ptr);
++
++static bool enabled, fail_second_svd, failure_reached;
++static size_t attempts, fail_at, live, svds;
++static void *allocated[4096];
++static bool released[4096];
++
++void *
++__wrap_calloc(size_t count, size_t size)
++{
++	void *ptr;
++	size_t index;
++
++	if (!enabled)
++		return __real_calloc(count, size);
++	index = attempts++;
++	assert(index < 4096);
++	if (count == 1 && size == sizeof(struct di_cta_svd))
++		svds++;
++	if (attempts == fail_at || (fail_second_svd && svds == 2 &&
++	    count == 1 && size == sizeof(struct di_cta_svd))) {
++		failure_reached = true;
++		errno = ENOMEM;
++		return NULL;
++	}
++	ptr = __real_calloc(count, size);
++	assert(ptr);
++	allocated[index] = ptr;
++	live++;
++	return ptr;
++}
++
++void
++__wrap_free(void *ptr)
++{
++	size_t i;
++
++	if (enabled && ptr) {
++		for (i = 0; i < attempts; i++) {
++			if (allocated[i] == ptr && !released[i]) {
++				released[i] = true;
++				assert(live > 0);
++				live--;
++				break;
++			}
++		}
++	}
++	__real_free(ptr);
++}
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static void
++reset(size_t fail)
++{
++	assert(live == 0);
++	memset(allocated, 0, sizeof(allocated));
++	memset(released, 0, sizeof(released));
++	attempts = svds = 0;
++	fail_at = fail;
++	failure_reached = fail_second_svd = false;
++}
++
++int
++main(int argc, char *argv[])
++{
++	uint8_t section[] = {
++		0x20, 21, 2, 0,
++		0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x40, 0, 0,
++		0x81, 0, 6, 0x41, 16, 0x41, 17, 0x41, 18, 0,
++	};
++	uint8_t edid[256] = {0};
++	FILE *log = tmpfile(), *fixture;
++	struct di_logger logger = {.f = log, .section = "allocation"};
++	struct di_displayid2 d;
++	struct di_info *info;
++	bool ok;
++	size_t fail;
++
++	assert(log && argc == 2);
++	checksum(section, sizeof(section));
++	for (fail = 1; fail <= 9; fail++) {
++		reset(fail);
++		memset(&d, 0, sizeof(d));
++		enabled = true;
++		errno = ENOMEM; /* unrelated stale errno must not imply failure */
++		ok = _di_displayid2_parse(&d, section, sizeof(section), &logger);
++		assert(ok == (fail == 9));
++		assert(failure_reached == (fail != 9));
++		if (!ok)
++			assert(errno == ENOMEM);
++		if (fail == 6) {
++			/* First nested SVD completed before the second child's SVD failed. */
++			assert(svds == 2 && allocated[3] && released[3]);
++			assert(d.data_blocks_len == 1 && live == 1);
++		}
++		_di_displayid2_finish(&d);
++		_di_displayid2_finish(&d);
++		assert(live == 0 && errno == ENOMEM);
++		enabled = false;
++	}
++	/* Reach the same nested child failure through failed EDID extension cleanup. */
++	fixture = fopen(argv[1], "rb");
++	if (!fixture)
++		abort();
++	assert(fread(edid, 128, 1, fixture) == 1);
++	fclose(fixture);
++	edid[126] = 1;
++	checksum(edid, 128);
++	edid[128] = 0x70;
++	memcpy(edid + 129, section, sizeof(section));
++	checksum(edid + 128, 128);
++	reset(0);
++	fail_second_svd = enabled = true;
++	info = di_info_parse_edid(edid, sizeof(edid));
++	assert(!info && failure_reached && svds == 2);
++	assert(errno == ENOMEM && live == 0);
++	enabled = false;
++	fclose(log);
++	puts("wrapped static nested allocation failure and extension cleanup: PASS");
++	return 0;
++}
+diff --git a/test/displayid2-bounds.c b/test/displayid2-bounds.c
+new file mode 100644
+index 0000000..2dc57c5
+--- /dev/null
++++ b/test/displayid2-bounds.c
+@@ -0,0 +1,50 @@
++#include <assert.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include "displayid2.h"
++#include <stdio.h>
++
++static void
++check(size_t payload, uint8_t declared)
++{
++	uint8_t *data = calloc(1, payload + 5);
++	struct di_displayid2 info = {0};
++	FILE *log = tmpfile();
++	struct di_logger logger = {.f = log, .section = "bounds"};
++	uint8_t sum = 0;
++	size_t i;
++
++	assert(data);
++	data[0] = 0x20;
++	data[1] = (uint8_t) payload;
++	data[2] = 2;
++	if (payload >= 3) {
++		data[4] = 0x20;
++		data[6] = declared;
++	} else if (payload) {
++		data[4] = 1;
++	}
++	for (i = 0; i < payload + 4; i++)
++		sum += data[i];
++	data[payload + 4] = (uint8_t) (0 - sum);
++	assert(log);
++	assert(_di_displayid2_parse(&info, data, payload + 5, &logger));
++	_di_displayid2_finish(&info);
++	_di_displayid2_finish(&info);
++	fclose(log);
++	free(data);
++}
++
++int
++main(void)
++{
++	check(0, 0);
++	check(1, 0);
++	check(2, 0);
++	check(3, 0);
++	check(3, 255);
++	check(12, 9);
++	check(3, 187); /* zero checksum, oversized block */
++	return 0;
++}
+diff --git a/test/displayid2-private.c b/test/displayid2-private.c
+new file mode 100644
+index 0000000..4067105
+--- /dev/null
++++ b/test/displayid2-private.c
+@@ -0,0 +1,144 @@
++#include <assert.h>
++#include <stdint.h>
++#include <stdlib.h>
++#include <string.h>
++#include "displayid2.h"
++#include <stdio.h>
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static struct di_displayid2 *
++parse(const uint8_t *blocks, size_t size, FILE *log)
++{
++	uint8_t *data = calloc(1, size + 5);
++	struct di_displayid2 *displayid2 = calloc(1, sizeof(*displayid2));
++	struct di_logger logger = {.f = log, .section = "test"};
++
++	if (!data || !displayid2)
++		abort();
++	data[0] = 0x20;
++	data[1] = (uint8_t) size;
++	data[2] = 2;
++	memcpy(data + 4, blocks, size);
++	checksum(data, size + 5);
++	assert(_di_displayid2_parse(displayid2, data, size + 5, &logger));
++	free(data);
++	return displayid2;
++}
++
++static void
++check(const uint8_t *block, size_t size, bool valid)
++{
++	FILE *log = tmpfile();
++	struct di_displayid2 *d;
++	const struct di_displayid2_data_block *const *blocks;
++	const struct di_displayid2_interface_features *f;
++	size_t i;
++
++	assert(log);
++	d = parse(block, size, log);
++	blocks = _di_displayid2_get_data_blocks(d);
++	assert((blocks[0] != NULL) == valid);
++	if (!valid)
++		assert(ftell(log) > 0);
++	if (valid) {
++		f = _di_displayid2_data_block_get_interface_features(blocks[0]);
++		assert(f);
++		assert(f->rgb_bit_depths == (block[3] & 0x3F));
++		assert(f->ycbcr444_bit_depths == (block[4] & 0x3F));
++		assert(f->ycbcr422_bit_depths == (block[5] & 0x1F));
++		assert(f->ycbcr420_bit_depths == (block[6] & 0x1F));
++		assert(f->ycbcr420_min_pixel_rate == 74.25f * block[7]);
++		assert(f->audio_capabilities == block[8]);
++		assert(f->standard_combinations == (block[9] & 0x7F));
++		assert(f->additional_combinations_len == block[11]);
++		for (i = 0; i < block[11]; i++) {
++			assert(f->additional_combinations[i].color_space == block[12 + i] >> 4);
++			assert(f->additional_combinations[i].eotf == (block[12 + i] & 15));
++		}
++	}
++	_di_displayid2_finish(d);
++	_di_displayid2_finish(d); /* idempotent */
++	free(d);
++	fclose(log);
++}
++
++int
++main(void)
++{
++	uint8_t block[20] = {0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x50, 0, 0};
++	uint8_t full[] = {
++		0x26, 0, 16, 0x3F, 0x12, 0x1F, 0x19, 2, 0xE0, 0x7F, 0, 7,
++		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x68,
++	};
++	uint8_t other[] = {0x20, 0, 0};
++	uint8_t two[24];
++	struct di_displayid2 *info;
++	FILE *log = tmpfile();
++	const struct di_displayid2_data_block *const *blocks;
++	size_t i;
++
++	check(full, sizeof(full), true);
++	info = parse(other, sizeof(other), log);
++	blocks = _di_displayid2_get_data_blocks(info);
++	assert(blocks[0] && !_di_displayid2_data_block_get_interface_features(blocks[0]));
++	_di_displayid2_finish(info);
++	free(info);
++	check(block, 12, true);
++	block[1] = 1;
++	check(block, 12, false);
++	block[1] = 8;
++	check(block, 12, false);
++	block[1] = 0;
++	for (i = 0; i < 9; i++) {
++		block[2] = (uint8_t) i;
++		check(block, i + 3, false);
++	}
++	block[2] = 9;
++	block[9] = 0x80;
++	check(block, 12, true); /* reserved bit never becomes a standard tuple */
++	block[9] = 0xC0;
++	block[11] = 1;
++	block[2] = 10;
++	block[12] = 0xFF;
++	check(block, 13, true); /* known standard tuple survives unknown pair */
++	block[12] = 0x68;
++	check(block, 13, true);
++	block[12] = 0x86;
++	check(block, 13, true); /* nibble order is not coerced */
++	block[11] = 7;
++	block[2] = 16;
++	check(block, 19, true);
++	block[11] = 8;
++	block[2] = 17;
++	check(block, 20, false);
++	block[11] = 1;
++	block[2] = 9;
++	check(block, 12, false); /* truncated pair */
++	block[11] = 0;
++	block[2] = 10;
++	check(block, 13, false); /* trailing payload */
++	block[2] = 9;
++	memcpy(two, block, 12);
++	memcpy(two + 12, block, 12);
++	two[1] = 1;
++	info = parse(two, sizeof(two), log);
++	blocks = _di_displayid2_get_data_blocks(info);
++	assert(blocks[0] && !blocks[1]); /* malformed block doesn't shadow valid */
++	_di_displayid2_finish(info);
++	free(info);
++	for (i = 0; i < 1000; i++)
++		check(block, 12, true);
++	fclose(log);
++	return 0;
++}
+diff --git a/test/meson.build b/test/meson.build
+index 8e91643..0cc2d4c 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -85,3 +85,25 @@ if ref_edid_decode.found()
+ 		env: test_env,
+ 	)
+ endif
++
++old_header_consumer = executable('old-header-consumer', 'old-header-consumer.c', dependencies: di_dep)
++test('native-hdr-abi', old_header_consumer, args: [files('data/qemu.edid'), 'patched'])
++
++# Test-only static objects let --wrap intercept allocations inside the parser.
++private_test_lib = static_library('displayid2-test-private',
++	['../cta.c', '../cta-vic-table.c', '../cvt.c', '../displayid.c', '../displayid2.c',
++	 '../dmt-table.c', '../edid.c', '../gtf.c', '../hdmi-vic-table.c', '../info.c',
++	 '../log.c', '../memory-stream.c', pnp_id_table],
++	include_directories: include_directories('../include'), dependencies: math,
++	install: false)
++private_test_dep = declare_dependency(link_with: private_test_lib,
++	include_directories: include_directories('../include'), dependencies: math)
++private_test = executable('displayid2-private', 'displayid2-private.c', dependencies: private_test_dep)
++test('displayid2-private', private_test)
++bounds_test = executable('displayid2-bounds', 'displayid2-bounds.c', dependencies: private_test_dep)
++test('displayid2-bounds', bounds_test)
++
++allocation_test = executable('displayid2-allocation', 'displayid2-allocation.c',
++	dependencies: private_test_dep,
++	link_args: ['-Wl,--wrap=calloc', '-Wl,--wrap=free'])
++test('displayid2-allocation', allocation_test, args: files('data/qemu.edid'))
+diff --git a/test/old-header-consumer.c b/test/old-header-consumer.c
+new file mode 100644
+index 0000000..411e9c8
+--- /dev/null
++++ b/test/old-header-consumer.c
+@@ -0,0 +1,460 @@
++#include <assert.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <libdisplay-info/info.h>
++/* Fixture encodings, deliberately independent of new public APIs. */
++enum { TEST_BT2020 = 6, TEST_ST2084 = 8 };
++
++static uint8_t base_edid[128];
++static const uint8_t native[] = {0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x50, 0, 0};
++static const uint8_t hdr[] = {0xE3, 6, 1, 0}; /* CTA explicitly SDR, no Type 1 */
++static const uint8_t color[] = {0xE3, 5, 0, 0}; /* CTA explicitly no BT2020 */
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static size_t
++section(uint8_t *data, const uint8_t *blocks, size_t size)
++{
++	memset(data, 0, size + 5);
++	data[0] = 0x20;
++	data[1] = (uint8_t) size;
++	data[2] = 2;
++	memcpy(data + 4, blocks, size);
++	checksum(data, size + 5);
++	return size + 5;
++}
++
++static struct di_info *
++parse(const uint8_t *blocks, size_t size)
++{
++	uint8_t edid[256] = {0};
++	struct di_info *info;
++
++	assert(size <= 121);
++	memcpy(edid, base_edid, 128);
++	edid[126] = 1;
++	checksum(edid, 128);
++	edid[128] = 0x70;
++	section(edid + 129, blocks, size);
++	checksum(edid + 128, 128);
++	info = di_info_parse_edid(edid, sizeof(edid));
++	assert(info);
++	return info;
++}
++
++static void
++check_info(struct di_info *info, bool supported)
++{
++	const struct di_hdr_static_metadata *h = di_info_get_hdr_static_metadata(info);
++	const struct di_supported_signal_colorimetry *c = di_info_get_supported_signal_colorimetry(info);
++
++	assert(h && c);
++	assert(h->pq == supported && c->bt2020_rgb == supported);
++	assert(h->traditional_sdr && !h->traditional_hdr && !h->hlg && !h->type1);
++	assert(h->desired_content_max_luminance == 0);
++	assert(h->desired_content_max_frame_avg_luminance == 0);
++	assert(h->desired_content_min_luminance == 0);
++	assert(!c->bt2020_cycc && !c->bt2020_ycc && !c->ictcp && !c->st2113_rgb);
++	di_info_destroy(info);
++}
++
++static void
++check(const uint8_t *blocks, size_t size, bool supported)
++{
++	check_info(parse(blocks, size), supported);
++}
++
++static void
++assert_same(const struct di_info *a, const struct di_info *b)
++{
++	const struct di_hdr_static_metadata *x = di_info_get_hdr_static_metadata(a);
++	const struct di_hdr_static_metadata *y = di_info_get_hdr_static_metadata(b);
++	const struct di_supported_signal_colorimetry *u = di_info_get_supported_signal_colorimetry(a);
++	const struct di_supported_signal_colorimetry *v = di_info_get_supported_signal_colorimetry(b);
++
++	assert(x->pq == y->pq && x->hlg == y->hlg && x->type1 == y->type1);
++	assert(x->traditional_sdr == y->traditional_sdr && x->traditional_hdr == y->traditional_hdr);
++	assert(x->desired_content_max_luminance == y->desired_content_max_luminance);
++	assert(x->desired_content_max_frame_avg_luminance == y->desired_content_max_frame_avg_luminance);
++	assert(x->desired_content_min_luminance == y->desired_content_min_luminance);
++	assert(u->bt2020_rgb == v->bt2020_rgb && u->bt2020_ycc == v->bt2020_ycc);
++	assert(u->bt2020_cycc == v->bt2020_cycc && u->ictcp == v->ictcp);
++	assert(u->st2113_rgb == v->st2113_rgb);
++}
++
++static void
++check_cta(bool has_hdr, bool has_color)
++{
++	uint8_t blocks[32], cta[16];
++	size_t n = 0, len = 0;
++	struct di_info *info, *baseline;
++
++	if (has_hdr) {
++		memcpy(cta + len, hdr, sizeof(hdr));
++		len += sizeof(hdr);
++	}
++	if (has_color) {
++		memcpy(cta + len, color, sizeof(color));
++		len += sizeof(color);
++	}
++	blocks[0] = 0x81;
++	blocks[1] = 0;
++	blocks[2] = (uint8_t) len;
++	memcpy(blocks + 3, cta, len);
++	n = 3 + len;
++	baseline = parse(blocks, n);
++	memcpy(blocks + n, native, sizeof(native));
++	info = parse(blocks, n + sizeof(native));
++	assert_same(info, baseline);
++	di_info_destroy(baseline);
++	check_info(info, false);
++	/* Native preceding CTA must yield the same authoritative result. */
++	memmove(blocks + sizeof(native), blocks, n);
++	memcpy(blocks, native, sizeof(native));
++	check(blocks, n + sizeof(native), false);
++}
++
++static void
++check_extensions(const uint8_t *first, size_t first_size,
++		 const uint8_t *second, size_t second_size, bool supported)
++{
++	uint8_t edid[384];
++	struct di_info *info;
++
++	memset(edid, 0, sizeof(edid));
++	memcpy(edid, base_edid, 128);
++	edid[126] = 2;
++	checksum(edid, 128);
++	edid[128] = edid[256] = 0x70;
++	section(edid + 129, first, first_size);
++	section(edid + 257, second, second_size);
++	checksum(edid + 128, 128);
++	checksum(edid + 256, 128);
++	info = di_info_parse_edid(edid, sizeof(edid));
++	assert(info);
++	check_info(info, supported);
++}
++
++static struct di_info *
++parse_mixed(const uint8_t *cta, size_t cta_size, bool ordinary, bool native_first,
++	    bool include_native)
++{
++	uint8_t edid[384], wrapped[64];
++	size_t offset = native_first ? 256 : 128;
++	struct di_info *info;
++
++	memset(edid, 0, sizeof(edid));
++	memcpy(edid, base_edid, 128);
++	edid[126] = 2;
++	checksum(edid, 128);
++	if (ordinary) {
++		edid[offset] = 2;
++		edid[offset + 1] = 3;
++		edid[offset + 2] = (uint8_t) (4 + cta_size);
++		memcpy(edid + offset + 4, cta, cta_size);
++	} else {
++		edid[offset] = 0x70;
++		wrapped[0] = 0x81;
++		wrapped[1] = 0;
++		wrapped[2] = (uint8_t) cta_size;
++		memcpy(wrapped + 3, cta, cta_size);
++		section(edid + offset + 1, wrapped, cta_size + 3);
++	}
++	checksum(edid + offset, 128);
++	offset = native_first ? 128 : 256;
++	edid[offset] = 0x70;
++	section(edid + offset + 1, native, include_native ? sizeof(native) : 0);
++	checksum(edid + offset, 128);
++	info = di_info_parse_edid(edid, sizeof(edid));
++	assert(info);
++	return info;
++}
++
++static struct di_info *
++parse_ordinary_nested(bool ordinary_first, bool include_native, bool unsupported)
++{
++	uint8_t edid[384], blocks[32];
++	static const uint8_t ordinary[] = {0xE3, 6, 0x0F, 1};
++	static const uint8_t nested[] = {0x81, 0, 8, 0xE3, 6, 1, 0, 0xE3, 5, 0x80, 0};
++	size_t offset = ordinary_first ? 128 : 256;
++	struct di_info *info;
++
++	memset(edid, 0, sizeof(edid));
++	memcpy(edid, base_edid, 128);
++	edid[126] = 2;
++	checksum(edid, 128);
++	edid[offset] = 2;
++	edid[offset + 1] = 3;
++	edid[offset + 2] = 8;
++	memcpy(edid + offset + 4, ordinary, sizeof(ordinary));
++	checksum(edid + offset, 128);
++	offset = ordinary_first ? 256 : 128;
++	edid[offset] = 0x70;
++	memcpy(blocks, nested, sizeof(nested));
++	if (unsupported)
++		blocks[1] = 1;
++	memcpy(blocks + sizeof(nested), native, sizeof(native));
++	section(edid + offset + 1, blocks,
++		sizeof(nested) + (include_native ? sizeof(native) : 0));
++	checksum(edid + offset, 128);
++	info = di_info_parse_edid(edid, sizeof(edid));
++	assert(info);
++	return info;
++}
++
++static void
++check_authority(void)
++{
++	static const uint8_t positive_hdr[] = {0xE6, 6, 0x0F, 1, 96, 80, 4};
++	static const uint8_t positive_color[] = {0xE3, 5, 0xE0, 0x80};
++	uint8_t cta[32], blocks[48];
++	struct di_info *baseline, *info;
++	size_t len, mode, order, domain;
++
++	for (domain = 1; domain <= 3; domain++) {
++		len = 0;
++		if (domain & 1) {
++			memcpy(cta, positive_hdr, sizeof(positive_hdr));
++			len += sizeof(positive_hdr);
++		}
++		if (domain & 2) {
++			memcpy(cta + len, positive_color, sizeof(positive_color));
++			len += sizeof(positive_color);
++		}
++		for (mode = 0; mode < 2; mode++) {
++			for (order = 0; order < 2; order++) {
++				baseline = parse_mixed(cta, len, mode != 0, order != 0, false);
++				info = parse_mixed(cta, len, mode != 0, order != 0, true);
++				assert_same(info, baseline);
++				if (domain & 1) {
++					assert(di_info_get_hdr_static_metadata(info)->type1);
++					assert(di_info_get_hdr_static_metadata(info)->hlg);
++					assert(di_info_get_hdr_static_metadata(info)->desired_content_max_luminance > 0);
++				}
++				di_info_destroy(info);
++				di_info_destroy(baseline);
++			}
++		}
++	}
++	/* First CTA duplicate stays authoritative, including an explicit no-PQ. */
++	memcpy(cta, hdr, sizeof(hdr));
++	memcpy(cta + sizeof(hdr), positive_hdr, sizeof(positive_hdr));
++	len = sizeof(hdr) + sizeof(positive_hdr);
++	for (mode = 0; mode < 2; mode++) {
++		info = parse_mixed(cta, len, mode != 0, false, true);
++		assert(!di_info_get_hdr_static_metadata(info)->pq);
++		di_info_destroy(info);
++	}
++	/* Mixed ordinary/nested duplicates retain EDID extension order. */
++	for (order = 0; order < 2; order++) {
++		baseline = parse_ordinary_nested(order != 0, false, false);
++		info = parse_ordinary_nested(order != 0, true, false);
++		assert_same(info, baseline);
++		assert(di_info_get_hdr_static_metadata(info)->pq == (order != 0));
++		assert(di_info_get_supported_signal_colorimetry(info)->bt2020_rgb);
++		di_info_destroy(info);
++		di_info_destroy(baseline);
++	}
++	memcpy(cta, positive_hdr, sizeof(positive_hdr));
++	blocks[0] = 0x81;
++	blocks[1] = 0;
++	/* Nested EDID CTA also preserves positive metadata with native appended. */
++	memcpy(cta + sizeof(positive_hdr), positive_color, sizeof(positive_color));
++	len = sizeof(positive_hdr) + sizeof(positive_color);
++	blocks[2] = (uint8_t) len;
++	memcpy(blocks + 3, cta, len);
++	info = parse(blocks, len + 3);
++	memcpy(blocks + len + 3, native, sizeof(native));
++	{
++		struct di_info *with_native = parse(blocks, len + 3 + sizeof(native));
++		assert_same(info, with_native);
++		di_info_destroy(with_native);
++	}
++	di_info_destroy(info);
++}
++
++static void
++print_loaded_library(void)
++{
++	FILE *maps = fopen("/proc/self/maps", "r");
++	char line[1024];
++	bool found = false;
++
++	assert(maps);
++	while (fgets(line, sizeof(line), maps)) {
++		if (strstr(line, "libdisplay-info.so")) {
++			printf("loaded: %s", line);
++			found = true;
++		}
++	}
++	fclose(maps);
++	assert(found);
++	printf("struct sizes: HDR=%zu, signal=%zu\n",
++	       sizeof(struct di_hdr_static_metadata), sizeof(struct di_supported_signal_colorimetry));
++}
++
++static void
++check_unusable_cta(void)
++{
++	uint8_t blocks[64], malformed[] = {0x81, 1, 0};
++	uint8_t empty[] = {0x81, 0, 0};
++	uint8_t audio[] = {0x81, 0, 4, 0x23, 0x09, 0x07, 0x01};
++	uint8_t rejected[] = {0x81, 0, 2, 0xE1, 6};
++	uint8_t tail[] = {0x81, 0, 1, 0xE3};
++	static const uint8_t positive[] = {0x81, 0, 7, 0xE6, 6, 0x0F, 1, 96, 80, 4};
++	struct di_info *baseline, *info;
++	size_t order;
++
++	check_extensions(native, sizeof(native), malformed, sizeof(malformed), false);
++	check_extensions(malformed, sizeof(malformed), native, sizeof(native), false);
++	malformed[1] = 8; /* reserved parent flags */
++	check_extensions(native, sizeof(native), malformed, sizeof(malformed), false);
++	malformed[1] = 0;
++	malformed[2] = 255; /* no trustworthy outer boundary */
++	check_extensions(native, sizeof(native), malformed, sizeof(malformed), false);
++	check_extensions(malformed, sizeof(malformed), native, sizeof(native), false);
++	check_extensions(native, sizeof(native), rejected, sizeof(rejected), false);
++	rejected[4] = 5;
++	check_extensions(native, sizeof(native), rejected, sizeof(rejected), false);
++	check_extensions(native, sizeof(native), tail, sizeof(tail), false);
++	check_extensions(native, sizeof(native), empty, sizeof(empty), true);
++	check_extensions(native, sizeof(native), audio, sizeof(audio), true);
++	for (order = 0; order < 2; order++) {
++		baseline = parse_ordinary_nested(order != 0, false, true);
++		info = parse_ordinary_nested(order != 0, true, true);
++		assert_same(info, baseline);
++		assert(di_info_get_hdr_static_metadata(info)->pq);
++		assert(di_info_get_hdr_static_metadata(info)->type1);
++		di_info_destroy(info);
++		di_info_destroy(baseline);
++	}
++	/* Earlier valid Type1/luminance survive a malformed nested tail. */
++	memcpy(blocks, positive, sizeof(positive));
++	blocks[2]++;
++	blocks[sizeof(positive)] = 0xE3;
++	baseline = parse(positive, sizeof(positive));
++	info = parse(blocks, sizeof(positive) + 1);
++	assert_same(info, baseline);
++	memcpy(blocks + sizeof(positive) + 1, native, sizeof(native));
++	di_info_destroy(info);
++	info = parse(blocks, sizeof(positive) + 1 + sizeof(native));
++	assert_same(info, baseline);
++	assert(di_info_get_hdr_static_metadata(info)->type1);
++	assert(di_info_get_hdr_static_metadata(info)->desired_content_max_luminance > 0);
++	di_info_destroy(info);
++	di_info_destroy(baseline);
++	/* An unsupported block doesn't erase a later valid nested authority. */
++	memcpy(blocks, (uint8_t[]){0x81, 1, 0}, 3);
++	memcpy(blocks + 3, positive, sizeof(positive));
++	baseline = parse(positive, sizeof(positive));
++	info = parse(blocks, sizeof(positive) + 3);
++	assert_same(info, baseline);
++	di_info_destroy(info);
++	di_info_destroy(baseline);
++}
++
++int
++main(int argc, char *argv[])
++{
++	uint8_t block[32], two[32], cta[16];
++	FILE *f;
++	size_t pair;
++
++	assert(argc == 3);
++	f = fopen(argv[1], "rb");
++	if (!f)
++		abort();
++	assert(fread(base_edid, 128, 1, f) == 1);
++	fclose(f);
++	print_loaded_library();
++	if (strcmp(argv[2], "baseline") == 0) {
++		check(native, sizeof(native), false);
++		puts("baseline old-header native defaults: PASS");
++		return 0;
++	}
++	check_unusable_cta();
++	check(native, sizeof(native), true);
++	memcpy(block, native, sizeof(native));
++	block[9] = 0x10;
++	check(block, 12, false); /* P3 alone */
++	block[9] = 0x20;
++	check(block, 12, false); /* BT2020 SDR */
++	block[9] = 0x80;
++	check(block, 12, false); /* reserved standard bit */
++	block[9] = 0x40;
++	block[3] = 0;
++	check(block, 12, false); /* RGB absent */
++	block[3] = 0x80;
++	check(block, 12, false); /* reserved depth is not RGB support */
++	block[3] = 4;
++	block[2] = 10;
++	block[11] = 1;
++	block[12] = 0xFF;
++	check(block, 13, true); /* unknown pair doesn't erase known standard */
++	block[9] = 0;
++	check(block, 13, false);
++	block[12] = 0x68;
++	check(block, 13, true); /* additional complete BT2020/PQ tuple */
++	block[2] = 16;
++	block[11] = 7;
++	memset(block + 12, 0x66, 7);
++	block[18] = (TEST_BT2020 << 4) | TEST_ST2084;
++	check(block, 19, true); /* only seventh additional pair proves PQ */
++	block[18] = 0x58;
++	check(block, 19, false);
++	block[2] = 10;
++	block[11] = 1;
++	for (pair = 0; pair < 256; pair++) {
++		block[12] = (uint8_t) pair;
++		check(block, 13, pair == ((TEST_BT2020 << 4) | TEST_ST2084));
++	}
++	block[12] = 0x86;
++	check(block, 13, false); /* reversed nibble values */
++	block[2] = 11;
++	block[11] = 2;
++	block[12] = 0x66;
++	block[13] = 0x58;
++	check(block, 14, false); /* BT2020 SDR plus P3 PQ is not BT2020 PQ */
++	memcpy(two, native, 12);
++	memcpy(two + 12, native, 12);
++	two[3] = 0;
++	two[21] = 0;
++	check(two, 24, false); /* RGB and PQ in different blocks */
++	check_extensions(two, 12, two + 12, 12, false);
++	two[1] = 1;
++	memcpy(two + 12, native, 12);
++	check(two, 24, true); /* invalid first block */
++	check_extensions(two, 12, native, 12, true);
++	memcpy(two, native, 12);
++	two[9] = 0;
++	check(two, 24, true); /* ineligible first valid block */
++	check_extensions(two, 12, native, 12, true);
++	check_authority();
++	check_cta(true, false);
++	check_cta(false, true);
++	check_cta(true, true);
++	cta[0] = 0x81;
++	cta[1] = 0;
++	cta[2] = sizeof(hdr);
++	memcpy(cta + 3, hdr, sizeof(hdr));
++	check_extensions(cta, 7, native, 12, false);
++	check_extensions(native, 12, cta, 7, false);
++	cta[2] = sizeof(color);
++	memcpy(cta + 3, color, sizeof(color));
++	check_extensions(cta, 7, native, 12, false);
++	check_extensions(native, 12, cta, 7, false);
++	puts("old-header native/CTA/malformed regression matrix: PASS");
++	return 0;
++}

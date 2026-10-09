@@ -1,0 +1,423 @@
+From 1045a031d1489711858e6b5168eeb1e1d41ab964 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Thu, 8 Oct 2026 01:42:13 -0400
+Subject: [PATCH 12/14] edid: expose structured extension parsing failures
+
+The global diagnostic string mixes descriptive base-block warnings with
+extension ambiguity. A consumer rejecting that whole string cannot use
+valid native DisplayID data on the ROG panel, whose base range/timing
+warnings do not affect interpretation of its extension blocks.
+
+Track extension failure state independently of logger formatting. Include
+extension diagnostics, every discarded/uninterpretable extension, checksum
+failures before early drops, and all input-size/block-count mismatches.
+Keep base header/version/checksum rejection and diagnostic text unchanged.
+The additive query reports known failures, not full conformance or readiness.
+
+Public-API tests cover unrelated base warnings, ordinary/nested extension
+failures, silently dropped unsupported versions, checksum/drop paths,
+revision-conditioned unknown tags, all framing mismatches and fatal base
+checks. Compiler and sanitizer qualification follows source review.
+---
+ debian/libdisplay-info3.symbols |   1 +
+ edid.c                          |  31 ++++-
+ include/edid.h                  |   1 +
+ include/libdisplay-info/edid.h  |  14 +++
+ include/log.h                   |   1 +
+ log.c                           |   1 +
+ test/edid-extension-failures.c  | 198 ++++++++++++++++++++++++++++++++
+ test/meson.build                |   4 +
+ test/native-api-consumer.c      |   1 +
+ 9 files changed, 247 insertions(+), 5 deletions(-)
+ create mode 100644 test/edid-extension-failures.c
+
+diff --git a/debian/libdisplay-info3.symbols b/debian/libdisplay-info3.symbols
+index 8ccce9b..4b5aedd 100644
+--- a/debian/libdisplay-info3.symbols
++++ b/debian/libdisplay-info3.symbols
+@@ -76,6 +76,7 @@ libdisplay-info.so.3 libdisplay-info3 #MINVER#
+  di_edid_get_version@Base 0.3.0
+  di_edid_get_video_input_analog@Base 0.3.0
+  di_edid_get_video_input_digital@Base 0.3.0
++ di_edid_has_extension_failures@Base 0.3.0-1ubuntu1~hdr5
+  di_edid_standard_timing_get_dmt@Base 0.3.0
+  di_edid_standard_timing_get_vert_video@Base 0.3.0
+  di_gtf_compute@Base 0.3.0
+diff --git a/edid.c b/edid.c
+index b945b53..307df1d 100644
+--- a/edid.c
++++ b/edid.c
+@@ -1170,9 +1170,16 @@ parse_ext(struct di_edid *edid, const uint8_t data[static EDID_BLOCK_SIZE])
+ 		.section = section_name,
+ 	};
+ 
++	/* Check the envelope even if the extension is subsequently discarded. */
++	if (!validate_block_checksum(data)) {
++		_di_logger_add_failure(&logger, "Invalid extension checksum.");
++		edid->has_extension_failures = true;
++	}
++
+ 	switch (ext->tag) {
+ 	case DI_EDID_EXT_CEA:
+ 		if (!_di_edid_cta_parse(&ext->cta, data, EDID_BLOCK_SIZE, &logger)) {
++			edid->has_extension_failures = true;
+ 			free(ext);
+ 			return errno == EINVAL;
+ 		}
+@@ -1201,10 +1208,12 @@ parse_ext(struct di_edid *edid, const uint8_t data[static EDID_BLOCK_SIZE])
+ 			break;
+ 		default:
+ 			/* Unsupported */
++			edid->has_extension_failures = true;
+ 			free(ext);
+ 			return true;
+ 		}
+ 		if (!ok) {
++			edid->has_extension_failures = true;
+ 			saved_errno = errno;
+ 			if (ext->displayid_version == 2)
+ 				_di_displayid2_finish(&ext->displayid2);
+@@ -1215,13 +1224,13 @@ parse_ext(struct di_edid *edid, const uint8_t data[static EDID_BLOCK_SIZE])
+ 		break;
+ 	default:
+ 		/* Unsupported */
++		edid->has_extension_failures = true;
+ 		free(ext);
+ 		add_failure_until(edid, 4, "Unknown Extension Block.");
+ 		return true;
+ 	}
+ 
+-	if (!validate_block_checksum(data))
+-		_di_logger_add_failure(&logger, "Invalid extension checksum.");
++	edid->has_extension_failures |= logger.has_failures;
+ 
+ 	assert(edid->exts_len < EDID_MAX_BLOCK_COUNT - 1);
+ 	edid->exts[edid->exts_len++] = ext;
+@@ -1275,16 +1284,22 @@ _di_edid_parse(const void *data, size_t size, FILE *failure_msg_file)
+ 	edid->version = version;
+ 	edid->revision = revision;
+ 
+-	if (size % EDID_BLOCK_SIZE != 0)
++	if (size % EDID_BLOCK_SIZE != 0) {
++		edid->has_extension_failures = true;
+ 		add_failure(edid, "The data is not a multiple of the block size.");
+-	if (size > EDID_MAX_BLOCK_COUNT * EDID_BLOCK_SIZE)
++	}
++	if (size > EDID_MAX_BLOCK_COUNT * EDID_BLOCK_SIZE) {
++		edid->has_extension_failures = true;
+ 		add_failure(edid, "The data is exceeding the maximum block count.");
++	}
+ 
+ 	exts_len = (size / EDID_BLOCK_SIZE) - 1;
+ 	parsed_ext_len = parse_ext_count(data);
+ 
+-	if (exts_len != parsed_ext_len)
++	if (exts_len != parsed_ext_len) {
++		edid->has_extension_failures = true;
+ 		add_failure(edid, "The data size does not match the encoded block count.");
++	}
+ 
+ 	if (parsed_ext_len < exts_len)
+ 		exts_len = parsed_ext_len;
+@@ -1606,6 +1621,12 @@ di_edid_display_descriptor_get_cvt_timing_codes(const struct di_edid_display_des
+ 	return (const struct di_edid_cvt_timing_code *const *) desc->cvt_timing_codes;
+ }
+ 
++bool
++di_edid_has_extension_failures(const struct di_edid *edid)
++{
++	return edid->has_extension_failures;
++}
++
+ const struct di_edid_ext *const *
+ di_edid_get_extensions(const struct di_edid *edid)
+ {
+diff --git a/include/edid.h b/include/edid.h
+index d49236c..b958d28 100644
+--- a/include/edid.h
++++ b/include/edid.h
+@@ -93,6 +93,7 @@ struct di_edid {
+ 	/* NULL-terminated, doesn't include the base block */
+ 	struct di_edid_ext *exts[EDID_MAX_BLOCK_COUNT];
+ 	size_t exts_len;
++	bool has_extension_failures;
+ 
+ 	struct di_logger *logger;
+ };
+diff --git a/include/libdisplay-info/edid.h b/include/libdisplay-info/edid.h
+index 003d78e..058f303 100644
+--- a/include/libdisplay-info/edid.h
++++ b/include/libdisplay-info/edid.h
+@@ -758,6 +758,20 @@ struct di_edid_cvt_timing_code {
+ const struct di_edid_cvt_timing_code *const *
+ di_edid_display_descriptor_get_cvt_timing_codes(const struct di_edid_display_descriptor *desc);
+ 
++/**
++ * Check for known extension parsing or framing failures.
++ *
++ * This includes extension diagnostics, discarded or uninterpretable extension
++ * records, invalid extension checksums, and a mismatch between the input size
++ * and encoded block count. Base-block descriptive diagnostics are excluded;
++ * invalid base headers, versions and checksums already prevent parsing.
++ *
++ * A false result does not guarantee full conformance, interpretation of every
++ * opaque field, or readiness for any particular display transport.
++ */
++bool
++di_edid_has_extension_failures(const struct di_edid *edid);
++
+ /**
+  * Get a list of EDID extensions.
+  *
+diff --git a/include/log.h b/include/log.h
+index b9f696c..9d566f2 100644
+--- a/include/log.h
++++ b/include/log.h
+@@ -13,6 +13,7 @@ struct di_logger {
+ 	FILE *f;
+ 	const char *section;
+ 	bool initialized;
++	bool has_failures;
+ };
+ 
+ void
+diff --git a/log.c b/log.c
+index 3fb7578..5f7f217 100644
+--- a/log.c
++++ b/log.c
+@@ -3,6 +3,7 @@
+ void
+ _di_logger_va_add_failure(struct di_logger *logger, const char fmt[], va_list args)
+ {
++	logger->has_failures = true;
+ 	if (!logger->initialized) {
+ 		if (ftell(logger->f) > 0) {
+ 			fprintf(logger->f, "\n");
+diff --git a/test/edid-extension-failures.c b/test/edid-extension-failures.c
+new file mode 100644
+index 0000000..04004b2
+--- /dev/null
++++ b/test/edid-extension-failures.c
+@@ -0,0 +1,198 @@
++#include <assert.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <libdisplay-info/info.h>
++#include <libdisplay-info/edid.h>
++
++static uint8_t base[128];
++static const uint8_t native[] = {0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x40, 0, 0};
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static void
++extension(uint8_t *data, const uint8_t *blocks, size_t size)
++{
++	assert(size <= 121);
++	memset(data, 0, 128);
++	data[0] = 0x70;
++	data[1] = 0x20;
++	data[2] = (uint8_t) size;
++	data[3] = 2;
++	memcpy(data + 5, blocks, size);
++	checksum(data + 1, size + 5);
++	checksum(data, 128);
++}
++
++static void
++check(const uint8_t *data, size_t size, bool failed, bool dropped, bool diagnosed)
++{
++	struct di_info *info = di_info_parse_edid(data, size);
++	const struct di_edid *edid;
++	const struct di_edid_ext *const *exts;
++	size_t count = 0;
++
++	assert(info);
++	edid = di_info_get_edid(info);
++	assert(di_edid_has_extension_failures(edid) == failed);
++	if (diagnosed)
++		assert(di_info_get_failure_msg(info));
++	exts = di_edid_get_extensions(edid);
++	while (exts[count])
++		count++;
++	assert(count == (dropped ? 1 : 2));
++	di_info_destroy(info);
++}
++
++int
++main(int argc, char **argv)
++{
++	uint8_t edid[384], blocks[32], *large;
++	const uint8_t empty[] = {0x81, 0, 0};
++	const uint8_t audio[] = {0x81, 0, 4, 0x23, 9, 7, 7};
++	const uint8_t malformed[] = {0x81, 0, 2, 0x43, 16};
++	FILE *f;
++	struct di_info *info;
++	size_t i, reverse;
++
++	assert(argc == 2);
++	f = fopen(argv[1], "rb");
++	assert(f && fread(base, sizeof(base), 1, f) == 1);
++	fclose(f);
++	memcpy(edid, base, 128);
++	edid[126] = 2;
++	checksum(edid, 128);
++	extension(edid + 128, native, sizeof(native));
++	extension(edid + 256, empty, sizeof(empty));
++	check(edid, sizeof(edid), false, false, false);
++	/* Descriptive base warnings do not imply extension ambiguity. */
++	memset(edid + 54, 0, 18);
++	edid[54 + 3] = 0xFD;
++	edid[54 + 5] = 40;
++	edid[54 + 6] = 60;
++	edid[54 + 7] = 30;
++	edid[54 + 8] = 90;
++	edid[54 + 9] = 100;
++	checksum(edid, 128);
++	check(edid, sizeof(edid), false, false, true);
++	memcpy(edid, base, 128);
++	edid[126] = 2;
++	checksum(edid, 128);
++
++	for (reverse = 0; reverse < 2; reverse++) {
++		uint8_t *other = edid + (reverse ? 128 : 256);
++
++		extension(edid + (reverse ? 256 : 128), native, sizeof(native));
++		for (i = 0; i < 3; i++) {
++			extension(other, i == 0 ? empty : i == 1 ? audio : malformed,
++				  i == 0 ? sizeof(empty) : i == 1 ? sizeof(audio) : sizeof(malformed));
++			check(edid, sizeof(edid), i == 2, false, i == 2);
++			other[6] = 1; /* Unsupported nested parent revision. */
++			checksum(other + 1, (size_t) other[2] + 5);
++			checksum(other, 128);
++			check(edid, sizeof(edid), true, false, true);
++		}
++		/* Unknown block in a retained DisplayID extension. */
++		memcpy(blocks, empty, sizeof(empty));
++		blocks[0] = 0x99;
++		extension(other, blocks, sizeof(empty));
++		check(edid, sizeof(edid), true, false, true);
++		/* Whole extension drop: unsupported major, bad use case, CTA offset. */
++		for (i = 0; i < 4; i++) {
++			extension(other, empty, sizeof(empty));
++			if (i == 0)
++				other[1] = 0x30;
++			else if (i == 1)
++				other[3] = 0xFF;
++			else if (i == 2) {
++				other[0] = 2;
++				other[1] = 3;
++				other[2] = 2;
++			}
++			if (i == 3)
++				other[other[2] + 5] ^= 1;
++			if (i < 2)
++				checksum(other + 1, (size_t) other[2] + 5);
++			checksum(other, 128);
++			check(edid, sizeof(edid), true, true, false);
++			other[127] ^= 1;
++			check(edid, sizeof(edid), true, true, true);
++		}
++		/* A retained ordinary CTA child diagnostic is also an extension failure. */
++		memset(other, 0, 128);
++		other[0] = 2;
++		other[1] = 3;
++		other[2] = 6;
++		other[4] = 0xE2;
++		other[5] = 6;
++		checksum(other, 128);
++		check(edid, sizeof(edid), true, false, true);
++		/* Known opaque extension kinds retain their prior interpretation. */
++		memset(other, 0, 128);
++		other[0] = 0xF0;
++		checksum(other, 128);
++		check(edid, sizeof(edid), false, false, false);
++		/* Unknown extension tags remain failures when revision suppresses text. */
++		for (i = 4; i < 6; i++) {
++			edid[19] = (uint8_t) i;
++			checksum(edid, 128);
++			extension(other, empty, sizeof(empty));
++			other[0] = 0xEE;
++			checksum(other, 128);
++			check(edid, sizeof(edid), true, true, false);
++		}
++		edid[19] = base[19];
++		checksum(edid, 128);
++		extension(other, empty, sizeof(empty));
++		other[127] ^= 1;
++		check(edid, sizeof(edid), true, false, true);
++	}
++	extension(edid + 128, native, sizeof(native));
++	extension(edid + 256, empty, sizeof(empty));
++	check(edid, sizeof(edid) - 1, true, true, true);
++	edid[126] = 1;
++	checksum(edid, 128);
++	check(edid, sizeof(edid), true, true, true);
++	edid[126] = 3;
++	checksum(edid, 128);
++	check(edid, sizeof(edid), true, false, true);
++	large = calloc(257, 128);
++	assert(large);
++	memcpy(large, edid, sizeof(edid));
++	large[126] = 255;
++	checksum(large, 128);
++	for (i = 3; i < 257; i++) {
++		large[128 * i] = 0xF0; /* Known opaque block-map extension. */
++		checksum(large + 128 * i, 128);
++	}
++	info = di_info_parse_edid(large, 257 * 128);
++	assert(info && di_edid_has_extension_failures(di_info_get_edid(info)));
++	di_info_destroy(info);
++	free(large);
++	/* Existing fatal base checks remain fatal. */
++	edid[126] = 2;
++	checksum(edid, 128);
++	for (i = 0; i < 3; i++) {
++		uint8_t saved = edid[i == 0 ? 0 : i == 1 ? 18 : 127];
++
++		edid[i == 0 ? 0 : i == 1 ? 18 : 127] ^= 1;
++		if (i != 2)
++			checksum(edid, 128);
++		assert(!di_info_parse_edid(edid, sizeof(edid)));
++		edid[i == 0 ? 0 : i == 1 ? 18 : 127] = saved;
++		checksum(edid, 128);
++	}
++	puts("structured extension failure, unrelated base warnings and framing matrix: PASS");
++	return 0;
++}
+diff --git a/test/meson.build b/test/meson.build
+index 8fab498..ff06604 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -116,3 +116,7 @@ test('displayid2-allocation', allocation_test, args: files('data/qemu.edid'))
+ native_api_consumer = executable('native-api-consumer', 'native-api-consumer.c',
+ 	dependencies: di_dep)
+ test('native-api-consumer', native_api_consumer, args: files('data/qemu.edid'))
++
++extension_failures = executable('edid-extension-failures', 'edid-extension-failures.c',
++	dependencies: di_dep)
++test('edid-extension-failures', extension_failures, args: files('data/qemu.edid'))
+diff --git a/test/native-api-consumer.c b/test/native-api-consumer.c
+index 44d2a3c..bd6d8eb 100644
+--- a/test/native-api-consumer.c
++++ b/test/native-api-consumer.c
+@@ -73,6 +73,7 @@ check(const uint8_t *other, size_t size, bool diagnosed, bool separate, bool rev
+ 	info = di_info_parse_edid(edid, edid_size);
+ 	assert(info);
+ 	assert((di_info_get_failure_msg(info) != NULL) == diagnosed);
++	assert(di_edid_has_extension_failures(di_info_get_edid(info)) == diagnosed);
+ 	h = di_info_get_hdr_static_metadata(info);
+ 	c = di_info_get_supported_signal_colorimetry(info);
+ 	assert(h->traditional_sdr && !h->traditional_hdr &&

@@ -1,0 +1,1019 @@
+From 3ded0d1d3348b9ad17838b1bfda4c1e9cbe1232c Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Thu, 8 Oct 2026 01:06:38 -0400
+Subject: [PATCH 10/14] displayid2: expose opt-in parsed capabilities on the
+ 0.3 ABI
+
+Add four parsed-block accessors and their public interface-feature types
+from the proposed parser API. Keep existing public type layouts, SONAME
+and pkg-config version unchanged; require the new package revision for
+new symbols and keep development/runtime versions matched exactly.
+
+Restore native-only defaults in both legacy HDR/colorimetry getters.
+Retain the earlier backport's explicit ordinary/nested first-match CTA
+lookup, including complete CTA Type 1/luminance authority. An opt-in
+Mutter consumer can use low-level native capabilities without silently
+migrating existing callers through the old getters.
+
+Exercise public getter ownership/fields, supported empty/audio children,
+unsupported parent removal, diagnostics and block/extension order. Keep
+all old-header fields and nested-CTA precedence covered. GCC analysis and
+Clang ASan/UBSan pass39/39 before the final stronger removal assertion;
+that focused requalification is pending. Only the synthetic native
+print golden changes to the restored default.
+
+This is a reviewed local proposal, not a released/accepted upstream API.
+Packaging patch regeneration and final artifact qualification follow.
+---
+ debian/README.native-displayid                |  99 ++++------
+ debian/changelog                              |  11 ++
+ debian/libdisplay-info3.symbols               |   4 +
+ displayid2.c                                  |   8 +-
+ include/displayid2.h                          | 169 +---------------
+ include/libdisplay-info/displayid2.h          | 185 ++++++++++++++++++
+ info.c                                        |  54 +----
+ .../data/synthetic-displayid2-interface.print |   4 +-
+ test/displayid2-private.c                     |  10 +-
+ test/meson.build                              |   4 +
+ test/native-api-consumer.c                    | 157 +++++++++++++++
+ test/old-header-consumer.c                    |  30 +--
+ 12 files changed, 431 insertions(+), 304 deletions(-)
+ create mode 100644 test/native-api-consumer.c
+
+diff --git a/debian/README.native-displayid b/debian/README.native-displayid
+index 4b9f84a..7455a70 100644
+--- a/debian/README.native-displayid
++++ b/debian/README.native-displayid
+@@ -1,60 +1,43 @@
+-Local native DisplayID HDR detection backport
++Local parsed DisplayID native capability API
+ ===========================================
+ 
+-This local package improves libdisplay-info 0.3 detection. It does not by
+-itself enable desktop HDR on the ROG panel. Mutter 51.0 additionally requires
+-CTA Static Metadata Type 1, and the installed i915 driver reports that its
+-Intel HDR backlight interface is unused because static metadata is missing.
+-No compositor, kernel, boot setting or panel firmware is changed here.
+-
+-The 0.3 public headers, exported symbols, struct layouts and SONAME .so.3 are
+-preserved. There are no new public entry points or standalone DisplayID APIs.
+-The parser privately owns DisplayID v2 blocks and nested CTA children and
+-releases partly initialized state when an allocation fails.
+-
+-For valid descriptions, nested CTA joins ordinary CTA in extension/block
+-order. The first match for each relevant CTA domain remains authoritative.
+-This deliberately extends 0.3, which previously ignored nested CTA. A mixed
+-input with an earlier nested declaration can consequently differ from the
+-old ordinary-only result. Native interface features contribute only when
+-neither CTA HDR static metadata nor CTA colorimetry exists, and one validated
+-block proves RGB encoding plus a complete BT.2020/SMPTE ST 2084 tuple.
+-
+-This intentionally broadens the existing high-level EOTF getter's derivation:
+-PQ and BT2020_RGB may describe native DisplayID signal support even without
+-CTA metadata reception. Type 1 remains false and desired-content luminance
+-remains zero. Native brightness, DCI-P3, HLG and other native color encodings
+-are not guessed or synthesized. Unknown native enum values are retained
+-privately, diagnosed and excluded from capability mapping. Known valid native
+-fields survive unrelated reserved values.
+-
+-There is a narrow, separately reviewed malformed-input difference from
+-upstream 4adfd7888e03987a4904a4ce0e14fd0ff4bccc42. Unusable nested CTA evidence
+-suppresses only native fallback; it never clears valid parsed CTA fields.
+-The marker is set for an unsupported 0x81 revision/reserved header flag,
+-an incomplete recognized 0x81 header, a declared outer length beyond the
+-section, a truncated nested child,
+-an empty extended tag, or a rejected HDR/colorimetry child. Unsupported parent
+-formats are skipped wholly. For a supported parent with a malformed tail,
+-earlier complete children remain authoritative, including their Type 1 and
+-luminance. Valid empty or irrelevant/audio-only nested CTA does not suppress
+-native fallback. Unrelated diagnostics and malformed native blocks do not
+-set this marker. Allocation failures are fatal and remain ENOMEM.
+-
+-The backport adapts upstream Simon Ser's private CTA context and DisplayID2
+-lifecycle changes d535192, 34b3635, 4713505, 788c056, 7324cca and 73ec53d, plus
+-the locally reviewed parser/safety/fallback commits da6168b, 533a338 and
+-4adfd78. The conservative malformed-input marker and ownership repairs are
+-local adaptations, not fabricated upstream commits or accepted patches.
+-
+-This is an unsigned local test build, not an Ubuntu upload or an upstream
+-acceptance claim. Human DCO attestation, normative DisplayID section checking
+-and maintainer review of the high-level semantics remain submission gates.
+-The private observed panel capture is not included in the source package.
+-
+-Allocation-failure tests use a private static source copy so linker wrapping
+-actually reaches nested allocations. Those test objects and the allocation
+-executable disable LTO, preserving optimization and hardening. Whole-program
+-analysis cannot observe linker --wrap counter side effects; the O2/LTO build
+-elided a required counter reload after cleanup. The installed library and
+-old-header ABI consumer retain production LTO. No assertion is weakened.
++This coordinated-stack prerequisite adds four upstream-proposed parsed-block
++getters and their native Display Interface Features types to libdisplay-info
++0.3. The new functions retain upstream ownership/lifetime semantics. Existing
++public types retain their layouts and the SONAME remains .so.3; pkg-config
++version remains the truthful 0.3.0. The development package requires its exact
++matching runtime, and the added symbols require 0.3.0-1ubuntu1~hdr4 or newer.
++
++Legacy HDR-static-metadata and supported-signal-colorimetry getters do not
++promote native-only DisplayID support: PQ, Type 1 and signal colorimetry stay
++false, with unknown desired-content nits zero. This restores the native-only
++contract after the superseded hdr3 experiment. The previous backport's nested
++CTA lookup is retained intentionally: ordinary and nested declarations join
++in extension/block order, first match per CTA domain remains authoritative.
++That nested behavior extends original Ubuntu 0.3 and is not claimed identical
++to its ordinary-only lookup. Complete CTA Type 1 and luminance remain intact.
++
++An explicit new consumer may use the parsed native API for a complete RGB
++BT.2020/PQ tuple in one block. Mutter's coordinated candidate does so only
++for eligible eDP/KMS/device support, preserving CTA authority and rejecting
++diagnosed inputs. No caller is silently migrated through the old getters.
++Unsupported nested CTA parent revisions/header flags are diagnosed and skipped;
++truncation and malformed children remain diagnosed, with complete earlier
++children preserved. Valid empty/audio-only containers remain usable.
++
++This library package alone does not enable desktop HDR. The coordinated
++Mutter opt-in and validated native luminance Intel display kernel route must
++be qualified together. Old-kernel/new-Mutter native HDR is not supported by
++this bounded stack until separately tested. No Type 1/content metadata is
++fabricated, and native panel brightness is not mastering/content metadata.
++
++The source preserves the attributed historical CTA/lifecycle backports and
++local parser changes identified in the quilt header. The additive API derives
++from the locally reviewed, unpushed parser proposal 533a338, not an accepted
++upstream release. Human DCO, normative section verification, maintainer review
++and any public submission remain separate gates.
++
++Fault tests use a private static parser copy and effective linker wrapping.
++Only that copy and the allocation executable disable LTO; optimization,
++hardening, all ownership/failure assertions and production library LTO remain.
++The private observed panel capture is excluded from source/package payloads.
+diff --git a/debian/changelog b/debian/changelog
+index 39cc7ec..e6db625 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,14 @@
++libdisplay-info (0.3.0-1ubuntu1~hdr4) stonking; urgency=medium
++
++  * Add four proposed parsed DisplayID2 getters/types for explicit native
++    capability consumers, with matching runtime/development dependencies.
++  * Restore native-only defaults in both legacy HDR/colorimetry getters;
++    retain the prior backport's first-match ordinary/nested CTA expansion.
++  * Diagnose unsupported nested CTA parents and test public accessor,
++    ownership, legacy defaults and malformed-container contracts.
++
++ -- Paul Junod <donujp@gmail.com>  Thu, 08 Oct 2026 00:58:37 -0400
++
+ libdisplay-info (0.3.0-1ubuntu1~hdr3) stonking; urgency=medium
+ 
+   * Correct DEP3 provenance: separate six actual historical upstream commits
+diff --git a/debian/libdisplay-info3.symbols b/debian/libdisplay-info3.symbols
+index 038421b..8ccce9b 100644
+--- a/debian/libdisplay-info3.symbols
++++ b/debian/libdisplay-info3.symbols
+@@ -27,6 +27,10 @@ libdisplay-info.so.3 libdisplay-info3 #MINVER#
+  di_cta_video_format_from_vic@Base 0.3.0
+  di_cta_ycbcr420_cap_map_supported@Base 0.3.0
+  di_cvt_compute@Base 0.3.0
++ di_displayid2_data_block_get_cta_data_blocks@Base 0.3.0-1ubuntu1~hdr4
++ di_displayid2_data_block_get_interface_features@Base 0.3.0-1ubuntu1~hdr4
++ di_displayid2_data_block_get_tag@Base 0.3.0-1ubuntu1~hdr4
++ di_displayid2_get_data_blocks@Base 0.3.0-1ubuntu1~hdr4
+  di_displayid2_get_product_primary_use_case@Base 0.3.0
+  di_displayid2_get_revision@Base 0.3.0
+  di_displayid_data_block_get_display_params@Base 0.3.0
+diff --git a/displayid2.c b/displayid2.c
+index 4915101..32ec5b3 100644
+--- a/displayid2.c
++++ b/displayid2.c
+@@ -377,19 +377,19 @@ di_displayid2_get_product_primary_use_case(const struct di_displayid2 *displayid
+ }
+ 
+ const struct di_displayid2_data_block *const *
+-_di_displayid2_get_data_blocks(const struct di_displayid2 *displayid2)
++di_displayid2_get_data_blocks(const struct di_displayid2 *displayid2)
+ {
+ 	return (const struct di_displayid2_data_block *const *) displayid2->data_blocks;
+ }
+ 
+ enum di_displayid2_data_block_tag
+-_di_displayid2_data_block_get_tag(const struct di_displayid2_data_block *data_block)
++di_displayid2_data_block_get_tag(const struct di_displayid2_data_block *data_block)
+ {
+ 	return data_block->tag;
+ }
+ 
+ const struct di_cta_data_block *const *
+-_di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *data_block)
++di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *data_block)
+ {
+ 	if (data_block->tag != DI_DISPLAYID2_DATA_BLOCK_CTA861) {
+ 		return NULL;
+@@ -398,7 +398,7 @@ _di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_bl
+ }
+ 
+ const struct di_displayid2_interface_features *
+-_di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_block *data_block)
++di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_block *data_block)
+ {
+ 	if (data_block->tag != DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES)
+ 		return NULL;
+diff --git a/include/displayid2.h b/include/displayid2.h
+index b6ae76d..3463a0c 100644
+--- a/include/displayid2.h
++++ b/include/displayid2.h
+@@ -33,164 +33,6 @@
+  */
+ #define DISPLAYID2_CTA861_MAX_DATA_BLOCKS 248
+ 
+-/**
+- * DisplayID v2 data block tag.
+- */
+-enum di_displayid2_data_block_tag {
+-	/* Product Identification Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID = 0x20,
+-	/* Display Parameters Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS = 0x21,
+-	/* Type VII Timing – Detailed Timing Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_TYPE_VII_TIMING = 0x22,
+-	/* Type VIII Timing – Enumerated Timing Code Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_TYPE_VIII_TIMING = 0x23,
+-	/* Type IX Timing – Formula-based Timing Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_TYPE_IX_TIMING = 0x24,
+-	/* Dynamic Video Timing Range Limits Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_DYN_TIMING_RANGE_LIMITS = 0x25,
+-	/* Display Interface Features Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES = 0x26,
+-	/* Stereo Display Interface Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_STEREO_DISPLAY_INTERFACE = 0x27,
+-	/* Tiled Display Topology Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_TILED_DISPLAY_TOPO = 0x28,
+-	/* ContainerID Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_CONTAINERID = 0x29,
+-	/* Type X Timing – Formula-based Timing Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_TYPE_X_TIMING = 0x2A,
+-	/* Adaptive-Sync Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_ADAPTIVE_SYNC = 0x2B,
+-	/* ARVR_HMD Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_ARVR_HMD = 0x2C,
+-	/* ARVR_Layer Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_ARVR_LAYER = 0x2D,
+-	/* CTA-861 Data Block Encapsulation DisplayID Data Block */
+-	DI_DISPLAYID2_DATA_BLOCK_CTA861 = 0x81,
+-};
+-
+-struct di_displayid2_data_block;
+-
+-/** Supported RGB/YCbCr 4:4:4 bit-depth flags. */
+-enum di_displayid2_bit_depth_444 {
+-	DI_DISPLAYID2_BIT_DEPTH_444_6 = 1 << 0,
+-	DI_DISPLAYID2_BIT_DEPTH_444_8 = 1 << 1,
+-	DI_DISPLAYID2_BIT_DEPTH_444_10 = 1 << 2,
+-	DI_DISPLAYID2_BIT_DEPTH_444_12 = 1 << 3,
+-	DI_DISPLAYID2_BIT_DEPTH_444_14 = 1 << 4,
+-	DI_DISPLAYID2_BIT_DEPTH_444_16 = 1 << 5,
+-};
+-
+-/** Supported YCbCr 4:2:2/4:2:0 bit-depth flags. */
+-enum di_displayid2_bit_depth_4xx {
+-	DI_DISPLAYID2_BIT_DEPTH_4XX_8 = 1 << 0,
+-	DI_DISPLAYID2_BIT_DEPTH_4XX_10 = 1 << 1,
+-	DI_DISPLAYID2_BIT_DEPTH_4XX_12 = 1 << 2,
+-	DI_DISPLAYID2_BIT_DEPTH_4XX_14 = 1 << 3,
+-	DI_DISPLAYID2_BIT_DEPTH_4XX_16 = 1 << 4,
+-};
+-
+-/** Supported audio sample-rate flags. */
+-enum di_displayid2_audio_capability {
+-	DI_DISPLAYID2_AUDIO_32_KHZ = 1 << 7,
+-	DI_DISPLAYID2_AUDIO_44_1_KHZ = 1 << 6,
+-	DI_DISPLAYID2_AUDIO_48_KHZ = 1 << 5,
+-};
+-
+-/** Standard color space/EOTF combination flags. */
+-enum di_displayid2_standard_combination {
+-	DI_DISPLAYID2_COMBINATION_SRGB = 1 << 0,
+-	DI_DISPLAYID2_COMBINATION_BT601 = 1 << 1,
+-	DI_DISPLAYID2_COMBINATION_BT709_BT1886 = 1 << 2,
+-	DI_DISPLAYID2_COMBINATION_ADOBE_RGB = 1 << 3,
+-	DI_DISPLAYID2_COMBINATION_DCI_P3 = 1 << 4,
+-	DI_DISPLAYID2_COMBINATION_BT2020 = 1 << 5,
+-	DI_DISPLAYID2_COMBINATION_BT2020_ST2084 = 1 << 6,
+-};
+-
+-/** Known additional-combination color-space encodings. */
+-enum di_displayid2_color_space {
+-	DI_DISPLAYID2_COLOR_SPACE_UNDEFINED = 0,
+-	DI_DISPLAYID2_COLOR_SPACE_SRGB = 1,
+-	DI_DISPLAYID2_COLOR_SPACE_BT601 = 2,
+-	DI_DISPLAYID2_COLOR_SPACE_BT709 = 3,
+-	DI_DISPLAYID2_COLOR_SPACE_ADOBE_RGB = 4,
+-	DI_DISPLAYID2_COLOR_SPACE_DCI_P3 = 5,
+-	DI_DISPLAYID2_COLOR_SPACE_BT2020 = 6,
+-	DI_DISPLAYID2_COLOR_SPACE_CUSTOM = 7,
+-};
+-
+-/** Known additional-combination EOTF encodings. */
+-enum di_displayid2_eotf {
+-	DI_DISPLAYID2_EOTF_UNDEFINED = 0,
+-	DI_DISPLAYID2_EOTF_SRGB = 1,
+-	DI_DISPLAYID2_EOTF_BT601 = 2,
+-	DI_DISPLAYID2_EOTF_BT1886 = 3,
+-	DI_DISPLAYID2_EOTF_ADOBE_RGB = 4,
+-	DI_DISPLAYID2_EOTF_DCI_P3 = 5,
+-	DI_DISPLAYID2_EOTF_BT2020 = 6,
+-	DI_DISPLAYID2_EOTF_GAMMA = 7,
+-	DI_DISPLAYID2_EOTF_ST2084 = 8,
+-	DI_DISPLAYID2_EOTF_HYBRID_LOG = 9,
+-	DI_DISPLAYID2_EOTF_CUSTOM = 10,
+-};
+-
+-/**
+- * Additional color space/EOTF combination from a Display Interface Features
+- * data block. Values are the DisplayID v2 encodings: color space occupies the
+- * high nibble and EOTF the low nibble. Reserved values are retained verbatim;
+- * they do not describe a known capability.
+- */
+-struct di_displayid2_color_eotf {
+-	/* enum di_displayid2_color_space, or an uninterpreted reserved value */
+-	uint8_t color_space;
+-	/* enum di_displayid2_eotf, or an uninterpreted reserved value */
+-	uint8_t eotf;
+-};
+-
+-/**
+- * Display Interface Features, revision 0.
+- *
+- * Bit-depth masks use bits 0 through 5 for 6, 8, 10, 12, 14, 16 bpc in
+- * RGB/4:4:4, and bits 0 through 4 for 8, 10, 12, 14, 16 bpc in 4:2:2/4:2:0.
+- * Reserved mask bits are excluded. Audio flags retain the DisplayID encoding
+- * (bits 7 through 5: 32, 44.1, 48 kHz; remaining bits reserved).
+- *
+- * Standard combinations use bits 0 through 6: sRGB, BT.601, BT.709/BT.1886,
+- * Adobe RGB, DCI-P3, BT.2020, BT.2020/SMPTE ST 2084. Reserved standard bits
+- * are excluded. Additional combinations retain reserved enum values without
+- * interpreting them. Known values are named by di_displayid2_color_space
+- * and di_displayid2_eotf.
+- */
+-struct di_displayid2_interface_features {
+-	/* Bitmask of enum di_displayid2_bit_depth_444 */
+-	uint8_t rgb_bit_depths;
+-	/* Bitmask of enum di_displayid2_bit_depth_444 */
+-	uint8_t ycbcr444_bit_depths;
+-	/* Bitmask of enum di_displayid2_bit_depth_4xx */
+-	uint8_t ycbcr422_bit_depths;
+-	/* Bitmask of enum di_displayid2_bit_depth_4xx */
+-	uint8_t ycbcr420_bit_depths;
+-	/* MHz, zero if not specified */
+-	float ycbcr420_min_pixel_rate;
+-	/* Bitmask of enum di_displayid2_audio_capability; reserved bits retained */
+-	uint8_t audio_capabilities;
+-	/* Bitmask of enum di_displayid2_standard_combination */
+-	uint8_t standard_combinations;
+-	uint8_t additional_combinations_len;
+-	struct di_displayid2_color_eotf additional_combinations[7];
+-};
+-
+-/**
+- * Get Display Interface Features from a DisplayID v2 data block.
+- *
+- * Returns NULL for another tag or a structurally invalid/unsupported block.
+- * The returned pointer is owned by the DisplayID structure and remains valid
+- * until it is destroyed.
+- */
+-const struct di_displayid2_interface_features *
+-_di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_block *data_block);
+-
+ struct di_displayid2 {
+ 	int revision;
+ 	enum di_displayid2_product_primary_use_case product_primary_use_case;
+@@ -198,7 +40,7 @@ struct di_displayid2 {
+ 	struct di_displayid2_data_block *data_blocks[DISPLAYID2_MAX_DATA_BLOCKS + 1];
+ 	size_t data_blocks_len;
+ 
+-	/* Uninterpretable nested CTA evidence suppresses native fallback only. */
++	/* Tracks unusable nested CTA; public callers also receive diagnostics. */
+ 	bool unusable_cta;
+ 
+ 	struct di_logger *logger;
+@@ -224,13 +66,4 @@ _di_displayid2_parse(struct di_displayid2 *displayid2, const uint8_t *data,
+ void
+ _di_displayid2_finish(struct di_displayid2 *displayid2);
+ 
+-const struct di_displayid2_data_block *const *
+-_di_displayid2_get_data_blocks(const struct di_displayid2 *displayid2);
+-
+-enum di_displayid2_data_block_tag
+-_di_displayid2_data_block_get_tag(const struct di_displayid2_data_block *block);
+-
+-const struct di_cta_data_block *const *
+-_di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *block);
+-
+ #endif
+diff --git a/include/libdisplay-info/displayid2.h b/include/libdisplay-info/displayid2.h
+index 028a2d9..585189f 100644
+--- a/include/libdisplay-info/displayid2.h
++++ b/include/libdisplay-info/displayid2.h
+@@ -23,6 +23,14 @@ struct di_displayid2;
+ int
+ di_displayid2_get_revision(const struct di_displayid2 *displayid2);
+ 
++/**
++ * Get DisplayID v2 data blocks.
++ *
++ * The returned array is NULL-terminated.
++ */
++const struct di_displayid2_data_block *const *
++di_displayid2_get_data_blocks(const struct di_displayid2 *displayid2);
++
+ /**
+  * Product primary use case identifier, defined in table 2-3.
+  */
+@@ -47,10 +55,187 @@ enum di_displayid2_product_primary_use_case {
+ 	DI_DISPLAYID2_PRODUCT_PRIMARY_USE_CASE_HMD_AR = 0x08,
+ };
+ 
++/**
++ * DisplayID v2 data block tag.
++ */
++enum di_displayid2_data_block_tag {
++	/* Product Identification Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID = 0x20,
++	/* Display Parameters Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS = 0x21,
++	/* Type VII Timing – Detailed Timing Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_VII_TIMING = 0x22,
++	/* Type VIII Timing – Enumerated Timing Code Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_VIII_TIMING = 0x23,
++	/* Type IX Timing – Formula-based Timing Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_IX_TIMING = 0x24,
++	/* Dynamic Video Timing Range Limits Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_DYN_TIMING_RANGE_LIMITS = 0x25,
++	/* Display Interface Features Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES = 0x26,
++	/* Stereo Display Interface Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_STEREO_DISPLAY_INTERFACE = 0x27,
++	/* Tiled Display Topology Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TILED_DISPLAY_TOPO = 0x28,
++	/* ContainerID Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_CONTAINERID = 0x29,
++	/* Type X Timing – Formula-based Timing Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_X_TIMING = 0x2A,
++	/* Adaptive-Sync Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_ADAPTIVE_SYNC = 0x2B,
++	/* ARVR_HMD Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_ARVR_HMD = 0x2C,
++	/* ARVR_Layer Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_ARVR_LAYER = 0x2D,
++	/* CTA-861 Data Block Encapsulation DisplayID Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_CTA861 = 0x81,
++};
++
++/**
++ * A DisplayID v2 data block.
++ */
++struct di_displayid2_data_block;
++
++/**
++ * Get a DisplayID v2 data block tag.
++ */
++enum di_displayid2_data_block_tag
++di_displayid2_data_block_get_tag(const struct di_displayid2_data_block *data_block);
++
+ /**
+  * Get the DisplayID v2 product primary use case.
+  */
+ enum di_displayid2_product_primary_use_case
+ di_displayid2_get_product_primary_use_case(const struct di_displayid2 *displayid2);
+ 
++/**
++ * Get CTA data blocks from a DisplayID v2 CTA-861 data block.
++ *
++ * The returned array is NULL-terminated.
++ *
++ * Returns NULL if the data block tag isn't DI_DISPLAYID2_DATA_BLOCK_CTA861.
++ */
++const struct di_cta_data_block *const *
++di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *data_block);
++
++/** Supported RGB/YCbCr 4:4:4 bit-depth flags. */
++enum di_displayid2_bit_depth_444 {
++	DI_DISPLAYID2_BIT_DEPTH_444_6 = 1 << 0,
++	DI_DISPLAYID2_BIT_DEPTH_444_8 = 1 << 1,
++	DI_DISPLAYID2_BIT_DEPTH_444_10 = 1 << 2,
++	DI_DISPLAYID2_BIT_DEPTH_444_12 = 1 << 3,
++	DI_DISPLAYID2_BIT_DEPTH_444_14 = 1 << 4,
++	DI_DISPLAYID2_BIT_DEPTH_444_16 = 1 << 5,
++};
++
++/** Supported YCbCr 4:2:2/4:2:0 bit-depth flags. */
++enum di_displayid2_bit_depth_4xx {
++	DI_DISPLAYID2_BIT_DEPTH_4XX_8 = 1 << 0,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_10 = 1 << 1,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_12 = 1 << 2,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_14 = 1 << 3,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_16 = 1 << 4,
++};
++
++/** Supported audio sample-rate flags. */
++enum di_displayid2_audio_capability {
++	DI_DISPLAYID2_AUDIO_32_KHZ = 1 << 7,
++	DI_DISPLAYID2_AUDIO_44_1_KHZ = 1 << 6,
++	DI_DISPLAYID2_AUDIO_48_KHZ = 1 << 5,
++};
++
++/** Standard color space/EOTF combination flags. */
++enum di_displayid2_standard_combination {
++	DI_DISPLAYID2_COMBINATION_SRGB = 1 << 0,
++	DI_DISPLAYID2_COMBINATION_BT601 = 1 << 1,
++	DI_DISPLAYID2_COMBINATION_BT709_BT1886 = 1 << 2,
++	DI_DISPLAYID2_COMBINATION_ADOBE_RGB = 1 << 3,
++	DI_DISPLAYID2_COMBINATION_DCI_P3 = 1 << 4,
++	DI_DISPLAYID2_COMBINATION_BT2020 = 1 << 5,
++	DI_DISPLAYID2_COMBINATION_BT2020_ST2084 = 1 << 6,
++};
++
++/** Known additional-combination color-space encodings. */
++enum di_displayid2_color_space {
++	DI_DISPLAYID2_COLOR_SPACE_UNDEFINED = 0,
++	DI_DISPLAYID2_COLOR_SPACE_SRGB = 1,
++	DI_DISPLAYID2_COLOR_SPACE_BT601 = 2,
++	DI_DISPLAYID2_COLOR_SPACE_BT709 = 3,
++	DI_DISPLAYID2_COLOR_SPACE_ADOBE_RGB = 4,
++	DI_DISPLAYID2_COLOR_SPACE_DCI_P3 = 5,
++	DI_DISPLAYID2_COLOR_SPACE_BT2020 = 6,
++	DI_DISPLAYID2_COLOR_SPACE_CUSTOM = 7,
++};
++
++/** Known additional-combination EOTF encodings. */
++enum di_displayid2_eotf {
++	DI_DISPLAYID2_EOTF_UNDEFINED = 0,
++	DI_DISPLAYID2_EOTF_SRGB = 1,
++	DI_DISPLAYID2_EOTF_BT601 = 2,
++	DI_DISPLAYID2_EOTF_BT1886 = 3,
++	DI_DISPLAYID2_EOTF_ADOBE_RGB = 4,
++	DI_DISPLAYID2_EOTF_DCI_P3 = 5,
++	DI_DISPLAYID2_EOTF_BT2020 = 6,
++	DI_DISPLAYID2_EOTF_GAMMA = 7,
++	DI_DISPLAYID2_EOTF_ST2084 = 8,
++	DI_DISPLAYID2_EOTF_HYBRID_LOG = 9,
++	DI_DISPLAYID2_EOTF_CUSTOM = 10,
++};
++
++/**
++ * Additional color space/EOTF combination from a Display Interface Features
++ * data block. Values are the DisplayID v2 encodings: color space occupies the
++ * high nibble and EOTF the low nibble. Reserved values are retained verbatim;
++ * they do not describe a known capability.
++ */
++struct di_displayid2_color_eotf {
++	/* enum di_displayid2_color_space, or an uninterpreted reserved value */
++	uint8_t color_space;
++	/* enum di_displayid2_eotf, or an uninterpreted reserved value */
++	uint8_t eotf;
++};
++
++/**
++ * Display Interface Features, revision 0.
++ *
++ * Bit-depth masks use bits 0 through 5 for 6, 8, 10, 12, 14, 16 bpc in
++ * RGB/4:4:4, and bits 0 through 4 for 8, 10, 12, 14, 16 bpc in 4:2:2/4:2:0.
++ * Reserved mask bits are excluded. Audio flags retain the DisplayID encoding
++ * (bits 7 through 5: 32, 44.1, 48 kHz; remaining bits reserved).
++ *
++ * Standard combinations use bits 0 through 6: sRGB, BT.601, BT.709/BT.1886,
++ * Adobe RGB, DCI-P3, BT.2020, BT.2020/SMPTE ST 2084. Reserved standard bits
++ * are excluded. Additional combinations retain reserved enum values without
++ * interpreting them. Known values are named by di_displayid2_color_space
++ * and di_displayid2_eotf.
++ */
++struct di_displayid2_interface_features {
++	/* Bitmask of enum di_displayid2_bit_depth_444 */
++	uint8_t rgb_bit_depths;
++	/* Bitmask of enum di_displayid2_bit_depth_444 */
++	uint8_t ycbcr444_bit_depths;
++	/* Bitmask of enum di_displayid2_bit_depth_4xx */
++	uint8_t ycbcr422_bit_depths;
++	/* Bitmask of enum di_displayid2_bit_depth_4xx */
++	uint8_t ycbcr420_bit_depths;
++	/* MHz, zero if not specified */
++	float ycbcr420_min_pixel_rate;
++	/* Bitmask of enum di_displayid2_audio_capability; reserved bits retained */
++	uint8_t audio_capabilities;
++	/* Bitmask of enum di_displayid2_standard_combination */
++	uint8_t standard_combinations;
++	uint8_t additional_combinations_len;
++	struct di_displayid2_color_eotf additional_combinations[7];
++};
++
++/**
++ * Get Display Interface Features from a DisplayID v2 data block.
++ *
++ * Returns NULL for another tag or a structurally invalid/unsupported block.
++ * The returned pointer is owned by the DisplayID structure and remains valid
++ * until it is destroyed.
++ */
++const struct di_displayid2_interface_features *
++di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_block *data_block);
++
+ #endif
+diff --git a/info.c b/info.c
+index 4665084..445b0f7 100644
+--- a/info.c
++++ b/info.c
+@@ -56,9 +56,9 @@ displayid2_get_cta_data_block(const struct di_displayid2 *displayid2, enum di_ct
+ 	const struct di_displayid2_data_block *const *data_blocks;
+ 	const struct di_cta_data_block *const *cta_data_blocks, *match;
+ 
+-	data_blocks = _di_displayid2_get_data_blocks(displayid2);
++	data_blocks = di_displayid2_get_data_blocks(displayid2);
+ 	for (i = 0; data_blocks[i] != NULL; i++) {
+-		cta_data_blocks = _di_displayid2_data_block_get_cta_data_blocks(data_blocks[i]);
++		cta_data_blocks = di_displayid2_data_block_get_cta_data_blocks(data_blocks[i]);
+ 		if (cta_data_blocks == NULL) {
+ 			continue;
+ 		}
+@@ -218,55 +218,6 @@ derive_edid_supported_signal_colorimetry(const struct di_edid *edid,
+ 	ssc->ictcp = cm->ictcp;
+ }
+ 
+-static bool
+-displayid2_has_rgb_bt2020_pq(const struct di_displayid2 *displayid2)
+-{
+-	const struct di_displayid2_data_block *const *blocks;
+-	const struct di_displayid2_interface_features *f;
+-	size_t i, j;
+-
+-	blocks = _di_displayid2_get_data_blocks(displayid2);
+-	for (i = 0; blocks[i]; i++) {
+-		f = _di_displayid2_data_block_get_interface_features(blocks[i]);
+-		if (!f || !f->rgb_bit_depths)
+-			continue;
+-		if (f->standard_combinations & DI_DISPLAYID2_COMBINATION_BT2020_ST2084)
+-			return true;
+-		for (j = 0; j < f->additional_combinations_len; j++) {
+-			if (f->additional_combinations[j].color_space == DI_DISPLAYID2_COLOR_SPACE_BT2020 &&
+-			    f->additional_combinations[j].eotf == DI_DISPLAYID2_EOTF_ST2084)
+-				return true;
+-		}
+-	}
+-	return false;
+-}
+-
+-static void
+-derive_native_hdr_colorimetry(struct di_info *info)
+-{
+-	const struct di_edid_ext *const *ext;
+-	const struct di_displayid2 *displayid2;
+-	bool supported = false;
+-
+-	if (edid_get_cta_data_block(info->edid, DI_CTA_DATA_BLOCK_HDR_STATIC_METADATA) ||
+-	    edid_get_cta_data_block(info->edid, DI_CTA_DATA_BLOCK_COLORIMETRY))
+-		return;
+-	for (ext = di_edid_get_extensions(info->edid); *ext; ext++) {
+-		displayid2 = di_edid_ext_get_displayid2(*ext);
+-		if (!displayid2)
+-			continue;
+-		if (displayid2->unusable_cta)
+-			return;
+-		if (!supported && displayid2_has_rgb_bt2020_pq(displayid2))
+-			supported = true;
+-	}
+-	if (supported) {
+-		/* Native signal support does not assert CTA metadata reception or nits. */
+-		info->derived.hdr_static_metadata.pq = true;
+-		info->derived.supported_signal_colorimetry.bt2020_rgb = true;
+-	}
+-}
+-
+ struct di_info *
+ di_info_parse_edid(const void *data, size_t size)
+ {
+@@ -297,7 +248,6 @@ di_info_parse_edid(const void *data, size_t size)
+ 	derive_edid_hdr_static_metadata(info->edid, &info->derived.hdr_static_metadata);
+ 	derive_edid_color_primaries(info->edid, &info->derived.color_primaries);
+ 	derive_edid_supported_signal_colorimetry(info->edid, &info->derived.supported_signal_colorimetry);
+-	derive_native_hdr_colorimetry(info);
+ 
+ 	return info;
+ 
+diff --git a/test/data/synthetic-displayid2-interface.print b/test/data/synthetic-displayid2-interface.print
+index ddf5e55..6732786 100644
+--- a/test/data/synthetic-displayid2-interface.print
++++ b/test/data/synthetic-displayid2-interface.print
+@@ -4,11 +4,11 @@ serial: {null}
+ HDR static metadata:
+ luminance 0.000000-0.000000, maxFALL 0.000000
+ metadata type1=no
+-EOTF tSDR=yes, tHDR=no, PQ=yes, HLG=no
++EOTF tSDR=yes, tHDR=no, PQ=no, HLG=no
+ default color primaries:
+     red: 0.000, 0.000
+   green: 0.000, 0.000
+    blue: 0.000, 0.000
+ default white: 0.000, 0.000
+ default gamma: 2.20
+-signal colorimetry: BT2020_RGB
++signal colorimetry:
+diff --git a/test/displayid2-private.c b/test/displayid2-private.c
+index 71d3f25..422f838 100644
+--- a/test/displayid2-private.c
++++ b/test/displayid2-private.c
+@@ -47,12 +47,12 @@ check(const uint8_t *block, size_t size, bool valid)
+ 
+ 	assert(log);
+ 	d = parse(block, size, log);
+-	blocks = _di_displayid2_get_data_blocks(d);
++	blocks = di_displayid2_get_data_blocks(d);
+ 	assert((blocks[0] != NULL) == valid);
+ 	if (!valid)
+ 		assert(ftell(log) > 0);
+ 	if (valid) {
+-		f = _di_displayid2_data_block_get_interface_features(blocks[0]);
++		f = di_displayid2_data_block_get_interface_features(blocks[0]);
+ 		assert(f);
+ 		assert(f->rgb_bit_depths == (block[3] & 0x3F));
+ 		assert(f->ycbcr444_bit_depths == (block[4] & 0x3F));
+@@ -111,8 +111,8 @@ main(void)
+ 	check_short_header(2, 0x26);
+ 	check(full, sizeof(full), true);
+ 	info = parse(other, sizeof(other), log);
+-	blocks = _di_displayid2_get_data_blocks(info);
+-	assert(blocks[0] && !_di_displayid2_data_block_get_interface_features(blocks[0]));
++	blocks = di_displayid2_get_data_blocks(info);
++	assert(blocks[0] && !di_displayid2_data_block_get_interface_features(blocks[0]));
+ 	_di_displayid2_finish(info);
+ 	free(info);
+ 	check(block, 12, true);
+@@ -154,7 +154,7 @@ main(void)
+ 	memcpy(two + 12, block, 12);
+ 	two[1] = 1;
+ 	info = parse(two, sizeof(two), log);
+-	blocks = _di_displayid2_get_data_blocks(info);
++	blocks = di_displayid2_get_data_blocks(info);
+ 	assert(blocks[0] && !blocks[1]); /* malformed block doesn't shadow valid */
+ 	_di_displayid2_finish(info);
+ 	free(info);
+diff --git a/test/meson.build b/test/meson.build
+index 5479c9d..8fab498 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -112,3 +112,7 @@ allocation_test = executable('displayid2-allocation', 'displayid2-allocation.c',
+ 	dependencies: private_test_dep, c_args: allocation_wrap_c_args,
+ 	link_args: ['-fno-lto', '-Wl,--wrap=calloc', '-Wl,--wrap=free'])
+ test('displayid2-allocation', allocation_test, args: files('data/qemu.edid'))
++
++native_api_consumer = executable('native-api-consumer', 'native-api-consumer.c',
++	dependencies: di_dep)
++test('native-api-consumer', native_api_consumer, args: files('data/qemu.edid'))
+diff --git a/test/native-api-consumer.c b/test/native-api-consumer.c
+new file mode 100644
+index 0000000..44d2a3c
+--- /dev/null
++++ b/test/native-api-consumer.c
+@@ -0,0 +1,157 @@
++#include <assert.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <libdisplay-info/info.h>
++#include <libdisplay-info/edid.h>
++#include <libdisplay-info/displayid2.h>
++
++static uint8_t base[128];
++static const uint8_t native[] = {0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x40, 0, 0};
++static const uint8_t empty[] = {0x81, 0, 0};
++static const uint8_t audio[] = {0x81, 0, 4, 0x23, 9, 7, 7};
++static const uint8_t tail[] = {0x81, 0, 2, 0x43, 16};
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static void
++extension(uint8_t *data, const uint8_t *blocks, size_t size)
++{
++	assert(size <= 121); /* Keep both section and EDID checksums separate. */
++	data[0] = 0x70;
++	data[1] = 0x20;
++	data[2] = (uint8_t) size;
++	data[3] = 2;
++	memcpy(data + 5, blocks, size);
++	checksum(data + 1, size + 5);
++	checksum(data, 128);
++}
++
++static void
++check(const uint8_t *other, size_t size, bool diagnosed, bool separate, bool reverse)
++{
++	uint8_t edid[384] = {0}, blocks[64];
++	struct di_info *info;
++	const struct di_edid_ext *const *exts;
++	const struct di_displayid2 *displayid2;
++	const struct di_displayid2_data_block *const *db;
++	const struct di_displayid2_interface_features *f;
++	const struct di_cta_data_block *const *children;
++	const struct di_hdr_static_metadata *h;
++	const struct di_supported_signal_colorimetry *c;
++	bool found = false;
++	size_t i, j, k, containers = 0, child_count = 0;
++	size_t edid_size = separate ? 384 : 256;
++
++	assert(size <= sizeof(blocks) - sizeof(native));
++	memcpy(edid, base, 128);
++	edid[126] = separate ? 2 : 1;
++	checksum(edid, 128);
++	if (separate) {
++		extension(edid + (reverse ? 256 : 128), native, sizeof(native));
++		extension(edid + (reverse ? 128 : 256), other, size);
++	} else {
++		if (reverse) {
++			memcpy(blocks, other, size);
++			memcpy(blocks + size, native, sizeof(native));
++		} else {
++			memcpy(blocks, native, sizeof(native));
++			memcpy(blocks + sizeof(native), other, size);
++		}
++		extension(edid + 128, blocks, sizeof(native) + size);
++	}
++	info = di_info_parse_edid(edid, edid_size);
++	assert(info);
++	assert((di_info_get_failure_msg(info) != NULL) == diagnosed);
++	h = di_info_get_hdr_static_metadata(info);
++	c = di_info_get_supported_signal_colorimetry(info);
++	assert(h->traditional_sdr && !h->traditional_hdr &&
++	       !h->pq && !h->hlg && !h->type1);
++	assert(h->desired_content_max_luminance == 0 && h->desired_content_min_luminance == 0);
++	assert(h->desired_content_max_frame_avg_luminance == 0);
++	assert(!c->bt2020_rgb && !c->bt2020_ycc && !c->bt2020_cycc &&
++	       !c->ictcp && !c->st2113_rgb);
++	exts = di_edid_get_extensions(di_info_get_edid(info));
++	for (i = 0; exts[i]; i++) {
++		displayid2 = di_edid_ext_get_displayid2(exts[i]);
++		assert(displayid2);
++		db = di_displayid2_get_data_blocks(displayid2);
++		for (j = 0; db[j]; j++) {
++			f = di_displayid2_data_block_get_interface_features(db[j]);
++			if (!f) {
++				assert(di_displayid2_data_block_get_tag(db[j]) == DI_DISPLAYID2_DATA_BLOCK_CTA861);
++				children = di_displayid2_data_block_get_cta_data_blocks(db[j]);
++				assert(children);
++				containers++;
++				for (k = 0; children[k]; k++)
++					child_count++;
++				continue;
++			}
++			assert(di_displayid2_data_block_get_tag(db[j]) ==
++			       DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES);
++			assert(!di_displayid2_data_block_get_cta_data_blocks(db[j]));
++			assert(f->rgb_bit_depths == DI_DISPLAYID2_BIT_DEPTH_444_10);
++			assert(f->standard_combinations == DI_DISPLAYID2_COMBINATION_BT2020_ST2084);
++			assert(f->additional_combinations_len == 0);
++			assert(!f->ycbcr444_bit_depths && !f->ycbcr422_bit_depths && !f->ycbcr420_bit_depths);
++			assert(!f->audio_capabilities && f->ycbcr420_min_pixel_rate == 0);
++			found = true;
++		}
++	}
++	/* Unsupported parents must disappear, not merely carry a diagnostic. */
++	if (size >= 3 && other[1] == 0 && size == (size_t) other[2] + 3) {
++		assert(containers == 1);
++		assert(child_count == (size == sizeof(audio) ? 1u : 0u));
++	} else {
++		assert(containers == 0 && child_count == 0);
++	}
++	/* A truncated same-section prefix can hide later native data. */
++	if (!(diagnosed && !separate && reverse && size < 3))
++		assert(found);
++	di_info_destroy(info);
++}
++
++int
++main(int argc, char **argv)
++{
++	uint8_t data[7];
++	FILE *f;
++	size_t separate, reverse, payload, bad;
++
++	assert(argc == 2);
++	f = fopen(argv[1], "rb");
++	assert(f && fread(base, 128, 1, f) == 1);
++	fclose(f);
++	for (separate = 0; separate < 2; separate++) {
++		for (reverse = 0; reverse < 2; reverse++) {
++			check(empty, sizeof(empty), false, separate != 0, reverse != 0);
++			check(audio, sizeof(audio), false, separate != 0, reverse != 0);
++			check(tail, sizeof(tail), true, separate != 0, reverse != 0);
++			for (payload = 0; payload < 2; payload++) {
++				memcpy(data, payload ? audio : empty,
++				       payload ? sizeof(audio) : sizeof(empty));
++				for (bad = 0; bad < 2; bad++) {
++					data[1] = bad ? 8 : 1;
++					check(data, payload ? sizeof(audio) : sizeof(empty),
++					      true, separate != 0, reverse != 0);
++				}
++			}
++			data[0] = 0x81;
++			data[1] = 0;
++			check(data, 1, true, separate != 0, reverse != 0);
++			check(data, 2, true, separate != 0, reverse != 0);
++		}
++	}
++	puts("additive parsed API, legacy defaults and diagnosed nested parent matrix: PASS");
++	return 0;
++}
+diff --git a/test/old-header-consumer.c b/test/old-header-consumer.c
+index 7191aaa..2a0e122 100644
+--- a/test/old-header-consumer.c
++++ b/test/old-header-consumer.c
+@@ -349,9 +349,9 @@ check_unusable_cta(void)
+ 		short_header[0] = 0x26; /* unrelated partial native tag is not CTA evidence */
+ 		memcpy(blocks, native, sizeof(native));
+ 		memcpy(blocks + sizeof(native), short_header, short_size);
+-		check(blocks, sizeof(native) + short_size, true);
+-		check_extensions(native, sizeof(native), short_header, short_size, true);
+-		check_extensions(short_header, short_size, native, sizeof(native), true);
++		check(blocks, sizeof(native) + short_size, false);
++		check_extensions(native, sizeof(native), short_header, short_size, false);
++		check_extensions(short_header, short_size, native, sizeof(native), false);
+ 		short_header[0] = 0x81;
+ 	}
+ 	check_extensions(native, sizeof(native), malformed, sizeof(malformed), false);
+@@ -366,8 +366,8 @@ check_unusable_cta(void)
+ 	rejected[4] = 5;
+ 	check_extensions(native, sizeof(native), rejected, sizeof(rejected), false);
+ 	check_extensions(native, sizeof(native), tail, sizeof(tail), false);
+-	check_extensions(native, sizeof(native), empty, sizeof(empty), true);
+-	check_extensions(native, sizeof(native), audio, sizeof(audio), true);
++	check_extensions(native, sizeof(native), empty, sizeof(empty), false);
++	check_extensions(native, sizeof(native), audio, sizeof(audio), false);
+ 	for (order = 0; order < 2; order++) {
+ 		baseline = parse_ordinary_nested(order != 0, false, true);
+ 		info = parse_ordinary_nested(order != 0, true, true);
+@@ -422,7 +422,7 @@ main(int argc, char *argv[])
+ 		return 0;
+ 	}
+ 	check_unusable_cta();
+-	check(native, sizeof(native), true);
++	check(native, sizeof(native), false);
+ 	memcpy(block, native, sizeof(native));
+ 	block[9] = 0x10;
+ 	check(block, 12, false); /* P3 alone */
+@@ -439,23 +439,23 @@ main(int argc, char *argv[])
+ 	block[2] = 10;
+ 	block[11] = 1;
+ 	block[12] = 0xFF;
+-	check(block, 13, true); /* unknown pair doesn't erase known standard */
++	check(block, 13, false); /* unknown pair doesn't erase known standard */
+ 	block[9] = 0;
+ 	check(block, 13, false);
+ 	block[12] = 0x68;
+-	check(block, 13, true); /* additional complete BT2020/PQ tuple */
++	check(block, 13, false); /* low-level tuple does not alter legacy getters */
+ 	block[2] = 16;
+ 	block[11] = 7;
+ 	memset(block + 12, 0x66, 7);
+ 	block[18] = (TEST_BT2020 << 4) | TEST_ST2084;
+-	check(block, 19, true); /* only seventh additional pair proves PQ */
++	check(block, 19, false); /* only seventh additional pair proves PQ */
+ 	block[18] = 0x58;
+ 	check(block, 19, false);
+ 	block[2] = 10;
+ 	block[11] = 1;
+ 	for (pair = 0; pair < 256; pair++) {
+ 		block[12] = (uint8_t) pair;
+-		check(block, 13, pair == ((TEST_BT2020 << 4) | TEST_ST2084));
++		check(block, 13, false);
+ 	}
+ 	block[12] = 0x86;
+ 	check(block, 13, false); /* reversed nibble values */
+@@ -472,12 +472,12 @@ main(int argc, char *argv[])
+ 	check_extensions(two, 12, two + 12, 12, false);
+ 	two[1] = 1;
+ 	memcpy(two + 12, native, 12);
+-	check(two, 24, true); /* invalid first block */
+-	check_extensions(two, 12, native, 12, true);
++	check(two, 24, false); /* invalid first block */
++	check_extensions(two, 12, native, 12, false);
+ 	memcpy(two, native, 12);
+ 	two[9] = 0;
+-	check(two, 24, true); /* ineligible first valid block */
+-	check_extensions(two, 12, native, 12, true);
++	check(two, 24, false); /* ineligible first valid block */
++	check_extensions(two, 12, native, 12, false);
+ 	check_authority();
+ 	check_cta(true, false);
+ 	check_cta(false, true);
+@@ -492,6 +492,6 @@ main(int argc, char *argv[])
+ 	memcpy(cta + 3, color, sizeof(color));
+ 	check_extensions(cta, 7, native, 12, false);
+ 	check_extensions(native, 12, cta, 7, false);
+-	puts("old-header native/CTA/malformed regression matrix: PASS");
++	puts("old-header legacy native defaults and retained nested CTA matrix: PASS");
+ 	return 0;
+ }

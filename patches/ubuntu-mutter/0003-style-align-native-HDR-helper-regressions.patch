@@ -1,0 +1,130 @@
+From 989d3169eba8d842c7e3cccc3fc437f085eda84b Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Thu, 8 Oct 2026 02:05:56 -0400
+Subject: [PATCH 3/5] style: align native HDR helper regressions
+
+Apply the project formatter to the new regression file and align the modified parser switch. Place the test helper declaration before the existing constructor declaration so the partial-context style checker does not split an unchanged signature.
+---
+ src/backends/edid-parse.c             |  2 +-
+ src/backends/native/meta-output-kms.h | 10 +++++-----
+ src/tests/native-hdr-tests.c          | 27 ++++++++++++++-------------
+ 3 files changed, 20 insertions(+), 19 deletions(-)
+
+diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
+index d653d31..6780412 100644
+--- a/src/backends/edid-parse.c
++++ b/src/backends/edid-parse.c
+@@ -168,7 +168,7 @@ meta_edid_info_new_parse (const uint8_t *edid,
+           info->min_vert_rate_hz = range_limits->min_vert_rate_hz;
+           break;
+         default:
+-            break;
++          break;
+         }
+     }
+ 
+diff --git a/src/backends/native/meta-output-kms.h b/src/backends/native/meta-output-kms.h
+index 4f85467..801ff28 100644
+--- a/src/backends/native/meta-output-kms.h
++++ b/src/backends/native/meta-output-kms.h
+@@ -41,13 +41,13 @@ MetaOutputKms * meta_output_kms_from_kms_connector (MetaKmsConnector *connector)
+ 
+ void meta_unlink_kms_connector (MetaKmsConnector *connector);
+ 
+-MetaOutputKms * meta_output_kms_new (MetaGpuKms        *gpu_kms,
+-                                     MetaKmsConnector  *kms_connector,
+-                                     MetaOutput        *old_output,
+-                                     GError           **error);
+-
+ META_EXPORT_TEST
+ void meta_output_kms_update_color_capabilities (MetaOutputInfo   *output_info,
+                                                 MetaKmsDeviceFlag device_flags,
+                                                 gboolean          hdr_supported,
+                                                 uint64_t          connector_colorimetry);
++
++MetaOutputKms * meta_output_kms_new (MetaGpuKms        *gpu_kms,
++                                     MetaKmsConnector  *kms_connector,
++                                     MetaOutput        *old_output,
++                                     GError           **error);
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index 097e3f0..5e9c5af 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -152,7 +152,7 @@ check_kms (MetaOutputInfo *info,
+                                 (1 << META_OUTPUT_HDR_METADATA_EOTF_TRADITIONAL_GAMMA_SDR)) : 0));
+             g_assert_cmpuint (info->supported_color_spaces, ==,
+                               (eligible || (cta_bt2020 && device && color)) ?
+-                                (1 << META_OUTPUT_COLORSPACE_BT2020) : 0);
++                              (1 << META_OUTPUT_COLORSPACE_BT2020) : 0);
+           }
+ }
+ 
+@@ -242,12 +242,12 @@ test_cta_authority (void)
+             memcpy (nested + 3, children[i], size);
+             if (ordinary)
+               info = reverse ?
+-                parse_extensions (children[i], size, native, sizeof (native),
+-                                  TRUE, FALSE) :
+-                parse (native, sizeof (native), children[i], size, TRUE);
++                     parse_extensions (children[i], size, native, sizeof (native),
++                                       TRUE, FALSE) :
++                     parse (native, sizeof (native), children[i], size, TRUE);
+             else if (separate)
+               info = reverse ? parse (nested, size + 3, native, sizeof (native), FALSE) :
+-                parse (native, sizeof (native), nested, size + 3, FALSE);
++                     parse (native, sizeof (native), nested, size + 3, FALSE);
+             else
+               {
+                 memcpy (blocks + (reverse ? size + 3 : 0), native, sizeof (native));
+@@ -281,7 +281,7 @@ test_diagnostics (void)
+           {
+             uint8_t other[7] = { 0x81, 0 }, blocks[64] = { 0 };
+             size_t size = kind == 0 ? sizeof (empty) : kind == 1 ? sizeof (audio) :
+-              kind == 2 ? sizeof (tail) : kind == 3 ? 1 : 2;
++                          kind == 2 ? sizeof (tail) : kind == 3 ? 1 : 2;
+             gboolean expected = kind < 2 && invalid == 0;
+             g_autoptr (MetaOutputInfo) info = NULL;
+ 
+@@ -290,7 +290,7 @@ test_diagnostics (void)
+             other[1] = invalid == 1 ? 1 : invalid == 2 ? 8 : 0;
+             if (separate)
+               info = reverse ? parse (other, size, native, sizeof (native), FALSE) :
+-                parse (native, sizeof (native), other, size, FALSE);
++                     parse (native, sizeof (native), other, size, FALSE);
+             else
+               {
+                 memcpy (blocks + (reverse ? size : 0), native, sizeof (native));
+@@ -314,10 +314,10 @@ test_extension_failures (void)
+         uint8_t edid[257 * 128 + 1] = { 0 };
+         uint8_t *other = edid + (reverse ? 128 : 256);
+         size_t size = make_edid (edid, reverse ? empty : native,
+-                                reverse ? sizeof (empty) : sizeof (native),
+-                                reverse ? native : empty,
+-                                reverse ? sizeof (native) : sizeof (empty),
+-                                FALSE, FALSE);
++                                 reverse ? sizeof (empty) : sizeof (native),
++                                 reverse ? native : empty,
++                                 reverse ? sizeof (native) : sizeof (empty),
++                                 FALSE, FALSE);
+         g_autoptr (MetaOutputInfo) info = NULL;
+ 
+         switch (failure)
+@@ -466,7 +466,7 @@ test_fatal_base (void)
+     {
+       uint8_t edid[256] = { 0 };
+       size_t size = make_edid (edid, native, sizeof (native), NULL, 0,
+-                              FALSE, FALSE);
++                               FALSE, FALSE);
+       g_autoptr (GBytes) bytes = NULL;
+       g_autoptr (MetaOutputInfo) info = meta_output_info_new ();
+ 
+@@ -481,7 +481,8 @@ test_fatal_base (void)
+ }
+ 
+ int
+-main (int argc, char **argv)
++main (int    argc,
++      char **argv)
+ {
+   g_test_init (&argc, &argv, NULL);
+   g_test_add_func ("/native-hdr/complete-tuple-and-kms-gates", test_native);

@@ -1,0 +1,53 @@
+From 5a161a31250a762ee6ac6d15bae7fac42a56f6e0 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 7 Oct 2026 23:34:35 -0400
+Subject: [PATCH 07/14] test: preserve linker allocation wrapping under
+ optimization
+
+The O2/LTO package build treats parser free calls as unable to modify
+private test counters, because the linker --wrap substitution occurs after
+whole-program analysis. At fail point 6 it checks live == 1, calls finish
+twice, then unconditionally fails the unchanged live == 0 assertion.
+
+Disable LTO only for the private static test objects and the allocation
+test executable/link. Keep O2 and hardening; installed library and ABI
+consumer retain full package LTO. The narrower no-builtin calloc/free
+control still failed. All injected failures and cleanup assertions remain.
+
+Validated with the optimized amd64 package flags: the same failure matrix
+passes, including the targeted second nested SVD allocation and failed
+extension cleanup. Failed and corrected disassembly are retained as evidence.
+---
+ test/meson.build | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/test/meson.build b/test/meson.build
+index b65c263..5479c9d 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -92,12 +92,15 @@ old_header_consumer = executable('old-header-consumer', 'old-header-consumer.c',
+ test('native-hdr-abi', old_header_consumer, args: [files('data/qemu.edid'), 'patched'])
+ 
+ # Test-only static objects let --wrap intercept allocations inside the parser.
++# Linker wrapping is invisible to LTO whole-program side-effect analysis.
++# Keep optimized test objects, but preserve the interposition boundary.
++allocation_wrap_c_args = ['-fno-lto']
+ private_test_lib = static_library('displayid2-test-private',
+ 	['../cta.c', '../cta-vic-table.c', '../cvt.c', '../displayid.c', '../displayid2.c',
+ 	 '../dmt-table.c', '../edid.c', '../gtf.c', '../hdmi-vic-table.c', '../info.c',
+ 	 '../log.c', '../memory-stream.c', pnp_id_table],
+ 	include_directories: include_directories('../include'), dependencies: math,
+-	install: false)
++	c_args: allocation_wrap_c_args, install: false)
+ private_test_dep = declare_dependency(link_with: private_test_lib,
+ 	include_directories: include_directories('../include'), dependencies: math)
+ private_test = executable('displayid2-private', 'displayid2-private.c', dependencies: private_test_dep)
+@@ -106,6 +109,6 @@ bounds_test = executable('displayid2-bounds', 'displayid2-bounds.c', dependencie
+ test('displayid2-bounds', bounds_test)
+ 
+ allocation_test = executable('displayid2-allocation', 'displayid2-allocation.c',
+-	dependencies: private_test_dep,
+-	link_args: ['-Wl,--wrap=calloc', '-Wl,--wrap=free'])
++	dependencies: private_test_dep, c_args: allocation_wrap_c_args,
++	link_args: ['-fno-lto', '-Wl,--wrap=calloc', '-Wl,--wrap=free'])
+ test('displayid2-allocation', allocation_test, args: files('data/qemu.edid'))

@@ -1,0 +1,1598 @@
+From 3be24689dfed1d53cc20888dca721a610d033306 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 7 Oct 2026 23:02:10 -0400
+Subject: [PATCH 01/14] displayid2: privately backport native HDR detection for
+ the 0.3 ABI
+
+Adapt the approved upstream CTA context, DisplayID2 lifecycle and native
+interface-feature derivation without new public headers or symbols.
+Own partial nested allocations safely and preserve fatal errno results.
+Unknown or malformed nested CTA evidence conservatively suppresses only
+native fallback, retaining all valid authoritative CTA prefix blocks.
+---
+ cta.c                | 228 +++++++++++++++++--------------
+ displayid2.c         | 313 ++++++++++++++++++++++++++++++++++++++++++-
+ edid.c               |   8 +-
+ include/cta.h        |  16 ++-
+ include/displayid2.h | 209 +++++++++++++++++++++++++++++
+ info.c               | 123 +++++++++++++++--
+ 6 files changed, 783 insertions(+), 114 deletions(-)
+
+diff --git a/cta.c b/cta.c
+index 12187cc..bb2ed4f 100644
+--- a/cta.c
++++ b/cta.c
+@@ -57,8 +57,20 @@ di_cta_hdmi_video_format_from_hdmi_vic(uint8_t hdmi_vic)
+ 	return NULL;
+ }
+ 
++static void *
++cta_calloc(struct di_cta *cta, size_t count, size_t size)
++{
++	void *ptr = calloc(count, size);
++
++	if (!ptr && count && size) {
++		cta->allocation_failed = true;
++		errno = ENOMEM;
++	}
++	return ptr;
++}
++
+ static void
+-add_failure(struct di_edid_cta *cta, const char fmt[], ...)
++add_failure(struct di_cta *cta, const char fmt[], ...)
+ {
+ 	va_list args;
+ 
+@@ -68,7 +80,7 @@ add_failure(struct di_edid_cta *cta, const char fmt[], ...)
+ }
+ 
+ static void
+-add_failure_until(struct di_edid_cta *cta, int revision, const char fmt[], ...)
++add_failure_until(struct di_cta *cta, int revision, const char fmt[], ...)
+ {
+ 	va_list args;
+ 
+@@ -82,7 +94,7 @@ add_failure_until(struct di_edid_cta *cta, int revision, const char fmt[], ...)
+ }
+ 
+ static struct di_cta_svd *
+-parse_svd(struct di_edid_cta *cta, uint8_t raw, uint8_t original_index,
++parse_svd(struct di_cta *cta, uint8_t raw, uint8_t original_index,
+ 	  const char *prefix)
+ {
+ 	struct di_cta_svd svd, *svd_ptr;
+@@ -107,7 +119,7 @@ parse_svd(struct di_edid_cta *cta, uint8_t raw, uint8_t original_index,
+ 		};
+ 	}
+ 
+-	svd_ptr = calloc(1, sizeof(*svd_ptr));
++	svd_ptr = cta_calloc(cta, 1, sizeof(*svd_ptr));
+ 	if (!svd_ptr)
+ 		return NULL;
+ 	*svd_ptr = svd;
+@@ -115,7 +127,7 @@ parse_svd(struct di_edid_cta *cta, uint8_t raw, uint8_t original_index,
+ }
+ 
+ static bool
+-parse_video_block(struct di_edid_cta *cta, struct di_cta_video_block_priv *video,
++parse_video_block(struct di_cta *cta, struct di_cta_video_block_priv *video,
+ 		  const uint8_t *data, size_t size)
+ {
+ 	uint8_t i;
+@@ -139,7 +151,7 @@ parse_video_block(struct di_edid_cta *cta, struct di_cta_video_block_priv *video
+ }
+ 
+ static int
+-hdmi_latency_from_raw(struct di_edid_cta *cta, const char *block_name,
++hdmi_latency_from_raw(struct di_cta *cta, const char *block_name,
+ 		      const char *type, uint8_t raw)
+ {
+ 	/* Unknown latency.  */
+@@ -161,7 +173,7 @@ hdmi_latency_from_raw(struct di_edid_cta *cta, const char *block_name,
+ }
+ 
+ static bool
+-parse_vendor_hdmi_block(struct di_edid_cta *cta,
++parse_vendor_hdmi_block(struct di_cta *cta,
+ 			struct di_cta_vendor_hdmi_block_priv *priv,
+ 			const uint8_t *data, size_t size)
+ {
+@@ -288,7 +300,7 @@ parse_vendor_hdmi_block(struct di_edid_cta *cta,
+ 		len_vic = size - index;
+ 	}
+ 
+-	priv->vics = calloc(len_vic, sizeof(*priv->vics));
++	priv->vics = cta_calloc(cta, len_vic, sizeof(*priv->vics));
+ 	if (!priv->vics)
+ 		return false;
+ 
+@@ -309,7 +321,7 @@ parse_vendor_hdmi_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_hdmi_scds(struct di_edid_cta *cta, struct di_cta_hdmi_scds *scds,
++parse_hdmi_scds(struct di_cta *cta, struct di_cta_hdmi_scds *scds,
+ 		struct di_cta_hdmi_dsc *dsc, const uint8_t *data, size_t size,
+ 		const char *block_name)
+ {
+@@ -476,7 +488,7 @@ parse_hdmi_scds(struct di_edid_cta *cta, struct di_cta_hdmi_scds *scds,
+ }
+ 
+ static bool
+-parse_vendor_hdmi_forum_block(struct di_edid_cta *cta,
++parse_vendor_hdmi_forum_block(struct di_cta *cta,
+ 			      struct di_cta_vendor_hdmi_forum_block_priv *priv,
+ 			      const uint8_t *data, size_t size)
+ {
+@@ -491,7 +503,7 @@ parse_vendor_hdmi_forum_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_hdmi_forum_sink_cap(struct di_edid_cta *cta,
++parse_hdmi_forum_sink_cap(struct di_cta *cta,
+ 			  struct di_cta_hdmi_forum_sink_cap_priv *priv,
+ 			  const uint8_t *data, size_t size)
+ {
+@@ -506,7 +518,7 @@ parse_hdmi_forum_sink_cap(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_ycbcr420_block(struct di_edid_cta *cta,
++parse_ycbcr420_block(struct di_cta *cta,
+ 		     struct di_cta_ycbcr420_video_block_priv *ycbcr420,
+ 		     const uint8_t *data, size_t size)
+ {
+@@ -531,7 +543,7 @@ parse_ycbcr420_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_sad_format(struct di_edid_cta *cta, uint8_t code, uint8_t code_ext,
++parse_sad_format(struct di_cta *cta, uint8_t code, uint8_t code_ext,
+ 		 enum di_cta_audio_format *format, const char *prefix)
+ {
+ 	switch (code) {
+@@ -624,7 +636,7 @@ parse_sad_format(struct di_edid_cta *cta, uint8_t code, uint8_t code_ext,
+ }
+ 
+ static bool
+-parse_sad(struct di_edid_cta *cta, struct di_cta_audio_block_priv *audio,
++parse_sad(struct di_cta *cta, struct di_cta_audio_block_priv *audio,
+ 	  const uint8_t data[static CTA_SAD_SIZE])
+ {
+ 	enum di_cta_audio_format format;
+@@ -647,7 +659,7 @@ parse_sad(struct di_edid_cta *cta, struct di_cta_audio_block_priv *audio,
+ 	if (!parse_sad_format(cta, code, code_ext, &format, "Audio Data Block"))
+ 		return true;
+ 
+-	priv = calloc(1, sizeof(*priv));
++	priv = cta_calloc(cta, 1, sizeof(*priv));
+ 	if (!priv)
+ 		return false;
+ 
+@@ -901,7 +913,7 @@ parse_sad(struct di_edid_cta *cta, struct di_cta_audio_block_priv *audio,
+ }
+ 
+ static bool
+-parse_audio_block(struct di_edid_cta *cta, struct di_cta_audio_block_priv *audio,
++parse_audio_block(struct di_cta *cta, struct di_cta_audio_block_priv *audio,
+ 		  const uint8_t *data, size_t size)
+ {
+ 	size_t i;
+@@ -919,7 +931,7 @@ parse_audio_block(struct di_edid_cta *cta, struct di_cta_audio_block_priv *audio
+ }
+ 
+ static bool
+-parse_speaker_alloc(struct di_edid_cta *cta, struct di_cta_speaker_allocation *speaker_alloc,
++parse_speaker_alloc(struct di_cta *cta, struct di_cta_speaker_allocation *speaker_alloc,
+ 		    const uint8_t data[3], const char *prefix)
+ {
+ 	bool rlc_rrc;
+@@ -960,7 +972,7 @@ parse_speaker_alloc(struct di_edid_cta *cta, struct di_cta_speaker_allocation *s
+ }
+ 
+ static bool
+-parse_speaker_alloc_block(struct di_edid_cta *cta,
++parse_speaker_alloc_block(struct di_cta *cta,
+ 			  struct di_cta_speaker_alloc_block *speaker_alloc,
+ 			  const uint8_t *data, size_t size)
+ {
+@@ -978,7 +990,7 @@ parse_speaker_alloc_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_video_cap_block(struct di_edid_cta *cta,
++parse_video_cap_block(struct di_cta *cta,
+ 		      struct di_cta_video_cap_block *video_cap,
+ 		      const uint8_t *data, size_t size)
+ {
+@@ -1003,11 +1015,11 @@ parse_video_cap_block(struct di_edid_cta *cta,
+ 
+ 	switch (video_cap->it_over_underscan) {
+ 	case DI_CTA_VIDEO_CAP_ALWAYS_OVERSCAN:
+-		if (cta->flags.it_underscan)
++		if (cta->flags && cta->flags->it_underscan)
+ 			add_failure(cta, "Video Capability Data Block: IT video formats are always overscanned, but bit 7 of Byte 3 of the CTA-861 Extension header is set to underscanned.");
+ 		break;
+ 	case DI_CTA_VIDEO_CAP_ALWAYS_UNDERSCAN:
+-		if (!cta->flags.it_underscan)
++		if (cta->flags && !cta->flags->it_underscan)
+ 			add_failure(cta, "Video Capability Data Block: IT video formats are always underscanned, but bit 7 of Byte 3 of the CTA-861 Extension header is set to overscanned.");
+ 	default:
+ 		break;
+@@ -1068,7 +1080,7 @@ parse_vesa_display_device_additional_primary_chromaticity(struct di_cta_vesa_dis
+ }
+ 
+ static bool
+-parse_vesa_display_device(struct di_edid_cta *cta, struct di_cta_vesa_display_device_block *dddb,
++parse_vesa_display_device(struct di_cta *cta, struct di_cta_vesa_display_device_block *dddb,
+ 		const uint8_t *data, size_t size)
+ {
+ 	const size_t offset = 2; /* CTA block header */
+@@ -1270,7 +1282,7 @@ parse_vesa_display_device(struct di_edid_cta *cta, struct di_cta_vesa_display_de
+ }
+ 
+ static bool
+-parse_colorimetry_block(struct di_edid_cta *cta,
++parse_colorimetry_block(struct di_cta *cta,
+ 			struct di_cta_colorimetry_block *colorimetry,
+ 			const uint8_t *data, size_t size)
+ {
+@@ -1316,7 +1328,7 @@ parse_min_luminance(uint8_t raw, float max)
+ }
+ 
+ static bool
+-parse_hdr_static_metadata_block(struct di_edid_cta *cta,
++parse_hdr_static_metadata_block(struct di_cta *cta,
+ 				struct di_cta_hdr_static_metadata_block_priv *metadata,
+ 				const uint8_t *data, size_t size)
+ {
+@@ -1359,7 +1371,7 @@ parse_hdr_static_metadata_block(struct di_edid_cta *cta,
+ 	return true;
+ }
+ static bool
+-parse_hdr_dynamic_metadata_block(struct di_edid_cta *cta,
++parse_hdr_dynamic_metadata_block(struct di_cta *cta,
+ 				 struct di_cta_hdr_dynamic_metadata_block_priv *priv,
+ 				 const uint8_t *data, size_t size)
+ {
+@@ -1473,7 +1485,7 @@ parse_hdr_dynamic_metadata_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_vesa_transfer_characteristics_block(struct di_edid_cta *cta,
++parse_vesa_transfer_characteristics_block(struct di_cta *cta,
+ 					  struct di_cta_vesa_transfer_characteristics_block *tf,
+ 					  const uint8_t *data, size_t size)
+ {
+@@ -1496,7 +1508,7 @@ parse_vesa_transfer_characteristics_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_video_format_pref_block(struct di_edid_cta *cta,
++parse_video_format_pref_block(struct di_cta *cta,
+ 			      struct di_cta_video_format_pref_priv *vfpdb,
+ 			      const uint8_t *data, size_t size)
+ {
+@@ -1517,7 +1529,7 @@ parse_video_format_pref_block(struct di_edid_cta *cta,
+ 			continue;
+ 		}
+ 
+-		svr = calloc(1, sizeof(*svr));
++		svr = cta_calloc(cta, 1, sizeof(*svr));
+ 		if (!svr)
+ 			return false;
+ 
+@@ -1547,7 +1559,7 @@ parse_video_format_pref_block(struct di_edid_cta *cta,
+ 
+ 
+ static void
+-parse_ycbcr420_cap_map(struct di_edid_cta *cta,
++parse_ycbcr420_cap_map(struct di_cta *cta,
+ 		       struct di_cta_ycbcr420_cap_map_block *ycbcr420_cap_map,
+ 		       const uint8_t *data, size_t size)
+ {
+@@ -1561,7 +1573,7 @@ parse_ycbcr420_cap_map(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_hdmi_audio_3d_descriptor(struct di_edid_cta *cta,
++parse_hdmi_audio_3d_descriptor(struct di_cta *cta,
+ 			       struct di_cta_sad_priv *sad,
+ 			       const uint8_t *data, size_t size)
+ {
+@@ -1610,7 +1622,7 @@ parse_hdmi_audio_3d_descriptor(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_hdmi_audio_block(struct di_edid_cta *cta,
++parse_hdmi_audio_block(struct di_cta *cta,
+ 		       struct di_cta_hdmi_audio_block_priv *priv,
+ 		       const uint8_t *data, size_t size)
+ {
+@@ -1666,7 +1678,7 @@ parse_hdmi_audio_block(struct di_edid_cta *cta,
+ 
+ 	/* First the 3D Audio Descriptors, the last one is the 3D Speaker Allocation Descriptor */
+ 	while (num_descs > 1) {
+-		sad_priv = calloc(1, sizeof(*sad_priv));
++		sad_priv = cta_calloc(cta, 1, sizeof(*sad_priv));
+ 		if (!sad_priv)
+ 			return false;
+ 
+@@ -1704,7 +1716,7 @@ skip:
+ }
+ 
+ static struct di_cta_infoframe_descriptor *
+-parse_infoframe(struct di_edid_cta *cta, uint8_t type,
++parse_infoframe(struct di_cta *cta, uint8_t type,
+ 		const uint8_t *data, size_t size)
+ {
+ 	struct di_cta_infoframe_descriptor infoframe = {0};
+@@ -1750,7 +1762,7 @@ parse_infoframe(struct di_edid_cta *cta, uint8_t type,
+ 		}
+ 	}
+ 
+-	ifp = calloc(1, sizeof(*ifp));
++	ifp = cta_calloc(cta, 1, sizeof(*ifp));
+ 	if (!ifp)
+ 		return NULL;
+ 
+@@ -1759,7 +1771,7 @@ parse_infoframe(struct di_edid_cta *cta, uint8_t type,
+ }
+ 
+ static bool
+-parse_infoframe_block(struct di_edid_cta *cta,
++parse_infoframe_block(struct di_cta *cta,
+ 		      struct di_cta_infoframe_block_priv *ifb,
+ 		      const uint8_t *data, size_t size)
+ {
+@@ -1827,7 +1839,7 @@ decode_coord(unsigned char x)
+ }
+ 
+ static bool
+-parse_room_config_block(struct di_edid_cta *cta,
++parse_room_config_block(struct di_cta *cta,
+ 			struct di_cta_room_configuration_block *rc,
+ 			const uint8_t *data, size_t size)
+ {
+@@ -1894,7 +1906,7 @@ parse_room_config_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_speaker_location_block(struct di_edid_cta *cta,
++parse_speaker_location_block(struct di_cta *cta,
+ 			     struct di_cta_speaker_location_priv *sldb,
+ 			     const uint8_t *data, size_t size)
+ {
+@@ -1931,7 +1943,7 @@ parse_speaker_location_block(struct di_edid_cta *cta,
+ 			data += 2;
+ 		}
+ 
+-		slp = calloc(1, sizeof(*slp));
++		slp = cta_calloc(cta, 1, sizeof(*slp));
+ 		if (!slp)
+ 			return false;
+ 
+@@ -1946,7 +1958,7 @@ parse_speaker_location_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_did_type_vii_timing(struct di_edid_cta *cta,
++parse_did_type_vii_timing(struct di_cta *cta,
+ 			  struct di_cta_type_vii_timing_priv *t,
+ 			  const uint8_t *data, size_t size)
+ {
+@@ -2067,7 +2079,7 @@ ff_peak_lum_index_to_nits(int index, int peak_lum)
+ }
+ 
+ static bool
+-parse_hdr10plus_block(struct di_edid_cta *cta,
++parse_hdr10plus_block(struct di_cta *cta,
+ 		      struct di_cta_hdr10plus_block *block,
+ 		      const uint8_t *data, size_t size)
+ {
+@@ -2105,7 +2117,7 @@ parse_hdr10plus_block(struct di_edid_cta *cta,
+ }
+ 
+ static bool
+-parse_dolby_video_block(struct di_edid_cta *cta,
++parse_dolby_video_block(struct di_cta *cta,
+ 			 struct di_cta_dolby_video_block_priv *dv_priv,
+ 			 const uint8_t *data, size_t size)
+ {
+@@ -2295,8 +2307,8 @@ parse_dolby_video_block(struct di_edid_cta *cta,
+ 	return true;
+ }
+ 
+-static void
+-destroy_data_block(struct di_cta_data_block *data_block)
++void
++_di_cta_data_block_destroy(struct di_cta_data_block *data_block)
+ {
+ 	size_t i;
+ 	struct di_cta_video_block_priv *video;
+@@ -2356,7 +2368,7 @@ destroy_data_block(struct di_cta_data_block *data_block)
+ }
+ 
+ static bool
+-parse_vendor_specific_video_block(struct di_edid_cta *cta,
++parse_vendor_specific_video_block(struct di_cta *cta,
+ 				  enum di_cta_data_block_tag *tag,
+ 				  struct di_cta_data_block *data_block,
+ 				  const uint8_t *data, size_t size)
+@@ -2399,7 +2411,7 @@ skip:
+ }
+ 
+ static bool
+-parse_vendor_specific_block(struct di_edid_cta *cta,
++parse_vendor_specific_block(struct di_cta *cta,
+ 			    enum di_cta_data_block_tag *tag,
+ 			    struct di_cta_data_block *data_block,
+ 			    const uint8_t *data, size_t size)
+@@ -2438,48 +2450,52 @@ skip:
+ 	return false;
+ }
+ 
+-static bool
+-parse_data_block(struct di_edid_cta *cta, uint8_t raw_tag, const uint8_t *data, size_t size)
++bool
++_di_cta_data_block_parse(struct di_cta *cta, uint8_t raw_tag, const uint8_t *data, size_t size,
++			 struct di_cta_data_block **data_block_out)
+ {
+-	enum di_cta_data_block_tag tag;
+ 	uint8_t extended_tag;
+ 	struct di_cta_data_block *data_block;
++	int saved_errno;
++
++	*data_block_out = NULL;
++	cta->allocation_failed = false;
+ 
+-	data_block = calloc(1, sizeof(*data_block));
++	data_block = cta_calloc(cta, 1, sizeof(*data_block));
+ 	if (!data_block) {
+ 		return false;
+ 	}
+ 
+ 	switch (raw_tag) {
+ 	case 1:
+-		tag = DI_CTA_DATA_BLOCK_AUDIO;
++		data_block->tag = DI_CTA_DATA_BLOCK_AUDIO;
+ 		if (!parse_audio_block(cta, &data_block->audio, data, size))
+ 			goto error;
+ 		break;
+ 	case 2:
+-		tag = DI_CTA_DATA_BLOCK_VIDEO;
++		data_block->tag = DI_CTA_DATA_BLOCK_VIDEO;
+ 		if (!parse_video_block(cta, &data_block->video, data, size))
+ 			goto error;
+ 		break;
+ 	case 3: /* Vendor-Specific Data Block */
+-		if (!parse_vendor_specific_block(cta, &tag, data_block, data, size))
++		if (!parse_vendor_specific_block(cta, &data_block->tag, data_block, data, size))
+ 			goto skip;
+ 		break;
+ 	case 4:
+-		tag = DI_CTA_DATA_BLOCK_SPEAKER_ALLOC;
++		data_block->tag = DI_CTA_DATA_BLOCK_SPEAKER_ALLOC;
+ 		if (!parse_speaker_alloc_block(cta, &data_block->speaker_alloc,
+ 					       data, size))
+ 			goto error;
+ 		break;
+ 	case 5:
+-		tag = DI_CTA_DATA_BLOCK_VESA_DISPLAY_TRANSFER_CHARACTERISTIC;
++		data_block->tag = DI_CTA_DATA_BLOCK_VESA_DISPLAY_TRANSFER_CHARACTERISTIC;
+ 		if (!parse_vesa_transfer_characteristics_block(cta,
+ 							       &data_block->vesa_transfer_characteristics,
+ 							       data, size))
+ 			goto error;
+ 		break;
+ 	case 6:
+-		tag = DI_CTA_DATA_BLOCK_VIDEO_FORMAT;
++		data_block->tag = DI_CTA_DATA_BLOCK_VIDEO_FORMAT;
+ 		break;
+ 	case 7:
+ 		/* Use Extended Tag */
+@@ -2494,107 +2510,107 @@ parse_data_block(struct di_edid_cta *cta, uint8_t raw_tag, const uint8_t *data,
+ 
+ 		switch (extended_tag) {
+ 		case 0:
+-			tag = DI_CTA_DATA_BLOCK_VIDEO_CAP;
++			data_block->tag = DI_CTA_DATA_BLOCK_VIDEO_CAP;
+ 			if (!parse_video_cap_block(cta, &data_block->video_cap,
+ 						   data, size))
+ 				goto skip;
+ 			break;
+ 		case 2:
+-			tag = DI_CTA_DATA_BLOCK_VESA_DISPLAY_DEVICE;
++			data_block->tag = DI_CTA_DATA_BLOCK_VESA_DISPLAY_DEVICE;
+ 			if (!parse_vesa_display_device(cta, &data_block->vesa_display_device,
+ 					     data, size))
+ 				goto skip;
+ 			break;
+ 		case 5:
+-			tag = DI_CTA_DATA_BLOCK_COLORIMETRY;
++			data_block->tag = DI_CTA_DATA_BLOCK_COLORIMETRY;
+ 			if (!parse_colorimetry_block(cta,
+ 						     &data_block->colorimetry,
+ 						     data, size))
+ 				goto skip;
+ 			break;
+ 		case 6:
+-			tag = DI_CTA_DATA_BLOCK_HDR_STATIC_METADATA;
++			data_block->tag = DI_CTA_DATA_BLOCK_HDR_STATIC_METADATA;
+ 			if (!parse_hdr_static_metadata_block(cta,
+ 							     &data_block->hdr_static_metadata,
+ 							     data, size))
+ 				goto skip;
+ 			break;
+ 		case 7:
+-			tag = DI_CTA_DATA_BLOCK_HDR_DYNAMIC_METADATA;
++			data_block->tag = DI_CTA_DATA_BLOCK_HDR_DYNAMIC_METADATA;
+ 			if (!parse_hdr_dynamic_metadata_block(cta,
+ 							      &data_block->hdr_dynamic_metadata,
+ 							      data, size))
+ 				goto skip;
+ 			break;
+ 		case 8:
+-			tag = DI_CTA_DATA_BLOCK_NATIVE_VIDEO_RESOLUTION;
++			data_block->tag = DI_CTA_DATA_BLOCK_NATIVE_VIDEO_RESOLUTION;
+ 			break;
+ 		case 13:
+-			tag = DI_CTA_DATA_BLOCK_VIDEO_FORMAT_PREF;
++			data_block->tag = DI_CTA_DATA_BLOCK_VIDEO_FORMAT_PREF;
+ 			if (!parse_video_format_pref_block(cta,
+ 							   &data_block->video_format_pref,
+ 							   data, size))
+ 				goto skip;
+ 			break;
+ 		case 14:
+-			tag = DI_CTA_DATA_BLOCK_YCBCR420;
++			data_block->tag = DI_CTA_DATA_BLOCK_YCBCR420;
+ 			if (!parse_ycbcr420_block(cta,
+ 						  &data_block->ycbcr420,
+ 						  data, size))
+ 				goto skip;
+ 			break;
+ 		case 15:
+-			tag = DI_CTA_DATA_BLOCK_YCBCR420_CAP_MAP;
++			data_block->tag = DI_CTA_DATA_BLOCK_YCBCR420_CAP_MAP;
+ 			parse_ycbcr420_cap_map(cta,
+ 					       &data_block->ycbcr420_cap_map,
+ 					       data, size);
+ 			break;
+ 		case 18:
+-			tag = DI_CTA_DATA_BLOCK_HDMI_AUDIO;
++			data_block->tag = DI_CTA_DATA_BLOCK_HDMI_AUDIO;
+ 			if (!parse_hdmi_audio_block(cta,
+ 						    &data_block->hdmi_audio,
+ 						    data, size))
+ 				goto skip;
+ 			break;
+ 		case 19:
+-			tag = DI_CTA_DATA_BLOCK_ROOM_CONFIG;
++			data_block->tag = DI_CTA_DATA_BLOCK_ROOM_CONFIG;
+ 			if (!parse_room_config_block(cta,
+ 						     &data_block->room_config,
+ 						     data, size))
+ 				goto skip;
+ 			break;
+ 		case 20:
+-			tag = DI_CTA_DATA_BLOCK_SPEAKER_LOCATION;
++			data_block->tag = DI_CTA_DATA_BLOCK_SPEAKER_LOCATION;
+ 			if (!parse_speaker_location_block(cta,
+ 							  &data_block->speaker_location,
+ 							  data, size))
+ 				goto skip;
+ 			break;
+ 		case 32:
+-			tag = DI_CTA_DATA_BLOCK_INFOFRAME;
++			data_block->tag = DI_CTA_DATA_BLOCK_INFOFRAME;
+ 			if (!parse_infoframe_block(cta,
+ 						   &data_block->infoframe,
+ 						   data, size))
+ 				goto skip;
+ 			break;
+ 		case 34:
+-			tag = DI_CTA_DATA_BLOCK_DISPLAYID_VIDEO_TIMING_VII;
++			data_block->tag = DI_CTA_DATA_BLOCK_DISPLAYID_VIDEO_TIMING_VII;
+ 			if (!parse_did_type_vii_timing(cta,
+ 						       &data_block->did_vii_timing,
+ 						       data, size))
+ 				goto skip;
+ 			break;
+ 		case 35:
+-			tag = DI_CTA_DATA_BLOCK_DISPLAYID_VIDEO_TIMING_VIII;
++			data_block->tag = DI_CTA_DATA_BLOCK_DISPLAYID_VIDEO_TIMING_VIII;
+ 			break;
+ 		case 42:
+-			tag = DI_CTA_DATA_BLOCK_DISPLAYID_VIDEO_TIMING_X;
++			data_block->tag = DI_CTA_DATA_BLOCK_DISPLAYID_VIDEO_TIMING_X;
+ 			break;
+ 		case 120:
+-			tag = DI_CTA_DATA_BLOCK_HDMI_EDID_EXT_OVERRIDE;
++			data_block->tag = DI_CTA_DATA_BLOCK_HDMI_EDID_EXT_OVERRIDE;
+ 			break;
+ 		case 121:
+-			tag = DI_CTA_DATA_BLOCK_HDMI_SINK_CAP;
++			data_block->tag = DI_CTA_DATA_BLOCK_HDMI_SINK_CAP;
+ 			/**
+ 			 * This expects data to include the extended tag. Let's
+ 			 * get back one byte.
+@@ -2606,7 +2622,7 @@ parse_data_block(struct di_edid_cta *cta, uint8_t raw_tag, const uint8_t *data,
+ 				goto skip;
+ 			break;
+ 		case 1: /* Vendor-Specific Video Data Block */
+-			if (!parse_vendor_specific_video_block(cta, &tag,
++			if (!parse_vendor_specific_video_block(cta, &data_block->tag,
+ 							       data_block,
+ 							       data, size))
+ 				goto skip;
+@@ -2628,24 +2644,30 @@ parse_data_block(struct di_edid_cta *cta, uint8_t raw_tag, const uint8_t *data,
+ 		goto skip;
+ 	}
+ 
+-	data_block->tag = tag;
+-	assert(cta->data_blocks_len < EDID_CTA_MAX_DATA_BLOCKS);
+-	cta->data_blocks[cta->data_blocks_len++] = data_block;
++	if (cta->allocation_failed)
++		goto error;
++	*data_block_out = data_block;
+ 	return true;
+ 
+ skip:
+-	free(data_block);
+-	return true;
++	saved_errno = cta->allocation_failed ? ENOMEM : errno;
++	_di_cta_data_block_destroy(data_block);
++	errno = saved_errno;
++	return !cta->allocation_failed;
+ 
+ error:
+-	destroy_data_block(data_block);
++	saved_errno = cta->allocation_failed ? ENOMEM : errno;
++	_di_cta_data_block_destroy(data_block);
++	errno = saved_errno;
+ 	return false;
+ }
+ 
+ bool
+-_di_edid_cta_parse(struct di_edid_cta *cta, const uint8_t *data, size_t size,
++_di_edid_cta_parse(struct di_edid_cta *edid_cta, const uint8_t *data, size_t size,
+ 		   struct di_logger *logger)
+ {
++	struct di_cta *cta;
++	struct di_cta_data_block *data_block;
+ 	uint8_t flags, dtd_start;
+ 	uint8_t data_block_header, data_block_tag, data_block_size;
+ 	size_t i;
+@@ -2654,18 +2676,21 @@ _di_edid_cta_parse(struct di_edid_cta *cta, const uint8_t *data, size_t size,
+ 	assert(size == 128);
+ 	assert(data[0] == 0x02);
+ 
+-	cta->logger = logger;
+-
+-	cta->revision = data[1];
++	edid_cta->revision = data[1];
++	cta = &(struct di_cta){
++		.revision = edid_cta->revision,
++		.flags = &edid_cta->flags,
++		.logger = logger,
++	};
+ 	dtd_start = data[2];
+ 
+ 	flags = data[3];
+ 	if (cta->revision >= 2) {
+-		cta->flags.it_underscan = has_bit(flags, 7);
+-		cta->flags.basic_audio = has_bit(flags, 6);
+-		cta->flags.ycc444 = has_bit(flags, 5);
+-		cta->flags.ycc422 = has_bit(flags, 4);
+-		cta->flags.native_dtds = get_bit_range(flags, 3, 0);
++		edid_cta->flags.it_underscan = has_bit(flags, 7);
++		edid_cta->flags.basic_audio = has_bit(flags, 6);
++		edid_cta->flags.ycc444 = has_bit(flags, 5);
++		edid_cta->flags.ycc422 = has_bit(flags, 4);
++		edid_cta->flags.native_dtds = get_bit_range(flags, 3, 0);
+ 	} else if (flags != 0) {
+ 		/* Reserved */
+ 		add_failure(cta, "Non-zero byte 3.");
+@@ -2696,12 +2721,16 @@ _di_edid_cta_parse(struct di_edid_cta *cta, const uint8_t *data, size_t size,
+ 					 "Definitions. Adjusted its size to attempt parsing.", i);
+ 		}
+ 
+-		if (!parse_data_block(cta, data_block_tag,
+-				      &data[i + 1], data_block_size)) {
+-			_di_edid_cta_finish(cta);
++		if (!_di_cta_data_block_parse(cta, data_block_tag,
++					      &data[i + 1], data_block_size, &data_block)) {
++			_di_edid_cta_finish(edid_cta);
+ 			return false;
+ 		}
+ 
++		if (data_block) {
++			assert(edid_cta->data_blocks_len < EDID_CTA_MAX_DATA_BLOCKS);
++			edid_cta->data_blocks[edid_cta->data_blocks_len++] = data_block;
++		}
+ 		i += 1 + data_block_size;
+ 	}
+ 
+@@ -2717,11 +2746,11 @@ _di_edid_cta_parse(struct di_edid_cta *cta, const uint8_t *data, size_t size,
+ 
+ 		detailed_timing_def = _di_edid_parse_detailed_timing_def(&data[i]);
+ 		if (!detailed_timing_def) {
+-			_di_edid_cta_finish(cta);
++			_di_edid_cta_finish(edid_cta);
+ 			return false;
+ 		}
+-		assert(cta->detailed_timing_defs_len < EDID_CTA_MAX_DETAILED_TIMING_DEFS);
+-		cta->detailed_timing_defs[cta->detailed_timing_defs_len++] = detailed_timing_def;
++		assert(edid_cta->detailed_timing_defs_len < EDID_CTA_MAX_DETAILED_TIMING_DEFS);
++		edid_cta->detailed_timing_defs[edid_cta->detailed_timing_defs_len++] = detailed_timing_def;
+ 	}
+ 
+ 	/* All padding bytes after the last DTD must be zero */
+@@ -2733,7 +2762,6 @@ _di_edid_cta_parse(struct di_edid_cta *cta, const uint8_t *data, size_t size,
+ 		i++;
+ 	}
+ 
+-	cta->logger = NULL;
+ 	return true;
+ }
+ 
+@@ -2741,14 +2769,20 @@ void
+ _di_edid_cta_finish(struct di_edid_cta *cta)
+ {
+ 	size_t i;
++	int saved_errno = errno;
+ 
+ 	for (i = 0; i < cta->data_blocks_len; i++) {
+-		destroy_data_block(cta->data_blocks[i]);
++		_di_cta_data_block_destroy(cta->data_blocks[i]);
++		cta->data_blocks[i] = NULL;
+ 	}
+ 
+ 	for (i = 0; i < cta->detailed_timing_defs_len; i++) {
+ 		free(cta->detailed_timing_defs[i]);
++		cta->detailed_timing_defs[i] = NULL;
+ 	}
++	cta->data_blocks_len = 0;
++	cta->detailed_timing_defs_len = 0;
++	errno = saved_errno;
+ }
+ 
+ int
+diff --git a/displayid2.c b/displayid2.c
+index 41167fa..73d4a36 100644
+--- a/displayid2.c
++++ b/displayid2.c
+@@ -1,17 +1,241 @@
+ #include <errno.h>
++#include <inttypes.h>
++#include <stdlib.h>
++#include <sys/types.h>
+ 
+ #include "bits.h"
+ #include "displayid.h"
+ #include "displayid2.h"
+ 
+ /**
+- * The size of the mandatory fields in a DisplayID v2 section.
++ * The size of a DisplayID v2 section header.
+  */
+-#define DISPLAYID2_MIN_SIZE 5
++#define DISPLAYID2_HEADER_SIZE 4
++/**
++ * The size of the mandatory fields in a DisplayID v2 section (header + checksum).
++ */
++#define DISPLAYID2_MIN_SIZE (DISPLAYID2_HEADER_SIZE + 1)
+ /**
+  * The maximum size of a DisplayID v2 section.
+  */
+ #define DISPLAYID2_MAX_SIZE 256
++/**
++ * The size of a DisplayID v2 data block header (tag, revision and size).
++ */
++#define DISPLAYID2_DATA_BLOCK_HEADER_SIZE 3
++
++static void
++add_failure(struct di_displayid2 *displayid2, const char fmt[], ...)
++{
++	va_list args;
++
++	va_start(args, fmt);
++	_di_logger_va_add_failure(displayid2->logger, fmt, args);
++	va_end(args);
++}
++
++static void
++data_block_destroy(struct di_displayid2_data_block *data_block);
++
++static bool
++parse_cta861_block(struct di_displayid2 *displayid2, struct di_displayid2_data_block *data_block,
++		   const uint8_t *data, size_t size)
++{
++	struct di_cta cta;
++	size_t i;
++	uint8_t data_block_tag, data_block_size;
++	struct di_cta_data_block *cta_data_block;
++
++	cta = (struct di_cta){
++		/* The DisplayID block doesn't specify the CTA revision. Use
++		 * the latest one to silence warnings. */
++		.revision = 3,
++		.logger = displayid2->logger,
++	};
++
++	i = 0x03;
++	while (i < size) {
++		data_block_size = get_bit_range(data[i], 4, 0);
++		data_block_tag = get_bit_range(data[i], 7, 5);
++
++		if (data_block_size > size - i - 1) {
++			add_failure(displayid2,
++				    "CTA data block size (%" PRIu8 ") exceeds number of remaining bytes (%zu)",
++				    data_block_size, size - i - 1);
++			displayid2->unusable_cta = true;
++			break;
++		}
++
++		if (!_di_cta_data_block_parse(&cta, data_block_tag,
++					      &data[i + 1], data_block_size, &cta_data_block)) {
++			return false;
++		}
++
++		/* Empty extended tags and rejected HDR/colorimetry leave unusable evidence. */
++		if (!cta_data_block && data_block_tag == 7 &&
++		    (data_block_size == 0 || data[i + 1] == 5 || data[i + 1] == 6))
++			displayid2->unusable_cta = true;
++
++		if (cta_data_block != NULL) {
++			assert(data_block->cta861.data_blocks_len < DISPLAYID2_CTA861_MAX_DATA_BLOCKS);
++			data_block->cta861.data_blocks[data_block->cta861.data_blocks_len++] = cta_data_block;
++		}
++
++		i += 1 + data_block_size;
++	}
++
++	return true;
++}
++
++static bool
++parse_interface_features(struct di_displayid2 *displayid2,
++			 struct di_displayid2_data_block *block,
++			 const uint8_t *data, size_t size)
++{
++	struct di_displayid2_interface_features *features = &block->interface_features;
++	uint8_t count, pair;
++	size_t i;
++
++	if (data[1] != 0) {
++		add_failure(displayid2, "Display Interface Features: unsupported revision or flags.");
++		return false;
++	}
++	if (size < 12) {
++		add_failure(displayid2, "Display Interface Features: fixed payload is too short.");
++		return false;
++	}
++	count = data[11];
++	if (count > 7 || size != (size_t) 12 + count) {
++		add_failure(displayid2,
++			    "Display Interface Features: invalid additional combination count or length.");
++		return false;
++	}
++	if ((data[3] & 0xC0) || (data[4] & 0xC0) ||
++	    (data[5] & 0xE0) || (data[6] & 0xE0) ||
++	    (data[9] & 0x80) || data[10]) {
++		add_failure(displayid2, "Display Interface Features: reserved mask bits are set.");
++	}
++	features->rgb_bit_depths = data[3] & 0x3F;
++	features->ycbcr444_bit_depths = data[4] & 0x3F;
++	features->ycbcr422_bit_depths = data[5] & 0x1F;
++	features->ycbcr420_bit_depths = data[6] & 0x1F;
++	features->ycbcr420_min_pixel_rate = 74.25f * data[7];
++	features->audio_capabilities = data[8];
++	features->standard_combinations = data[9] & 0x7F;
++	features->additional_combinations_len = count;
++	for (i = 0; i < count; i++) {
++		pair = data[12 + i];
++		features->additional_combinations[i].color_space = pair >> 4;
++		features->additional_combinations[i].eotf = pair & 0x0F;
++		if ((pair >> 4) > DI_DISPLAYID2_COLOR_SPACE_CUSTOM ||
++		    (pair & 0x0F) > DI_DISPLAYID2_EOTF_CUSTOM) {
++			add_failure(displayid2, "Display Interface Features: reserved additional combination.");
++		}
++	}
++	return true;
++}
++
++static ssize_t
++parse_data_block(struct di_displayid2 *displayid2, const uint8_t *data,
++		 size_t size)
++{
++	uint8_t tag;
++	size_t data_block_size;
++	struct di_displayid2_data_block *data_block = NULL;
++	int saved_errno;
++
++	assert(size >= DISPLAYID2_DATA_BLOCK_HEADER_SIZE);
++
++	tag = data[0x00];
++	data_block_size = (size_t) data[0x02] + DISPLAYID2_DATA_BLOCK_HEADER_SIZE;
++	if (data_block_size > size) {
++		add_failure(displayid2,
++			    "The length of this DisplayID data block (%zu) exceeds the number of bytes remaining (%zu)",
++			    data_block_size, size);
++		if (tag == DI_DISPLAYID2_DATA_BLOCK_CTA861)
++			displayid2->unusable_cta = true;
++		return (ssize_t) size;
++	}
++
++	data_block = calloc(1, sizeof(*data_block));
++	if (!data_block)
++		goto error;
++
++	switch (tag) {
++	case DI_DISPLAYID2_DATA_BLOCK_CTA861:
++		if (data[1] != 0) {
++			add_failure(displayid2, "CTA-861: unsupported nested revision or flags.");
++			displayid2->unusable_cta = true;
++			goto skip;
++		}
++		if (!parse_cta861_block(displayid2, data_block, data, data_block_size)) {
++			goto error;
++		}
++		break;
++	case DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES:
++		if (!parse_interface_features(displayid2, data_block, data, data_block_size))
++			goto skip;
++		break;
++	case DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID:
++	case DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS:
++	case DI_DISPLAYID2_DATA_BLOCK_TYPE_VII_TIMING:
++	case DI_DISPLAYID2_DATA_BLOCK_TYPE_VIII_TIMING:
++	case DI_DISPLAYID2_DATA_BLOCK_TYPE_IX_TIMING:
++	case DI_DISPLAYID2_DATA_BLOCK_DYN_TIMING_RANGE_LIMITS:
++	case DI_DISPLAYID2_DATA_BLOCK_STEREO_DISPLAY_INTERFACE:
++	case DI_DISPLAYID2_DATA_BLOCK_TILED_DISPLAY_TOPO:
++	case DI_DISPLAYID2_DATA_BLOCK_CONTAINERID:
++	case DI_DISPLAYID2_DATA_BLOCK_TYPE_X_TIMING:
++	case DI_DISPLAYID2_DATA_BLOCK_ADAPTIVE_SYNC:
++	case DI_DISPLAYID2_DATA_BLOCK_ARVR_HMD:
++	case DI_DISPLAYID2_DATA_BLOCK_ARVR_LAYER:
++		break; /* Supported */
++	case 0x7E:
++		goto skip; /* Vendor-specific */
++	default:
++		add_failure(displayid2,
++			    "Unknown DisplayID v2 Data Block (0x%" PRIx8 ", length %" PRIu8 ")",
++			    tag, data_block_size - DISPLAYID2_DATA_BLOCK_HEADER_SIZE);
++		goto skip;
++	}
++
++	data_block->tag = tag;
++
++	assert(displayid2->data_blocks_len < DISPLAYID2_MAX_DATA_BLOCKS);
++	displayid2->data_blocks[displayid2->data_blocks_len++] = data_block;
++	return (ssize_t) data_block_size;
++
++skip:
++	free(data_block);
++	return (ssize_t) data_block_size;
++
++error:
++	saved_errno = errno;
++	data_block_destroy(data_block);
++	errno = saved_errno;
++	return -1;
++}
++
++static bool
++is_all_zeroes(const uint8_t *data, size_t size)
++{
++	size_t i;
++
++	for (i = 0; i < size; i++) {
++		if (data[i] != 0)
++			return false;
++	}
++
++	return true;
++}
++
++static bool
++is_data_block_end(const uint8_t *data, size_t size)
++{
++	if (size < DISPLAYID2_DATA_BLOCK_HEADER_SIZE)
++		return true;
++	return is_all_zeroes(data, DISPLAYID2_DATA_BLOCK_HEADER_SIZE);
++}
+ 
+ static bool
+ validate_checksum(const uint8_t *data, size_t size)
+@@ -30,7 +254,8 @@ bool
+ _di_displayid2_parse(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		     size_t size, struct di_logger *logger)
+ {
+-	size_t section_size;
++	size_t section_size, i, max_data_block_size;
++	ssize_t data_block_size;
+ 	int version;
+ 	uint8_t product_primary_use_case;
+ 
+@@ -77,10 +302,63 @@ _di_displayid2_parse(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		return false;
+ 	}
+ 
++	i = DISPLAYID2_HEADER_SIZE;
++	max_data_block_size = 0;
++	while (i < section_size - 1) {
++		max_data_block_size = section_size - 1 - i;
++		if (is_data_block_end(&data[i], max_data_block_size))
++			break;
++		data_block_size = parse_data_block(displayid2, &data[i],
++						   max_data_block_size);
++		if (data_block_size < 0)
++			return false;
++		assert(data_block_size > 0);
++		i += (size_t) data_block_size;
++	}
++	max_data_block_size = section_size - 1 - i;
++	if (!is_all_zeroes(&data[i], max_data_block_size)) {
++		if (max_data_block_size < DISPLAYID2_DATA_BLOCK_HEADER_SIZE) {
++			add_failure(displayid2,
++				    "Not enough bytes remain (%zu) for a DisplayID data block and the DisplayID filler is non-0.",
++				    max_data_block_size);
++		} else {
++			add_failure(displayid2, "Padding: Contains non-zero bytes.");
++		}
++	}
++
+ 	displayid2->logger = NULL;
+ 	return true;
+ }
+ 
++static void
++data_block_destroy(struct di_displayid2_data_block *data_block)
++{
++	size_t i;
++
++	if (!data_block)
++		return;
++
++	for (i = 0; i < data_block->cta861.data_blocks_len; i++)
++		_di_cta_data_block_destroy(data_block->cta861.data_blocks[i]);
++
++	free(data_block);
++}
++
++void
++_di_displayid2_finish(struct di_displayid2 *displayid2)
++{
++	size_t i;
++	int saved_errno = errno;
++
++	for (i = 0; i < displayid2->data_blocks_len; i++) {
++		data_block_destroy(displayid2->data_blocks[i]);
++		displayid2->data_blocks[i] = NULL;
++	}
++	displayid2->data_blocks_len = 0;
++	displayid2->logger = NULL;
++	errno = saved_errno;
++}
++
+ int
+ di_displayid2_get_revision(const struct di_displayid2 *displayid2)
+ {
+@@ -92,3 +370,32 @@ di_displayid2_get_product_primary_use_case(const struct di_displayid2 *displayid
+ {
+ 	return displayid2->product_primary_use_case;
+ }
++
++const struct di_displayid2_data_block *const *
++_di_displayid2_get_data_blocks(const struct di_displayid2 *displayid2)
++{
++	return (const struct di_displayid2_data_block *const *) displayid2->data_blocks;
++}
++
++enum di_displayid2_data_block_tag
++_di_displayid2_data_block_get_tag(const struct di_displayid2_data_block *data_block)
++{
++	return data_block->tag;
++}
++
++const struct di_cta_data_block *const *
++_di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *data_block)
++{
++	if (data_block->tag != DI_DISPLAYID2_DATA_BLOCK_CTA861) {
++		return NULL;
++	}
++	return (const struct di_cta_data_block *const *) data_block->cta861.data_blocks;
++}
++
++const struct di_displayid2_interface_features *
++_di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_block *data_block)
++{
++	if (data_block->tag != DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES)
++		return NULL;
++	return &data_block->interface_features;
++}
+diff --git a/edid.c b/edid.c
+index 45ad13f..b945b53 100644
+--- a/edid.c
++++ b/edid.c
+@@ -1155,6 +1155,7 @@ parse_ext(struct di_edid *edid, const uint8_t data[static EDID_BLOCK_SIZE])
+ 	const uint8_t *ext_data;
+ 	size_t ext_size;
+ 	bool ok;
++	int saved_errno;
+ 
+ 	ext = calloc(1, sizeof(*ext));
+ 	if (!ext) {
+@@ -1204,8 +1205,12 @@ parse_ext(struct di_edid *edid, const uint8_t data[static EDID_BLOCK_SIZE])
+ 			return true;
+ 		}
+ 		if (!ok) {
++			saved_errno = errno;
++			if (ext->displayid_version == 2)
++				_di_displayid2_finish(&ext->displayid2);
+ 			free(ext);
+-			return errno == ENOTSUP || errno == EINVAL;
++			errno = saved_errno;
++			return saved_errno == ENOTSUP || saved_errno == EINVAL;
+ 		}
+ 		break;
+ 	default:
+@@ -1380,6 +1385,7 @@ _di_edid_destroy(struct di_edid *edid)
+ 			break;
+ 		case DI_EDID_EXT_DISPLAYID:
+ 			_di_displayid_finish(&ext->displayid);
++			_di_displayid2_finish(&ext->displayid2);
+ 			break;
+ 		default:
+ 			break; /* Nothing to do */
+diff --git a/include/cta.h b/include/cta.h
+index 25e1dfa..9ad9f81 100644
+--- a/include/cta.h
++++ b/include/cta.h
+@@ -81,6 +81,14 @@
+  */
+ #define EDID_CTA_MAX_HDMI_AUDIO_BLOCK_ENTRIES 15
+ 
++/* Minimal shared parse context, adapted from upstream d535192/34b3635. */
++struct di_cta {
++	int revision;
++	const struct di_edid_cta_flags *flags; /* NULL in nested DisplayID CTA */
++	struct di_logger *logger;
++	bool allocation_failed;
++};
++
+ struct di_edid_cta {
+ 	int revision;
+ 	struct di_edid_cta_flags flags;
+@@ -93,7 +101,6 @@ struct di_edid_cta {
+ 	struct di_edid_detailed_timing_def_priv *detailed_timing_defs[EDID_CTA_MAX_DETAILED_TIMING_DEFS + 1];
+ 	size_t detailed_timing_defs_len;
+ 
+-	struct di_logger *logger;
+ };
+ 
+ struct di_cta_hdr_static_metadata_block_priv {
+@@ -275,4 +282,11 @@ _di_edid_cta_parse(struct di_edid_cta *cta, const uint8_t *data, size_t size,
+ void
+ _di_edid_cta_finish(struct di_edid_cta *cta);
+ 
++bool
++_di_cta_data_block_parse(struct di_cta *cta, uint8_t raw_tag, const uint8_t *data, size_t size,
++			struct di_cta_data_block **data_block_out);
++
++void
++_di_cta_data_block_destroy(struct di_cta_data_block *data_block);
++
+ #endif
+diff --git a/include/displayid2.h b/include/displayid2.h
+index e82eae6..b6ae76d 100644
+--- a/include/displayid2.h
++++ b/include/displayid2.h
+@@ -11,17 +11,226 @@
+ 
+ #include <libdisplay-info/displayid2.h>
+ 
++#include "cta.h"
+ #include "log.h"
+ 
++/**
++ * The maximum number of data blocks in a DisplayID v2 section.
++ *
++ * A DisplayID v2 section has a maximum payload size of 251 bytes (256 bytes
++ * maximum size, 5 bytes header), and each data block has a minimum size of
++ * 3 bytes.
++ */
++#define DISPLAYID2_MAX_DATA_BLOCKS 83
++
++/**
++ * The maximum number of CTA data blocks in a DisplayID v2 CTA-861 data block.
++ *
++ * A DisplayID v2 section has a maximum payload size of 251 bytes (256 bytes
++ * maximum size, 5 bytes header), a DisplayID v2 data block has a maximum
++ * payload size of 248 bytes (3 bytes header), and each CTA data block takes at
++ * least 1 byte.
++ */
++#define DISPLAYID2_CTA861_MAX_DATA_BLOCKS 248
++
++/**
++ * DisplayID v2 data block tag.
++ */
++enum di_displayid2_data_block_tag {
++	/* Product Identification Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_PRODUCT_ID = 0x20,
++	/* Display Parameters Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS = 0x21,
++	/* Type VII Timing – Detailed Timing Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_VII_TIMING = 0x22,
++	/* Type VIII Timing – Enumerated Timing Code Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_VIII_TIMING = 0x23,
++	/* Type IX Timing – Formula-based Timing Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_IX_TIMING = 0x24,
++	/* Dynamic Video Timing Range Limits Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_DYN_TIMING_RANGE_LIMITS = 0x25,
++	/* Display Interface Features Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES = 0x26,
++	/* Stereo Display Interface Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_STEREO_DISPLAY_INTERFACE = 0x27,
++	/* Tiled Display Topology Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TILED_DISPLAY_TOPO = 0x28,
++	/* ContainerID Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_CONTAINERID = 0x29,
++	/* Type X Timing – Formula-based Timing Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_TYPE_X_TIMING = 0x2A,
++	/* Adaptive-Sync Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_ADAPTIVE_SYNC = 0x2B,
++	/* ARVR_HMD Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_ARVR_HMD = 0x2C,
++	/* ARVR_Layer Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_ARVR_LAYER = 0x2D,
++	/* CTA-861 Data Block Encapsulation DisplayID Data Block */
++	DI_DISPLAYID2_DATA_BLOCK_CTA861 = 0x81,
++};
++
++struct di_displayid2_data_block;
++
++/** Supported RGB/YCbCr 4:4:4 bit-depth flags. */
++enum di_displayid2_bit_depth_444 {
++	DI_DISPLAYID2_BIT_DEPTH_444_6 = 1 << 0,
++	DI_DISPLAYID2_BIT_DEPTH_444_8 = 1 << 1,
++	DI_DISPLAYID2_BIT_DEPTH_444_10 = 1 << 2,
++	DI_DISPLAYID2_BIT_DEPTH_444_12 = 1 << 3,
++	DI_DISPLAYID2_BIT_DEPTH_444_14 = 1 << 4,
++	DI_DISPLAYID2_BIT_DEPTH_444_16 = 1 << 5,
++};
++
++/** Supported YCbCr 4:2:2/4:2:0 bit-depth flags. */
++enum di_displayid2_bit_depth_4xx {
++	DI_DISPLAYID2_BIT_DEPTH_4XX_8 = 1 << 0,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_10 = 1 << 1,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_12 = 1 << 2,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_14 = 1 << 3,
++	DI_DISPLAYID2_BIT_DEPTH_4XX_16 = 1 << 4,
++};
++
++/** Supported audio sample-rate flags. */
++enum di_displayid2_audio_capability {
++	DI_DISPLAYID2_AUDIO_32_KHZ = 1 << 7,
++	DI_DISPLAYID2_AUDIO_44_1_KHZ = 1 << 6,
++	DI_DISPLAYID2_AUDIO_48_KHZ = 1 << 5,
++};
++
++/** Standard color space/EOTF combination flags. */
++enum di_displayid2_standard_combination {
++	DI_DISPLAYID2_COMBINATION_SRGB = 1 << 0,
++	DI_DISPLAYID2_COMBINATION_BT601 = 1 << 1,
++	DI_DISPLAYID2_COMBINATION_BT709_BT1886 = 1 << 2,
++	DI_DISPLAYID2_COMBINATION_ADOBE_RGB = 1 << 3,
++	DI_DISPLAYID2_COMBINATION_DCI_P3 = 1 << 4,
++	DI_DISPLAYID2_COMBINATION_BT2020 = 1 << 5,
++	DI_DISPLAYID2_COMBINATION_BT2020_ST2084 = 1 << 6,
++};
++
++/** Known additional-combination color-space encodings. */
++enum di_displayid2_color_space {
++	DI_DISPLAYID2_COLOR_SPACE_UNDEFINED = 0,
++	DI_DISPLAYID2_COLOR_SPACE_SRGB = 1,
++	DI_DISPLAYID2_COLOR_SPACE_BT601 = 2,
++	DI_DISPLAYID2_COLOR_SPACE_BT709 = 3,
++	DI_DISPLAYID2_COLOR_SPACE_ADOBE_RGB = 4,
++	DI_DISPLAYID2_COLOR_SPACE_DCI_P3 = 5,
++	DI_DISPLAYID2_COLOR_SPACE_BT2020 = 6,
++	DI_DISPLAYID2_COLOR_SPACE_CUSTOM = 7,
++};
++
++/** Known additional-combination EOTF encodings. */
++enum di_displayid2_eotf {
++	DI_DISPLAYID2_EOTF_UNDEFINED = 0,
++	DI_DISPLAYID2_EOTF_SRGB = 1,
++	DI_DISPLAYID2_EOTF_BT601 = 2,
++	DI_DISPLAYID2_EOTF_BT1886 = 3,
++	DI_DISPLAYID2_EOTF_ADOBE_RGB = 4,
++	DI_DISPLAYID2_EOTF_DCI_P3 = 5,
++	DI_DISPLAYID2_EOTF_BT2020 = 6,
++	DI_DISPLAYID2_EOTF_GAMMA = 7,
++	DI_DISPLAYID2_EOTF_ST2084 = 8,
++	DI_DISPLAYID2_EOTF_HYBRID_LOG = 9,
++	DI_DISPLAYID2_EOTF_CUSTOM = 10,
++};
++
++/**
++ * Additional color space/EOTF combination from a Display Interface Features
++ * data block. Values are the DisplayID v2 encodings: color space occupies the
++ * high nibble and EOTF the low nibble. Reserved values are retained verbatim;
++ * they do not describe a known capability.
++ */
++struct di_displayid2_color_eotf {
++	/* enum di_displayid2_color_space, or an uninterpreted reserved value */
++	uint8_t color_space;
++	/* enum di_displayid2_eotf, or an uninterpreted reserved value */
++	uint8_t eotf;
++};
++
++/**
++ * Display Interface Features, revision 0.
++ *
++ * Bit-depth masks use bits 0 through 5 for 6, 8, 10, 12, 14, 16 bpc in
++ * RGB/4:4:4, and bits 0 through 4 for 8, 10, 12, 14, 16 bpc in 4:2:2/4:2:0.
++ * Reserved mask bits are excluded. Audio flags retain the DisplayID encoding
++ * (bits 7 through 5: 32, 44.1, 48 kHz; remaining bits reserved).
++ *
++ * Standard combinations use bits 0 through 6: sRGB, BT.601, BT.709/BT.1886,
++ * Adobe RGB, DCI-P3, BT.2020, BT.2020/SMPTE ST 2084. Reserved standard bits
++ * are excluded. Additional combinations retain reserved enum values without
++ * interpreting them. Known values are named by di_displayid2_color_space
++ * and di_displayid2_eotf.
++ */
++struct di_displayid2_interface_features {
++	/* Bitmask of enum di_displayid2_bit_depth_444 */
++	uint8_t rgb_bit_depths;
++	/* Bitmask of enum di_displayid2_bit_depth_444 */
++	uint8_t ycbcr444_bit_depths;
++	/* Bitmask of enum di_displayid2_bit_depth_4xx */
++	uint8_t ycbcr422_bit_depths;
++	/* Bitmask of enum di_displayid2_bit_depth_4xx */
++	uint8_t ycbcr420_bit_depths;
++	/* MHz, zero if not specified */
++	float ycbcr420_min_pixel_rate;
++	/* Bitmask of enum di_displayid2_audio_capability; reserved bits retained */
++	uint8_t audio_capabilities;
++	/* Bitmask of enum di_displayid2_standard_combination */
++	uint8_t standard_combinations;
++	uint8_t additional_combinations_len;
++	struct di_displayid2_color_eotf additional_combinations[7];
++};
++
++/**
++ * Get Display Interface Features from a DisplayID v2 data block.
++ *
++ * Returns NULL for another tag or a structurally invalid/unsupported block.
++ * The returned pointer is owned by the DisplayID structure and remains valid
++ * until it is destroyed.
++ */
++const struct di_displayid2_interface_features *
++_di_displayid2_data_block_get_interface_features(const struct di_displayid2_data_block *data_block);
++
+ struct di_displayid2 {
+ 	int revision;
+ 	enum di_displayid2_product_primary_use_case product_primary_use_case;
+ 
++	struct di_displayid2_data_block *data_blocks[DISPLAYID2_MAX_DATA_BLOCKS + 1];
++	size_t data_blocks_len;
++
++	/* Uninterpretable nested CTA evidence suppresses native fallback only. */
++	bool unusable_cta;
++
+ 	struct di_logger *logger;
+ };
+ 
++struct di_displayid2_data_block {
++	enum di_displayid2_data_block_tag tag;
++
++	struct di_displayid2_interface_features interface_features;
++
++	/* Used for DI_DISPLAYID2_DATA_BLOCK_CTA861 */
++	struct {
++		/* NULL-terminated */
++		struct di_cta_data_block *data_blocks[DISPLAYID2_CTA861_MAX_DATA_BLOCKS + 1];
++		size_t data_blocks_len;
++	} cta861;
++};
++
+ bool
+ _di_displayid2_parse(struct di_displayid2 *displayid2, const uint8_t *data,
+ 		     size_t size, struct di_logger *logger);
+ 
++void
++_di_displayid2_finish(struct di_displayid2 *displayid2);
++
++const struct di_displayid2_data_block *const *
++_di_displayid2_get_data_blocks(const struct di_displayid2 *displayid2);
++
++enum di_displayid2_data_block_tag
++_di_displayid2_data_block_get_tag(const struct di_displayid2_data_block *block);
++
++const struct di_cta_data_block *const *
++_di_displayid2_data_block_get_cta_data_blocks(const struct di_displayid2_data_block *block);
++
+ #endif
+diff --git a/info.c b/info.c
+index f901e06..4665084 100644
+--- a/info.c
++++ b/info.c
+@@ -5,6 +5,7 @@
+ #include <assert.h>
+ 
+ #include "edid.h"
++#include "displayid2.h"
+ #include "info.h"
+ #include "memory-stream.h"
+ 
+@@ -36,8 +37,43 @@ di_cta_data_block_allowed_multiple(enum di_cta_data_block_tag tag)
+ }
+ 
+ static const struct di_cta_data_block *
+-di_edid_get_cta_data_block(const struct di_edid *edid,
+-			   enum di_cta_data_block_tag tag)
++find_cta_data_block(const struct di_cta_data_block *const *blocks, enum di_cta_data_block_tag tag)
++{
++	size_t i;
++
++	for (i = 0; blocks[i] != NULL; i++) {
++		if (di_cta_data_block_get_tag(blocks[i]) == tag)
++			return blocks[i];
++	}
++
++	return NULL;
++}
++
++static const struct di_cta_data_block *
++displayid2_get_cta_data_block(const struct di_displayid2 *displayid2, enum di_cta_data_block_tag tag)
++{
++	size_t i;
++	const struct di_displayid2_data_block *const *data_blocks;
++	const struct di_cta_data_block *const *cta_data_blocks, *match;
++
++	data_blocks = _di_displayid2_get_data_blocks(displayid2);
++	for (i = 0; data_blocks[i] != NULL; i++) {
++		cta_data_blocks = _di_displayid2_data_block_get_cta_data_blocks(data_blocks[i]);
++		if (cta_data_blocks == NULL) {
++			continue;
++		}
++
++		match = find_cta_data_block(cta_data_blocks, tag);
++		if (match != NULL) {
++			return match;
++		}
++	}
++
++	return NULL;
++}
++
++static const struct di_cta_data_block *
++edid_get_cta_data_block(const struct di_edid *edid, enum di_cta_data_block_tag tag)
+ {
+ 	const struct di_edid_ext *const *ext;
+ 
+@@ -49,15 +85,28 @@ di_edid_get_cta_data_block(const struct di_edid *edid,
+ 
+ 	for (ext = di_edid_get_extensions(edid); *ext; ext++) {
+ 		const struct di_edid_cta *cta;
+-		const struct di_cta_data_block *const *block;
+-
+-		if (di_edid_ext_get_tag(*ext) != DI_EDID_EXT_CEA)
+-			continue;
++		const struct di_displayid2 *displayid2;
++		const struct di_cta_data_block *match;
++
++		match = NULL;
++		switch (di_edid_ext_get_tag(*ext)) {
++		case DI_EDID_EXT_CEA:
++			cta = di_edid_ext_get_cta(*ext);
++			match = find_cta_data_block(di_edid_cta_get_data_blocks(cta), tag);
++			break;
++		case DI_EDID_EXT_DISPLAYID:
++			displayid2 = di_edid_ext_get_displayid2(*ext);
++			if (displayid2 == NULL) {
++				break;
++			}
++			match = displayid2_get_cta_data_block(displayid2, tag);
++			break;
++		default:
++			break; /* Ignore */
++		}
+ 
+-		cta = di_edid_ext_get_cta(*ext);
+-		for (block = di_edid_cta_get_data_blocks(cta); *block; block++) {
+-			if (di_cta_data_block_get_tag(*block) == tag)
+-				return *block;
++		if (match != NULL) {
++			return match;
+ 		}
+ 	}
+ 
+@@ -74,7 +123,7 @@ derive_edid_hdr_static_metadata(const struct di_edid *edid,
+ 	/* By default, everything unset and only traditional gamma supported. */
+ 	hsm->traditional_sdr = true;
+ 
+-	block = di_edid_get_cta_data_block(edid, DI_CTA_DATA_BLOCK_HDR_STATIC_METADATA);
++	block = edid_get_cta_data_block(edid, DI_CTA_DATA_BLOCK_HDR_STATIC_METADATA);
+ 	if (!block)
+ 		return;
+ 
+@@ -155,7 +204,7 @@ derive_edid_supported_signal_colorimetry(const struct di_edid *edid,
+ 
+ 	/* Defaults to all unsupported. */
+ 
+-	block = di_edid_get_cta_data_block(edid, DI_CTA_DATA_BLOCK_COLORIMETRY);
++	block = edid_get_cta_data_block(edid, DI_CTA_DATA_BLOCK_COLORIMETRY);
+ 	if (!block)
+ 		return;
+ 
+@@ -169,6 +218,55 @@ derive_edid_supported_signal_colorimetry(const struct di_edid *edid,
+ 	ssc->ictcp = cm->ictcp;
+ }
+ 
++static bool
++displayid2_has_rgb_bt2020_pq(const struct di_displayid2 *displayid2)
++{
++	const struct di_displayid2_data_block *const *blocks;
++	const struct di_displayid2_interface_features *f;
++	size_t i, j;
++
++	blocks = _di_displayid2_get_data_blocks(displayid2);
++	for (i = 0; blocks[i]; i++) {
++		f = _di_displayid2_data_block_get_interface_features(blocks[i]);
++		if (!f || !f->rgb_bit_depths)
++			continue;
++		if (f->standard_combinations & DI_DISPLAYID2_COMBINATION_BT2020_ST2084)
++			return true;
++		for (j = 0; j < f->additional_combinations_len; j++) {
++			if (f->additional_combinations[j].color_space == DI_DISPLAYID2_COLOR_SPACE_BT2020 &&
++			    f->additional_combinations[j].eotf == DI_DISPLAYID2_EOTF_ST2084)
++				return true;
++		}
++	}
++	return false;
++}
++
++static void
++derive_native_hdr_colorimetry(struct di_info *info)
++{
++	const struct di_edid_ext *const *ext;
++	const struct di_displayid2 *displayid2;
++	bool supported = false;
++
++	if (edid_get_cta_data_block(info->edid, DI_CTA_DATA_BLOCK_HDR_STATIC_METADATA) ||
++	    edid_get_cta_data_block(info->edid, DI_CTA_DATA_BLOCK_COLORIMETRY))
++		return;
++	for (ext = di_edid_get_extensions(info->edid); *ext; ext++) {
++		displayid2 = di_edid_ext_get_displayid2(*ext);
++		if (!displayid2)
++			continue;
++		if (displayid2->unusable_cta)
++			return;
++		if (!supported && displayid2_has_rgb_bt2020_pq(displayid2))
++			supported = true;
++	}
++	if (supported) {
++		/* Native signal support does not assert CTA metadata reception or nits. */
++		info->derived.hdr_static_metadata.pq = true;
++		info->derived.supported_signal_colorimetry.bt2020_rgb = true;
++	}
++}
++
+ struct di_info *
+ di_info_parse_edid(const void *data, size_t size)
+ {
+@@ -199,6 +297,7 @@ di_info_parse_edid(const void *data, size_t size)
+ 	derive_edid_hdr_static_metadata(info->edid, &info->derived.hdr_static_metadata);
+ 	derive_edid_color_primaries(info->edid, &info->derived.color_primaries);
+ 	derive_edid_supported_signal_colorimetry(info->edid, &info->derived.supported_signal_colorimetry);
++	derive_native_hdr_colorimetry(info);
+ 
+ 	return info;
+ 

@@ -1,0 +1,163 @@
+From 5e44fee88a5bd880d7e0ec0549e6ede730324caf Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 7 Oct 2026 23:17:26 -0400
+Subject: [PATCH 04/14] displayid2: mark recognized incomplete nested CTA
+ headers
+
+A short section tail bypassed data-block parsing and left only a padding
+diagnostic, allowing native fallback despite identified unusable CTA.
+Mark only incomplete 0x81 headers, preserving existing bounds and all
+completed authority. Pin one/two-byte tails in the same section, both
+extension orders, retained Type 1/luminance and unrelated padding.
+---
+ debian/README.native-displayid |  3 ++-
+ displayid2.c                   |  7 ++++-
+ test/displayid2-private.c      | 21 +++++++++++++++
+ test/old-header-consumer.c     | 47 ++++++++++++++++++++++++++++++----
+ 4 files changed, 71 insertions(+), 7 deletions(-)
+
+diff --git a/debian/README.native-displayid b/debian/README.native-displayid
+index eff9c7e..838326e 100644
+--- a/debian/README.native-displayid
++++ b/debian/README.native-displayid
+@@ -32,7 +32,8 @@ There is a narrow, separately reviewed malformed-input difference from
+ upstream 4adfd7888e03987a4904a4ce0e14fd0ff4bccc42. Unusable nested CTA evidence
+ suppresses only native fallback; it never clears valid parsed CTA fields.
+ The marker is set for an unsupported 0x81 revision/reserved header flag,
+-a declared outer length beyond the section, a truncated nested child,
++an incomplete recognized 0x81 header, a declared outer length beyond the
++section, a truncated nested child,
+ an empty extended tag, or a rejected HDR/colorimetry child. Unsupported parent
+ formats are skipped wholly. For a supported parent with a malformed tail,
+ earlier complete children remain authoritative, including their Type 1 and
+diff --git a/displayid2.c b/displayid2.c
+index 73d4a36..4915101 100644
+--- a/displayid2.c
++++ b/displayid2.c
+@@ -306,8 +306,13 @@ _di_displayid2_parse(struct di_displayid2 *displayid2, const uint8_t *data,
+ 	max_data_block_size = 0;
+ 	while (i < section_size - 1) {
+ 		max_data_block_size = section_size - 1 - i;
+-		if (is_data_block_end(&data[i], max_data_block_size))
++		if (is_data_block_end(&data[i], max_data_block_size)) {
++			if (max_data_block_size > 0 &&
++			    max_data_block_size < DISPLAYID2_DATA_BLOCK_HEADER_SIZE &&
++			    data[i] == DI_DISPLAYID2_DATA_BLOCK_CTA861)
++				displayid2->unusable_cta = true;
+ 			break;
++		}
+ 		data_block_size = parse_data_block(displayid2, &data[i],
+ 						   max_data_block_size);
+ 		if (data_block_size < 0)
+diff --git a/test/displayid2-private.c b/test/displayid2-private.c
+index 4067105..71d3f25 100644
+--- a/test/displayid2-private.c
++++ b/test/displayid2-private.c
+@@ -73,6 +73,23 @@ check(const uint8_t *block, size_t size, bool valid)
+ 	fclose(log);
+ }
+ 
++static void
++check_short_header(size_t tail_size, uint8_t tag)
++{
++	uint8_t blocks[14] = {0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x40, 0, 0};
++	FILE *log = tmpfile();
++	struct di_displayid2 *d;
++
++	assert(log && (tail_size == 1 || tail_size == 2));
++	blocks[12] = tag;
++	d = parse(blocks, 12 + tail_size, log);
++	assert(d->unusable_cta == (tag == 0x81));
++	assert(d->data_blocks_len == 1 && ftell(log) > 0);
++	_di_displayid2_finish(d);
++	free(d);
++	fclose(log);
++}
++
+ int
+ main(void)
+ {
+@@ -88,6 +105,10 @@ main(void)
+ 	const struct di_displayid2_data_block *const *blocks;
+ 	size_t i;
+ 
++	check_short_header(1, 0x81);
++	check_short_header(2, 0x81);
++	check_short_header(1, 0x26);
++	check_short_header(2, 0x26);
+ 	check(full, sizeof(full), true);
+ 	info = parse(other, sizeof(other), log);
+ 	blocks = _di_displayid2_get_data_blocks(info);
+diff --git a/test/old-header-consumer.c b/test/old-header-consumer.c
+index 411e9c8..7191aaa 100644
+--- a/test/old-header-consumer.c
++++ b/test/old-header-consumer.c
+@@ -126,9 +126,9 @@ check_cta(bool has_hdr, bool has_color)
+ 	check(blocks, n + sizeof(native), false);
+ }
+ 
+-static void
+-check_extensions(const uint8_t *first, size_t first_size,
+-		 const uint8_t *second, size_t second_size, bool supported)
++static struct di_info *
++parse_extensions(const uint8_t *first, size_t first_size,
++		 const uint8_t *second, size_t second_size)
+ {
+ 	uint8_t edid[384];
+ 	struct di_info *info;
+@@ -144,7 +144,14 @@ check_extensions(const uint8_t *first, size_t first_size,
+ 	checksum(edid + 256, 128);
+ 	info = di_info_parse_edid(edid, sizeof(edid));
+ 	assert(info);
+-	check_info(info, supported);
++	return info;
++}
++
++static void
++check_extensions(const uint8_t *first, size_t first_size,
++		 const uint8_t *second, size_t second_size, bool supported)
++{
++	check_info(parse_extensions(first, first_size, second, second_size), supported);
+ }
+ 
+ static struct di_info *
+@@ -315,8 +322,38 @@ check_unusable_cta(void)
+ 	uint8_t tail[] = {0x81, 0, 1, 0xE3};
+ 	static const uint8_t positive[] = {0x81, 0, 7, 0xE6, 6, 0x0F, 1, 96, 80, 4};
+ 	struct di_info *baseline, *info;
+-	size_t order;
++	size_t order, short_size;
++	uint8_t short_header[] = {0x81, 0};
+ 
++	for (short_size = 1; short_size <= 2; short_size++) {
++		memcpy(blocks, native, sizeof(native));
++		memcpy(blocks + sizeof(native), short_header, short_size);
++		check(blocks, sizeof(native) + short_size, false);
++		check_extensions(native, sizeof(native), short_header, short_size, false);
++		check_extensions(short_header, short_size, native, sizeof(native), false);
++		baseline = parse(positive, sizeof(positive));
++		memcpy(blocks + sizeof(native), positive, sizeof(positive));
++		memcpy(blocks + sizeof(native) + sizeof(positive), short_header, short_size);
++		info = parse(blocks, sizeof(native) + sizeof(positive) + short_size);
++		assert_same(info, baseline);
++		di_info_destroy(info);
++		info = parse_extensions(blocks, sizeof(native) + sizeof(positive),
++					short_header, short_size);
++		assert_same(info, baseline);
++		di_info_destroy(info);
++		info = parse_extensions(short_header, short_size,
++					blocks, sizeof(native) + sizeof(positive));
++		assert_same(info, baseline);
++		di_info_destroy(info);
++		di_info_destroy(baseline);
++		short_header[0] = 0x26; /* unrelated partial native tag is not CTA evidence */
++		memcpy(blocks, native, sizeof(native));
++		memcpy(blocks + sizeof(native), short_header, short_size);
++		check(blocks, sizeof(native) + short_size, true);
++		check_extensions(native, sizeof(native), short_header, short_size, true);
++		check_extensions(short_header, short_size, native, sizeof(native), true);
++		short_header[0] = 0x81;
++	}
+ 	check_extensions(native, sizeof(native), malformed, sizeof(malformed), false);
+ 	check_extensions(malformed, sizeof(malformed), native, sizeof(native), false);
+ 	malformed[1] = 8; /* reserved parent flags */

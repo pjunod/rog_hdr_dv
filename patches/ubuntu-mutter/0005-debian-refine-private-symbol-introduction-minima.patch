@@ -1,0 +1,63 @@
+From f8b71478843220c0de2d68b73add82231c6f3909 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Thu, 8 Oct 2026 03:01:30 -0400
+Subject: [PATCH 5/5] debian: refine private symbol introduction minima
+
+---
+ debian/changelog              | 9 +++++++++
+ debian/control                | 4 ++--
+ debian/libmutter-51-0.symbols | 2 +-
+ 3 files changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/debian/changelog b/debian/changelog
+index 3973d3f..ad84f94 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,12 @@
++mutter (51.0-1ubuntu3+nativehdr2) stonking; urgency=medium
++
++  * Use the documented terminal-tilde symbol introduction minimum for the
++    private KMS helper; permit actual backports of the hdr5 query API.
++  * Repackage unchanged qualified production objects. Preserve nativehdr1
++    artifacts and exact compiler/runtime qualification receipts.
++
++ -- Paul Junod <donujp@gmail.com>  Thu, 08 Oct 2026 03:01:29 -0400
++
+ mutter (51.0-1ubuntu3+nativehdr1) stonking; urgency=medium
+ 
+   * Opt in to parsed native DisplayID RGB BT.2020/ST 2084 capability on eDP
+diff --git a/debian/control b/debian/control
+index 84b0476..df97310 100644
+--- a/debian/control
++++ b/debian/control
+@@ -36,7 +36,7 @@ Build-Depends: debhelper-compat (= 14),
+                libcairo2-dev,
+                libcanberra-gtk3-dev,
+                libcolord-dev,
+-               libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr5),
++               libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr5~),
+                libdrm-dev (>= 2.4.118),
+                libegl1-mesa-dev,
+                libfribidi-dev,
+@@ -220,7 +220,7 @@ Depends: gir1.2-mutter-51 (= ${binary:Version}),
+          libcairo2-dev,
+          libcanberra-dev,
+          libcolord-dev,
+-         libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr5),
++         libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr5~),
+          libdrm-dev (>= 2.4.118),
+          libeis-dev (>= 1.3.901),
+          libegl1-mesa-dev,
+diff --git a/debian/libmutter-51-0.symbols b/debian/libmutter-51-0.symbols
+index 09e969d..23cde0c 100644
+--- a/debian/libmutter-51-0.symbols
++++ b/debian/libmutter-51-0.symbols
+@@ -578,7 +578,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_output_is_presentation@Base 43.0
+  meta_output_is_primary@Base 43.0
+  meta_output_is_underscanning@Base 43.0
+- meta_output_kms_update_color_capabilities@Base 51.0-1ubuntu3+nativehdr1
++ meta_output_kms_update_color_capabilities@Base 51.0-1ubuntu3+nativehdr1~
+  meta_output_native_get_type@Base 47.0
+  meta_output_peek_rgb_range@Base 46.0
+  meta_output_unassign_crtc@Base 43.0

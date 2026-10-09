@@ -1,0 +1,172 @@
+From bcd577ef5f3fa61be223bea3afa4c52601cc8d8d Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 7 Oct 2026 23:13:50 -0400
+Subject: [PATCH 03/14] test: add attributed downstream fixtures and package
+ behavior notes
+
+---
+ debian/README.native-displayid                |  52 ++++++++++++++++++
+ debian/libdisplay-info3.docs                  |   1 +
+ test/data/README.md                           |   7 +++
+ test/data/asus-ux3405.edid                    | Bin 0 -> 256 bytes
+ test/data/synthetic-displayid2-interface.edid | Bin 0 -> 256 bytes
+ test/gen-displayid2-interface.py              |  24 ++++++++
+ test/meson.build                              |   2 +
+ 7 files changed, 86 insertions(+)
+ create mode 100644 debian/README.native-displayid
+ create mode 100644 debian/libdisplay-info3.docs
+ create mode 100644 test/data/asus-ux3405.edid
+ create mode 100644 test/data/synthetic-displayid2-interface.edid
+ create mode 100644 test/gen-displayid2-interface.py
+
+diff --git a/debian/README.native-displayid b/debian/README.native-displayid
+new file mode 100644
+index 0000000..eff9c7e
+--- /dev/null
++++ b/debian/README.native-displayid
+@@ -0,0 +1,52 @@
++Local native DisplayID HDR detection backport
++===========================================
++
++This local package improves libdisplay-info 0.3 detection. It does not by
++itself enable desktop HDR on the ROG panel. Mutter 51.0 additionally requires
++CTA Static Metadata Type 1, and the installed i915 driver reports that its
++Intel HDR backlight interface is unused because static metadata is missing.
++No compositor, kernel, boot setting or panel firmware is changed here.
++
++The 0.3 public headers, exported symbols, struct layouts and SONAME .so.3 are
++preserved. There are no new public entry points or standalone DisplayID APIs.
++The parser privately owns DisplayID v2 blocks and nested CTA children and
++releases partly initialized state when an allocation fails.
++
++For valid descriptions, nested CTA joins ordinary CTA in extension/block
++order. The first match for each relevant CTA domain remains authoritative.
++This deliberately extends 0.3, which previously ignored nested CTA. A mixed
++input with an earlier nested declaration can consequently differ from the
++old ordinary-only result. Native interface features contribute only when
++neither CTA HDR static metadata nor CTA colorimetry exists, and one validated
++block proves RGB encoding plus a complete BT.2020/SMPTE ST 2084 tuple.
++
++This intentionally broadens the existing high-level EOTF getter's derivation:
++PQ and BT2020_RGB may describe native DisplayID signal support even without
++CTA metadata reception. Type 1 remains false and desired-content luminance
++remains zero. Native brightness, DCI-P3, HLG and other native color encodings
++are not guessed or synthesized. Unknown native enum values are retained
++privately, diagnosed and excluded from capability mapping. Known valid native
++fields survive unrelated reserved values.
++
++There is a narrow, separately reviewed malformed-input difference from
++upstream 4adfd7888e03987a4904a4ce0e14fd0ff4bccc42. Unusable nested CTA evidence
++suppresses only native fallback; it never clears valid parsed CTA fields.
++The marker is set for an unsupported 0x81 revision/reserved header flag,
++a declared outer length beyond the section, a truncated nested child,
++an empty extended tag, or a rejected HDR/colorimetry child. Unsupported parent
++formats are skipped wholly. For a supported parent with a malformed tail,
++earlier complete children remain authoritative, including their Type 1 and
++luminance. Valid empty or irrelevant/audio-only nested CTA does not suppress
++native fallback. Unrelated diagnostics and malformed native blocks do not
++set this marker. Allocation failures are fatal and remain ENOMEM.
++
++The backport adapts upstream Simon Ser's private CTA context and DisplayID2
++lifecycle changes d535192, 34b3635, 4713505, 788c056, 7324cca and 73ec53d, plus
++the locally reviewed parser/safety/fallback commits da6168b, 533a338 and
++4adfd78. The conservative malformed-input marker and ownership repairs are
++local adaptations, not fabricated upstream commits or accepted patches.
++
++This is an unsigned local test build, not an Ubuntu upload or an upstream
++acceptance claim. Human DCO attestation, normative DisplayID section checking
++and maintainer review of the high-level semantics remain submission gates.
++The private observed panel capture is not included in the source package.
+diff --git a/debian/libdisplay-info3.docs b/debian/libdisplay-info3.docs
+new file mode 100644
+index 0000000..63a040f
+--- /dev/null
++++ b/debian/libdisplay-info3.docs
+@@ -0,0 +1 @@
++debian/README.native-displayid
+diff --git a/test/data/README.md b/test/data/README.md
+index 69a5817..5038538 100644
+--- a/test/data/README.md
++++ b/test/data/README.md
+@@ -50,6 +50,13 @@ philips-4k-2023		| display
+ qemu			| generated
+ samsung-qn900b-8k	| display
+ 
++The following additional fixtures use the project license:
++
++name | source
++---- | ------
++asus-ux3405 | copied from libdisplay-info upstream `62a9346c3dce2bddba1d4dc186949e4320d6f801`, where it is attributed as display data under the project license
++synthetic-displayid2-interface | constructed from scratch by `test/gen-displayid2-interface.py`; not a hardware capture
++
+ [linuxhw/EDID]: https://github.com/linuxhw/EDID
+ [edid-decode]: https://git.linuxtv.org/edid-decode.git
+ [CC-BY-4.0]: LICENSE.CC-BY-4.0
+diff --git a/test/data/asus-ux3405.edid b/test/data/asus-ux3405.edid
+new file mode 100644
+index 0000000000000000000000000000000000000000..9a0d15a5261e55b674361aa471d055b0cac3e108
+GIT binary patch
+literal 256
+zcmZSh4+acA&2t?YKtO?!WviTU1@rlf>jLezDRT#e00kM*!0CSuDH}K}$`v>|81(iE
+zFfd3175!x}sJL~@i4kN9I)DlOV{i=db2Kq<4mB{-HBewwEl{XrVo+e<@o8p&Ie<Zt
+zL3Rgs4!Z+42Rp;NR{?J>Z?kpcW^@g4h`W#=A)s8L#=yzW#tgI~fPq1YLFD;o&Q^Qw
+zWCnQ#b_RBKaS+MS$RJ-V#lXPKY*4|lpoA%bsRHDp-p8yB4A0nD8A}qFz%HCP0RXB`
+BH30ws
+
+literal 0
+HcmV?d00001
+
+diff --git a/test/data/synthetic-displayid2-interface.edid b/test/data/synthetic-displayid2-interface.edid
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7df149d9632de8073a98f78a7715cb6af01c616
+GIT binary patch
+literal 256
+zcmZSh4+acDC5#Lpz^KB=vXp_Lf(gun5sYX6C@uh#gVSV)FfJ`n5MW|ZW8h_BVrFD|
+S5Wv8a5s@aS0ymS^j0phl+YJE#
+
+literal 0
+HcmV?d00001
+
+diff --git a/test/gen-displayid2-interface.py b/test/gen-displayid2-interface.py
+new file mode 100644
+index 0000000..012495a
+--- /dev/null
++++ b/test/gen-displayid2-interface.py
+@@ -0,0 +1,24 @@
++#!/usr/bin/env python3
++"""Generate a synthetic interface-feature EDID without hardware source data."""
++import pathlib
++import sys
++
++edid = bytearray(256)
++edid[:8] = bytes.fromhex("00ffffffffffff00")
++edid[8:10] = bytes.fromhex("5274")
++edid[10] = 1
++edid[16:25] = bytes([1, 36, 1, 4, 0xa5, 0, 0, 120, 2])
++edid[38:54] = bytes([1, 1]) * 8
++for i in range(4):
++    edid[54 + 18 * i + 3] = 0x10
++edid[126] = 1
++edid[127] = -sum(edid[:127]) % 256
++section = bytearray([
++    0x20, 16, 2, 0,
++    0x26, 0, 13, 4, 2, 3, 1, 2, 0xe0, 0x50, 0, 4, 0x68, 0x58, 0x66, 0x11, 0,
++])
++section[-1] = -sum(section[:-1]) % 256
++edid[128] = 0x70
++edid[129:129 + len(section)] = section
++edid[255] = -sum(edid[128:255]) % 256
++pathlib.Path(sys.argv[1]).write_bytes(edid)
+diff --git a/test/meson.build b/test/meson.build
+index 0cc2d4c..b65c263 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -10,6 +10,8 @@ di_edid_print = executable(
+ print_harness = find_program('./edid-print-check.sh', native: true)
+ 
+ test_cases = [
++	'asus-ux3405',
++	'synthetic-displayid2-interface',
+ 	'acer-p1276',
+ 	'amazon-fire-tv-48',
+ 	'apple-xdr-dp',

@@ -1,0 +1,218 @@
+From 28b17f8c276fd8eab7ccbed7c331c9fbb1a4eb17 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Thu, 8 Oct 2026 02:21:33 -0400
+Subject: [PATCH 3/4] displayid2: reject unsupported nested CTA headers
+
+An encapsulation block with unsupported revision or header flags cannot
+establish the absence of authoritative CTA metadata. The parser previously
+ignored that byte, including empty/audio-only parents, leaving no diagnostic
+for an explicit native capability consumer to reject.
+
+Diagnose and skip unsupported parent formats before interpreting children.
+Preserve valid empty/audio-only parents and complete earlier children of
+supported blocks. The EDID-only public consumer regression covers both
+block/extension orders, parent absence/counts, short headers and malformed
+tails, and verifies that parsed capabilities do not broaden legacy getters.
+
+Validation: GCC analysis and Clang address/undefined sanitizer suites pass
+all 74 tests on this parser-only source revision.
+---
+ displayid2.c               |   4 +
+ test/meson.build           |   4 +
+ test/native-api-consumer.c | 157 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 165 insertions(+)
+ create mode 100644 test/native-api-consumer.c
+
+diff --git a/displayid2.c b/displayid2.c
+index b3872ff..110c364 100644
+--- a/displayid2.c
++++ b/displayid2.c
+@@ -151,6 +151,10 @@ parse_data_block(struct di_displayid2 *displayid2, const uint8_t *data,
+ 
+ 	switch (tag) {
+ 	case DI_DISPLAYID2_DATA_BLOCK_CTA861:
++		if (data[1] != 0) {
++			add_failure(displayid2, "CTA-861 block: unsupported revision or reserved header flags");
++			goto skip;
++		}
+ 		if (!parse_cta861_block(displayid2, data_block, data, data_block_size)) {
+ 			goto error;
+ 		}
+diff --git a/test/meson.build b/test/meson.build
+index 31853a2..6a05256 100644
+--- a/test/meson.build
++++ b/test/meson.build
+@@ -141,3 +141,7 @@ test('displayid2-bounds', section_bounds)
+ 
+ interface_features = executable('displayid2-interface', 'displayid2-interface.c', dependencies: di_dep)
+ test('displayid2-interface', interface_features)
++
++native_api_consumer = executable('native-api-consumer', 'native-api-consumer.c',
++	dependencies: di_dep)
++test('native-api-consumer', native_api_consumer, args: files('data/qemu.edid'))
+diff --git a/test/native-api-consumer.c b/test/native-api-consumer.c
+new file mode 100644
+index 0000000..44d2a3c
+--- /dev/null
++++ b/test/native-api-consumer.c
+@@ -0,0 +1,157 @@
++#include <assert.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <libdisplay-info/info.h>
++#include <libdisplay-info/edid.h>
++#include <libdisplay-info/displayid2.h>
++
++static uint8_t base[128];
++static const uint8_t native[] = {0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x40, 0, 0};
++static const uint8_t empty[] = {0x81, 0, 0};
++static const uint8_t audio[] = {0x81, 0, 4, 0x23, 9, 7, 7};
++static const uint8_t tail[] = {0x81, 0, 2, 0x43, 16};
++
++static void
++checksum(uint8_t *data, size_t size)
++{
++	uint8_t sum = 0;
++	size_t i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = (uint8_t) (0 - sum);
++}
++
++static void
++extension(uint8_t *data, const uint8_t *blocks, size_t size)
++{
++	assert(size <= 121); /* Keep both section and EDID checksums separate. */
++	data[0] = 0x70;
++	data[1] = 0x20;
++	data[2] = (uint8_t) size;
++	data[3] = 2;
++	memcpy(data + 5, blocks, size);
++	checksum(data + 1, size + 5);
++	checksum(data, 128);
++}
++
++static void
++check(const uint8_t *other, size_t size, bool diagnosed, bool separate, bool reverse)
++{
++	uint8_t edid[384] = {0}, blocks[64];
++	struct di_info *info;
++	const struct di_edid_ext *const *exts;
++	const struct di_displayid2 *displayid2;
++	const struct di_displayid2_data_block *const *db;
++	const struct di_displayid2_interface_features *f;
++	const struct di_cta_data_block *const *children;
++	const struct di_hdr_static_metadata *h;
++	const struct di_supported_signal_colorimetry *c;
++	bool found = false;
++	size_t i, j, k, containers = 0, child_count = 0;
++	size_t edid_size = separate ? 384 : 256;
++
++	assert(size <= sizeof(blocks) - sizeof(native));
++	memcpy(edid, base, 128);
++	edid[126] = separate ? 2 : 1;
++	checksum(edid, 128);
++	if (separate) {
++		extension(edid + (reverse ? 256 : 128), native, sizeof(native));
++		extension(edid + (reverse ? 128 : 256), other, size);
++	} else {
++		if (reverse) {
++			memcpy(blocks, other, size);
++			memcpy(blocks + size, native, sizeof(native));
++		} else {
++			memcpy(blocks, native, sizeof(native));
++			memcpy(blocks + sizeof(native), other, size);
++		}
++		extension(edid + 128, blocks, sizeof(native) + size);
++	}
++	info = di_info_parse_edid(edid, edid_size);
++	assert(info);
++	assert((di_info_get_failure_msg(info) != NULL) == diagnosed);
++	h = di_info_get_hdr_static_metadata(info);
++	c = di_info_get_supported_signal_colorimetry(info);
++	assert(h->traditional_sdr && !h->traditional_hdr &&
++	       !h->pq && !h->hlg && !h->type1);
++	assert(h->desired_content_max_luminance == 0 && h->desired_content_min_luminance == 0);
++	assert(h->desired_content_max_frame_avg_luminance == 0);
++	assert(!c->bt2020_rgb && !c->bt2020_ycc && !c->bt2020_cycc &&
++	       !c->ictcp && !c->st2113_rgb);
++	exts = di_edid_get_extensions(di_info_get_edid(info));
++	for (i = 0; exts[i]; i++) {
++		displayid2 = di_edid_ext_get_displayid2(exts[i]);
++		assert(displayid2);
++		db = di_displayid2_get_data_blocks(displayid2);
++		for (j = 0; db[j]; j++) {
++			f = di_displayid2_data_block_get_interface_features(db[j]);
++			if (!f) {
++				assert(di_displayid2_data_block_get_tag(db[j]) == DI_DISPLAYID2_DATA_BLOCK_CTA861);
++				children = di_displayid2_data_block_get_cta_data_blocks(db[j]);
++				assert(children);
++				containers++;
++				for (k = 0; children[k]; k++)
++					child_count++;
++				continue;
++			}
++			assert(di_displayid2_data_block_get_tag(db[j]) ==
++			       DI_DISPLAYID2_DATA_BLOCK_DISPLAY_INTERFACE_FEATURES);
++			assert(!di_displayid2_data_block_get_cta_data_blocks(db[j]));
++			assert(f->rgb_bit_depths == DI_DISPLAYID2_BIT_DEPTH_444_10);
++			assert(f->standard_combinations == DI_DISPLAYID2_COMBINATION_BT2020_ST2084);
++			assert(f->additional_combinations_len == 0);
++			assert(!f->ycbcr444_bit_depths && !f->ycbcr422_bit_depths && !f->ycbcr420_bit_depths);
++			assert(!f->audio_capabilities && f->ycbcr420_min_pixel_rate == 0);
++			found = true;
++		}
++	}
++	/* Unsupported parents must disappear, not merely carry a diagnostic. */
++	if (size >= 3 && other[1] == 0 && size == (size_t) other[2] + 3) {
++		assert(containers == 1);
++		assert(child_count == (size == sizeof(audio) ? 1u : 0u));
++	} else {
++		assert(containers == 0 && child_count == 0);
++	}
++	/* A truncated same-section prefix can hide later native data. */
++	if (!(diagnosed && !separate && reverse && size < 3))
++		assert(found);
++	di_info_destroy(info);
++}
++
++int
++main(int argc, char **argv)
++{
++	uint8_t data[7];
++	FILE *f;
++	size_t separate, reverse, payload, bad;
++
++	assert(argc == 2);
++	f = fopen(argv[1], "rb");
++	assert(f && fread(base, 128, 1, f) == 1);
++	fclose(f);
++	for (separate = 0; separate < 2; separate++) {
++		for (reverse = 0; reverse < 2; reverse++) {
++			check(empty, sizeof(empty), false, separate != 0, reverse != 0);
++			check(audio, sizeof(audio), false, separate != 0, reverse != 0);
++			check(tail, sizeof(tail), true, separate != 0, reverse != 0);
++			for (payload = 0; payload < 2; payload++) {
++				memcpy(data, payload ? audio : empty,
++				       payload ? sizeof(audio) : sizeof(empty));
++				for (bad = 0; bad < 2; bad++) {
++					data[1] = bad ? 8 : 1;
++					check(data, payload ? sizeof(audio) : sizeof(empty),
++					      true, separate != 0, reverse != 0);
++				}
++			}
++			data[0] = 0x81;
++			data[1] = 0;
++			check(data, 1, true, separate != 0, reverse != 0);
++			check(data, 2, true, separate != 0, reverse != 0);
++		}
++	}
++	puts("additive parsed API, legacy defaults and diagnosed nested parent matrix: PASS");
++	return 0;
++}
+-- 
+2.54.0 (Apple Git-157)
+

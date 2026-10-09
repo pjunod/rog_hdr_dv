@@ -1,0 +1,25 @@
+{
+  "date": "2026-10-08",
+  "result": "PARTIAL",
+  "method": "Apply frozen production patches and test source addition to captured Ubuntu baseline subset; compare affected files with frozen candidate archive",
+  "matched_files": [
+    {
+      "path": "include/drm/drm_connector.h",
+      "sha256": "3f0873d7d9dde155f82cb0761ef8fd1349fe7f6852fa060d95914c4eb02f220f"
+    },
+    {
+      "path": "drivers/gpu/drm/drm_edid.c",
+      "sha256": "5d262130aae6f1a75bddabc6727f8c5ff76a1e21ced816770a4c105851c20800"
+    },
+    {
+      "path": "drivers/gpu/drm/i915/display/intel_dp_aux_backlight.c",
+      "sha256": "dd9771b144b0d42ea84c4d4fcdafb3b39e704f4bbf0f5af03a19767d11830541"
+    },
+    {
+      "path": "drivers/gpu/drm/tests/drm_displayid_luminance_test.c",
+      "sha256": "c339bc8eca5e08688bd95024c9c7337e4c4932cc3e69e5215b970f54f2386dd2"
+    }
+  ],
+  "omitted": "drivers/gpu/drm/tests/Makefile is absent from captured baseline; its patch hunk was not revalidated. Full fourth-patch application failed for that reason.",
+  "limits": "Original four patch exports copied byte-for-byte. No new full-kernel reconstruction, compilation or runtime qualification."
+}

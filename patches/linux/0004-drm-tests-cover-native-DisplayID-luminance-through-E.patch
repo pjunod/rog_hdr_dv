@@ -1,0 +1,326 @@
+From cd001a94d0689c828653aa2544d19283addb3caa Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Thu, 8 Oct 2026 01:17:39 -0400
+Subject: [PATCH 4/4] drm/tests: cover native DisplayID luminance through EDID
+ updates
+
+Use real DRM connector updates instead of a second decoder
+implementation.
+Cover full-frame versus peak luminance, valid tiny/zero/subnormal
+minimum,
+rounding boundaries, nonfinite/signed/unavailable values, pre/post-round
+ordering, every header byte and range-information mode, payload lengths,
+duplicate selection, reset and CTA-derived range authority.
+
+Assert native-only parsing leaves the entire HDR sink metadata object
+zero.
+Assert mapped and unmapped CTA declarations retain their exact Type 1,
+EOTF and encoded luminance fields in both extension orders. A CTA
+declaration
+without a mapped range may use validated native limits.
+
+The original parser fails the production native-range reproducer; the
+reviewed candidate passes all four test groups in isolated x86_64 QEMU.
+LLM assistance covered fixture construction, assertions and changelog.
+No physical panel test or human DCO attestation is claimed.
+
+Assisted-by: LLM
+---
+ drivers/gpu/drm/tests/Makefile                |   1 +
+ .../drm/tests/drm_displayid_luminance_test.c  | 275 ++++++++++++++++++
+ 2 files changed, 276 insertions(+)
+ create mode 100644 drivers/gpu/drm/tests/drm_displayid_luminance_test.c
+
+diff --git a/drivers/gpu/drm/tests/Makefile b/drivers/gpu/drm/tests/Makefile
+index e7193b4..ac92374 100644
+--- a/drivers/gpu/drm/tests/Makefile
++++ b/drivers/gpu/drm/tests/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_DRM_KUNIT_TEST) += \
+ 	drm_cmdline_parser_test.o \
+ 	drm_connector_test.o \
+ 	drm_damage_helper_test.o \
++	drm_displayid_luminance_test.o \
+ 	drm_dp_mst_helper_test.o \
+ 	drm_exec_test.o \
+ 	drm_format_helper_test.o \
+diff --git a/drivers/gpu/drm/tests/drm_displayid_luminance_test.c b/drivers/gpu/drm/tests/drm_displayid_luminance_test.c
+new file mode 100644
+index 0000000..194ec77
+--- /dev/null
++++ b/drivers/gpu/drm/tests/drm_displayid_luminance_test.c
+@@ -0,0 +1,275 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/unaligned.h>
++
++#include <drm/drm_atomic_state_helper.h>
++#include <drm/drm_connector.h>
++#include <drm/drm_drv.h>
++#include <drm/drm_edid.h>
++#include <drm/drm_kunit_helpers.h>
++
++#include <kunit/test.h>
++
++#include "drm_kunit_edid.h"
++
++struct luminance_priv {
++	struct drm_device drm;
++	struct drm_connector connector;
++};
++
++static const struct drm_connector_funcs luminance_funcs = {
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
++};
++
++static int luminance_init(struct kunit *test)
++{
++	struct luminance_priv *priv;
++	struct device *dev;
++	int ret;
++
++	dev = drm_kunit_helper_alloc_device(test);
++	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, dev);
++	priv = drm_kunit_helper_alloc_drm_device(test, dev,
++						struct luminance_priv, drm,
++						DRIVER_MODESET | DRIVER_ATOMIC);
++	KUNIT_ASSERT_NOT_ERR_OR_NULL(test, priv);
++	ret = drmm_connector_init(&priv->drm, &priv->connector,
++				  &luminance_funcs, DRM_MODE_CONNECTOR_eDP, NULL);
++	KUNIT_ASSERT_EQ(test, ret, 0);
++	test->priv = priv;
++	return 0;
++}
++
++static void checksum(u8 *data, unsigned int size)
++{
++	u8 sum = 0;
++	unsigned int i;
++
++	data[size - 1] = 0;
++	for (i = 0; i < size - 1; i++)
++		sum += data[i];
++	data[size - 1] = -sum;
++}
++
++static void native_block(u8 *block, u8 rev, u8 len, u8 mode,
++			 u16 max, u16 min)
++{
++	memset(block, 0, 32);
++	block[0] = 0x21;
++	block[1] = rev;
++	block[2] = len;
++	block[11] = mode << 3;
++	put_unaligned_le16(max, block + 24);
++	put_unaligned_le16(0x60d0, block + 26); /* 616 nits peak */
++	put_unaligned_le16(min, block + 28);
++	block[30] = 0x20; /* OLED */
++}
++
++static void native_edid(u8 *data, unsigned int blocks)
++{
++	u8 *ext = data + 128;
++
++	memcpy(data, test_edid_dvi_1080p, 128);
++	data[126] = 1;
++	checksum(data, 128);
++	memset(ext, 0, 128);
++	ext[0] = 0x70;
++	ext[1] = 0x20;
++	ext[2] = blocks * 32;
++	ext[3] = 2;
++}
++
++static void finish_native(u8 *data)
++{
++	u8 *ext = data + 128;
++
++	checksum(ext + 1, ext[2] + 5);
++	checksum(ext, 128);
++}
++
++static void update_edid(struct kunit *test, const u8 *data, size_t len)
++{
++	struct luminance_priv *priv = test->priv;
++	const struct drm_edid *edid;
++	int ret;
++	u8 zero[sizeof(priv->connector.display_info.hdr_sink_metadata)] = {};
++
++	edid = drm_edid_alloc(data, len);
++	KUNIT_ASSERT_NOT_NULL(test, edid);
++	ret = drm_edid_connector_update(&priv->connector, edid);
++	drm_edid_free(edid);
++	KUNIT_ASSERT_EQ(test, ret, 0);
++	if (len <= 256)
++		KUNIT_EXPECT_MEMEQ(test,
++			&priv->connector.display_info.hdr_sink_metadata,
++			zero, sizeof(zero));
++}
++
++static void expect_range(struct kunit *test, u32 max, u32 min)
++{
++	struct luminance_priv *priv = test->priv;
++	struct drm_display_info *info = &priv->connector.display_info;
++
++	KUNIT_EXPECT_EQ(test, info->luminance_range.max_luminance, max);
++	KUNIT_EXPECT_EQ(test, info->luminance_range.min_luminance, min);
++}
++
++static void luminance_values(struct kunit *test)
++{
++	static const struct {
++		u16 max, min;
++		u32 expected_max, expected_min;
++	} cases[] = {
++		{ 0x5e40, 0x1019, 400, 0 }, /* Tiny real minimum */
++		{ 0x5e40, 0, 400, 0 },
++		{ 0x5e40, 1, 400, 0 }, /* Smallest subnormal */
++		{ 0x5e40, 0x03ff, 400, 0 },
++		{ 0x5e40, 0x37ff, 400, 0 }, /* Just below half */
++		{ 0x5e40, 0x3800, 400, 1 },
++		{ 0x5e40, 0x3801, 400, 1 },
++		{ 0x3800, 0, 1, 0 },
++		{ 0x37ff, 0, 0, 0 }, /* Maximum rounds to zero */
++		{ 0x7bff, 0, 65504, 0 },
++		{ 0x5e40, 0x8000, 0, 0 }, /* Unavailable minimum */
++		{ 0x5e40, 0xbc00, 0, 0 },
++		{ 0x5e40, 0x7c00, 0, 0 },
++		{ 0x5e40, 0x7e00, 0, 0 },
++		{ 0x8000, 0, 0, 0 },
++		{ 0xbc00, 0, 0, 0 },
++		{ 0x7c00, 0, 0, 0 },
++		{ 0x7e00, 0, 0, 0 },
++		{ 0, 0, 0, 0 },
++		{ 1, 0, 0, 0 },
++		{ 0x5e40, 0x5e40, 0, 0 },
++		{ 0x5e40, 0x60d0, 0, 0 },
++		{ 0x3c01, 0x3c00, 0, 0 }, /* Equal after rounding */
++	};
++	u8 data[256];
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(cases); i++) {
++		native_edid(data, 1);
++		native_block(data + 133, 0, 29, 0, cases[i].max, cases[i].min);
++		finish_native(data);
++		update_edid(test, data, sizeof(data));
++		expect_range(test, cases[i].expected_max, cases[i].expected_min);
++	}
++}
++
++static void luminance_headers(struct kunit *test)
++{
++	u8 data[256];
++	unsigned int rev, mode, len;
++
++	for (rev = 0; rev < 256; rev++) {
++		for (mode = 0; mode < 4; mode++) {
++			native_edid(data, 1);
++			native_block(data + 133, rev, 29, mode, 0x5e40, 0);
++			finish_native(data);
++			update_edid(test, data, sizeof(data));
++			expect_range(test, !mode && (rev & ~0x80) <= 1 ? 400 : 0, 0);
++		}
++	}
++	for (len = 0; len < 32; len++) {
++		native_edid(data, 1);
++		native_block(data + 133, 0, len, 0, 0x5e40, 0);
++		/* Include the oversized payload in the section as well. */
++		data[130] = len + 3;
++		finish_native(data);
++		update_edid(test, data, sizeof(data));
++		expect_range(test, len == 29 ? 400 : 0, 0);
++	}
++}
++
++static void luminance_duplicates_reset(struct kunit *test)
++{
++	u8 data[256];
++
++	native_edid(data, 2);
++	native_block(data + 133, 0, 29, 0, 0x5e40, 0);
++	native_block(data + 165, 0, 29, 0, 0x60d0, 0x4400);
++	finish_native(data);
++	update_edid(test, data, sizeof(data));
++	expect_range(test, 400, 0);
++	native_block(data + 133, 0, 29, 1, 0x5e40, 0);
++	finish_native(data);
++	update_edid(test, data, sizeof(data));
++	expect_range(test, 616, 4);
++	update_edid(test, test_edid_dvi_1080p, 128);
++	expect_range(test, 0, 0);
++	KUNIT_ASSERT_EQ(test, drm_edid_connector_update(
++		&((struct luminance_priv *)test->priv)->connector, NULL), 0);
++	expect_range(test, 0, 0);
++}
++
++static void expect_cta_both_orders(struct kunit *test, const u8 data[384],
++				   bool mapped)
++{
++	struct luminance_priv *priv = test->priv;
++	const struct hdr_static_metadata *hdr =
++		&priv->connector.display_info.hdr_sink_metadata.hdmi_type1;
++	u8 swapped[384];
++	unsigned int order;
++
++	memcpy(swapped, data, 128);
++	memcpy(swapped + 128, data + 256, 128);
++	memcpy(swapped + 256, data + 128, 128);
++	for (order = 0; order < 2; order++) {
++		update_edid(test, order ? swapped : data, 384);
++		expect_range(test, mapped ? 200 : 400, 0);
++		KUNIT_EXPECT_EQ(test, hdr->metadata_type, 1);
++		KUNIT_EXPECT_EQ(test, hdr->eotf, 4);
++		KUNIT_EXPECT_EQ(test, hdr->max_cll, mapped ? 64 : 0);
++		KUNIT_EXPECT_EQ(test, hdr->max_fall, mapped ? 64 : 0);
++		KUNIT_EXPECT_EQ(test, hdr->min_cll, 0);
++	}
++}
++
++static void luminance_cta_authority(struct kunit *test)
++{
++	u8 data[384];
++	u8 *cta = data + 256;
++
++	native_edid(data, 1);
++	native_block(data + 133, 0, 29, 0, 0x5e40, 0);
++	finish_native(data);
++	data[126] = 2;
++	checksum(data, 128);
++	memset(cta, 0, 128);
++	cta[0] = 2;
++	cta[1] = 3;
++	cta[2] = 11;
++	cta[4] = 0xe6;
++	cta[5] = 6;
++	cta[6] = 4;
++	cta[7] = 1;
++	cta[8] = 64;
++	cta[9] = 64;
++	cta[10] = 0;
++	checksum(cta, 128);
++	expect_cta_both_orders(test, data, true);
++	/* Type 1 declaration with no mapped luminance no longer needs 512. */
++	cta[2] = 8;
++	cta[4] = 0xe3;
++	memset(cta + 8, 0, 119);
++	checksum(cta, 128);
++	expect_cta_both_orders(test, data, false);
++}
++
++static struct kunit_case luminance_cases[] = {
++	KUNIT_CASE(luminance_values),
++	KUNIT_CASE(luminance_headers),
++	KUNIT_CASE(luminance_duplicates_reset),
++	KUNIT_CASE(luminance_cta_authority),
++	{ }
++};
++
++static struct kunit_suite luminance_suite = {
++	.name = "drm_displayid_luminance",
++	.init = luminance_init,
++	.test_cases = luminance_cases,
++};
++
++kunit_test_suite(luminance_suite);
++MODULE_LICENSE("GPL");
