@@ -20,6 +20,8 @@ Start with [status](docs/STATUS.md) for what is proven, then
 investigation and staged plan. [Provenance](docs/PROVENANCE.md) records where
 the imported work came from and how to interpret its evidence.
 [Licensing and attribution](LICENSES.md) explains the retained upstream terms.
+[The status page](docs/STATUS.html) shows the active workboard;
+[review findings](docs/REVIEW.md) records review dispositions and validation.
 
 ## Work with the repository
 

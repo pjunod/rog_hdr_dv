@@ -6,35 +6,123 @@
       "component": "ubuntu-libdisplay-info",
       "base_commit": "fc100604841ba8f8a9f88ea4ebfb6a522a9a73fb",
       "candidate_commit": "e1e1ddf4270db27acf984ab1f005daf64e9f0038",
-      "source": "ubuntu/native-api",
       "patch_count": 14,
-      "candidate_tree": "33c4658ced7128e82cd707593784ef7f8748309f"
+      "candidate_tree": "33c4658ced7128e82cd707593784ef7f8748309f",
+      "patch_order": [
+        "0001-displayid2-privately-backport-native-HDR-detection-f.patch",
+        "0002-test-cover-private-DisplayID-parsing-precedence-and-.patch",
+        "0003-test-add-attributed-downstream-fixtures-and-package-.patch",
+        "0004-displayid2-mark-recognized-incomplete-nested-CTA-hea.patch",
+        "0005-test-record-exact-pinned-reference-downstream-expect.patch",
+        "0006-debian-prepare-unsigned-ABI-preserving-local-detecti.patch",
+        "0007-test-preserve-linker-allocation-wrapping-under-optim.patch",
+        "0008-packaging-qualify-revised-allocation-harness-as-hdr2.patch",
+        "0009-packaging-distinguish-local-proposed-series-provenan.patch",
+        "0010-displayid2-expose-opt-in-parsed-capabilities-on-the-.patch",
+        "0011-packaging-prepare-opt-in-DisplayID-API-as-hdr4.patch",
+        "0012-edid-expose-structured-extension-parsing-failures.patch",
+        "0013-packaging-prepare-structured-extension-status-as-hdr.patch",
+        "0014-debian-use-precise-intermediate-symbol-introduction-.patch"
+      ],
+      "base_tree": "5708d8b3c49f6fbb9adaf777487ffe353dd0946f",
+      "historical_workspace_subdirectory": "ubuntu/native-api",
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "libdisplay-info",
+        "version": "0.3.0-1",
+        "suite": "stonking",
+        "package_page": "https://launchpad.net/ubuntu/+source/libdisplay-info/0.3.0-1",
+        "extraction": "dpkg-source -x; retain normally applied quilt patches; exclude generated .pc/ from Git import",
+        "authentication": "Original retrieval used authenticated Ubuntu APT archive metadata. Inline source-maintainer signature is not independently attested here; pinned SHA256 values bind the imported bytes.",
+        "artifacts": [
+          {
+            "file": "libdisplay-info_0.3.0-1.dsc",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/libd/libdisplay-info/libdisplay-info_0.3.0-1.dsc",
+            "sha256": "df30fdb92d6fdb186872a8d236f3f3ccb64b4fbcd154a00f1b5334ebd41478a5"
+          },
+          {
+            "file": "libdisplay-info_0.3.0.orig.tar.bz2",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/libd/libdisplay-info/libdisplay-info_0.3.0.orig.tar.bz2",
+            "sha256": "915cc6713b7b2e173a90f9db248fb8994f9668171fecc1e9fded5e36bb34d890"
+          },
+          {
+            "file": "libdisplay-info_0.3.0-1.debian.tar.xz",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/libd/libdisplay-info/libdisplay-info_0.3.0-1.debian.tar.xz",
+            "sha256": "0978f1bf3576042eb79a0d4b4db0286a4997b56de2d6f7a9eb50dbf4b73cd3fd"
+          }
+        ]
+      }
     },
     {
       "component": "ubuntu-mutter",
       "base_commit": "f8b113189f8c67beabf7475adf26f6ebcbf36684",
       "candidate_commit": "f8b71478843220c0de2d68b73add82231c6f3909",
-      "source": "mutter/work",
       "patch_count": 5,
-      "candidate_tree": "61bf80d9dea0995f98120f783155eb79029d6be1"
+      "candidate_tree": "61bf80d9dea0995f98120f783155eb79029d6be1",
+      "patch_order": [
+        "0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch",
+        "0002-backends-native-scope-native-capability-veto-to-exte.patch",
+        "0003-style-align-native-HDR-helper-regressions.patch",
+        "0004-packaging-prepare-private-native-DisplayID-HDR-candi.patch",
+        "0005-debian-refine-private-symbol-introduction-minima.patch"
+      ],
+      "base_tree": "30242cc54cebe1ec524a6d79473b41be5f07d05b",
+      "historical_workspace_subdirectory": "mutter/work",
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "mutter",
+        "version": "51.0-1ubuntu3",
+        "suite": "stonking",
+        "package_page": "https://launchpad.net/ubuntu/+source/mutter/51.0-1ubuntu3",
+        "extraction": "dpkg-source -x; retain normally applied quilt patches; exclude generated .pc/ from Git import",
+        "authentication": "Original retrieval used authenticated Ubuntu APT archive metadata. Inline source-maintainer signature is not independently attested here; pinned SHA256 values bind the imported bytes.",
+        "artifacts": [
+          {
+            "file": "mutter_51.0-1ubuntu3.dsc",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/mutter_51.0-1ubuntu3.dsc",
+            "sha256": "dc396c0c4451f07ae00dfbbc14bb485582307a29e3d21cf5b98c7f6a0865e0af"
+          },
+          {
+            "file": "mutter_51.0.orig.tar.xz",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/mutter_51.0.orig.tar.xz",
+            "sha256": "5d28f3ae225692428fcafb96500d673f34328b698b86960c9c1460d0b1d983b3"
+          },
+          {
+            "file": "mutter_51.0-1ubuntu3.debian.tar.xz",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/mutter_51.0-1ubuntu3.debian.tar.xz",
+            "sha256": "3ed4fd1f6cca56a9a6e62292382ae677500bb8b4f3807c9c5ebd71c34e0b1727"
+          }
+        ]
+      }
     },
     {
       "component": "libdisplay-info",
       "base_commit": "62a9346c3dce2bddba1d4dc186949e4320d6f801",
       "candidate_commit": "ce64f8f904243d6efed1365a7201f786757fa0b0",
       "upstream": "https://gitlab.freedesktop.org/emersion/libdisplay-info.git",
-      "source": "upstream-native-api",
       "patch_count": 4,
-      "candidate_tree": "23dcea1f5fb4a9b28eaccf661b034b4decea18db"
+      "candidate_tree": "23dcea1f5fb4a9b28eaccf661b034b4decea18db",
+      "patch_order": [
+        "0001-displayid2-bound-section-padding-scans-to-remaining-.patch",
+        "0002-displayid2-parse-display-interface-features.patch",
+        "0003-displayid2-reject-unsupported-nested-CTA-headers.patch",
+        "0004-edid-expose-structured-extension-parsing-failures.patch"
+      ],
+      "base_tree": "524c3dfd9e942bbeca34792b7837224fb971c6be",
+      "historical_workspace_subdirectory": "upstream-native-api"
     },
     {
       "component": "mutter",
       "base_commit": "d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7",
       "candidate_commit": "ab7633fd411d159ca588ba52f01e07ecd940d390",
       "upstream": "https://github.com/GNOME/mutter.git",
-      "source": "mutter-native-hdr",
       "patch_count": 1,
-      "candidate_tree": "618dcc5c7cffa142e7845ae81e306c5aa0d4c8fd"
+      "candidate_tree": "618dcc5c7cffa142e7845ae81e306c5aa0d4c8fd",
+      "patch_order": [
+        "0001-backends-native-support-native-DisplayID-RGB-BT.2020.patch"
+      ],
+      "base_tree": "478ac554a425b94599405831477e6bafbe427af2",
+      "historical_workspace_subdirectory": "mutter-native-hdr"
     },
     {
       "component": "linux",
@@ -42,7 +130,19 @@
       "base_tag": "Ubuntu-7.3.0-8.8",
       "candidate_commit": "cd001a94d0689c828653aa2544d19283addb3caa",
       "candidate_identity_scope": "local source-subset preparation repository",
-      "patch_count": 4
+      "patch_count": 4,
+      "patch_order": [
+        "0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch",
+        "0002-drm-i915-display-accept-a-luminance-range-from-any-s.patch",
+        "0003-drm-edid-validate-native-DisplayID-physical-luminanc.patch",
+        "0004-drm-tests-cover-native-DisplayID-luminance-through-E.patch"
+      ],
+      "upstream": "https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/stonking",
+      "source_origin": {
+        "kind": "ubuntu-kernel-git",
+        "documentation": "https://ubuntu.com/kernel/docs/how-to/source-code/obtain-kernel-source-git/",
+        "qualification": "Resolve base_tag and require exact base_commit before applying; repository URL follows official per-series naming. A fresh full-source fetch has not been requalified in this repository."
+      }
     }
   ]
 }

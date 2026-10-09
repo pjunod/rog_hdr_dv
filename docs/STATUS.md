@@ -7,6 +7,11 @@ This is the current ledger. [Provenance](PROVENANCE.md) identifies inherited
 evidence; [development](DEVELOPMENT.md) defines new checks. Importing patches
 into this repository is not a fresh build or hardware qualification.
 
+See [the visual status page](STATUS.html) for the current workboard and
+[the review ledger](REVIEW.md) for findings. The first implementation batch
+adds reproducible read-only diagnostics and an isolated OEM activation probe;
+final review, fast-lane checks and live diagnostic receipts are pending.
+
 | Component | State | Remaining evidence/work |
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware/upstream acceptance |

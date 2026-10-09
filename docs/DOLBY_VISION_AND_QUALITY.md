@@ -64,8 +64,9 @@ trim fidelity, or Profile 7 FEL support. Preserve that distinction.
 
 ### 2.1 The current compositor needs a deeper calibration audit
 
-The inspected morning-work Mutter checkout has base commit
-`ab7633fd411d159ca588ba52f01e07ecd940d390` plus local patches. Its
+The inspected morning-work Mutter checkout is clean at candidate commit
+`ab7633fd411d159ca588ba52f01e07ecd940d390`, based on
+`d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7`. Its
 `src/backends/meta-color-device.c:get_color_metadata_from_monitor()` selects
 sRGB/gamma 2.2, BT.2020/PQ or EDID-native colourimetry by monitor mode.
 `update_color_state()` starts with EOTF default luminance and scales reference
