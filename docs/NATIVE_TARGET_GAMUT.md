@@ -149,6 +149,7 @@ target information to consumers; it does not claim those consumers use it.
 
 The Ubuntu hdr8 candidate is `805d07b9116cd1fc7bcc7446617ef13f92857b9c`;
 the upstream candidate is `1462cebeac89a5f5f5b7fa475b7501eb21158b53`. Both
+[compiler receipt](../evidence/native-chromaticities-compile.json) records that
 production libraries and synthetic test binaries compile on native amd64 with
 GCC 15.3.0, Meson 1.10.1 and warnings as errors. No new runtime checks have
 executed yet. The appended patches and updated hashes preserve all earlier

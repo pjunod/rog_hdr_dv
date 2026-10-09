@@ -135,3 +135,93 @@ why it was inactive. Do not classify it as a brightness bug or a physical HDR
 failure. An awake, enabled-output observation is still needed to bind logical
 colour state to the actual scanout and optical measurements. No display was
 woken, reconfigured or restarted for this capture.
+
+## Inspect the compositor's actual colour descriptions
+
+The separate [Wayland colour probe](../probes/wayland_color_info/probe.c)
+reads the encoding and target-volume information available to applications.
+It binds existing outputs without creating a surface, window or buffer. It
+does not change any mode, profile, compositor setting or output property.
+This complements the system inspector above: package versions and a selected
+HDR mode do not establish what colour metadata the compositor publishes.
+
+**Status:** client and synthetic server compiled on native amd64 with warnings
+as errors; final adversarial review and runtime qualification are pending.
+The [compiler receipt](../evidence/wayland-color-info-compile.json) binds all
+seven source files and the protocol digest. No live laptop result is claimed.
+
+### Build and acquire one report
+
+Build on Linux with a C11 compiler, Python 3, pkg-config, wayland-scanner and
+libwayland-client development files. The build uses the vendored, unmodified
+Wayland Protocols 1.48 XML and verifies its pinned digest before generating
+bindings. The upstream MIT notice remains in the XML. Generated files and
+binaries belong in an explicit external build directory.
+
+```bash
+probe_build="$(mktemp -d)"
+sh probes/wayland_color_info/build.sh "$probe_build"
+"$probe_build/wayland-color-info"       # Print one bounded JSON report.
+```
+
+Run the binary as the desktop user in the intended Wayland session. It uses
+that process's Wayland connection environment; it does not discover another
+user's socket. The process suppresses libwayland error/debug text because
+those messages can contain private server strings. Report output uses only
+fixed labels and numerical values. Keep stdout captures private and outside
+Git; shell redirection inherits the caller's permissions and overwrite rules.
+
+The total acquisition deadline is five seconds, including connection and
+protocol discovery. Bounds are one colour manager, 32 output globals, 8,192
+event-accounting calls and 1 MiB of accounted payload. The client negotiates
+colour-management version 1 or 2 and wl_output version 1 or 2. It records
+32-bit or 64-bit image identities as appropriate. A registry/synchronization
+sequence handles either global-announcement order without a blocking
+roundtrip outside the deadline.
+
+Exit `0` means a complete bounded observation. Exit `1` means missing support,
+disconnection, a limit/deadline, unstable topology or incomplete/malformed
+output information. Unexpected command-line arguments exit `2`. Always read
+the top-level and per-output statuses; a partially populated record is not a
+successful snapshot.
+
+### Interpret raw values without inventing missing fields
+
+Every information field has a presence flag and raw integer array. Missing
+fields retain an empty array; they are never replaced with an assumed zero.
+The JSON supplies scales and coordinate ordering.
+
+| Field | Interpretation |
+|---|---|
+| `primaries`, `primaries_named` | Pixel encoding RGB primaries and white; signed xy coordinates use a scale of 1,000,000. |
+| `tf_named`, `tf_power` | Declared transfer characteristic; power exponents use a scale of 10,000. |
+| `luminances` | Encoding minimum, maximum and reference white. Only the minimum is scaled by 10,000. |
+| `target_primaries`, `target_luminance` | Independent target RGBW and luminance, using the corresponding encoding-field scales. |
+| `target_max_cll`, `target_max_fall` | Optional target content-light values in cd/m². |
+| `icc_size` | Profile-event presence and declared size only. The received descriptor is closed immediately without reading the profile. |
+| `description_identity`, `global`, `ordinal` | Session-local correlation values, not persistent hardware identity or a DRM connector mapping. |
+
+Completion checks required fields and known contradictory named/power pairs.
+It does not prove general mathematical colour validity, profile validity,
+application usage, rendering accuracy, active scanout or optical output.
+Unknown enum values remain visible for interpretation. A target changing
+during acquisition marks the observation unstable instead of silently joining
+two states. Removed outputs remain explicitly marked.
+
+### Synthetic protocol qualification
+
+The [socket fixture](../probes/wayland_color_info/fixture.c) uses
+libwayland-server in a private temporary runtime directory; it never connects
+to the real desktop. Compile it with the additional server development files.
+After final adversarial review, run the selected tests once:
+
+```bash
+sh probes/wayland_color_info/build-fixture.sh "$probe_build"
+WAYLAND_COLOR_INFO_BUILD="$probe_build" python3 -m unittest discover \
+  -s probes/wayland_color_info -p test_protocol.py -v
+```
+
+Cases cover protocol versions and discovery order, encoding/target separation,
+missing or contradictory events, removal, changed descriptions, deadline,
+ICC descriptor closure and privacy with debug logging requested. Failed or
+invalidated cases are retried individually under the project workflow.

@@ -23,7 +23,7 @@ the imported work came from and how to interpret its evidence.
 [The status page](docs/STATUS.html) shows the active workboard;
 [review findings](docs/REVIEW.md) records review dispositions and validation.
 [Display diagnostics](docs/DISPLAY_DIAGNOSTICS.md) explains the read-only
-Linux inspector and how to interpret its privacy-filtered report.
+Linux inspector and bounded Wayland colour probe, including their privacy-filtered reports.
 [The Dolby activation probe](docs/DOLBY_ACTIVATION_PROBE.md) documents the
 isolated Windows API experiment, compiler receipt and remaining contracts.
 [Wine API contract](docs/WINE_API_CONTRACT.md) isolates the missing file API

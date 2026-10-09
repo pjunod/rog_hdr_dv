@@ -32,8 +32,10 @@ retained privately; the live installation is unchanged.
 
 The new hdr8/upstream native-chromaticity implementations compile with warnings
 as errors. Their append-only patch series preserve the delivered prefixes.
-Mutter consumption and a bounded read-only Wayland colour inspector are in
-progress.
+Mutter consumption is in progress. The bounded read-only Wayland colour
+inspector and its synthetic server compile with warnings as errors;
+[the diagnostic guide](DISPLAY_DIAGNOSTICS.md#inspect-the-compositors-actual-colour-descriptions)
+explains raw fields, completion limits and privacy.
 New gamut and monitor implementations still require their own final review and
 affected runtime qualification; package compilation does not replace those.
 

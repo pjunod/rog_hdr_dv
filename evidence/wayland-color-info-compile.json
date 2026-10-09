@@ -1,0 +1,45 @@
+{
+  "source_commit": "a97b6877da9841c50d71a44ad39fab4c0d427db0",
+  "source_tree": "e831f8516b712fbc30fa2c25eef15f1e99bb173f",
+  "source_archive_sha256": "838d48378166caaea8beab811317630604a42e95147992b27c19df214fa1d52d",
+  "protocol_sha256": "b05c15a021d467cff446ab88d8a41d3a908a66cdb5ae104611a410007a01979b",
+  "compiler": "cc (Ubuntu15.3.0-4ubuntu1)15.3.0",
+  "SDK": [
+    "libwayland-bin 1.26.0-1",
+    "libwayland-client0:amd64 1.26.0-1",
+    "libwayland-dev:amd64 1.26.0-1",
+    "libwayland-server0:amd64 1.26.0-1"
+  ],
+  "scanner": "1.26.0",
+  "client_server_pkg_config": "1.26.0",
+  "build_exit": 0,
+  "build_flags": "-std=c11 -O2 -Wall -Wextra -Werror",
+  "timeout_seconds": 120,
+  "nice": 19,
+  "jobs": 1,
+  "generated_bindings": "Pinned1.48 XML, generated client/server/private-code only in external private build directory",
+  "binary_sha256": {
+    "wayland-color-info": "846ca2a6a6c76bea92504e7b696aab0eb6e0e4ff6e98044300cff6555c4c5d52",
+    "color-info-fixture": "618c6437cac5fbbda23fcc2f524665e515646b81cc78f627a5fa111088f17bc3"
+  },
+  "tests_executed": false,
+  "desktop_execution": false,
+  "source_files": {
+    "probes/wayland_color_info/test_protocol.py": "2ad9bba7cbef702125bc8e6b42d8d4a3aaed7664125d728f228afef1419d9bb0",
+    "probes/wayland_color_info/source_manifest.json": "906cb763fa929e113fe8025c0825150e0f53a077b776e67aaf79c0085ec6b50b",
+    "probes/wayland_color_info/build.sh": "a99763a1ac56d2f6f667635c237f8500c28ca47235753fb796f2b7590e124bba",
+    "probes/wayland_color_info/color-management-v1.xml": "b05c15a021d467cff446ab88d8a41d3a908a66cdb5ae104611a410007a01979b",
+    "probes/wayland_color_info/fixture.c": "fe6e61b1b0f4f4aa296068fed6d0a92a57297abe537917a9e4f72a2452e7a639",
+    "probes/wayland_color_info/build-fixture.sh": "416478d65b7b7419f42f8be9124ee4067f6b92ac30bbd2ceeb6759473557a313",
+    "probes/wayland_color_info/probe.c": "d74fb32da8769be1397dfe314b68124328c757a652ddfd79fd4db14f6260bdf2"
+  },
+  "libwayland_fd_ownership_source": {
+    "url": "https://gitlab.freedesktop.org/wayland/wayland/-/raw/1.26.0/src/wayland-client.c",
+    "sha256": "c3536111c4fae59f9379a5927d79b80ef9bc4d0fe42054d54ce49027747d4c60",
+    "finding": "connect_to_fd consumes and closes fd on failure; caller must not close again"
+  },
+  "prepared_test_selection": "WAYLAND_COLOR_INFO_BUILD=EXTERNAL_BUILD_DIRECTORY python3 probes/wayland_color_info/test_protocol.py",
+  "report_limits": "Required fields and known transfer-pair consistency only; no full colour validation or optical acceptance",
+  "repository_integration_commit": "c2ba7e2",
+  "integration_equality": "All seven integrated probe files match the compiled source-file SHA256 values."
+}
