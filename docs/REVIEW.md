@@ -110,9 +110,9 @@ Mutter candidate before runtime tests:
 
 | Finding | Required correction | State |
 |---|---|---|
-| Primary/topology changes can leave an unmapped surface's preferred target stale | Refresh records and preferred feedback after the Wayland output table changes; cover primary switch and removal | In progress |
-| Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | In progress |
-| A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | In progress |
+| Primary/topology changes can leave an unmapped surface's preferred target stale | Refresh records and preferred feedback after the Wayland output table changes; cover primary switch and removal | Addressed; delta review pending |
+| Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | Addressed; delta review pending |
+| A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | Addressed; delta review pending |
 
 No additional actionable issues were found in the Wine wrapper/export,
 synthetic corpus encoding, immutable description ownership, v2 identity

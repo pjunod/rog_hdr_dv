@@ -63,6 +63,9 @@ Replace the cached output record before notifying clients. Recompute preferred
 records for surfaces, including surfaces using the primary-monitor fallback,
 and suppress unchanged results. Keep record references and identity allocation
 safe through output removal, surface destruction and manager teardown.
+The canonical output-table update refreshes all active records before surface
+preferences, including primary-only changes and removal. Reject physical ranges
+that collapse when the published maximum is quantized to whole cd/m².
 Client-created image descriptions still describe their submitted pixels; this
 output-feedback correction must not change surface-input interpretation.
 
