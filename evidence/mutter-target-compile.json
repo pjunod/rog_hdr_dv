@@ -10,30 +10,33 @@
   "distribution": "Ubuntu 26.10 stonking",
   "mutter": {
     "base_commit": "f8b71478843220c0de2d68b73add82231c6f3909",
-    "commit": "dea8fd02b7540cee5c499fbd44cf312ba7e2456e",
-    "tree": "6569f7243c189d4220b30a72db2977ebe979f59f",
-    "archive_sha256": "0e69451caa427bd027a31bc15c9939c4634a9e444467e333102ad1c816733077",
+    "commit": "a04bc3ecde3f425cd90d4017c57ad2840475682f",
+    "tree": "cbb5b082e8de7740f110b44033a453af7f94cfe6",
+    "archive_sha256": "4bf24530e57b4362008886a069e334ea918f9deb3b483b8924af760a47b0f791",
     "branch": "codex/output-target-volume",
     "commits": [
       "384ac30",
       "122d37d",
-      "dea8fd0"
+      "dea8fd0",
+      "9c10145",
+      "a04bc3e"
     ],
     "configure": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled LD_LIBRARY_PATH=/work/build/libdisplay-physical meson setup /work/build/mutter-target /work/source/mutter-baseline -Dremote_desktop=true -Dwerror=true",
     "compile": "ninja -j2 -C /work/build/mutter-target src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
     "compile_exit": 0,
-    "compile_started_utc": "2026-10-09T04:56:07Z",
-    "compile_finished_utc": "2026-10-09T04:56:07Z",
+    "compile_started_utc": "2026-10-09T05:07:46Z",
+    "compile_finished_utc": "2026-10-09T05:07:46Z",
     "integrity": {
       "files_verified": 2302,
       "exact_final_archive": true,
       "binaries": {
-        "src/libmutter-51.so.0.0.0": "e69a2aff6d772e689ac064eeef54295171eea9ef21731fe0054c48a6c512c354",
-        "src/tests/mutter-native-hdr": "9cb1d1148723bf88a38d7628ae9ee7f0920b4d95c51c6557a3a5dc15c27799d1",
-        "src/tests/mutter-wayland-color-management": "c188ee6c23af2776033a7c3958f36e4cdbec8f3f6d00df238095a838459cfbe0",
-        "src/tests/wayland-test-clients/color-management": "6466e720f0f3bdbe1ffdd2118e820a08cd1cef71e48d9993e7770edfa2bf97cd"
+        "src/libmutter-51.so.0.0.0": "fcf7cfc2ec2897ff48270a8f3f040b7c12199bbb850fd0993c408d73a9b49de5",
+        "src/tests/mutter-native-hdr": "44e441e63ed6de6034628b0c98d996184ab1f9e98834b674269612c4b93a04d4",
+        "src/tests/mutter-wayland-color-management": "147cca6065e107b00e17a70f82d298ec0c808ec0eb84444edcad6d3a78a0ccc2",
+        "src/tests/wayland-test-clients/color-management": "86a468670b76b6e4980b339fcaed86070bb16dc254155c7809699e491e1e9972"
       }
-    }
+    },
+    "archive_path": "/private/tmp/mutter-target-fixture-final.tar"
   },
   "library": {
     "commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
@@ -87,7 +90,7 @@
     "tool": "Uncrustify-0.78.1_f",
     "check": "python3 check-style.py --dry-run --sha HEAD^",
     "exit": 0,
-    "source": "independent source-only disposable git checkout, base f8b7147 overlay 122d37d, formatter output applied as dea8fd0",
+    "source": "independent source-only disposable git checkout; fixture correction official formatter unchanged and dry-run exit0",
     "token_sequences_unchanged": true
   },
   "new_exports": {
@@ -109,6 +112,8 @@
     "/wayland/target-luminance/v1",
     "/wayland/target-luminance/v2"
   ],
+  "correction": "After output table refresh/removal inerting, refresh all immutable output records before preferences; primary-only fallback switch/removal regression; fallback assertions reference exact encoding max; wire-width equality boundary rejects min>=floor(max).",
+  "fixture_correction": "Global force-HDR phases explicitly expect second-output changes/done; native-only phases retain quiet checks. Fresh other-output current snapshot immediately before primary topology; original snapshot retained and repeatedly checked immutable.",
   "date": "2026-10-09",
   "schema_version": 1
 }

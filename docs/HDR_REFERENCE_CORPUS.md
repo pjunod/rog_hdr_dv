@@ -78,6 +78,7 @@ only after final adversarial review:
 python3 -B -m unittest discover -s tests -p test_generate_hdr_corpus.py
 ```
 
-Implementation and syntax checks are complete; runtime tests and actual
-reference-tool processing are pending. [Status](STATUS.md) records the current
+All 11 focused tests passed on the first run after independent review; the
+[test receipt](../evidence/hdr-corpus-tests.json) binds the checked source.
+Actual reference-tool processing is a separate private experiment. [Status](STATUS.md) records the current
 acceptance boundary. No reference output has been produced or compared yet.

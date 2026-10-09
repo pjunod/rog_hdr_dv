@@ -110,16 +110,16 @@ Mutter candidate before runtime tests:
 
 | Finding | Required correction | State |
 |---|---|---|
-| Primary/topology changes can leave an unmapped surface's preferred target stale | Refresh records and preferred feedback after the Wayland output table changes; cover primary switch and removal | Addressed; delta review pending |
-| Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | Addressed; delta review pending |
-| A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | Addressed; delta review pending |
+| Primary/topology changes can leave an unmapped surface's preferred target stale | Refresh records and preferred feedback after the Wayland output table changes; cover primary switch and removal | Addressed and approved |
+| Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | Addressed and approved |
+| A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | Addressed and approved |
 
 A correction-delta review also caught a fixture assumption: the global force-HDR
 setting changes the second output. The fixture now expects those events and
 uses a fresh second-output identity before topology changes, while retaining
 the original immutable snapshot and unrelated-output silence checks for native
 target-only updates. No test execution was needed to identify either fixture
-issue. Final delta review is pending.
+issue. Independent delta review approved final source `a04bc3ecde3f425cd90d4017c57ad2840475682f`.
 
 No additional actionable issues were found in the Wine wrapper/export,
 synthetic corpus encoding, immutable description ownership, v2 identity
@@ -127,7 +127,8 @@ allocation or narrowly scoped public-certificate scan exception. The Mutter
 runner is also being made explicitly UID 1000; lack of Docker privileged mode
 alone does not mean a process has a non-root UID.
 
-Focused runtime tests remain held until the findings are addressed and their
-correction delta reviewed. Dolby executables have separately returned their
+Focused runtime tests are now executing after the findings and their
+correction deltas were approved. The 11 new corpus tests passed on their first
+run; both complete patch series reconstructed to their pinned source trees. Dolby executables have separately returned their
 versions in an isolated CPU environment following the owner's installer action;
 no reference frames have been processed.
