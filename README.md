@@ -33,6 +33,8 @@ explains private inspection of factory profile data.
 target-volume reporting, calibration and KMS metadata in pinned source.
 [Native luminance API](docs/NATIVE_LUMINANCE_API.md) documents the additive
 physical-declaration API and its source-only qualification boundary.
+[Mutter target feedback](docs/MUTTER_TARGET_LUMINANCE.md) specifies independent
+physical-target state, immutable descriptions and their qualification.
 
 ## Work with the repository
 

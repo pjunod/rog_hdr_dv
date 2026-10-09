@@ -65,7 +65,9 @@ range from a physical display target. A corrective implementation needs
 explicit target-volume provenance, a transform owner, and metadata consistent
 with the pixels actually emitted. A panel's peak must not be substituted for
 an encoding normalization constant. Generic source fixes and panel-specific
-calibration data remain separate deliverables.
+calibration data remain separate deliverables. The accepted
+[target-luminance design](MUTTER_TARGET_LUMINANCE.md) defines the first compositor
+correction, its state ownership and immutable Wayland descriptions.
 
 The [Wine API diagnostic](WINE_API_CONTRACT.md) likewise distinguishes an
 API-set name, an exported function, a working function and an activated Dolby
