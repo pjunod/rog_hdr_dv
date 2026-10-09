@@ -5,7 +5,8 @@
 Companion to [the Dolby activation probe](DOLBY_ACTIVATION_PROBE.md): this
 diagnostic answers whether stock Wine resolves the one API-set import that
 blocked that experiment. Read [status](STATUS.md) for the wider display
-acceptance boundary. Its [source](../probes/wine_api_contract/probe.cpp) loads
+acceptance boundary. The subsequent [source implementation](WINE_FILE_FROMAPP.md)
+has its own desktop-process scope and qualification. This diagnostic’s [source](../probes/wine_api_contract/probe.cpp) loads
 no OEM DLL, calls no discovered export and changes no live display state.
 
 ## The exact contract and what a result proves

@@ -207,10 +207,13 @@ Start with a tiny synthetic or otherwise authorized master and explicitly
 varied metadata. Compare identical frames/targets, then include a controlled
 trim change. Only after that reference contract is established should a
 consumer-profile decoder/reconstruction route be added to the comparison.
-No reference package has been downloaded or executed in this project.
+The owner supplied and accepted the Professional Tools v5.6.4 package. A
+private isolated reference-processing experiment has completed; tool-generated
+metadata and rendered reference outputs are retained privately. Creative trim
+qualification and consumer-profile comparison remain open. See the generic
+[reference corpus](HDR_REFERENCE_CORPUS.md) for the public input fixture.
 
-The download page requires account access; availability of a package to this
-operator is unresolved. The separate
+The download page requires account access. The separate
 [Professional Decoder Toolkit](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-professional-decoder-toolkit-v602/)
 lists Linux and requires the relevant purchased/evaluation product access.
 The [external CMU product](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-ecmu-software-v304/)

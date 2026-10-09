@@ -1,0 +1,11 @@
+# Keep standard detectors. This is the SHA-256 of WineHQ's public APT
+# verification certificate, not a credential or private signing material.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public WineHQ APT verification certificate digest in compiler receipt"
+condition = "AND"
+paths = ['''^evidence/wine-file-fromapp-compile\.json$''']
+regexTarget = "secret"
+regexes = ['''^d965d646defe94b3dfba6d5b4406900ac6c81065428bf9d9303ad7a72ee8d1b8$''']

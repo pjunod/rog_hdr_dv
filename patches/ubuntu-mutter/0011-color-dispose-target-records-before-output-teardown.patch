@@ -1,0 +1,246 @@
+From 113f7f4330f9a49e9f6f4be254f111ee2443b8fb Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 01:15:56 -0400
+Subject: [PATCH] fix(color): dispose Wayland target records before output
+ teardown
+
+---
+ src/tests/wayland-color-management-test.c     | 40 +++++++++----------
+ .../wayland-test-clients/color-management.c   | 14 ++++---
+ src/wayland/meta-wayland-color-management.c   | 21 +++++++---
+ src/wayland/meta-wayland-color-management.h   |  2 +
+ src/wayland/meta-wayland.c                    |  1 +
+ 5 files changed, 47 insertions(+), 31 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 6b65831..1ee1ca0 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -239,33 +239,33 @@ target_luminance (gconstpointer data)
+   meta_wayland_test_driver_set_property (test_driver, "target-output", meta_output_get_name (output));
+   client = meta_wayland_test_client_new_with_args (test_context, "color-management",
+                                                    version == 1 ? "target-v1" : "target-v2", NULL);
+-  wait_for_sync_point (10);
++  wait_for_sync_point (0);
+   info->edid_info->native_luminance.max_luminance_10pct = 700;
+   meta_color_device_update (device);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+   g_assert_cmpuint (color_changes, ==, 0);
+   g_assert_cmpuint (target_changes, ==, 1);
+-  emit_sync_event (10);
++  emit_sync_event (0);
+ 
+-  wait_for_sync_point (11);
++  wait_for_sync_point (1);
+   info->edid_info->native_luminance.max_luminance_full = 500;
+   meta_color_device_update (device);
+   g_assert_cmpuint (target_changes, ==, 2);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+-  emit_sync_event (11);
++  emit_sync_event (1);
+ 
+-  wait_for_sync_point (12);
++  wait_for_sync_point (2);
+   g_object_set (debug, "force-hdr", TRUE, NULL);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, encoding_luminance->max);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+-  emit_sync_event (12);
++  emit_sync_event (2);
+ 
+-  wait_for_sync_point (13);
++  wait_for_sync_point (3);
+   g_object_set (debug, "force-hdr", FALSE, NULL);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 700);
+-  emit_sync_event (13);
++  emit_sync_event (3);
+ 
+-  wait_for_sync_point (14);
++  wait_for_sync_point (4);
+   info->edid_info->native_rgb_bt2020_pq = FALSE;
+   info->edid_info->hdr_static_metadata.type1 = TRUE;
+   info->edid_info->hdr_static_metadata.pq = TRUE;
+@@ -274,16 +274,16 @@ target_luminance (gconstpointer data)
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, encoding_luminance->max);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+   g_assert_cmpuint (color_changes, ==, 0);
+-  emit_sync_event (14);
++  emit_sync_event (4);
+ 
+-  wait_for_sync_point (15);
++  wait_for_sync_point (5);
+   meta_color_device_update (device);
+-  emit_sync_event (15);
++  emit_sync_event (5);
+ 
+   /* Topology-only changes must update a role-less surface's primary fallback,
+    * even when no device emits a color/target change. Emit the canonical output
+    * lifecycle signal after changing this isolated monitor fixture's topology. */
+-  wait_for_sync_point (18);
++  wait_for_sync_point (6);
+   {
+     MetaLogicalMonitor *target_logical =
+       meta_monitor_get_logical_monitor (meta_output_get_monitor (output));
+@@ -300,9 +300,9 @@ target_luminance (gconstpointer data)
+     g_assert_true (meta_color_device_get_color_state (device) == encoding);
+     g_assert_cmpuint (color_changes, ==, 0);
+     g_assert_cmpuint (target_changes, ==, old_target_changes);
+-    emit_sync_event (18);
++    emit_sync_event (6);
+ 
+-    wait_for_sync_point (19);
++    wait_for_sync_point (7);
+     other_logical->is_primary = FALSE;
+     target_logical->is_primary = TRUE;
+     monitor_manager->primary_logical_monitor = target_logical;
+@@ -312,17 +312,17 @@ target_luminance (gconstpointer data)
+     g_assert_true (meta_color_device_get_color_state (device) == encoding);
+     g_assert_cmpuint (color_changes, ==, 0);
+     g_assert_cmpuint (target_changes, ==, old_target_changes);
+-    emit_sync_event (19);
++    emit_sync_event (7);
+   }
+ 
+-  wait_for_sync_point (16);
++  wait_for_sync_point (8);
+   set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
+   meta_color_device_update (device);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 80);
+   g_assert_cmpuint (color_changes, ==, 1);
+-  emit_sync_event (16);
++  emit_sync_event (8);
+ 
+-  wait_for_sync_point (17);
++  wait_for_sync_point (9);
+   if (version == 2)
+     {
+       MetaWaylandCompositor *compositor = meta_context_get_wayland_compositor (test_context);
+@@ -332,7 +332,7 @@ target_luminance (gconstpointer data)
+       g_object_run_dispose (wayland_manager);
+       g_object_run_dispose (wayland_manager);
+     }
+-  emit_sync_event (17);
++  emit_sync_event (9);
+   meta_wayland_test_client_finish (client);
+   g_signal_handler_disconnect (device, color_handler);
+   g_signal_handler_disconnect (device, target_handler);
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 8cc2c2c..b448eec 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -732,6 +732,8 @@ target_luminance_client (WaylandDisplay *display,
+ 
+   for (phase = 0; phase < G_N_ELEMENTS (maxima); phase++)
+     {
++      /* Device phases0..5, topology6/7, SDR8, then lifetime9. */
++      unsigned int serial = phase < 6 ? phase : 8;
+       unsigned int changed = phase == 1 || phase == 5 ? 0 : 1;
+       /* Force-HDR is global; native-only updates still leave this output quiet. */
+       unsigned int other_changed = phase == 2 || phase == 3 ? 1 : 0;
+@@ -747,8 +749,8 @@ target_luminance_client (WaylandDisplay *display,
+               uint64_t expected_identity = topology_phase == 0 ?
+                                            current_other.identity : snapshots[phase].identity;
+ 
+-              test_driver_sync_point (display->test_driver, 18 + topology_phase, NULL);
+-              wait_for_sync_event (display, 18 + topology_phase);
++              test_driver_sync_point (display->test_driver, 6 + topology_phase, NULL);
++              wait_for_sync_event (display, 6 + topology_phase);
+               wl_display_roundtrip (display->display);
+               check_topology_preference (&client);
+               preferred = (TargetSnapshot) {
+@@ -766,8 +768,8 @@ target_luminance_client (WaylandDisplay *display,
+             }
+         }
+ 
+-      test_driver_sync_point (display->test_driver, 10 + phase, NULL);
+-      wait_for_sync_event (display, 10 + phase);
++      test_driver_sync_point (display->test_driver, serial, NULL);
++      wait_for_sync_event (display, serial);
+       wl_display_roundtrip (display->display);
+       check_target_events (&client, target, changed, other_changed);
+       snapshots[phase + 1].description = wp_color_management_output_v1_get_image_description (target->color_output);
+@@ -795,8 +797,8 @@ target_luminance_client (WaylandDisplay *display,
+       g_assert_cmpuint (info.target_max, ==, 80);
+     }
+ 
+-  test_driver_sync_point (display->test_driver, 17, NULL);
+-  wait_for_sync_event (display, 17);
++  test_driver_sync_point (display->test_driver, 9, NULL);
++  wait_for_sync_event (display, 9);
+   /* Version 2 has just disposed the manager twice with these objects alive. */
+   info = read_target_info (display, &snapshots[0]);
+   g_assert_cmpuint (info.target_max, ==, 616);
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 89b923c..707791f 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -58,6 +58,7 @@ struct _MetaWaylandColorManager
+   gulong color_state_changed_handler_id;
+   gulong target_volume_changed_handler_id;
+   MetaWaylandDescriptionIds *ids;
++  struct wl_global *global;
+ 
+   MetaWaylandDescriptionRecord *default_record;
+ 
+@@ -2161,6 +2162,7 @@ meta_wayland_color_manager_dispose (GObject *object)
+   MetaWaylandColorManager *color_manager = META_WAYLAND_COLOR_MANAGER (object);
+   MetaColorManager *meta_color_manager = get_meta_color_manager (color_manager);
+ 
++  g_clear_pointer (&color_manager->global, wl_global_destroy);
+   g_clear_signal_handler (&color_manager->color_state_changed_handler_id,
+                           meta_color_manager);
+   g_clear_signal_handler (&color_manager->target_volume_changed_handler_id,
+@@ -2247,14 +2249,23 @@ meta_wayland_init_color_management (MetaWaylandCompositor *compositor)
+ 
+   color_manager = meta_wayland_color_manager_new (compositor);
+ 
+-  if (wl_global_create (compositor->wayland_display,
+-                        &wp_color_manager_v1_interface,
+-                        META_WP_COLOR_MANAGEMENT_VERSION,
+-                        color_manager,
+-                        color_management_bind) == NULL)
++  color_manager->global = wl_global_create (compositor->wayland_display,
++                                            &wp_color_manager_v1_interface,
++                                            META_WP_COLOR_MANAGEMENT_VERSION,
++                                            color_manager,
++                                            color_management_bind);
++  if (!color_manager->global)
+     g_error ("Failed to register a global wp_color_management object");
+ 
+   g_object_set_data_full (G_OBJECT (compositor), "-meta-wayland-color-manager",
+                           g_steal_pointer (&color_manager),
+                           g_object_unref);
+ }
++
++void
++meta_wayland_finalize_color_management (MetaWaylandCompositor *compositor)
++{
++  /* Release records and disconnect output/surface handlers while the display,
++   * outputs and backend still exist, rather than during parent GObject finalize. */
++  g_object_set_data (G_OBJECT (compositor), "-meta-wayland-color-manager", NULL);
++}
+diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
+index ec3348f..a26d234 100644
+--- a/src/wayland/meta-wayland-color-management.h
++++ b/src/wayland/meta-wayland-color-management.h
+@@ -24,4 +24,6 @@
+ 
+ void meta_wayland_init_color_management (MetaWaylandCompositor *compositor);
+ 
++void meta_wayland_finalize_color_management (MetaWaylandCompositor *compositor);
++
+ void meta_wayland_color_management_outputs_changed (MetaWaylandCompositor *compositor);
+diff --git a/src/wayland/meta-wayland.c b/src/wayland/meta-wayland.c
+index c2f2484..c652cc2 100644
+--- a/src/wayland/meta-wayland.c
++++ b/src/wayland/meta-wayland.c
+@@ -800,6 +800,7 @@ meta_wayland_compositor_finalize (GObject *object)
+   MetaBackend *backend = meta_context_get_backend (compositor->context);
+   ClutterActor *stage = meta_backend_get_stage (backend);
+ 
++  meta_wayland_finalize_color_management (compositor);
+   meta_wayland_xdg_foreign_finalize (compositor);
+   meta_wayland_xdg_session_management_finalize (compositor);
+   meta_wayland_activation_finalize (compositor);
+-- 
+2.54.0 (Apple Git-157)
+

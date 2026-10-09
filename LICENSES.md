@@ -10,10 +10,12 @@ OEM components.
   notices; consult the pinned source's `COPYING` and affected file headers.
 - Linux patches retain the kernel's applicable GPL-2.0 and file-level SPDX
   terms. Preserve original authorship, assistance and signoff trailers.
+- Wine patches retain LGPL-2.1-or-later notices; consult the pinned source's
+  `COPYING.LIB` and affected file headers.
 - Ubuntu packaging changes retain their source package's copyright/licensing
   declarations, including notices carried by the patch series.
 
 Original repository documentation and utility code have no separate public
-licence grant selected yet. Choose one explicitly before public distribution.
-The repository is created locally; no public release or upstream submission
-is implied. No Dolby/ASUS binary or profile payload is distributed here.
+licence grant selected yet. Public repository visibility does not change those
+terms. Publication of patches does not imply upstream acceptance. No Dolby/ASUS
+binary, proprietary documentation or profile payload is distributed here.

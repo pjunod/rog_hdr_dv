@@ -1,0 +1,1187 @@
+From 384ac303aa342708d50f3d3316a2fe03139ab2bf Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 00:36:26 -0400
+Subject: [PATCH] fix(color): separate native HDR target luminance from
+ encoding
+
+---
+ debian/changelog                            |   9 +
+ debian/control                              |   4 +-
+ meson.build                                 |  12 +-
+ src/backends/edid-parse.c                   |  92 +++++
+ src/backends/edid.h                         |  13 +
+ src/backends/meta-color-device.c            | 118 +++++-
+ src/backends/meta-color-device.h            |  27 ++
+ src/backends/meta-color-manager.c           |  19 +
+ src/wayland/meta-wayland-color-management.c | 397 ++++++++++++++------
+ 9 files changed, 572 insertions(+), 119 deletions(-)
+
+diff --git a/debian/changelog b/debian/changelog
+index ad84f94..6c89638 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,12 @@
++mutter (51.0-1ubuntu3+nativehdr3) UNRELEASED; urgency=medium
++
++  * Report validated native HDR firmware target luminance independently of
++    PQ encoding through immutable Wayland output and preferred descriptions.
++  * Require the hdr7 physical DisplayID2 luminance API at configure/link time.
++    This source candidate is not installed or package-qualified.
++
++ -- Codex <codex@invalid>  Fri, 09 Oct 2026 00:00:00 +0000
++
+ mutter (51.0-1ubuntu3+nativehdr2) stonking; urgency=medium
+ 
+   * Use the documented terminal-tilde symbol introduction minimum for the
+diff --git a/debian/control b/debian/control
+index df97310..23734be 100644
+--- a/debian/control
++++ b/debian/control
+@@ -36,7 +36,7 @@ Build-Depends: debhelper-compat (= 14),
+                libcairo2-dev,
+                libcanberra-gtk3-dev,
+                libcolord-dev,
+-               libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr5~),
++               libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr7~),
+                libdrm-dev (>= 2.4.118),
+                libegl1-mesa-dev,
+                libfribidi-dev,
+@@ -220,7 +220,7 @@ Depends: gir1.2-mutter-51 (= ${binary:Version}),
+          libcairo2-dev,
+          libcanberra-dev,
+          libcolord-dev,
+-         libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr5~),
++         libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr7~),
+          libdrm-dev (>= 2.4.118),
+          libeis-dev (>= 1.3.901),
+          libegl1-mesa-dev,
+diff --git a/meson.build b/meson.build
+index 84bd95e..1b9a5e9 100644
+--- a/meson.build
++++ b/meson.build
+@@ -149,6 +149,8 @@ if not cc.links('''
+       di_displayid2_data_block_get_interface_features (*blocks);
+     const struct di_cta_data_block *const *children =
+       di_displayid2_data_block_get_cta_data_blocks (*blocks);
++    const struct di_displayid2_luminance *luminance =
++      di_displayid2_data_block_get_luminance (*blocks);
+     return di_edid_has_extension_failures (0) +
+       di_displayid2_data_block_get_tag (*blocks) +
+       features->rgb_bit_depths + features->standard_combinations +
+@@ -156,11 +158,15 @@ if not cc.links('''
+       features->additional_combinations[0].color_space +
+       features->additional_combinations[0].eotf + (children != 0) +
+       DI_DISPLAYID2_COMBINATION_BT2020_ST2084 +
+-      DI_DISPLAYID2_COLOR_SPACE_BT2020 + DI_DISPLAYID2_EOTF_ST2084;
++      DI_DISPLAYID2_COLOR_SPACE_BT2020 + DI_DISPLAYID2_EOTF_ST2084 +
++      luminance->has_min_luminance + luminance->has_max_luminance_full +
++      luminance->has_max_luminance_10pct +
++      (luminance->min_luminance != 0) + (luminance->max_luminance_full != 0) +
++      (luminance->max_luminance_10pct != 0);
+   }
+ ''', dependencies: libdisplay_info_dep,
+-  name: 'parsed DisplayID v2 interface and nested CTA API')
+-  error('libdisplay-info needs the parsed DisplayID v2 interface and nested CTA API; install matching development and runtime packages')
++  name: 'parsed DisplayID v2 interface, luminance and nested CTA API')
++  error('libdisplay-info needs the parsed DisplayID v2 interface, physical luminance and nested CTA API; install matching development and runtime packages')
+ endif
+ 
+ libdrm_dep = dependency('libdrm', version: libdrm_req)
+diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
+index 6780412..07e0713 100644
+--- a/src/backends/edid-parse.c
++++ b/src/backends/edid-parse.c
+@@ -112,6 +112,97 @@ has_native_rgb_bt2020_pq (const struct di_info *info)
+   return supported;
+ }
+ 
++static gboolean
++luminance_equal (const struct di_displayid2_luminance *a,
++                 const struct di_displayid2_luminance *b)
++{
++  return a->has_min_luminance == b->has_min_luminance &&
++         a->has_max_luminance_full == b->has_max_luminance_full &&
++         a->has_max_luminance_10pct == b->has_max_luminance_10pct &&
++         (!a->has_min_luminance || a->min_luminance == b->min_luminance) &&
++         (!a->has_max_luminance_full || a->max_luminance_full == b->max_luminance_full) &&
++         (!a->has_max_luminance_10pct || a->max_luminance_10pct == b->max_luminance_10pct);
++}
++
++static gboolean
++luminance_valid (const struct di_displayid2_luminance *lum)
++{
++  if ((lum->has_min_luminance &&
++       (!isfinite (lum->min_luminance) || lum->min_luminance < 0 ||
++        (double) lum->min_luminance * 10000 > G_MAXUINT32)) ||
++      (lum->has_max_luminance_full &&
++       (!isfinite (lum->max_luminance_full) || lum->max_luminance_full < 0 ||
++        (double) lum->max_luminance_full > G_MAXUINT32)) ||
++      (lum->has_max_luminance_10pct &&
++       (!isfinite (lum->max_luminance_10pct) || lum->max_luminance_10pct < 1 ||
++        (double) lum->max_luminance_10pct > G_MAXUINT32)))
++    return FALSE;
++
++  return !(lum->has_min_luminance && lum->has_max_luminance_10pct &&
++           lum->min_luminance > lum->max_luminance_10pct) &&
++         !(lum->has_min_luminance && lum->has_max_luminance_full &&
++           lum->min_luminance > lum->max_luminance_full) &&
++         !(lum->has_max_luminance_full && lum->has_max_luminance_10pct &&
++           lum->max_luminance_full > lum->max_luminance_10pct);
++}
++
++static void
++read_native_luminance (MetaEdidInfo         *info,
++                       const struct di_info *di_info)
++{
++  const struct di_edid_ext *const *extensions;
++  gboolean found = FALSE;
++
++  if (di_edid_has_extension_failures (di_info_get_edid (di_info)))
++    {
++      info->native_luminance_status = META_NATIVE_LUMINANCE_INVALID;
++      return;
++    }
++
++  extensions = di_edid_get_extensions (di_info_get_edid (di_info));
++  for (; *extensions; extensions++)
++    {
++      const struct di_displayid2 *displayid = di_edid_ext_get_displayid2 (*extensions);
++      const struct di_displayid2_data_block *const *blocks;
++
++      if (!displayid)
++        continue;
++
++      blocks = di_displayid2_get_data_blocks (displayid);
++      for (; *blocks; blocks++)
++        {
++          const struct di_displayid2_luminance *lum;
++
++          if (di_displayid2_data_block_get_tag (*blocks) !=
++              DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS)
++            continue;
++
++          lum = di_displayid2_data_block_get_luminance (*blocks);
++          if (!lum || !luminance_valid (lum))
++            {
++              info->native_luminance_status = META_NATIVE_LUMINANCE_INVALID;
++              memset (&info->native_luminance, 0, sizeof (info->native_luminance));
++              return;
++            }
++
++          if (found && !luminance_equal (&info->native_luminance, lum))
++            {
++              info->native_luminance_status = META_NATIVE_LUMINANCE_CONFLICT;
++              memset (&info->native_luminance, 0, sizeof (info->native_luminance));
++              return;
++            }
++
++          info->native_luminance = *lum;
++          found = TRUE;
++        }
++    }
++
++  if (found && (info->native_luminance.has_min_luminance ||
++                info->native_luminance.has_max_luminance_full ||
++                info->native_luminance.has_max_luminance_10pct))
++    info->native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
++}
++
+ MetaEdidInfo *
+ meta_edid_info_new_parse (const uint8_t *edid,
+                           size_t         size)
+@@ -194,6 +285,7 @@ meta_edid_info_new_parse (const uint8_t *edid,
+           sizeof (*hdr_static_metadata));
+ 
+   info->native_rgb_bt2020_pq = has_native_rgb_bt2020_pq (di_info);
++  read_native_luminance (info, di_info);
+ 
+   di_info_destroy (di_info);
+   return g_steal_pointer (&info);
+diff --git a/src/backends/edid.h b/src/backends/edid.h
+index 96583b8..9a3b1ce 100644
+--- a/src/backends/edid.h
++++ b/src/backends/edid.h
+@@ -25,9 +25,18 @@
+ 
+ #include <stdint.h>
+ #include <libdisplay-info/info.h>
++#include <libdisplay-info/displayid2.h>
+ 
+ #include "core/util-private.h"
+ 
++typedef enum
++{
++  META_NATIVE_LUMINANCE_UNAVAILABLE,
++  META_NATIVE_LUMINANCE_FIRMWARE_DECLARED,
++  META_NATIVE_LUMINANCE_INVALID,
++  META_NATIVE_LUMINANCE_CONFLICT,
++} MetaNativeLuminanceStatus;
++
+ typedef struct _MetaEdidInfo
+ {
+   char *manufacturer_code;
+@@ -48,6 +57,10 @@ typedef struct _MetaEdidInfo
+ 
+   /* Native DisplayID capability; independent of CTA static metadata. */
+   gboolean native_rgb_bt2020_pq;
++
++  /* Physical declarations, never CTA content metadata or calibration. */
++  MetaNativeLuminanceStatus native_luminance_status;
++  struct di_displayid2_luminance native_luminance;
+ } MetaEdidInfo;
+ 
+ META_EXPORT_TEST
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 2006fdd..79230ad 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -23,6 +23,7 @@
+ #include "backends/meta-color-device.h"
+ 
+ #include <colord.h>
++#include <math.h>
+ 
+ #include "backends/meta-backend-private.h"
+ #include "backends/meta-color-device.h"
+@@ -41,6 +42,7 @@ enum
+   READY,
+   CALIBRATION_CHANGED,
+   COLOR_STATE_CHANGED,
++  TARGET_VOLUME_CHANGED,
+ 
+   N_SIGNALS
+ };
+@@ -51,6 +53,7 @@ typedef enum
+ {
+   UPDATE_RESULT_CALIBRATION = 1 << 0,
+   UPDATE_RESULT_COLOR_STATE = 1 << 1,
++  UPDATE_RESULT_TARGET_VOLUME = 1 << 2,
+ } UpdateResult;
+ 
+ typedef enum
+@@ -80,6 +83,7 @@ struct _MetaColorDevice
+   GCancellable *cancellable;
+ 
+   ClutterColorState *color_state;
++  MetaColorTargetLuminance target_luminance;
+ 
+   PendingState pending_state;
+   gboolean is_ready;
+@@ -369,6 +373,12 @@ meta_color_device_class_init (MetaColorDeviceClass *klass)
+                   G_SIGNAL_RUN_LAST, 0,
+                   NULL, NULL, NULL,
+                   G_TYPE_NONE, 0);
++  signals[TARGET_VOLUME_CHANGED] =
++    g_signal_new ("target-volume-changed",
++                  G_TYPE_FROM_CLASS (klass),
++                  G_SIGNAL_RUN_LAST, 0,
++                  NULL, NULL, NULL,
++                  G_TYPE_NONE, 0);
+ }
+ 
+ static void
+@@ -742,6 +752,94 @@ get_color_metadata_from_monitor (MetaMonitor        *monitor,
+   g_assert_not_reached ();
+ }
+ 
++void
++meta_color_target_luminance_init (MetaColorTargetLuminance *target,
++                                  const MetaEdidInfo       *edid_info,
++                                  gboolean                  native_hdr,
++                                  const ClutterLuminance   *encoding)
++{
++  *target = (MetaColorTargetLuminance) {
++    .minimum = encoding->min,
++    .maximum = encoding->max,
++  };
++
++  if (!native_hdr || !edid_info ||
++      edid_info->native_luminance_status != META_NATIVE_LUMINANCE_FIRMWARE_DECLARED)
++    return;
++
++  target->physical = edid_info->native_luminance;
++  if (target->physical.has_min_luminance)
++    {
++      target->minimum = target->physical.min_luminance;
++      target->minimum_source = META_COLOR_TARGET_FIRMWARE_DECLARED;
++    }
++  if (target->physical.has_max_luminance_10pct)
++    {
++      target->maximum = target->physical.max_luminance_10pct;
++      target->maximum_source = META_COLOR_TARGET_FIRMWARE_DECLARED;
++    }
++
++  /* A partial declaration must also agree with the explicit fallback. */
++  if (!isfinite (target->minimum) || !isfinite (target->maximum) ||
++      target->minimum < 0 || target->maximum < 1 ||
++      target->minimum > target->maximum ||
++      (double) target->minimum * 10000 > G_MAXUINT32 ||
++      (double) target->maximum > G_MAXUINT32)
++    {
++      target->minimum = encoding->min;
++      target->maximum = encoding->max;
++      target->minimum_source = META_COLOR_TARGET_ENCODING_FALLBACK;
++      target->maximum_source = META_COLOR_TARGET_ENCODING_FALLBACK;
++    }
++}
++
++static gboolean
++target_luminance_equal (const MetaColorTargetLuminance *a,
++                        const MetaColorTargetLuminance *b)
++{
++  const struct di_displayid2_luminance *pa = &a->physical;
++  const struct di_displayid2_luminance *pb = &b->physical;
++
++  return a->minimum == b->minimum && a->maximum == b->maximum &&
++         a->minimum_source == b->minimum_source &&
++         a->maximum_source == b->maximum_source &&
++         pa->has_min_luminance == pb->has_min_luminance &&
++         pa->has_max_luminance_full == pb->has_max_luminance_full &&
++         pa->has_max_luminance_10pct == pb->has_max_luminance_10pct &&
++         (!pa->has_min_luminance || pa->min_luminance == pb->min_luminance) &&
++         (!pa->has_max_luminance_full || pa->max_luminance_full == pb->max_luminance_full) &&
++         (!pa->has_max_luminance_10pct || pa->max_luminance_10pct == pb->max_luminance_10pct);
++}
++
++static UpdateResult
++update_target_luminance (MetaColorDevice *color_device)
++{
++  MetaMonitor *monitor = color_device->monitor;
++  MetaOutput *output = meta_monitor_get_main_output (monitor);
++  const MetaOutputInfo *info = meta_output_get_info (output);
++  MetaBackend *backend = meta_color_manager_get_backend (color_device->color_manager);
++  MetaDebugControl *debug_control =
++    meta_context_get_debug_control (meta_backend_get_context (backend));
++  const ClutterLuminance *encoding =
++    clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state));
++  MetaColorTargetLuminance target;
++  gboolean native_hdr;
++
++  native_hdr = meta_monitor_is_active (monitor) &&
++               meta_monitor_get_color_mode (monitor) == META_COLOR_MODE_BT2100 &&
++               !meta_debug_control_is_hdr_forced (debug_control) &&
++               info->connector_type == META_CONNECTOR_TYPE_eDP &&
++               info->edid_info && info->edid_info->native_rgb_bt2020_pq &&
++               (info->supported_hdr_eotfs & (1 << META_OUTPUT_HDR_METADATA_EOTF_PQ)) &&
++               (info->supported_color_spaces & (1 << META_OUTPUT_COLORSPACE_BT2020));
++  meta_color_target_luminance_init (&target, info->edid_info, native_hdr, encoding);
++  if (target_luminance_equal (&color_device->target_luminance, &target))
++    return 0;
++
++  color_device->target_luminance = target;
++  return UPDATE_RESULT_TARGET_VOLUME;
++}
++
+ static UpdateResult
+ update_color_state (MetaColorDevice *color_device)
+ {
+@@ -802,6 +900,7 @@ meta_color_device_new (MetaColorManager *color_manager,
+   color_device->reference_luminance_factor = 1.0;
+ 
+   update_color_state (color_device);
++  update_target_luminance (color_device);
+ 
+   if (meta_monitor_is_virtual (monitor))
+     {
+@@ -1464,6 +1563,12 @@ meta_color_device_get_color_state (MetaColorDevice *color_device)
+   return color_device->color_state;
+ }
+ 
++const MetaColorTargetLuminance *
++meta_color_device_get_target_luminance (MetaColorDevice *color_device)
++{
++  return &color_device->target_luminance;
++}
++
+ MetaColorProfile *
+ meta_color_device_get_device_profile (MetaColorDevice *color_device)
+ {
+@@ -1590,17 +1695,20 @@ do_update (MetaColorDevice *color_device)
+   MetaMonitor *monitor = color_device->monitor;
+   UpdateResult result = 0;
+ 
+-  if (!meta_monitor_is_active (monitor))
+-    return;
+-
+-  result |= update_white_point (color_device);
+-  result |= update_color_state (color_device);
++  if (meta_monitor_is_active (monitor))
++    {
++      result |= update_white_point (color_device);
++      result |= update_color_state (color_device);
++    }
++  result |= update_target_luminance (color_device);
+ 
+   if (result & UPDATE_RESULT_CALIBRATION)
+     g_signal_emit (color_device, signals[CALIBRATION_CHANGED], 0);
+ 
+   if (result & UPDATE_RESULT_COLOR_STATE)
+     g_signal_emit (color_device, signals[COLOR_STATE_CHANGED], 0);
++  if (result & UPDATE_RESULT_TARGET_VOLUME)
++    g_signal_emit (color_device, signals[TARGET_VOLUME_CHANGED], 0);
+ }
+ 
+ void
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 4288508..222bb74 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -21,6 +21,8 @@
+ #include <gio/gio.h>
+ 
+ #include "backends/meta-backend-types.h"
++#include "backends/edid.h"
++#include "clutter/clutter.h"
+ #include "core/util-private.h"
+ 
+ #define META_TYPE_COLOR_DEVICE (meta_color_device_get_type ())
+@@ -28,6 +30,31 @@ G_DECLARE_FINAL_TYPE (MetaColorDevice, meta_color_device,
+                       META, COLOR_DEVICE,
+                       GObject)
+ 
++typedef enum
++{
++  META_COLOR_TARGET_ENCODING_FALLBACK,
++  META_COLOR_TARGET_FIRMWARE_DECLARED,
++} MetaColorTargetProvenance;
++
++typedef struct
++{
++  struct di_displayid2_luminance physical;
++  float minimum;
++  float maximum;
++  MetaColorTargetProvenance minimum_source;
++  MetaColorTargetProvenance maximum_source;
++} MetaColorTargetLuminance;
++
++META_EXPORT_TEST
++const MetaColorTargetLuminance *
++meta_color_device_get_target_luminance (MetaColorDevice *color_device);
++
++META_EXPORT_TEST
++void meta_color_target_luminance_init (MetaColorTargetLuminance *target,
++                                       const MetaEdidInfo       *edid_info,
++                                       gboolean                  native_hdr,
++                                       const ClutterLuminance   *encoding);
++
+ MetaColorDevice * meta_color_device_new (MetaColorManager *color_manager,
+                                          MetaMonitor      *monitor);
+ 
+diff --git a/src/backends/meta-color-manager.c b/src/backends/meta-color-manager.c
+index 6962ce0..be0e2a0 100644
+--- a/src/backends/meta-color-manager.c
++++ b/src/backends/meta-color-manager.c
+@@ -65,6 +65,7 @@ enum
+ {
+   DEVICE_CALIBRATION_CHANGED,
+   DEVICE_COLOR_STATE_CHANGED,
++  DEVICE_TARGET_VOLUME_CHANGED,
+   READY,
+ 
+   N_SIGNALS
+@@ -171,6 +172,14 @@ generate_monitor_id (MetaMonitor *monitor)
+   return g_string_free (id, FALSE);
+ }
+ 
++static void
++on_target_volume_changed (MetaColorDevice  *color_device,
++                          MetaColorManager *color_manager)
++{
++  g_signal_emit (color_manager, signals[DEVICE_TARGET_VOLUME_CHANGED],
++                 0, color_device);
++}
++
+ static void
+ update_devices (MetaColorManager *color_manager)
+ {
+@@ -229,6 +238,9 @@ update_devices (MetaColorManager *color_manager)
+           g_signal_connect_object (color_device, "color-state-changed",
+                                    G_CALLBACK (on_color_state_changed),
+                                    color_manager, 0);
++          g_signal_connect_object (color_device, "target-volume-changed",
++                                   G_CALLBACK (on_target_volume_changed),
++                                   color_manager, 0);
+         }
+     }
+ 
+@@ -597,6 +609,13 @@ meta_color_manager_class_init (MetaColorManagerClass *klass)
+                   NULL, NULL, NULL,
+                   G_TYPE_NONE, 1,
+                   META_TYPE_COLOR_DEVICE);
++  signals[DEVICE_TARGET_VOLUME_CHANGED] =
++    g_signal_new ("device-target-volume-changed",
++                  G_TYPE_FROM_CLASS (klass),
++                  G_SIGNAL_RUN_LAST, 0,
++                  NULL, NULL, NULL,
++                  G_TYPE_NONE, 1,
++                  META_TYPE_COLOR_DEVICE);
+   signals[READY] =
+     g_signal_new ("ready",
+                   G_TYPE_FROM_CLASS (klass),
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 5558813..efaa9dc 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -37,7 +37,17 @@
+ 
+ #include "color-management-v1-server-protocol.h"
+ 
+-static GQuark image_desc_id_quark = 0;
++typedef struct _MetaWaylandDescriptionRecord MetaWaylandDescriptionRecord;
++
++typedef struct
++{
++  grefcount ref_count;
++  GQueue *to_reuse;
++  uint32_t next_id;
++  uint64_t next_id64;
++  /* Weak keys and values; records remove themselves before final release. */
++  GHashTable *records;
++} MetaWaylandDescriptionIds;
+ 
+ struct _MetaWaylandColorManager
+ {
+@@ -46,12 +56,10 @@ struct _MetaWaylandColorManager
+   MetaWaylandCompositor *compositor;
+ 
+   gulong color_state_changed_handler_id;
++  gulong target_volume_changed_handler_id;
++  MetaWaylandDescriptionIds *ids;
+ 
+-  struct
+-  {
+-    GQueue *to_reuse;
+-    uint32_t next_id;
+-  } ids;
++  MetaWaylandDescriptionRecord *default_record;
+ 
+   /* struct wl_resource */
+   GList *resources;
+@@ -85,6 +93,7 @@ typedef struct _MetaWaylandColorManagementOutput
+   GList *resources;
+   MetaWaylandOutput *output;
+   gulong output_destroyed_handler_id;
++  MetaWaylandDescriptionRecord *record;
+ } MetaWaylandColorManagementOutput;
+ 
+ typedef struct _MetaWaylandColorManagementSurface
+@@ -98,7 +107,7 @@ typedef struct _MetaWaylandColorManagementSurface
+   MetaWaylandSurface *surface;
+   gulong surface_destroyed_handler_id;
+   gulong surface_main_monitor_handler_id;
+-  ClutterColorState *preferred_color_state;
++  MetaWaylandDescriptionRecord *preferred_record;
+ } MetaWaylandColorManagementSurface;
+ 
+ typedef enum _MetaWaylandImageDescriptionState
+@@ -122,9 +131,20 @@ typedef struct _MetaWaylandImageDescription
+   struct wl_resource *resource;
+   MetaWaylandImageDescriptionState state;
+   gboolean has_info;
+-  ClutterColorState *color_state;
++  MetaWaylandDescriptionRecord *record;
+ } MetaWaylandImageDescription;
+ 
++struct _MetaWaylandDescriptionRecord
++{
++  grefcount ref_count;
++  MetaWaylandDescriptionIds *ids;
++  ClutterColorState *color_state;
++  uint32_t target_minimum;
++  uint32_t target_maximum;
++  uint32_t identity;
++  uint64_t identity64;
++};
++
+ typedef struct _MetaWaylandCreatorParams
+ {
+   MetaWaylandColorManager *color_manager;
+@@ -151,6 +171,9 @@ typedef struct _MetaWaylandCreatorIcc
+ } MetaWaylandCreatorIcc;
+ 
+ static void meta_wayland_color_management_surface_free (MetaWaylandColorManagementSurface *cm_surface);
++static MetaWaylandColorManagementOutput *
++ensure_color_management_output (MetaWaylandColorManager *color_manager,
++                                MetaWaylandOutput       *output);
+ 
+ static void meta_wayland_color_management_output_free (MetaWaylandColorManagementOutput *cm_output);
+ 
+@@ -352,6 +375,148 @@ get_output_color_state (MetaWaylandColorManager *color_manager,
+   return color_state;
+ }
+ 
++static guint
++description_record_hash (gconstpointer data)
++{
++  const MetaWaylandDescriptionRecord *record = data;
++
++  return g_direct_hash (record->color_state) ^
++         record->target_minimum ^ record->target_maximum;
++}
++
++static gboolean
++description_record_equal (gconstpointer a,
++                          gconstpointer b)
++{
++  const MetaWaylandDescriptionRecord *ra = a;
++  const MetaWaylandDescriptionRecord *rb = b;
++
++  return ra->color_state == rb->color_state &&
++         ra->target_minimum == rb->target_minimum &&
++         ra->target_maximum == rb->target_maximum;
++}
++
++static MetaWaylandDescriptionIds *
++description_ids_ref (MetaWaylandDescriptionIds *ids)
++{
++  g_ref_count_inc (&ids->ref_count);
++  return ids;
++}
++
++static void
++description_ids_unref (MetaWaylandDescriptionIds *ids)
++{
++  if (!g_ref_count_dec (&ids->ref_count))
++    return;
++
++  g_assert (g_hash_table_size (ids->records) == 0);
++  g_hash_table_unref (ids->records);
++  g_queue_free (ids->to_reuse);
++  g_free (ids);
++}
++
++static MetaWaylandDescriptionRecord *
++description_record_ref (MetaWaylandDescriptionRecord *record)
++{
++  g_ref_count_inc (&record->ref_count);
++  return record;
++}
++
++static void
++description_record_unref (MetaWaylandDescriptionRecord *record)
++{
++  if (!g_ref_count_dec (&record->ref_count))
++    return;
++
++  g_hash_table_remove (record->ids->records, record);
++  g_queue_push_tail (record->ids->to_reuse, GUINT_TO_POINTER (record->identity));
++  g_clear_object (&record->color_state);
++  description_ids_unref (record->ids);
++  g_free (record);
++}
++
++G_DEFINE_AUTOPTR_CLEANUP_FUNC (MetaWaylandDescriptionRecord,
++                               description_record_unref)
++
++static MetaWaylandDescriptionRecord *
++description_record_get (MetaWaylandColorManager       *color_manager,
++                        ClutterColorState             *color_state,
++                        const MetaColorTargetLuminance *target)
++{
++  const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
++  MetaWaylandDescriptionRecord lookup = {
++    .color_state = color_state,
++    .target_minimum = (uint32_t) MIN ((double) (target ? target->minimum : encoding->min) * 10000,
++                                     G_MAXUINT32),
++    .target_maximum = (uint32_t) (target ? target->maximum : encoding->max),
++  };
++  MetaWaylandDescriptionRecord *record;
++  MetaWaylandDescriptionIds *ids = color_manager->ids;
++
++  record = g_hash_table_lookup (ids->records, &lookup);
++  if (record)
++    return description_record_ref (record);
++
++  record = g_new0 (MetaWaylandDescriptionRecord, 1);
++  g_ref_count_init (&record->ref_count);
++  record->ids = description_ids_ref (ids);
++  record->color_state = g_object_ref (color_state);
++  record->target_minimum = lookup.target_minimum;
++  record->target_maximum = lookup.target_maximum;
++  if (!g_queue_is_empty (ids->to_reuse))
++    record->identity = GPOINTER_TO_UINT (g_queue_pop_head (ids->to_reuse));
++  else
++    {
++      g_assert (ids->next_id < G_MAXUINT32);
++      record->identity = ++ids->next_id;
++    }
++  g_assert (ids->next_id64 < G_MAXUINT64);
++  record->identity64 = ++ids->next_id64;
++  g_hash_table_insert (ids->records, record, record);
++  return record;
++}
++
++static gboolean
++update_output_record (MetaWaylandColorManagementOutput *cm_output)
++{
++  MetaWaylandColorManager *color_manager = cm_output->color_manager;
++  MetaMonitor *monitor = meta_wayland_output_get_monitor (cm_output->output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (get_meta_color_manager (color_manager), monitor);
++  const MetaColorTargetLuminance *target =
++    device ? meta_color_device_get_target_luminance (device) : NULL;
++  g_autoptr (MetaWaylandDescriptionRecord) record = NULL;
++
++  record = description_record_get (color_manager,
++                                    get_output_color_state (color_manager, monitor),
++                                    target);
++  if (cm_output->record &&
++      clutter_color_state_equals (cm_output->record->color_state, record->color_state) &&
++      cm_output->record->target_minimum == record->target_minimum &&
++      cm_output->record->target_maximum == record->target_maximum)
++    return FALSE;
++
++  g_clear_pointer (&cm_output->record, description_record_unref);
++  cm_output->record = g_steal_pointer (&record);
++  return TRUE;
++}
++
++static MetaWaylandDescriptionRecord *
++get_output_record (MetaWaylandColorManager *color_manager,
++                    MetaMonitor             *monitor)
++{
++  MetaWaylandOutput *output =
++    g_hash_table_lookup (color_manager->compositor->outputs, meta_monitor_get_spec (monitor));
++  MetaWaylandColorManagementOutput *cm_output;
++
++  if (!output)
++    return color_manager->default_record;
++
++  cm_output = ensure_color_management_output (color_manager, output);
++  update_output_record (cm_output);
++  return cm_output->record;
++}
++
+ static MetaWaylandImageDescription *
+ meta_wayland_image_description_new (MetaWaylandColorManager *color_manager,
+                                     struct wl_resource      *resource)
+@@ -380,7 +545,7 @@ meta_wayland_image_description_unref (MetaWaylandImageDescription *image_desc)
+ {
+   if (g_ref_count_dec (&image_desc->ref_count))
+     {
+-      g_clear_object (&image_desc->color_state);
++      g_clear_pointer (&image_desc->record, description_record_unref);
+       free (image_desc);
+     }
+ }
+@@ -404,81 +569,45 @@ meta_wayland_image_description_set_failed (MetaWaylandImageDescription        *i
+   wp_image_description_v1_send_failed (image_desc->resource, cause, message);
+ }
+ 
+-static gint
+-compare_ids (gconstpointer id_a,
+-             gconstpointer id_b,
+-             gpointer      user_data)
+-{
+-  return GPOINTER_TO_INT (id_a) - GPOINTER_TO_INT (id_b);
+-}
+-
+ static void
+-on_color_state_destroyed (ClutterColorState       *color_state,
+-                          MetaWaylandColorManager *color_manager)
+-{
+-  uint32_t id = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (color_state),
+-                                                      image_desc_id_quark));
+-
+-  g_queue_insert_sorted (color_manager->ids.to_reuse,
+-                         GUINT_TO_POINTER (id),
+-                         compare_ids, NULL);
+-}
+-
+-static uint32_t
+-get_image_description_id (ClutterColorState       *color_state,
+-                          MetaWaylandColorManager *color_manager)
+-{
+-  uint32_t id = GPOINTER_TO_UINT (g_object_get_qdata (G_OBJECT (color_state),
+-                                                      image_desc_id_quark));
+-  if (id != 0)
+-    return id;
+-
+-  if (!g_queue_is_empty (color_manager->ids.to_reuse))
+-    id = GPOINTER_TO_UINT (g_queue_pop_head (color_manager->ids.to_reuse));
+-  else
+-    id = ++color_manager->ids.next_id;
+-
+-  g_object_set_qdata (G_OBJECT (color_state),
+-                      image_desc_id_quark,
+-                      GUINT_TO_POINTER (id));
+-
+-  g_signal_connect_object (G_OBJECT (color_state),
+-                           "destroyed",
+-                           G_CALLBACK (on_color_state_destroyed),
+-                           color_manager, G_CONNECT_DEFAULT);
+-
+-  return id;
+-}
+-
+-static void
+-meta_wayland_image_description_set_ready (MetaWaylandImageDescription      *image_desc,
+-                                          ClutterColorState                *color_state,
++meta_wayland_image_description_set_ready_record (MetaWaylandImageDescription      *image_desc,
++                                                 MetaWaylandDescriptionRecord      *record,
+                                           MetaWaylandImageDescriptionFlags  flags)
+ {
+   g_return_if_fail (image_desc->state == META_WAYLAND_IMAGE_DESCRIPTION_STATE_INIT);
+ 
+   image_desc->state = META_WAYLAND_IMAGE_DESCRIPTION_STATE_READY;
+   image_desc->has_info = !!(flags & META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
+-  image_desc->color_state = g_object_ref (color_state);
++  image_desc->record = description_record_ref (record);
+ 
+   if (!image_desc->resource)
+     return;
+ 
+   if (wl_resource_get_version (image_desc->resource) >= 2)
+     {
+-      uint64_t id = clutter_color_state_get_id (image_desc->color_state);
++      uint64_t id = record->identity64;
+       wp_image_description_v1_send_ready2 (image_desc->resource,
+                                            (uint32_t) (id >> 32),
+                                            (uint32_t) (id));
+     }
+   else
+     {
+-      uint32_t id = get_image_description_id (image_desc->color_state,
+-                                              image_desc->color_manager);
++      uint32_t id = record->identity;
+       wp_image_description_v1_send_ready (image_desc->resource, id);
+     }
+ }
+ 
++static void
++meta_wayland_image_description_set_ready (MetaWaylandImageDescription      *image_desc,
++                                          ClutterColorState                *color_state,
++                                          MetaWaylandImageDescriptionFlags  flags)
++{
++  g_autoptr (MetaWaylandDescriptionRecord) record =
++    description_record_get (image_desc->color_manager, color_state, NULL);
++
++  meta_wayland_image_description_set_ready_record (image_desc, record, flags);
++}
++
+ static void
+ image_description_destructor (struct wl_resource *resource)
+ {
+@@ -604,19 +733,23 @@ send_information_from_params (struct wl_resource *info_resource,
+                                                 float_to_scaled_uint32 (lum->min),
+                                                 (uint32_t) lum->max,
+                                                 (uint32_t) lum->ref);
+-  wp_image_description_info_v1_send_target_luminance (info_resource,
+-                                                      float_to_scaled_uint32 (lum->min),
+-                                                      (uint32_t) lum->max);
+ }
+ 
+ static void
+ send_information (struct wl_resource *info_resource,
+-                  ClutterColorState  *color_state)
++                  MetaWaylandDescriptionRecord *record)
+ {
++  ClutterColorState *color_state = record->color_state;
++
+   if (CLUTTER_IS_COLOR_STATE_ICC (color_state))
+     send_information_from_icc_profile (info_resource, color_state);
+   else if (CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
+-    send_information_from_params (info_resource, color_state);
++    {
++      send_information_from_params (info_resource, color_state);
++      wp_image_description_info_v1_send_target_luminance (info_resource,
++                                                         record->target_minimum,
++                                                         record->target_maximum);
++    }
+   else
+     g_assert_not_reached ();
+ }
+@@ -645,7 +778,7 @@ image_description_get_information (struct wl_client   *client,
+       return;
+     }
+ 
+-  g_return_if_fail (image_desc->color_state);
++  g_return_if_fail (image_desc->record);
+ 
+   info_resource =
+     wl_resource_create (client,
+@@ -653,7 +786,7 @@ image_description_get_information (struct wl_client   *client,
+                         wl_resource_get_version (resource),
+                         id);
+ 
+-  send_information (info_resource, image_desc->color_state);
++  send_information (info_resource, image_desc->record);
+ 
+   wp_image_description_info_v1_send_done (info_resource);
+   wl_resource_destroy (info_resource);
+@@ -666,6 +799,19 @@ static const struct wp_image_description_v1_interface
+   image_description_get_information,
+ };
+ 
++static void
++send_preferred_changed (struct wl_resource             *resource,
++                        MetaWaylandDescriptionRecord   *record)
++{
++  if (wl_resource_get_version (resource) >= 2)
++    wp_color_management_surface_feedback_v1_send_preferred_changed2 (resource,
++                                                                     (uint32_t) (record->identity64 >> 32),
++                                                                     (uint32_t) record->identity64);
++  else
++    wp_color_management_surface_feedback_v1_send_preferred_changed (resource,
++                                                                  record->identity);
++}
++
+ static void
+ update_preferred_color_state (MetaWaylandColorManagementSurface *cm_surface)
+ {
+@@ -673,9 +819,9 @@ update_preferred_color_state (MetaWaylandColorManagementSurface *cm_surface)
+   MetaMonitorManager *monitor_manager = get_monitor_manager (color_manager);
+   MetaWaylandSurface *surface = cm_surface->surface;
+   MetaLogicalMonitor *logical_monitor;
+-  ClutterColorState *color_state = NULL;
++  MetaWaylandDescriptionRecord *record = NULL;
+   GList *l;
+-  gboolean initial = !cm_surface->preferred_color_state;
++  gboolean initial = !cm_surface->preferred_record;
+ 
+   g_return_if_fail (surface != NULL);
+ 
+@@ -692,18 +838,22 @@ update_preferred_color_state (MetaWaylandColorManagementSurface *cm_surface)
+ 
+       g_return_if_fail (monitors != NULL);
+ 
+-      color_state = get_output_color_state (color_manager, monitors->data);
++      record = get_output_record (color_manager, monitors->data);
+     }
+ 
+-  if (!color_state)
+-    color_state = get_default_color_state (color_manager);
++  if (!record)
++    record = color_manager->default_record;
+ 
+-  if (cm_surface->preferred_color_state &&
+-      clutter_color_state_equals (color_state,
+-                                  cm_surface->preferred_color_state))
++  if (cm_surface->preferred_record &&
++      clutter_color_state_equals (record->color_state,
++                                  cm_surface->preferred_record->color_state) &&
++      record->target_minimum == cm_surface->preferred_record->target_minimum &&
++      record->target_maximum == cm_surface->preferred_record->target_maximum)
+     return;
+ 
+-  g_set_object (&cm_surface->preferred_color_state, color_state);
++  description_record_ref (record);
++  g_clear_pointer (&cm_surface->preferred_record, description_record_unref);
++  cm_surface->preferred_record = record;
+ 
+   if (initial)
+     return;
+@@ -712,18 +862,7 @@ update_preferred_color_state (MetaWaylandColorManagementSurface *cm_surface)
+     {
+       struct wl_resource *resource = l->data;
+ 
+-      if (wl_resource_get_version (resource) >= 2)
+-        {
+-          int64_t id = clutter_color_state_get_id (color_state);
+-          wp_color_management_surface_feedback_v1_send_preferred_changed2 (resource,
+-                                                                           (uint32_t) (id >> 32),
+-                                                                           (uint32_t) (id));
+-        }
+-      else
+-        {
+-          uint32_t id = get_image_description_id (color_state, color_manager);
+-          wp_color_management_surface_feedback_v1_send_preferred_changed (resource, id);
+-        }
++      send_preferred_changed (resource, record);
+     }
+ }
+ 
+@@ -795,7 +934,7 @@ meta_wayland_color_management_surface_free (MetaWaylandColorManagementSurface *c
+   g_hash_table_remove (cm_surface->color_manager->surfaces,
+                        cm_surface->surface);
+ 
+-  g_clear_object (&cm_surface->preferred_color_state);
++  g_clear_pointer (&cm_surface->preferred_record, description_record_unref);
+ 
+   free (cm_surface);
+ }
+@@ -874,7 +1013,7 @@ color_management_surface_set_image_description (struct wl_client   *client,
+       return;
+     }
+ 
+-  if (!image_desc->color_state ||
++  if (!image_desc->record ||
+       image_desc->state != META_WAYLAND_IMAGE_DESCRIPTION_STATE_READY)
+     {
+       wl_resource_post_error (resource,
+@@ -894,7 +1033,7 @@ color_management_surface_set_image_description (struct wl_client   *client,
+       return;
+     }
+ 
+-  set_image_description (cm_surface, image_desc->color_state);
++  set_image_description (cm_surface, image_desc->record->color_state);
+ }
+ 
+ static void
+@@ -965,6 +1104,7 @@ meta_wayland_color_management_output_free (MetaWaylandColorManagementOutput *cm_
+     }
+ 
+   g_clear_list (&cm_output->resources, NULL);
++  g_clear_pointer (&cm_output->record, description_record_unref);
+ 
+   g_clear_signal_handler (&cm_output->output_destroyed_handler_id,
+                           cm_output->output);
+@@ -1034,11 +1174,10 @@ color_management_output_get_image_description (struct wl_client   *client,
+   if (cm_output)
+     {
+       MetaMonitor *monitor = meta_wayland_output_get_monitor (cm_output->output);
+-      ClutterColorState *color_state =
+-        get_output_color_state (color_manager, monitor);
++      MetaWaylandDescriptionRecord *record = get_output_record (color_manager, monitor);
+ 
+-      meta_wayland_image_description_set_ready (image_desc,
+-                                                color_state,
++      meta_wayland_image_description_set_ready_record (image_desc,
++                                                       record,
+                                                 META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+                                                 META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
+     }
+@@ -1681,8 +1820,8 @@ color_management_surface_feedback_get_preferred (struct wl_client   *client,
+ 
+   image_desc = meta_wayland_image_description_new (color_manager,
+                                                    image_desc_resource);
+-  meta_wayland_image_description_set_ready (image_desc,
+-                                            cm_surface->preferred_color_state,
++  meta_wayland_image_description_set_ready_record (image_desc,
++                                                  cm_surface->preferred_record,
+                                             META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+                                             META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
+ 
+@@ -1746,11 +1885,12 @@ color_manager_get_surface_feedback (struct wl_client   *client,
+                                   cm_surface,
+                                   color_management_surface_feedback_destructor);
+ 
++  update_preferred_color_state (cm_surface);
++
+   cm_surface->feedback_resources =
+     g_list_prepend (cm_surface->feedback_resources,
+                     cm_surface_feedback_resource);
+-
+-  update_preferred_color_state (cm_surface);
++  send_preferred_changed (cm_surface_feedback_resource, cm_surface->preferred_record);
+ }
+ 
+ static void
+@@ -1931,9 +2071,12 @@ update_output_color_state (MetaWaylandColorManager *color_manager,
+   wayland_output = g_hash_table_lookup (color_manager->compositor->outputs,
+                                         meta_monitor_get_spec (monitor));
+ 
+-  cm_output = g_hash_table_lookup (color_manager->outputs, wayland_output);
++  if (!wayland_output)
++    return;
+ 
+-  if (cm_output)
++  cm_output = ensure_color_management_output (color_manager, wayland_output);
++
++  if (update_output_record (cm_output))
+     {
+       GList *l;
+ 
+@@ -1943,15 +2086,20 @@ update_output_color_state (MetaWaylandColorManager *color_manager,
+ 
+           wp_color_management_output_v1_send_image_description_changed (resource);
+         }
++
++      for (l = (GList *) meta_wayland_output_get_resources (wayland_output); l; l = l->next)
++        {
++          struct wl_resource *resource = l->data;
++
++          if (wl_resource_get_version (resource) >= WL_OUTPUT_DONE_SINCE_VERSION)
++            wl_output_send_done (resource);
++        }
+     }
+ 
+   g_hash_table_iter_init (&iter_surfaces, color_manager->surfaces);
+   while (g_hash_table_iter_next (&iter_surfaces, NULL, (gpointer *)&cm_surface))
+     {
+-      MetaWaylandSurface *surface = cm_surface->surface;
+-
+-      if (g_hash_table_contains (surface->outputs, wayland_output))
+-        update_preferred_color_state (cm_surface);
++      update_preferred_color_state (cm_surface);
+     }
+ }
+ 
+@@ -1973,11 +2121,33 @@ meta_wayland_color_manager_dispose (GObject *object)
+ 
+   g_clear_signal_handler (&color_manager->color_state_changed_handler_id,
+                           meta_color_manager);
++  g_clear_signal_handler (&color_manager->target_volume_changed_handler_id,
++                          meta_color_manager);
++
++  while (g_hash_table_size (color_manager->outputs) > 0)
++    {
++      GHashTableIter iter;
++      gpointer value;
++
++      g_hash_table_iter_init (&iter, color_manager->outputs);
++      g_hash_table_iter_next (&iter, NULL, &value);
++      meta_wayland_color_management_output_free (value);
++    }
++  while (g_hash_table_size (color_manager->surfaces) > 0)
++    {
++      GHashTableIter iter;
++      gpointer value;
++
++      g_hash_table_iter_init (&iter, color_manager->surfaces);
++      g_hash_table_iter_next (&iter, NULL, &value);
++      meta_wayland_color_management_surface_free (value);
++    }
+ 
+   g_clear_pointer (&color_manager->outputs, g_hash_table_destroy);
+   g_clear_pointer (&color_manager->surfaces, g_hash_table_destroy);
+ 
+-  g_clear_pointer (&color_manager->ids.to_reuse, g_queue_free);
++  g_clear_pointer (&color_manager->default_record, description_record_unref);
++  g_clear_pointer (&color_manager->ids, description_ids_unref);
+ 
+   G_OBJECT_CLASS (meta_wayland_color_manager_parent_class)->dispose (object);
+ }
+@@ -1988,7 +2158,11 @@ meta_wayland_color_manager_init (MetaWaylandColorManager *color_manager)
+   color_manager->outputs = g_hash_table_new (NULL, NULL);
+   color_manager->surfaces = g_hash_table_new (NULL, NULL);
+ 
+-  color_manager->ids.to_reuse = g_queue_new ();
++  color_manager->ids = g_new0 (MetaWaylandDescriptionIds, 1);
++  g_ref_count_init (&color_manager->ids->ref_count);
++  color_manager->ids->to_reuse = g_queue_new ();
++  color_manager->ids->records =
++    g_hash_table_new (description_record_hash, description_record_equal);
+ }
+ 
+ static void
+@@ -1998,7 +2172,6 @@ meta_wayland_color_manager_class_init (MetaWaylandColorManagerClass *klass)
+ 
+   object_class->dispose = meta_wayland_color_manager_dispose;
+ 
+-  image_desc_id_quark = g_quark_from_static_string ("-image-desc-id");
+ }
+ 
+ static MetaWaylandColorManager *
+@@ -2009,12 +2182,18 @@ meta_wayland_color_manager_new (MetaWaylandCompositor *compositor)
+ 
+   color_manager = g_object_new (META_TYPE_WAYLAND_COLOR_MANAGER, NULL);
+   color_manager->compositor = compositor;
++  color_manager->default_record =
++    description_record_get (color_manager, get_default_color_state (color_manager), NULL);
+ 
+   meta_color_manager = get_meta_color_manager (color_manager);
+   color_manager->color_state_changed_handler_id =
+     g_signal_connect_object (meta_color_manager, "device-color-state-changed",
+                              G_CALLBACK (on_device_color_state_changed),
+                              color_manager, 0);
++  color_manager->target_volume_changed_handler_id =
++    g_signal_connect_object (meta_color_manager, "device-target-volume-changed",
++                             G_CALLBACK (on_device_color_state_changed),
++                             color_manager, 0);
+ 
+   return color_manager;
+ }
+-- 
+2.54.0 (Apple Git-157)
+

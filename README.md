@@ -33,6 +33,12 @@ explains private inspection of factory profile data.
 target-volume reporting, calibration and KMS metadata in pinned source.
 [Native luminance API](docs/NATIVE_LUMINANCE_API.md) documents the additive
 physical-declaration API and its source-only qualification boundary.
+[Mutter target feedback](docs/MUTTER_TARGET_LUMINANCE.md) specifies independent
+physical-target state, immutable descriptions and their qualification.
+[Wine file API implementation](docs/WINE_FILE_FROMAPP.md) scopes the missing
+function correction and its desktop-only compatibility evidence.
+[HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) defines reproducible
+synthetic PQ inputs and the separate official-reference workflow.
 
 ## Work with the repository
 
@@ -58,6 +64,7 @@ any live compositor or kernel update.
   local changes from authenticated Ubuntu source imports, including the
   delivered prefixes and explicitly marked unreleased candidates. These are alternative packaging paths to the upstream series.
 - `patches/linux/` — four native luminance/backlight/parser-test patches.
+- `patches/wine/` — bounded Windows API compatibility work for processor investigation.
 - `sources.json` · `SHA256SUMS` — source identities and patch integrity.
 - `docs/` — maintained technical documentation, indexed above.
 - `evidence/` — small reproducible migration/validation receipts. Large or

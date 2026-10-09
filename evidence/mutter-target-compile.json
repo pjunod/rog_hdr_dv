@@ -1,0 +1,73 @@
+{
+  "status": "PASS",
+  "scope": "Linux ARM64 source-only compilation; production and focused regression binaries; no package delivery claim",
+  "mutter": {
+    "base_commit": "f8b71478843220c0de2d68b73add82231c6f3909",
+    "commit": "4db354c816e7ac72091a246b7b2eb8adee9a9412",
+    "tree": "08611d1053a276779b47f8f9151dd528f51a653e",
+    "source_archive_sha256": "da0783d410f948b95c06a2a9d1603f536e8ec476a65c92dd417571b2021c99b2",
+    "tracked_files_and_symlinks_verified": 2302
+  },
+  "library": {
+    "commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+    "tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
+    "source_archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c",
+    "linkage": "Source-built shared library; explicit new-function API configure/link requirement, not numeric version alone",
+    "configure_command": "meson setup /work/build/libdisplay-physical /work/source/libdisplay-physical -Dwerror=true",
+    "compile_command": "ninja -j2 -C /work/build/libdisplay-physical libdisplay-info.so.0.3.0",
+    "runtime_resolution": "ELF RPATH and ldd resolve /work/build/libdisplay-physical/libdisplay-info.so.3"
+  },
+  "environment": {
+    "distribution": "Ubuntu26.10 stonking ARM64",
+    "image_digest": "sha256:73b76549166d2d32444ccbd2b79b34381a1b3e25fd150cdd7fb12383fe7ebdc2",
+    "compiler": "GCC15.3.0 Ubuntu15.3.0-4ubuntu1",
+    "linker": "GNU ld2.47",
+    "meson": "1.10.1",
+    "ninja": "1.13.2",
+    "authenticated_guest_dependencies": true
+  },
+  "options": {
+    "werror": true,
+    "buildtype": "debug",
+    "assertions_enabled": true,
+    "parallel_jobs": 2
+  },
+  "configure_command": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled LD_LIBRARY_PATH=/work/build/libdisplay-physical meson setup /work/build/mutter-target /work/source/mutter-baseline -Dremote_desktop=true -Dwerror=true",
+  "compile_command": "ninja -j2 -C /work/build/mutter-target src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
+  "exit": 0,
+  "new_symbols": {
+    "meta_color_device_get_color_state": "51.0-1ubuntu3+nativehdr3~",
+    "meta_color_device_get_target_luminance": "51.0-1ubuntu3+nativehdr3~",
+    "meta_color_device_update": "51.0-1ubuntu3+nativehdr3~",
+    "meta_color_target_luminance_init": "51.0-1ubuntu3+nativehdr3~"
+  },
+  "compiled_binary_sha256": {
+    "src/libmutter-51.so.0.0.0": "c685dd28e157c4113f536b176b4c14ad9dd118955b656a9fcb0565b191eaebfd",
+    "src/tests/mutter-native-hdr": "44e441e63ed6de6034628b0c98d996184ab1f9e98834b674269612c4b93a04d4",
+    "src/tests/mutter-wayland-color-management": "d9b10e7fc9b6cc1567cf3d8eb34a77727d621b048acb2d3a3093ee5b3dd9a03f",
+    "src/tests/wayland-test-clients/color-management": "ea584c9f6fc89af2179cf565aa8c65174b055646f6e7adf43dba08d59bd3f85c"
+  },
+  "formatting": {
+    "uncrustify": "0.78.1_f",
+    "project_check_style_exit": 0,
+    "final_delta_from_reviewed_922fcac": "Formatting only; identical C token sequences including literals/comments"
+  },
+  "runtime_receipt": "mutter-target-runtime.json",
+  "limitations": [
+    "ARM64 compile evidence is not amd64 package qualification",
+    "No physical measurements, calibration, installation or live-display changes",
+    "No credentials, repository metadata or OEM data transferred"
+  ],
+  "schema_version": 1,
+  "date": "2026-10-09",
+  "gvdb_commit": "b54bc5da25127ef416858a3ad92e57159ff565b3",
+  "dependency_versions": {
+    "glib": "2.90.0",
+    "schemas": "51.0",
+    "wayland": "1.26.0",
+    "wayland_protocols": "1.49",
+    "libinput": "1.31.3",
+    "libei": "1.5.0",
+    "pipewire": "1.6.8"
+  }
+}

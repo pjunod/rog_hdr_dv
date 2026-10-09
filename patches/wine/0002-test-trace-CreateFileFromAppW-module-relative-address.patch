@@ -1,0 +1,27 @@
+From 68c5cce867c8c5dc7e318eefc4c13f832d0471fa Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 00:44:12 -0400
+Subject: [PATCH] tests: trace the resolved file API module for fixture
+ verification
+
+---
+ dlls/kernelbase/tests/file_fromapp.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/dlls/kernelbase/tests/file_fromapp.c b/dlls/kernelbase/tests/file_fromapp.c
+index c0362b6..ff73e64 100644
+--- a/dlls/kernelbase/tests/file_fromapp.c
++++ b/dlls/kernelbase/tests/file_fromapp.c
+@@ -201,6 +201,9 @@ START_TEST(file_fromapp)
+                 win_skip("CreateFileFromAppW unavailable, error %lu.\n", GetLastError());
+             else
+             {
++                HMODULE kernelbase = GetModuleHandleA("kernelbase.dll");
++                trace("Module %p; CreateFileFromAppW RVA %#Ix relative to kernelbase %p.\n",
++                      module, (UINT_PTR)create_file - (UINT_PTR)kernelbase, kernelbase);
+                 test_dispositions(create_file, path);
+                 test_access_and_flags(create_file, path);
+             }
+-- 
+2.54.0 (Apple Git-157)
+

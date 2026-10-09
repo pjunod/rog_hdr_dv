@@ -1,7 +1,7 @@
 # Review — adversarial findings and the current implementation batch
 
-**Updated:** 2026-10-09 UTC · **State:** findings addressed; candidate reviewed
-and affected fast lane passed.
+**Updated:** 2026-10-09 UTC · **State:** prior batches merged; fourth batch
+review findings addressed and all selected runtime checks passed.
 
 Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
@@ -102,3 +102,74 @@ exports are the API addition and its test-fixture correction on each source base
 The final repository integrity check passed for 32 patches, five series and
 documentation links. Both owned library build containers were removed after
 retaining source-bound receipts; source checkouts remain for consumer work.
+
+## Fourth batch — native target feedback and reference preparation
+
+Independent adversarial review of PR 4 requested three corrections in the
+Mutter candidate before runtime tests:
+
+| Finding | Required correction | State |
+|---|---|---|
+| Primary/topology changes can leave an unmapped surface's preferred target stale | Refresh records and preferred feedback after the Wayland output table changes; cover primary switch and removal | Addressed and approved |
+| Two fallback assertions require exactly 10000 internally, while PQ encoding preserves minimum plus its 10000-unit swing | Compare against actual encoding luminance; keep the integer wire expectation separate | Addressed and approved |
+| A physical range can collapse after maximum luminance is quantized to whole nits | Require a strictly positive published range and cover the equality boundary | Addressed and approved |
+
+A correction-delta review also caught a fixture assumption: the global force-HDR
+setting changes the second output. The fixture now expects those events and
+uses a fresh second-output identity before topology changes, while retaining
+the original immutable snapshot and unrelated-output silence checks for native
+target-only updates. No test execution was needed to identify either fixture
+issue. Independent delta review approved final source `a04bc3ecde3f425cd90d4017c57ad2840475682f`.
+
+No additional actionable issues were found in the Wine wrapper/export,
+synthetic corpus encoding, immutable description ownership, v2 identity
+allocation or narrowly scoped public-certificate scan exception. The Mutter
+runtime tests explicitly use UID 1000; dependency installation and compilation
+use root only inside the owned guest. Lack of Docker privileged mode alone
+does not mean a process has a non-root UID.
+
+Focused runtime tests completed after the findings and their
+correction deltas were approved. The 11 new corpus tests passed on their first
+run; both complete patch series reconstructed to their pinned source trees. The owner separately accepted the official Dolby tools and a private offline
+reference experiment completed. Proprietary processing details and results
+remain outside the public repository.
+
+The first runtime pass found a shutdown lifetime defect: qdata released the
+colour manager after the compositor had already freed its outputs. A bounded
+GDB run of the failed test identified the stale output access in signal
+disconnection. Explicit colour-manager finalization now precedes output
+teardown, after canonical shutdown has destroyed clients. The two new Wayland
+fixtures also used nonconsecutive synchronization serials; their numbering is
+corrected without weakening the helper. The eight native checks passed and
+remain valid. After independent review of the correction, the existing Wayland
+check passed including teardown. The two new checks exposed a synthetic-fixture
+mode reset during forced-HDR reconfiguration; product policy correctly fell
+back to the SDR target. A narrowly matched handler is now blocked only during
+the synchronous test setting change and immediately restored, preserving
+colour-device notifications. Independent review approved this fixed-route
+fixture correction; it does not qualify real monitor reconfiguration. Only
+the two failed protocol checks were retried; both passed on final source
+`4db354c816e7ac72091a246b7b2eb8adee9a9412`. Its change from the final reviewed
+semantic delta is official formatting only, with identical lexical tokens.
+All eleven selected compositor paths now have valid passing evidence.
+
+The Wine contract passed all 123 assertions with no failures or skips, using
+the exact reviewed source, DLL and test executable. Its failed attempts were
+private runner issues: malformed shell limit syntax, prefix truncation caused
+by a process-wide file-size limit, then an ASCII locale unable to represent
+the Unicode test filename. A diagnostic reproduced the latter through ordinary
+CreateFileW as well as the new entry point before the fixture selected UTF-8.
+Bounded log drainers replaced the global limit. The passing receipt identifies
+the loaded module and function offset; no OEM execution is implied.
+
+The owned Mutter build container was removed after source, binary and runtime
+evidence verification. The independent source clone and private receipts remain
+for subsequent packaging work.
+
+Final repository integrity passed for 41 patches, six series and documentation
+links. All earlier patch bytes remain unchanged. Gitleaks 8.30.1 found no leaks
+in the candidate tree or reachable history. Infrastructure-pattern matches were
+inspected: only the intentional path-redaction expression and synthetic privacy
+fixtures matched; no real infrastructure identifier was found. Final evidence
+and publication review approved the scoped claims after two stale tense
+statements were corrected.

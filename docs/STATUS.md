@@ -1,87 +1,86 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-09 (America/New_York) · **State:** HDR10 operational by owner report;
-full DV and measured image-quality acceptance open.
+**Updated:** 2026-10-09 (America/New_York) · **State:** HDR10 operational by owner
+report; full Dolby Vision and measured image-quality acceptance remain open.
 
-This is the current ledger. [Provenance](PROVENANCE.md) identifies inherited
-evidence; [development](DEVELOPMENT.md) defines new checks. Importing patches
-into this repository is not a fresh build or hardware qualification.
+The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
+distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
+defines validation, and [review](REVIEW.md) records findings and their resolution.
+Source qualification is separate from package delivery and physical measurement.
 
-See [the visual status page](STATUS.html) for the current workboard and
-[the review ledger](REVIEW.md) for findings. The first implementation batch
-adds reproducible read-only diagnostics and an isolated OEM activation probe.
-Adversarial findings are resolved; all 45 Python tests and the repository
-integrity check passed. Live collection and bounded activation were executed.
+## Fourth batch — native target feedback and processor prerequisites
 
-The [display inspector](DISPLAY_DIAGNOSTICS.md) captured the configured
-2560×1600/240 Hz BT.2100 output and one colord display association. Scanout was
-disabled at capture time, so active-output colour qualification remains open.
-The [Dolby activation probe](DOLBY_ACTIVATION_PROBE.md) initialized COM, WinRT
-and Media Foundation but stopped at DLL loading: Wine 9.0 lacks the imported
-`api-ms-win-core-file-fromapp-l1-1-0.dll`. Processor activation was not reached.
-The reviewed experiment changed no live display settings; raw results are
-private. Full Dolby Vision remains unimplemented/unqualified.
+[PR 4](https://github.com/pjunod/rog_hdr_dv/pull/4) adds three components:
 
-## Third batch — native physical-luminance API ready
-
-An additive [libdisplay-info low-level API](NATIVE_LUMINANCE_API.md) is implemented for the native
-DisplayID 2 display-parameters luminance fields. It preserves fractional
-physical minimum/full-frame/small-window data and distinguishes absent fields
-from zero. It leaves legacy CTA desired-content metadata unchanged, so a
-future compositor target policy can use physical declarations explicitly.
-
-The work uses independent source clones and a disposable compiler environment.
-It is source work only: no package installation or display change on the host.
-Both final source candidates compiled with warnings as errors on Linux ARM64
-and emulated x86-64. Independent review approved the change. All 12 selected
-checks passed across the initial run and focused retries after correcting a
-reserved bit in synthetic CTA data. Both previous binaries passed against the
-new libraries; final series reconstruction matches both source trees.
-
-The compositor target-volume correction is next. Its separate Ubuntu ARM64
-compiler environment is being prepared. No new package is delivered: hdr6
-remains installed, while hdr7 is explicitly an unreleased source candidate.
-
-## Second batch — reviewed tools and concrete remaining contracts
-
-The [ICC inspector](ICC_CHARACTERISATION.md) parsed all four factory profile
-variants privately. Both CMDEF files contain identity MHC2 matrix/LUTs and
-616 cd/m² peak metadata; their standard ICC characterisation is nontrivial
-and differs by GPU route. These are data findings, not activated calibration.
-
-The [Wine API diagnostic](WINE_API_CONTRACT.md) ran on stock Wine 11.0:
-API-set loading succeeds, but `CreateFileFromAppW` lookup fails with Win32
-127. The required function contract remains unimplemented in that runtime.
-The disposable container was removed after saving private receipts.
-
-The [compositor audit](COLOUR_PIPELINE_AUDIT.md) identifies separate output
-target-volume reporting, display characterisation and mapping gaps in the
-exact Ubuntu source candidate. The first correction should carry physical
-target data separately from PQ encoding normalization. KMS content metadata
-must not be populated with a guessed panel peak.
-
-Adversarial review found no actionable defects. The repository check passed;
-all 16 new ICC tests passed across the initial run and a focused retry after
-correcting one malformed fixture. Unchanged suites were not rerun. The
-[review ledger](REVIEW.md) records the exact CI receipts.
-
-Mutter's `PowerSaveMode` returned `3` (off), consistent with the prior disabled
-scanout capture. Awake-output and optical acceptance remain open. Availability
-of a measurement instrument and official reference-tool package is unanswered;
-software source corrections can proceed independently.
-
-| Component | State | Remaining evidence/work |
+| Component | Qualified evidence | Remaining delivery or acceptance |
 |---|---|---|
-| Native HDR detection | Implemented and installed | Wider hardware/upstream acceptance |
-| Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and mode coverage |
-| Library | hdr6 delivered; additive hdr7 source qualified | i386/full packaging and compositor consumer integration remain |
-| Mutter | nativehdr2 delivered | Physical colour-path audit; unresolved historical flaky batch failure |
-| Full Dolby Vision | Missing function confirmed on stock Wine 11.0 | Implement the required file API semantics; continue native reference and processor routes |
-| General colour quality | Delivered-source audit complete | Separate physical target feedback from encoding, then implement and qualify mapping/calibration |
-| Exact-panel tuning | Factory ICC/MHC2 structures inspected | Implement the correct characterisation/calibration path and measure this unit |
-| Plurx | Independent downstream integration | Browser/native rendering route, metadata preservation and physical playback |
+| [Mutter physical-target feedback](MUTTER_TARGET_LUMINANCE.md) | Compiled with warnings as errors; independent review corrections addressed; all eleven selected checks passed across initial runs and focused retries | Package and verify active physical output |
+| [Wine file API](WINE_FILE_FROMAPP.md) | Reviewed, compiled; 123 focused assertions passed with no failures or skips; loaded module identity verified | Continue processor activation investigation |
+| [Synthetic HDR corpus](HDR_REFERENCE_CORPUS.md) | Eleven new tests passed; private official-reference experiment completed | Creative-trim and consumer-profile comparisons |
 
-## Installed baseline
+Mutter now keeps firmware-declared physical target luminance separate from PQ
+encoding and renderer state. Immutable Wayland descriptions preserve old
+snapshots and notify clients of target changes. The first test pass exposed a
+shutdown lifetime defect; explicit manager cleanup before output destruction
+fixes its demonstrated cause. Synthetic forced-HDR tests preserve
+their manually selected output mode while testing target policy. This fixed-route
+fixture does not qualify real monitor reconfiguration.
+
+Wine is used to investigate the Windows Dolby processor recovered from the
+factory image. The missing file function now passes its desktop API contract.
+Actual processor activation remains open; Wine is a candidate compatibility
+route, not a confirmed requirement of the final Linux solution. The HDR and
+colour-management changes are native Linux code.
+
+The owner supplied and accepted official Dolby Professional Tools v5.6.4.
+Private offline reference processing has completed. Proprietary tools,
+documentation, generated metadata, rendered outputs and numerical comparisons
+remain private. This establishes a reference workflow, not general playback,
+creative-trim fidelity or calibrated panel accuracy. Its processing container
+and owned runtime image were removed after retaining private evidence.
+
+No host package, live display setting, boot selection or calibration changed
+in this batch. Mutter remains ARM64 source qualification; delivery needs amd64
+Mutter and matching amd64/i386 library packaging.
+
+## Overall remaining work
+
+| Area | State | Remaining work or acceptance |
+|---|---|---|
+| Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
+| Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
+| Physical luminance library | hdr6 delivered; additive hdr7 source qualified | Matching packages and compositor consumer delivery |
+| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified | Merge, package and verify active output |
+| Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
+| General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
+| Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
+| Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
+
+The owner has no colourimeter or spectrophotometer yet and is open to obtaining
+one. Software work continues independently. Define the measurement procedure
+and OLED correction before choosing equipment. Firmware and factory-profile
+values are not measurements of this particular unit.
+
+## Completed source batches
+
+1. **Repository, diagnostics and activation probe:** ordered patch provenance,
+   public source reconstruction inputs, read-only diagnostics and an isolated
+   activation probe. Review findings resolved; 45 Python tests and repository
+   integrity passed. Live capture reported BT.2100 at 2560×1600/240 Hz, but the
+   display was powered off, so active scanout remains unqualified. The original
+   Wine 9 probe initialized COM/WinRT/Media Foundation and stopped at DLL loading.
+2. **Profile interpretation and colour audit:** four factory ICC variants were
+   parsed privately. MHC2 transforms are identity; standard characterisation
+   differs by GPU route. All 16 new ICC tests passed across the initial run and
+   one corrected-fixture retry. Stock Wine 11 isolated the missing file export.
+3. **[Native physical-luminance API](NATIVE_LUMINANCE_API.md):** merged in
+   [PR 3](https://github.com/pjunod/rog_hdr_dv/pull/3). Additive API preserves
+   fractional physical luminance and field presence separately from CTA metadata.
+   ARM64 and emulated amd64 builds passed with warnings as errors; 12 selected
+   checks passed with only the corrected synthetic fixture retried. Previous
+   consumer binaries passed against the new libraries; both series reconstructed.
+
+## Installed baseline and inherited evidence
 
 - Kernel `7.3.0-rc5-nativehdr1`, from Ubuntu `7.3.0-8.8` plus four patches.
 - libdisplay-info `0.3.0-1ubuntu1~hdr6`, amd64 and i386.
@@ -89,27 +88,23 @@ software source corrections can proceed independently.
 - NVIDIA `615.71.09`; Secure Boot remains enabled.
 - mpv `0.41.0`, libplacebo `7.360.1`, FFmpeg `8.1.2` at inspection.
 
-## Inherited qualification receipts
-
-The preceding workspace records upstream library GCC/Clang suites at 75/75,
-Ubuntu library suites at 40/40 per architecture, ABI/export checks, and actual
-package install/offline rollback. Mutter's six focused regressions passed;
-its ordinary package batch had 190 passes and five expected failures. A
-marked-flaky batch had one unresolved `map-after-headless` failure; isolated
-passes did not prove it unrelated.
+Historical receipts record upstream library GCC/Clang suites at 75/75, Ubuntu
+library suites at 40/40 per architecture, ABI/export checks and actual package
+install/offline rollback. Mutter's six focused regressions passed; its ordinary
+package batch had 190 passes and five expected failures. A marked-flaky batch
+had one unresolved `map-after-headless` failure; isolated passes did not establish
+that it was unrelated.
 
 Kernel receipts record affected DRM/i915/xe compilation, sparse, four KUnit
 groups, full package builds, signature checks and delivered-header NVIDIA
 builds. Initial physical boot and working HDR10 were subsequently reported.
-These are scoped historical results, not newly rerun here.
+These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-1. Implement separate physical-target feedback in Mutter using the newly
-   qualified library API; preserve PQ encoding and immutable Wayland descriptions.
-2. Probe the OEM processor contract and evaluate a native/open full-DV route.
-3. Implement generic colour corrections and panel characterisation separately.
-4. Qualify multiple applications, including Plurx, then measure and package.
-
-The staged acceptance criteria live in
+Continue the bounded processor activation experiment and native/full-DV
+route evaluation alongside
+colour-pipeline implementation. Package and install source-qualified components
+in a coordinated recovery-ready window; qualify actual output before optical
+calibration. The staged acceptance criteria remain in
 [Dolby Vision and display quality](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance).

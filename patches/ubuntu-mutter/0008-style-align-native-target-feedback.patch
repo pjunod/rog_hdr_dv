@@ -1,0 +1,465 @@
+From dea8fd02b7540cee5c499fbd44cf312ba7e2456e Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 00:55:36 -0400
+Subject: [PATCH] style(color): apply project formatting to native target
+ feedback
+
+---
+ src/tests/wayland-color-management-test.c     |   2 +-
+ .../wayland-test-clients/color-management.c   | 147 +++++++++++++-----
+ src/wayland/meta-wayland-color-management.c   |  36 ++---
+ 3 files changed, 125 insertions(+), 60 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 3817251..c676e1d 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -173,7 +173,7 @@ color_management (void)
+ 
+ static void
+ count_color_signal (MetaColorDevice *device,
+-                     unsigned int    *count)
++                    unsigned int    *count)
+ {
+   (*count)++;
+ }
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 2da345f..ce8f409 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -290,20 +290,32 @@ typedef struct
+ } TargetClient;
+ 
+ static void
+-target_output_geometry (void *data, struct wl_output *output, int32_t x, int32_t y,
+-                        int32_t width, int32_t height, int32_t subpixel,
+-                        const char *make, const char *model, int32_t transform)
++target_output_geometry (void             *data,
++                        struct wl_output *output,
++                        int32_t           x,
++                        int32_t           y,
++                        int32_t           width,
++                        int32_t           height,
++                        int32_t           subpixel,
++                        const char       *make,
++                        const char       *model,
++                        int32_t           transform)
+ {
+ }
+ 
+ static void
+-target_output_mode (void *data, struct wl_output *output, uint32_t flags,
+-                    int32_t width, int32_t height, int32_t refresh)
++target_output_mode (void             *data,
++                    struct wl_output *output,
++                    uint32_t          flags,
++                    int32_t           width,
++                    int32_t           height,
++                    int32_t           refresh)
+ {
+ }
+ 
+ static void
+-target_output_done (void *data, struct wl_output *output)
++target_output_done (void             *data,
++                    struct wl_output *output)
+ {
+   TargetOutput *target = data;
+ 
+@@ -312,12 +324,16 @@ target_output_done (void *data, struct wl_output *output)
+ }
+ 
+ static void
+-target_output_scale (void *data, struct wl_output *output, int32_t factor)
++target_output_scale (void             *data,
++                     struct wl_output *output,
++                     int32_t           factor)
+ {
+ }
+ 
+ static void
+-target_output_name (void *data, struct wl_output *output, const char *name)
++target_output_name (void             *data,
++                    struct wl_output *output,
++                    const char       *name)
+ {
+   TargetOutput *target = data;
+ 
+@@ -326,7 +342,9 @@ target_output_name (void *data, struct wl_output *output, const char *name)
+ }
+ 
+ static void
+-target_output_description (void *data, struct wl_output *output, const char *description)
++target_output_description (void             *data,
++                           struct wl_output *output,
++                           const char       *description)
+ {
+ }
+ 
+@@ -340,12 +358,15 @@ static const struct wl_output_listener target_output_listener = {
+ };
+ 
+ static void
+-target_manager_enum (void *data, struct wp_color_manager_v1 *manager, uint32_t value)
++target_manager_enum (void                       *data,
++                     struct wp_color_manager_v1 *manager,
++                     uint32_t                    value)
+ {
+ }
+ 
+ static void
+-target_manager_done (void *data, struct wp_color_manager_v1 *manager)
++target_manager_done (void                       *data,
++                     struct wp_color_manager_v1 *manager)
+ {
+ }
+ 
+@@ -358,8 +379,11 @@ static const struct wp_color_manager_v1_listener target_manager_listener = {
+ };
+ 
+ static void
+-target_registry_global (void *data, struct wl_registry *registry, uint32_t name,
+-                        const char *interface, uint32_t version)
++target_registry_global (void               *data,
++                        struct wl_registry *registry,
++                        uint32_t            name,
++                        const char         *interface,
++                        uint32_t            version)
+ {
+   TargetClient *client = data;
+ 
+@@ -382,7 +406,9 @@ target_registry_global (void *data, struct wl_registry *registry, uint32_t name,
+ }
+ 
+ static void
+-target_registry_remove (void *data, struct wl_registry *registry, uint32_t name)
++target_registry_remove (void               *data,
++                        struct wl_registry *registry,
++                        uint32_t            name)
+ {
+ }
+ 
+@@ -392,14 +418,18 @@ static const struct wl_registry_listener target_registry_listener = {
+ };
+ 
+ static void
+-target_image_failed (void *data, struct wp_image_description_v1 *description,
+-                     uint32_t cause, const char *message)
++target_image_failed (void                           *data,
++                     struct wp_image_description_v1 *description,
++                     uint32_t                        cause,
++                     const char                     *message)
+ {
+   g_error ("Synthetic target description failed");
+ }
+ 
+ static void
+-target_image_ready (void *data, struct wp_image_description_v1 *description, uint32_t identity)
++target_image_ready (void                           *data,
++                    struct wp_image_description_v1 *description,
++                    uint32_t                        identity)
+ {
+   TargetSnapshot *snapshot = data;
+ 
+@@ -407,8 +437,10 @@ target_image_ready (void *data, struct wp_image_description_v1 *description, uin
+ }
+ 
+ static void
+-target_image_ready2 (void *data, struct wp_image_description_v1 *description,
+-                     uint32_t hi, uint32_t lo)
++target_image_ready2 (void                           *data,
++                     struct wp_image_description_v1 *description,
++                     uint32_t                        hi,
++                     uint32_t                        lo)
+ {
+   TargetSnapshot *snapshot = data;
+ 
+@@ -422,46 +454,66 @@ static const struct wp_image_description_v1_listener target_image_listener = {
+ };
+ 
+ static void
+-target_info_done (void *data, struct wp_image_description_info_v1 *info)
++target_info_done (void                                *data,
++                  struct wp_image_description_info_v1 *info)
+ {
+   ((TargetInfo *) data)->done = TRUE;
+ }
+ 
+ static void
+-target_info_icc (void *data, struct wp_image_description_info_v1 *info, int32_t fd, uint32_t size)
++target_info_icc (void                                *data,
++                 struct wp_image_description_info_v1 *info,
++                 int32_t                              fd,
++                 uint32_t                             size)
+ {
+   close (fd);
+   g_assert_not_reached ();
+ }
+ 
+ static void
+-target_info_primaries (void *data, struct wp_image_description_info_v1 *info,
+-                       int32_t rx, int32_t ry, int32_t gx, int32_t gy,
+-                       int32_t bx, int32_t by, int32_t wx, int32_t wy)
++target_info_primaries (void                                *data,
++                       struct wp_image_description_info_v1 *info,
++                       int32_t                              rx,
++                       int32_t                              ry,
++                       int32_t                              gx,
++                       int32_t                              gy,
++                       int32_t                              bx,
++                       int32_t                              by,
++                       int32_t                              wx,
++                       int32_t                              wy)
+ {
+ }
+ 
+ static void
+-target_info_named (void *data, struct wp_image_description_info_v1 *info, uint32_t value)
++target_info_named (void                                *data,
++                   struct wp_image_description_info_v1 *info,
++                   uint32_t                             value)
+ {
+   ((TargetInfo *) data)->primaries = value;
+ }
+ 
+ static void
+-target_info_tf (void *data, struct wp_image_description_info_v1 *info, uint32_t value)
++target_info_tf (void                                *data,
++                struct wp_image_description_info_v1 *info,
++                uint32_t                             value)
+ {
+   ((TargetInfo *) data)->tf = value;
+ }
+ 
+ static void
+-target_info_power (void *data, struct wp_image_description_info_v1 *info, uint32_t value)
++target_info_power (void                                *data,
++                   struct wp_image_description_info_v1 *info,
++                   uint32_t                             value)
+ {
+   g_assert_not_reached ();
+ }
+ 
+ static void
+-target_info_luminances (void *data, struct wp_image_description_info_v1 *info,
+-                        uint32_t minimum, uint32_t maximum, uint32_t reference)
++target_info_luminances (void                                *data,
++                        struct wp_image_description_info_v1 *info,
++                        uint32_t                             minimum,
++                        uint32_t                             maximum,
++                        uint32_t                             reference)
+ {
+   TargetInfo *target = data;
+ 
+@@ -472,8 +524,10 @@ target_info_luminances (void *data, struct wp_image_description_info_v1 *info,
+ }
+ 
+ static void
+-target_info_target (void *data, struct wp_image_description_info_v1 *info,
+-                    uint32_t minimum, uint32_t maximum)
++target_info_target (void                                *data,
++                    struct wp_image_description_info_v1 *info,
++                    uint32_t                             minimum,
++                    uint32_t                             maximum)
+ {
+   TargetInfo *target = data;
+ 
+@@ -483,7 +537,9 @@ target_info_target (void *data, struct wp_image_description_info_v1 *info,
+ }
+ 
+ static void
+-target_info_content (void *data, struct wp_image_description_info_v1 *info, uint32_t value)
++target_info_content (void                                *data,
++                     struct wp_image_description_info_v1 *info,
++                     uint32_t                             value)
+ {
+   ((TargetInfo *) data)->content_events++;
+ }
+@@ -503,7 +559,8 @@ static const struct wp_image_description_info_v1_listener target_info_listener =
+ };
+ 
+ static TargetInfo
+-read_target_info (WaylandDisplay *display, TargetSnapshot *snapshot)
++read_target_info (WaylandDisplay *display,
++                  TargetSnapshot *snapshot)
+ {
+   TargetInfo info = { 0 };
+   struct wp_image_description_info_v1 *resource =
+@@ -519,7 +576,8 @@ read_target_info (WaylandDisplay *display, TargetSnapshot *snapshot)
+ }
+ 
+ static void
+-wait_target_snapshot (WaylandDisplay *display, TargetSnapshot *snapshot)
++wait_target_snapshot (WaylandDisplay *display,
++                      TargetSnapshot *snapshot)
+ {
+   wp_image_description_v1_add_listener (snapshot->description, &target_image_listener, snapshot);
+   while (!snapshot->identity)
+@@ -527,7 +585,8 @@ wait_target_snapshot (WaylandDisplay *display, TargetSnapshot *snapshot)
+ }
+ 
+ static void
+-target_output_changed (void *data, struct wp_color_management_output_v1 *output)
++target_output_changed (void                                 *data,
++                       struct wp_color_management_output_v1 *output)
+ {
+   TargetOutput *target = data;
+ 
+@@ -541,8 +600,9 @@ static const struct wp_color_management_output_v1_listener target_color_output_l
+ };
+ 
+ static void
+-target_preferred_changed (void *data, struct wp_color_management_surface_feedback_v1 *feedback,
+-                          uint32_t identity)
++target_preferred_changed (void                                           *data,
++                          struct wp_color_management_surface_feedback_v1 *feedback,
++                          uint32_t                                        identity)
+ {
+   TargetClient *client = data;
+ 
+@@ -551,8 +611,10 @@ target_preferred_changed (void *data, struct wp_color_management_surface_feedbac
+ }
+ 
+ static void
+-target_preferred_changed2 (void *data, struct wp_color_management_surface_feedback_v1 *feedback,
+-                           uint32_t hi, uint32_t lo)
++target_preferred_changed2 (void                                           *data,
++                           struct wp_color_management_surface_feedback_v1 *feedback,
++                           uint32_t                                        hi,
++                           uint32_t                                        lo)
+ {
+   TargetClient *client = data;
+ 
+@@ -566,7 +628,9 @@ static const struct wp_color_management_surface_feedback_v1_listener target_feed
+ };
+ 
+ static void
+-check_target_events (TargetClient *client, TargetOutput *target, unsigned int count)
++check_target_events (TargetClient *client,
++                     TargetOutput *target,
++                     unsigned int  count)
+ {
+   unsigned int i;
+ 
+@@ -589,7 +653,8 @@ check_target_events (TargetClient *client, TargetOutput *target, unsigned int co
+ }
+ 
+ static void
+-target_luminance_client (WaylandDisplay *display, int version)
++target_luminance_client (WaylandDisplay *display,
++                         int             version)
+ {
+   TargetClient client = { .version = version };
+   struct wl_registry *registry = wl_display_get_registry (display->display);
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 3926c54..05d8988 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -440,15 +440,15 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MetaWaylandDescriptionRecord,
+                                description_record_unref)
+ 
+ static MetaWaylandDescriptionRecord *
+-description_record_get (MetaWaylandDescriptionIds     *ids,
+-                        ClutterColorState             *color_state,
+-                        const MetaColorTargetLuminance *target)
++description_record_get (MetaWaylandDescriptionIds * ids,
++                        ClutterColorState * color_state,
++                        const MetaColorTargetLuminance * target)
+ {
+   const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
+   MetaWaylandDescriptionRecord lookup = {
+     .color_state = color_state,
+     .target_minimum = (uint32_t) MIN ((double) ((target ? target->minimum : encoding->min) * 10000.0f),
+-                                     G_MAXUINT32),
++                                      G_MAXUINT32),
+     .target_maximum = (uint32_t) (target ? target->maximum : encoding->max),
+   };
+   MetaWaylandDescriptionRecord *record;
+@@ -488,8 +488,8 @@ update_output_record (MetaWaylandColorManagementOutput *cm_output)
+   g_autoptr (MetaWaylandDescriptionRecord) record = NULL;
+ 
+   record = description_record_get (color_manager->ids,
+-                                    get_output_color_state (color_manager, monitor),
+-                                    target);
++                                   get_output_color_state (color_manager, monitor),
++                                   target);
+   if (cm_output->record &&
+       clutter_color_state_equals (cm_output->record->color_state, record->color_state) &&
+       cm_output->record->target_minimum == record->target_minimum &&
+@@ -503,7 +503,7 @@ update_output_record (MetaWaylandColorManagementOutput *cm_output)
+ 
+ static MetaWaylandDescriptionRecord *
+ get_output_record (MetaWaylandColorManager *color_manager,
+-                    MetaMonitor             *monitor)
++                   MetaMonitor             *monitor)
+ {
+   MetaWaylandOutput *output =
+     g_hash_table_lookup (color_manager->compositor->outputs, meta_monitor_get_spec (monitor));
+@@ -575,9 +575,9 @@ meta_wayland_image_description_set_failed (MetaWaylandImageDescription        *i
+ }
+ 
+ static void
+-meta_wayland_image_description_set_ready_record (MetaWaylandImageDescription      *image_desc,
++meta_wayland_image_description_set_ready_record (MetaWaylandImageDescription       *image_desc,
+                                                  MetaWaylandDescriptionRecord      *record,
+-                                          MetaWaylandImageDescriptionFlags  flags)
++                                                 MetaWaylandImageDescriptionFlags   flags)
+ {
+   g_return_if_fail (image_desc->state == META_WAYLAND_IMAGE_DESCRIPTION_STATE_INIT);
+ 
+@@ -741,7 +741,7 @@ send_information_from_params (struct wl_resource *info_resource,
+ }
+ 
+ static void
+-send_information (struct wl_resource *info_resource,
++send_information (struct wl_resource           *info_resource,
+                   MetaWaylandDescriptionRecord *record)
+ {
+   ClutterColorState *color_state = record->color_state;
+@@ -752,8 +752,8 @@ send_information (struct wl_resource *info_resource,
+     {
+       send_information_from_params (info_resource, color_state);
+       wp_image_description_info_v1_send_target_luminance (info_resource,
+-                                                         record->target_minimum,
+-                                                         record->target_maximum);
++                                                          record->target_minimum,
++                                                          record->target_maximum);
+     }
+   else
+     g_assert_not_reached ();
+@@ -814,7 +814,7 @@ send_preferred_changed (struct wl_resource             *resource,
+                                                                      (uint32_t) record->identity64);
+   else
+     wp_color_management_surface_feedback_v1_send_preferred_changed (resource,
+-                                                                  record->identity);
++                                                                    record->identity);
+ }
+ 
+ static void
+@@ -1183,8 +1183,8 @@ color_management_output_get_image_description (struct wl_client   *client,
+ 
+       meta_wayland_image_description_set_ready_record (image_desc,
+                                                        record,
+-                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+-                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
++                                                       META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
++                                                       META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
+     }
+   else
+     {
+@@ -1825,9 +1825,9 @@ color_management_surface_feedback_get_preferred (struct wl_client   *client,
+   image_desc = meta_wayland_image_description_new (color_manager,
+                                                    image_desc_resource);
+   meta_wayland_image_description_set_ready_record (image_desc,
+-                                                  cm_surface->preferred_record,
+-                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+-                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
++                                                   cm_surface->preferred_record,
++                                                   META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
++                                                   META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
+ 
+   wl_resource_set_implementation (image_desc_resource,
+                                   &meta_wayland_image_description_interface,
+-- 
+2.54.0 (Apple Git-157)
+
