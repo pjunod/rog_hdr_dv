@@ -24,6 +24,8 @@ the imported work came from and how to interpret its evidence.
 [review findings](docs/REVIEW.md) records review dispositions and validation.
 [Display diagnostics](docs/DISPLAY_DIAGNOSTICS.md) explains the read-only
 Linux inspector and how to interpret its privacy-filtered report.
+[The Dolby activation probe](docs/DOLBY_ACTIVATION_PROBE.md) documents the
+isolated Windows API experiment, compiler receipt and remaining contracts.
 
 ## Work with the repository
 

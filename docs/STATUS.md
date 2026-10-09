@@ -15,6 +15,9 @@ final review, fast-lane checks and live diagnostic receipts are pending.
 The [display inspector](DISPLAY_DIAGNOSTICS.md) is implemented with fixture
 regressions awaiting the agreed pre-merge fast lane. It deliberately produces
 observations, not a universal HDR/DV support verdict.
+The [Dolby activation probe](DOLBY_ACTIVATION_PROBE.md) cross-compiles with
+warnings as errors in an isolated container. Runtime activation remains
+pending; no proprietary code or live display change is part of public CI.
 
 | Component | State | Remaining evidence/work |
 |---|---|---|
