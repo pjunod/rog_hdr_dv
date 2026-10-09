@@ -22,7 +22,21 @@ and Media Foundation but stopped at DLL loading: Wine 9.0 lacks the imported
 The reviewed experiment changed no live display settings; raw results are
 private. Full Dolby Vision remains unimplemented/unqualified.
 
-## Third batch — native physical-luminance API ready
+## Active source correction — compositor physical-target feedback
+
+The native luminance library work is merged in [PR 3](https://github.com/pjunod/rog_hdr_dv/pull/3).
+A separate Ubuntu ARM64 compiler loop has now built the pinned Mutter baseline
+with warnings as errors. Implementation is beginning for physical target
+luminance in output and preferred Wayland descriptions on the existing native
+HDR route. Target snapshots and notifications will be separate from encoding
+and renderer state; earlier image descriptions must remain immutable.
+
+This first compositor slice leaves CTA target policy, colour primaries, tone
+mapping, ICC application and KMS content metadata for their own evidence-based
+changes. Source compilation is not a live display update or optical result.
+Review and focused compositor checks will follow the completed candidate.
+
+## Third batch — native physical-luminance API merged
 
 An additive [libdisplay-info low-level API](NATIVE_LUMINANCE_API.md) is implemented for the native
 DisplayID 2 display-parameters luminance fields. It preserves fractional
@@ -38,8 +52,8 @@ checks passed across the initial run and focused retries after correcting a
 reserved bit in synthetic CTA data. Both previous binaries passed against the
 new libraries; final series reconstruction matches both source trees.
 
-The compositor target-volume correction is next. Its separate Ubuntu ARM64
-compiler environment is being prepared. No new package is delivered: hdr6
+The compositor target-volume correction is now in implementation. No new
+package is delivered: hdr6
 remains installed, while hdr7 is explicitly an unreleased source candidate.
 
 ## Second batch — reviewed tools and concrete remaining contracts
