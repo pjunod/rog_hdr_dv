@@ -171,11 +171,14 @@ class ProfileTests(unittest.TestCase):
 
     def test_header_and_tag_table_corruption_is_controlled(self):
         base = profile([(b"DVB1", typed(b"priv", b"PRIVATE_SERIAL"))])
+        # Remove the tag record's size word and keep the declared size exact,
+        # so the parser reaches the table-length check rather than size checks.
+        truncated_table = change(base[:140], 0, uint(140))
         cases = [(b"\0" * 127, "truncated_profile_header_or_table"),
                  (change(base, 0, uint(len(base) + 4)), "declared_size_mismatch"),
                  (change(base, 36, b"bad!"), "invalid_profile_signature"),
                  (change(base, 128, uint(257)), "tag_count_limit"),
-                 (change(base, 128, uint(3)), "truncated_tag_table"),
+                 (truncated_table, "truncated_tag_table"),
                  (change(base, 136, uint(145)), "tag_offset_misaligned"),
                  (change(base, 136, uint(128)), "tag_out_of_bounds"),
                  (change(base, 140, uint(0xffffffff)), "tag_out_of_bounds"),
