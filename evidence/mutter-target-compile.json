@@ -1,7 +1,7 @@
 {
   "scope": "Native firmware-declared HDR target luminance; ARM64 compile only",
-  "status": "candidate_compiled_tests_held",
-  "tests_executed": false,
+  "status": "wayland_root_cause_fixed_compiled_review_retries_held",
+  "tests_executed": true,
   "host_packages_installed": false,
   "live_display_changes": false,
   "source_transfer": "git archive only; no repository metadata, credentials or OEM data",
@@ -10,33 +10,34 @@
   "distribution": "Ubuntu 26.10 stonking",
   "mutter": {
     "base_commit": "f8b71478843220c0de2d68b73add82231c6f3909",
-    "commit": "a04bc3ecde3f425cd90d4017c57ad2840475682f",
-    "tree": "cbb5b082e8de7740f110b44033a453af7f94cfe6",
-    "archive_sha256": "4bf24530e57b4362008886a069e334ea918f9deb3b483b8924af760a47b0f791",
+    "commit": "113f7f4330f9a49e9f6f4be254f111ee2443b8fb",
+    "tree": "d55c5d37e76b0181ae5158adb5be18b55295becc",
+    "archive_sha256": "2691d92070ace4aa4e0b54ae00a9315a76369c9791aea996312e19e66dbbd901",
     "branch": "codex/output-target-volume",
     "commits": [
       "384ac30",
       "122d37d",
       "dea8fd0",
       "9c10145",
-      "a04bc3e"
+      "a04bc3e",
+      "113f7f4"
     ],
     "configure": "PKG_CONFIG_PATH=/work/build/libdisplay-physical/meson-uninstalled LD_LIBRARY_PATH=/work/build/libdisplay-physical meson setup /work/build/mutter-target /work/source/mutter-baseline -Dremote_desktop=true -Dwerror=true",
     "compile": "ninja -j2 -C /work/build/mutter-target src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
     "compile_exit": 0,
-    "compile_started_utc": "2026-10-09T05:07:46Z",
-    "compile_finished_utc": "2026-10-09T05:07:46Z",
+    "compile_started_utc": "2026-10-09T05:16:30Z",
+    "compile_finished_utc": "2026-10-09T05:16:31Z",
     "integrity": {
       "files_verified": 2302,
       "exact_final_archive": true,
       "binaries": {
-        "src/libmutter-51.so.0.0.0": "fcf7cfc2ec2897ff48270a8f3f040b7c12199bbb850fd0993c408d73a9b49de5",
+        "src/libmutter-51.so.0.0.0": "c685dd28e157c4113f536b176b4c14ad9dd118955b656a9fcb0565b191eaebfd",
         "src/tests/mutter-native-hdr": "44e441e63ed6de6034628b0c98d996184ab1f9e98834b674269612c4b93a04d4",
-        "src/tests/mutter-wayland-color-management": "147cca6065e107b00e17a70f82d298ec0c808ec0eb84444edcad6d3a78a0ccc2",
-        "src/tests/wayland-test-clients/color-management": "86a468670b76b6e4980b339fcaed86070bb16dc254155c7809699e491e1e9972"
+        "src/tests/mutter-wayland-color-management": "314ce35862bc01a375dbf6aed9b2287be57d73b9fefec07c243d7281a44fdfbd",
+        "src/tests/wayland-test-clients/color-management": "ea584c9f6fc89af2179cf565aa8c65174b055646f6e7adf43dba08d59bd3f85c"
       }
     },
-    "archive_path": "/private/tmp/mutter-target-fixture-final.tar"
+    "archive_path": "/private/tmp/mutter-target-teardown-final.tar"
   },
   "library": {
     "commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
@@ -90,7 +91,7 @@
     "tool": "Uncrustify-0.78.1_f",
     "check": "python3 check-style.py --dry-run --sha HEAD^",
     "exit": 0,
-    "source": "independent source-only disposable git checkout; fixture correction official formatter unchanged and dry-run exit0",
+    "source": "teardown correction official formatter unchanged; dry-run exit0",
     "token_sequences_unchanged": true
   },
   "new_exports": {
@@ -114,6 +115,17 @@
   ],
   "correction": "After output table refresh/removal inerting, refresh all immutable output records before preferences; primary-only fallback switch/removal regression; fallback assertions reference exact encoding max; wire-width equality boundary rejects min>=floor(max).",
   "fixture_correction": "Global force-HDR phases explicitly expect second-output changes/done; native-only phases retain quiet checks. Fresh other-output current snapshot immediately before primary topology; original snapshot retained and repeatedly checked immutable.",
+  "focused_results": "focused-receipt-a04bc3e.json: 8nativePASS, 3WaylandFAIL first attempts; initial8preflight invocations and one diagnostic separate. No qualification retries yet.",
+  "diagnostic": {
+    "authorization": "One bounded rerun of FAILED existing Wayland path only; diagnostic, not qualification",
+    "source_commit": "a04bc3ecde3f425cd90d4017c57ad2840475682f",
+    "gdb": "17.2-1ubuntu1 installed guest-only using authenticated Ubuntu apt",
+    "trace_file": "diagnostic-teardown-full.txt",
+    "trace_sha256": "e6968d96918548dfbb16a4a226186de95d0ec5174b259b9036bd9169f28ae34a",
+    "runner_log_sha256": "c098669e127e4013308a39109b249b99774f55ed82b00c44bae832503c9e5a23",
+    "result": "Confirmed SIGSEGV in g_signal_handler_disconnect from output_free during color_manager_dispose invoked after compositor outputs finalized."
+  },
+  "root_cause_fix": "Explicit color-management finalization before outputs destruction; manager owns/destroys protocol global. Fixture sync helper remains strict, serials consecutive0..9.",
   "date": "2026-10-09",
   "schema_version": 1
 }

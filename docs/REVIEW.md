@@ -132,3 +132,13 @@ correction deltas were approved. The 11 new corpus tests passed on their first
 run; both complete patch series reconstructed to their pinned source trees. Dolby executables have separately returned their
 versions in an isolated CPU environment following the owner's installer action;
 no reference frames have been processed.
+
+The first runtime pass found a shutdown lifetime defect: qdata released the
+colour manager after the compositor had already freed its outputs. A bounded
+GDB run of the failed test identified the stale output access in signal
+disconnection. Explicit colour-manager finalization now precedes output
+teardown, after canonical shutdown has destroyed clients. The two new Wayland
+fixtures also used nonconsecutive synchronization serials; their numbering is
+corrected without weakening the helper. The eight native checks passed and
+remain valid; only the three failed Wayland paths need qualification retries
+after this correction is reviewed.
