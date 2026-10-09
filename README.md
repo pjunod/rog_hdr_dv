@@ -37,6 +37,8 @@ physical-declaration API and its source-only qualification boundary.
 physical-target state, immutable descriptions and their qualification.
 [Wine file API implementation](docs/WINE_FILE_FROMAPP.md) scopes the missing
 function correction and its desktop-only compatibility evidence.
+[HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) defines reproducible
+synthetic PQ inputs and the separate official-reference workflow.
 
 ## Work with the repository
 
