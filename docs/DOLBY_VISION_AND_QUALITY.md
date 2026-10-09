@@ -181,6 +181,42 @@ it has not been built or tested here, and does not qualify this laptop's
 internal panel. Its HDR10 conversion modes are outside this project's DV
 acceptance contract.
 
+### 4.1 Use an official Linux reference for display-management validation
+
+Dolby's [Professional Tools 5.6.4 product page](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-professional-tools-v564/)
+(updated June 24, 2026) identifies Linux, macOS and Windows executables.
+Its [CM Offline documentation](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-professional-tools-v564/documentation/user-guide/cm-offline)
+describes metadata-driven mapping to target displays, custom targets and
+CPU/CUDA execution. The published input list covers production image/master
+formats; it does not document a consumer HEVC/RPU playback interface.
+
+**Decision (2026-10-08):** use this as the preferred reference-image source
+when an authorized Linux package is available. Continue investigating the
+OEM compatibility host independently. Neither an offline image render nor
+a working DLL loader establishes general desktop DV playback.
+
+**Why:** a controlled reference lets us test creative trims and target
+changes against Dolby's output. A visually pleasing result or agreement with
+our own implementation cannot supply that independent evidence. The accepted
+cost is producing frame-aligned master images and metadata in the reference
+tool's supported formats before comparing candidate output.
+
+The next reference receipt must pin tool version, input-image encoding,
+metadata/frame alignment, target gamut/EOTF/luminance and output encoding.
+Start with a tiny synthetic or otherwise authorized master and explicitly
+varied metadata. Compare identical frames/targets, then include a controlled
+trim change. Only after that reference contract is established should a
+consumer-profile decoder/reconstruction route be added to the comparison.
+No reference package has been downloaded or executed in this project.
+
+The download page requires account access; availability of a package to this
+operator is unresolved. The separate
+[Professional Decoder Toolkit](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-professional-decoder-toolkit-v602/)
+lists Linux and requires the relevant purchased/evaluation product access.
+The [external CMU product](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-ecmu-software-v304/)
+is also Linux-capable but requires a license and its own integration contract.
+These are distinct products, not automatically available dependencies.
+
 ## 5. Work in stages with observable acceptance
 
 ### 5.1 Capture the colour path and validate OEM data
