@@ -12,6 +12,10 @@ See [the visual status page](STATUS.html) for the current workboard and
 adds reproducible read-only diagnostics and an isolated OEM activation probe;
 final review, fast-lane checks and live diagnostic receipts are pending.
 
+The [display inspector](DISPLAY_DIAGNOSTICS.md) is implemented with fixture
+regressions awaiting the agreed pre-merge fast lane. It deliberately produces
+observations, not a universal HDR/DV support verdict.
+
 | Component | State | Remaining evidence/work |
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware/upstream acceptance |
