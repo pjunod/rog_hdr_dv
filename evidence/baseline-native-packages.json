@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "qualification": "binary package compile/build/export only; no host installation or runtime/display acceptance",
+  "compiler": {
+    "architecture": "native amd64",
+    "distribution": "Ubuntu26.10",
+    "base_digest": "sha256:ee126c2fa0249079a7e24ae3a3d29b04783ef93ab33c868751c9a1289d3fffff",
+    "gcc": "15.3.0-4ubuntu1",
+    "meson": "1.10.1",
+    "ninja": "1.13.2",
+    "bounded_resources": {
+      "cpus": 2,
+      "memory_gib": 4,
+      "extra_swap_gib": 0
+    },
+    "dependency_authentication": "Official Ubuntu signed InRelease metadata; dependency inventories and metadata hashes retained privately",
+    "offline_compilation": true,
+    "host_installs": false,
+    "unit_suites_executed": false,
+    "warning_policy": "Debian packaging defaults; this receipt does not claim a warnings-as-errors build."
+  },
+  "artifact_sets": [
+    {
+      "architecture": "amd64",
+      "build_options": "nocheck parallel=2",
+      "component": "libdisplay-info",
+      "package_signature": "unsigned local binary build; no signing credentials",
+      "source_archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c",
+      "source_commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+      "source_tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
+      "tracked_source_entries_unchanged": 216,
+      "unit_suites_executed": false,
+      "version": "0.3.0-1ubuntu1~hdr7",
+      "exported_file_count": 7,
+      "runtime_packages": [
+        {
+          "bytes": 93432,
+          "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr7_amd64.deb",
+          "sha256": "c173ca30963fd0c4360f8530944e8afe350cfae1410989875c79e271e65ca83c"
+        }
+      ]
+    },
+    {
+      "architecture": "i386",
+      "build_options": "nocheck parallel=2",
+      "component": "libdisplay-info",
+      "package_signature": "unsigned local binary build; no signing credentials",
+      "source_archive_sha256": "96b1d164b0c29a66675842ef16cf3646841aa924ade0fb25e11081f18047bf4c",
+      "source_commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+      "source_tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
+      "tracked_source_entries_unchanged": 216,
+      "unit_suites_executed": false,
+      "version": "0.3.0-1ubuntu1~hdr7",
+      "exported_file_count": 7,
+      "runtime_packages": [
+        {
+          "bytes": 92790,
+          "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr7_i386.deb",
+          "sha256": "da135ed8155a18b2ae29df3f2cf8333c1e9bc9d1697b95ed68692204469ce5af"
+        }
+      ]
+    },
+    {
+      "architecture": "amd64",
+      "build_options": "nocheck parallel=1",
+      "component": "mutter",
+      "package_signature": "unsigned local binary build; no signing credentials",
+      "source_archive_sha256": "da0783d410f948b95c06a2a9d1603f536e8ec476a65c92dd417571b2021c99b2",
+      "source_commit": "4db354c816e7ac72091a246b7b2eb8adee9a9412",
+      "source_tree": "08611d1053a276779b47f8f9151dd528f51a653e",
+      "tracked_source_entries_unchanged": 2302,
+      "unit_suites_executed": false,
+      "version": "51.0-1ubuntu3+nativehdr3",
+      "exported_file_count": 18,
+      "runtime_packages": [
+        {
+          "bytes": 164644,
+          "file": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr3_amd64.deb",
+          "sha256": "d518832b97b02bae94a6bf4a229e7e628d632812437c27fc058ba89ed658eaae"
+        },
+        {
+          "bytes": 1566360,
+          "file": "libmutter-51-0_51.0-1ubuntu3+nativehdr3_amd64.deb",
+          "sha256": "85ae2c584305fed4aa44a830a5b4ed09b76fefcb24414594a414cd826f2c84fe"
+        },
+        {
+          "bytes": 57250,
+          "file": "mutter-common-bin_51.0-1ubuntu3+nativehdr3_amd64.deb",
+          "sha256": "a08cd632351e447df82c2494127c072f20701e34a0b424ee9a8ff94b714ef51c"
+        },
+        {
+          "bytes": 560160,
+          "file": "mutter-common_51.0-1ubuntu3+nativehdr3_all.deb",
+          "sha256": "76a82754c8b683e195d007b24c6f7e1c8cc2cbe888b903957784940d255f9030"
+        }
+      ]
+    }
+  ],
+  "initial_preflight_failure": {
+    "result": "missing native dependency after i386 build-dependency configuration replaced non-coinstallable pkgconf/edid-decode architecture",
+    "resolution": "Dependency-only sequencing correction; initial failure receipt retained; no source changes or dependency bypass"
+  },
+  "baseline_dependencies": "Mutter built against hdr7 amd64 in frozen /usr prefix; additive next API not installed during baseline build",
+  "transaction_summary": {
+    "candidate_simulation": {
+      "exit": 0,
+      "upgrades": 6,
+      "new_installs": 0,
+      "removals": 0
+    },
+    "rollback_model_simulation": {
+      "exit": 0,
+      "downgrades": 6,
+      "new_installs": 0,
+      "removals": 0,
+      "limitation": "Candidate package control stanzas substituted only in a private copy of installed dpkg status; actual host unchanged"
+    },
+    "coherence": [
+      "libdisplay-info3 Multi-Arch same requires matching amd64/i386 versions",
+      "gir1.2-mutter-51 requires exact matching libmutter-51-0 version",
+      "Retain one coherent Mutter source version for library/GIR/common/common-bin"
+    ],
+    "session": [
+      "Log out of the Wayland GNOME session in the coordinated maintenance window before package replacement; a newly started GNOME Shell is required to load the new library",
+      "Keep an independent text-console/SSH recovery route; do not terminate the active session automatically",
+      "No kernel, Secure Boot, bootloader, ICC profile, monitor mode, colour settings or saved user setting changes"
+    ]
+  },
+  "date": "2026-10-09",
+  "scope": "Qualified fourth-batch source only; later chromaticity and monitor candidates are not covered."
+}

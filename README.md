@@ -23,7 +23,7 @@ the imported work came from and how to interpret its evidence.
 [The status page](docs/STATUS.html) shows the active workboard;
 [review findings](docs/REVIEW.md) records review dispositions and validation.
 [Display diagnostics](docs/DISPLAY_DIAGNOSTICS.md) explains the read-only
-Linux inspector and how to interpret its privacy-filtered report.
+Linux inspector and bounded Wayland colour probe, including their privacy-filtered reports.
 [The Dolby activation probe](docs/DOLBY_ACTIVATION_PROBE.md) documents the
 isolated Windows API experiment, compiler receipt and remaining contracts.
 [Wine API contract](docs/WINE_API_CONTRACT.md) isolates the missing file API
@@ -39,6 +39,12 @@ physical-target state, immutable descriptions and their qualification.
 function correction and its desktop-only compatibility evidence.
 [HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) defines reproducible
 synthetic PQ inputs and the separate official-reference workflow.
+[Panel measurement](docs/PANEL_MEASUREMENT.md) defines the optical procedure,
+initial accuracy targets and evidence required before calibration claims.
+[Native target gamut](docs/NATIVE_TARGET_GAMUT.md) specifies lossless physical
+chromaticity declarations and independent compositor feedback.
+[Wine monitor discovery](docs/WINE_DISPLAY_MONITOR.md) defines the next
+activation prerequisite, truthful topology and descriptor handling.
 
 ## Work with the repository
 

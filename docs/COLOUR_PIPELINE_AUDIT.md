@@ -317,3 +317,80 @@ state, and composition-versus-direct-scanout equivalence. Scanout disabled at
 capture time leaves all visible-output acceptance open. No profile activation,
 brightness change, compositor restart or optical accuracy claim follows from
 this source audit.
+
+## Follow-up source findings — input contracts and mapping ownership
+
+Read-only follow-up at Ubuntu candidate
+`4db354c816e7ac72091a246b7b2eb8adee9a9412` identifies additional work after
+the independent target-feedback corrections. These are source observations;
+no new runtime reproduction or physical result is claimed here.
+
+- `creator_params_set_primaries()` receives signed protocol coordinates but
+  uses `scaled_uint32_to_float_chromaticity(uint32_t)`, then clamps every
+  coordinate to `[0,1]`. Negative coordinates can therefore wrap and acquire
+  a different meaning. The output conversion helper also returns unsigned
+  values. The [protocol's custom-primary arguments](https://github.com/wayland-mirror/wayland-protocols/blob/1.48/staging/color-management/color-management-v1.xml)
+  are signed; physical-panel domain rules must not automatically be imposed
+  on imaginary encoding primaries. A correction needs signed preservation,
+  explicit unsupported/degenerate-matrix handling and an independent input
+  regression, rather than silently clamping a client's declaration.
+- `creator_icc_set_icc_file()` tests an existing descriptor with `fd > 0`,
+  although descriptor zero is valid, and checks file bounds after computing
+  `offset + length` in the protocol's 32-bit type. A focused correction needs
+  an explicit unset sentinel and widened bounds arithmetic. Later asynchronous
+  parsing failure does not replace validation of the requested range.
+- `cicp_transfer_to_clutter()` explicitly rejects HLG. Adding a name or an
+  inverse OETF alone would be insufficient: HLG requires its display-light
+  interpretation, including the OOTF. Source EOTF, output adaptation and
+  physical-target policy need separate ownership.
+- Transform construction skips work when source and destination encoding
+  states compare equal. Its cache key contains source, destination and flags.
+  Direct scanout uses this same encoding-transform decision. Future physical
+  mapping therefore needs an explicit target/mapping identity in both render
+  and scanout decisions; changing feedback alone cannot activate it.
+
+The next mapping design must preserve source target-volume metadata through
+surface commits, distinguish already display-managed content, map each surface
+for the destination before composition, and apply output characterization once.
+It must cover alpha, cross-monitor movement, HDR/SDR mixing and scanout parity.
+Algorithm selection and measured target parameters remain open; no placeholder
+mapper or guessed panel curve is introduced by the current feedback work.
+
+### Next bounded implementation batch
+
+After target-gamut integration, correct the two demonstrated input defects in
+one source batch. Preserve the ordinary named-colour paths and keep this work
+independent of physical target selection.
+
+For custom primaries, use signed conversions in both directions and remove
+the normalization clamp. Validate the matrices the actual renderer needs,
+including white-point adaptation and inverse conversion, before accepting the
+state. Share that calculation with transform construction so validation and
+rendering cannot drift into two definitions of supported colourimetry.
+Singular or nonfinite transforms must produce an unsupported image-description
+result, never an identity matrix masquerading as the requested space. Ensure
+protocol serialization cannot perform an out-of-range float-to-integer cast.
+The [protocol creation contract](https://github.com/wayland-mirror/wayland-protocols/blob/1.48/staging/color-management/color-management-v1.xml)
+provides this asynchronous failure path.
+
+The regression should pass a legitimate synthetic encoding gamut with a
+negative coordinate through the real client-to-surface path, inspect retained
+state and compare a transformed colour against independently calculated matrix
+values. Cover degenerate RGB columns, an unusable white point and signed
+serialization boundaries separately. A physical gamut's positive-coordinate
+rules do not define the domain of an encoding gamut.
+
+For ICC input, keep the existing `-1` unset sentinel; descriptor zero must
+count as set. Compute requested file-end bounds in a wide unsigned type only
+after rejecting negative file sizes, and preserve descriptor ownership on every
+rejection. Distinguish file-read errors from unsupported profile content.
+Protocol regressions must exercise a wrapping offset, an exact end-of-file
+range, a repeated set when the stored descriptor is zero, and connection
+survival after an unsupported image description. The zero-descriptor test
+needs a controlled compositor-side fixture: the client's descriptor number
+is not preserved across descriptor passing.
+
+Compiler qualification precedes edits. Final adversarial review precedes the
+affected runtime checks. No live profile assignment, mode switch or compositor
+replacement is part of this source batch. HLG, output characterization and
+physical mapping remain subsequent changes with their own contracts.

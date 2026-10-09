@@ -16,7 +16,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>HDR, Dolby Vision<br>and display quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 9, 2026 · compositor, Wine API and corpus focused checks passed</p></header>
+<p class="muted">Updated October 9, 2026 · qualified source merged; monitor contracts and package delivery active</p></header>
 <div class="callout"><strong>Current physical result:</strong> the owner reports
 working HDR10 on the patched stack with Secure Boot enabled. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
@@ -25,8 +25,10 @@ and measured calibration are not yet qualified.</div>
 <tr><td>Existing HDR stack</td><td class="state done">Implemented</td><td>28 imported patches; library, compositor and kernel baseline recorded. Transition/resume acceptance remains.</td></tr>
 <tr><td>Public repository and provenance</td><td class="state active">Validated</td><td>Ordered series, public source URLs/hashes and pre-merge workflow. Adversarial findings resolved; 45 tests and integrity checks passed.</td></tr>
 <tr><td>Display-path diagnostic</td><td class="state active">Live capture complete</td><td>BT.2100, 2560×1600 at 240 Hz reported. Scanout disabled at capture; active-output quality qualification remains.</td></tr>
-<tr><td>Dolby processor feasibility</td><td class="state active">Load boundary found</td><td>COM/WinRT/MF initialized. Wine 11.0 resolves the API-set but lacks the required CreateFileFromAppW export. The missing function is implemented, reviewed and passed 123 focused assertions. Processor activation remains open; Wine is an investigated route, not a settled dependency.</td></tr>
+<tr><td>Dolby processor feasibility</td><td class="state active">Load boundary found</td><td>COM/WinRT/MF initialized. Wine 11.0 resolves the API-set but lacks the required CreateFileFromAppW export. The missing function is implemented, reviewed and passed 123 focused assertions. The recovered DLL now loads; its factory stops at a missing Windows DisplayMonitor dependency. Wine remains an investigated route.</td></tr>
 <tr><td>General colour correctness</td><td class="state active">API qualified</td><td>Delivered-source audit complete. Additive library API reviewed, compiled and focused checks passed. Mutter target feedback compiled with warnings as errors; all eleven selected checks passed after reviewed corrections and focused retries. PQ normalization is unchanged.</td></tr>
+<tr><td>Physical target gamut</td><td class="state active">Implementing</td><td>Library implementations compile with warnings as errors and preserve raw native RGBW declarations. The read-only Wayland colour inspector also compiles; compositor gamut integration is in progress. New runtime checks await the final adversarial review.</td></tr>
+<tr><td>Linux package delivery</td><td class="state active">Baseline built</td><td>Qualified hdr7 amd64/i386 and nativehdr3 compositor packages built in isolation. Six-package upgrade and modeled rollback resolve without additions or removals. Gamut candidate qualification and live delivery remain.</td></tr>
 <tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>Four factory profiles parsed privately. MHC2 transforms are identity; standard ICC characterisation differs by GPU route. Optical acceptance remains.</td></tr>
 <tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
 </tbody></table>

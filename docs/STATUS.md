@@ -8,6 +8,37 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
+## Active fifth batch — display contracts and delivery
+
+The qualified Wine candidate now loads the exact recovered Dolby DLL. Its
+factory request stops when the component asks for the missing Windows
+`DisplayMonitor` runtime class. The manifest, hashes and loader trace agree;
+[activation evidence](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
+records the exact scope. Object activation and frame processing remain open.
+
+Work continues on a [generic monitor contract](WINE_DISPLAY_MONITOR.md) backed by actual display data,
+native [physical-target gamut reporting](NATIVE_TARGET_GAMUT.md), and matching amd64/i386 library plus
+amd64 compositor packages. Packaging uses isolated source-only builds; no host
+installation or live display change is implied. The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
+initial accuracy goals and held-out validation; this unit has not been measured.
+
+The exact qualified hdr7 library source has produced amd64 and i386 packages,
+and nativehdr3 compositor packaging has completed in the isolated native
+builder. The [package receipt](../evidence/baseline-native-packages.json)
+records source identities and the six runtime artifacts. Read-only APT
+simulations found a coherent six-package upgrade and modeled six-package
+rollback, with no additions or removals. Recovery artifacts are hashed and
+retained privately; the live installation is unchanged.
+
+The new hdr8/upstream native-chromaticity implementations compile with warnings
+as errors. Their append-only patch series preserve the delivered prefixes.
+Mutter consumption is in progress. The bounded read-only Wayland colour
+inspector and its synthetic server compile with warnings as errors;
+[the diagnostic guide](DISPLAY_DIAGNOSTICS.md#inspect-the-compositors-actual-colour-descriptions)
+explains raw fields, completion limits and privacy.
+New gamut and monitor implementations still require their own final review and
+affected runtime qualification; package compilation does not replace those.
+
 ## Fourth batch — native target feedback and processor prerequisites
 
 [PR 4](https://github.com/pjunod/rog_hdr_dv/pull/4) adds three components:
@@ -28,7 +59,7 @@ fixture does not qualify real monitor reconfiguration.
 
 Wine is used to investigate the Windows Dolby processor recovered from the
 factory image. The missing file function now passes its desktop API contract.
-Actual processor activation remains open; Wine is a candidate compatibility
+DLL loading now passes; actual processor activation remains open; Wine is a candidate compatibility
 route, not a confirmed requirement of the final Linux solution. The HDR and
 colour-management changes are native Linux code.
 
@@ -49,8 +80,8 @@ Mutter and matching amd64/i386 library packaging.
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
-| Physical luminance library | hdr6 delivered; additive hdr7 source qualified | Matching packages and compositor consumer delivery |
-| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified | Merge, package and verify active output |
+| Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built | Deliver matching compositor/library set; hdr8 gamut candidate awaits review and runtime checks |
+| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built | Finish target gamut, deliver reviewed set and verify active output |
 | Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
 | General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |

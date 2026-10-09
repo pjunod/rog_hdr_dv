@@ -216,9 +216,45 @@ qualification and consumer-profile comparison remain open. See the generic
 The download page requires account access. The separate
 [Professional Decoder Toolkit](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-professional-decoder-toolkit-v602/)
 lists Linux and requires the relevant purchased/evaluation product access.
-The [external CMU product](https://customer.dolby.com/content-creation-and-delivery/dolby-vision-ecmu-software-v304/)
-is also Linux-capable but requires a license and its own integration contract.
-These are distinct products, not automatically available dependencies.
+The external CMU is a historical reference: Dolby's
+[current support article](https://professionalsupport.dolby.com/s/article/The-Dolby-Vision-Content-Mapping-Unit-Difference-between-iCMU-and-eCMU?language=en_US)
+says it was discontinued in early 2024 without further updates. It is not the
+preferred new runtime dependency. These products are distinct from the
+downloaded Professional Tools.
+
+### 4.2 Native decoder integration has a public interface example
+
+Dolby's [public decoder example](https://github.com/DolbyLaboratories/dolby_vision_professional_decoder_plugin/tree/6b66669fae9623bd38767e6b73bbacc749244dce)
+was inspected at commit `6b66669fae9623bd38767e6b73bbacc749244dce`. Its FFmpeg
+plug-in instructions include Linux builds. Its GStreamer element includes
+`dvpd_api.h` and calls the separate processor's create, initialize, push,
+reset, drain/join and destruction APIs. That header and processor implementation
+are absent from the public repository; the example alone cannot supply them.
+
+The example exposes distinct reconstruction/colour-conversion, display-managed
+and HDMI output choices. Its GStreamer implementation sends only the base
+layer and explicitly omits dual-layer support. Neither its option names nor
+the older sample establishes current SDK support, custom-panel configuration,
+real-time performance, Profile 7 FEL processing or redistribution permission.
+
+**Decision:** inspect an authorized native Decoder package if available while
+the OEM Wine route progresses. Do not build a speculative replacement for the
+missing SDK or treat the Professional Tools installer as the decoder library.
+The downloaded package's actual header, binary ABI, version and terms must
+establish the integration contract first.
+
+A production adapter must preserve frame identity through reordering, flush,
+seek and target changes. Validate buffer size/stride and output colour metadata
+against each negotiated format; report initialization and processing errors.
+The public example's fallback to the oldest queued frame is insufficient proof
+of frame-matched metadata. The adapter needs a stable processing generation and
+explicit drain/reset semantics, with bounded queues and ownership. Those are
+implementation requirements, not claims of existing functionality.
+
+For the internal panel, acceptance still requires supported metadata/trims,
+the correct panel configuration and a documented handoff that avoids duplicate
+display management. Successful SDK linking or an image in a generic PQ format
+does not close that acceptance.
 
 ## 5. Work in stages with observable acceptance
 
