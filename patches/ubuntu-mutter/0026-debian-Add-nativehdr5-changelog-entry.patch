@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 16:59:21 -0400
+Subject: [PATCH] debian: Add nativehdr5 changelog entry
+
+Summarise the color-management input batch: signed custom primaries with
+shared fallible matrix validation, ICC range and descriptor fixes, EDID
+primaries validation for native SDR, exact encoding and fallback target
+serialization, and the creator-params error code fix.
+---
+ debian/changelog | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index 16dd137..1035f1c 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,24 @@
++mutter (51.0-1ubuntu3+nativehdr5) UNRELEASED; urgency=medium
++
++  * Accept signed custom primaries for encoding gamuts within [-16, 16]
++    without clamping, and decide support with one fallible definition of the
++    renderer's linear BT.2020 matrices shared by the color transform and the
++    Wayland creator: collinear or nearly singular primaries and white points
++    with y <= 0 or outside the primaries fail with 'unsupported'.
++  * Fix ICC file handling: descriptor 0 counts as set, the offset + length
++    range is checked without 32-bit wraparound, descriptors are owned on
++    every rejection path, the profile is read at the absolute offset and a
++    short read fails as 'operating_system', and unusable profile data fails
++    as 'unsupported'.
++  * Validate EDID default primaries before using them for the native SDR
++    output color state; fall back to sRGB colorimetry and warn once.
++  * Publish encoding primaries and the encoding-fallback target primaries
++    with one exact signed round-and-check conversion.
++  * Post the creator-params interface's own unsupported_feature error.
++    Source candidate only; runtime and package qualification pending.
++
++ -- Claude Agent <claude-agent@invalid>  Sat, 10 Oct 2026 00:00:00 +0000
++
+ mutter (51.0-1ubuntu3+nativehdr4) UNRELEASED; urgency=medium
+ 
+   * Publish independent firmware-declared target RGBW on the validated native

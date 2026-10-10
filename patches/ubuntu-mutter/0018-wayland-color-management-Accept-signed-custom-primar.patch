@@ -1,0 +1,231 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 16:52:46 -0400
+Subject: [PATCH] wayland/color-management: Accept signed custom primaries
+ without clamping
+
+wp_image_description_creator_params_v1.set_primaries carries signed
+chromaticity coordinates (int32, units of 1/1000000), but the handler
+converted them with a helper taking uint32_t. A negative coordinate
+wrapped to a large positive one, and every coordinate was then clamped
+to [0, 1] with only a warning. The resulting color state described a
+different space from the one requested. Encoding gamuts legitimately use
+imaginary primaries (ACES AP0 has a negative blue y); the positive-range
+rules of a physical display gamut do not define the domain of an
+encoding gamut.
+
+Parse with meta_color_chromaticity_from_fixed() and drop the clamp.
+Accepted coordinates must be stored exactly. Coordinates are limited to
+[-16, 16] (16000000 protocol units), the range in which every protocol
+value survives the single precision representation unchanged; beyond it,
+exactness would depend on each value's bit pattern. Coordinates outside
+it are reported as unsupported with a message saying so, and the exact
+round trip through meta_color_primaries_to_fixed(), the conversion every
+publisher uses, is still verified.
+
+Whether custom primaries are usable is now decided at create time by
+clutter_colorimetry_get_linear_bt2020_matrices(), the same function the
+color transform uses, covering the RGB to XYZ matrix, the white-point
+adaptation and the inverse direction. Collinear primaries, a white point
+with no finite XYZ (y = 0) or any other singular or non-finite transform
+make the created image description deliver the failed event with the
+'unsupported' cause, as the protocol prescribes, instead of producing a
+color state that renders with an identity matrix. The same applies to
+nearly collinear primaries and to white points with y <= 0 or outside
+the primaries' triangle, which that function rejects. The connection is
+unaffected. Named primaries are not touched by this check.
+---
+ src/wayland/meta-wayland-color-management.c | 120 ++++++++++++++------
+ 1 file changed, 86 insertions(+), 34 deletions(-)
+
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index c387241..ec5b807 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -29,6 +29,7 @@
+ 
+ #include "backends/meta-color-device.h"
+ #include "backends/meta-color-manager.h"
++#include "clutter/clutter-color-utils-private.h"
+ #include "compositor/meta-surface-actor-wayland.h"
+ #include "wayland/meta-wayland-client-private.h"
+ #include "wayland/meta-wayland-private.h"
+@@ -37,6 +38,10 @@
+ 
+ #include "color-management-v1-server-protocol.h"
+ 
++/* The largest accepted custom chromaticity coordinate magnitude, 16.0 in the
++ * protocol's units of 1/1000000. */
++#define MAX_CHROMATICITY_COORDINATE (16 * 1000000)
++
+ typedef struct _MetaWaylandDescriptionRecord MetaWaylandDescriptionRecord;
+ 
+ typedef struct
+@@ -160,6 +165,10 @@ typedef struct _MetaWaylandCreatorParams
+   gboolean is_colorimetry_set;
+   gboolean is_eotf_set;
+   gboolean is_luminance_set;
++
++  /* Set when the parameters are well-formed but cannot be supported; the
++   * created image description then fails with the 'unsupported' cause. */
++  const char *unsupported_reason;
+ } MetaWaylandCreatorParams;
+ 
+ typedef struct _MetaWaylandCreatorIcc
+@@ -207,12 +216,6 @@ get_meta_color_manager (MetaWaylandColorManager *color_manager)
+   return meta_backend_get_color_manager (backend);
+ }
+ 
+-static float
+-scaled_uint32_to_float_chromaticity (uint32_t value)
+-{
+-  return value * 0.000001f;
+-}
+-
+ static float
+ scaled_uint32_to_float (uint32_t value)
+ {
+@@ -1435,6 +1438,31 @@ creator_params_destructor (struct wl_resource *resource)
+   meta_wayland_creator_params_free (creator_params);
+ }
+ 
++/*
++ * Custom primaries describe an encoding gamut, whose primaries may be
++ * imaginary. Whether they are supported is decided by the renderer's own
++ * matrices, computed by the same function that builds the color transform, so
++ * acceptance and rendering cannot disagree about supported colorimetry.
++ */
++static gboolean
++creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
++                                GError                   **error)
++{
++  if (creator_params->unsupported_reason)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
++                           creator_params->unsupported_reason);
++      return FALSE;
++    }
++
++  if (creator_params->colorimetry.type != CLUTTER_COLORIMETRY_TYPE_PRIMARIES)
++    return TRUE;
++
++  return clutter_colorimetry_get_linear_bt2020_matrices (&creator_params->colorimetry,
++                                                         NULL, NULL,
++                                                         error);
++}
++
+ static void
+ creator_params_create (struct wl_client   *client,
+                        struct wl_resource *resource,
+@@ -1447,6 +1475,7 @@ creator_params_create (struct wl_client   *client,
+   struct wl_resource *image_desc_resource;
+   g_autoptr (ClutterColorState) color_state = NULL;
+   g_autoptr (MetaWaylandImageDescription) image_desc = NULL;
++  g_autoptr (GError) error = NULL;
+ 
+   if (!creator_params->is_colorimetry_set || !creator_params->is_eotf_set)
+     {
+@@ -1462,17 +1491,26 @@ creator_params_create (struct wl_client   *client,
+                         wl_resource_get_version (resource),
+                         id);
+ 
+-  color_state =
+-    clutter_color_state_params_new_from_primitives (clutter_context,
+-                                                    creator_params->colorimetry,
+-                                                    creator_params->eotf,
+-                                                    creator_params->lum);
+-
+   image_desc = meta_wayland_image_description_new (color_manager,
+                                                    image_desc_resource);
+-  meta_wayland_image_description_set_ready (image_desc,
+-                                            color_state,
+-                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
++
++  if (creator_params_check_supported (creator_params, &error))
++    {
++      color_state =
++        clutter_color_state_params_new_from_primitives (clutter_context,
++                                                        creator_params->colorimetry,
++                                                        creator_params->eotf,
++                                                        creator_params->lum);
++      meta_wayland_image_description_set_ready (image_desc,
++                                                color_state,
++                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
++    }
++  else
++    {
++      meta_wayland_image_description_set_failed (image_desc,
++                                                 WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED,
++                                                 error->message);
++    }
+ 
+   wl_resource_set_implementation (image_desc_resource,
+                                   &meta_wayland_image_description_interface,
+@@ -1594,7 +1632,10 @@ creator_params_set_primaries (struct wl_client   *client,
+ {
+   MetaWaylandCreatorParams *creator_params =
+     wl_resource_get_user_data (resource);
++  const int32_t requested[8] = { r_x, r_y, g_x, g_y, b_x, b_y, w_x, w_y };
++  int32_t published[8];
+   ClutterPrimaries *primaries;
++  unsigned int i;
+ 
+   if (creator_params->is_colorimetry_set)
+     {
+@@ -1605,26 +1646,37 @@ creator_params_set_primaries (struct wl_client   *client,
+     }
+ 
+   primaries = g_new0 (ClutterPrimaries, 1);
+-  primaries->r_x = scaled_uint32_to_float_chromaticity (r_x);
+-  primaries->r_y = scaled_uint32_to_float_chromaticity (r_y);
+-  primaries->g_x = scaled_uint32_to_float_chromaticity (g_x);
+-  primaries->g_y = scaled_uint32_to_float_chromaticity (g_y);
+-  primaries->b_x = scaled_uint32_to_float_chromaticity (b_x);
+-  primaries->b_y = scaled_uint32_to_float_chromaticity (b_y);
+-  primaries->w_x = scaled_uint32_to_float_chromaticity (w_x);
+-  primaries->w_y = scaled_uint32_to_float_chromaticity (w_y);
+-
+-  if (primaries->r_x < 0.0f || primaries->r_x > 1.0f ||
+-      primaries->r_y < 0.0f || primaries->r_y > 1.0f ||
+-      primaries->g_x < 0.0f || primaries->g_x > 1.0f ||
+-      primaries->g_y < 0.0f || primaries->g_y > 1.0f ||
+-      primaries->b_x < 0.0f || primaries->b_x > 1.0f ||
+-      primaries->b_y < 0.0f || primaries->b_y > 1.0f ||
+-      primaries->w_x < 0.0f || primaries->w_x > 1.0f ||
+-      primaries->w_y < 0.0f || primaries->w_y > 1.0f)
++  primaries->r_x = meta_color_chromaticity_from_fixed (r_x);
++  primaries->r_y = meta_color_chromaticity_from_fixed (r_y);
++  primaries->g_x = meta_color_chromaticity_from_fixed (g_x);
++  primaries->g_y = meta_color_chromaticity_from_fixed (g_y);
++  primaries->b_x = meta_color_chromaticity_from_fixed (b_x);
++  primaries->b_y = meta_color_chromaticity_from_fixed (b_y);
++  primaries->w_x = meta_color_chromaticity_from_fixed (w_x);
++  primaries->w_y = meta_color_chromaticity_from_fixed (w_y);
++
++  /* Coordinates are not clamped: an encoding gamut may lie outside the
++   * spectral locus. They are limited to [-16, 16], the range in which every
++   * protocol value is stored exactly by the single precision representation,
++   * so an accepted coordinate always describes the requested space. Beyond
++   * that, exactness would depend on the bit pattern of each value. The exact
++   * round trip is still verified. (Custom primaries within the color state
++   * equality tolerance of sRGB are subsequently stored as named sRGB.) */
++  for (i = 0; i < G_N_ELEMENTS (requested); i++)
++    {
++      if (ABS ((int64_t) requested[i]) > MAX_CHROMATICITY_COORDINATE)
++        {
++          creator_params->unsupported_reason =
++            "Chromaticity coordinates must lie within [-16, 16]";
++        }
++    }
++
++  if (!creator_params->unsupported_reason &&
++      (!meta_color_primaries_to_fixed (primaries, published) ||
++       memcmp (published, requested, sizeof (published)) != 0))
+     {
+-      g_warning ("Primaries out of expected normalized range");
+-      clutter_primaries_ensure_normalized_range (primaries);
++      creator_params->unsupported_reason =
++        "A chromaticity coordinate cannot be represented exactly";
+     }
+ 
+   creator_params->colorimetry.type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES;
