@@ -67,45 +67,42 @@ class ProtocolTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((root / 'not-created').exists())
 
-    def test_versions_and_global_order(self):
-        for version in (1, 2):
-            for scenario in ('normal', 'manager-first', 'output-v1'):
-                with self.subTest(version=version, scenario=scenario):
-                    code, data, _ = self.capture(scenario, version)
-                    self.assertEqual(code, 0)
-                    self.assertEqual(data['status'], 'complete')
-                    self.assertEqual(data['manager_version'], version)
-                    o = data['outputs'][0]
-                    self.assertEqual(o['description_identity']['hi'], 0 if version == 1 else 1)
-                    self.assertEqual(o['luminances']['raw'], [500, 1000, 203])
-                    self.assertEqual(o['target_luminance']['raw'], [100, 616])
-                    self.assertNotEqual(o['primaries']['raw'], o['target_primaries']['raw'])
-                    self.assertTrue(o['tf_power']['present'] and o['tf_named']['present'])
-                    self.assertEqual(o['tf_named']['raw'], [2])
-                    self.assertEqual(o['tf_pair_consistency'], 'consistent')
-                    self.assertEqual(o['target_max_cll']['raw'], [600])
-                    self.assertEqual(o['target_max_fall']['raw'], [300])
+    def assert_success(self, scenario, version):
+        code, data, _ = self.capture(scenario, version)
+        self.assertEqual(code, 0)
+        self.assertEqual(data['status'], 'complete')
+        self.assertEqual(data['manager_version'], version)
+        o = data['outputs'][0]
+        self.assertEqual(o['description_identity']['hi'], 0 if version == 1 else 1)
+        self.assertEqual(o['luminances']['raw'], [500, 1000, 203])
+        self.assertEqual(o['target_luminance']['raw'], [100, 616])
+        self.assertNotEqual(o['primaries']['raw'], o['target_primaries']['raw'])
+        self.assertTrue(o['tf_power']['present'] and o['tf_named']['present'])
+        self.assertEqual(o['tf_named']['raw'], [2])
+        self.assertEqual(o['tf_pair_consistency'], 'consistent')
+        self.assertEqual(o['target_max_cll']['raw'], [600])
+        self.assertEqual(o['target_max_fall']['raw'], [300])
 
-    def test_non_success_protocol_cases(self):
-        for scenario in ('absent', 'duplicate', 'incomplete', 'remove', 'changed', 'failed', 'overflow', 'disconnect', 'contradictory-tf', 'manager-remove'):
-            with self.subTest(scenario=scenario):
-                code, data, _ = self.capture(scenario)
-                self.assertNotEqual(code, 0)
-                self.assertEqual(data['status'], 'incomplete')
-                self.assertLessEqual(len(data['outputs']), 32)
-                if scenario == 'remove':
-                    self.assertEqual(data['outputs'][0]['status'], 'removed')
-                if scenario == 'changed':
-                    self.assertEqual(data['snapshot_consistency'], 'unstable')
+    def assert_non_success(self, scenario):
+        code, data, _ = self.capture(scenario)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(data['status'], 'incomplete')
+        self.assertLessEqual(len(data['outputs']), 32)
+        if scenario == 'remove':
+            self.assertEqual(data['outputs'][0]['status'], 'removed')
+        if scenario == 'changed':
+            self.assertEqual(data['snapshot_consistency'], 'unstable')
+        if scenario == 'contradictory-tf':
+            self.assertEqual(data['outputs'][0]['tf_pair_consistency'], 'contradictory')
+        if scenario == 'manager-remove':
+            self.assertTrue(data['manager_removed'])
 
-    def test_deadline_and_missing_completion(self):
-        for scenario in ('hang', 'missing-done', 'icc-hang'):
-            with self.subTest(scenario=scenario):
-                code, data, elapsed = self.capture(scenario)
-                self.assertNotEqual(code, 0)
-                self.assertEqual(data['reason'], 'deadline')
-                self.assertGreater(elapsed, 4)
-                self.assertLess(elapsed, 6.5)
+    def assert_deadline(self, scenario):
+        code, data, elapsed = self.capture(scenario)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(data['reason'], 'deadline')
+        self.assertGreater(elapsed, 4)
+        self.assertLess(elapsed, 6.5)
 
     def test_icc_presence_without_contents(self):
         code, data, _ = self.capture('icc')
@@ -114,6 +111,38 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(o['icc_size'], {'present': True, 'raw': [123]})
         self.assertFalse(o['primaries']['present'])
         self.assertEqual(o['primaries']['raw'], [])
+
+
+# Each case has an exact unittest selector; retries never repeat passing scenarios.
+def success_case(scenario, version):
+    def test(self):
+        self.assert_success(scenario, version)
+    return test
+
+
+def failure_case(scenario):
+    def test(self):
+        self.assert_non_success(scenario)
+    return test
+
+
+def deadline_case(scenario):
+    def test(self):
+        self.assert_deadline(scenario)
+    return test
+
+
+for protocol_version in (1, 2):
+    for fixture_scenario in ('normal', 'manager-first', 'output-v1'):
+        setattr(ProtocolTests, f'test_v{protocol_version}_{fixture_scenario.replace("-", "_")}',
+                success_case(fixture_scenario, protocol_version))
+for fixture_scenario in ('absent', 'duplicate', 'incomplete', 'remove', 'changed',
+                         'failed', 'overflow', 'disconnect', 'contradictory-tf', 'manager-remove'):
+    setattr(ProtocolTests, f'test_failure_{fixture_scenario.replace("-", "_")}',
+            failure_case(fixture_scenario))
+for fixture_scenario in ('hang', 'missing-done', 'icc-hang'):
+    setattr(ProtocolTests, f'test_deadline_{fixture_scenario.replace("-", "_")}',
+            deadline_case(fixture_scenario))
 
 
 if __name__ == '__main__':
