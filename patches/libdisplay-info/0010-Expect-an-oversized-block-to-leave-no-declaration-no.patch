@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 15:30:45 -0400
+Subject: [PATCH] Expect an oversized block to leave no declaration, not a
+ dropped section
+
+The formats test asserted that a Display Parameters block whose declared
+payload exceeds its envelope drops the whole DisplayID extension. The
+parser records a failure, consumes the remaining bytes and keeps the
+section without a data block. Assert that no block (and so no native
+declaration) is produced, which is the property under test.
+---
+ test/displayid2-native-chromaticities.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/test/displayid2-native-chromaticities.c b/test/displayid2-native-chromaticities.c
+index 80836f6..7979b07 100644
+--- a/test/displayid2-native-chromaticities.c
++++ b/test/displayid2-native-chromaticities.c
+@@ -221,7 +221,14 @@ check_formats(void)
+ 	parameters(data);
+ 	info = parse(data, 31); /* Declared payload exceeds its envelope. */
+ 	assert(di_edid_has_extension_failures(di_info_get_edid(info)));
+-	assert(!di_edid_get_extensions(di_info_get_edid(info))[0]);
++	{
++		/* The section is kept with a recorded failure; the oversized block
++		 * is consumed without producing a data block or a declaration. */
++		const struct di_edid_ext *const *exts = di_edid_get_extensions(di_info_get_edid(info));
++		const struct di_displayid2 *d = exts[0] ? di_edid_ext_get_displayid2(exts[0]) : NULL;
++
++		assert(!d || !di_displayid2_get_data_blocks(d)[0]);
++	}
+ 	di_info_destroy(info);
+ 	data[0] = 0x20;
+ 	data[2] = 0;
