@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "status": "compile_pass_runtime_held",
+  "scope": "Native amd64 source compilation of the nativehdr4 native-target-gamut candidate and its focused regression binaries; no package delivery, installation or runtime claim",
+  "mutter": {
+    "base_commit_local": "49e58dc (reconstruction of nativehdr3 candidate)",
+    "base_tree": "08611d1053a276779b47f8f9151dd528f51a653e",
+    "candidate_tree": "3271c446fe79f3a6e886567d938ba879596de813",
+    "appended_patches": [
+      "0013",
+      "0014",
+      "0015"
+    ],
+    "recovery": "The original uncommitted edit (about 800 lines) was lost with its macOS temporary clone. It was replayed hunk-for-hunk from the implementing agent's recorded apply_patch calls onto the exactly reproduced 08611d10 base; all hunks applied without fuzz. Subprocess isolation of the target-volume Wayland cases and project formatting were then added."
+  },
+  "library": {
+    "series": "ubuntu-libdisplay-info hdr8",
+    "tree": "e79ea573a50aec6f53e1c939d4ea2c0af1bba01c",
+    "compile": "meson setup -Dwerror=true --prefix=/usr --libdir=lib/x86_64-linux-gnu; ninja (zero warnings); installed into the disposable build container only",
+    "upstream_tree_also_compiled": "a15b92001bcd3eab0caf931d075974a854782f5f (zero warnings)"
+  },
+  "environment": {
+    "distribution": "Ubuntu 26.10 stonking amd64",
+    "image_digest": "sha256:622755ac4289828beb0895ceb03a187ef104309713b82f6f65a39694f7d038fd",
+    "compiler": "gcc 15.3.0-4ubuntu1",
+    "linker": "GNU ld 2.47",
+    "meson": "1.10.1",
+    "ninja": "1.13.2",
+    "glib": "2.90.0-1",
+    "wayland": "1.26.0-1",
+    "wayland_protocols": "1.49-1",
+    "uncrustify": "0.78.1_f",
+    "dependencies": "Ubuntu archive build-dependencies over HTTPS with signed InRelease metadata"
+  },
+  "options": {
+    "werror": true,
+    "buildtype": "debug (project default)",
+    "remote_desktop": true,
+    "parallel_jobs": 2
+  },
+  "configure_command": "meson setup $BUILD $SOURCE -Dremote_desktop=true -Dwerror=true",
+  "compile_command": "ninja -j2 -C $BUILD src/libmutter-51.so.0.0.0 src/tests/mutter-native-hdr src/tests/mutter-wayland-color-management src/tests/wayland-test-clients/color-management src/compositor/plugins/libdefault.so src/tests/drm-mock/libdrm-mock.so data/gschemas.compiled src/tests/gschemas.compiled",
+  "exit": 0,
+  "warnings": 0,
+  "style": {
+    "command": "python3 check-style.py --sha <nativehdr3 base>",
+    "result": "formatting applied; formatter is clean on the final candidate"
+  },
+  "new_symbols": {
+    "meta_color_device_get_target_primaries": "51.0-1ubuntu3+nativehdr4~",
+    "meta_color_target_primaries_init": "51.0-1ubuntu3+nativehdr4~"
+  },
+  "compiled_binary_sha256": {
+    "src/libmutter-51.so.0.0.0": "d56e45b59ff2a469014d9f0dba571f6880c96d7a66055241f00d66b5fd1be22b",
+    "src/tests/mutter-native-hdr": "122aacb3f2cfb538b7c06cf5ccc8328d04b3832d187767e4880eb31440264f32",
+    "src/tests/mutter-wayland-color-management": "84d6070b858636f1e032717cf611464b1c47a033bb02a42054848c1bc91fcf59",
+    "src/tests/wayland-test-clients/color-management": "9f5718065aebc4c6f7b978cecd591b23b419678c13d0db079bb4eb585582f47a"
+  },
+  "tests_executed": false,
+  "held_tests": [
+    "/native-hdr/physical-chromaticities",
+    "/native-hdr/target-primaries-policy",
+    "/wayland/target-primaries/v1",
+    "/wayland/target-primaries/v2",
+    "/wayland/target-luminance/v1",
+    "/wayland/target-luminance/v2 (invalidated by the isolation change)"
+  ],
+  "limitations": [
+    "Compile evidence only; no runtime, package, installation or physical-output claim",
+    "Base commit IDs are local reconstruction IDs; trees are the identity"
+  ]
+}
