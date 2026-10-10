@@ -243,6 +243,34 @@ invented panel identifiers, physical primaries or Dolby capability flags would
 make subsequent processor results unreliable. No later package, panel,
 licensing, rendering or metadata requirement has been qualified yet.
 
+## DisplayMonitor follow-up — the processor activates
+
+With [Wine DisplayMonitor discovery](WINE_DISPLAY_MONITOR.md) merged, the same
+verified probe and OEM DLL ran once more in a fresh isolated fixture. As
+before there was no network, mount, GPU or display, and an unprivileged UID.
+The candidate modules from Wine patches 0001–0009 were placed before the
+prefix was created. [The sanitized receipt](../evidence/dolby-displaymonitor-activation.json)
+binds inputs, modules and isolation.
+
+| Contract | Observed result |
+|---|---|
+| Factory request for `DolbyVisionPlugin.RendererEffect` | Successful |
+| `ActivateInstance` and `IMFTransform` | Successful |
+| Streams | One input and one output; stream IDs are consecutive (`E_NOTIMPL`, as documented) |
+| Offered input types | P010 and NV12 |
+| Offered output types | 10-bit RGB (`A2B10G10R10`), half-float RGBA (`A16B16G16R16F`) and 8-bit ARGB |
+| Runtime requests during activation | DisplayMonitor statics and two monitor lookups by interface ID. The light sensor is unavailable in Wine. System manufacturer/product/SKU accessors are Wine stubs. Activation continued in every case. |
+
+The missing monitor class was the activation boundary. Activation proves only
+that the component instantiates and describes its transform. Media-type
+negotiation, the device and metadata contract, frame processing and output
+fidelity are not established. In this display-less fixture, the monitors it
+resolves are Wine's fallback monitor, not the laptop panel.
+
+The next stage would negotiate the transform's own offered types and trace
+which standard and private sample attributes it requests, without supplying
+invented metadata. That stage has not started; see [status](STATUS.md).
+
 ## Read the JSONL — an HRESULT belongs to one call
 
 The probe writes one JSON object per line to stdout and flushes before each

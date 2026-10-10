@@ -1,7 +1,7 @@
 # Review — adversarial findings and the current implementation batch
 
-**Updated:** 2026-10-10 UTC · **State:** fifth batch reviewed; findings
-addressed and the pre-merge fast lane passed.
+**Updated:** 2026-10-10 UTC · **State:** fifth batch merged; sixth batch
+(nativehdr5) reviewed, findings addressed, fast lane passed.
 
 Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
@@ -230,3 +230,28 @@ After the fixes, the affected fast lane ran once. The
   refreshed, `displaymonitor` alone was rerun and passed 308 tests with none
   failing.
 
+## Sixth batch — compositor colour input (nativehdr5)
+
+The coordinator reviewed the first implementation and required four changes.
+The installed Clutter headers and the signatures and behaviour of the existing exported functions had to stay unchanged; the ABI is extended only additively (seven new symbols at `+nativehdr5~`). Encoding and fallback
+target primaries had to share one conversion. A wrong error code had to be
+fixed. EDID-derived output primaries had to be validated at source rather
+than left to a renderer fallback.
+
+An independent adversarial review then confirmed one blocker and three
+should-fix defects. All are fixed:
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| ICC reader skipped from the client's current file position and accepted short reads, passing an unfilled buffer to lcms | Blocker (reproduced) | `pread()` at the absolute offset; anything short of exactly the requested length is an operating-system error. The tests no longer depend on file position; a truncated-before-read case was added. |
+| Nearly collinear primaries passed graphene's unscaled determinant test | Should-fix (measured: 0.107 identity error) | Round trip to identity within 1e-4, computed in double. Named spaces, AP0, AP1, ProPhoto and XYZ keep bit-identical matrices. |
+| Descriptor-0 fixture failed when stdin starts closed | Should-fix | Handles the memfd already being 0, and restores over the stored descriptor with no window in between. |
+| Non-physical white points accepted | Should-fix | White y must be positive, a positive mix of the primaries, and give positive cone responses. |
+| Round-trip rule unpredictable beyond ±16; OS failure classed as unsupported; missing error-code test; overstated comment; housekeeping | Nit | Explicit ±16 bound, classification by stage, tests added, comment corrected, warnings once per state. |
+
+The fast lane ran once over the affected suites. Every one passed except the
+main Wayland invocation. There, the new protocol-error cases had not declared
+the disconnect warning libwayland-server logs, so the harness aborted the
+compositor and the client saw EPIPE. The cases now expect that warning, as
+the other Mutter protocol-error tests do. Only that invocation was rerun,
+and it passed ([receipt](../evidence/mutter-colour-input.json)).

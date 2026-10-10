@@ -1,0 +1,417 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 16:53:31 -0400
+Subject: [PATCH] wayland/color-management: Fix ICC file range and descriptor
+ handling
+
+creator_icc_set_icc_file() had three defects:
+
+ - It detected an already-set file with "fd > 0", while the unset
+   sentinel is -1 and descriptor 0 is a valid descriptor (a compositor
+   started with stdin closed receives client descriptors as 0). A second
+   set_icc_file after a file stored as descriptor 0 was accepted and the
+   first descriptor leaked, instead of raising already_set.
+ - It compared the file size against offset + length computed in the
+   protocol's 32-bit unsigned type. An offset near UINT32_MAX wrapped the
+   sum to a small value and an out-of-file range was accepted, to fail
+   later as an operating-system read error.
+ - Once the data was read, every failure, including a profile lcms
+   rejects, was reported with the 'operating_system' cause. The protocol
+   reserves that cause for errors independent of the client; data that
+   is not a supported ICC profile must fail with 'unsupported'.
+
+Move the request-time validation into meta_wayland_icc_file_set(),
+operating on a small MetaWaylandIccFile state embedded in the creator.
+It tests the stored descriptor against the -1 sentinel, rejects negative
+sizes from fstat(), computes the requested end of the range in uint64_t
+and takes ownership of the incoming descriptor on every path: it is
+stored on success and closed on each rejection, while an already stored
+descriptor is never touched. The request handler only turns a rejection
+into the matching protocol error.
+
+The asynchronous completion now distinguishes a failed read
+('operating_system') from profile content that cannot be used
+('unsupported'). ClutterColorStateIcc reported an unparsable profile and
+a profile without a computable ID as G_IO_ERROR_FAILED, the same code a
+caller would see for an environment failure; report them as
+G_IO_ERROR_INVALID_DATA, next to the existing G_IO_ERROR_NOT_SUPPORTED
+for a non-RGB profile, and report a failure to store the profile in an
+anonymous file as G_IO_ERROR_FAILED whatever the errno (ENOSYS would
+otherwise map to NOT_SUPPORTED). The parsing stage then maps to
+'unsupported' and the storage stage to 'operating_system'.
+
+meta_wayland_icc_file_set() and its init/clear companions are exported
+for tests (META_EXPORT_TEST, uninstalled header; added to the symbols
+file): a client cannot choose the descriptor number the compositor
+receives, so the descriptor 0 case can only be exercised on the
+compositor side.
+---
+ clutter/clutter/clutter-color-state-icc.c   |  13 +-
+ debian/libmutter-51-0.symbols               |   3 +
+ src/wayland/meta-wayland-color-management.c | 193 +++++++++++++-------
+ src/wayland/meta-wayland-color-management.h |  28 +++
+ 4 files changed, 162 insertions(+), 75 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-icc.c b/clutter/clutter/clutter-color-state-icc.c
+index e1d7632..bcfcacb 100644
+--- a/clutter/clutter/clutter-color-state-icc.c
++++ b/clutter/clutter/clutter-color-state-icc.c
+@@ -229,9 +229,14 @@ get_icc_file (const uint8_t     *icc_bytes,
+   file = mtk_anonymous_file_new ("icc-file", icc_length, icc_bytes);
+   if (!file)
+     {
+-      g_set_error (error, G_IO_ERROR, g_io_error_from_errno (errno),
++      int errsv = errno;
++
++      /* A storage failure, not a property of the profile: keep it apart from
++       * the G_IO_ERROR_INVALID_DATA and G_IO_ERROR_NOT_SUPPORTED that parsing
++       * reports, whatever the errno (ENOSYS would map to NOT_SUPPORTED). */
++      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Couldn't create anonymous ICC file: %s",
+-                   g_strerror (errno));
++                   g_strerror (errsv));
+       return FALSE;
+     }
+ 
+@@ -253,7 +258,7 @@ get_icc_profile (const uint8_t  *icc_bytes,
+   profile = cmsOpenProfileFromMem (icc_bytes, icc_length);
+   if (!profile)
+     {
+-      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
++      g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                    "Couldn't parse ICC profile");
+       return FALSE;
+     }
+@@ -288,7 +293,7 @@ get_checksum (cmsHPROFILE  *icc_profile,
+   if (memcmp (checksum, checksum_zeros, CHECKSUM_SIZE) != 0)
+     return TRUE;
+ 
+-  g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
++  g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                "Failed getting checksum from ICC profile");
+ 
+   return FALSE;
+diff --git a/debian/libmutter-51-0.symbols b/debian/libmutter-51-0.symbols
+index 6aa7d9a..e884230 100644
+--- a/debian/libmutter-51-0.symbols
++++ b/debian/libmutter-51-0.symbols
+@@ -800,6 +800,9 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_wayland_filter_manager_remove_global@Base 44.0
+  meta_wayland_get_public_xwayland_display_name@Base 43.0
+  meta_wayland_get_wayland_display_name@Base 43.0
++ meta_wayland_icc_file_clear@Base 51.0-1ubuntu3+nativehdr5~
++ meta_wayland_icc_file_init@Base 51.0-1ubuntu3+nativehdr5~
++ meta_wayland_icc_file_set@Base 51.0-1ubuntu3+nativehdr5~
+  meta_wayland_keyboard_get_focus_surface@Base 49.0
+  meta_wayland_output_get_resources@Base 49.2
+  meta_wayland_override_display_name@Base 43.0
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index ec5b807..c7c6aff 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -24,6 +24,7 @@
+ 
+ #include <fcntl.h>
+ #include <glib/gstdio.h>
++#include <sys/stat.h>
+ 
+ #include "meta-wayland-color-management.h"
+ 
+@@ -177,9 +178,7 @@ typedef struct _MetaWaylandCreatorIcc
+   struct wl_resource *resource;
+   struct wl_resource *image_desc_resource;
+ 
+-  int fd;
+-  uint32_t offset;
+-  uint32_t length;
++  MetaWaylandIccFile icc_file;
+ } MetaWaylandCreatorIcc;
+ 
+ static void meta_wayland_color_management_surface_free (MetaWaylandColorManagementSurface *cm_surface);
+@@ -1246,6 +1245,85 @@ static const struct wp_color_management_output_v1_interface
+   color_management_output_get_image_description,
+ };
+ 
++void
++meta_wayland_icc_file_init (MetaWaylandIccFile *icc_file)
++{
++  *icc_file = (MetaWaylandIccFile) { .fd = -1 };
++}
++
++void
++meta_wayland_icc_file_clear (MetaWaylandIccFile *icc_file)
++{
++  g_clear_fd (&icc_file->fd, NULL);
++  icc_file->offset = 0;
++  icc_file->length = 0;
++}
++
++/*
++ * Takes ownership of @fd. On success it is stored in @icc_file; on every
++ * rejection it is closed and @icc_file is left unchanged, so a protocol error
++ * never leaks the client's descriptor nor closes the stored one.
++ */
++gboolean
++meta_wayland_icc_file_set (MetaWaylandIccFile                              *icc_file,
++                           int                                              fd,
++                           uint32_t                                         offset,
++                           uint32_t                                         length,
++                           enum wp_image_description_creator_icc_v1_error  *error_code,
++                           const char                                     **error_message)
++{
++  g_autofd int icc_profile_fd = fd;
++  struct stat stat_buf;
++  uint64_t file_end;
++  int flags;
++
++  /* -1 is the unset sentinel; descriptor 0 is a valid stored file. */
++  if (icc_file->fd != -1)
++    {
++      *error_code = WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_ALREADY_SET;
++      *error_message = "The ICC file was already set";
++      return FALSE;
++    }
++
++  flags = fcntl (icc_profile_fd, F_GETFL);
++  if (flags == -1 ||
++      (flags & O_ACCMODE) == O_WRONLY ||
++      lseek (icc_profile_fd, 0, SEEK_CUR) < 0)
++    {
++      *error_code = WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_BAD_FD;
++      *error_message = "The ICC file is not readable and seekable";
++      return FALSE;
++    }
++
++  if (length == 0 || length > (32 * 1024 * 1024))
++    {
++      *error_code = WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_BAD_SIZE;
++      *error_message = "The size is 0 or bigger than 32 MB";
++      return FALSE;
++    }
++
++  if (fstat (icc_profile_fd, &stat_buf) == -1 || stat_buf.st_size < 0)
++    {
++      *error_code = WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_BAD_FD;
++      *error_message = "Couldn't determine the size of the ICC profile fd";
++      return FALSE;
++    }
++
++  /* The protocol's offset and length are 32-bit; their sum is not. */
++  file_end = (uint64_t) offset + (uint64_t) length;
++  if ((uint64_t) stat_buf.st_size < file_end)
++    {
++      *error_code = WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_OUT_OF_FILE;
++      *error_message = "ICC file shorter than expected";
++      return FALSE;
++    }
++
++  icc_file->fd = g_steal_fd (&icc_profile_fd);
++  icc_file->offset = offset;
++  icc_file->length = length;
++  return TRUE;
++}
++
+ static MetaWaylandCreatorIcc *
+ meta_wayland_creator_icc_new (MetaWaylandColorManager *color_manager,
+                               struct wl_resource      *resource)
+@@ -1255,7 +1333,7 @@ meta_wayland_creator_icc_new (MetaWaylandColorManager *color_manager,
+   creator_icc = g_new0 (MetaWaylandCreatorIcc, 1);
+   creator_icc->color_manager = color_manager;
+   creator_icc->resource = resource;
+-  creator_icc->fd = -1;
++  meta_wayland_icc_file_init (&creator_icc->icc_file);
+ 
+   return creator_icc;
+ }
+@@ -1263,7 +1341,7 @@ meta_wayland_creator_icc_new (MetaWaylandColorManager *color_manager,
+ static void
+ meta_wayland_creator_icc_free (MetaWaylandCreatorIcc *creator_icc)
+ {
+-  g_clear_fd (&creator_icc->fd, NULL);
++  meta_wayland_icc_file_clear (&creator_icc->icc_file);
+   g_free (creator_icc);
+ }
+ 
+@@ -1279,26 +1357,42 @@ on_icc_create_bytes_read (GObject      *source_object,
+   g_autofree uint8_t *icc_bytes = NULL;
+   uint32_t icc_length;
+ 
+-  if (meta_read_bytes_finish (result, &icc_bytes, &icc_length, &error))
++  if (!meta_read_bytes_finish (result, &icc_bytes, &icc_length, &error))
+     {
+-      color_state = clutter_color_state_icc_new (clutter_context,
+-                                                 icc_bytes,
+-                                                 icc_length,
+-                                                 &error);
++      /* The range was validated against the file size when it was set, so
++       * a failing read is independent of the client. */
++      meta_wayland_image_description_set_failed (image_desc,
++                                                 WP_IMAGE_DESCRIPTION_V1_CAUSE_OPERATING_SYSTEM,
++                                                 error->message);
++      return;
+     }
+ 
+-  if (color_state)
+-    {
+-      meta_wayland_image_description_set_ready (image_desc,
+-                                                color_state,
+-                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
+-    }
+-  else
++  color_state = clutter_color_state_icc_new (clutter_context,
++                                             icc_bytes,
++                                             icc_length,
++                                             &error);
++  if (!color_state)
+     {
+-      meta_wayland_image_description_set_failed (image_desc,
+-                                                 WP_IMAGE_DESCRIPTION_V1_CAUSE_OPERATING_SYSTEM,
++      enum wp_image_description_v1_cause cause;
++
++      /* ClutterColorStateIcc reports the parsing stage as INVALID_DATA or
++       * NOT_SUPPORTED: the client's data is not a supported profile. Its
++       * storage stage reports G_IO_ERROR_FAILED, which is independent of the
++       * client. */
++      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA) ||
++          g_error_matches (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED))
++        cause = WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED;
++      else
++        cause = WP_IMAGE_DESCRIPTION_V1_CAUSE_OPERATING_SYSTEM;
++
++      meta_wayland_image_description_set_failed (image_desc, cause,
+                                                  error->message);
++      return;
+     }
++
++  meta_wayland_image_description_set_ready (image_desc,
++                                            color_state,
++                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
+ }
+ 
+ static void
+@@ -1311,7 +1405,7 @@ creator_icc_create (struct wl_client   *client,
+   struct wl_resource *image_desc_resource;
+   g_autoptr (MetaWaylandImageDescription) image_desc = NULL;
+ 
+-  if (creator_icc->fd == -1)
++  if (creator_icc->icc_file.fd == -1)
+     {
+       wl_resource_post_error (resource,
+                               WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_INCOMPLETE_SET,
+@@ -1333,9 +1427,9 @@ creator_icc_create (struct wl_client   *client,
+                                   meta_wayland_image_description_ref (image_desc),
+                                   image_description_destructor);
+ 
+-  meta_read_bytes (creator_icc->fd,
+-                   creator_icc->offset,
+-                   creator_icc->length,
++  meta_read_bytes (creator_icc->icc_file.fd,
++                   creator_icc->icc_file.offset,
++                   creator_icc->icc_file.length,
+                    on_icc_create_bytes_read,
+                    meta_wayland_image_description_ref (image_desc));
+ 
+@@ -1350,55 +1444,12 @@ creator_icc_set_icc_file (struct wl_client   *client,
+                           uint32_t            length)
+ {
+   MetaWaylandCreatorIcc *creator_icc = wl_resource_get_user_data (resource);
+-  g_autofd int icc_profile_fd = fd;
+-  struct stat stat;
+-  int flags;
+-
+-  if (creator_icc->fd > 0)
+-    {
+-      wl_resource_post_error (resource,
+-                              WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_ALREADY_SET,
+-                              "The ICC file was already set");
+-      return;
+-    }
+-
+-  flags = fcntl (icc_profile_fd, F_GETFL);
+-  if ((flags & O_ACCMODE) == O_WRONLY ||
+-      lseek (icc_profile_fd, 0, SEEK_CUR) < 0)
+-    {
+-      wl_resource_post_error (resource,
+-                              WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_BAD_FD,
+-                              "The ICC file is not readable and seekable");
+-      return;
+-    }
+-
+-  if (length == 0 || length > (32 * 1024 * 1024))
+-    {
+-      wl_resource_post_error (resource,
+-                              WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_BAD_SIZE,
+-                              "The size is 0 or bigger than 32 MB");
+-      return;
+-    }
+-
+-  if (fstat (icc_profile_fd, &stat) == -1)
+-    {
+-      wl_resource_post_error (resource,
+-                              WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_BAD_FD,
+-                              "Couldn't fstat the ICC profile fd");
+-      return;
+-    }
+-
+-  if (stat.st_size < offset + length)
+-    {
+-      wl_resource_post_error (resource,
+-                              WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_OUT_OF_FILE,
+-                              "ICC file shorter than expected");
+-      return;
+-    }
++  enum wp_image_description_creator_icc_v1_error error_code;
++  const char *error_message;
+ 
+-  creator_icc->fd = g_steal_fd (&icc_profile_fd);
+-  creator_icc->offset = offset;
+-  creator_icc->length = length;
++  if (!meta_wayland_icc_file_set (&creator_icc->icc_file, fd, offset, length,
++                                  &error_code, &error_message))
++    wl_resource_post_error (resource, error_code, "%s", error_message);
+ }
+ 
+ static const struct wp_image_description_creator_icc_v1_interface
+diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
+index a26d234..308cd9c 100644
+--- a/src/wayland/meta-wayland-color-management.h
++++ b/src/wayland/meta-wayland-color-management.h
+@@ -20,10 +20,38 @@
+ 
+ #pragma once
+ 
++#include <glib.h>
++#include <stdint.h>
++
++#include "core/util-private.h"
+ #include "wayland/meta-wayland-types.h"
+ 
++#include "color-management-v1-server-protocol.h"
++
++/* The file state of a wp_image_description_creator_icc_v1. */
++typedef struct _MetaWaylandIccFile
++{
++  int fd;
++  uint32_t offset;
++  uint32_t length;
++} MetaWaylandIccFile;
++
+ void meta_wayland_init_color_management (MetaWaylandCompositor *compositor);
+ 
+ void meta_wayland_finalize_color_management (MetaWaylandCompositor *compositor);
+ 
+ void meta_wayland_color_management_outputs_changed (MetaWaylandCompositor *compositor);
++
++META_EXPORT_TEST
++void meta_wayland_icc_file_init (MetaWaylandIccFile *icc_file);
++
++META_EXPORT_TEST
++void meta_wayland_icc_file_clear (MetaWaylandIccFile *icc_file);
++
++META_EXPORT_TEST
++gboolean meta_wayland_icc_file_set (MetaWaylandIccFile                              *icc_file,
++                                    int                                              fd,
++                                    uint32_t                                         offset,
++                                    uint32_t                                         length,
++                                    enum wp_image_description_creator_icc_v1_error  *error_code,
++                                    const char                                     **error_message);

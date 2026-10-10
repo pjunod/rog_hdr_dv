@@ -8,40 +8,50 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Active fifth batch — display contracts and delivery
+## Active sixth batch — colour input and processor activation
 
-The qualified Wine candidate now loads the exact recovered Dolby DLL. Its
-factory request stops when the component asks for the missing Windows
-`DisplayMonitor` runtime class. The manifest, hashes and loader trace agree;
-[activation evidence](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
-records the exact scope. Object activation and frame processing remain open.
+With DisplayMonitor merged, the recovered OEM processor now **activates**
+under Wine in the isolated fixture. It returns an `IMFTransform` that reports
+one input and one output stream. It offers P010/NV12 input and 10-bit RGB,
+half-float or 8-bit RGB output.
+[The activation section](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates)
+records what that does and does not prove. No media type has been set and no frame has been processed. The next stage
+negotiates the offered types and traces the metadata the transform requests.
+It has not started and awaits the owner's scope confirmation.
 
-Work continues on a [generic monitor contract](WINE_DISPLAY_MONITOR.md) backed by actual display data,
-native [physical-target gamut reporting](NATIVE_TARGET_GAMUT.md), and matching amd64/i386 library plus
-amd64 compositor packages. Packaging uses isolated source-only builds; no host
-installation or live display change is implied. The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
-initial accuracy goals and held-out validation; this unit has not been measured.
+The compositor's colour-input defects from the
+[audit](COLOUR_PIPELINE_AUDIT.md#implementation-status) are fixed in
+`nativehdr5`, which was reviewed and passed its affected fast lane
+([receipt](../evidence/mutter-colour-input.json)). The current delivery
+candidate is the hdr8 library with `nativehdr5`. It still needs packaging for
+amd64 (and i386 for the library) and a coordinated, recovery-ready
+installation before active-output verification.
 
-The exact qualified hdr7 library source has produced amd64 and i386 packages,
-and nativehdr3 compositor packaging has completed in the isolated native
-builder. The [package receipt](../evidence/baseline-native-packages.json)
-records source identities and the six runtime artifacts. Read-only APT
-simulations found a coherent six-package upgrade and modeled six-package
-rollback, with no additions or removals. Recovery artifacts are hashed and
-retained privately; the live installation is unchanged.
+## Fifth batch — display contracts and delivery (merged, PR 5)
 
-The new hdr8/upstream native-chromaticity implementations compile with warnings
-as errors. Their append-only patch series preserve the delivered prefixes.
-The nativehdr4 compositor candidate, Mutter patches 0013–0015, now publishes
-the native target gamut and compiles cleanly against hdr8 on native amd64.
-The Wine monitor-provenance and DisplayMonitor slices, Wine patches 0003–0008,
-compile with warnings as errors. Both receipts are linked from their topic
-documents. The bounded read-only Wayland colour
-inspector and its synthetic server compile with warnings as errors;
-[the diagnostic guide](DISPLAY_DIAGNOSTICS.md#inspect-the-compositors-actual-colour-descriptions)
-explains raw fields, completion limits and privacy.
-New gamut and monitor implementations still require their own final review and
-affected runtime qualification; package compilation does not replace those.
+Before this batch, the qualified Wine candidate loaded the exact recovered
+Dolby DLL but its factory request stopped at the missing Windows
+`DisplayMonitor` runtime class
+([evidence](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)).
+The batch delivered a [generic monitor contract](WINE_DISPLAY_MONITOR.md)
+backed by actual display data, and native
+[physical-target gamut reporting](NATIVE_TARGET_GAMUT.md) in the library
+(hdr8 and upstream series) and the compositor (`nativehdr4`). It also added
+the bounded read-only Wayland colour inspector
+([guide](DISPLAY_DIAGNOSTICS.md#inspect-the-compositors-actual-colour-descriptions)).
+The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
+initial accuracy goals and held-out validation; this unit has not been
+measured.
+
+Baseline packaging preceded the batch. The exact qualified hdr7 library
+source produced amd64 and i386 packages, and nativehdr3 compositor packaging
+completed in the isolated native builder. The
+[package receipt](../evidence/baseline-native-packages.json) records source
+identities and the six runtime artifacts. Read-only APT simulations found a
+coherent six-package upgrade and modeled six-package rollback, with no
+additions or removals. Recovery artifacts are hashed and retained privately;
+the live installation is unchanged. Delivery now targets the newer reviewed
+candidates instead of installing this baseline.
 
 The adversarial review found two blockers and a set of should-fix defects;
 all are addressed ([review](REVIEW.md#fifth-batch--display-contracts-pr-5)).
@@ -100,9 +110,9 @@ Mutter and matching amd64/i386 library packaging.
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
 | Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built; hdr8 gamut candidate reviewed and fast-lane qualified | Package hdr8 for both architectures and deliver the matching compositor/library set |
-| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built; nativehdr4 gamut candidate reviewed and fast-lane qualified | Package nativehdr4, deliver reviewed set and verify active output |
-| Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
-| General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
+| Compositor feedback | nativehdr2 delivered; nativehdr3 packages built; nativehdr4 (gamut) and nativehdr5 (colour input) source-qualified | Package nativehdr5, deliver the reviewed set and verify active output |
+| Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
+| General colour quality | Audit complete; input defects fixed in nativehdr5 (reviewed, fast lane passed) | HLG, tone and gamut mapping, output characterization, profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 
