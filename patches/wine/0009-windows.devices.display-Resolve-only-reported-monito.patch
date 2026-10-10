@@ -1,0 +1,512 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 15:24:14 -0400
+Subject: [PATCH] windows.devices.display: Resolve only reported monitors and
+ use base EDID facts.
+
+Hold win32u's display_device_init mutex while resolving a monitor and
+reading its facts, so a snapshot never straddles a display reconfiguration
+that rebuilds the monitor device nodes. Resolve only monitors with an
+enabled (linked) monitor interface, for both identifier forms, and include
+InterfaceEnabled in the device selector.
+
+Read the adapter LUID with the type win32u writes (UINT64), so the adapter
+device ID resolves. Prefer the validated EDID product name to the generic
+description written for every monitor node. Do not guess a usage kind for
+virtual monitors.
+
+Use base EDID 1.4 facts where no DisplayID declaration provides them: the
+colour characteristics (all four points in the chromaticity domain or
+none) and a preferred timing that EDID 1.4 declares native. A DisplayID
+section with a reserved product primary use is left opaque.
+
+Tests cover unlinked interfaces, connector validity (HD15 is zero),
+virtual origin, base EDID facts, EDID 1.3 preferred timing, the reserved
+use case, a short non-zero tail and adapter resolution on real topology.
+---
+ dlls/windows.devices.display/descriptor.c     |  50 +++++-
+ dlls/windows.devices.display/main.c           |  98 ++++++++---
+ dlls/windows.devices.display/private.h        |   1 +
+ .../tests/displaymonitor.c                    | 162 +++++++++++++++++-
+ 4 files changed, 285 insertions(+), 26 deletions(-)
+
+diff --git a/dlls/windows.devices.display/descriptor.c b/dlls/windows.devices.display/descriptor.c
+index f6f6260..09b4ef1 100644
+--- a/dlls/windows.devices.display/descriptor.c
++++ b/dlls/windows.devices.display/descriptor.c
+@@ -114,6 +114,44 @@ static void parse_native_parameters( const BYTE *block, struct monitor_descripto
+     }
+ }
+ 
++/* EDID 1.4 colour characteristics (bytes 0x19-0x22) are the display's own
++ * chromaticities as 10-bit fractions of 1024. Like the native declaration,
++ * all four points must lie in the chromaticity domain or none is used. */
++static BOOL edid_chromaticities( const BYTE *edid, Point points[4] )
++{
++    static const struct { BYTE high, low, shift; } fields[8] =
++    {
++        {0x1b, 0x19, 6}, {0x1c, 0x19, 4}, {0x1d, 0x19, 2}, {0x1e, 0x19, 0},
++        {0x1f, 0x1a, 6}, {0x20, 0x1a, 4}, {0x21, 0x1a, 2}, {0x22, 0x1a, 0},
++    };
++    UINT32 value[8], i;
++
++    for (i = 0; i < 8; i++) value[i] = (edid[fields[i].high] << 2) | ((edid[fields[i].low] >> fields[i].shift) & 3);
++    for (i = 0; i < 4; i++)
++    {
++        if (!value[2 * i + 1] || value[2 * i] + value[2 * i + 1] > 1024) return FALSE;
++        points[i].X = value[2 * i] / 1024.0f;
++        points[i].Y = value[2 * i + 1] / 1024.0f;
++    }
++    return TRUE;
++}
++
++/* In EDID 1.4, feature bit 1 states that the first detailed timing is the
++ * native pixel format. Earlier revisions only mark it preferred. */
++static BOOL edid_native_resolution( const BYTE *edid, SizeInt32 *size )
++{
++    const BYTE *timing = edid + 54;
++    UINT32 width, height;
++
++    if (edid[19] < 4 || !(edid[24] & 2) || !(timing[0] | timing[1]) || (timing[17] & 0x80)) return FALSE;
++    width = timing[2] | ((timing[4] & 0xf0) << 4);
++    height = timing[5] | ((timing[7] & 0xf0) << 4);
++    if (!width || !height) return FALSE;
++    size->Width = width;
++    size->Height = height;
++    return TRUE;
++}
++
+ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_descriptor *descriptor )
+ {
+     static const BYTE header[] = {0, 255, 255, 255, 255, 255, 255, 0};
+@@ -128,6 +166,9 @@ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_des
+     count = edid[126] + 1;
+     if (count * 128 > size) return;
+     for (i = 0; i < count; i++) if (!checksum_valid( edid + 128 * i, 128 )) return;
++    descriptor->flags |= MONITOR_EDID_VALID;
++    if (edid_chromaticities( edid, descriptor->primaries )) descriptor->flags |= MONITOR_NATIVE_PRIMARIES;
++    if (edid_native_resolution( edid, &descriptor->native_resolution )) descriptor->flags |= MONITOR_NATIVE_RESOLUTION;
+ 
+     /* Non-zero base dimensions are physical centimetres. A zero dimension
+      * can instead encode aspect ratio, so it is not a physical measurement. */
+@@ -146,6 +187,9 @@ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_des
+         if (section[0] != 0x20 && section[0] != 0x21) return;
+         section_size = section[1] + 5;
+         if (section_size > 126 || !checksum_valid( section, section_size )) return;
++        /* Product primary use cases above 8 are reserved; such a section is
++         * not a DisplayID 2.x structure we can interpret. */
++        if (section[2] > 8) return;
+         if (!first) first = section;
+         displayid_count++;
+         for (offset = 4; offset < section_size - 1; offset += length)
+@@ -189,9 +233,11 @@ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_des
+      * value by arbitrary ordering. Other known physical facts remain usable. */
+     if (!parameters || duplicate_parameters) return;
+     parse_native_parameters( parameters, &native );
++    /* The DisplayID declaration takes precedence for each fact it provides;
++     * base EDID facts remain for the ones it leaves unavailable. */
+     if (native.flags & MONITOR_PHYSICAL_SIZE) descriptor->physical_size = native.physical_size;
+-    descriptor->native_resolution = native.native_resolution;
+-    memcpy( descriptor->primaries, native.primaries, sizeof(native.primaries) );
++    if (native.flags & MONITOR_NATIVE_RESOLUTION) descriptor->native_resolution = native.native_resolution;
++    if (native.flags & MONITOR_NATIVE_PRIMARIES) memcpy( descriptor->primaries, native.primaries, sizeof(native.primaries) );
+     descriptor->max_luminance = native.max_luminance;
+     descriptor->min_luminance = native.min_luminance;
+     descriptor->full_luminance = native.full_luminance;
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index c823e93..c553bbe 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -356,7 +356,7 @@ static void read_adapter_device_id( struct monitor *impl )
+         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || !(detail = malloc(size))) continue;
+         detail->cbSize = sizeof(*detail);
+         if (SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, &device ) &&
+-            read_property( set, &device, &adapter_luid, DEVPROP_TYPE_INT64, &luid, sizeof(luid) ) &&
++            read_property( set, &device, &adapter_luid, DEVPROP_TYPE_UINT64, &luid, sizeof(luid) ) &&
+             !memcmp( &luid, &impl->adapter_id, sizeof(luid) ))
+             WindowsCreateString( detail->DevicePath, wcslen(detail->DevicePath), &impl->adapter_device_id );
+         free( detail );
+@@ -386,33 +386,71 @@ static void read_descriptor( HDEVINFO set, SP_DEVINFO_DATA *device, struct monit
+     monitor_descriptor_parse( impl->edid, impl->edid_size, &impl->descriptor );
+ }
+ 
++/* The monitor's own product name from a validated EDID takes precedence over
++ * the generic description Wine writes for every monitor node. */
++static BOOL read_edid_name( struct monitor *impl )
++{
++    WCHAR buffer[13];
++    UINT32 i, j, length;
++
++    if (!(impl->descriptor.flags & MONITOR_EDID_VALID)) return FALSE;
++    for (i = 54; i <= 108; i += 18)
++    {
++        if (memcmp( impl->edid + i, "\0\0\0\xfc\0", 5 )) continue;
++        for (j = 0; j < 13 && impl->edid[i + 5 + j] >= 32 && impl->edid[i + 5 + j] <= 126; j++)
++            buffer[j] = impl->edid[i + 5 + j];
++        length = j;
++        while (length && buffer[length - 1] == ' ') length--;
++        if (!length) return FALSE;
++        return SUCCEEDED(WindowsCreateString( buffer, length, &impl->display_name ));
++    }
++    return FALSE;
++}
++
+ static void read_name( HDEVINFO set, SP_DEVINFO_DATA *device, struct monitor *impl )
+ {
+     WCHAR buffer[512];
+     DWORD type, size;
+-    UINT32 i, j, length;
+     BOOL found;
++
++    if (read_edid_name( impl )) return;
+     found = SetupDiGetDeviceRegistryPropertyW( set, device, SPDRP_FRIENDLYNAME, &type,
+                                               (BYTE *)buffer, sizeof(buffer), &size );
+     if (!found) found = SetupDiGetDeviceRegistryPropertyW( set, device, SPDRP_DEVICEDESC, &type,
+                                                          (BYTE *)buffer, sizeof(buffer), &size );
+     if (found && type == REG_SZ && size >= sizeof(WCHAR) && size <= sizeof(buffer) &&
+         !(size % sizeof(WCHAR)) && !buffer[size / sizeof(WCHAR) - 1])
+-    {
+         WindowsCreateString( buffer, wcslen(buffer), &impl->display_name );
+-        return;
+-    }
+-    if (impl->edid_size < 128) return;
+-    for (i = 54; i <= 108; i += 18)
+-    {
+-        if (memcmp( impl->edid + i, "\0\0\0\xfc\0", 5 )) continue;
+-        for (j = 0; j < 13 && impl->edid[i + 5 + j] >= 32 && impl->edid[i + 5 + j] <= 126; j++)
+-            buffer[j] = impl->edid[i + 5 + j];
+-        length = j;
+-        while (length && buffer[length - 1] == ' ') length--;
+-        WindowsCreateString( buffer, length, &impl->display_name );
+-        return;
+-    }
++}
++
++/* A monitor is resolvable only while it has an enabled (linked) monitor
++ * interface; win32u links the interfaces of monitors it currently reports. */
++static BOOL monitor_interface_active( HDEVINFO set, SP_DEVINFO_DATA *device )
++{
++    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
++    DWORD index;
++
++    for (index = 0; SetupDiEnumDeviceInterfaces( set, device, &monitor_interface, index, &iface ); index++)
++        if (iface.Flags & SPINT_ACTIVE) return TRUE;
++    return FALSE;
++}
++
++/* win32u rebuilds the monitor device nodes under this session mutex when the
++ * display configuration changes. Holding it while resolving and reading a
++ * monitor yields a snapshot of one consistent configuration. */
++static HANDLE lock_display_devices(void)
++{
++    HANDLE mutex = CreateMutexW( NULL, FALSE, L"display_device_init" );
++
++    if (mutex) WaitForSingleObject( mutex, INFINITE );
++    return mutex;
++}
++
++static void unlock_display_devices( HANDLE mutex )
++{
++    if (!mutex) return;
++    ReleaseMutex( mutex );
++    CloseHandle( mutex );
+ }
+ 
+ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **result )
+@@ -421,14 +459,21 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+     SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
+     SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
+     struct monitor *impl;
++    HANDLE mutex;
+     HRESULT hr;
+     DWORD size;
+     const WCHAR *buffer = WindowsGetStringRawBuffer( id, NULL );
+ 
+     *result = NULL;
+     TRACE( "Resolving monitor, interface_id %d.\n", interface_id );
++    mutex = lock_display_devices();
+     set = SetupDiCreateDeviceInfoList( NULL, NULL );
+-    if (set == INVALID_HANDLE_VALUE) return HRESULT_FROM_WIN32(GetLastError());
++    if (set == INVALID_HANDLE_VALUE)
++    {
++        hr = HRESULT_FROM_WIN32(GetLastError());
++        unlock_display_devices( mutex );
++        return hr;
++    }
+     if (interface_id)
+     {
+         if (!SetupDiOpenDeviceInterfaceW( set, buffer, 0, &iface )) goto failed;
+@@ -437,6 +482,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+             hr = E_INVALIDARG;
+             goto done;
+         }
++        if (!(iface.Flags & SPINT_ACTIVE))
++        {
++            hr = HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE);
++            goto done;
++        }
+         /* The sizing call returns the interface's real device instance. */
+         SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, &device );
+         if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) goto failed;
+@@ -447,6 +497,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+         hr = E_INVALIDARG;
+         goto done;
+     }
++    if (!interface_id && !monitor_interface_active( set, &device ))
++    {
++        hr = HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE);
++        goto done;
++    }
+     if (!(impl = calloc( 1, sizeof(*impl) )))
+     {
+         hr = E_OUTOFMEMORY;
+@@ -470,11 +525,6 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+     read_adapter_device_id( impl );
+     read_descriptor( set, &device, impl );
+     read_name( set, &device, impl );
+-    if (impl->properties.origin == WINE_MONITOR_ORIGIN_VIRTUAL && !(impl->descriptor.flags & MONITOR_USAGE))
+-    {
+-        impl->descriptor.flags |= MONITOR_USAGE;
+-        impl->descriptor.usage = DisplayMonitorUsageKind_Standard;
+-    }
+     *result = (IInspectable *)&impl->IDisplayMonitor_iface;
+     hr = S_OK;
+     goto done;
+@@ -482,6 +532,7 @@ failed:
+     hr = HRESULT_FROM_WIN32(GetLastError());
+ done:
+     SetupDiDestroyDeviceInfoList( set );
++    unlock_display_devices( mutex );
+     return hr;
+ }
+ 
+@@ -595,7 +646,8 @@ DEFINE_IINSPECTABLE( statics, IDisplayMonitorStatics, struct factory, IActivatio
+ 
+ static HRESULT WINAPI statics_GetDeviceSelector( IDisplayMonitorStatics *iface, HSTRING *value )
+ {
+-    static const WCHAR selector[] = L"System.Devices.InterfaceClassGuid:=\"{E6F07B5F-EE97-4A90-B076-33F57BF4EAA7}\"";
++    static const WCHAR selector[] = L"System.Devices.InterfaceClassGuid:=\"{E6F07B5F-EE97-4A90-B076-33F57BF4EAA7}\" "
++                                   L"AND System.Devices.InterfaceEnabled:=System.StructuredQueryType.Boolean#True";
+     if (!value) return E_POINTER;
+     return WindowsCreateString( selector, ARRAY_SIZE(selector) - 1, value );
+ }
+diff --git a/dlls/windows.devices.display/private.h b/dlls/windows.devices.display/private.h
+index 4fb9b20..609d59a 100644
+--- a/dlls/windows.devices.display/private.h
++++ b/dlls/windows.devices.display/private.h
+@@ -49,6 +49,7 @@
+ #define MONITOR_MIN_LUMINANCE     0x0010
+ #define MONITOR_FULL_LUMINANCE    0x0020
+ #define MONITOR_USAGE            0x0040
++#define MONITOR_EDID_VALID       0x0080
+ 
+ struct monitor_descriptor
+ {
+diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
+index e0040a7..8a7d6d0 100644
+--- a/dlls/windows.devices.display/tests/displaymonitor.c
++++ b/dlls/windows.devices.display/tests/displaymonitor.c
+@@ -135,6 +135,16 @@ static void test_real_interfaces(void)
+         ok( hr == S_OK, "Real monitor interface resolution hr %#lx.\n", hr );
+         if (SUCCEEDED(hr))
+         {
++            DisplayAdapterId adapter;
++            HSTRING adapter_id;
++
++            /* A monitor that reports its adapter LUID must also resolve the adapter. */
++            if (IDisplayMonitor_get_DisplayAdapterId( monitor, &adapter ) == S_OK)
++            {
++                hr = IDisplayMonitor_get_DisplayAdapterDeviceId( monitor, &adapter_id );
++                ok( hr == S_OK && WindowsGetStringLen(adapter_id), "Adapter device id hr %#lx.\n", hr );
++                WindowsDeleteString( adapter_id );
++            }
+             hr = IDisplayMonitor_get_DeviceId( monitor, &id );
+             ok( hr == S_OK && WindowsGetStringLen(id), "DeviceId hr %#lx.\n", hr );
+             if (SUCCEEDED(hr))
+@@ -171,6 +181,7 @@ static void make_edid( BYTE *edid )
+     edid[19] = 4;
+     edid[21] = 60; /* Deliberately differs from native 30 cm width. */
+     edid[22] = 40;
++    memcpy( edid + 72, "\0\0\0\xfc\0WINETEST OLED", 18 ); /* monitor name descriptor */
+     edid[126] = 1;
+     edid[128] = 0x70;
+     section[0] = 0x20;
+@@ -212,7 +223,8 @@ static void test_descriptor_cases( HKEY key, const WCHAR *id )
+         {28, 0x8000, TRUE, TRUE, FALSE, TRUE, 616},
+         {1,  0x1d02, FALSE, FALSE, FALSE, FALSE, 0}, /* unknown revision, exact length */
+         {11, 0x3308, FALSE, FALSE, FALSE, TRUE, 0}, /* source guidance is not physical */
+-        {2,  0xb81c, FALSE, FALSE, FALSE, FALSE, 0}, /* short block leaves malformed tail */
++        {2,  0xb81c, FALSE, FALSE, FALSE, FALSE, 0}, /* 28-byte payload is not the known layout */
++        {2,  0xb81b, FALSE, FALSE, FALSE, FALSE, 0}, /* 27-byte payload leaves a non-zero short tail */
+     };
+     IDisplayMonitor *monitor;
+     SizeInt32 resolution;
+@@ -361,6 +373,142 @@ static void test_descriptor_chromaticities( HKEY key, const WCHAR *id )
+     }
+ }
+ 
++/* Wine links the interfaces of the monitors it reports (Control\Linked = 1);
++ * a test-owned node needs the same state to be resolvable. Removing the test
++ * device deletes this key with the rest of the interface. */
++static BOOL set_interface_linked( const WCHAR *path, DWORD linked )
++{
++    WCHAR key_path[MAX_PATH];
++    HKEY key;
++    LONG ret;
++
++    swprintf( key_path, ARRAY_SIZE(key_path),
++              L"System\\CurrentControlSet\\Control\\DeviceClasses\\{E6F07B5F-EE97-4A90-B076-33F57BF4EAA7}\\##?#%s\\#\\Control",
++              path + 4 );
++    ret = RegCreateKeyExW( HKEY_LOCAL_MACHINE, key_path, 0, NULL, 0, KEY_SET_VALUE, NULL, &key, NULL );
++    if (ret) return FALSE;
++    ret = RegSetValueExW( key, L"Linked", 0, REG_DWORD, (BYTE *)&linked, sizeof(linked) );
++    RegCloseKey( key );
++    return !ret;
++}
++
++static void test_connector_properties( HDEVINFO set, SP_DEVINFO_DATA *device, HKEY key, const WCHAR *id )
++{
++    static const struct
++    {
++        struct wine_monitor_properties properties;
++        HRESULT connection_hr;
++        DisplayMonitorConnectionKind connection;
++        DisplayMonitorPhysicalConnectorKind connector;
++    } cases[] =
++    {
++        /* HD15 is numerically zero, so validity, not the value, makes it known. */
++        {{WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID, WINE_MONITOR_ORIGIN_DISPLAY_SERVER, DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15},
++         S_OK, DisplayMonitorConnectionKind_Wired, DisplayMonitorPhysicalConnectorKind_HD15},
++        {{0, WINE_MONITOR_ORIGIN_DISPLAY_SERVER, DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15},
++         __HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), 0, DisplayMonitorPhysicalConnectorKind_Unknown},
++        {{WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID, WINE_MONITOR_ORIGIN_DISPLAY_SERVER, DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED},
++         S_OK, DisplayMonitorConnectionKind_Internal, DisplayMonitorPhysicalConnectorKind_DisplayPort},
++        {{0, WINE_MONITOR_ORIGIN_VIRTUAL, 0},
++         S_OK, DisplayMonitorConnectionKind_Virtual, DisplayMonitorPhysicalConnectorKind_Unknown},
++    };
++    DisplayMonitorPhysicalConnectorKind connector;
++    DisplayMonitorConnectionKind connection;
++    DisplayMonitorUsageKind usage;
++    IDisplayMonitor *monitor;
++    BYTE edid[256];
++    UINT32 i;
++    HRESULT hr;
++
++    /* Product primary use 0 declares no usage kind. */
++    make_edid( edid );
++    edid[131] = 0;
++    checksum( edid + 129, 37 );
++    checksum( edid + 128, 128 );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++    for (i = 0; i < ARRAY_SIZE(cases); i++)
++    {
++        SetupDiSetDevicePropertyW( set, device, &WINE_DEVPROPKEY_MONITOR_PROPERTIES, DEVPROP_TYPE_BINARY,
++                                   (BYTE *)&cases[i].properties, sizeof(cases[i].properties), 0 );
++        hr = get_monitor( id, FALSE, &monitor );
++        ok( hr == S_OK, "Connector case %u creation hr %#lx.\n", i, hr );
++        if (FAILED(hr)) continue;
++        connection = -1;
++        hr = IDisplayMonitor_get_ConnectionKind( monitor, &connection );
++        ok( hr == cases[i].connection_hr, "Connector case %u connection hr %#lx.\n", i, hr );
++        if (SUCCEEDED(hr)) ok( connection == cases[i].connection, "Connector case %u connection %d.\n", i, connection );
++        hr = IDisplayMonitor_get_PhysicalConnector( monitor, &connector );
++        ok( hr == S_OK && connector == cases[i].connector, "Connector case %u connector %d.\n", i, connector );
++        /* A virtual origin is not evidence of a usage kind. */
++        hr = IDisplayMonitor_get_UsageKind( monitor, &usage );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Connector case %u usage hr %#lx.\n", i, hr );
++        IDisplayMonitor_Release( monitor );
++    }
++}
++
++static void test_base_edid_facts( HKEY key, const WCHAR *id )
++{
++    static const BYTE chromaticities[10] = {0xee, 0x91, 0xa3, 0x54, 0x4c, 0x99, 0x26, 0x0f, 0x50, 0x54};
++    IDisplayMonitor *monitor;
++    SizeInt32 resolution;
++    BYTE edid[256];
++    HSTRING name;
++    Point point;
++    HRESULT hr;
++    UINT32 i;
++
++    /* Base EDID 1.4 only: colour characteristics and a native preferred timing. */
++    for (i = 0; i < 2; i++)
++    {
++        make_edid( edid );
++        edid[126] = 0;
++        memcpy( edid + 25, chromaticities, sizeof(chromaticities) );
++        edid[24] = 0x0a; /* preferred timing is the native format */
++        edid[54] = 0x01; edid[55] = 0x1d; /* non-zero pixel clock */
++        edid[56] = 0x00; edid[58] = 0xf0; /* 3840 active */
++        edid[59] = 0x70; edid[61] = 0x80; /* 2160 active */
++        if (i) edid[19] = 3; /* EDID 1.3 marks the timing preferred, not native */
++        checksum( edid, 128 );
++        RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, 128 );
++        hr = get_monitor( id, FALSE, &monitor );
++        ok( hr == S_OK, "Base EDID case %u creation hr %#lx.\n", i, hr );
++        if (FAILED(hr)) continue;
++        hr = IDisplayMonitor_get_RedPrimary( monitor, &point );
++        ok( hr == S_OK && fabsf( point.X - 655 / 1024.0f ) < 1e-6f && fabsf( point.Y - 338 / 1024.0f ) < 1e-6f,
++            "Base EDID case %u red hr %#lx, %f,%f.\n", i, hr, point.X, point.Y );
++        hr = IDisplayMonitor_get_NativeResolutionInRawPixels( monitor, &resolution );
++        if (i) ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "EDID 1.3 preferred timing used as native.\n" );
++        else ok( hr == S_OK && resolution.Width == 3840 && resolution.Height == 2160,
++                 "Base EDID native resolution hr %#lx, %dx%d.\n", hr, resolution.Width, resolution.Height );
++        hr = IDisplayMonitor_get_DisplayName( monitor, &name );
++        ok( hr == S_OK && !wcscmp( WindowsGetStringRawBuffer( name, NULL ), L"WINETEST OLED" ),
++            "Base EDID case %u name %s.\n", i, wine_dbgstr_w( WindowsGetStringRawBuffer( name, NULL ) ) );
++        WindowsDeleteString( name );
++        IDisplayMonitor_Release( monitor );
++    }
++
++    /* A reserved product primary use makes the DisplayID section opaque. */
++    make_edid( edid );
++    edid[131] = 0x55;
++    checksum( edid + 129, 37 );
++    checksum( edid + 128, 128 );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++    hr = get_monitor( id, FALSE, &monitor );
++    ok( hr == S_OK, "Reserved use creation hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        UINT32 length;
++        BYTE *copy;
++
++        hr = IDisplayMonitor_get_NativeResolutionInRawPixels( monitor, &resolution );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Reserved use native resolution hr %#lx.\n", hr );
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_DisplayId, &length, &copy );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Reserved use DisplayID copy hr %#lx.\n", hr );
++        if (SUCCEEDED(hr)) CoTaskMemFree( copy );
++        IDisplayMonitor_Release( monitor );
++    }
++}
++
+ static void test_async_lifetime(void)
+ {
+     static const WCHAR missing[] = L"ROOT\\WINETEST_MISSING_DISPLAYMONITOR\\0";
+@@ -456,6 +604,16 @@ static void test_synthetic_descriptor(void)
+     ret = SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, NULL );
+     ok( ret, "Interface detail error %lu.\n", GetLastError() );
+     if (!ret) goto close;
++    /* A monitor without an enabled interface is not currently reported. */
++    hr = get_monitor( detail->DevicePath, TRUE, &monitor );
++    ok( hr == HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE), "Unlinked interface hr %#lx.\n", hr );
++    if (SUCCEEDED(hr)) IDisplayMonitor_Release( monitor );
++    hr = get_monitor( id, FALSE, &monitor );
++    ok( hr == HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE), "Unlinked device hr %#lx.\n", hr );
++    if (SUCCEEDED(hr)) IDisplayMonitor_Release( monitor );
++    ret = set_interface_linked( detail->DevicePath, 1 );
++    ok( ret, "Link test interface error.\n" );
++    if (!ret) goto close;
+     hr = get_monitor( detail->DevicePath, TRUE, &monitor );
+     ok( hr == S_OK, "Synthetic monitor hr %#lx.\n", hr );
+     if (FAILED(hr)) goto close;
+@@ -508,6 +666,8 @@ static void test_synthetic_descriptor(void)
+     IDisplayMonitor_Release( monitor );
+     test_descriptor_cases( key, id );
+     test_descriptor_chromaticities( key, id );
++    test_base_edid_facts( key, id );
++    test_connector_properties( set, &device, key, id );
+ close:
+     free( detail );
+     RegCloseKey( key );
