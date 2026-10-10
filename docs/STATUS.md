@@ -8,7 +8,27 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Active fifth batch — display contracts and delivery
+## Active sixth batch — colour input and processor activation
+
+With DisplayMonitor merged, the recovered OEM processor now **activates**
+under Wine in the isolated fixture. It returns a working Media Foundation
+transform: P010/NV12 in, and 10-bit RGB, half-float or 8-bit RGB out.
+[The activation section](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates)
+records what that does and does not prove. No frame has been processed. The
+next stage negotiates the offered types and traces the metadata the transform
+requests. It has not started: an automated safety check stopped the
+implementing agent while it was writing the instrumented probe, and the owner
+needs to confirm scope before work resumes.
+
+The compositor's colour-input defects from the
+[audit](COLOUR_PIPELINE_AUDIT.md#implementation-status) are fixed in
+`nativehdr5`, which was reviewed and passed its affected fast lane
+([receipt](../evidence/mutter-colour-input.json)). The final delivery
+candidate is the hdr8 library with `nativehdr5`. It still needs packaging for
+amd64 (and i386 for the library) and a coordinated, recovery-ready
+installation before active-output verification.
+
+## Fifth batch — display contracts and delivery (merged, PR 5)
 
 The qualified Wine candidate now loads the exact recovered Dolby DLL. Its
 factory request stops when the component asks for the missing Windows
@@ -101,8 +121,8 @@ Mutter and matching amd64/i386 library packaging.
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
 | Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built; hdr8 gamut candidate reviewed and fast-lane qualified | Package hdr8 for both architectures and deliver the matching compositor/library set |
 | Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built; nativehdr4 gamut candidate reviewed and fast-lane qualified | Package nativehdr4, deliver reviewed set and verify active output |
-| Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
-| General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
+| Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
+| General colour quality | Audit complete; input defects fixed in nativehdr5 (reviewed, fast lane passed) | HLG, tone and gamut mapping, output characterization, profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 

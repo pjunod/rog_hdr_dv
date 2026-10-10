@@ -394,3 +394,31 @@ Compiler qualification precedes edits. Final adversarial review precedes the
 affected runtime checks. No live profile assignment, mode switch or compositor
 replacement is part of this source batch. HLG, output characterization and
 physical mapping remain subsequent changes with their own contracts.
+
+### Implementation status
+
+Mutter patches 0016–0027 (`nativehdr5`) implement this batch:
+
+- **One fallible matrix definition.** A single internal function now owns
+  the linear BT.2020 matrices used by the renderer. Both the renderer and
+  protocol validation call it. It rejects singular, non-finite and badly
+  conditioned matrices (round trip to identity within 1e-4, computed in
+  double). It also rejects white points that are not a positive mix of the
+  primaries. The public Clutter API is unchanged.
+- **Signed primaries.** Custom primaries are signed in both directions, held
+  exactly within ±16 and never clamped. Unusable ones yield the protocol's
+  asynchronous `unsupported` failure.
+- **Shared serialization.** Encoding primaries and the fallback target
+  primaries go through one rounding and saturation rule, so the two events
+  always agree.
+- **ICC input.** Descriptor 0 counts as set. Ranges are checked in 64 bits.
+  Descriptor ownership holds on every rejection. The profile is read at the
+  absolute offset, and a short read is an operating-system error, distinct
+  from unsupported content.
+- **EDID primaries** for native SDR are validated with the same function and
+  fall back to sRGB if unusable.
+
+The review, the affected fast lane and the remaining renderer limitation are
+in the [receipt](../evidence/mutter-colour-input.json). HLG, output
+characterization and physical mapping remain subsequent work.
+
