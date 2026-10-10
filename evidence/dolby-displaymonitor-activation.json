@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "experiment": "isolated recovered processor activation and unconfigured type discovery, repeated with the DisplayMonitor implementation",
+  "architecture": "native-linux-amd64",
+  "result": "object activation and transform discovery complete; no media type set and no frame processed",
+  "source": {
+    "wine_candidate_tree": "905b2ed5509c7d09490a5dd16735381979c2a51e",
+    "wine_patches": "0001-0009 (file API, monitor provenance, DisplayMonitor)"
+  },
+  "hashes": {
+    "candidate_kernelbase_sha256": "f29218773f3ee8a2db9b66a000183825d8373c394fd4c95cf9eaadde951ba0e3",
+    "candidate_windows_devices_display_sha256": "fec541c98e8f560e9e171f301df760eccc25f5d70ee67788e8362512ff35d170",
+    "candidate_win32u_so_sha256": "db846d98d7ede72dd274d3e001a56eb9edacc5ca9e09d88a3b564071cafdf7f2",
+    "inventoried_plugin_sha256": "ecb3d9024e53defcdfaa0ae6bd3fdc87165f2a845efc71d83456d59add4d9936",
+    "retained_probe_sha256": "06975793c115c3bceab8acecb33c791355d719a98ab078feb2a0e5fdbe78e8cd",
+    "preflight_and_final_inputs_match": true,
+    "private_log_sha256": {
+      "probe_jsonl": "5463761f4a4361269fa7be9549008925bfce3f423a4b86f8452c46e8be98f31d",
+      "loader_trace": "10aedc3c702faa7cef6ebb370fd242e529924f36401404154217b9277af335c9"
+    }
+  },
+  "kernelbase_note": "Built from the qualified file-API source in the DisplayMonitor compiler tree; the source is unchanged, the binary differs from the earlier build environment's.",
+  "fixture": {
+    "winehq_version": "11.0.0.0~noble-1",
+    "candidate_modules_overlaid_before_prefix_creation": true,
+    "uid": 1000,
+    "locale": "C.UTF-8",
+    "fresh_prefix": true,
+    "network_count": 0,
+    "mount_count": 0,
+    "devices": 0,
+    "privileged": false,
+    "no_new_privileges": true,
+    "cpus": 1,
+    "memory_bytes": 2147483648,
+    "memory_swap_bytes": 2147483648,
+    "pids_limit": 512,
+    "gpu_or_display_bus_access": false,
+    "probe_deadline_seconds": 60,
+    "per_stream_saved_byte_limit": 4194304,
+    "installer_dialogs_suppressed": "WINEDLLOVERRIDES=mscoree,mshtml="
+  },
+  "module_proof": {
+    "plugin_load_path": "Z:\\work\\oem\\DolbyVisionPlugin.dll",
+    "plugin_kind": "native",
+    "windows_devices_display_kind": "builtin",
+    "kernelbase_kind": "builtin",
+    "win32u_kind": "builtin"
+  },
+  "observation": {
+    "steps": {
+      "CoInitializeEx_MTA": "S_OK",
+      "RoInitialize_MTA": "S_FALSE",
+      "MFStartup_NOSOCKET": "S_OK",
+      "load_exact_plugin": "S_OK",
+      "DllGetActivationFactory_class": "S_OK",
+      "ActivateInstance": "S_OK",
+      "QueryInterface_IMFTransform": "S_OK",
+      "GetStreamCount": "S_OK (1 input, 1 output)",
+      "GetStreamIDs": "E_NOTIMPL (documented consecutive IDs)",
+      "MFShutdown": "S_OK",
+      "unload_plugin": "S_OK"
+    },
+    "input_types": [
+      "MFVideoFormat_P010",
+      "MFVideoFormat_NV12"
+    ],
+    "output_types": [
+      "D3DFMT_A2B10G10R10 (31)",
+      "D3DFMT_A16B16G16R16F (113)",
+      "D3DFMT_A2B10G10R10 (31)",
+      "D3DFMT_A8R8G8B8 (21)",
+      "D3DFMT_A16B16G16R16F (113)"
+    ],
+    "runtime_requests_during_activation": [
+      "Windows.Devices.Display.DisplayMonitor statics resolved; two monitors resolved by interface ID (Wine's fallback monitor in this display-less fixture)",
+      "Windows.Devices.Sensors.LightSensor: no implementation in Wine; activation continued",
+      "EasClientDeviceInformation system manufacturer, product name and SKU: Wine stubs; activation continued"
+    ],
+    "summary": {
+      "contract_discovery_complete": true,
+      "cleanup_complete": true,
+      "full_dv_qualified": false
+    }
+  },
+  "interpretation": "The DisplayMonitor dependency was the activation boundary. The processor now instantiates and describes its transform. Media-type negotiation, the device (D3D11) and metadata contract, frame processing and output fidelity are not established.",
+  "privacy": "Raw JSONL and loader traces remain private on the laptop; only API-level outcomes and public format identifiers are recorded here."
+}
