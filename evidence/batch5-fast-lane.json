@@ -87,7 +87,10 @@
     "first_run_failure": "Instance-ID resolution returned ERROR_DEVICE_NOT_AVAILABLE for every monitor: the enabled-interface check enumerated interfaces of a device-only information set, which never contains interfaces. Fixed by looking up enabled interfaces in the monitor interface class and matching the owning instance; the synthetic test ID now uses the upper-case form SetupAPI stores. A second attempt still exercised the old module because the existing prefix kept its installed copy; the prefix was refreshed with wineboot -u and the displaymonitor test was rerun alone.",
     "not_invalidated": "kernelbase:file_fromapp (no dependency changed)"
   },
-  "repository": "check_repository.py and the Python unittest discovery run once on the final tree (see PR)",
+  "repository": {
+    "check_repository": "PASS (60 patches, 6 series, documentation links)",
+    "unittest_discovery": "72 tests: 70 passed; 2 integrity tests failed only because the new patch files were not yet tracked (the tests copy tracked files). After committing them, those two were rerun by exact selector and passed."
+  },
   "limits": [
     "Synthetic and headless fixtures; no live display, installation, OEM component or physical measurement",
     "Wine run is win64 with WineHQ binaries plus candidate modules, not a full candidate build"
