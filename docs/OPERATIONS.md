@@ -71,29 +71,29 @@ its expected display mode and the Linux transform path are understood.
 
 ## 4. Prepared userspace package transaction
 
-The [native package receipt](../evidence/baseline-native-packages.json) covers
-the qualified hdr7 library and nativehdr3 compositor source. Both library
-architectures and the compositor packages built in an isolated Ubuntu 26.10
-environment with authenticated dependencies and tests disabled deliberately.
-This is packaging evidence; it does not qualify active scanout or the later
-gamut implementation. No package from this build is installed on the laptop.
+The [current package receipt](../evidence/hdr8-nativehdr5-packages.json)
+covers the reviewed hdr8 library and `nativehdr5` compositor (PR 6). Both
+library architectures (i386 cross-built) and the compositor packages were
+built from the exact recorded source trees in a disposable Ubuntu 26.10
+environment, with tests disabled deliberately. This is packaging evidence; it
+does not qualify active scanout. Nothing from this build is installed yet. The
+earlier [hdr7/nativehdr3 receipt](../evidence/baseline-native-packages.json)
+is superseded and was never installed.
 
 The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
 `libdisplay-info3:i386`, `libmutter-51-0`, `gir1.2-mutter-51`, `mutter-common`
 and `mutter-common-bin`. The two library architectures require the same
-version, and GIR requires the exact matching Mutter library. The current
-GNOME Shell satisfies the candidate package compatibility bounds. APT
-simulation reports six upgrades, zero additions and zero removals.
+version, and GIR requires the exact matching Mutter library. The compositor
+depends on the hdr8 library. On the laptop, APT simulation reports six
+upgrades, zero additions and zero removals.
 
-A private copy of the installed package database, with only those six candidate
-control records substituted, also resolves the six saved recovery packages as
-six downgrades without additions or removals. This is a modeled rollback, not
-an executed recovery. Artifact hashes and exact local commands are retained
-with the private delivery proposal. Reverify them against the final source and
-current installed state before the coordinated maintenance window.
+A private copy of the installed package database, with only those six
+candidate control records substituted, resolves the six previously installed
+hdr6/nativehdr2 packages as six downgrades without additions or removals.
+This is a modeled rollback, not an executed one. The packages, their hashes
+and step-by-step install and recovery notes are staged privately on the
+laptop.
 
-Log out of the Wayland GNOME session before replacement and start a fresh
-session to load the new compositor library. Retain an independent text-console
-or SSH recovery route; do not terminate the desktop automatically. The final
-transaction must include the reviewed gamut implementation rather than
-installing this intermediate baseline and immediately replacing it again.
+Log out of GNOME before replacement, then restart the display manager so a new
+GNOME Shell loads the new library. Retain an independent text-console or SSH
+recovery route; do not terminate the desktop automatically.

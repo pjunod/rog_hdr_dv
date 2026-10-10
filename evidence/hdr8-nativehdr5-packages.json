@@ -1,0 +1,123 @@
+{
+ "schema": 1,
+ "date": "2026-10-10",
+ "qualification": "binary package build and APT transaction simulation only; no host installation, unit suites or runtime/display acceptance",
+ "compiler": {
+  "architecture": "native amd64",
+  "distribution": "Ubuntu 26.10",
+  "base_image_digest": "sha256:622755ac4289828beb0895ceb03a187ef104309713b82f6f65a39694f7d038fd",
+  "gcc": "15.3.0-4ubuntu1",
+  "gcc_i686_cross": "15.3.0-4ubuntu1cross1",
+  "meson": "1.10.1-1ubuntu2",
+  "ninja": "1.13.2-1",
+  "debhelper": "14.5ubuntu1",
+  "dpkg_dev": "1.23.7ubuntu2",
+  "environment": "disposable agent container; dependencies from the distribution archive; nothing installed on the laptop host",
+  "warning_policy": "Debian packaging defaults; not a warnings-as-errors build (the source candidates were compiled with warnings as errors during qualification)",
+  "quilt_state": "imported trees are the quilt-applied state; .pc/applied-patches regenerated from debian/patches/series so dpkg-source does not reapply"
+ },
+ "artifact_sets": [
+  {
+   "component": "libdisplay-info",
+   "architecture": "amd64",
+   "version": "0.3.0-1ubuntu1~hdr8",
+   "build_options": "nocheck parallel=2",
+   "source_commit": "b5657d5ca0e845c6528f6a54056ee153e74053f7",
+   "source_tree": "004413f716800db397eb9739fd56ef71e979260f",
+   "source_archive_sha256": "84aab7333400038a1722a37e9fb5659500ece314f4418515ad3b166916800ef0",
+   "runtime_packages": [
+    {
+     "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr8_amd64.deb",
+     "bytes": 93956,
+     "sha256": "901a956450acb4729842baf748e7946840e9a23a07fe46c0bbf1466af4fe40dd"
+    }
+   ],
+   "exported_symbols_checked": [
+    "di_displayid2_data_block_get_luminance",
+    "di_displayid2_data_block_get_native_chromaticities"
+   ]
+  },
+  {
+   "component": "libdisplay-info",
+   "architecture": "i386",
+   "version": "0.3.0-1ubuntu1~hdr8",
+   "build_options": "nocheck parallel=2; cross-built with dpkg-buildpackage -a i386 -B",
+   "source_commit": "b5657d5ca0e845c6528f6a54056ee153e74053f7",
+   "source_tree": "004413f716800db397eb9739fd56ef71e979260f",
+   "source_archive_sha256": "84aab7333400038a1722a37e9fb5659500ece314f4418515ad3b166916800ef0",
+   "elf_machine": "Intel 80386",
+   "runtime_packages": [
+    {
+     "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr8_i386.deb",
+     "bytes": 93688,
+     "sha256": "c0edfe9c98fc675c30c7dc1f8034ebccfe24308fd04dcb545693ada7153d4eb1"
+    }
+   ],
+   "exported_symbols_checked": [
+    "di_displayid2_data_block_get_luminance",
+    "di_displayid2_data_block_get_native_chromaticities"
+   ]
+  },
+  {
+   "component": "mutter",
+   "architecture": "amd64",
+   "version": "51.0-1ubuntu3+nativehdr5",
+   "build_options": "nocheck parallel=2",
+   "source_commit": "832064b155b49c28b1e3c5494325c5ee55b95ef3",
+   "source_tree": "164c2252d41dc5631b72587ac4431186541bdc6a",
+   "source_archive_sha256": "ddefd7bd9d0455b529ec9307c5122c981a7c07c4e5b24cfa84c58967ec7a967b",
+   "subproject_note": "subprojects/gvdb ships in the pinned mutter_51.0.orig.tar.xz (sha256 5d28f3ae\u2026d983b3, verified) but upstream .gitignore keeps it out of the Git import; it was extracted from that tarball",
+   "built_against": "libdisplay-info-dev 0.3.0-1ubuntu1~hdr8 (this build)",
+   "libdisplay_info_dependency": "libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr8~)",
+   "runtime_packages": [
+    {
+     "file": "libmutter-51-0_51.0-1ubuntu3+nativehdr5_amd64.deb",
+     "bytes": 1566484,
+     "sha256": "e4ea670636faff9a0747499c49b8fa55d22485e72e210f89006d3dfb6b2950c6"
+    },
+    {
+     "file": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr5_amd64.deb",
+     "bytes": 165220,
+     "sha256": "a9c73537c5384cdffd7b12ed952f8e14aa27ebae4ec32b7d05bda25269fa62e2"
+    },
+    {
+     "file": "mutter-common_51.0-1ubuntu3+nativehdr5_all.deb",
+     "bytes": 560950,
+     "sha256": "a2dce3b87dae898f8b665e6339d9c1d0d1b34b5c35e07b5de653cd604958fb45"
+    },
+    {
+     "file": "mutter-common-bin_51.0-1ubuntu3+nativehdr5_amd64.deb",
+     "bytes": 57854,
+     "sha256": "9fe20926650bfe6017fa444317c7e291fb72a65a610aed0256028cbaf99badf9"
+    }
+   ]
+  }
+ ],
+ "transaction_summary": {
+  "installed_before": {
+   "libdisplay-info3": "0.3.0-1ubuntu1~hdr6 (amd64, i386)",
+   "mutter": "51.0-1ubuntu3+nativehdr2",
+   "gnome-shell": "51.0-2ubuntu3"
+  },
+  "candidate_simulation": {
+   "method": "apt-get -s install of the six local packages on the laptop, as an unprivileged user",
+   "upgrades": 6,
+   "new_installs": 0,
+   "removals": 0
+  },
+  "rollback_model_simulation": {
+   "method": "private copy of the installed dpkg status with only the six candidate control records substituted; apt-get -s install of the retained hdr6/nativehdr2 packages",
+   "downgrades": 6,
+   "new_installs": 0,
+   "removals": 0,
+   "limitation": "modeled rollback; the host package database was not changed"
+  },
+  "rollback_artifacts": "the six previously installed packages are retained privately on the laptop and their recorded hashes verified",
+  "session": [
+   "Log out of GNOME before replacement; restart the display manager so a new GNOME Shell loads the new library",
+   "Keep a text-console or SSH recovery route",
+   "No kernel, Secure Boot, bootloader, ICC profile, display mode or saved setting change"
+  ]
+ },
+ "scope": "hdr8 library and nativehdr5 compositor (PR 6). Later compositor batches are not covered."
+}

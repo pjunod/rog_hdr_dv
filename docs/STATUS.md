@@ -8,24 +8,40 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Active sixth batch — colour input and processor activation
+## Active seventh batch — delivery packages, HLG and tone mapping
+
+The reviewed hdr8 library and `nativehdr5` compositor are packaged for amd64,
+with the library also built for i386
+([receipt](../evidence/hdr8-nativehdr5-packages.json)). On the laptop, APT
+simulates six upgrades with no additions or removals, and a modeled rollback
+to the installed hdr6/nativehdr2 packages gives six downgrades. Installation
+needs a coordinated, recovery-ready window
+([operations](OPERATIONS.md#4-prepared-userspace-package-transaction)).
+Nothing is installed yet.
+
+The compositor's next batch (`nativehdr6`) implements the
+[HLG and tone-mapping contract](HDR_MAPPING.md): HLG decoding with its
+OOTF, validated source mastering metadata, and BT.2390 highlight mapping to
+the panel's declared target luminance, applied once per surface and only
+when content exceeds that target. Gamut compression and output
+characterization follow separately.
+
+## Sixth batch — colour input and processor activation (merged, PR 6)
 
 With DisplayMonitor merged, the recovered OEM processor now **activates**
 under Wine in the isolated fixture. It returns an `IMFTransform` that reports
 one input and one output stream. It offers P010/NV12 input and 10-bit RGB,
 half-float or 8-bit RGB output.
 [The activation section](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates)
-records what that does and does not prove. No media type has been set and no frame has been processed. The next stage
-negotiates the offered types and traces the metadata the transform requests.
-It has not started and awaits the owner's scope confirmation.
+records what that does and does not prove. No media type has been set and no
+frame has been processed. The next stage negotiates the offered types and
+traces the metadata the transform requests. It has not started and awaits the
+owner's scope confirmation.
 
 The compositor's colour-input defects from the
 [audit](COLOUR_PIPELINE_AUDIT.md#implementation-status) are fixed in
 `nativehdr5`, which was reviewed and passed its affected fast lane
-([receipt](../evidence/mutter-colour-input.json)). The current delivery
-candidate is the hdr8 library with `nativehdr5`. It still needs packaging for
-amd64 (and i386 for the library) and a coordinated, recovery-ready
-installation before active-output verification.
+([receipt](../evidence/mutter-colour-input.json)).
 
 ## Fifth batch — display contracts and delivery (merged, PR 5)
 
@@ -109,10 +125,10 @@ Mutter and matching amd64/i386 library packaging.
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
-| Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built; hdr8 gamut candidate reviewed and fast-lane qualified | Package hdr8 for both architectures and deliver the matching compositor/library set |
-| Compositor feedback | nativehdr2 delivered; nativehdr3 packages built; nativehdr4 (gamut) and nativehdr5 (colour input) source-qualified | Package nativehdr5, deliver the reviewed set and verify active output |
+| Physical luminance library | hdr6 delivered; hdr8 (luminance and gamut) reviewed, fast-lane qualified and packaged for amd64 and i386 | Coordinated installation with the matching compositor |
+| Compositor feedback | nativehdr2 delivered; nativehdr5 (target luminance, gamut, colour input) qualified and packaged | Coordinated installation and active-output verification |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
-| General colour quality | Audit complete; input defects fixed in nativehdr5 (reviewed, fast lane passed) | HLG, tone and gamut mapping, output characterization, profile application, SDR/HDR consistency and cross-application checks |
+| General colour quality | Audit complete; input defects fixed in nativehdr5; HLG and tone-mapping contract defined (nativehdr6 in progress) | Implement and qualify HLG and highlight mapping; gamut compression, output characterization, profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 
