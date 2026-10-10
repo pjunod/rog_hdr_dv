@@ -1,8 +1,8 @@
 # Native target gamut — retain physical colour declarations
 
-**Status:** library implementations compiled; compositor integration and final
-review/runtime qualification in progress.
-**Date:** 2026-10-09.
+**Status:** library and compositor implementations compiled with warnings as
+errors; final review and runtime qualification pending.
+**Date:** 2026-10-10.
 
 Companion to [target luminance](MUTTER_TARGET_LUMINANCE.md) and the
 [colour-pipeline audit](COLOUR_PIPELINE_AUDIT.md). This extends physical-target
@@ -160,3 +160,23 @@ these candidates, but their surrounding parser implementations differ. Final
 qualification therefore runs the four new test groups on both source series
 and verifies previous consumer binaries against the new libraries. A literal
 packed-byte fixture provides a check independent of the fixture encoder.
+
+The compositor candidate appends `nativehdr4` patches 0013–0015 to the
+qualified luminance series. It publishes target primaries only on the
+validated native route, keeps PQ encoding and renderer state unchanged, and
+raises one target-volume notification when either component changes. Its
+[compiler receipt](../evidence/mutter-native-gamut-compile.json) records a
+clean native amd64 build against the hdr8 library, with zero warnings and
+the project formatter applied.
+
+The first draft of the Wayland tests had an ordering defect. The
+target-luminance v2 case disposes the shared colour manager to exercise
+teardown with live records, and every target case rewrites the fixture
+output's connector, capabilities, EDID, colour mode, forced-HDR state and
+topology. Cases registered after it therefore ran against a disposed manager
+and inherited mutated state. Each target-volume case now runs in its own
+bounded GLib test subprocess with a fresh context, so no case can observe
+another case's fixture or manager lifetime. This invalidates the earlier
+target-luminance runtime receipt for those cases only, and they rerun in the
+fast lane.
+

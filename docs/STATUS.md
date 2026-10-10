@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-09 (America/New_York) · **State:** HDR10 operational by owner
+**Updated:** 2026-10-10 (America/New_York) · **State:** HDR10 operational by owner
 report; full Dolby Vision and measured image-quality acceptance remain open.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
@@ -32,12 +32,24 @@ retained privately; the live installation is unchanged.
 
 The new hdr8/upstream native-chromaticity implementations compile with warnings
 as errors. Their append-only patch series preserve the delivered prefixes.
-Mutter consumption is in progress. The bounded read-only Wayland colour
+The nativehdr4 compositor candidate, Mutter patches 0013–0015, now publishes
+the native target gamut and compiles cleanly against hdr8 on native amd64.
+The Wine monitor-provenance and DisplayMonitor slices, Wine patches 0003–0008,
+compile with warnings as errors. Both receipts are linked from their topic
+documents. The bounded read-only Wayland colour
 inspector and its synthetic server compile with warnings as errors;
 [the diagnostic guide](DISPLAY_DIAGNOSTICS.md#inspect-the-compositors-actual-colour-descriptions)
 explains raw fields, completion limits and privacy.
 New gamut and monitor implementations still require their own final review and
 affected runtime qualification; package compilation does not replace those.
+
+On 2026-10-10 the previous agents' macOS temporary clones were gone and two
+local commits had never been pushed. Every unfinished change was recovered:
+the probe test selectors are byte-identical to their recorded hash, the
+library, nativehdr3 and Wine baselines reproduce their recorded trees, the
+Mutter edit was replayed from the implementing agent's log, and the Wine
+component was copied from the retained offline compiler container. Recovered
+work keeps its original authorship; corrections are separate commits.
 
 ## Fourth batch — native target feedback and processor prerequisites
 
@@ -81,7 +93,7 @@ Mutter and matching amd64/i386 library packaging.
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
 | Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built | Deliver matching compositor/library set; hdr8 gamut candidate awaits review and runtime checks |
-| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built | Finish target gamut, deliver reviewed set and verify active output |
+| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built; nativehdr4 gamut candidate compiled | Review and runtime-qualify nativehdr4, deliver reviewed set and verify active output |
 | Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
 | General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |

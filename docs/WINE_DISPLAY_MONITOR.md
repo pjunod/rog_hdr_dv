@@ -1,7 +1,7 @@
 # Wine DisplayMonitor — truthful monitor discovery for processor activation
 
-**Status:** implementation and compiler qualification in progress; runtime
-qualification has not started. **Date:** 2026-10-09.
+**Status:** implementation compiled with warnings as errors; final review and
+runtime qualification pending. **Date:** 2026-10-10.
 
 The [activation experiment](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
 loaded the exact OEM Dolby component, then stopped when it requested the
@@ -109,6 +109,30 @@ enumeration and loader logs private; public receipts contain sanitized facts.
 Run no OEM component as part of the ordinary regression suite. A later bounded
 activation experiment is a separate operation with its own exact inputs and
 isolation checks.
+
+## Current implementation receipt
+
+Patches 0003–0008 follow the qualified file-API series. The monitor
+provenance slice reproduces the original tree exactly. The DisplayMonitor
+component was recovered from the retained offline compiler container, and
+its review corrections are separate commits:
+
+- Native chromaticities are exposed only when all four points lie in the
+  chromaticity domain. CIE 1976 u′v′ is converted to CIE 1931 xy with
+  integral domain checks. When the not-understood feature bit 5 is set, the
+  declaration stays unavailable, as in the library contract.
+- Zero DisplayID filler after the last data block is accepted. Non-zero
+  filler makes the section untrustworthy and none of its facts are used.
+- XRandR EDID retrieval reads the whole property in one request and accepts
+  only complete 8-bit INTEGER data. It never frees a buffer the server call
+  did not return, and an output without an EDID property is not an error.
+- Native pixel dimensions are direct values, matching the pinned decoder.
+
+The configure change is the three module lines that GNU Autoconf 2.72
+generates. Other generator differences belong to Wine's release tooling and
+are not carried. The [compiler receipt](../evidence/wine-displaymonitor-compile.json)
+records the affected modules and both test binaries built on native amd64
+with zero warnings. Runtime tests are held for the pre-merge fast lane.
 
 ## Remaining processor boundary
 

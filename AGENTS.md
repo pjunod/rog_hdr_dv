@@ -36,6 +36,6 @@ The repository is public. Scan the staged tree and reachable Git history for
 secrets before pushing; diagnostics and experimental output remain private
 until explicitly sanitized. Use a neutral agent Git identity. Keep the status
 page updated and record autonomous decisions and unresolved evidence limits.
-Use GPT-6.1 Sol agents for specified implementation work; the coordinating
-agent owns design, review and integration. Fix demonstrated causes within the
+Delegate specified implementation work to implementation agents; the
+coordinating agent owns design, review and integration. Fix demonstrated causes within the
 architecture, not symptoms with watchdogs, forced capabilities or ad hoc gates.

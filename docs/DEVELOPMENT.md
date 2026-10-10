@@ -126,8 +126,9 @@ initial repository does not claim a newly tested all-component build script.
 
 Use a separate agent clone, not the owner's working checkout. Keep related
 implementation commits on a `codex/` branch and merge the reviewed PR only
-after its required fast lane passes. Use local Git identity `Codex <codex@invalid>`
-for agent work; preserve upstream patch authorship. The repository is public:
+after its required fast lane passes. Use a neutral agent Git identity, such as
+`Codex <codex@invalid>` or `Claude Agent <claude-agent@invalid>`, and keep the
+authorship of recovered or imported work; preserve upstream patch authorship. The repository is public:
 inspect staged changes and Git metadata before pushing and never paste tokens,
 raw host captures, OEM files or signing material into commits or CI output.
 
