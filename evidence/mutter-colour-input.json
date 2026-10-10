@@ -13,7 +13,8 @@
     "compiler": "gcc 15.3.0-4ubuntu1",
     "meson": "1.10.1",
     "werror": true,
-    "full_tree_build": "ninja (all targets) exit 0, zero warnings"
+    "full_tree_build": "ninja over all targets with -Dwerror=true (warnings are fatal), exit 0",
+    "libdisplay_info": "hdr8 library built from the reviewed Ubuntu series and installed into the disposable build container; Mutter's configure check requires its native chromaticity API"
   },
   "compiled_binary_sha256": {
     "src/libmutter-51.so.0.0.0": "89474ccfe84912832709b439c8803df76ddd5e0f70bdafd5f7a0ec6b45bf8f90",
@@ -22,7 +23,7 @@
     "src/tests/mutter-wayland-color-management": "633529c5df1a4d5cb86512d31f72ecb1f7fa343096bbfc16a989647a999f1017",
     "src/tests/wayland-test-clients/color-management": "9ac40af6b3703efd862866e149bba2f32fb83ed7f22e97269353507520304d17"
   },
-  "public_abi": "clutter-color-utils.h unchanged; new exports recorded in debian/libmutter-51-0.symbols at 51.0-1ubuntu3+nativehdr5~",
+  "public_abi": "Installed clutter-color-utils.h and existing exported functions unchanged; ABI extended additively by seven symbols recorded in debian/libmutter-51-0.symbols at 51.0-1ubuntu3+nativehdr5~",
   "fast_lane": {
     "first_run": {
       "mutter:actor-color-state": "OK",
@@ -43,5 +44,48 @@
   "limits": [
     "Synthetic headless tests; no live compositor replacement or installation",
     "Renderer fallback for colour states created through the public API without validation still logs once and adds no matrix"
-  ]
+  ],
+  "binary_note": "The mutter-wayland-color-management hash is the binary rebuilt after patch 0027 (used for the rerun); the seven separate invocations ran the earlier build of the same executable, whose separate cases are unchanged by 0027.",
+  "logs_sha256": {
+    "fast_lane_first_run": "ced4c4e1e7aa049a4aa8aa659d5b3e05846adb82c861a46b04331da8fd3e4cd1",
+    "fast_lane_rerun": "bc43d6d6b3ee63cb7cdd0a99e51416144313a2945e0eb8e73d927a38d0b52ccf",
+    "meson_tap_log_rerun": "3793cb46b64239a155dc3bfbb3f4166ffa940a6ac0a5419944e6f9a94a19bcbd"
+  },
+  "review": {
+    "coordinator_required": [
+      "installed headers and existing exported functions unchanged",
+      "one conversion for encoding and fallback target primaries",
+      "creator-params unsupported_feature error code",
+      "EDID primaries validated where output colour states are built"
+    ],
+    "adversarial_findings": [
+      {
+        "finding": "ICC reader used the client's file position and accepted short reads",
+        "severity": "blocker",
+        "evidence": "reproduced with a written-then-duplicated memfd: 0 bytes read reported as success",
+        "disposition": "pread at absolute offset; exact length required"
+      },
+      {
+        "finding": "nearly collinear primaries accepted",
+        "severity": "should-fix",
+        "evidence": "r=(0.6,0.6) g=(0.3,0.300001) b=(0.1,0.1) D65: round-trip identity error up to 0.107",
+        "disposition": "double-precision round trip within 1e-4"
+      },
+      {
+        "finding": "descriptor-0 fixture fails with stdin closed",
+        "severity": "should-fix",
+        "disposition": "fixture handles fd 0 and restores without a window"
+      },
+      {
+        "finding": "non-physical white points accepted",
+        "severity": "should-fix",
+        "disposition": "positive y, positive primary mix and positive cone responses required"
+      },
+      {
+        "finding": "round-trip bound, error classification, missing error-code test, comment, housekeeping",
+        "severity": "nit",
+        "disposition": "addressed"
+      }
+    ]
+  }
 }

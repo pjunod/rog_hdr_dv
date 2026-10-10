@@ -404,7 +404,8 @@ Mutter patches 0016–0027 (`nativehdr5`) implement this batch:
   protocol validation call it. It rejects singular, non-finite and badly
   conditioned matrices (round trip to identity within 1e-4, computed in
   double). It also rejects white points that are not a positive mix of the
-  primaries. The public Clutter API is unchanged.
+  primaries. The installed Clutter headers and existing functions are unchanged;
+  the ABI grows only by additive symbols.
 - **Signed primaries.** Custom primaries are signed in both directions, held
   exactly within ±16 and never clamped. Unusable ones yield the protocol's
   asynchronous `unsupported` failure.
@@ -418,7 +419,7 @@ Mutter patches 0016–0027 (`nativehdr5`) implement this batch:
 - **EDID primaries** for native SDR are validated with the same function and
   fall back to sRGB if unusable.
 
-The review, the affected fast lane and the remaining renderer limitation are
-in the [receipt](../evidence/mutter-colour-input.json). HLG, output
+The review findings are in [review](REVIEW.md#sixth-batch--compositor-colour-input-nativehdr5);
+the affected fast lane and the remaining renderer limitation are in the
+[receipt](../evidence/mutter-colour-input.json). HLG, output
 characterization and physical mapping remain subsequent work.
-

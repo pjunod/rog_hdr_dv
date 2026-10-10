@@ -20,7 +20,7 @@
       "loader_trace": "10aedc3c702faa7cef6ebb370fd242e529924f36401404154217b9277af335c9"
     }
   },
-  "kernelbase_note": "Built from the qualified file-API source in the DisplayMonitor compiler tree; the source is unchanged, the binary differs from the earlier build environment's.",
+  "kernelbase_note": "Built with 'make dlls/kernelbase/all' (configured with --enable-werror) from the qualified file-API source inside the DisplayMonitor compiler tree, exit 0; the source is unchanged, the binary differs from the earlier build environment's.",
   "fixture": {
     "winehq_version": "11.0.0.0~noble-1",
     "candidate_modules_overlaid_before_prefix_creation": true,
@@ -66,13 +66,21 @@
       "MFVideoFormat_P010",
       "MFVideoFormat_NV12"
     ],
-    "output_types": [
-      "D3DFMT_A2B10G10R10 (31)",
-      "D3DFMT_A16B16G16R16F (113)",
-      "D3DFMT_A2B10G10R10 (31)",
-      "D3DFMT_A8R8G8B8 (21)",
-      "D3DFMT_A16B16G16R16F (113)"
-    ],
+    "output_types": {
+      "enumerated_indices": 5,
+      "entries": [
+        "D3DFMT_A2B10G10R10 (31)",
+        "D3DFMT_A16B16G16R16F (113)",
+        "D3DFMT_A2B10G10R10 (31)",
+        "D3DFMT_A8R8G8B8 (21)",
+        "D3DFMT_A16B16G16R16F (113)"
+      ],
+      "distinct_formats": [
+        "D3DFMT_A2B10G10R10",
+        "D3DFMT_A16B16G16R16F",
+        "D3DFMT_A8R8G8B8"
+      ]
+    },
     "runtime_requests_during_activation": [
       "Windows.Devices.Display.DisplayMonitor statics resolved; two monitors resolved by interface ID (Wine's fallback monitor in this display-less fixture)",
       "Windows.Devices.Sensors.LightSensor: no implementation in Wine; activation continued",
@@ -85,5 +93,18 @@
     }
   },
   "interpretation": "The DisplayMonitor dependency was the activation boundary. The processor now instantiates and describes its transform. Media-type negotiation, the device (D3D11) and metadata contract, frame processing and output fidelity are not established.",
-  "privacy": "Raw JSONL and loader traces remain private on the laptop; only API-level outcomes and public format identifiers are recorded here."
+  "privacy": "Raw JSONL and loader traces remain private on the laptop; only API-level outcomes and public format identifiers are recorded here.",
+  "execution": {
+    "wineboot_exit": 0,
+    "probe_exit": 0,
+    "probe_stdout_bytes": 8291,
+    "loader_trace_bytes": 8273,
+    "save_limit_reached": false,
+    "trace_channels": "+loaddll,+displaymonitor"
+  },
+  "scope_limits": [
+    "Activation and unconfigured type discovery only; no type negotiation, device, metadata or frame processing",
+    "Display-less fixture: the monitors resolved are Wine's fallback monitor, not the panel",
+    "No licensing, identity or capability values supplied; no OEM component registered"
+  ]
 }

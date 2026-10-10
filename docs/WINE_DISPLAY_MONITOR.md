@@ -1,7 +1,7 @@
 # Wine DisplayMonitor — truthful monitor discovery for processor activation
 
-**Status:** implementation reviewed; the pre-merge fast lane passed. The OEM
-activation experiment with matching modules is next. **Date:** 2026-10-10.
+**Status:** implementation reviewed and merged; with matching modules the OEM
+processor now [activates](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates). **Date:** 2026-10-10.
 
 The [activation experiment](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
 loaded the exact OEM Dolby component, then stopped when it requested the

@@ -233,7 +233,7 @@ After the fixes, the affected fast lane ran once. The
 ## Sixth batch — compositor colour input (nativehdr5)
 
 The coordinator reviewed the first implementation and required four changes.
-The public Clutter API and ABI had to stay unchanged. Encoding and fallback
+The installed Clutter headers and the signatures and behaviour of the existing exported functions had to stay unchanged; the ABI is extended only additively (seven new symbols at `+nativehdr5~`). Encoding and fallback
 target primaries had to share one conversion. A wrong error code had to be
 fixed. EDID-derived output primaries had to be validated at source rather
 than left to a renderer fallback.
@@ -255,4 +255,3 @@ the disconnect warning libwayland-server logs, so the harness aborted the
 compositor and the client saw EPIPE. The cases now expect that warning, as
 the other Mutter protocol-error tests do. Only that invocation was rerun,
 and it passed ([receipt](../evidence/mutter-colour-input.json)).
-
