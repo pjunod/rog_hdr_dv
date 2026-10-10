@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Codex <codex@invalid>
-Date: Sat, 10 Oct 2026 14:37:32 -0400
-Subject: [PATCH 13/15] color: publish native target primaries independently of
+Date: Sat, 10 Oct 2026 15:21:42 -0400
+Subject: [PATCH] color: publish native target primaries independently of
  encoding
 
 Retain raw native DisplayID v2 RGBW chromaticity declarations alongside the
@@ -20,17 +20,24 @@ reference-white normalization and renderer colour state are unchanged.
 
 Require the additive hdr8 chromaticity API at configure/link time and
 record the nativehdr4 packaging metadata.
+
+Review corrections: classify every Display Parameters block before deciding,
+so status does not depend on block order; an uninterpretable block is
+reported as unsupported, separately from a recognized but unusable
+declaration (which keeps its raw counts).
+
+Co-Authored-By: Claude Agent <claude-agent@invalid>
 ---
  debian/changelog                            |  11 ++
  debian/control                              |   4 +-
  debian/libmutter-51-0.symbols               |   2 +
  meson.build                                 |  11 +-
- src/backends/edid-parse.c                   |  80 ++++++++++++
- src/backends/edid.h                         |  10 ++
+ src/backends/edid-parse.c                   |  86 +++++++++++++
+ src/backends/edid.h                         |  13 ++
  src/backends/meta-color-device.c            | 129 +++++++++++++++++++-
  src/backends/meta-color-device.h            |  17 +++
  src/wayland/meta-wayland-color-management.c |  83 +++++++++----
- 9 files changed, 314 insertions(+), 33 deletions(-)
+ 9 files changed, 323 insertions(+), 33 deletions(-)
 
 diff --git a/debian/changelog b/debian/changelog
 index 6c89638..16dd137 100644
@@ -125,10 +132,10 @@ index 1b9a5e9..47b7527 100644
  
  libdrm_dep = dependency('libdrm', version: libdrm_req)
 diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
-index 07e0713..6057945 100644
+index 07e0713..c58a6a2 100644
 --- a/src/backends/edid-parse.c
 +++ b/src/backends/edid-parse.c
-@@ -203,6 +203,85 @@ read_native_luminance (MetaEdidInfo         *info,
+@@ -203,6 +203,91 @@ read_native_luminance (MetaEdidInfo         *info,
      info->native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
  }
  
@@ -157,7 +164,7 @@ index 07e0713..6057945 100644
 +                            const struct di_info *di_info)
 +{
 +  const struct di_edid_ext *const *extensions;
-+  gboolean found = FALSE;
++  gboolean found = FALSE, unsupported = FALSE, conflict = FALSE;
 +  unsigned int i;
 +
 +  if (di_edid_has_extension_failures (di_info_get_edid (di_info)))
@@ -166,6 +173,10 @@ index 07e0713..6057945 100644
 +      return;
 +    }
 +
++  /* Classify every Display Parameters block before deciding, so the result
++   * does not depend on block order. A block that cannot be interpreted means
++   * no declaration can be trusted; two recognized but different
++   * declarations (including different revisions) are a conflict. */
 +  extensions = di_edid_get_extensions (di_info_get_edid (di_info));
 +  for (; *extensions; extensions++)
 +    {
@@ -185,22 +196,24 @@ index 07e0713..6057945 100644
 +
 +          native = di_displayid2_data_block_get_native_chromaticities (*blocks);
 +          if (!native)
++            unsupported = TRUE;
++          else if (!found)
 +            {
-+              info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_INVALID;
-+              memset (&info->native_chromaticities, 0, sizeof (info->native_chromaticities));
-+              return;
++              info->native_chromaticities = *native;
++              found = TRUE;
 +            }
-+          if (found && !chromaticities_equal (&info->native_chromaticities, native))
-+            {
-+              info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
-+              memset (&info->native_chromaticities, 0, sizeof (info->native_chromaticities));
-+              return;
-+            }
-+          info->native_chromaticities = *native;
-+          found = TRUE;
++          else if (!chromaticities_equal (&info->native_chromaticities, native))
++            conflict = TRUE;
 +        }
 +    }
 +
++  if (unsupported || conflict)
++    {
++      info->native_chromaticities_status = unsupported ?
++        META_NATIVE_CHROMATICITIES_UNSUPPORTED : META_NATIVE_CHROMATICITIES_CONFLICT;
++      memset (&info->native_chromaticities, 0, sizeof (info->native_chromaticities));
++      return;
++    }
 +  if (!found)
 +    return;
 +  info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_INVALID;
@@ -214,7 +227,7 @@ index 07e0713..6057945 100644
  MetaEdidInfo *
  meta_edid_info_new_parse (const uint8_t *edid,
                            size_t         size)
-@@ -286,6 +365,7 @@ meta_edid_info_new_parse (const uint8_t *edid,
+@@ -286,6 +371,7 @@ meta_edid_info_new_parse (const uint8_t *edid,
  
    info->native_rgb_bt2020_pq = has_native_rgb_bt2020_pq (di_info);
    read_native_luminance (info, di_info);
@@ -223,10 +236,10 @@ index 07e0713..6057945 100644
    di_info_destroy (di_info);
    return g_steal_pointer (&info);
 diff --git a/src/backends/edid.h b/src/backends/edid.h
-index 9a3b1ce..1f3239c 100644
+index 9a3b1ce..35f3e13 100644
 --- a/src/backends/edid.h
 +++ b/src/backends/edid.h
-@@ -37,6 +37,14 @@ typedef enum
+@@ -37,6 +37,17 @@ typedef enum
    META_NATIVE_LUMINANCE_CONFLICT,
  } MetaNativeLuminanceStatus;
  
@@ -234,14 +247,17 @@ index 9a3b1ce..1f3239c 100644
 +{
 +  META_NATIVE_CHROMATICITIES_UNAVAILABLE,
 +  META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED,
++  /* Recognized declaration whose points are not all usable; raw counts kept. */
 +  META_NATIVE_CHROMATICITIES_INVALID,
 +  META_NATIVE_CHROMATICITIES_CONFLICT,
++  /* A Display Parameters block in a format this parser does not understand. */
++  META_NATIVE_CHROMATICITIES_UNSUPPORTED,
 +} MetaNativeChromaticitiesStatus;
 +
  typedef struct _MetaEdidInfo
  {
    char *manufacturer_code;
-@@ -61,6 +69,8 @@ typedef struct _MetaEdidInfo
+@@ -61,6 +72,8 @@ typedef struct _MetaEdidInfo
    /* Physical declarations, never CTA content metadata or calibration. */
    MetaNativeLuminanceStatus native_luminance_status;
    struct di_displayid2_luminance native_luminance;

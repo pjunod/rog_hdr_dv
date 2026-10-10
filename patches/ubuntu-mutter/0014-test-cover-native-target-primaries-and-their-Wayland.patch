@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Codex <codex@invalid>
-Date: Sat, 10 Oct 2026 14:37:32 -0400
-Subject: [PATCH 14/15] test: cover native target primaries and their Wayland
+Date: Sat, 10 Oct 2026 15:21:42 -0400
+Subject: [PATCH] test: cover native target primaries and their Wayland
  feedback
 
 Parser cases cover complete, duplicate, conflicting, invalid-point and
@@ -10,17 +10,24 @@ CIE 1976 conversion, quantization-invalid geometry, degenerate and
 incomplete RGBW, and conflicts. Wayland v1/v2 cases check that target
 primaries change independently of encoding, emit one notification per
 target-volume change, and leave the PQ encoding state unchanged.
+
+Review corrections: cover a white point exactly on a raw primary edge that
+quantization would move inside, all CIE 1976 coordinates, declarations
+split across DisplayID extensions, structural extension failures and
+order-independent unsupported blocks.
+
+Co-Authored-By: Claude Agent <claude-agent@invalid>
 ---
- src/tests/native-hdr-tests.c                  | 162 ++++++++++++++++
- src/tests/wayland-color-management-test.c     | 124 +++++++++++++
- .../wayland-test-clients/color-management.c   | 175 +++++++++++++++++-
- 3 files changed, 460 insertions(+), 1 deletion(-)
+ src/tests/native-hdr-tests.c                  | 219 ++++++++++++++++++
+ src/tests/wayland-color-management-test.c     | 124 ++++++++++
+ .../wayland-test-clients/color-management.c   | 175 +++++++++++++-
+ 3 files changed, 517 insertions(+), 1 deletion(-)
 
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index f3091cb..6e34a15 100644
+index f3091cb..ad35c05 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
-@@ -626,6 +626,166 @@ test_target_luminance_policy (void)
+@@ -626,6 +626,223 @@ test_target_luminance_policy (void)
    g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
  }
  
@@ -92,7 +99,17 @@ index f3091cb..6e34a15 100644
 +      blocks[(reverse ? 12 : 44) + 1] = 2;
 +      info = parse (blocks, 76, NULL, 0, FALSE);
 +      g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
-+                       META_NATIVE_CHROMATICITIES_INVALID);
++                       META_NATIVE_CHROMATICITIES_UNSUPPORTED);
++      g_clear_pointer (&info, meta_output_info_unref);
++
++      /* An uninterpretable block withdraws the declaration in either order. */
++      chromaticities (blocks + 12);
++      chromaticities (blocks + 44);
++      blocks[(reverse ? 12 : 44) + 0x15]++;
++      blocks[(reverse ? 44 : 12) + 0x0b] = 0x20;
++      info = parse (blocks, 76, NULL, 0, FALSE);
++      g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                       META_NATIVE_CHROMATICITIES_UNSUPPORTED);
 +      g_clear_pointer (&info, meta_output_info_unref);
 +    }
 +
@@ -112,9 +129,36 @@ index f3091cb..6e34a15 100644
 +                   META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED);
 +  g_assert_cmpint (info->edid_info->native_luminance_status, ==, META_NATIVE_LUMINANCE_INVALID);
 +  g_clear_pointer (&info, meta_output_info_unref);
++  g_clear_pointer (&info, meta_output_info_unref);
 +  info = parse (native, sizeof (native), NULL, 0, FALSE);
 +  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
 +                   META_NATIVE_CHROMATICITIES_UNAVAILABLE);
++  g_clear_pointer (&info, meta_output_info_unref);
++
++  /* Declarations in separate DisplayID extensions agree or conflict. */
++  chromaticities (blocks + 12);
++  info = parse (blocks, 44, blocks + 12, 32, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED);
++  g_clear_pointer (&info, meta_output_info_unref);
++  memcpy (blocks + 44, blocks + 12, 32);
++  blocks[44 + 0x0c]++;
++  info = parse (blocks, 44, blocks + 44, 32, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_CONFLICT);
++  g_clear_pointer (&info, meta_output_info_unref);
++
++  /* Any structural extension failure withdraws the declaration. */
++  {
++    const uint8_t unsupported[] = { 0x81, 1, 0 };
++    uint8_t edid[384] = { 0 };
++
++    chromaticities (blocks + 12);
++    make_edid (edid, blocks, 44, unsupported, sizeof (unsupported), FALSE, FALSE);
++    info = parse_bytes (edid, sizeof (edid));
++    g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                     META_NATIVE_CHROMATICITIES_INVALID);
++  }
 +}
 +
 +static void
@@ -139,31 +183,42 @@ index f3091cb..6e34a15 100644
 +  const uint16_t uv[4][2] = {
 +    { 1024, 2304 }, { 512, 2304 }, { 719, 647 }, { 810, 1918 },
 +  };
++  /* Raw white lies exactly on RG; published truncation moves it inside. */
++  const uint16_t raw_edge[4][2] = {
++    { 2138, 1396 }, { 1082, 2994 }, { 453, 232 }, { 1610, 2195 },
++  };
 +  /* Raw white is strictly inside; published rounding puts it outside RG. */
 +  const uint16_t quantized[4][2] = {
 +    { 1, 1000 }, { 1501, 1001 }, { 1301, 1002 }, { 1500, 1001 },
 +  };
-+  MetaEdidInfo edid = { .native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED };
-+  const ClutterPrimaries *encoding = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
-+  MetaColorTargetPrimaries target, fallback;
-+  unsigned int i;
++MetaEdidInfo edid = { .native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED };
++const ClutterPrimaries *encoding = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
++MetaColorTargetPrimaries target, fallback;
++unsigned int i;
 +
-+  set_raw_points (&edid, xy);
-+  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
-+  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
-+  g_assert_cmpint (target.coordinates[0], ==, 687500);
-+  g_assert_cmpint (target.coordinates[1], ==, 312500);
-+  g_assert_cmpint (target.coordinates[6], ==, 312500);
-+  g_assert_cmpint (target.coordinates[7], ==, 328125);
-+  meta_color_target_primaries_init (&fallback, &edid, FALSE, encoding);
-+  g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
-+  g_assert_cmpint (fallback.coordinates[0], ==, 708000);
-+  g_assert_cmpfloat (encoding->r_x, ==, 0.708f);
++set_raw_points (&edid, xy);
++meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++g_assert_cmpint (target.coordinates[0], ==, 687500);
++g_assert_cmpint (target.coordinates[1], ==, 312500);
++g_assert_cmpint (target.coordinates[6], ==, 312500);
++g_assert_cmpint (target.coordinates[7], ==, 328125);
++meta_color_target_primaries_init (&fallback, &edid, FALSE, encoding);
++g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++g_assert_cmpint (fallback.coordinates[0], ==, 708000);
++g_assert_cmpfloat (encoding->r_x, ==, 0.708f);
 +
-+  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
++edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
 +  set_raw_points (&edid, uv);
 +  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
 +  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  for (i = 0; i < 4; i++)
++    {
++      int64_t a = uv[i][0], b = uv[i][1], d = 6 * a - 16 * b + 12 * 4096;
++
++      g_assert_cmpint (target.coordinates[2 * i], ==, (9 * a * 1000000) / d);
++      g_assert_cmpint (target.coordinates[2 * i + 1], ==, (4 * b * 1000000) / d);
++    }
 +  g_assert_cmpint (target.coordinates[0], ==, 500000);
 +  g_assert_cmpint (target.coordinates[1], ==, 500000);
 +  set_raw_points (&edid, quantized);
@@ -171,13 +226,22 @@ index f3091cb..6e34a15 100644
 +  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
 +
 +  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1931;
++  set_raw_points (&edid, raw_edge);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1931;
 +  for (i = 0; i < 4; i++)
 +    {
 +      set_raw_points (&edid, xy);
-+      if (i == 0) edid.native_chromaticities.primaries[1] = edid.native_chromaticities.primaries[0];
-+      if (i == 1) edid.native_chromaticities.white_point = edid.native_chromaticities.primaries[0];
-+      if (i == 2) edid.native_chromaticities.white_point.valid = FALSE;
-+      if (i == 3) edid.native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
++      if (i == 0)
++        edid.native_chromaticities.primaries[1] = edid.native_chromaticities.primaries[0];
++      else if (i == 1)
++        edid.native_chromaticities.white_point = edid.native_chromaticities.primaries[0];
++      else if (i == 2)
++        edid.native_chromaticities.white_point.valid = FALSE;
++      else
++        edid.native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
 +      meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
 +      g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
 +      g_assert_cmpint (target.coordinates[6], ==, fallback.coordinates[6]);
@@ -187,7 +251,7 @@ index f3091cb..6e34a15 100644
  int
  main (int    argc,
        char **argv)
-@@ -640,5 +800,7 @@ main (int    argc,
+@@ -640,5 +857,7 @@ main (int    argc,
                     test_cta_with_extension_failure);
    g_test_add_func ("/native-hdr/physical-luminance", test_physical_luminance);
    g_test_add_func ("/native-hdr/target-luminance-policy", test_target_luminance_policy);
@@ -338,7 +402,7 @@ index 2e3be0b..a66efa6 100644
  
  int
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index b448eec..db96797 100644
+index b448eec..1c5b739 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -271,6 +271,8 @@ typedef struct
@@ -405,8 +469,8 @@ index b448eec..db96797 100644
  
 +static void
 +check_gamut (const TargetInfo *info,
-+             const int32_t encoding[8],
-+             const int32_t target[8])
++             const int32_t     encoding[8],
++             const int32_t     target[8])
 +{
 +  unsigned int i;
 +
