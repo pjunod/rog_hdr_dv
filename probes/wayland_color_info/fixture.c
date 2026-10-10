@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
     if (!f.display || wl_display_add_socket(f.display,"fixture")) return 2;
     bool manager_first=!strcmp(f.scenario,"manager-first");
     if (manager_first) f.manager=wl_global_create(f.display,&wp_color_manager_v1_interface,f.version,&f,bind_manager);
-    unsigned count=!strcmp(f.scenario,"overflow")?33:1;
+    unsigned count=!strcmp(f.scenario,"overflow")?33:!strcmp(f.scenario,"max")?32:1;
     for (unsigned i=0;i<count;i++) f.output=wl_global_create(f.display,&wl_output_interface,
         !strcmp(f.scenario,"output-v1")?1:2,&f,bind_output);
     if (!manager_first && strcmp(f.scenario,"absent")) f.manager=wl_global_create(f.display,&wp_color_manager_v1_interface,f.version,&f,bind_manager);

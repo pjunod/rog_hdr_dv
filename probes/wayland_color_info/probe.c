@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
@@ -274,7 +275,10 @@ static bool barrier(struct app *a) {
     while (!a->sync_done && !a->error) if (!pump(a)) break;
     return a->sync_done && !a->error;
 }
-/* Avoid a blocking Unix connect extending the total acquisition deadline. */
+/* Bound the Unix connect by the remaining acquisition deadline. On Linux a
+ * non-blocking AF_UNIX connect never reports EINPROGRESS: with the listen
+ * backlog full it fails with EAGAIN having started nothing. A blocking
+ * connect honours SO_SNDTIMEO instead, waiting for the backlog to drain. */
 static struct wl_display *connect_display(struct app *a) {
     const char *inherited=getenv("WAYLAND_SOCKET");
     int fd=-1;
@@ -289,16 +293,13 @@ static struct wl_display *connect_display(struct app *a) {
         int n=name[0]=='/' ? snprintf(address.sun_path,sizeof(address.sun_path),"%s",name) :
             (runtime?snprintf(address.sun_path,sizeof(address.sun_path),"%s/%s",runtime,name):-1);
         if (n<0 || (size_t)n>=sizeof(address.sun_path)) { a->error="connection"; return NULL; }
-        fd=socket(AF_UNIX,SOCK_STREAM|SOCK_NONBLOCK|SOCK_CLOEXEC,0);
-        if (fd>=0 && connect(fd,(struct sockaddr *)&address,sizeof(address))<0) {
-            if (errno!=EINPROGRESS && errno!=EAGAIN) { close(fd); fd=-1; }
-            else {
-                struct pollfd p={.fd=fd,.events=POLLOUT};
-                int result;
-                do { result=poll(&p,1,remaining(a)); } while (result<0 && errno==EINTR && !a->error);
-                int error=0; socklen_t length=sizeof(error);
-                if (result<=0 || getsockopt(fd,SOL_SOCKET,SO_ERROR,&error,&length)<0 || error) { close(fd); fd=-1; }
-            }
+        fd=socket(AF_UNIX,SOCK_STREAM|SOCK_CLOEXEC,0);
+        while (fd>=0) {
+            int left=remaining(a);
+            struct timeval timeout={.tv_sec=left/1000,.tv_usec=(left%1000)*1000};
+            if (left<=0 || setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&timeout,sizeof(timeout))<0) { close(fd); fd=-1; break; }
+            if (!connect(fd,(struct sockaddr *)&address,sizeof(address))) break;
+            if (errno!=EINTR) { close(fd); fd=-1; }
         }
     }
     if (fd<0) { if (!a->error) a->error="connection"; return NULL; }

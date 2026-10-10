@@ -72,11 +72,16 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(data['status'], 'complete')
         self.assertEqual(data['manager_version'], version)
+        self.assertEqual(len(data['outputs']), 32 if scenario == 'max' else 1)
         o = data['outputs'][0]
         self.assertEqual(o['description_identity']['hi'], 0 if version == 1 else 1)
         self.assertEqual(o['luminances']['raw'], [500, 1000, 203])
         self.assertEqual(o['target_luminance']['raw'], [100, 616])
-        self.assertNotEqual(o['primaries']['raw'], o['target_primaries']['raw'])
+        # Exact values pin which event fills which field, not just that they differ.
+        self.assertEqual(o['primaries']['raw'],
+                         [640000, 330000, 300000, 600000, 150000, 60000, 312700, 329000])
+        self.assertEqual(o['target_primaries']['raw'],
+                         [680000, 320000, 265000, 690000, 150000, 60000, 312700, 329000])
         self.assertTrue(o['tf_power']['present'] and o['tf_named']['present'])
         self.assertEqual(o['tf_named']['raw'], [2])
         self.assertEqual(o['tf_pair_consistency'], 'consistent')
@@ -88,6 +93,10 @@ class ProtocolTests(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertEqual(data['status'], 'incomplete')
         self.assertLessEqual(len(data['outputs']), 32)
+        expected_reason = {'absent': 'unsupported_protocol', 'overflow': 'output_cap',
+                           'disconnect': 'disconnect', 'manager-remove': 'manager_removed'}
+        if scenario in expected_reason:
+            self.assertEqual(data['reason'], expected_reason[scenario])
         if scenario == 'remove':
             self.assertEqual(data['outputs'][0]['status'], 'removed')
         if scenario == 'changed':
@@ -133,7 +142,7 @@ def deadline_case(scenario):
 
 
 for protocol_version in (1, 2):
-    for fixture_scenario in ('normal', 'manager-first', 'output-v1'):
+    for fixture_scenario in ('normal', 'manager-first', 'output-v1', 'max'):
         setattr(ProtocolTests, f'test_v{protocol_version}_{fixture_scenario.replace("-", "_")}',
                 success_case(fixture_scenario, protocol_version))
 for fixture_scenario in ('absent', 'duplicate', 'incomplete', 'remove', 'changed',
