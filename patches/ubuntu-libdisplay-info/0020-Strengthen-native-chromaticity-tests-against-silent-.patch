@@ -1,0 +1,95 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 15:24:47 -0400
+Subject: [PATCH] Strengthen native chromaticity tests against silent
+ regressions
+
+Compare default-signal primaries with a reference that has no recognized
+native declaration, so a leak of native points into the signal API would
+fail. Reject each unknown Display Parameters header bit 3-6 individually,
+and judge each point under the declared coordinate system with a white
+point that is valid only as CIE 1931 xy.
+---
+ test/displayid2-native-chromaticities.c | 45 ++++++++++++++++++++++---
+ 1 file changed, 40 insertions(+), 5 deletions(-)
+
+diff --git a/test/displayid2-native-chromaticities.c b/test/displayid2-native-chromaticities.c
+index 3ef0425..80836f6 100644
+--- a/test/displayid2-native-chromaticities.c
++++ b/test/displayid2-native-chromaticities.c
+@@ -164,6 +164,32 @@ check_domain(void)
+ 	}
+ }
+ 
++static void
++check_cie1976_points(void)
++{
++	static const uint16_t uv[3][2] = {{1024, 2304}, {512, 2304}, {719, 647}};
++	uint8_t data[33];
++	struct di_info *info;
++	const struct di_displayid2_native_chromaticities *c;
++	size_t i;
++
++	/* (0, 4095) is a valid CIE 1931 point but outside the u'v' domain, so
++	 * each point must be judged under the declared coordinate system. */
++	parameters(data);
++	data[0x0B] = 0x40;
++	for (i = 0; i < 3; i++)
++		put_point(data + 0x0C + 3 * i, uv[i][0], uv[i][1]);
++	put_point(data + 0x15, 0, 4095);
++	info = parse(data, 32);
++	c = di_displayid2_data_block_get_native_chromaticities(get_block(info));
++	assert(c && c->coordinates == DI_DISPLAYID2_CHROMATICITY_CIE1976);
++	for (i = 0; i < 3; i++)
++		assert(c->primaries[i].valid);
++	assert(!c->white_point.valid);
++	assert(c->white_point.a == 0 && c->white_point.b == 4095);
++	di_info_destroy(info);
++}
++
+ static void
+ check_formats(void)
+ {
+@@ -182,11 +208,11 @@ check_formats(void)
+ 		assert(!di_edid_has_extension_failures(di_info_get_edid(info)));
+ 		di_info_destroy(info);
+ 	}
+-	for (n = 0; n < 3; n++) {
++	for (n = 0; n < 6; n++) {
+ 		parameters(data);
+ 		if (n == 0) data[1] = 2;
+-		if (n == 1) data[1] = 8;
+-		if (n == 2) data[0x0B] = 0x20; /* Meaning not independently established. */
++		if (n >= 1 && n <= 4) data[1] = (uint8_t) (8 << (n - 1)); /* Header bits 3-6. */
++		if (n == 5) data[0x0B] = 0x20; /* Meaning not independently established. */
+ 		info = parse(data, 32);
+ 		assert(!di_info_get_failure_msg(info));
+ 		assert(!di_displayid2_data_block_get_native_chromaticities(get_block(info)));
+@@ -212,8 +238,14 @@ check_independence(void)
+ 	const struct di_color_primaries *a, *b;
+ 	size_t flags;
+ 
++	/* The reference carries no recognized native declaration (28-byte
++	 * payload), so a leak of native points into the default-signal
++	 * primaries would make the two differ. */
++	parameters(data);
++	data[2] = 28;
++	reference = parse(data, 31);
++	assert(!di_displayid2_data_block_get_native_chromaticities(get_block(reference)));
+ 	parameters(data);
+-	reference = parse(data, 32);
+ 	for (flags = 0; flags < 256; flags++) {
+ 		if (flags & 0x20) continue;
+ 		data[0x0B] = (uint8_t) flags;
+@@ -243,7 +275,10 @@ main(int argc, char **argv)
+ 	assert(f && fread(base, sizeof(base), 1, f) == 1);
+ 	fclose(f);
+ 	if (!strcmp(argv[2], "known")) check_known();
+-	else if (!strcmp(argv[2], "domain")) check_domain();
++	else if (!strcmp(argv[2], "domain")) {
++		check_domain();
++		check_cie1976_points();
++	}
+ 	else if (!strcmp(argv[2], "formats")) check_formats();
+ 	else if (!strcmp(argv[2], "independence")) check_independence();
+ 	else assert(false);
