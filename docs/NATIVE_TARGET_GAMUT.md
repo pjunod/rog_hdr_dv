@@ -1,7 +1,7 @@
 # Native target gamut — retain physical colour declarations
 
-**Status:** library and compositor implementations compiled with warnings as
-errors; final review and runtime qualification pending.
+**Status:** library and compositor implementations reviewed; the pre-merge
+fast lane passed. Package delivery and physical-output verification remain.
 **Date:** 2026-10-10.
 
 Companion to [target luminance](MUTTER_TARGET_LUMINANCE.md) and the
@@ -187,3 +187,9 @@ as unsupported. A recognized declaration with unusable points is reported as
 invalid and keeps its raw counts. Declarations that differ in any field,
 including revision, are a conflict. Only a complete, valid declaration on the
 qualified route becomes the published target.
+
+The [fast-lane receipt](../evidence/batch5-fast-lane.json) records the four
+chromaticity groups on both library series and the legacy-consumer checks,
+plus all ten `native-hdr` cases and the five Wayland invocations, all
+passing.
+

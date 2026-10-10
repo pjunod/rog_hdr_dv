@@ -1,7 +1,7 @@
 # Review — adversarial findings and the current implementation batch
 
-**Updated:** 2026-10-10 UTC · **State:** fourth batch merged; fifth batch
-adversarial review findings addressed, fast lane pending.
+**Updated:** 2026-10-10 UTC · **State:** fifth batch reviewed; findings
+addressed and the pre-merge fast lane passed.
 
 Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
@@ -205,4 +205,28 @@ GDI ABI bump, and the probe's privacy and fd ownership. Two items stay open
 because they need native Windows to settle: the identifier semantics and the
 behaviour of getters with no data. The IDL could not be re-checked against the
 pinned SDK in this session.
+
+### Fifth batch validation
+
+After the fixes, the affected fast lane ran once. The
+[receipt](../evidence/batch5-fast-lane.json) holds commands, trees and hashes.
+
+- **Library:** the four chromaticity groups passed on both series except
+  `formats`. That check had expected an oversized block to drop the whole
+  DisplayID extension, but the parser keeps the section with a recorded
+  failure and no block. The pre-review test source fails the same way. Only
+  the test expectation was corrected; only `formats` was rerun, and it passed
+  on both series. Binaries built from the previous candidates passed against
+  the new libraries.
+- **Mutter:** `native-hdr` passed all ten cases. The main Wayland invocation
+  and the four separate target-volume invocations each passed on the first
+  run.
+- **Probe:** all 23 cases passed in one run.
+- **Wine:** `user32:displayconfig` passed (14 tests). The first
+  `displaymonitor` run exposed a real defect. The enabled-interface check for
+  instance IDs searched a device-only information set, which never contains
+  interfaces, so every instance ID was refused. The check now finds enabled
+  interfaces through the monitor interface class. After the prefix copy was
+  refreshed, `displaymonitor` alone was rerun and passed 308 tests with none
+  failing.
 

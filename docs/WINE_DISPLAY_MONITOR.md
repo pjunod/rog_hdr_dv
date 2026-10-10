@@ -1,7 +1,7 @@
 # Wine DisplayMonitor — truthful monitor discovery for processor activation
 
-**Status:** implementation compiled with warnings as errors; final review and
-runtime qualification pending. **Date:** 2026-10-10.
+**Status:** implementation reviewed; the pre-merge fast lane passed. The OEM
+activation experiment with matching modules is next. **Date:** 2026-10-10.
 
 The [activation experiment](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
 loaded the exact OEM Dolby component, then stopped when it requested the
@@ -150,7 +150,9 @@ The configure change is the three module lines that GNU Autoconf 2.72
 generates. Other generator differences belong to Wine's release tooling and
 are not carried. The [compiler receipt](../evidence/wine-displaymonitor-compile.json)
 records the affected modules and both test binaries built on native amd64
-with zero warnings. Runtime tests are held for the pre-merge fast lane.
+with zero warnings. The [fast-lane receipt](../evidence/batch5-fast-lane.json)
+records `displaymonitor` (308 tests) and `displayconfig` (14 tests) passing
+with the candidate modules loaded into a WineHQ 11.0 runtime.
 
 ## Remaining processor boundary
 
