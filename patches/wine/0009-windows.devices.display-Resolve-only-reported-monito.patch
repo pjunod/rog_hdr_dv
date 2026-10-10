@@ -25,10 +25,10 @@ virtual origin, base EDID facts, EDID 1.3 preferred timing, the reserved
 use case, a short non-zero tail and adapter resolution on real topology.
 ---
  dlls/windows.devices.display/descriptor.c     |  50 +++++-
- dlls/windows.devices.display/main.c           |  98 ++++++++---
+ dlls/windows.devices.display/main.c           | 110 +++++++++---
  dlls/windows.devices.display/private.h        |   1 +
- .../tests/displaymonitor.c                    | 162 +++++++++++++++++-
- 4 files changed, 285 insertions(+), 26 deletions(-)
+ .../tests/displaymonitor.c                    | 164 +++++++++++++++++-
+ 4 files changed, 300 insertions(+), 25 deletions(-)
 
 diff --git a/dlls/windows.devices.display/descriptor.c b/dlls/windows.devices.display/descriptor.c
 index f6f6260..09b4ef1 100644
@@ -114,10 +114,18 @@ index f6f6260..09b4ef1 100644
      descriptor->min_luminance = native.min_luminance;
      descriptor->full_luminance = native.full_luminance;
 diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
-index c823e93..c553bbe 100644
+index c823e93..ce140f3 100644
 --- a/dlls/windows.devices.display/main.c
 +++ b/dlls/windows.devices.display/main.c
-@@ -356,7 +356,7 @@ static void read_adapter_device_id( struct monitor *impl )
+@@ -23,6 +23,7 @@
+ #include "private.h"
+ #include "winreg.h"
+ #include "setupapi.h"
++#include "cfgmgr32.h"
+ #include "devguid.h"
+ #include "roapi.h"
+ #include "wine/debug.h"
+@@ -356,7 +357,7 @@ static void read_adapter_device_id( struct monitor *impl )
          if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || !(detail = malloc(size))) continue;
          detail->cbSize = sizeof(*detail);
          if (SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, &device ) &&
@@ -126,7 +134,7 @@ index c823e93..c553bbe 100644
              !memcmp( &luid, &impl->adapter_id, sizeof(luid) ))
              WindowsCreateString( detail->DevicePath, wcslen(detail->DevicePath), &impl->adapter_device_id );
          free( detail );
-@@ -386,33 +386,71 @@ static void read_descriptor( HDEVINFO set, SP_DEVINFO_DATA *device, struct monit
+@@ -386,33 +387,86 @@ static void read_descriptor( HDEVINFO set, SP_DEVINFO_DATA *device, struct monit
      monitor_descriptor_parse( impl->edid, impl->edid_size, &impl->descriptor );
  }
  
@@ -171,7 +179,25 @@ index c823e93..c553bbe 100644
 -    }
 -    if (impl->edid_size < 128) return;
 -    for (i = 54; i <= 108; i += 18)
--    {
++}
++
++/* A monitor is resolvable only while it has an enabled (linked) monitor
++ * interface; win32u links the interfaces of monitors it currently reports.
++ * Interfaces are not part of a device-only information set, so look them up
++ * in the monitor interface class and match the owning device instance. */
++static BOOL monitor_interface_active( const WCHAR *instance )
++{
++    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
++    SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
++    WCHAR owner[MAX_DEVICE_ID_LEN];
++    BOOL active = FALSE;
++    HDEVINFO set;
++    DWORD index;
++
++    set = SetupDiGetClassDevsW( &monitor_interface, NULL, NULL, DIGCF_DEVICEINTERFACE );
++    if (set == INVALID_HANDLE_VALUE) return FALSE;
++    for (index = 0; !active && SetupDiEnumDeviceInterfaces( set, NULL, &monitor_interface, index, &iface ); index++)
+     {
 -        if (memcmp( impl->edid + i, "\0\0\0\xfc\0", 5 )) continue;
 -        for (j = 0; j < 13 && impl->edid[i + 5 + j] >= 32 && impl->edid[i + 5 + j] <= 126; j++)
 -            buffer[j] = impl->edid[i + 5 + j];
@@ -179,19 +205,14 @@ index c823e93..c553bbe 100644
 -        while (length && buffer[length - 1] == ' ') length--;
 -        WindowsCreateString( buffer, length, &impl->display_name );
 -        return;
--    }
-+}
-+
-+/* A monitor is resolvable only while it has an enabled (linked) monitor
-+ * interface; win32u links the interfaces of monitors it currently reports. */
-+static BOOL monitor_interface_active( HDEVINFO set, SP_DEVINFO_DATA *device )
-+{
-+    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
-+    DWORD index;
-+
-+    for (index = 0; SetupDiEnumDeviceInterfaces( set, device, &monitor_interface, index, &iface ); index++)
-+        if (iface.Flags & SPINT_ACTIVE) return TRUE;
-+    return FALSE;
++        if (!(iface.Flags & SPINT_ACTIVE)) continue;
++        SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, NULL, &device );
++        if (SetupDiGetDeviceInstanceIdW( set, &device, owner, ARRAY_SIZE(owner), NULL ) &&
++            !wcsicmp( owner, instance ))
++            active = TRUE;
+     }
++    SetupDiDestroyDeviceInfoList( set );
++    return active;
 +}
 +
 +/* win32u rebuilds the monitor device nodes under this session mutex when the
@@ -213,7 +234,7 @@ index c823e93..c553bbe 100644
  }
  
  static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **result )
-@@ -421,14 +459,21 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+@@ -421,14 +475,21 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
      SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
      SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
      struct monitor *impl;
@@ -236,7 +257,7 @@ index c823e93..c553bbe 100644
      if (interface_id)
      {
          if (!SetupDiOpenDeviceInterfaceW( set, buffer, 0, &iface )) goto failed;
-@@ -437,6 +482,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+@@ -437,6 +498,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
              hr = E_INVALIDARG;
              goto done;
          }
@@ -248,11 +269,11 @@ index c823e93..c553bbe 100644
          /* The sizing call returns the interface's real device instance. */
          SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, &device );
          if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) goto failed;
-@@ -447,6 +497,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+@@ -447,6 +513,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
          hr = E_INVALIDARG;
          goto done;
      }
-+    if (!interface_id && !monitor_interface_active( set, &device ))
++    if (!interface_id && !monitor_interface_active( buffer ))
 +    {
 +        hr = HRESULT_FROM_WIN32(ERROR_DEVICE_NOT_AVAILABLE);
 +        goto done;
@@ -260,7 +281,7 @@ index c823e93..c553bbe 100644
      if (!(impl = calloc( 1, sizeof(*impl) )))
      {
          hr = E_OUTOFMEMORY;
-@@ -470,11 +525,6 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+@@ -470,11 +541,6 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
      read_adapter_device_id( impl );
      read_descriptor( set, &device, impl );
      read_name( set, &device, impl );
@@ -272,7 +293,7 @@ index c823e93..c553bbe 100644
      *result = (IInspectable *)&impl->IDisplayMonitor_iface;
      hr = S_OK;
      goto done;
-@@ -482,6 +532,7 @@ failed:
+@@ -482,6 +548,7 @@ failed:
      hr = HRESULT_FROM_WIN32(GetLastError());
  done:
      SetupDiDestroyDeviceInfoList( set );
@@ -280,7 +301,7 @@ index c823e93..c553bbe 100644
      return hr;
  }
  
-@@ -595,7 +646,8 @@ DEFINE_IINSPECTABLE( statics, IDisplayMonitorStatics, struct factory, IActivatio
+@@ -595,7 +662,8 @@ DEFINE_IINSPECTABLE( statics, IDisplayMonitorStatics, struct factory, IActivatio
  
  static HRESULT WINAPI statics_GetDeviceSelector( IDisplayMonitorStatics *iface, HSTRING *value )
  {
@@ -303,7 +324,7 @@ index 4fb9b20..609d59a 100644
  struct monitor_descriptor
  {
 diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
-index e0040a7..8a7d6d0 100644
+index e0040a7..83c3419 100644
 --- a/dlls/windows.devices.display/tests/displaymonitor.c
 +++ b/dlls/windows.devices.display/tests/displaymonitor.c
 @@ -135,6 +135,16 @@ static void test_real_interfaces(void)
@@ -484,6 +505,15 @@ index e0040a7..8a7d6d0 100644
  static void test_async_lifetime(void)
  {
      static const WCHAR missing[] = L"ROOT\\WINETEST_MISSING_DISPLAYMONITOR\\0";
+@@ -432,7 +580,7 @@ static void test_synthetic_descriptor(void)
+      * or by the production implementation. They do not join the display
+      * topology and are removed on every completed fixture path. */
+     if (!winetest_platform || strcmp(winetest_platform, "wine")) return;
+-    swprintf( id, ARRAY_SIZE(id), L"ROOT\\WINETEST_DISPLAYMONITOR\\%08lx", GetCurrentProcessId() );
++    swprintf( id, ARRAY_SIZE(id), L"ROOT\\WINETEST_DISPLAYMONITOR\\%08lX", GetCurrentProcessId() );
+     set = SetupDiCreateDeviceInfoList( &GUID_DEVCLASS_MONITOR, NULL );
+     ret = SetupDiCreateDeviceInfoW( set, id, &GUID_DEVCLASS_MONITOR, L"Wine test monitor", NULL, 0, &device );
+     ok( ret, "Create test device error %lu.\n", GetLastError() );
 @@ -456,6 +604,16 @@ static void test_synthetic_descriptor(void)
      ret = SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, NULL );
      ok( ret, "Interface detail error %lu.\n", GetLastError() );
