@@ -12,6 +12,8 @@ OEM components.
   terms. Preserve original authorship, assistance and signoff trailers.
 - Wine patches retain LGPL-2.1-or-later notices; consult the pinned source's
   `COPYING.LIB` and affected file headers.
+- The vendored Wayland colour-management protocol XML retains its upstream
+  MIT notice; its source and digest are pinned beside the probe.
 - Ubuntu packaging changes retain their source package's copyright/licensing
   declarations, including notices carried by the patch series.
 

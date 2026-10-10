@@ -1,0 +1,57 @@
+From 6d3a25d8c4475e8d2266b6a6c19ff085f9d7891f Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Fri, 9 Oct 2026 02:12:56 -0400
+Subject: [PATCH 18/19] Clarify unusable declarations and correct signal
+ fixture fields
+
+---
+ include/libdisplay-info/displayid2.h    |  3 ++-
+ test/displayid2-native-chromaticities.c | 14 +++++++++++---
+ 2 files changed, 13 insertions(+), 4 deletions(-)
+
+diff --git a/include/libdisplay-info/displayid2.h b/include/libdisplay-info/displayid2.h
+index caf3762..c842750 100644
+--- a/include/libdisplay-info/displayid2.h
++++ b/include/libdisplay-info/displayid2.h
+@@ -189,7 +189,8 @@ struct di_displayid2_native_chromaticities {
+  * Unknown header flags and feature bit 5 are unsupported. Known orientation,
+  * audio and luminance-class fields do not affect chromaticity interpretation.
+  * Returns NULL for another tag or an unsupported format. Individual unusable
+- * points retain their counts and only clear valid; gamut validation is the
++ * points retain their counts and only clear valid; a recognized declaration
++ * is returned even if all four points are unusable. Gamut validation is the
+  * caller's responsibility. These declarations do not imply HDR support.
+  *
+  * The pointer is owned by the parsed DisplayID object for its lifetime.
+diff --git a/test/displayid2-native-chromaticities.c b/test/displayid2-native-chromaticities.c
+index c78605e..ed1cef1 100644
+--- a/test/displayid2-native-chromaticities.c
++++ b/test/displayid2-native-chromaticities.c
+@@ -106,6 +106,14 @@ check_known(void)
+ 		assert(c == di_displayid2_data_block_get_native_chromaticities(get_block(info)));
+ 		di_info_destroy(info);
+ 	}
++	parameters(data);
++	memset(data + 0x0C, 0, 12);
++	info = parse(data, 32);
++	c = di_displayid2_data_block_get_native_chromaticities(get_block(info));
++	assert(c && !c->white_point.valid);
++	assert(!c->primaries[0].valid && !c->primaries[1].valid && !c->primaries[2].valid);
++	assert(!di_info_get_failure_msg(info));
++	di_info_destroy(info);
+ }
+ 
+ static void
+@@ -205,9 +213,9 @@ check_independence(void)
+ 		a = di_info_get_default_color_primaries(info);
+ 		b = di_info_get_default_color_primaries(reference);
+ 		assert(a->has_primaries == b->has_primaries && a->has_default_white_point == b->has_default_white_point);
+-		assert(a->primary_red.x == b->primary_red.x && a->primary_red.y == b->primary_red.y);
+-		assert(a->primary_green.x == b->primary_green.x && a->primary_green.y == b->primary_green.y);
+-		assert(a->primary_blue.x == b->primary_blue.x && a->primary_blue.y == b->primary_blue.y);
++		assert(a->primary[0].x == b->primary[0].x && a->primary[0].y == b->primary[0].y);
++		assert(a->primary[1].x == b->primary[1].x && a->primary[1].y == b->primary[1].y);
++		assert(a->primary[2].x == b->primary[2].x && a->primary[2].y == b->primary[2].y);
+ 		assert(a->default_white.x == b->default_white.x && a->default_white.y == b->default_white.y);
+ 		assert((di_displayid2_data_block_get_luminance(get_block(info)) != NULL) == !(flags & 0x18));
+ 		di_info_destroy(info);

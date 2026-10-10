@@ -1,0 +1,326 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 14:46:42 -0400
+Subject: [PATCH] windows.devices.display: Validate native chromaticities and
+ DisplayID filler.
+
+Expose native RGBW only when every point lies in the chromaticity domain,
+convert CIE 1976 u'v' declarations to CIE 1931 xy instead of leaving them
+unavailable, and leave the declaration unavailable when the not-understood
+feature bit 5 is set, matching the library contract. Accept zero filler
+after the last DisplayID data block and reject a section whose filler is
+non-zero. Correct copied file descriptions.
+
+winex11.drv: Never free an EDID buffer XRRGetOutputProperty did not
+return, and do not warn for outputs that simply have no EDID property.
+
+windows.devices.display/tests: Include devguid.h before initguid.h so the
+test links against libuuid's GUID definitions instead of duplicating them,
+and cover chromaticity validity, CIE 1976 conversion, feature bit 5 and
+DisplayID filler handling.
+---
+ dlls/windows.devices.display/classes.idl      |  2 +-
+ dlls/windows.devices.display/descriptor.c     | 48 ++++++++--
+ dlls/windows.devices.display/main.c           |  2 +-
+ dlls/windows.devices.display/private.h        |  2 +-
+ .../tests/displaymonitor.c                    | 96 ++++++++++++++++++-
+ dlls/winex11.drv/xrandr.c                     | 23 ++++-
+ include/windows.devices.display.idl           |  2 +-
+ 7 files changed, 157 insertions(+), 18 deletions(-)
+
+diff --git a/dlls/windows.devices.display/classes.idl b/dlls/windows.devices.display/classes.idl
+index 21ca4dd..b175507 100644
+--- a/dlls/windows.devices.display/classes.idl
++++ b/dlls/windows.devices.display/classes.idl
+@@ -1,5 +1,5 @@
+ /*
+- * Internal facts associated with Wine display monitors
++ * Windows.Devices.Display runtime class registration
+  *
+  * Copyright 2026 Codex
+  *
+diff --git a/dlls/windows.devices.display/descriptor.c b/dlls/windows.devices.display/descriptor.c
+index 8cf5559..f6f6260 100644
+--- a/dlls/windows.devices.display/descriptor.c
++++ b/dlls/windows.devices.display/descriptor.c
+@@ -36,6 +36,27 @@ static BOOL physical_luminance( const BYTE *data, FLOAT *value )
+     return TRUE;
+ }
+ 
++/* Decode one 12-bit chromaticity pair. CIE 1976 u'v' is converted with
++ * xy = (9u', 4v') / (6u' - 16v' + 12); domain checks stay integral so the
++ * exact x + y = 1 boundary is not subject to rounding. */
++static BOOL native_chromaticity( const BYTE *data, BOOL cie1976, Point *point )
++{
++    INT32 a = data[0] | ((data[1] & 15) << 8), b = (data[1] >> 4) | (data[2] << 4), denominator;
++
++    if (!cie1976)
++    {
++        if (!b || a + b > 4096) return FALSE;
++        point->X = a / 4096.0f;
++        point->Y = b / 4096.0f;
++        return TRUE;
++    }
++    denominator = 6 * a - 16 * b + 12 * 4096;
++    if (denominator <= 0 || !b || 9 * a + 4 * b > denominator) return FALSE;
++    point->X = 9.0f * a / denominator;
++    point->Y = 4.0f * b / denominator;
++    return TRUE;
++}
++
+ static void parse_native_parameters( const BYTE *block, struct monitor_descriptor *descriptor )
+ {
+     UINT32 width, height, i;
+@@ -65,17 +86,22 @@ static void parse_native_parameters( const BYTE *block, struct monitor_descripto
+         descriptor->physical_size.Height = height * units / 25.4f;
+         descriptor->flags |= MONITOR_PHYSICAL_SIZE;
+     }
+-    /* These are explicitly native coordinates. CIE 1976 conversion is not
+-     * yet implemented; never expose its u/v as CIE 1931 x/y. */
+-    if (!(block[11] & 0x40))
++    /* Native RGBW, as raw 12-bit counts over 4096. Feature bit 6 selects
++     * CIE 1976 u'v' instead of CIE 1931 xy; bit 5 is not understood, so the
++     * declaration is left unavailable rather than guessed. Every point must
++     * lie in the chromaticity domain or none is exposed. */
++    if (!(block[11] & 0x20))
+     {
++        BOOL cie1976 = !!(block[11] & 0x40);
++        Point points[4];
++
+         for (i = 0; i < 4; i++)
++            if (!native_chromaticity( block + 12 + 3 * i, cie1976, &points[i] )) break;
++        if (i == 4)
+         {
+-            const BYTE *point = block + 12 + 3 * i;
+-            descriptor->primaries[i].X = (point[0] | ((point[1] & 15) << 8)) / 4096.0f;
+-            descriptor->primaries[i].Y = ((point[1] >> 4) | (point[2] << 4)) / 4096.0f;
++            memcpy( descriptor->primaries, points, sizeof(points) );
++            descriptor->flags |= MONITOR_NATIVE_PRIMARIES;
+         }
+-        descriptor->flags |= MONITOR_NATIVE_PRIMARIES;
+     }
+     if (!(block[11] & 0x18))
+     {
+@@ -124,8 +150,14 @@ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_des
+         displayid_count++;
+         for (offset = 4; offset < section_size - 1; offset += length)
+         {
+-            if (section_size - 1 - offset < 3) return;
+             block = section + offset;
++            /* A short tail or an all-zero block header starts the filler,
++             * which must be zero up to the checksum. */
++            if (section_size - 1 - offset < 3 || !(block[0] | block[1] | block[2]))
++            {
++                for (; offset < section_size - 1; offset++) if (section[offset]) return;
++                break;
++            }
+             length = block[2] + 3;
+             if (length > section_size - 1 - offset) return;
+             if (block[0] != 0x21) continue;
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index 885a262..c823e93 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -1,5 +1,5 @@
+ /*
+- * Internal facts associated with Wine display monitors
++ * Windows.Devices.Display.DisplayMonitor runtime class
+  *
+  * Copyright 2026 Codex
+  *
+diff --git a/dlls/windows.devices.display/private.h b/dlls/windows.devices.display/private.h
+index a2dde37..4fb9b20 100644
+--- a/dlls/windows.devices.display/private.h
++++ b/dlls/windows.devices.display/private.h
+@@ -1,5 +1,5 @@
+ /*
+- * Internal facts associated with Wine display monitors
++ * Windows.Devices.Display private declarations
+  *
+  * Copyright 2026 Codex
+  *
+diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
+index f737c74..e0040a7 100644
+--- a/dlls/windows.devices.display/tests/displaymonitor.c
++++ b/dlls/windows.devices.display/tests/displaymonitor.c
+@@ -1,5 +1,5 @@
+ /*
+- * Internal facts associated with Wine display monitors
++ * Windows.Devices.Display.DisplayMonitor tests
+  *
+  * Copyright 2026 Codex
+  *
+@@ -19,14 +19,15 @@
+  */
+ 
+ 
++#include <math.h>
+ #include <stdarg.h>
+ #define COBJMACROS
+ #include "windows.h"
+ #include "winstring.h"
+ #include "winreg.h"
+ #include "setupapi.h"
+-#include "initguid.h"
+ #include "devguid.h"
++#include "initguid.h"
+ #include "roapi.h"
+ #define WIDL_using_Windows_Foundation
+ #include "windows.foundation.h"
+@@ -270,6 +271,96 @@ static void test_descriptor_cases( HKEY key, const WCHAR *id )
+     }
+ }
+ 
++static void set_point( BYTE *data, UINT16 a, UINT16 b )
++{
++    data[0] = a & 0xff;
++    data[1] = (a >> 8) | ((b & 15) << 4);
++    data[2] = b >> 4;
++}
++
++static void set_points( BYTE *edid, const UINT16 points[4][2], BYTE features )
++{
++    BYTE *block = edid + 133;
++    UINT32 i;
++
++    for (i = 0; i < 4; i++) set_point( block + 12 + 3 * i, points[i][0], points[i][1] );
++    block[11] = features;
++    checksum( edid + 129, 37 );
++    checksum( edid + 128, 128 );
++}
++
++static void test_descriptor_chromaticities( HKEY key, const WCHAR *id )
++{
++    static const UINT16 xy[4][2] = {{2816, 1280}, {1024, 2816}, {512, 256}, {1280, 1344}};
++    static const UINT16 uv[4][2] = {{1024, 2304}, {512, 2304}, {719, 647}, {810, 1918}};
++    static const UINT16 off_domain[4][2] = {{2816, 1281}, {1024, 2816}, {512, 256}, {1280, 1344}};
++    static const UINT16 zero_y[4][2] = {{2816, 1280}, {1024, 2816}, {512, 0}, {1280, 1344}};
++    static const struct
++    {
++        const UINT16 (*points)[2];
++        BYTE features;
++        BOOL available;
++        FLOAT red_x, red_y;
++    } cases[] =
++    {
++        {xy, 0x00, TRUE, 2816 / 4096.0f, 1280 / 4096.0f},
++        {xy, 0x18, TRUE, 2816 / 4096.0f, 1280 / 4096.0f}, /* luminance class is independent */
++        {xy, 0x20, FALSE}, /* feature bit 5 is not understood */
++        {off_domain, 0x00, FALSE}, /* x + y > 1 */
++        {zero_y, 0x00, FALSE},
++        {uv, 0x40, TRUE, 0.5f, 0.5f}, /* CIE 1976 u'v' converted to xy */
++    };
++    IDisplayMonitor *monitor;
++    BYTE edid[256], *section = edid + 129;
++    SizeInt32 resolution;
++    Point point;
++    UINT32 i;
++    HRESULT hr;
++
++    for (i = 0; i < ARRAY_SIZE(cases); i++)
++    {
++        make_edid( edid );
++        set_points( edid, cases[i].points, cases[i].features );
++        RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++        hr = get_monitor( id, FALSE, &monitor );
++        ok( hr == S_OK, "Chromaticity case %u creation hr %#lx.\n", i, hr );
++        if (FAILED(hr)) continue;
++        memset( &point, 0, sizeof(point) );
++        hr = IDisplayMonitor_get_RedPrimary( monitor, &point );
++        ok( hr == (cases[i].available ? S_OK : HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)),
++            "Chromaticity case %u red hr %#lx.\n", i, hr );
++        if (cases[i].available)
++            ok( fabsf( point.X - cases[i].red_x ) < 1e-6f && fabsf( point.Y - cases[i].red_y ) < 1e-6f,
++                "Chromaticity case %u red %f,%f.\n", i, point.X, point.Y );
++        hr = IDisplayMonitor_get_WhitePoint( monitor, &point );
++        ok( hr == (cases[i].available ? S_OK : HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)),
++            "Chromaticity case %u white hr %#lx.\n", i, hr );
++        hr = IDisplayMonitor_get_NativeResolutionInRawPixels( monitor, &resolution );
++        ok( hr == S_OK, "Chromaticity case %u native resolution hr %#lx.\n", i, hr );
++        IDisplayMonitor_Release( monitor );
++    }
++
++    /* Zero filler after the last data block is valid; non-zero filler makes
++     * the whole DisplayID section untrustworthy. */
++    for (i = 0; i < 2; i++)
++    {
++        make_edid( edid );
++        set_points( edid, xy, 0 );
++        section[1] = 40;
++        memset( section + 36, 0, 8 );
++        if (i) section[40] = 1;
++        checksum( section, 45 );
++        checksum( edid + 128, 128 );
++        RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++        hr = get_monitor( id, FALSE, &monitor );
++        ok( hr == S_OK, "Filler case %u creation hr %#lx.\n", i, hr );
++        if (FAILED(hr)) continue;
++        hr = IDisplayMonitor_get_NativeResolutionInRawPixels( monitor, &resolution );
++        ok( hr == (i ? HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED) : S_OK), "Filler case %u hr %#lx.\n", i, hr );
++        IDisplayMonitor_Release( monitor );
++    }
++}
++
+ static void test_async_lifetime(void)
+ {
+     static const WCHAR missing[] = L"ROOT\\WINETEST_MISSING_DISPLAYMONITOR\\0";
+@@ -416,6 +507,7 @@ static void test_synthetic_descriptor(void)
+     }
+     IDisplayMonitor_Release( monitor );
+     test_descriptor_cases( key, id );
++    test_descriptor_chromaticities( key, id );
+ close:
+     free( detail );
+     RegCloseKey( key );
+diff --git a/dlls/winex11.drv/xrandr.c b/dlls/winex11.drv/xrandr.c
+index 1d8c7ef..5fb3f0a 100644
+--- a/dlls/winex11.drv/xrandr.c
++++ b/dlls/winex11.drv/xrandr.c
+@@ -589,17 +589,32 @@ static unsigned int get_edid( RROutput output, unsigned char **prop )
+     unsigned long bytes_after, len;
+     Atom actual_type;
+ 
+-    result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 8192, FALSE, FALSE,
++    /* Read the complete property (up to 256 EDID blocks) in one request and
++     * accept it only as 8-bit INTEGER data with nothing left unread, so a
++     * truncated extension list is never presented as a whole descriptor. */
++    *prop = NULL;
++    result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 256 * 128 / 4, FALSE, FALSE,
+                                     AnyPropertyType, &actual_type, &actual_format, &len,
+                                     &bytes_after, prop );
+-
+-    if (result != Success || actual_type != XA_INTEGER || actual_format != 8 || bytes_after || len > 32768)
++    if (result != Success)
+     {
+-        if (*prop) XFree( *prop );
+         WARN("Could not retrieve EDID property for output %#lx.\n", output);
+         *prop = NULL;
+         return 0;
+     }
++    if (actual_type == None)
++    {
++        if (*prop) XFree( *prop );
++        *prop = NULL;
++        return 0;
++    }
++    if (actual_type != XA_INTEGER || actual_format != 8 || bytes_after || len > 256 * 128)
++    {
++        WARN("Ignoring malformed or incomplete EDID property for output %#lx.\n", output);
++        if (*prop) XFree( *prop );
++        *prop = NULL;
++        return 0;
++    }
+     return len;
+ }
+ 
+diff --git a/include/windows.devices.display.idl b/include/windows.devices.display.idl
+index 5a9300b..fbf571d 100644
+--- a/include/windows.devices.display.idl
++++ b/include/windows.devices.display.idl
+@@ -1,5 +1,5 @@
+ /*
+- * Internal facts associated with Wine display monitors
++ * Windows.Devices.Display WinRT interface definitions
+  *
+  * Copyright 2026 Codex
+  *

@@ -1,0 +1,102 @@
+{
+  "status": "compile_pass_runtime_held",
+  "architecture": "native amd64",
+  "environment": {
+    "distribution": "Ubuntu 26.10",
+    "image_digest": "sha256:ee126c2fa0249079a7e24ae3a3d29b04783ef93ab33c868751c9a1289d3fffff",
+    "gcc": "15.3.0 (Ubuntu 15.3.0-4ubuntu1)",
+    "linker": "GNU ld 2.47",
+    "meson": "1.10.1",
+    "ninja": "1.13.2",
+    "uid": 1000,
+    "gid": 1000,
+    "nice": 19,
+    "jobs": 1,
+    "werror": true,
+    "shared_cap": "2 CPU / 4 GiB",
+    "network_disconnected": true,
+    "host_mounts": false
+  },
+  "sources": [
+    {
+      "series": "ubuntu",
+      "baseline": "051af9ad21839a017f9fcc6d2f291902eb82136e",
+      "candidate": "805d07b9116cd1fc7bcc7446617ef13f92857b9c",
+      "tree": "e79ea573a50aec6f53e1c939d4ea2c0af1bba01c",
+      "archive_sha256": "6b807de5e500b32d74c71fdd3af301292554532bccd232f8d9adcc0d6e74b9eb",
+      "baseline_compile_exit": 0,
+      "candidate_compile_exit": 0
+    },
+    {
+      "series": "upstream",
+      "baseline": "1ddb6ea03a59d2758d28c994eb5d91f969f36314",
+      "candidate": "1462cebeac89a5f5f5b7fa475b7501eb21158b53",
+      "tree": "a15b92001bcd3eab0caf931d075974a854782f5f",
+      "archive_sha256": "0efc7db94b711574b2e0e668eba6426695407e39141fe02ceec504d77de9ab05",
+      "baseline_compile_exit": 0,
+      "candidate_compile_exit": 0
+    }
+  ],
+  "commands": [
+    "meson setup \"$BUILD\" \"$SOURCE\" -Dwerror=true --prefix=\"$OWNED_STAGE\"",
+    "nice -n 19 meson compile -C \"$BUILD\" -j 1"
+  ],
+  "new_export": "di_displayid2_data_block_get_native_chromaticities",
+  "ubuntu_symbol_minimum": "0.3.0-1ubuntu1~hdr8~",
+  "focused_groups_compiled": [
+    "displayid2-native-chromaticities-known",
+    "displayid2-native-chromaticities-domain",
+    "displayid2-native-chromaticities-formats",
+    "displayid2-native-chromaticities-independence"
+  ],
+  "tests_executed": false,
+  "held_commands": [
+    "meson test -C \"$BUILD\" --no-rebuild --num-processes 1 --timeout-multiplier 1 displayid2-native-chromaticities-known",
+    "meson test -C \"$BUILD\" --no-rebuild --num-processes 1 --timeout-multiplier 1 displayid2-native-chromaticities-domain",
+    "meson test -C \"$BUILD\" --no-rebuild --num-processes 1 --timeout-multiplier 1 displayid2-native-chromaticities-formats",
+    "meson test -C \"$BUILD\" --no-rebuild --num-processes 1 --timeout-multiplier 1 displayid2-native-chromaticities-independence"
+  ],
+  "qualification_requires_both_series": true,
+  "prior_consumer_binaries_preserved": true,
+  "format_evidence": {
+    "edid_decode_commit": "1316a80455ef70889bea89491f37cd69170f3ee7",
+    "edid_decode_blob": "0b6d7dcfd1d155129a821dbf5a55269ef1a465f8",
+    "nvidia_commit": "61dcc93722ecb418bb5f2e00923f05b4b8051dd1",
+    "nvidia_blob": "5eff6503dbccce239d6514d94e39012cfaa50f97",
+    "complete_vesa_verification": false
+  },
+  "superseded_attempt": {
+    "candidate": "9dd1b77",
+    "result": "production library compiled; new fixture compile failed due to wrong existing field names; corrected by 6d3a25d"
+  },
+  "private_log_hashes": {
+    "library-baseline-configure.log": "feaef03aa5ca08de88f8728dd0c188f9761cbf40abea45caee8dd41d1aa0fef1",
+    "library-baseline-compile.log": "c8fa02130075285b9025d829bf524722f988c24532c7761cca84b55b49d94d59",
+    "library-9dd1b77-compile.log": "116b364175678069e1dd659df0c413461609e63fca52c7d6dcbe64905e064cb5",
+    "library-6d3a25d-compile.log": "b5eee92a3fa58f7a49c47dabb791138ce4fa800b287433d1fcc30f9430776890",
+    "library-upstream-baseline-configure.log": "0f8d7ecb7274787f42d5607a886ab64cf963e757519e5662157ed3fdba6144dc",
+    "library-upstream-baseline-compile.log": "4da7f8f26ac68f4673ce9b0322a5f66176704663b0945ed4e2adda4981590b81",
+    "library-upstream-0444a7b-compile.log": "82264c361b24327f2c4ec2a72300dfdf3f42b0ee4b3f3bbf7fb1f97c8089a185",
+    "library-805d07b-compile.log": "b5eee92a3fa58f7a49c47dabb791138ce4fa800b287433d1fcc30f9430776890",
+    "library-upstream-1462ceb-compile.log": "82264c361b24327f2c4ec2a72300dfdf3f42b0ee4b3f3bbf7fb1f97c8089a185"
+  },
+  "scope": "Raw firmware declarations and mathematical per-point validity only; no runtime, optical, package-delivery or calibration claim.",
+  "fixture_review_correction": "Truncated extension is asserted omitted without dereferencing it; literal BC 3A 12 independently decodes ABC/123.",
+  "source_equality": {
+    "include/libdisplay-info/displayid2.h": {
+      "byte_identical": true,
+      "ubuntu_sha256": "12f0e0ce223a4cdbf76972425630dfcafb9bbdbac477efccd6a78ef5610bd7c8",
+      "upstream_sha256": "12f0e0ce223a4cdbf76972425630dfcafb9bbdbac477efccd6a78ef5610bd7c8"
+    },
+    "test/displayid2-native-chromaticities.c": {
+      "byte_identical": true,
+      "ubuntu_sha256": "31173ef8b28967cd5fffd55dd869bd0c302f13689b3e56830b08ab4aa52c2f40",
+      "upstream_sha256": "31173ef8b28967cd5fffd55dd869bd0c302f13689b3e56830b08ab4aa52c2f40"
+    },
+    "added_decode_and_parse_bodies": {
+      "byte_identical": true,
+      "ubuntu_sha256": "91d310c4b6652c7a0af69392d72cd422f8fccb11959ec9fca4d6b0999ec5ba7e",
+      "upstream_sha256": "91d310c4b6652c7a0af69392d72cd422f8fccb11959ec9fca4d6b0999ec5ba7e"
+    }
+  }
+}

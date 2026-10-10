@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "experiment": "isolated recovered processor activation and unconfigured type discovery",
+  "architecture": "native-linux-amd64",
+  "result": "stopped at internal WinRT DisplayMonitor activation",
+  "source": {
+    "wine_candidate_commit": "68c5cce867c8c5dc7e318eefc4c13f832d0471fa",
+    "wine_candidate_tree": "387cfcb18f0870100227fe059d804f2c16249c89"
+  },
+  "hashes": {
+    "candidate_kernelbase_sha256": "deb6b2218e05cca05319140a6a35cec1d2a90e1c45b16828e192d7456f223b32",
+    "inventoried_plugin_sha256": "ecb3d9024e53defcdfaa0ae6bd3fdc87165f2a845efc71d83456d59add4d9936",
+    "retained_probe_sha256": "06975793c115c3bceab8acecb33c791355d719a98ab078feb2a0e5fdbe78e8cd",
+    "manifest_sha256": "0fbfc167d7d870b58aaaa3bb2d6e83241d2bb9a41ebf2454c6595eb4ce6d3972",
+    "preflight_and_final_inputs_match": true
+  },
+  "fixture": {
+    "winehq_version": "11.0.0.0~noble-1",
+    "uid": 1000,
+    "locale": "C.UTF-8",
+    "charmap": "UTF-8",
+    "fresh_prefix": true,
+    "network_count": 0,
+    "mount_count": 0,
+    "devices": 0,
+    "privileged": false,
+    "no_new_privileges": true,
+    "cpus": 1,
+    "memory_bytes": 2147483648,
+    "memory_swap_bytes": 2147483648,
+    "pids_limit": 512,
+    "only_two_approved_inputs_staged": true,
+    "gpu_or_display_bus_access": false,
+    "probe_deadline_seconds": 30,
+    "whole_deadline_seconds": 90,
+    "kill_grace_seconds": 5,
+    "per_stream_saved_byte_limit": 2097152,
+    "drainers_continue_after_limit": true,
+    "global_file_size_limit": false
+  },
+  "manifest_consistency": {
+    "category": "windows.videoRendererEffect",
+    "architecture": "x64",
+    "class": "DolbyVisionPlugin.RendererEffect",
+    "dll": "x64\\DolbyVisionPlugin.dll",
+    "matches_probe_class_and_dll": true,
+    "namespace_aware_attribute_check": true
+  },
+  "module_proof": {
+    "kernelbase_load_path": "C:\\windows\\system32\\kernelbase.dll",
+    "kernelbase_kind": "builtin",
+    "plugin_load_path": "Z:\\work\\oem\\DolbyVisionPlugin.dll",
+    "plugin_kind": "native",
+    "same_probe_process_proof": true,
+    "prior_focused_api_wrapper_rva": "0x13f00",
+    "activation_probe_does_not_measure_wrapper_rva": true
+  },
+  "observation": {
+    "oem_factory_call": {
+      "event": "result",
+      "step": "DllGetActivationFactory_class",
+      "hresult": "0x80040154",
+      "hresult_name": "REGDB_E_CLASSNOTREG",
+      "disposition": "stop_missing_contract"
+    },
+    "internal_winrt_request": {
+      "class": "Windows.Devices.Display.DisplayMonitor",
+      "interface_iid": "6eae698f-a228-4c05-821d-b695d667de8e",
+      "loader_diagnostic": "Failed to find library",
+      "originated_hresult": "0x80040154"
+    },
+    "earlier_device_information_accessors": "Wine stubs for SystemSku, SystemProductName and SystemManufacturer",
+    "successful_contracts": [
+      "CoInitializeEx_MTA",
+      "load_combase_system32",
+      "RoInitialize",
+      "RoUninitialize",
+      "WindowsCreateString",
+      "WindowsDeleteString",
+      "RoInitialize_MTA",
+      "load_mfplat_system32",
+      "MFStartup",
+      "MFShutdown",
+      "MFStartup_NOSOCKET",
+      "load_exact_plugin",
+      "DllGetActivationFactory",
+      "WindowsCreateString_class",
+      "MFShutdown",
+      "unload_plugin"
+    ],
+    "not_reached": [
+      "ActivateInstance",
+      "QueryInterface_IMFTransform",
+      "GetStreamCount",
+      "media type enumeration"
+    ],
+    "unmatched_begin": null
+  },
+  "execution": {
+    "probe_exit": 2,
+    "supervisor_exit": 0,
+    "cleanup_complete": true,
+    "container_stopped": true,
+    "activation_runs": 1,
+    "passing_file_api_tests_rerun": false,
+    "stdout_bytes": 3181,
+    "stderr_bytes": 69209,
+    "logs_hit_saved_limit": false
+  },
+  "preflight_history": {
+    "initial_failure_before_copy_or_execution": "enabled SecurityOpt encoded as no-new-privileges:true; strict harness predicate expected no-new-privileges",
+    "correction": "exact enabled true form accepted; actual isolation unchanged"
+  },
+  "scope_limits": [
+    "No frames, graphics device, panel configuration, profiles, registration or licence bypass supplied.",
+    "The manifest matches the requested class; this is not evidence that merely registering the OEM class fixes activation.",
+    "Missing internal DisplayMonitor activation does not establish Wine infeasibility or later package, panel or licensing requirements.",
+    "No full Dolby Vision, rendering, optical or native Windows qualification."
+  ],
+  "cleanup": {
+    "container_removal": "completed after logs and hash receipts preserved; only exact stopped owned container removed",
+    "source_clone_and_private_receipts_retained": true
+  },
+  "date": "2026-10-09"
+}

@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 14:46:42 -0400
+Subject: [PATCH] configure: Generate the windows.devices.display makefiles
+ with Autoconf 2.72.
+
+---
+ configure | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/configure b/configure
+index df4c4a9..ea76900 100755
+--- a/configure
++++ b/configure
+@@ -1508,6 +1508,7 @@ enable_winbio
+ enable_winbrand
+ enable_windows_applicationmodel
+ enable_windows_devices_bluetooth
++enable_windows_devices_display
+ enable_windows_devices_enumeration
+ enable_windows_devices_usb
+ enable_windows_gaming_input
+@@ -23158,6 +23159,8 @@ wine_fn_config_makefile dlls/windows.applicationmodel enable_windows_application
+ wine_fn_config_makefile dlls/windows.applicationmodel/tests enable_tests
+ wine_fn_config_makefile dlls/windows.devices.bluetooth enable_windows_devices_bluetooth
+ wine_fn_config_makefile dlls/windows.devices.bluetooth/tests enable_tests
++wine_fn_config_makefile dlls/windows.devices.display enable_windows_devices_display
++wine_fn_config_makefile dlls/windows.devices.display/tests enable_tests
+ wine_fn_config_makefile dlls/windows.devices.enumeration enable_windows_devices_enumeration
+ wine_fn_config_makefile dlls/windows.devices.enumeration/tests enable_tests
+ wine_fn_config_makefile dlls/windows.devices.usb enable_windows_devices_usb

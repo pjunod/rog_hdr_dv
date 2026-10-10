@@ -1,12 +1,62 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-09 (America/New_York) · **State:** HDR10 operational by owner
+**Updated:** 2026-10-10 (America/New_York) · **State:** HDR10 operational by owner
 report; full Dolby Vision and measured image-quality acceptance remain open.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
 distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
+
+## Active fifth batch — display contracts and delivery
+
+The qualified Wine candidate now loads the exact recovered Dolby DLL. Its
+factory request stops when the component asks for the missing Windows
+`DisplayMonitor` runtime class. The manifest, hashes and loader trace agree;
+[activation evidence](DOLBY_ACTIVATION_PROBE.md#wine-11-follow-up--the-dll-loads-displaymonitor-activation-is-missing)
+records the exact scope. Object activation and frame processing remain open.
+
+Work continues on a [generic monitor contract](WINE_DISPLAY_MONITOR.md) backed by actual display data,
+native [physical-target gamut reporting](NATIVE_TARGET_GAMUT.md), and matching amd64/i386 library plus
+amd64 compositor packages. Packaging uses isolated source-only builds; no host
+installation or live display change is implied. The [optical measurement procedure](PANEL_MEASUREMENT.md) defines conditions,
+initial accuracy goals and held-out validation; this unit has not been measured.
+
+The exact qualified hdr7 library source has produced amd64 and i386 packages,
+and nativehdr3 compositor packaging has completed in the isolated native
+builder. The [package receipt](../evidence/baseline-native-packages.json)
+records source identities and the six runtime artifacts. Read-only APT
+simulations found a coherent six-package upgrade and modeled six-package
+rollback, with no additions or removals. Recovery artifacts are hashed and
+retained privately; the live installation is unchanged.
+
+The new hdr8/upstream native-chromaticity implementations compile with warnings
+as errors. Their append-only patch series preserve the delivered prefixes.
+The nativehdr4 compositor candidate, Mutter patches 0013–0015, now publishes
+the native target gamut and compiles cleanly against hdr8 on native amd64.
+The Wine monitor-provenance and DisplayMonitor slices, Wine patches 0003–0008,
+compile with warnings as errors. Both receipts are linked from their topic
+documents. The bounded read-only Wayland colour
+inspector and its synthetic server compile with warnings as errors;
+[the diagnostic guide](DISPLAY_DIAGNOSTICS.md#inspect-the-compositors-actual-colour-descriptions)
+explains raw fields, completion limits and privacy.
+New gamut and monitor implementations still require their own final review and
+affected runtime qualification; package compilation does not replace those.
+
+The adversarial review found two blockers and a set of should-fix defects;
+all are addressed ([review](REVIEW.md#fifth-batch--display-contracts-pr-5)).
+The pre-merge fast lane then passed: library groups and legacy consumers,
+Mutter `native-hdr` and all Wayland target-volume invocations, 23 probe
+cases, and the Wine `displaymonitor` and `displayconfig` tests
+([receipt](../evidence/batch5-fast-lane.json)). Nothing is installed yet.
+
+On 2026-10-10 the previous agents' macOS temporary clones were gone and two
+local commits had never been pushed. Every unfinished change was recovered:
+the probe test selectors are byte-identical to their recorded hash, the
+library, nativehdr3 and Wine baselines reproduce their recorded trees, the
+Mutter edit was replayed from the implementing agent's log, and the Wine
+component was copied from the retained offline compiler container. Recovered
+work keeps its original authorship; corrections are separate commits.
 
 ## Fourth batch — native target feedback and processor prerequisites
 
@@ -28,7 +78,7 @@ fixture does not qualify real monitor reconfiguration.
 
 Wine is used to investigate the Windows Dolby processor recovered from the
 factory image. The missing file function now passes its desktop API contract.
-Actual processor activation remains open; Wine is a candidate compatibility
+DLL loading now passes; actual processor activation remains open; Wine is a candidate compatibility
 route, not a confirmed requirement of the final Linux solution. The HDR and
 colour-management changes are native Linux code.
 
@@ -49,8 +99,8 @@ Mutter and matching amd64/i386 library packaging.
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
-| Physical luminance library | hdr6 delivered; additive hdr7 source qualified | Matching packages and compositor consumer delivery |
-| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified | Merge, package and verify active output |
+| Physical luminance library | hdr6 delivered; hdr7 source qualified and both package architectures built; hdr8 gamut candidate reviewed and fast-lane qualified | Package hdr8 for both architectures and deliver the matching compositor/library set |
+| Compositor feedback | nativehdr2 delivered; nativehdr3 source qualified and amd64 packages built; nativehdr4 gamut candidate reviewed and fast-lane qualified | Package nativehdr4, deliver reviewed set and verify active output |
 | Full Dolby Vision | Processor route unresolved; reference workflow available | Activate/evaluate full processor, preserve frame metadata, validate supported profiles and trims, integrate playback |
 | General colour quality | Delivered-source audit complete | Tone and gamut mapping, correct profile application, SDR/HDR consistency and cross-application checks |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |

@@ -20,9 +20,9 @@ under `patches/` has a `series` file. Apply files in that order.
 
 | Series | Base | Purpose |
 |---|---|---|
-| libdisplay-info | Upstream `62a9346c3dce2bddba1d4dc186949e4320d6f801` | Six native parser/API and regression patches |
+| libdisplay-info | Upstream `62a9346c3dce2bddba1d4dc186949e4320d6f801` | Native parser/API and regression patches; ordered inventory in sources.json |
 | mutter | Upstream `d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7` | Native DisplayID eDP capability recognition |
-| ubuntu-libdisplay-info | Authenticated Ubuntu `0.3.0-1` source import | Delivered hdr6 prefix plus source-only hdr7 candidate |
+| ubuntu-libdisplay-info | Authenticated Ubuntu `0.3.0-1` source import | Delivered hdr6 prefix, qualified hdr7 and new hdr8 chromaticity candidate |
 | ubuntu-mutter | Authenticated Ubuntu `51.0-1ubuntu3` source import | Delivered nativehdr2 prefix plus source-only nativehdr3 target feedback |
 | wine | Wine `wine-11.0`, peeled `db11d0fe6a169c457e23d007e20404643d067aa8` | Source-only desktop CreateFileFromAppW compatibility |
 | linux | Ubuntu tag `Ubuntu-7.3.0-8.8`, peeled `d03cf7a92919b0e6ab4e4a756dec41542eb2040f` | Native luminance, Intel selection and KUnit tests |
@@ -126,8 +126,9 @@ initial repository does not claim a newly tested all-component build script.
 
 Use a separate agent clone, not the owner's working checkout. Keep related
 implementation commits on a `codex/` branch and merge the reviewed PR only
-after its required fast lane passes. Use local Git identity `Codex <codex@invalid>`
-for agent work; preserve upstream patch authorship. The repository is public:
+after its required fast lane passes. Use a neutral agent Git identity, such as
+`Codex <codex@invalid>` or `Claude Agent <claude-agent@invalid>`, and keep the
+authorship of recovered or imported work; preserve upstream patch authorship. The repository is public:
 inspect staged changes and Git metadata before pushing and never paste tokens,
 raw host captures, OEM files or signing material into commits or CI output.
 

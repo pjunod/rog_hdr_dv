@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "status": "PASS",
+  "scope": "Pre-merge fast lane for PR 5, run once after the adversarial review fixes; only failed checks were rerun after their fixes",
+  "library": {
+    "environment": "Ubuntu 26.10 amd64 container, gcc 15.3.0, meson 1.10.1",
+    "trees": {
+      "ubuntu": "004413f716800db397eb9739fd56ef71e979260f",
+      "upstream": "72626245922181526fbcb990de3eb7f575efa56b"
+    },
+    "library_sha256": {
+      "ubuntu libdisplay-info.so.0.3.0": "2ce1440cfb21df94e4fef61ae45565aa9289e25074fa07ebe510d75672008276",
+      "upstream libdisplay-info.so.0.5.0": "456a420b5f5f573282a61b9cdf57c372eb04f4361d7d2f55a90b80fed5c56805"
+    },
+    "first_run": {
+      "ubuntu": {
+        "known": "OK",
+        "domain": "OK",
+        "formats": "FAIL (SIGABRT)",
+        "independence": "OK"
+      },
+      "upstream": {
+        "known": "OK",
+        "domain": "OK",
+        "formats": "FAIL (SIGABRT)",
+        "independence": "OK"
+      }
+    },
+    "failure_cause": "Test expectation defect present since the formats check was written (reproduced with the pre-review test source): an oversized Display Parameters block was expected to drop the whole DisplayID extension, but the parser records a failure, consumes the remaining bytes and keeps the section without a block. Corrected in appended patches 0010/0021; the library itself is unchanged.",
+    "focused_retry": {
+      "command": "meson test -C $BUILD --no-rebuild --num-processes 1 --print-errorlogs displayid2-native-chromaticities-formats",
+      "ubuntu": "OK",
+      "upstream": "OK",
+      "test_binary_sha256": {
+        "ubuntu": "bc628d46660b3bedd53a28b7dbc469fb277264505d4b3c984318609688aeea77",
+        "upstream": "5c3b2b5688ea425bdd3cfb1b94bac080294c1b5faa7289bf8d46f0eca0685485"
+      },
+      "note": "Only check_formats changed; the three passing groups were not invalidated."
+    },
+    "legacy_consumers": {
+      "method": "Binaries compiled from the previous candidates (upstream 99a8bb3-equivalent, Ubuntu hdr7) executed against the new libraries via LD_LIBRARY_PATH; their RUNPATH ($ORIGIN/..) yields to LD_LIBRARY_PATH and the new library was confirmed loaded",
+      "results": {
+        "upstream native-api-consumer": "PASS",
+        "ubuntu old-header-consumer": "PASS (struct sizes HDR=20, signal=5)",
+        "ubuntu native-api-consumer": "PASS"
+      }
+    }
+  },
+  "mutter": {
+    "tree": "0c09163312eb2cd4a82254c7fb95414bd72bf86b",
+    "environment": "Ubuntu 26.10 amd64; UID 1000; mutter D-Bus test runner; LIBGL_ALWAYS_SOFTWARE llvmpipe",
+    "command": "meson test -C $BUILD --setup mutter:default --no-rebuild --num-processes 1 --timeout-multiplier 2 --print-errorlogs mutter:native-hdr mutter:wayland-color-management mutter:wayland-color-management-wayland-target-luminance-v1 ...-v2 mutter:wayland-color-management-wayland-target-primaries-v1 ...-v2",
+    "results": {
+      "mutter:native-hdr": "OK (10/10 cases incl. /native-hdr/physical-chromaticities and /native-hdr/target-primaries-policy)",
+      "mutter:wayland-color-management": "OK (/wayland/color-management; four target cases skipped by -s)",
+      "wayland-target-luminance-v1": "OK",
+      "wayland-target-luminance-v2": "OK",
+      "wayland-target-primaries-v1": "OK",
+      "wayland-target-primaries-v2": "OK"
+    },
+    "first_run_failures": 0
+  },
+  "probe": {
+    "binaries_sha256": {
+      "wayland-color-info": "a5e203b3c6040d24ce1ba4a9a3296ce2d30aa1deabef0154d4e2748d86c2e5f0",
+      "color-info-fixture": "44abd3e2e9081c4bcd8573166fe1d4d765f0f867891084f3689e4ce5c6e04093"
+    },
+    "command": "WAYLAND_COLOR_INFO_BUILD=$BUILD python3 -m unittest discover -s probes/wayland_color_info -p test_protocol.py -v (UID 1000)",
+    "result": "23 tests OK in one run"
+  },
+  "wine": {
+    "tree": "905b2ed5509c7d09490a5dd16735381979c2a51e",
+    "runtime": "WineHQ wine-stable 11.0.0.0~noble-1 (amd64) in a disposable Ubuntu 24.04 container with the candidate win32u (.so/.dll), winex11 and winewayland (.so/.drv), user32, setupapi, cfgmgr32, windows.devices.enumeration and windows.devices.display modules overlaid; prefix created after the overlay; Xvfb display; WINEDLLOVERRIDES=mscoree,mshtml= to suppress installer dialogs",
+    "loaded_module_sha256": {
+      "win32u.so": "db846d98d7ede72dd274d3e001a56eb9edacc5ca9e09d88a3b564071cafdf7f2",
+      "win32u.dll": "7922829ebcb763afcd5ef7f9c0d7c1aa5a8a05014287b43c7b37f5468cb0c9e7",
+      "winex11.so": "42b54b36d5695e196a37fe3c3e82080ed9c844949953509b4c8929b4dd611e6b",
+      "user32.dll": "2ca7f4c94b75babeeb0188ff23a3c22a826bd0003f44c57685072a25c8715d3f",
+      "setupapi.dll": "2e5b15a52fac1c5fb4db615886ce38640bff17f6a89c7ffcf3d154ba3761c56a",
+      "windows.devices.display.dll": "fec541c98e8f560e9e171f301df760eccc25f5d70ee67788e8362512ff35d170"
+    },
+    "results": {
+      "user32:displayconfig": "14 tests, 0 failures (first run)",
+      "windows.devices.display:displaymonitor": "308 tests, 0 failures, 0 skipped (after one fix)"
+    },
+    "first_run_failure": "Instance-ID resolution returned ERROR_DEVICE_NOT_AVAILABLE for every monitor: the enabled-interface check enumerated interfaces of a device-only information set, which never contains interfaces. Fixed by looking up enabled interfaces in the monitor interface class and matching the owning instance; the synthetic test ID now uses the upper-case form SetupAPI stores. A second attempt still exercised the old module because the existing prefix kept its installed copy; the prefix was refreshed with wineboot -u and the displaymonitor test was rerun alone.",
+    "not_invalidated": "kernelbase:file_fromapp (no dependency changed)"
+  },
+  "repository": {
+    "check_repository": "PASS (60 patches, 6 series, documentation links)",
+    "unittest_discovery": "72 tests: 70 passed; 2 integrity tests failed only because the new patch files were not yet tracked (the tests copy tracked files). After committing them, those two were rerun by exact selector and passed."
+  },
+  "limits": [
+    "Synthetic and headless fixtures; no live display, installation, OEM component or physical measurement",
+    "Wine run is win64 with WineHQ binaries plus candidate modules, not a full candidate build"
+  ]
+}
