@@ -53,5 +53,33 @@
     "case_count": 21,
     "exact_case_example": "WAYLAND_COLOR_INFO_BUILD=EXTERNAL_BUILD_DIRECTORY python3 probes/wayland_color_info/test_protocol.py ProtocolTests.test_deadline_icc_hang",
     "repository_integration": "Recreated on 2026-10-10 after the first integration was lost unpushed; file bytes equal the recorded SHA-256."
+  },
+  "review_followup": {
+    "date": "2026-10-10",
+    "changes": [
+      "blocking connect bounded by SO_SNDTIMEO at the remaining deadline (a full Linux listen backlog previously failed immediately)",
+      "32-output fixture scenario",
+      "exact encoding/target raw arrays and failure reasons asserted"
+    ],
+    "source_files": {
+      "probes/wayland_color_info/build-fixture.sh": "416478d65b7b7419f42f8be9124ee4067f6b92ac30bbd2ceeb6759473557a313",
+      "probes/wayland_color_info/build.sh": "a99763a1ac56d2f6f667635c237f8500c28ca47235753fb796f2b7590e124bba",
+      "probes/wayland_color_info/color-management-v1.xml": "b05c15a021d467cff446ab88d8a41d3a908a66cdb5ae104611a410007a01979b",
+      "probes/wayland_color_info/fixture.c": "ab99aff903569656ec0da5853f4686d1a0df4ec9934ca9969f06585996f5b883",
+      "probes/wayland_color_info/probe.c": "6e452e03c489cf595baffcd8dbd4872d1b453eaedf1032d6857c6af88a41333b",
+      "probes/wayland_color_info/source_manifest.json": "906cb763fa929e113fe8025c0825150e0f53a077b776e67aaf79c0085ec6b50b",
+      "probes/wayland_color_info/test_protocol.py": "50201608151323a12d8fcc12157d55dae2f193dde2d5aa1a7b5d832624c1835d"
+    },
+    "compile": {
+      "environment": "Ubuntu 26.10 amd64, gcc 15.3.0, wayland 1.26.0",
+      "flags": "-std=c11 -O2 -Wall -Wextra -Werror",
+      "exit": 0,
+      "binary_sha256": {
+        "wayland-color-info": "a5e203b3c6040d24ce1ba4a9a3296ce2d30aa1deabef0154d4e2748d86c2e5f0",
+        "color-info-fixture": "44abd3e2e9081c4bcd8573166fe1d4d765f0f867891084f3689e4ce5c6e04093"
+      }
+    },
+    "case_count": 23,
+    "tests_executed": false
   }
 }

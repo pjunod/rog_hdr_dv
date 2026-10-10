@@ -1,7 +1,7 @@
 # Review — adversarial findings and the current implementation batch
 
-**Updated:** 2026-10-09 UTC · **State:** prior batches merged; fourth batch
-review findings addressed and all selected runtime checks passed.
+**Updated:** 2026-10-10 UTC · **State:** fourth batch merged; fifth batch
+adversarial review findings addressed, fast lane pending.
 
 Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
@@ -173,3 +173,36 @@ inspected: only the intentional path-redaction expression and synthetic privacy
 fixtures matched; no real infrastructure identifier was found. Final evidence
 and publication review approved the scoped claims after two stale tense
 statements were corrected.
+
+## Fifth batch — display contracts (PR 5)
+
+Three independent reviewers examined the library chromaticity API and the
+Wayland probe, the Mutter native-gamut candidate, and the Wine
+DisplayMonitor candidate. None of them had seen the work being produced.
+Each finding was verified before it was fixed.
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| Mutter: subprocess isolation could not start; a child compositor binds the fixed test display socket the parent holds | Blocker (reproduced with libwayland 1.26) | Replaced by per-case test invocations (`separate_cases`) that the D-Bus runner gives their own runtime directory, bus and socket. Target cases are skipped in the main invocation. |
+| Mutter: no fixture fails if the raw-geometry check is removed | Should-fix (computed) | Added a white point exactly on the raw R–G edge that truncation would move inside. |
+| Mutter: parser status depended on block order; unsupported and unusable were merged | Nit | Every block is classified first; a new unsupported status sits beside the recognized-but-unusable one. |
+| Mutter: gaps in extension-failure, multi-extension and CIE 1976 coverage | Should-fix | Cases added. A revision mismatch between declarations counts as a conflict, as documented. |
+| Wine: build cache and backup configure committed | Blocker | Removed. Patches are exported with `--no-numbered`, so appending leaves earlier bytes intact. |
+| Wine: adapter LUID read as INT64, but win32u writes UINT64, so `DisplayAdapterDeviceId` never resolved | Should-fix | Reads UINT64. A real-topology test checks resolution when the LUID is present. |
+| Wine: `DisplayName` always fell back to the generic description | Should-fix | The validated EDID product name now takes precedence. |
+| Wine: reserved DisplayID product use was trusted | Should-fix | Such a section is opaque. |
+| Wine: unlinked interfaces resolved; a lookup during a display rebuild could return an empty object | Should-fix | Only monitors with an enabled interface resolve, and the selector includes `InterfaceEnabled`. Resolution holds win32u's `display_device_init` mutex, which also guards the rebuild, so each snapshot reflects one configuration. |
+| Wine: connector validity (HD15 is zero) and virtual origin untested | Should-fix | Table-driven cases added. The guessed usage kind for virtual monitors is removed. |
+| Wine: most monitors have no DisplayID Display Parameters | Design | Base EDID 1.4 colour characteristics and a preferred timing that EDID 1.4 declares native now apply where DisplayID provides nothing. CTA desired-content luminance is still not a physical value. Getter behaviour for missing facts remains a native-Windows qualification gap. |
+| Library: independence test could not detect a native-to-signal leak; header bits 3–6 untested; CIE 1976 per-point rule untested | Should-fix | Tests strengthened in both series (appended patches 0009 and 0020). |
+| Probe: a full listen backlog failed immediately as a disconnect | Should-fix (reproduced) | Blocking connect bounded by `SO_SNDTIMEO` at the remaining deadline. |
+| Probe: encoding and target assignment not pinned; 32-output boundary untested | Should-fix | Exact raw arrays asserted; 32-output success scenario and failure reasons added (23 cases). |
+
+The reviewers confirmed as sound: the conversion and geometry arithmetic,
+route gating, single notification, unchanged encoding state, Wayland record
+immutability, library ABI and symbol files, Wine COM and async lifetimes, the
+GDI ABI bump, and the probe's privacy and fd ownership. Two items stay open
+because they need native Windows to settle: the identifier semantics and the
+behaviour of getters with no data. The IDL could not be re-checked against the
+pinned SDK in this session.
+

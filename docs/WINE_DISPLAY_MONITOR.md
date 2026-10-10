@@ -128,6 +128,24 @@ its review corrections are separate commits:
   did not return, and an output without an EDID property is not an error.
 - Native pixel dimensions are direct values, matching the pinned decoder.
 
+The adversarial review then led to these changes:
+
+- Resolution holds win32u's `display_device_init` session mutex, the same
+  lock that guards rebuilding the monitor device nodes, so every returned
+  snapshot comes from a single display configuration.
+- Only monitors with an enabled (linked) monitor interface resolve, for both
+  identifier forms. The device selector requires `InterfaceEnabled`.
+- The adapter LUID is read with the UINT64 type win32u writes, so the adapter
+  device ID now resolves.
+- `DisplayName` prefers the validated EDID product name over the generic
+  description Wine writes for every monitor node.
+- Where DisplayID declares nothing, base EDID 1.4 colour characteristics and
+  a preferred timing that EDID 1.4 states is native are used. DisplayID
+  facts take precedence. CTA desired-content luminance is still not treated
+  as a physical value.
+- A DisplayID section with a reserved product primary use is opaque.
+- Virtual monitors no longer get a guessed usage kind.
+
 The configure change is the three module lines that GNU Autoconf 2.72
 generates. Other generator differences belong to Wine's release tooling and
 are not carried. The [compiler receipt](../evidence/wine-displaymonitor-compile.json)

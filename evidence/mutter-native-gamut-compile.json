@@ -6,13 +6,13 @@
   "mutter": {
     "base_commit_local": "49e58dc (reconstruction of nativehdr3 candidate)",
     "base_tree": "08611d1053a276779b47f8f9151dd528f51a653e",
-    "candidate_tree": "3271c446fe79f3a6e886567d938ba879596de813",
+    "candidate_tree": "0c09163312eb2cd4a82254c7fb95414bd72bf86b",
     "appended_patches": [
       "0013",
       "0014",
       "0015"
     ],
-    "recovery": "The original uncommitted edit (about 800 lines) was lost with its macOS temporary clone. It was replayed hunk-for-hunk from the implementing agent's recorded apply_patch calls onto the exactly reproduced 08611d10 base; all hunks applied without fuzz. Subprocess isolation of the target-volume Wayland cases and project formatting were then added."
+    "recovery": "The original uncommitted edit (about 800 lines) was lost with its macOS temporary clone. It was replayed hunk-for-hunk from the implementing agent's recorded apply_patch calls onto the exactly reproduced 08611d10 base; all hunks applied without fuzz. Review corrections and project formatting were then added; target-volume Wayland cases run in separate test invocations."
   },
   "library": {
     "series": "ubuntu-libdisplay-info hdr8",
@@ -52,22 +52,24 @@
     "meta_color_target_primaries_init": "51.0-1ubuntu3+nativehdr4~"
   },
   "compiled_binary_sha256": {
-    "src/libmutter-51.so.0.0.0": "d56e45b59ff2a469014d9f0dba571f6880c96d7a66055241f00d66b5fd1be22b",
-    "src/tests/mutter-native-hdr": "122aacb3f2cfb538b7c06cf5ccc8328d04b3832d187767e4880eb31440264f32",
-    "src/tests/mutter-wayland-color-management": "84d6070b858636f1e032717cf611464b1c47a033bb02a42054848c1bc91fcf59",
+    "src/libmutter-51.so.0.0.0": "eb968c65f5230c0253a54c627cf0653efd83e17eeee5a5d51fe03eb25be8cc56",
+    "src/tests/mutter-native-hdr": "9c00dc09c6a57cd6c07439f25dda6ee37f6e2dea1e6259343298c7a05bdd3486",
+    "src/tests/mutter-wayland-color-management": "61e66ce2316a2fde95dd8a0477a89106a11981c2a1c6e5079d8e290955909cc4",
     "src/tests/wayland-test-clients/color-management": "9f5718065aebc4c6f7b978cecd591b23b419678c13d0db079bb4eb585582f47a"
   },
   "tests_executed": false,
   "held_tests": [
     "/native-hdr/physical-chromaticities",
     "/native-hdr/target-primaries-policy",
-    "/wayland/target-primaries/v1",
-    "/wayland/target-primaries/v2",
-    "/wayland/target-luminance/v1",
-    "/wayland/target-luminance/v2 (invalidated by the isolation change)"
+    "meson test wayland-color-management (main invocation, target cases skipped)",
+    "wayland-color-management-wayland-target-luminance-v1",
+    "wayland-color-management-wayland-target-luminance-v2",
+    "wayland-color-management-wayland-target-primaries-v1",
+    "wayland-color-management-wayland-target-primaries-v2"
   ],
   "limitations": [
     "Compile evidence only; no runtime, package, installation or physical-output claim",
     "Base commit IDs are local reconstruction IDs; trees are the identity"
-  ]
+  ],
+  "review": "Adversarial review findings addressed (docs/REVIEW.md, fifth batch)."
 }

@@ -5,9 +5,9 @@
     {
       "component": "ubuntu-libdisplay-info",
       "base_commit": "fc100604841ba8f8a9f88ea4ebfb6a522a9a73fb",
-      "candidate_commit": "805d07b9116cd1fc7bcc7446617ef13f92857b9c",
-      "patch_count": 19,
-      "candidate_tree": "e79ea573a50aec6f53e1c939d4ea2c0af1bba01c",
+      "candidate_commit": "3fde6726e4c8ecd0e0efeff3a3c06be5606c60fc",
+      "patch_count": 20,
+      "candidate_tree": "3503074418c375b84ab869829881cb8a61578c62",
       "patch_order": [
         "0001-displayid2-privately-backport-native-HDR-detection-f.patch",
         "0002-test-cover-private-DisplayID-parsing-precedence-and-.patch",
@@ -27,7 +27,8 @@
         "0016-test-correct-synthetic-CTA-colorimetry-fixture.patch",
         "0017-Add-lossless-native-DisplayID2-chromaticity-declarat.patch",
         "0018-Clarify-unusable-declarations-and-correct-signal-fix.patch",
-        "0019-Fix-truncated-extension-fixture-and-check-literal-co.patch"
+        "0019-Fix-truncated-extension-fixture-and-check-literal-co.patch",
+        "0020-Strengthen-native-chromaticity-tests-against-silent-.patch"
       ],
       "base_tree": "5708d8b3c49f6fbb9adaf777487ffe353dd0946f",
       "historical_workspace_subdirectory": "ubuntu/native-api",
@@ -63,14 +64,14 @@
       "delivered_candidate_tree": "33c4658ced7128e82cd707593784ef7f8748309f",
       "delivered_patch_count": 14,
       "delivered_version": "0.3.0-1ubuntu1~hdr6",
-      "candidate_status": "source-only native luminance and chromaticity API; chromaticity candidate compiled with warnings as errors; final adversarial review and affected runtime checks pending; not installed"
+      "candidate_status": "source-only native luminance and chromaticity API; chromaticity candidate compiled with warnings as errors; adversarial review addressed; affected runtime checks pending; not installed"
     },
     {
       "component": "ubuntu-mutter",
       "base_commit": "f8b113189f8c67beabf7475adf26f6ebcbf36684",
-      "candidate_commit": "003ca78d18157ae4e35af5a237b2a4569d7e2ab9",
+      "candidate_commit": "14e63d7c8e04c8553da615c38abfc03d53890b53",
       "patch_count": 15,
-      "candidate_tree": "3271c446fe79f3a6e886567d938ba879596de813",
+      "candidate_tree": "0c09163312eb2cd4a82254c7fb95414bd72bf86b",
       "patch_order": [
         "0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch",
         "0002-backends-native-scope-native-capability-veto-to-exte.patch",
@@ -86,7 +87,7 @@
         "0012-test-isolate-fixed-route-forced-HDR-policy.patch",
         "0013-color-publish-native-target-primaries-independently-.patch",
         "0014-test-cover-native-target-primaries-and-their-Wayland.patch",
-        "0015-test-isolate-target-volume-cases-in-bounded-subproce.patch"
+        "0015-test-run-target-volume-cases-in-separate-test-invoca.patch"
       ],
       "base_tree": "30242cc54cebe1ec524a6d79473b41be5f07d05b",
       "historical_workspace_subdirectory": "mutter/work",
@@ -120,15 +121,15 @@
       "delivered_candidate_tree": "61bf80d9dea0995f98120f783155eb79029d6be1",
       "delivered_patch_count": 5,
       "delivered_version": "51.0-1ubuntu3+nativehdr2",
-      "candidate_status": "source-only native target gamut (nativehdr4) on the qualified luminance prefix; native amd64 -Werror compile passed; final review and runtime checks pending; not installed"
+      "candidate_status": "source-only native target gamut (nativehdr4) on the qualified luminance prefix; native amd64 -Werror compile passed; adversarial review addressed; runtime checks pending; not installed"
     },
     {
       "component": "libdisplay-info",
       "base_commit": "62a9346c3dce2bddba1d4dc186949e4320d6f801",
-      "candidate_commit": "1462cebeac89a5f5f5b7fa475b7501eb21158b53",
+      "candidate_commit": "40b36d05a1e018ae6498af0517d029d8f4c06ade",
       "upstream": "https://gitlab.freedesktop.org/emersion/libdisplay-info.git",
-      "patch_count": 8,
-      "candidate_tree": "a15b92001bcd3eab0caf931d075974a854782f5f",
+      "patch_count": 9,
+      "candidate_tree": "5a6b55808977863f07008daa86563bcac116ebfd",
       "patch_order": [
         "0001-displayid2-bound-section-padding-scans-to-remaining-.patch",
         "0002-displayid2-parse-display-interface-features.patch",
@@ -137,13 +138,14 @@
         "0005-displayid2-expose-native-physical-luminance.patch",
         "0006-test-correct-synthetic-CTA-colorimetry-fixture.patch",
         "0007-Add-lossless-native-DisplayID2-chromaticity-declarat.patch",
-        "0008-Fix-truncated-extension-fixture-and-check-literal-co.patch"
+        "0008-Fix-truncated-extension-fixture-and-check-literal-co.patch",
+        "0009-Strengthen-native-chromaticity-tests-against-silent-.patch"
       ],
       "base_tree": "524c3dfd9e942bbeca34792b7837224fb971c6be",
       "historical_workspace_subdirectory": "upstream-native-api",
       "previous_candidate_commit": "1ddb6ea03a59d2758d28c994eb5d91f969f36314",
       "previous_candidate_tree": "b9bb408efc36d2c139141a9d57af6800543eac43",
-      "candidate_status": "source-only native luminance and chromaticity API; chromaticity candidate compiled with warnings as errors; final adversarial review and affected runtime checks pending; not installed"
+      "candidate_status": "native physical luminance and chromaticity API; compiled with warnings as errors; adversarial review addressed; runtime checks pending"
     },
     {
       "component": "mutter",
@@ -183,10 +185,10 @@
       "base_tag": "wine-11.0",
       "base_commit": "db11d0fe6a169c457e23d007e20404643d067aa8",
       "base_tree": "c143c87e72ecf5e6795b7bd802983bec54c345f4",
-      "candidate_commit": "b78d5de97bc5385ecbed37f1e821fa234ddf4029",
-      "candidate_tree": "feb56d05677ca30ded9a80b8b89d11351014a52c",
+      "candidate_commit": "7e2c70971acd3091b2ce1f2da0c5af0b005e10c9",
+      "candidate_tree": "763726629463c15766bade9bbc4c76bd05953aff",
       "upstream": "https://github.com/wine-mirror/wine.git",
-      "patch_count": 8,
+      "patch_count": 9,
       "patch_order": [
         "0001-kernelbase-implement-CreateFileFromAppW.patch",
         "0002-test-trace-CreateFileFromAppW-module-relative-address.patch",
@@ -195,9 +197,10 @@
         "0005-user32-tests-Include-registry-types-before-SetupAPI-.patch",
         "0006-windows.devices.display-Add-DisplayMonitor-statics-b.patch",
         "0007-configure-Generate-the-windows.devices.display-makef.patch",
-        "0008-windows.devices.display-Validate-native-chromaticiti.patch"
+        "0008-windows.devices.display-Validate-native-chromaticiti.patch",
+        "0009-windows.devices.display-Resolve-only-reported-monito.patch"
       ],
-      "candidate_status": "source-only DisplayMonitor discovery on the qualified file-API prefix; native amd64 -Werror compile of affected modules and tests passed; final review and runtime checks pending; not installed"
+      "candidate_status": "source-only DisplayMonitor discovery on the qualified file-API prefix; native amd64 -Werror compile of affected modules and tests passed; adversarial review addressed; runtime checks pending; not installed"
     }
   ]
 }

@@ -12,14 +12,15 @@
     "tree": "b0dbecbda28bf3cdab932d492aecc7bddc06545b",
     "recovery": "Replayed from the implementing agent's recorded edit scripts onto the reproduced baseline; tree equals the original exactly."
   },
-  "candidate_tree": "feb56d05677ca30ded9a80b8b89d11351014a52c",
+  "candidate_tree": "763726629463c15766bade9bbc4c76bd05953aff",
   "appended_patches": [
     "0003",
     "0004",
     "0005",
     "0006",
     "0007",
-    "0008"
+    "0008",
+    "0009"
   ],
   "component_recovery": "The uncommitted DisplayMonitor draft was copied from the retained offline compiler container (state at 2026-10-09T06:40Z), plus the one later test-header edit recorded in the agent log.",
   "corrections": [
@@ -28,7 +29,13 @@
     "CIE 1976 u'v' converted to CIE 1931 xy",
     "zero DisplayID filler accepted, non-zero filler rejects the section",
     "XRandR EDID: no free of an unreturned buffer; absent property is silent",
-    "test links GUIDs from libuuid instead of redefining them"
+    "test links GUIDs from libuuid instead of redefining them",
+    "monitor resolution holds win32u's display_device_init mutex and requires an enabled monitor interface; selector includes InterfaceEnabled",
+    "adapter LUID read with win32u's UINT64 type",
+    "validated EDID product name preferred for DisplayName",
+    "reserved DisplayID product use leaves the section opaque",
+    "base EDID 1.4 colour characteristics and declared-native preferred timing used where DisplayID provides none",
+    "no guessed usage kind for virtual monitors"
   ],
   "configure": "Generated with GNU Autoconf 2.72 (built from the GNU release tarball, sha256 ba885c1319578d6c94d46e9b0dceb4014caafe2490e437a0dbca3f270a223f5a); only the three module lines are taken, the remaining generator delta belongs to Wine's own release tooling",
   "environment": {
@@ -48,8 +55,8 @@
     "requires_matching_driver_components": true
   },
   "compiled_binary_sha256": {
-    "windows.devices.display.dll": "104a62c5aab9b271ac6d390f51a13b727230e65d99ad965ca4ece8086073902e",
-    "windows.devices.display_test.exe": "fb31aeda6c0e23ed97be56369c55430aa761839c4ed7e254df519116af9c959f",
+    "windows.devices.display.dll": "db9c4fac1567d37dbffd1adf3cda526fe9482c9356f610fa737747edc86ceedc",
+    "windows.devices.display_test.exe": "4b5f914962dbfa099a14ce61f696578f594627ab7536625a6334b668c93ce50f",
     "user32_test.exe": "72a9d05fd0aeff435517571645b9bae11a639a28b315040ad904f8f99a72fb8d",
     "win32u.so": "db846d98d7ede72dd274d3e001a56eb9edacc5ca9e09d88a3b564071cafdf7f2",
     "win32u.dll": "7922829ebcb763afcd5ef7f9c0d7c1aa5a8a05014287b43c7b37f5468cb0c9e7",
@@ -68,5 +75,6 @@
     "win64 build only",
     "No OEM component involved",
     "Compile evidence only"
-  ]
+  ],
+  "review": "Adversarial review findings addressed (docs/REVIEW.md, fifth batch)."
 }

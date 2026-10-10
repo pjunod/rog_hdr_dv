@@ -173,10 +173,17 @@ The first draft of the Wayland tests had an ordering defect. The
 target-luminance v2 case disposes the shared colour manager to exercise
 teardown with live records, and every target case rewrites the fixture
 output's connector, capabilities, EDID, colour mode, forced-HDR state and
-topology. Cases registered after it therefore ran against a disposed manager
-and inherited mutated state. Each target-volume case now runs in its own
-bounded GLib test subprocess with a fresh context, so no case can observe
-another case's fixture or manager lifetime. This invalidates the earlier
-target-luminance runtime receipt for those cases only, and they rerun in the
-fast lane.
+topology. In one process, cases registered after it ran against a disposed
+manager and inherited mutated state. Each target-volume case now runs in its
+own meson test invocation, listed in the test definition's `separate_cases`,
+and the main invocation skips those cases. The D-Bus test runner gives each
+invocation its own runtime directory, bus and display socket. A first attempt
+using GLib test subprocesses could not work: the child compositor binds the
+same fixed display socket the parent still holds.
 
+The parser classifies every Display Parameters block before deciding, so the
+result does not depend on block order. An uninterpretable block is reported
+as unsupported. A recognized declaration with unusable points is reported as
+invalid and keeps its raw counts. Declarations that differ in any field,
+including revision, are a conflict. Only a complete, valid declaration on the
+qualified route becomes the published target.

@@ -223,8 +223,9 @@ WAYLAND_COLOR_INFO_BUILD="$probe_build" python3 -m unittest discover \
 
 Cases cover protocol versions and discovery order, encoding/target separation,
 missing or contradictory events, removal, changed descriptions, deadline,
-ICC descriptor closure and privacy with debug logging requested. Each of the
-21 scenarios is its own test method, so a failed or invalidated case is
+ICC descriptor closure and privacy with debug logging requested, the exact
+encoding and target values, the 32-output boundary and specific failure reasons.
+Each of the 23 scenarios is its own test method, so a failed or invalidated case is
 retried by exact selector without repeating passing scenarios:
 
 ```bash
