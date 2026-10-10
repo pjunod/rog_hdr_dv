@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "status": "compile_pass_runtime_held",
+  "scope": "Native amd64 compilation of the monitor-provenance and DisplayMonitor slices with warnings as errors; no runtime claim",
+  "baseline": {
+    "description": "qualified file-API candidate",
+    "tree": "387cfcb18f0870100227fe059d804f2c16249c89"
+  },
+  "monitor_provenance_slice": {
+    "source_commit_original": "ec38999a3aa2655f38b4a2a7ec1079069a6281b9",
+    "tree": "b0dbecbda28bf3cdab932d492aecc7bddc06545b",
+    "recovery": "Replayed from the implementing agent's recorded edit scripts onto the reproduced baseline; tree equals the original exactly."
+  },
+  "candidate_tree": "feb56d05677ca30ded9a80b8b89d11351014a52c",
+  "appended_patches": [
+    "0003",
+    "0004",
+    "0005",
+    "0006",
+    "0007",
+    "0008"
+  ],
+  "component_recovery": "The uncommitted DisplayMonitor draft was copied from the retained offline compiler container (state at 2026-10-09T06:40Z), plus the one later test-header edit recorded in the agent log.",
+  "corrections": [
+    "native xy/u'v' domain validity, all four points or none",
+    "feature bit 5 leaves chromaticities unavailable, matching the library",
+    "CIE 1976 u'v' converted to CIE 1931 xy",
+    "zero DisplayID filler accepted, non-zero filler rejects the section",
+    "XRandR EDID: no free of an unreturned buffer; absent property is silent",
+    "test links GUIDs from libuuid instead of redefining them"
+  ],
+  "configure": "Generated with GNU Autoconf 2.72 (built from the GNU release tarball, sha256 ba885c1319578d6c94d46e9b0dceb4014caafe2490e437a0dbca3f270a223f5a); only the three module lines are taken, the remaining generator delta belongs to Wine's own release tooling",
+  "environment": {
+    "container": "retained offline 1 CPU / 2 GiB compiler, no network, no mounts",
+    "image": "sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3",
+    "distribution": "Ubuntu 24.04.5",
+    "gcc": "13.3.0-6ubuntu2~24.04.1",
+    "mingw": "x86_64-w64-mingw32-gcc 13-win32"
+  },
+  "configure_command": "configure --enable-win64 --enable-werror --without-opengl --with-x --with-wayland",
+  "compile_command": "make -j1 dlls/win32u/all dlls/user32/all dlls/setupapi/all dlls/cfgmgr32/all dlls/windows.devices.enumeration/all dlls/winex11.drv/all dlls/winewayland.drv/all dlls/user32/tests/all dlls/windows.devices.display/all dlls/windows.devices.display/tests/all",
+  "exit": 0,
+  "warnings": 0,
+  "internal_gdi_driver_abi": {
+    "before": 108,
+    "candidate": 109,
+    "requires_matching_driver_components": true
+  },
+  "compiled_binary_sha256": {
+    "windows.devices.display.dll": "104a62c5aab9b271ac6d390f51a13b727230e65d99ad965ca4ece8086073902e",
+    "windows.devices.display_test.exe": "fb31aeda6c0e23ed97be56369c55430aa761839c4ed7e254df519116af9c959f",
+    "user32_test.exe": "72a9d05fd0aeff435517571645b9bae11a639a28b315040ad904f8f99a72fb8d",
+    "win32u.so": "db846d98d7ede72dd274d3e001a56eb9edacc5ca9e09d88a3b564071cafdf7f2",
+    "win32u.dll": "7922829ebcb763afcd5ef7f9c0d7c1aa5a8a05014287b43c7b37f5468cb0c9e7",
+    "winex11.so": "42b54b36d5695e196a37fe3c3e82080ed9c844949953509b4c8929b4dd611e6b",
+    "winewayland.so": "93d47bc7f75320450ce99c8c7a0879135e815bf770f2c1b8d4ed7f0c7525e22f",
+    "user32.dll": "2ca7f4c94b75babeeb0188ff23a3c22a826bd0003f44c57685072a25c8715d3f",
+    "setupapi.dll": "2e5b15a52fac1c5fb4db615886ce38640bff17f6a89c7ffcf3d154ba3761c56a"
+  },
+  "tests_executed": false,
+  "held_tests": [
+    "windows.devices.display:displaymonitor",
+    "user32:displayconfig",
+    "kernelbase:file_fromapp (invalidated only if a dependency change affects it)"
+  ],
+  "limitations": [
+    "win64 build only",
+    "No OEM component involved",
+    "Compile evidence only"
+  ]
+}

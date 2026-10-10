@@ -1,0 +1,549 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Sat, 10 Oct 2026 14:41:14 -0400
+Subject: [PATCH 3/8] win32u: Preserve monitor provenance and reported
+ connector technology.
+
+---
+ dlls/user32/tests/Makefile.in     |   1 +
+ dlls/user32/tests/displayconfig.c | 148 ++++++++++++++++++++++++++++++
+ dlls/win32u/sysparams.c           |  83 ++++++++++++++---
+ dlls/winewayland.drv/display.c    |   2 +-
+ dlls/winex11.drv/xinerama.c       |   1 +
+ dlls/winex11.drv/xrandr.c         |  55 +++++++++++
+ include/wine/gdi_driver.h         |   4 +-
+ include/wine/monitor.h            |  49 ++++++++++
+ 8 files changed, 330 insertions(+), 13 deletions(-)
+ create mode 100644 dlls/user32/tests/displayconfig.c
+ create mode 100644 include/wine/monitor.h
+
+diff --git a/dlls/user32/tests/Makefile.in b/dlls/user32/tests/Makefile.in
+index 4bc7172..c5c648e 100644
+--- a/dlls/user32/tests/Makefile.in
++++ b/dlls/user32/tests/Makefile.in
+@@ -13,6 +13,7 @@ SOURCES = \
+ 	dce.c \
+ 	dde.c \
+ 	dialog.c \
++	displayconfig.c \
+ 	edit.c \
+ 	generated.c \
+ 	input.c \
+diff --git a/dlls/user32/tests/displayconfig.c b/dlls/user32/tests/displayconfig.c
+new file mode 100644
+index 0000000..d36628b
+--- /dev/null
++++ b/dlls/user32/tests/displayconfig.c
+@@ -0,0 +1,148 @@
++/*
++ * DisplayConfig monitor provenance and connector tests
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#include <stdarg.h>
++
++#define COBJMACROS
++#include "windef.h"
++#include "winbase.h"
++#include "wingdi.h"
++#include "winuser.h"
++#include "setupapi.h"
++#include "initguid.h"
++#include "wine/monitor.h"
++#include "wine/test.h"
++
++static LONG (WINAPI *query_display_config)(UINT32, UINT32 *, DISPLAYCONFIG_PATH_INFO *,
++                                          UINT32 *, DISPLAYCONFIG_MODE_INFO *, DISPLAYCONFIG_TOPOLOGY_ID *);
++static LONG (WINAPI *get_display_config_buffer_sizes)(UINT32, UINT32 *, UINT32 *);
++static LONG (WINAPI *display_config_get_device_info)(DISPLAYCONFIG_DEVICE_INFO_HEADER *);
++
++static void check_backend_properties( const DISPLAYCONFIG_TARGET_DEVICE_NAME *name,
++                                      DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY technology )
++{
++    struct wine_monitor_properties properties;
++    SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
++    SP_DEVINFO_DATA devinfo = {sizeof(devinfo)};
++    HDEVINFO set;
++    DEVPROPTYPE type;
++    DWORD size;
++    BOOL ret;
++
++    /* These private provenance facts are Wine-specific, not a Windows promise. */
++    if (strcmp( winetest_platform, "wine" )) return;
++    set = SetupDiCreateDeviceInfoList( NULL, NULL );
++    ok( set != INVALID_HANDLE_VALUE, "Failed to create device info list: %lu.\n", GetLastError() );
++    if (set == INVALID_HANDLE_VALUE) return;
++    ret = SetupDiOpenDeviceInterfaceW( set, name->monitorDevicePath, 0, &iface );
++    ok( ret, "Failed to resolve DisplayConfig monitor interface: %lu.\n", GetLastError() );
++    if (!ret) goto done;
++    ret = SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, &devinfo );
++    ok( !ret && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Unexpected detail sizing result %d, error %lu.\n",
++        ret, GetLastError() );
++    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) goto done;
++    size = sizeof(properties);
++    ret = SetupDiGetDevicePropertyW( set, &devinfo, &WINE_DEVPROPKEY_MONITOR_PROPERTIES,
++                                    &type, (BYTE *)&properties, size, &size, 0 );
++    ok( ret, "Monitor backend properties unavailable: %lu.\n", GetLastError() );
++    if (!ret) goto done;
++    ok( type == DEVPROP_TYPE_BINARY && size == sizeof(properties), "Unexpected property shape %#lx, %lu.\n", type, size );
++    if (type != DEVPROP_TYPE_BINARY || size != sizeof(properties)) goto done;
++    ok( properties.origin <= WINE_MONITOR_ORIGIN_VIRTUAL, "Invalid origin %u.\n", properties.origin );
++    ok( !(properties.flags & ~WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID), "Unknown property flags %#x.\n", properties.flags );
++    if (properties.flags & WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID)
++        ok( technology == properties.output_technology, "Connector differs from backend fact %#x, got %#x.\n",
++            properties.output_technology, technology );
++    else
++        ok( technology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_OTHER, "Absent connector was reported as %#x.\n", technology );
++    if (properties.origin == WINE_MONITOR_ORIGIN_VIRTUAL)
++        ok( technology == DISPLAYCONFIG_OUTPUT_TECHNOLOGY_OTHER, "Synthetic Wine monitor reported a physical connector %#x.\n",
++            technology );
++done:
++    SetupDiDestroyDeviceInfoList( set );
++}
++
++static void test_connector_consistency(void)
++{
++    DISPLAYCONFIG_MODE_INFO *modes = NULL;
++    DISPLAYCONFIG_PATH_INFO *paths = NULL;
++    DISPLAYCONFIG_TARGET_DEVICE_NAME name;
++    UINT32 path_count, mode_count, i;
++    LONG ret;
++    unsigned int attempt;
++
++    /* Retry only the documented topology sizing race, not test failures. */
++    for (attempt = 0; attempt < 3; attempt++)
++    {
++        ret = get_display_config_buffer_sizes( QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count );
++        ok( !ret, "Failed to size active topology: %ld.\n", ret );
++        if (ret) return;
++        if (!path_count || !mode_count)
++        {
++            trace( "No active monitor paths; no physical monitor is inferred.\n" );
++            return;
++        }
++        paths = calloc( path_count, sizeof(*paths) );
++        modes = calloc( mode_count, sizeof(*modes) );
++        ok( paths && modes, "Allocation failed.\n" );
++        if (!paths || !modes) goto done;
++        ret = query_display_config( QDC_ONLY_ACTIVE_PATHS, &path_count, paths, &mode_count, modes, NULL );
++        if (ret != ERROR_INSUFFICIENT_BUFFER) break;
++        free( paths );
++        free( modes );
++        paths = NULL;
++        modes = NULL;
++    }
++    ok( !ret, "Failed to query active topology: %ld.\n", ret );
++    if (ret) goto done;
++    for (i = 0; i < path_count; i++)
++    {
++        memset( &name, 0, sizeof(name) );
++        name.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME;
++        name.header.size = sizeof(name);
++        name.header.adapterId = paths[i].targetInfo.adapterId;
++        name.header.id = paths[i].targetInfo.id;
++        ret = display_config_get_device_info( &name.header );
++        ok( !ret, "Failed to obtain target identity: %ld.\n", ret );
++        if (ret) continue;
++        ok( name.outputTechnology == paths[i].targetInfo.outputTechnology,
++            "Same target has conflicting connector types %#x and %#x.\n",
++            paths[i].targetInfo.outputTechnology, name.outputTechnology );
++        check_backend_properties( &name, name.outputTechnology );
++    }
++done:
++    free( modes );
++    free( paths );
++}
++
++START_TEST(displayconfig)
++{
++    HMODULE user32 = GetModuleHandleW( L"user32.dll" );
++
++    query_display_config = (void *)GetProcAddress( user32, "QueryDisplayConfig" );
++    get_display_config_buffer_sizes = (void *)GetProcAddress( user32, "GetDisplayConfigBufferSizes" );
++    display_config_get_device_info = (void *)GetProcAddress( user32, "DisplayConfigGetDeviceInfo" );
++    if (!query_display_config || !get_display_config_buffer_sizes || !display_config_get_device_info)
++    {
++        win_skip( "DisplayConfig APIs unavailable.\n" );
++        return;
++    }
++    test_connector_consistency();
++}
+diff --git a/dlls/win32u/sysparams.c b/dlls/win32u/sysparams.c
+index eee8149..1a641bc 100644
+--- a/dlls/win32u/sysparams.c
++++ b/dlls/win32u/sysparams.c
+@@ -66,6 +66,8 @@ static const char devpropkey_monitor_output_idA[] = "Properties\\{CA085853-16CE-
+ static const char wine_devpropkey_monitor_rcworkA[] = "Properties\\{233a9ef3-afc4-4abd-b564-c32f21f1535b}\\0004";
+ static const char wine_devpropkey_monitor_hdr_enabledA[] = "Properties\\{233a9ef3-afc4-4abd-b564-c32f21f1535b}\\0006";
+ 
++static const char wine_devpropkey_monitor_propertiesA[] = "Properties\\{233a9ef3-afc4-4abd-b564-c32f21f1535b}\\0007";
++
+ static const WCHAR linkedW[] = {'L','i','n','k','e','d',0};
+ static const WCHAR symbolic_link_valueW[] =
+     {'S','y','m','b','o','l','i','c','L','i','n','k','V','a','l','u','e',0};
+@@ -157,6 +159,7 @@ struct monitor
+     BOOL is_clone;
+     struct edid_monitor_info edid_info;
+     BOOL hdr_enabled;
++    struct wine_monitor_properties properties;
+ };
+ 
+ static struct list gpus = LIST_INIT(gpus);
+@@ -720,6 +723,51 @@ static BOOL read_source_from_registry( unsigned int index, struct source *source
+     return TRUE;
+ }
+ 
++static struct wine_monitor_properties sanitize_monitor_properties( const struct wine_monitor_properties *properties )
++{
++    struct wine_monitor_properties result = *properties;
++
++    result.flags &= WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID;
++    if (result.origin > WINE_MONITOR_ORIGIN_VIRTUAL) result.origin = WINE_MONITOR_ORIGIN_UNKNOWN;
++    if (result.flags & WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID)
++    {
++        switch (result.output_technology)
++        {
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_OTHER:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SVIDEO:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPOSITE_VIDEO:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPONENT_VIDEO:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HDMI:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_LVDS:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_D_JPN:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDI:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EXTERNAL:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EMBEDDED:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDTVDONGLE:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_MIRACAST:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL:
++            break;
++        default:
++            result.flags &= ~WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID;
++            break;
++        }
++    }
++    if (!(result.flags & WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID))
++        result.output_technology = DISPLAYCONFIG_OUTPUT_TECHNOLOGY_OTHER;
++    return result;
++}
++
++static DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY monitor_output_technology( const struct monitor *monitor )
++{
++    if (monitor->properties.flags & WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID)
++        return monitor->properties.output_technology;
++    return DISPLAYCONFIG_OUTPUT_TECHNOLOGY_OTHER;
++}
++
+ static BOOL read_monitor_from_registry( struct monitor *monitor )
+ {
+     char buffer[4096];
+@@ -767,6 +815,12 @@ static BOOL read_monitor_from_registry( struct monitor *monitor )
+     }
+     monitor->hdr_enabled = *(const BOOL *)value->Data;
+ 
++    /* Optional backend facts: old prefixes and malformed data remain unknown. */
++    memset( &monitor->properties, 0, sizeof(monitor->properties) );
++    size = query_reg_subkey_value( hkey, wine_devpropkey_monitor_propertiesA, value, sizeof(buffer) );
++    if (size == sizeof(monitor->properties) && value->Type == (0xffff0000 | DEVPROP_TYPE_BINARY))
++        monitor->properties = sanitize_monitor_properties( (const struct wine_monitor_properties *)value->Data );
++
+     NtClose( hkey );
+     return TRUE;
+ }
+@@ -1948,8 +2002,14 @@ static BOOL write_monitor_to_registry( struct monitor *monitor, const BYTE *edid
+         NtClose( subkey );
+     }
+ 
+-    NtClose( hkey );
++    if ((subkey = reg_create_ascii_key( hkey, wine_devpropkey_monitor_propertiesA, 0, NULL )))
++    {
++        set_reg_value( subkey, NULL, 0xffff0000 | DEVPROP_TYPE_BINARY,
++                       &monitor->properties, sizeof(monitor->properties) );
++        NtClose( subkey );
++    }
+ 
++    NtClose( hkey );
+ 
+     snprintf( buffer, sizeof(buffer), "Class\\%s\\%04X", guid_devclass_monitorA, monitor->output_id );
+     if (!(hkey = reg_create_ascii_key( control_key, buffer, 0, NULL ))) return FALSE;
+@@ -1978,6 +2038,7 @@ static void add_monitor( const struct gdi_monitor *gdi_monitor, void *param )
+     monitor->output_id = ctx->monitor_count;
+     monitor->rc_work = gdi_monitor->rc_work;
+     monitor->hdr_enabled = gdi_monitor->hdr_enabled;
++    monitor->properties = sanitize_monitor_properties( &gdi_monitor->properties );
+ 
+     TRACE( "%u %s %s\n", monitor->id, wine_dbgstr_rect(&gdi_monitor->rc_monitor), wine_dbgstr_rect(&gdi_monitor->rc_work) );
+ 
+@@ -2632,7 +2693,7 @@ static NTSTATUS default_update_display_devices( struct device_manager_ctx *ctx )
+     };
+     static const DWORD source_flags = DISPLAY_DEVICE_ATTACHED_TO_DESKTOP | DISPLAY_DEVICE_PRIMARY_DEVICE | DISPLAY_DEVICE_VGA_COMPATIBLE;
+     struct pci_id pci_id = {0};
+-    struct gdi_monitor monitor = {0};
++    struct gdi_monitor monitor = {.properties.origin = WINE_MONITOR_ORIGIN_VIRTUAL};
+     DEVMODEW mode = {.dmSize = sizeof(mode)};
+     struct source *source;
+ 
+@@ -2694,7 +2755,7 @@ static BOOL add_virtual_source( struct device_manager_ctx *ctx )
+ {
+     DEVMODEW current = {.dmSize = sizeof(current)}, initial = ctx->primary, maximum = ctx->primary, *modes;
+     struct source *physical, *source;
+-    struct gdi_monitor monitor = {0};
++    struct gdi_monitor monitor = {.properties.origin = WINE_MONITOR_ORIGIN_VIRTUAL};
+     UINT modes_count;
+     struct gpu *gpu;
+ 
+@@ -3479,19 +3540,19 @@ static void set_mode_target_info( DISPLAYCONFIG_MODE_INFO *info, const LUID *gpu
+     mode->targetVideoSignalInfo.scanLineOrdering = get_dc_scanline_ordering( devmode );
+ }
+ 
+-static void set_path_target_info( DISPLAYCONFIG_PATH_TARGET_INFO *info, const LUID *gpu_luid,
+-                                  UINT32 target_id, UINT32 mode_index, UINT32 desktop_mode_index,
++static void set_path_target_info( DISPLAYCONFIG_PATH_TARGET_INFO *info, const struct monitor *monitor,
++                                  UINT32 mode_index, UINT32 desktop_mode_index,
+                                   UINT32 flags, const DEVMODEW *devmode )
+ {
+-    info->adapterId = *gpu_luid;
+-    info->id = target_id;
++    info->adapterId = monitor->source->gpu->luid;
++    info->id = monitor->output_id;
+     if (flags & QDC_VIRTUAL_MODE_AWARE)
+     {
+         info->targetModeInfoIdx = mode_index;
+         info->desktopModeInfoIdx = desktop_mode_index;
+     }
+     else info->modeInfoIdx = mode_index;
+-    info->outputTechnology = DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL;
++    info->outputTechnology = monitor_output_technology( monitor );
+     info->rotation = get_dc_rotation( devmode );
+     info->scaling = DISPLAYCONFIG_SCALING_IDENTITY;
+     info->refreshRate.Numerator = devmode->dmDisplayFrequency;
+@@ -3672,10 +3733,10 @@ LONG WINAPI NtUserQueryDisplayConfig( UINT32 flags, UINT32 *paths_count, DISPLAY
+                 goto done;
+             }
+             set_mode_desktop_info( &modes[mode_index], gpu_luid, output_id, &modes[source_mode_index].sourceMode );
+-            set_path_target_info( &paths[path_index].targetInfo, gpu_luid, output_id, mode_index - 1, mode_index,
++            set_path_target_info( &paths[path_index].targetInfo, monitor, mode_index - 1, mode_index,
+                                   flags, &devmode );
+         }
+-        else set_path_target_info( &paths[path_index].targetInfo, gpu_luid, output_id, mode_index, ~0u, flags, &devmode );
++        else set_path_target_info( &paths[path_index].targetInfo, monitor, mode_index, ~0u, flags, &devmode );
+         ++mode_index;
+ 
+         set_path_source_info( &paths[path_index].sourceInfo, gpu_luid, source_index, source_mode_index, flags );
+@@ -7657,7 +7718,7 @@ NTSTATUS WINAPI NtUserDisplayConfigGetDeviceInfo( DISPLAYCONFIG_DEVICE_INFO_HEAD
+                         sizeof(monitor->source->gpu->luid) ))
+                 continue;
+ 
+-            target_name->outputTechnology = DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL;
++            target_name->outputTechnology = monitor_output_technology( monitor );
+             snprintf( buffer, ARRAY_SIZE(buffer), "Display%u", monitor->output_id + 1 );
+             asciiz_to_unicode( target_name->monitorFriendlyDeviceName, buffer );
+             monitor_get_interface_name( monitor, target_name->monitorDevicePath );
+diff --git a/dlls/winewayland.drv/display.c b/dlls/winewayland.drv/display.c
+index b2a9428..cd4aeb1 100644
+--- a/dlls/winewayland.drv/display.c
++++ b/dlls/winewayland.drv/display.c
+@@ -208,7 +208,7 @@ static void wayland_add_device_source(const struct gdi_device_manager *device_ma
+ static void wayland_add_device_monitor(const struct gdi_device_manager *device_manager,
+                                        void *param, struct output_info *output_info)
+ {
+-    struct gdi_monitor monitor = {0};
++    struct gdi_monitor monitor = {.properties.origin = WINE_MONITOR_ORIGIN_DISPLAY_SERVER};
+ 
+     SetRect(&monitor.rc_monitor, output_info->x, output_info->y,
+             output_info->x + output_info->output->current_mode->width,
+diff --git a/dlls/winex11.drv/xinerama.c b/dlls/winex11.drv/xinerama.c
+index 81f7392..842098f 100644
+--- a/dlls/winex11.drv/xinerama.c
++++ b/dlls/winex11.drv/xinerama.c
+@@ -300,6 +300,7 @@ static BOOL xinerama_get_monitors( ULONG_PTR adapter_id, struct gdi_monitor **ne
+             || (EqualRect( &monitors[i].rcMonitor, &monitors[first].rcMonitor )
+                 && !IsRectEmpty( &monitors[first].rcMonitor )))
+         {
++            monitor[index].properties.origin = WINE_MONITOR_ORIGIN_DISPLAY_SERVER;
+             monitor[index].rc_monitor = monitors[i].rcMonitor;
+             monitor[index].rc_work = monitors[i].rcWork;
+             /* Xinerama only reports monitors already attached */
+diff --git a/dlls/winex11.drv/xrandr.c b/dlls/winex11.drv/xrandr.c
+index b147b95..63030e1 100644
+--- a/dlls/winex11.drv/xrandr.c
++++ b/dlls/winex11.drv/xrandr.c
+@@ -531,6 +531,58 @@ static void get_screen_size( XRRScreenResources *resources, unsigned int *width,
+     }
+ }
+ 
++/* RandR ConnectorType is an ATOM/32 property containing one item. An absent
++ * or unknown value does not imply VGA, DisplayPort or an internal panel. */
++static struct wine_monitor_properties get_monitor_properties( RROutput output )
++{
++    static const struct
++    {
++        const char *name;
++        DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY technology;
++    } connectors[] =
++    {
++        { "VGA", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15 },
++        { "DVI", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI },
++        { "DVI-I", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI },
++        { "DVI-D", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI },
++        { "DVI-A", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI },
++        { "HDMI", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HDMI },
++        { "Panel", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL },
++        { "TV-Composite", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPOSITE_VIDEO },
++        { "TV-SVideo", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SVIDEO },
++        { "TV-Component", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPONENT_VIDEO },
++        { "DisplayPort", DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL },
++    };
++    struct wine_monitor_properties properties = {.origin = WINE_MONITOR_ORIGIN_DISPLAY_SERVER};
++    unsigned long count = 0, remaining = 0;
++    unsigned char *data = NULL;
++    Atom property, type;
++    char *name;
++    int format, ret;
++    unsigned int i;
++
++    property = XInternAtom( gdi_display, RR_PROPERTY_CONNECTOR_TYPE, True );
++    if (!property) return properties;
++    ret = pXRRGetOutputProperty( gdi_display, output, property, 0, 1, FALSE, FALSE,
++                                XA_ATOM, &type, &format, &count, &remaining, &data );
++    if (ret == Success && type == XA_ATOM && format == 32 && count == 1 && !remaining && data)
++    {
++        if ((name = XGetAtomName( gdi_display, *(Atom *)data )))
++        {
++            for (i = 0; i < ARRAY_SIZE(connectors); i++)
++            {
++                if (strcmp( name, connectors[i].name )) continue;
++                properties.flags |= WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID;
++                properties.output_technology = connectors[i].technology;
++                break;
++            }
++            XFree( name );
++        }
++    }
++    if (data) XFree( data );
++    return properties;
++}
++
+ static unsigned int get_edid( RROutput output, unsigned char **prop )
+ {
+     int result, actual_format;
+@@ -1106,6 +1158,7 @@ static BOOL xrandr14_get_monitors( ULONG_PTR adapter_id, struct gdi_monitor **ne
+     /* Inactive but attached monitor, no need to check for mirrored/replica monitors */
+     if (!output_info->crtc || !crtc_info->mode)
+     {
++        monitors[monitor_count].properties = get_monitor_properties( adapter_id );
+         monitors[monitor_count].edid_len = get_edid( adapter_id, &monitors[monitor_count].edid );
+         monitor_count = 1;
+     }
+@@ -1149,6 +1202,8 @@ static BOOL xrandr14_get_monitors( ULONG_PTR adapter_id, struct gdi_monitor **ne
+                     enum_crtc_info->width == crtc_info->width &&
+                     enum_crtc_info->height == crtc_info->height)
+                 {
++                    memset( &monitors[monitor_count], 0, sizeof(monitors[monitor_count]) );
++                    monitors[monitor_count].properties = get_monitor_properties( screen_resources->outputs[i] );
+                     SetRect( &monitors[monitor_count].rc_monitor, crtc_info->x, crtc_info->y,
+                              crtc_info->x + crtc_info->width, crtc_info->y + crtc_info->height );
+                     monitors[monitor_count].rc_work = get_work_area( &monitors[monitor_count].rc_monitor );
+diff --git a/include/wine/gdi_driver.h b/include/wine/gdi_driver.h
+index d7b5018..2698bfa 100644
+--- a/include/wine/gdi_driver.h
++++ b/include/wine/gdi_driver.h
+@@ -39,6 +39,7 @@
+ #include "ddk/d3dkmthk.h"
+ #include "kbd.h"
+ #include "wine/list.h"
++#include "wine/monitor.h"
+ #include "wine/debug.h"
+ 
+ struct gdi_dc_funcs;
+@@ -218,7 +219,7 @@ struct gdi_dc_funcs
+ };
+ 
+ /* increment this when you change the DC function table */
+-#define WINE_GDI_DRIVER_VERSION 108
++#define WINE_GDI_DRIVER_VERSION 109
+ 
+ #define GDI_PRIORITY_NULL_DRV        0  /* null driver */
+ #define GDI_PRIORITY_FONT_DRV      100  /* any font driver */
+@@ -344,6 +345,7 @@ struct gdi_monitor
+     unsigned char *edid;  /* Extended Device Identification Data */
+     UINT edid_len;
+     BOOL hdr_enabled;
++    struct wine_monitor_properties properties;
+ };
+ 
+ struct gdi_device_manager
+diff --git a/include/wine/monitor.h b/include/wine/monitor.h
+new file mode 100644
+index 0000000..0d02a4c
+--- /dev/null
++++ b/include/wine/monitor.h
+@@ -0,0 +1,49 @@
++/*
++ * Internal facts associated with Wine display monitors
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#ifndef __WINE_MONITOR_H
++#define __WINE_MONITOR_H
++
++#include "windef.h"
++#include "devpropdef.h"
++
++enum wine_monitor_origin
++{
++    WINE_MONITOR_ORIGIN_UNKNOWN,
++    WINE_MONITOR_ORIGIN_DISPLAY_SERVER,
++    WINE_MONITOR_ORIGIN_VIRTUAL,
++};
++
++#define WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID 0x00000001
++
++/* A zero-initialized provider has no known connector, even though HD15 is zero.
++ * DISPLAY_SERVER identifies the source of the facts, not physical hardware.
++ * VIRTUAL is reserved for a monitor explicitly synthesized by Wine. */
++struct wine_monitor_properties
++{
++    UINT32 flags;
++    UINT32 origin;
++    UINT32 output_technology;
++};
++
++DEFINE_DEVPROPKEY( WINE_DEVPROPKEY_MONITOR_PROPERTIES, 0x233a9ef3, 0xafc4, 0x4abd,
++                  0xb5, 0x64, 0xc3, 0x2f, 0x21, 0xf1, 0x53, 0x5b, 7 );
++
++#endif /* __WINE_MONITOR_H */

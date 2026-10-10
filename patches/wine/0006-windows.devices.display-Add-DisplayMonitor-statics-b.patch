@@ -1,0 +1,2273 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Sat, 10 Oct 2026 14:41:48 -0400
+Subject: [PATCH 6/8] windows.devices.display: Add DisplayMonitor statics
+ backed by monitor descriptors.
+
+---
+ configure.ac                                  |   2 +
+ dlls/windows.devices.display/Makefile.in      |   8 +
+ dlls/windows.devices.display/async.c          | 540 ++++++++++++++
+ .../windows.devices.display/async_private.idl |  46 ++
+ dlls/windows.devices.display/classes.idl      |  24 +
+ dlls/windows.devices.display/descriptor.c     | 167 +++++
+ dlls/windows.devices.display/main.c           | 663 ++++++++++++++++++
+ dlls/windows.devices.display/private.h        | 109 +++
+ .../windows.devices.display/tests/Makefile.in |   5 +
+ .../tests/displaymonitor.c                    | 451 ++++++++++++
+ .../windows.devices.display.spec              |   3 +
+ dlls/winex11.drv/xrandr.c                     |   5 +-
+ include/Makefile.in                           |   1 +
+ include/windows.devices.display.idl           | 112 +++
+ 14 files changed, 2134 insertions(+), 2 deletions(-)
+ create mode 100644 dlls/windows.devices.display/Makefile.in
+ create mode 100644 dlls/windows.devices.display/async.c
+ create mode 100644 dlls/windows.devices.display/async_private.idl
+ create mode 100644 dlls/windows.devices.display/classes.idl
+ create mode 100644 dlls/windows.devices.display/descriptor.c
+ create mode 100644 dlls/windows.devices.display/main.c
+ create mode 100644 dlls/windows.devices.display/private.h
+ create mode 100644 dlls/windows.devices.display/tests/Makefile.in
+ create mode 100644 dlls/windows.devices.display/tests/displaymonitor.c
+ create mode 100644 dlls/windows.devices.display/windows.devices.display.spec
+ create mode 100644 include/windows.devices.display.idl
+
+diff --git a/configure.ac b/configure.ac
+index b8ae3db..9048249 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3300,6 +3300,8 @@ WINE_CONFIG_MAKEFILE(dlls/windows.applicationmodel)
+ WINE_CONFIG_MAKEFILE(dlls/windows.applicationmodel/tests)
+ WINE_CONFIG_MAKEFILE(dlls/windows.devices.bluetooth)
+ WINE_CONFIG_MAKEFILE(dlls/windows.devices.bluetooth/tests)
++WINE_CONFIG_MAKEFILE(dlls/windows.devices.display)
++WINE_CONFIG_MAKEFILE(dlls/windows.devices.display/tests)
+ WINE_CONFIG_MAKEFILE(dlls/windows.devices.enumeration)
+ WINE_CONFIG_MAKEFILE(dlls/windows.devices.enumeration/tests)
+ WINE_CONFIG_MAKEFILE(dlls/windows.devices.usb)
+diff --git a/dlls/windows.devices.display/Makefile.in b/dlls/windows.devices.display/Makefile.in
+new file mode 100644
+index 0000000..6299e06
+--- /dev/null
++++ b/dlls/windows.devices.display/Makefile.in
+@@ -0,0 +1,8 @@
++MODULE = windows.devices.display.dll
++IMPORTS = advapi32 combase propsys setupapi user32 uuid
++SOURCES = \
++	async.c \
++	async_private.idl \
++	classes.idl \
++	descriptor.c \
++	main.c
+diff --git a/dlls/windows.devices.display/async.c b/dlls/windows.devices.display/async.c
+new file mode 100644
+index 0000000..12a1fe4
+--- /dev/null
++++ b/dlls/windows.devices.display/async.c
+@@ -0,0 +1,540 @@
++/* WinRT IAsync* implementation
++ *
++ * Copyright 2022 Bernhard Kölbl for CodeWeavers
++ * Copyright 2022 Rémi Bernon for CodeWeavers
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#define WIDL_using_Wine_Internal
++#include "private.h"
++#include "initguid.h"
++#include "async_private.h"
++
++#include "wine/debug.h"
++
++WINE_DEFAULT_DEBUG_CHANNEL(combase);
++
++#define Closed 4
++#define HANDLER_NOT_SET ((void *)~(ULONG_PTR)0)
++
++struct async_info
++{
++    IAsyncInfoImpl IAsyncInfoImpl_iface;
++    IAsyncInfo IAsyncInfo_iface;
++    IInspectable *IInspectable_outer;
++    LONG ref;
++
++    async_operation_callback callback;
++    TP_WORK *async_run_work;
++    IUnknown *invoker;
++    IUnknown *param;
++
++    CRITICAL_SECTION cs;
++    IAsyncOperationCompletedHandlerImpl *handler;
++    PROPVARIANT result;
++    AsyncStatus status;
++    HRESULT hr;
++};
++
++static inline struct async_info *impl_from_IAsyncInfoImpl( IAsyncInfoImpl *iface )
++{
++    return CONTAINING_RECORD( iface, struct async_info, IAsyncInfoImpl_iface );
++}
++
++static HRESULT WINAPI async_impl_QueryInterface( IAsyncInfoImpl *iface, REFIID iid, void **out )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++
++    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
++
++    if (IsEqualGUID( iid, &IID_IAsyncInfoImpl ))
++    {
++        *out = &impl->IAsyncInfoImpl_iface;
++        IAsyncInfoImpl_AddRef( *out );
++        return S_OK;
++    }
++    if (IsEqualGUID( iid, &IID_IAsyncInfo ))
++    {
++        *out = &impl->IAsyncInfo_iface;
++        IAsyncInfo_AddRef( *out );
++        return S_OK;
++    }
++    return IInspectable_QueryInterface( impl->IInspectable_outer, iid, out );
++}
++
++static ULONG WINAPI async_impl_AddRef( IAsyncInfoImpl *iface )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++    ULONG ref = InterlockedIncrement( &impl->ref );
++    TRACE( "iface %p, ref %lu.\n", iface, ref );
++    return ref;
++}
++
++static ULONG WINAPI async_impl_Release( IAsyncInfoImpl *iface )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++    ULONG ref = InterlockedDecrement( &impl->ref );
++    TRACE( "iface %p, ref %lu.\n", iface, ref );
++
++    if (!ref)
++    {
++        if (impl->handler && impl->handler != HANDLER_NOT_SET) IAsyncOperationCompletedHandlerImpl_Release( impl->handler );
++        IAsyncInfo_Close( &impl->IAsyncInfo_iface );
++        if (impl->param) IUnknown_Release( impl->param );
++        if (impl->invoker) IUnknown_Release( impl->invoker );
++        PropVariantClear( &impl->result );
++        impl->cs.DebugInfo->Spare[0] = 0;
++        DeleteCriticalSection( &impl->cs );
++        free( impl );
++    }
++
++    return ref;
++}
++
++static HRESULT WINAPI async_impl_put_Completed( IAsyncInfoImpl *iface, IAsyncOperationCompletedHandlerImpl *handler )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p, handler %p.\n", iface, handler );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
++    else if (impl->handler != HANDLER_NOT_SET) hr = E_ILLEGAL_DELEGATE_ASSIGNMENT;
++    else if ((impl->handler = handler))
++    {
++        IAsyncOperationCompletedHandlerImpl_AddRef( impl->handler );
++
++        if (impl->status > Started)
++        {
++            IInspectable *operation = impl->IInspectable_outer;
++            AsyncStatus status = impl->status;
++            impl->handler = NULL; /* Prevent concurrent invoke. */
++            LeaveCriticalSection( &impl->cs );
++
++            IAsyncOperationCompletedHandlerImpl_Invoke( handler, operation, status );
++            IAsyncOperationCompletedHandlerImpl_Release( handler );
++
++            return S_OK;
++        }
++    }
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static HRESULT WINAPI async_impl_get_Completed( IAsyncInfoImpl *iface, IAsyncOperationCompletedHandlerImpl **handler )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p, handler %p.\n", iface, handler );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
++    if (impl->handler == NULL || impl->handler == HANDLER_NOT_SET) *handler = NULL;
++    else IAsyncOperationCompletedHandlerImpl_AddRef( (*handler = impl->handler) );
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static HRESULT WINAPI async_impl_get_Result( IAsyncInfoImpl *iface, PROPVARIANT *result )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++    HRESULT hr = E_ILLEGAL_METHOD_CALL;
++
++    TRACE( "iface %p, result %p.\n", iface, result );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Completed || impl->status == Error || impl->status == Canceled)
++    {
++        PropVariantCopy( result, &impl->result );
++        hr = impl->hr;
++    }
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static BOOL async_info_complete( struct async_info *impl, BOOL called_async )
++{
++    IInspectable *operation = impl->IInspectable_outer;
++    PROPVARIANT result = {0};
++    HRESULT hr;
++
++    hr = impl->callback( impl->invoker, impl->param, &result, called_async );
++    if (!called_async && hr == STATUS_PENDING) return FALSE;
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Started)
++    {
++        impl->status = FAILED(hr) ? Error : Completed;
++        PropVariantCopy( &impl->result, &result );
++        impl->hr = hr;
++    }
++    /* Cancel and Close may win while the descriptor read is running. Do not
++     * revive a terminal operation or expose its discarded result. */
++
++    if (impl->status != Closed && impl->handler != NULL && impl->handler != HANDLER_NOT_SET)
++    {
++        IAsyncOperationCompletedHandlerImpl *handler = impl->handler;
++        AsyncStatus status = impl->status;
++        impl->handler = NULL; /* Prevent concurrent invoke. */
++        LeaveCriticalSection( &impl->cs );
++
++        IAsyncOperationCompletedHandlerImpl_Invoke( handler, operation, status );
++        IAsyncOperationCompletedHandlerImpl_Release( handler );
++    }
++    else LeaveCriticalSection( &impl->cs );
++
++    /* release refcount acquired in Start */
++    IInspectable_Release( operation );
++
++    PropVariantClear( &result );
++    return TRUE;
++}
++
++static HRESULT WINAPI async_impl_Start( IAsyncInfoImpl *iface )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++
++    TRACE( "iface %p.\n", iface );
++
++    /* keep the async alive in the callback */
++    IInspectable_AddRef( impl->IInspectable_outer );
++    if (!async_info_complete( impl, FALSE )) SubmitThreadpoolWork( impl->async_run_work );
++
++    return S_OK;
++}
++
++static const struct IAsyncInfoImplVtbl async_impl_vtbl =
++{
++    /* IUnknown methods */
++    async_impl_QueryInterface,
++    async_impl_AddRef,
++    async_impl_Release,
++    /* IAsyncInfoImpl */
++    async_impl_put_Completed,
++    async_impl_get_Completed,
++    async_impl_get_Result,
++    async_impl_Start,
++};
++
++DEFINE_IINSPECTABLE_OUTER( async_info, IAsyncInfo, struct async_info, IInspectable_outer )
++
++static HRESULT WINAPI async_info_get_Id( IAsyncInfo *iface, UINT32 *id )
++{
++    struct async_info *impl = impl_from_IAsyncInfo( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p, id %p.\n", iface, id );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
++    *id = 1;
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static HRESULT WINAPI async_info_get_Status( IAsyncInfo *iface, AsyncStatus *status )
++{
++    struct async_info *impl = impl_from_IAsyncInfo( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p, status %p.\n", iface, status );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
++    *status = impl->status;
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static HRESULT WINAPI async_info_get_ErrorCode( IAsyncInfo *iface, HRESULT *error_code )
++{
++    struct async_info *impl = impl_from_IAsyncInfo( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p, error_code %p.\n", iface, error_code );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Closed) *error_code = hr = E_ILLEGAL_METHOD_CALL;
++    else *error_code = impl->hr;
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static HRESULT WINAPI async_info_Cancel( IAsyncInfo *iface )
++{
++    struct async_info *impl = impl_from_IAsyncInfo( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p.\n", iface );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Closed) hr = E_ILLEGAL_METHOD_CALL;
++    else if (impl->status == Started)
++    {
++        impl->status = Canceled;
++        impl->hr = E_ABORT;
++    }
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static HRESULT WINAPI async_info_Close( IAsyncInfo *iface )
++{
++    struct async_info *impl = impl_from_IAsyncInfo( iface );
++    HRESULT hr = S_OK;
++
++    TRACE( "iface %p.\n", iface );
++
++    EnterCriticalSection( &impl->cs );
++    if (impl->status == Started)
++        hr = E_ILLEGAL_STATE_CHANGE;
++    else if (impl->status != Closed)
++    {
++        CloseThreadpoolWork( impl->async_run_work );
++        impl->async_run_work = NULL;
++        impl->status = Closed;
++    }
++    LeaveCriticalSection( &impl->cs );
++
++    return hr;
++}
++
++static const struct IAsyncInfoVtbl async_info_vtbl =
++{
++    /* IUnknown methods */
++    async_info_QueryInterface,
++    async_info_AddRef,
++    async_info_Release,
++    /* IInspectable methods */
++    async_info_GetIids,
++    async_info_GetRuntimeClassName,
++    async_info_GetTrustLevel,
++    /* IAsyncInfo */
++    async_info_get_Id,
++    async_info_get_Status,
++    async_info_get_ErrorCode,
++    async_info_Cancel,
++    async_info_Close,
++};
++
++static void CALLBACK async_info_callback( TP_CALLBACK_INSTANCE *instance, void *iface, TP_WORK *work )
++{
++    struct async_info *impl = impl_from_IAsyncInfoImpl( iface );
++
++    async_info_complete( impl, TRUE );
++}
++
++static HRESULT async_info_create( IUnknown *invoker, IUnknown *param, async_operation_callback callback,
++                                  IInspectable *outer, IAsyncInfoImpl **out )
++{
++    struct async_info *impl;
++    HRESULT hr;
++
++    if (!(impl = calloc( 1, sizeof(struct async_info) ))) return E_OUTOFMEMORY;
++    impl->IAsyncInfoImpl_iface.lpVtbl = &async_impl_vtbl;
++    impl->IAsyncInfo_iface.lpVtbl = &async_info_vtbl;
++    impl->IInspectable_outer = outer;
++    impl->ref = 1;
++
++    impl->callback = callback;
++    impl->handler = HANDLER_NOT_SET;
++    impl->status = Started;
++    if (!(impl->async_run_work = CreateThreadpoolWork( async_info_callback, &impl->IAsyncInfoImpl_iface, NULL )))
++    {
++        hr = HRESULT_FROM_WIN32( GetLastError() );
++        free( impl );
++        return hr;
++    }
++
++    if ((impl->invoker = invoker)) IUnknown_AddRef( impl->invoker );
++    if ((impl->param = param)) IUnknown_AddRef( impl->param );
++
++    InitializeCriticalSectionEx( &impl->cs, 0, RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO );
++    impl->cs.DebugInfo->Spare[0] = (DWORD_PTR)( __FILE__ ": async_info.cs" );
++
++    *out = &impl->IAsyncInfoImpl_iface;
++    return S_OK;
++}
++
++struct async_inspectable
++{
++    IAsyncOperation_IInspectable IAsyncOperation_IInspectable_iface;
++    IAsyncInfoImpl *IAsyncInfoImpl_inner;
++    LONG ref;
++    const GUID *iid;
++};
++
++static inline struct async_inspectable *impl_from_IAsyncOperation_IInspectable( IAsyncOperation_IInspectable *iface )
++{
++    return CONTAINING_RECORD( iface, struct async_inspectable, IAsyncOperation_IInspectable_iface );
++}
++
++static HRESULT WINAPI async_inspectable_QueryInterface( IAsyncOperation_IInspectable *iface, REFIID iid, void **out )
++{
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++
++    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
++
++    if (IsEqualGUID( iid, &IID_IUnknown ) ||
++        IsEqualGUID( iid, &IID_IInspectable ) ||
++        IsEqualGUID( iid, &IID_IAgileObject ) ||
++        IsEqualGUID( iid, impl->iid ))
++    {
++        IInspectable_AddRef( (*out = &impl->IAsyncOperation_IInspectable_iface) );
++        return S_OK;
++    }
++
++    if (IsEqualGUID( iid, &IID_IAsyncInfo ))
++        return IAsyncInfoImpl_QueryInterface( impl->IAsyncInfoImpl_inner, iid, out );
++    *out = NULL;
++    return E_NOINTERFACE;
++}
++
++static ULONG WINAPI async_inspectable_AddRef( IAsyncOperation_IInspectable *iface )
++{
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++    ULONG ref = InterlockedIncrement( &impl->ref );
++    TRACE( "iface %p, ref %lu.\n", iface, ref );
++    return ref;
++}
++
++static ULONG WINAPI async_inspectable_Release( IAsyncOperation_IInspectable *iface )
++{
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++    ULONG ref = InterlockedDecrement( &impl->ref );
++    TRACE( "iface %p, ref %lu.\n", iface, ref );
++
++    if (!ref)
++    {
++        /* guard against re-entry if inner releases an outer iface */
++        InterlockedIncrement( &impl->ref );
++        IAsyncInfoImpl_Release( impl->IAsyncInfoImpl_inner );
++        free( impl );
++    }
++
++    return ref;
++}
++
++static HRESULT WINAPI async_inspectable_GetIids( IAsyncOperation_IInspectable *iface, ULONG *iid_count, IID **iids )
++{
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++    if (!iid_count || !iids) return E_POINTER;
++    *iid_count = 0;
++    if (!(*iids = CoTaskMemAlloc( 2 * sizeof(**iids) ))) return E_OUTOFMEMORY;
++    (*iids)[0] = *impl->iid;
++    (*iids)[1] = IID_IAsyncInfo;
++    *iid_count = 2;
++    return S_OK;
++}
++
++static HRESULT WINAPI async_inspectable_GetRuntimeClassName( IAsyncOperation_IInspectable *iface, HSTRING *class_name )
++{
++    return WindowsCreateString( L"Windows.Foundation.IAsyncOperation`1<Windows.Devices.Display.DisplayMonitor>",
++                                ARRAY_SIZE(L"Windows.Foundation.IAsyncOperation`1<Windows.Devices.Display.DisplayMonitor>") - 1,
++                                class_name );
++}
++
++static HRESULT WINAPI async_inspectable_GetTrustLevel( IAsyncOperation_IInspectable *iface, TrustLevel *trust_level )
++{
++    if (!trust_level) return E_POINTER;
++    *trust_level = BaseTrust;
++    return S_OK;
++}
++
++static HRESULT WINAPI async_inspectable_put_Completed( IAsyncOperation_IInspectable *iface, IAsyncOperationCompletedHandler_IInspectable *bool_handler )
++{
++    IAsyncOperationCompletedHandlerImpl *handler = (IAsyncOperationCompletedHandlerImpl *)bool_handler;
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++    TRACE( "iface %p, handler %p.\n", iface, handler );
++    return IAsyncInfoImpl_put_Completed( impl->IAsyncInfoImpl_inner, handler );
++}
++
++static HRESULT WINAPI async_inspectable_get_Completed( IAsyncOperation_IInspectable *iface, IAsyncOperationCompletedHandler_IInspectable **bool_handler )
++{
++    IAsyncOperationCompletedHandlerImpl **handler = (IAsyncOperationCompletedHandlerImpl **)bool_handler;
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++    TRACE( "iface %p, handler %p.\n", iface, handler );
++    return IAsyncInfoImpl_get_Completed( impl->IAsyncInfoImpl_inner, handler );
++}
++
++static HRESULT WINAPI async_inspectable_GetResults( IAsyncOperation_IInspectable *iface, IInspectable **results )
++{
++    struct async_inspectable *impl = impl_from_IAsyncOperation_IInspectable( iface );
++    PROPVARIANT result = {.vt = VT_UNKNOWN};
++    HRESULT hr;
++
++    TRACE( "iface %p, results %p.\n", iface, results );
++    if (!results) return E_POINTER;
++    *results = NULL;
++
++    if (SUCCEEDED(hr = IAsyncInfoImpl_get_Result( impl->IAsyncInfoImpl_inner, &result )))
++    {
++        if ((*results = (IInspectable *)result.punkVal)) IInspectable_AddRef( *results );
++        PropVariantClear( &result );
++    }
++
++    return hr;
++}
++
++static const struct IAsyncOperation_IInspectableVtbl async_inspectable_vtbl =
++{
++    /* IUnknown methods */
++    async_inspectable_QueryInterface,
++    async_inspectable_AddRef,
++    async_inspectable_Release,
++    /* IInspectable methods */
++    async_inspectable_GetIids,
++    async_inspectable_GetRuntimeClassName,
++    async_inspectable_GetTrustLevel,
++    /* IAsyncOperation<IInspectable> */
++    async_inspectable_put_Completed,
++    async_inspectable_get_Completed,
++    async_inspectable_GetResults,
++};
++
++HRESULT async_operation_inspectable_create( const GUID *iid, IUnknown *invoker, IUnknown *param, async_operation_callback callback,
++                                            IAsyncOperation_IInspectable **out )
++{
++    struct async_inspectable *impl;
++    HRESULT hr;
++
++    *out = NULL;
++    if (!(impl = calloc( 1, sizeof(*impl) ))) return E_OUTOFMEMORY;
++    impl->IAsyncOperation_IInspectable_iface.lpVtbl = &async_inspectable_vtbl;
++    impl->ref = 1;
++    impl->iid = iid;
++
++    if (FAILED(hr = async_info_create( invoker, param, callback, (IInspectable *)&impl->IAsyncOperation_IInspectable_iface, &impl->IAsyncInfoImpl_inner )) ||
++        FAILED(hr = IAsyncInfoImpl_Start( impl->IAsyncInfoImpl_inner )))
++    {
++        if (impl->IAsyncInfoImpl_inner) IAsyncInfoImpl_Release( impl->IAsyncInfoImpl_inner );
++        free( impl );
++        return hr;
++    }
++
++    *out = &impl->IAsyncOperation_IInspectable_iface;
++    TRACE( "created IAsyncOperation_IInspectable %p\n", *out );
++    return S_OK;
++}
+diff --git a/dlls/windows.devices.display/async_private.idl b/dlls/windows.devices.display/async_private.idl
+new file mode 100644
+index 0000000..40ea63c
+--- /dev/null
++++ b/dlls/windows.devices.display/async_private.idl
+@@ -0,0 +1,46 @@
++/*
++ * Copyright 2022 Rémi Bernon for CodeWeavers
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#pragma makedep header
++
++#ifdef __WIDL__
++#pragma winrt ns_prefix
++#endif
++
++import "propidl.idl";
++import "inspectable.idl";
++import "asyncinfo.idl";
++import "windowscontracts.idl";
++
++namespace Wine.Internal {
++    /* type-pruning version of AsyncOperationCompletedHandlerImpl<T> */
++    delegate HRESULT AsyncOperationCompletedHandlerImpl([in] IInspectable *async, [in] AsyncStatus status);
++
++    [
++        uuid(d81ab70d-82e0-481c-983d-401225d98a2c)
++    ]
++    interface IAsyncInfoImpl : IUnknown
++    {
++        [propput] HRESULT Completed([in] AsyncOperationCompletedHandlerImpl *handler);
++        [propget] HRESULT Completed([out, retval] AsyncOperationCompletedHandlerImpl **handler);
++        [propget] HRESULT Result([out, retval] PROPVARIANT *result);
++        HRESULT Start();
++    }
++
++    typedef HRESULT (*async_operation_callback)( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, BOOL called_async );
++}
+diff --git a/dlls/windows.devices.display/classes.idl b/dlls/windows.devices.display/classes.idl
+new file mode 100644
+index 0000000..21ca4dd
+--- /dev/null
++++ b/dlls/windows.devices.display/classes.idl
+@@ -0,0 +1,24 @@
++/*
++ * Internal facts associated with Wine display monitors
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#pragma makedep register
++#pragma winrt ns_prefix
++import "windows.devices.display.idl";
++namespace Windows.Devices.Display { runtimeclass DisplayMonitor; }
+diff --git a/dlls/windows.devices.display/descriptor.c b/dlls/windows.devices.display/descriptor.c
+new file mode 100644
+index 0000000..8cf5559
+--- /dev/null
++++ b/dlls/windows.devices.display/descriptor.c
+@@ -0,0 +1,167 @@
++/* Descriptor-backed monitor facts. No signal-space defaults or CTA desired
++ * content luminance are substituted for native physical properties.
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ */
++
++#include <math.h>
++#include "private.h"
++
++static BOOL checksum_valid( const BYTE *data, UINT32 size )
++{
++    BYTE sum = 0;
++    UINT32 i;
++    for (i = 0; i < size; i++) sum += data[i];
++    return !sum;
++}
++
++static UINT32 read_u16( const BYTE *data )
++{
++    return data[0] | (data[1] << 8);
++}
++
++static BOOL physical_luminance( const BYTE *data, FLOAT *value )
++{
++    UINT32 bits = read_u16( data ), exponent = (bits >> 10) & 31, fraction = bits & 1023;
++
++    /* Signed values include the do-not-use negative-zero sentinel. */
++    if ((bits & 0x8000) || exponent == 31) return FALSE;
++    if (!exponent) *value = ldexpf( fraction, -24 );
++    else *value = ldexpf( fraction | 1024, (int)exponent - 25 );
++    return TRUE;
++}
++
++static void parse_native_parameters( const BYTE *block, struct monitor_descriptor *descriptor )
++{
++    UINT32 width, height, i;
++    FLOAT units;
++
++    /* DisplayID 2.0/2.1 tag 0x21: 29-byte payload, revision 0 or 1.
++     * Header bit 7 changes image-size units; other unknown header bits are
++     * not guessed. Native geometry/color and luminance availability are
++     * independent. Feature bits 4:3 distinguish physical guarantees from
++     * source guidance; only the former is a physical luminance source.
++     */
++    if (block[2] != 29 || (block[1] & 0x7f) > 1) return;
++    width = read_u16( block + 7 );
++    height = read_u16( block + 9 );
++    if (width && height)
++    {
++        descriptor->native_resolution.Width = width;
++        descriptor->native_resolution.Height = height;
++        descriptor->flags |= MONITOR_NATIVE_RESOLUTION;
++    }
++    units = (block[1] & 0x80) ? 1.0f : 0.1f;
++    width = read_u16( block + 3 );
++    height = read_u16( block + 5 );
++    if (width && height)
++    {
++        descriptor->physical_size.Width = width * units / 25.4f;
++        descriptor->physical_size.Height = height * units / 25.4f;
++        descriptor->flags |= MONITOR_PHYSICAL_SIZE;
++    }
++    /* These are explicitly native coordinates. CIE 1976 conversion is not
++     * yet implemented; never expose its u/v as CIE 1931 x/y. */
++    if (!(block[11] & 0x40))
++    {
++        for (i = 0; i < 4; i++)
++        {
++            const BYTE *point = block + 12 + 3 * i;
++            descriptor->primaries[i].X = (point[0] | ((point[1] & 15) << 8)) / 4096.0f;
++            descriptor->primaries[i].Y = ((point[1] >> 4) | (point[2] << 4)) / 4096.0f;
++        }
++        descriptor->flags |= MONITOR_NATIVE_PRIMARIES;
++    }
++    if (!(block[11] & 0x18))
++    {
++        if (physical_luminance( block + 24, &descriptor->full_luminance ))
++            descriptor->flags |= MONITOR_FULL_LUMINANCE;
++        if (physical_luminance( block + 26, &descriptor->max_luminance ))
++            descriptor->flags |= MONITOR_MAX_LUMINANCE;
++        if (physical_luminance( block + 28, &descriptor->min_luminance ))
++            descriptor->flags |= MONITOR_MIN_LUMINANCE;
++    }
++}
++
++void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_descriptor *descriptor )
++{
++    static const BYTE header[] = {0, 255, 255, 255, 255, 255, 255, 0};
++    struct monitor_descriptor native = {0};
++    const BYTE *parameters = NULL, *first = NULL, *section, *block;
++    UINT32 count, i, offset, length, section_size, displayid_count = 0;
++    BOOL duplicate_parameters = FALSE;
++
++    memset( descriptor, 0, sizeof(*descriptor) );
++    if (!edid || size < 128 || size > DISPLAYMONITOR_MAX_EDID_SIZE || size % 128 ||
++        memcmp( edid, header, sizeof(header) ) || edid[18] != 1) return;
++    count = edid[126] + 1;
++    if (count * 128 > size) return;
++    for (i = 0; i < count; i++) if (!checksum_valid( edid + 128 * i, 128 )) return;
++
++    /* Non-zero base dimensions are physical centimetres. A zero dimension
++     * can instead encode aspect ratio, so it is not a physical measurement. */
++    if (edid[21] && edid[22])
++    {
++        descriptor->physical_size.Width = edid[21] / 2.54f;
++        descriptor->physical_size.Height = edid[22] / 2.54f;
++        descriptor->flags |= MONITOR_PHYSICAL_SIZE;
++    }
++
++    for (i = 1; i < count; i++)
++    {
++        if (edid[128 * i] != 0x70) continue;
++        section = edid + 128 * i + 1;
++        /* Leave older and unknown DisplayID layouts opaque. */
++        if (section[0] != 0x20 && section[0] != 0x21) return;
++        section_size = section[1] + 5;
++        if (section_size > 126 || !checksum_valid( section, section_size )) return;
++        if (!first) first = section;
++        displayid_count++;
++        for (offset = 4; offset < section_size - 1; offset += length)
++        {
++            if (section_size - 1 - offset < 3) return;
++            block = section + offset;
++            length = block[2] + 3;
++            if (length > section_size - 1 - offset) return;
++            if (block[0] != 0x21) continue;
++            if (parameters) duplicate_parameters = TRUE;
++            else parameters = block;
++        }
++    }
++    if (!first || first[3] + 1 != displayid_count) return;
++    /* A single native DisplayID section is copied directly without the EDID
++     * extension tag or padding. Multi-section byte-array representation
++     * remains a native-Windows qualification gap; do not reserialize it. */
++    if (displayid_count == 1)
++    {
++        descriptor->displayid_offset = first - edid;
++        descriptor->displayid_size = first[1] + 5;
++    }
++    switch (first[2])
++    {
++    case 2: case 3: case 4: case 5: case 6:
++        descriptor->usage = DisplayMonitorUsageKind_Standard;
++        descriptor->flags |= MONITOR_USAGE;
++        break;
++    case 7: case 8:
++        descriptor->usage = DisplayMonitorUsageKind_HeadMounted;
++        descriptor->flags |= MONITOR_USAGE;
++        break;
++    }
++    /* Conflicting or repeated native parameters cannot select a physical
++     * value by arbitrary ordering. Other known physical facts remain usable. */
++    if (!parameters || duplicate_parameters) return;
++    parse_native_parameters( parameters, &native );
++    if (native.flags & MONITOR_PHYSICAL_SIZE) descriptor->physical_size = native.physical_size;
++    descriptor->native_resolution = native.native_resolution;
++    memcpy( descriptor->primaries, native.primaries, sizeof(native.primaries) );
++    descriptor->max_luminance = native.max_luminance;
++    descriptor->min_luminance = native.min_luminance;
++    descriptor->full_luminance = native.full_luminance;
++    descriptor->flags |= native.flags;
++}
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+new file mode 100644
+index 0000000..885a262
+--- /dev/null
++++ b/dlls/windows.devices.display/main.c
+@@ -0,0 +1,663 @@
++/*
++ * Internal facts associated with Wine display monitors
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++
++#include "initguid.h"
++#include "private.h"
++#include "winreg.h"
++#include "setupapi.h"
++#include "devguid.h"
++#include "roapi.h"
++#include "wine/debug.h"
++
++WINE_DEFAULT_DEBUG_CHANNEL(displaymonitor);
++
++static const GUID monitor_interface = {0xe6f07b5f,0xee97,0x4a90,{0xb0,0x76,0x33,0xf5,0x7b,0xf4,0xea,0xa7}};
++static const GUID adapter_interface = {0x5b45201d,0xf2f2,0x4f3b,{0x85,0xbb,0x30,0xff,0x1f,0x95,0x35,0x99}};
++static const DEVPROPKEY monitor_luid = {{0xca085853,0x16ce,0x48aa,{0xb1,0x14,0xde,0x9c,0x72,0x33,0x42,0x23}},1};
++static const DEVPROPKEY monitor_target = {{0xca085853,0x16ce,0x48aa,{0xb1,0x14,0xde,0x9c,0x72,0x33,0x42,0x23}},2};
++static const DEVPROPKEY adapter_luid = {{0x60b193cb,0x5276,0x4d0f,{0x96,0xfc,0xf1,0x73,0xab,0xad,0x3e,0xc6}},2};
++
++struct monitor
++{
++    IDisplayMonitor IDisplayMonitor_iface;
++    LONG ref;
++    HSTRING device_id, display_name, adapter_device_id;
++    DisplayAdapterId adapter_id;
++    UINT32 target_id;
++    BOOL has_adapter, has_target;
++    struct wine_monitor_properties properties;
++    BYTE *edid;
++    UINT32 edid_size;
++    struct monitor_descriptor descriptor;
++};
++
++static HRESULT inspectable_iids( const IID *iid, ULONG *count, IID **iids )
++{
++    if (!count || !iids) return E_POINTER;
++    *count = 0;
++    *iids = CoTaskMemAlloc( sizeof(**iids) );
++    if (!*iids) return E_OUTOFMEMORY;
++    **iids = *iid;
++    *count = 1;
++    return S_OK;
++}
++
++static HRESULT class_name( HSTRING *name )
++{
++    if (!name) return E_POINTER;
++    return WindowsCreateString( RuntimeClass_Windows_Devices_Display_DisplayMonitor,
++                               wcslen(RuntimeClass_Windows_Devices_Display_DisplayMonitor), name );
++}
++
++static struct monitor *impl_from_IDisplayMonitor( IDisplayMonitor *iface )
++{
++    return CONTAINING_RECORD( iface, struct monitor, IDisplayMonitor_iface );
++}
++
++static HRESULT WINAPI monitor_QueryInterface( IDisplayMonitor *iface, REFIID iid, void **out )
++{
++    if (!out) return E_POINTER;
++    *out = NULL;
++    if (!IsEqualGUID( iid, &IID_IUnknown ) && !IsEqualGUID( iid, &IID_IInspectable ) &&
++        !IsEqualGUID( iid, &IID_IAgileObject ) && !IsEqualGUID( iid, &IID_IDisplayMonitor )) return E_NOINTERFACE;
++    *out = iface;
++    IDisplayMonitor_AddRef( iface );
++    return S_OK;
++}
++
++static ULONG WINAPI monitor_AddRef( IDisplayMonitor *iface )
++{
++    return InterlockedIncrement( &impl_from_IDisplayMonitor(iface)->ref );
++}
++
++static ULONG WINAPI monitor_Release( IDisplayMonitor *iface )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    ULONG ref = InterlockedDecrement( &impl->ref );
++    if (!ref)
++    {
++        WindowsDeleteString( impl->device_id );
++        WindowsDeleteString( impl->display_name );
++        WindowsDeleteString( impl->adapter_device_id );
++        free( impl->edid );
++        free( impl );
++    }
++    return ref;
++}
++
++static HRESULT WINAPI monitor_GetIids( IDisplayMonitor *iface, ULONG *count, IID **iids )
++{
++    return inspectable_iids( &IID_IDisplayMonitor, count, iids );
++}
++
++static HRESULT WINAPI monitor_GetRuntimeClassName( IDisplayMonitor *iface, HSTRING *name )
++{
++    return class_name( name );
++}
++
++static HRESULT WINAPI monitor_GetTrustLevel( IDisplayMonitor *iface, TrustLevel *level )
++{
++    if (!level) return E_POINTER;
++    *level = BaseTrust;
++    return S_OK;
++}
++
++static HRESULT WINAPI monitor_get_DeviceId( IDisplayMonitor *iface, HSTRING *value )
++{
++    if (!value) return E_POINTER;
++    return WindowsDuplicateString( impl_from_IDisplayMonitor(iface)->device_id, value );
++}
++
++static HRESULT WINAPI monitor_get_DisplayName( IDisplayMonitor *iface, HSTRING *value )
++{
++    if (!value) return E_POINTER;
++    return WindowsDuplicateString( impl_from_IDisplayMonitor(iface)->display_name, value );
++}
++
++static HRESULT WINAPI monitor_get_ConnectionKind( IDisplayMonitor *iface, DisplayMonitorConnectionKind *value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    if (!value) return E_POINTER;
++    if (impl->properties.origin == WINE_MONITOR_ORIGIN_VIRTUAL)
++    {
++        *value = DisplayMonitorConnectionKind_Virtual;
++        return S_OK;
++    }
++    if (!(impl->properties.flags & WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID)) return DISPLAYMONITOR_UNAVAILABLE;
++    switch (impl->properties.output_technology)
++    {
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_LVDS:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EMBEDDED:
++        *value = DisplayMonitorConnectionKind_Internal;
++        break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_MIRACAST:
++        *value = DisplayMonitorConnectionKind_Wireless;
++        break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SVIDEO:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPOSITE_VIDEO:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPONENT_VIDEO:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HDMI:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_D_JPN:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDI:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EXTERNAL:
++        *value = DisplayMonitorConnectionKind_Wired;
++        break;
++    default: return DISPLAYMONITOR_UNAVAILABLE;
++    }
++    return S_OK;
++}
++
++static HRESULT WINAPI monitor_get_PhysicalConnector( IDisplayMonitor *iface, DisplayMonitorPhysicalConnectorKind *value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    if (!value) return E_POINTER;
++    *value = DisplayMonitorPhysicalConnectorKind_Unknown;
++    if (!(impl->properties.flags & WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID)) return S_OK;
++    switch (impl->properties.output_technology)
++    {
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15: *value = DisplayMonitorPhysicalConnectorKind_HD15; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SVIDEO:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPOSITE_VIDEO:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPONENT_VIDEO: *value = DisplayMonitorPhysicalConnectorKind_AnalogTV; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DVI: *value = DisplayMonitorPhysicalConnectorKind_Dvi; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HDMI: *value = DisplayMonitorPhysicalConnectorKind_Hdmi; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_LVDS: *value = DisplayMonitorPhysicalConnectorKind_Lvds; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDI: *value = DisplayMonitorPhysicalConnectorKind_Sdi; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED: *value = DisplayMonitorPhysicalConnectorKind_DisplayPort; break;
++    }
++    return S_OK;
++}
++
++static HRESULT WINAPI monitor_get_DisplayAdapterDeviceId( IDisplayMonitor *iface, HSTRING *value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    if (!value) return E_POINTER;
++    *value = NULL;
++    if (!impl->adapter_device_id) return DISPLAYMONITOR_UNAVAILABLE;
++    return WindowsDuplicateString( impl->adapter_device_id, value );
++}
++
++static HRESULT WINAPI monitor_get_DisplayAdapterId( IDisplayMonitor *iface, DisplayAdapterId *value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    if (!value) return E_POINTER;
++    if (!impl->has_adapter) return DISPLAYMONITOR_UNAVAILABLE;
++    *value = impl->adapter_id;
++    return S_OK;
++}
++
++static HRESULT WINAPI monitor_get_DisplayAdapterTargetId( IDisplayMonitor *iface, UINT32 *value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    if (!value) return E_POINTER;
++    if (!impl->has_target) return DISPLAYMONITOR_UNAVAILABLE;
++    *value = impl->target_id;
++    return S_OK;
++}
++
++#define DESCRIPTOR_GETTER(name, type, flag, field) \
++static HRESULT WINAPI monitor_get_##name( IDisplayMonitor *iface, type *value ) \
++{ \
++    struct monitor *impl = impl_from_IDisplayMonitor( iface ); \
++    if (!value) return E_POINTER; \
++    if (!(impl->descriptor.flags & flag)) return DISPLAYMONITOR_UNAVAILABLE; \
++    *value = impl->descriptor.field; \
++    return S_OK; \
++}
++DESCRIPTOR_GETTER(UsageKind, DisplayMonitorUsageKind, MONITOR_USAGE, usage)
++DESCRIPTOR_GETTER(NativeResolutionInRawPixels, SizeInt32, MONITOR_NATIVE_RESOLUTION, native_resolution)
++DESCRIPTOR_GETTER(RedPrimary, Point, MONITOR_NATIVE_PRIMARIES, primaries[0])
++DESCRIPTOR_GETTER(GreenPrimary, Point, MONITOR_NATIVE_PRIMARIES, primaries[1])
++DESCRIPTOR_GETTER(BluePrimary, Point, MONITOR_NATIVE_PRIMARIES, primaries[2])
++DESCRIPTOR_GETTER(WhitePoint, Point, MONITOR_NATIVE_PRIMARIES, primaries[3])
++DESCRIPTOR_GETTER(MaxLuminanceInNits, FLOAT, MONITOR_MAX_LUMINANCE, max_luminance)
++DESCRIPTOR_GETTER(MinLuminanceInNits, FLOAT, MONITOR_MIN_LUMINANCE, min_luminance)
++DESCRIPTOR_GETTER(MaxAverageFullFrameLuminanceInNits, FLOAT, MONITOR_FULL_LUMINANCE, full_luminance)
++
++static HRESULT WINAPI monitor_get_PhysicalSizeInInches( IDisplayMonitor *iface, IReference_Size **value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    IPropertyValueStatics *statics;
++    IInspectable *boxed;
++    HSTRING name;
++    HRESULT hr;
++
++    if (!value) return E_POINTER;
++    *value = NULL;
++    if (!(impl->descriptor.flags & MONITOR_PHYSICAL_SIZE)) return S_OK;
++    hr = WindowsCreateString( RuntimeClass_Windows_Foundation_PropertyValue,
++                              wcslen(RuntimeClass_Windows_Foundation_PropertyValue), &name );
++    if (FAILED(hr)) return hr;
++    hr = RoGetActivationFactory( name, &IID_IPropertyValueStatics, (void **)&statics );
++    WindowsDeleteString( name );
++    if (FAILED(hr)) return hr;
++    hr = IPropertyValueStatics_CreateSize( statics, impl->descriptor.physical_size, &boxed );
++    IPropertyValueStatics_Release( statics );
++    if (FAILED(hr)) return hr;
++    hr = IInspectable_QueryInterface( boxed, &IID_IReference_Size, (void **)value );
++    IInspectable_Release( boxed );
++    return hr;
++}
++
++static HRESULT monitor_dpi( struct monitor *impl, BOOL vertical, FLOAT *value )
++{
++    if (!value) return E_POINTER;
++    if ((impl->descriptor.flags & (MONITOR_NATIVE_RESOLUTION | MONITOR_PHYSICAL_SIZE)) !=
++        (MONITOR_NATIVE_RESOLUTION | MONITOR_PHYSICAL_SIZE)) return DISPLAYMONITOR_UNAVAILABLE;
++    *value = vertical ? impl->descriptor.native_resolution.Height / impl->descriptor.physical_size.Height :
++                        impl->descriptor.native_resolution.Width / impl->descriptor.physical_size.Width;
++    return S_OK;
++}
++static HRESULT WINAPI monitor_get_RawDpiX( IDisplayMonitor *iface, FLOAT *value )
++{
++    return monitor_dpi( impl_from_IDisplayMonitor(iface), FALSE, value );
++}
++static HRESULT WINAPI monitor_get_RawDpiY( IDisplayMonitor *iface, FLOAT *value )
++{
++    return monitor_dpi( impl_from_IDisplayMonitor(iface), TRUE, value );
++}
++
++static HRESULT WINAPI monitor_GetDescriptor( IDisplayMonitor *iface, DisplayMonitorDescriptorKind kind,
++                                           UINT32 *size, BYTE **value )
++{
++    struct monitor *impl = impl_from_IDisplayMonitor( iface );
++    UINT32 offset = 0, length;
++    if (!size || !value) return E_POINTER;
++    *size = 0;
++    *value = NULL;
++    if (kind == DisplayMonitorDescriptorKind_Edid) length = impl->edid_size;
++    else if (kind == DisplayMonitorDescriptorKind_DisplayId)
++    {
++        offset = impl->descriptor.displayid_offset;
++        length = impl->descriptor.displayid_size;
++    }
++    else return E_INVALIDARG;
++    if (!length) return DISPLAYMONITOR_UNAVAILABLE;
++    if (!(*value = CoTaskMemAlloc( length ))) return E_OUTOFMEMORY;
++    memcpy( *value, impl->edid + offset, length );
++    *size = length;
++    return S_OK;
++}
++
++static const IDisplayMonitorVtbl monitor_vtbl =
++{
++    monitor_QueryInterface, monitor_AddRef, monitor_Release,
++    monitor_GetIids, monitor_GetRuntimeClassName, monitor_GetTrustLevel,
++    monitor_get_DeviceId, monitor_get_DisplayName, monitor_get_ConnectionKind, monitor_get_PhysicalConnector,
++    monitor_get_DisplayAdapterDeviceId, monitor_get_DisplayAdapterId, monitor_get_DisplayAdapterTargetId,
++    monitor_get_UsageKind, monitor_get_NativeResolutionInRawPixels, monitor_get_PhysicalSizeInInches,
++    monitor_get_RawDpiX, monitor_get_RawDpiY, monitor_get_RedPrimary, monitor_get_GreenPrimary,
++    monitor_get_BluePrimary, monitor_get_WhitePoint, monitor_get_MaxLuminanceInNits,
++    monitor_get_MinLuminanceInNits, monitor_get_MaxAverageFullFrameLuminanceInNits, monitor_GetDescriptor
++};
++
++static BOOL read_property( HDEVINFO set, SP_DEVINFO_DATA *device, const DEVPROPKEY *key,
++                           DEVPROPTYPE expected, void *value, DWORD size )
++{
++    DEVPROPTYPE type;
++    DWORD needed;
++    return SetupDiGetDevicePropertyW( set, device, key, &type, value, size, &needed, 0 ) &&
++           type == expected && needed == size;
++}
++
++static HRESULT instance_id( HDEVINFO set, SP_DEVINFO_DATA *device, HSTRING *value )
++{
++    WCHAR *buffer;
++    DWORD size;
++    HRESULT hr;
++    SetupDiGetDeviceInstanceIdW( set, device, NULL, 0, &size );
++    if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) return HRESULT_FROM_WIN32(GetLastError());
++    if (!(buffer = malloc( size * sizeof(*buffer) ))) return E_OUTOFMEMORY;
++    if (!SetupDiGetDeviceInstanceIdW( set, device, buffer, size, NULL )) hr = HRESULT_FROM_WIN32(GetLastError());
++    else hr = WindowsCreateString( buffer, wcslen(buffer), value );
++    free( buffer );
++    return hr;
++}
++
++static void read_adapter_device_id( struct monitor *impl )
++{
++    HDEVINFO set;
++    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
++    SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
++    SP_DEVICE_INTERFACE_DETAIL_DATA_W *detail;
++    DisplayAdapterId luid;
++    DWORD index, size;
++
++    if (!impl->has_adapter) return;
++    set = SetupDiGetClassDevsW( &adapter_interface, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT );
++    if (set == INVALID_HANDLE_VALUE) return;
++    for (index = 0; SetupDiEnumDeviceInterfaces( set, NULL, &adapter_interface, index, &iface ); index++)
++    {
++        SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, NULL );
++        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || !(detail = malloc(size))) continue;
++        detail->cbSize = sizeof(*detail);
++        if (SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, &device ) &&
++            read_property( set, &device, &adapter_luid, DEVPROP_TYPE_INT64, &luid, sizeof(luid) ) &&
++            !memcmp( &luid, &impl->adapter_id, sizeof(luid) ))
++            WindowsCreateString( detail->DevicePath, wcslen(detail->DevicePath), &impl->adapter_device_id );
++        free( detail );
++        if (impl->adapter_device_id) break;
++    }
++    SetupDiDestroyDeviceInfoList( set );
++}
++
++static void read_descriptor( HDEVINFO set, SP_DEVINFO_DATA *device, struct monitor *impl )
++{
++    HKEY key;
++    DWORD size, type;
++    key = SetupDiOpenDevRegKey( set, device, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ );
++    if (key == INVALID_HANDLE_VALUE) return;
++    if (!RegQueryValueExW( key, L"EDID", NULL, &type, NULL, &size ) && type == REG_BINARY &&
++        size && size <= DISPLAYMONITOR_MAX_EDID_SIZE && (impl->edid = malloc(size)))
++    {
++        impl->edid_size = size;
++        if (RegQueryValueExW( key, L"EDID", NULL, &type, impl->edid, &size ) || type != REG_BINARY || size != impl->edid_size)
++        {
++            free( impl->edid );
++            impl->edid = NULL;
++            impl->edid_size = 0;
++        }
++    }
++    RegCloseKey( key );
++    monitor_descriptor_parse( impl->edid, impl->edid_size, &impl->descriptor );
++}
++
++static void read_name( HDEVINFO set, SP_DEVINFO_DATA *device, struct monitor *impl )
++{
++    WCHAR buffer[512];
++    DWORD type, size;
++    UINT32 i, j, length;
++    BOOL found;
++    found = SetupDiGetDeviceRegistryPropertyW( set, device, SPDRP_FRIENDLYNAME, &type,
++                                              (BYTE *)buffer, sizeof(buffer), &size );
++    if (!found) found = SetupDiGetDeviceRegistryPropertyW( set, device, SPDRP_DEVICEDESC, &type,
++                                                         (BYTE *)buffer, sizeof(buffer), &size );
++    if (found && type == REG_SZ && size >= sizeof(WCHAR) && size <= sizeof(buffer) &&
++        !(size % sizeof(WCHAR)) && !buffer[size / sizeof(WCHAR) - 1])
++    {
++        WindowsCreateString( buffer, wcslen(buffer), &impl->display_name );
++        return;
++    }
++    if (impl->edid_size < 128) return;
++    for (i = 54; i <= 108; i += 18)
++    {
++        if (memcmp( impl->edid + i, "\0\0\0\xfc\0", 5 )) continue;
++        for (j = 0; j < 13 && impl->edid[i + 5 + j] >= 32 && impl->edid[i + 5 + j] <= 126; j++)
++            buffer[j] = impl->edid[i + 5 + j];
++        length = j;
++        while (length && buffer[length - 1] == ' ') length--;
++        WindowsCreateString( buffer, length, &impl->display_name );
++        return;
++    }
++}
++
++static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **result )
++{
++    HDEVINFO set;
++    SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
++    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
++    struct monitor *impl;
++    HRESULT hr;
++    DWORD size;
++    const WCHAR *buffer = WindowsGetStringRawBuffer( id, NULL );
++
++    *result = NULL;
++    TRACE( "Resolving monitor, interface_id %d.\n", interface_id );
++    set = SetupDiCreateDeviceInfoList( NULL, NULL );
++    if (set == INVALID_HANDLE_VALUE) return HRESULT_FROM_WIN32(GetLastError());
++    if (interface_id)
++    {
++        if (!SetupDiOpenDeviceInterfaceW( set, buffer, 0, &iface )) goto failed;
++        if (!IsEqualGUID( &iface.InterfaceClassGuid, &monitor_interface ))
++        {
++            hr = E_INVALIDARG;
++            goto done;
++        }
++        /* The sizing call returns the interface's real device instance. */
++        SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, &device );
++        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) goto failed;
++    }
++    else if (!SetupDiOpenDeviceInfoW( set, buffer, NULL, 0, &device )) goto failed;
++    if (!IsEqualGUID( &device.ClassGuid, &GUID_DEVCLASS_MONITOR ))
++    {
++        hr = E_INVALIDARG;
++        goto done;
++    }
++    if (!(impl = calloc( 1, sizeof(*impl) )))
++    {
++        hr = E_OUTOFMEMORY;
++        goto done;
++    }
++    impl->IDisplayMonitor_iface.lpVtbl = &monitor_vtbl;
++    impl->ref = 1;
++    hr = instance_id( set, &device, &impl->device_id );
++    if (FAILED(hr))
++    {
++        IDisplayMonitor_Release( &impl->IDisplayMonitor_iface );
++        goto done;
++    }
++    if (!read_property( set, &device, &WINE_DEVPROPKEY_MONITOR_PROPERTIES, DEVPROP_TYPE_BINARY,
++                        &impl->properties, sizeof(impl->properties) ))
++        memset( &impl->properties, 0, sizeof(impl->properties) );
++    impl->has_adapter = read_property( set, &device, &monitor_luid, DEVPROP_TYPE_INT64,
++                                      &impl->adapter_id, sizeof(impl->adapter_id) );
++    impl->has_target = read_property( set, &device, &monitor_target, DEVPROP_TYPE_UINT32,
++                                     &impl->target_id, sizeof(impl->target_id) );
++    read_adapter_device_id( impl );
++    read_descriptor( set, &device, impl );
++    read_name( set, &device, impl );
++    if (impl->properties.origin == WINE_MONITOR_ORIGIN_VIRTUAL && !(impl->descriptor.flags & MONITOR_USAGE))
++    {
++        impl->descriptor.flags |= MONITOR_USAGE;
++        impl->descriptor.usage = DisplayMonitorUsageKind_Standard;
++    }
++    *result = (IInspectable *)&impl->IDisplayMonitor_iface;
++    hr = S_OK;
++    goto done;
++failed:
++    hr = HRESULT_FROM_WIN32(GetLastError());
++done:
++    SetupDiDestroyDeviceInfoList( set );
++    return hr;
++}
++
++struct request
++{
++    IUnknown IUnknown_iface;
++    LONG ref;
++    HSTRING id;
++    BOOL interface_id;
++};
++static struct request *impl_from_request( IUnknown *iface )
++{
++    return CONTAINING_RECORD( iface, struct request, IUnknown_iface );
++}
++static HRESULT WINAPI request_QueryInterface( IUnknown *iface, REFIID iid, void **out )
++{
++    if (!out) return E_POINTER;
++    *out = NULL;
++    if (!IsEqualGUID( iid, &IID_IUnknown )) return E_NOINTERFACE;
++    *out = iface;
++    IUnknown_AddRef( iface );
++    return S_OK;
++}
++static ULONG WINAPI request_AddRef( IUnknown *iface )
++{
++    return InterlockedIncrement( &impl_from_request(iface)->ref );
++}
++static ULONG WINAPI request_Release( IUnknown *iface )
++{
++    struct request *impl = impl_from_request( iface );
++    ULONG ref = InterlockedDecrement( &impl->ref );
++    if (!ref)
++    {
++        WindowsDeleteString( impl->id );
++        free( impl );
++    }
++    return ref;
++}
++static const IUnknownVtbl request_vtbl = {request_QueryInterface, request_AddRef, request_Release};
++
++static HRESULT monitor_async( IUnknown *invoker, IUnknown *param, PROPVARIANT *result, BOOL called_async )
++{
++    struct request *request = impl_from_request( param );
++    IInspectable *monitor;
++    HRESULT hr;
++    if (!called_async) return STATUS_PENDING;
++    if (FAILED(hr = monitor_create( request->id, request->interface_id, &monitor ))) return hr;
++    result->vt = VT_UNKNOWN;
++    result->punkVal = (IUnknown *)monitor;
++    return S_OK;
++}
++
++struct factory
++{
++    IActivationFactory IActivationFactory_iface;
++    IDisplayMonitorStatics IDisplayMonitorStatics_iface;
++    LONG ref;
++};
++static struct factory *impl_from_IActivationFactory( IActivationFactory *iface )
++{
++    return CONTAINING_RECORD( iface, struct factory, IActivationFactory_iface );
++}
++static HRESULT WINAPI factory_QueryInterface( IActivationFactory *iface, REFIID iid, void **out )
++{
++    struct factory *impl = impl_from_IActivationFactory( iface );
++    if (!out) return E_POINTER;
++    *out = NULL;
++    if (IsEqualGUID( iid, &IID_IUnknown ) || IsEqualGUID( iid, &IID_IInspectable ) ||
++        IsEqualGUID( iid, &IID_IAgileObject ) || IsEqualGUID( iid, &IID_IActivationFactory ))
++        *out = &impl->IActivationFactory_iface;
++    else if (IsEqualGUID( iid, &IID_IDisplayMonitorStatics )) *out = &impl->IDisplayMonitorStatics_iface;
++    else return E_NOINTERFACE;
++    IActivationFactory_AddRef( iface );
++    return S_OK;
++}
++static ULONG WINAPI factory_AddRef( IActivationFactory *iface )
++{
++    return InterlockedIncrement( &impl_from_IActivationFactory(iface)->ref );
++}
++static ULONG WINAPI factory_Release( IActivationFactory *iface )
++{
++    return InterlockedDecrement( &impl_from_IActivationFactory(iface)->ref );
++}
++static HRESULT WINAPI factory_GetIids( IActivationFactory *iface, ULONG *count, IID **iids )
++{
++    return inspectable_iids( &IID_IDisplayMonitorStatics, count, iids );
++}
++static HRESULT WINAPI factory_GetRuntimeClassName( IActivationFactory *iface, HSTRING *name )
++{
++    return class_name( name );
++}
++static HRESULT WINAPI factory_GetTrustLevel( IActivationFactory *iface, TrustLevel *level )
++{
++    if (!level) return E_POINTER;
++    *level = BaseTrust;
++    return S_OK;
++}
++static HRESULT WINAPI factory_ActivateInstance( IActivationFactory *iface, IInspectable **value )
++{
++    if (!value) return E_POINTER;
++    *value = NULL;
++    return E_ILLEGAL_METHOD_CALL;
++}
++static const IActivationFactoryVtbl factory_vtbl =
++{
++    factory_QueryInterface, factory_AddRef, factory_Release,
++    factory_GetIids, factory_GetRuntimeClassName, factory_GetTrustLevel, factory_ActivateInstance
++};
++
++DEFINE_IINSPECTABLE( statics, IDisplayMonitorStatics, struct factory, IActivationFactory_iface )
++
++static HRESULT WINAPI statics_GetDeviceSelector( IDisplayMonitorStatics *iface, HSTRING *value )
++{
++    static const WCHAR selector[] = L"System.Devices.InterfaceClassGuid:=\"{E6F07B5F-EE97-4A90-B076-33F57BF4EAA7}\"";
++    if (!value) return E_POINTER;
++    return WindowsCreateString( selector, ARRAY_SIZE(selector) - 1, value );
++}
++static HRESULT start_request( HSTRING id, BOOL interface_id, IAsyncOperation_DisplayMonitor **operation )
++{
++    struct request *request;
++    HRESULT hr;
++    UINT32 size;
++    BOOL embedded_null;
++    if (!operation) return E_POINTER;
++    *operation = NULL;
++    WindowsGetStringRawBuffer( id, &size );
++    if (!size || FAILED(WindowsStringHasEmbeddedNull( id, &embedded_null )) || embedded_null) return E_INVALIDARG;
++    if (!(request = calloc( 1, sizeof(*request) ))) return E_OUTOFMEMORY;
++    request->IUnknown_iface.lpVtbl = &request_vtbl;
++    request->ref = 1;
++    request->interface_id = interface_id;
++    if (FAILED(hr = WindowsDuplicateString( id, &request->id )))
++    {
++        IUnknown_Release( &request->IUnknown_iface );
++        return hr;
++    }
++    hr = async_operation_inspectable_create( &IID_IAsyncOperation_DisplayMonitor, NULL, &request->IUnknown_iface,
++                                            monitor_async, (IAsyncOperation_IInspectable **)operation );
++    IUnknown_Release( &request->IUnknown_iface );
++    return hr;
++}
++static HRESULT WINAPI statics_FromIdAsync( IDisplayMonitorStatics *iface, HSTRING id,
++                                         IAsyncOperation_DisplayMonitor **operation )
++{
++    return start_request( id, FALSE, operation );
++}
++static HRESULT WINAPI statics_FromInterfaceIdAsync( IDisplayMonitorStatics *iface, HSTRING id,
++                                                  IAsyncOperation_DisplayMonitor **operation )
++{
++    return start_request( id, TRUE, operation );
++}
++static const IDisplayMonitorStaticsVtbl statics_vtbl =
++{
++    statics_QueryInterface, statics_AddRef, statics_Release,
++    statics_GetIids, statics_GetRuntimeClassName, statics_GetTrustLevel,
++    statics_GetDeviceSelector, statics_FromIdAsync, statics_FromInterfaceIdAsync
++};
++static struct factory factory = {{&factory_vtbl}, {&statics_vtbl}, 1};
++
++HRESULT WINAPI DllGetActivationFactory( HSTRING name, IActivationFactory **value )
++{
++    UINT32 length;
++    const WCHAR *buffer = WindowsGetStringRawBuffer( name, &length );
++    if (!value) return E_POINTER;
++    *value = NULL;
++    if (length != wcslen(RuntimeClass_Windows_Devices_Display_DisplayMonitor) ||
++        memcmp( buffer, RuntimeClass_Windows_Devices_Display_DisplayMonitor, length * sizeof(WCHAR) )) return CLASS_E_CLASSNOTAVAILABLE;
++    return IActivationFactory_QueryInterface( &factory.IActivationFactory_iface, &IID_IActivationFactory, (void **)value );
++}
++HRESULT WINAPI DllGetClassObject( REFCLSID clsid, REFIID iid, void **value )
++{
++    if (!value) return E_POINTER;
++    *value = NULL;
++    return CLASS_E_CLASSNOTAVAILABLE;
++}
++HRESULT WINAPI DllCanUnloadNow(void)
++{
++    return S_FALSE;
++}
+diff --git a/dlls/windows.devices.display/private.h b/dlls/windows.devices.display/private.h
+new file mode 100644
+index 0000000..a2dde37
+--- /dev/null
++++ b/dlls/windows.devices.display/private.h
+@@ -0,0 +1,109 @@
++/*
++ * Internal facts associated with Wine display monitors
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#ifndef __WINE_DISPLAYMONITOR_PRIVATE_H
++#define __WINE_DISPLAYMONITOR_PRIVATE_H
++
++#include <stdarg.h>
++#define COBJMACROS
++#include "windef.h"
++#include "winbase.h"
++#include "winstring.h"
++#include "objbase.h"
++#include "propsys.h"
++#include "activation.h"
++#define WIDL_using_Windows_Foundation
++#define WIDL_using_Windows_Foundation_Collections
++#include "windows.foundation.h"
++#define WIDL_using_Windows_Graphics
++#include "windows.graphics.h"
++#define WIDL_using_Windows_Devices_Display
++#include "windows.devices.display.h"
++#include "async_private.h"
++#include "wine/monitor.h"
++
++#define DISPLAYMONITOR_MAX_EDID_SIZE (256 * 128)
++#define DISPLAYMONITOR_UNAVAILABLE HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)
++
++#define MONITOR_NATIVE_RESOLUTION 0x0001
++#define MONITOR_PHYSICAL_SIZE     0x0002
++#define MONITOR_NATIVE_PRIMARIES  0x0004
++#define MONITOR_MAX_LUMINANCE     0x0008
++#define MONITOR_MIN_LUMINANCE     0x0010
++#define MONITOR_FULL_LUMINANCE    0x0020
++#define MONITOR_USAGE            0x0040
++
++struct monitor_descriptor
++{
++    UINT32 flags;
++    SizeInt32 native_resolution;
++    Size physical_size;
++    Point primaries[4];
++    FLOAT max_luminance, min_luminance, full_luminance;
++    DisplayMonitorUsageKind usage;
++    UINT32 displayid_offset, displayid_size;
++};
++
++void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_descriptor *descriptor );
++HRESULT async_operation_inspectable_create( const GUID *iid, IUnknown *invoker, IUnknown *param,
++                                           async_operation_callback callback, IAsyncOperation_IInspectable **out );
++
++#define DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from, iface_mem, expr )             \
++    static inline impl_type *impl_from( iface_type *iface )                                        \
++    {                                                                                              \
++        return CONTAINING_RECORD( iface, impl_type, iface_mem );                                   \
++    }                                                                                              \
++    static HRESULT WINAPI pfx##_QueryInterface( iface_type *iface, REFIID iid, void **out )        \
++    {                                                                                              \
++        impl_type *impl = impl_from( iface );                                                      \
++        return IInspectable_QueryInterface( (IInspectable *)(expr), iid, out );                    \
++    }                                                                                              \
++    static ULONG WINAPI pfx##_AddRef( iface_type *iface )                                          \
++    {                                                                                              \
++        impl_type *impl = impl_from( iface );                                                      \
++        return IInspectable_AddRef( (IInspectable *)(expr) );                                      \
++    }                                                                                              \
++    static ULONG WINAPI pfx##_Release( iface_type *iface )                                         \
++    {                                                                                              \
++        impl_type *impl = impl_from( iface );                                                      \
++        return IInspectable_Release( (IInspectable *)(expr) );                                     \
++    }                                                                                              \
++    static HRESULT WINAPI pfx##_GetIids( iface_type *iface, ULONG *iid_count, IID **iids )         \
++    {                                                                                              \
++        impl_type *impl = impl_from( iface );                                                      \
++        return IInspectable_GetIids( (IInspectable *)(expr), iid_count, iids );                    \
++    }                                                                                              \
++    static HRESULT WINAPI pfx##_GetRuntimeClassName( iface_type *iface, HSTRING *class_name )      \
++    {                                                                                              \
++        impl_type *impl = impl_from( iface );                                                      \
++        return IInspectable_GetRuntimeClassName( (IInspectable *)(expr), class_name );             \
++    }                                                                                              \
++    static HRESULT WINAPI pfx##_GetTrustLevel( iface_type *iface, TrustLevel *trust_level )        \
++    {                                                                                              \
++        impl_type *impl = impl_from( iface );                                                      \
++        return IInspectable_GetTrustLevel( (IInspectable *)(expr), trust_level );                  \
++    }
++#define DEFINE_IINSPECTABLE( pfx, iface_type, impl_type, base_iface )                              \
++    DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, &impl->base_iface )
++#define DEFINE_IINSPECTABLE_OUTER( pfx, iface_type, impl_type, outer_iface )                       \
++    DEFINE_IINSPECTABLE_( pfx, iface_type, impl_type, impl_from_##iface_type, iface_type##_iface, impl->outer_iface )
++
++
++#endif
+diff --git a/dlls/windows.devices.display/tests/Makefile.in b/dlls/windows.devices.display/tests/Makefile.in
+new file mode 100644
+index 0000000..3b6250c
+--- /dev/null
++++ b/dlls/windows.devices.display/tests/Makefile.in
+@@ -0,0 +1,5 @@
++TESTDLL = windows.devices.display.dll
++IMPORTS = advapi32 combase setupapi user32 uuid
++
++SOURCES = \
++	displaymonitor.c
+diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
+new file mode 100644
+index 0000000..f737c74
+--- /dev/null
++++ b/dlls/windows.devices.display/tests/displaymonitor.c
+@@ -0,0 +1,451 @@
++/*
++ * Internal facts associated with Wine display monitors
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++
++#include <stdarg.h>
++#define COBJMACROS
++#include "windows.h"
++#include "winstring.h"
++#include "winreg.h"
++#include "setupapi.h"
++#include "initguid.h"
++#include "devguid.h"
++#include "roapi.h"
++#define WIDL_using_Windows_Foundation
++#include "windows.foundation.h"
++#define WIDL_using_Windows_Graphics
++#include "windows.graphics.h"
++#define WIDL_using_Windows_Devices_Display
++#include "windows.devices.display.h"
++#include "wine/monitor.h"
++#include "wine/test.h"
++
++static const GUID monitor_interface = {0xe6f07b5f,0xee97,0x4a90,{0xb0,0x76,0x33,0xf5,0x7b,0xf4,0xea,0xa7}};
++static IDisplayMonitorStatics *statics;
++
++static HRESULT get_monitor( const WCHAR *id, BOOL interface_id, IDisplayMonitor **monitor )
++{
++    IAsyncOperation_DisplayMonitor *operation;
++    IAsyncInfo *info;
++    AsyncStatus status = Started;
++    HSTRING string;
++    HRESULT hr;
++    DWORD start;
++
++    *monitor = NULL;
++    WindowsCreateString( id, wcslen(id), &string );
++    hr = interface_id ? IDisplayMonitorStatics_FromInterfaceIdAsync( statics, string, &operation ) :
++                        IDisplayMonitorStatics_FromIdAsync( statics, string, &operation );
++    WindowsDeleteString( string ); /* The operation must own its input. */
++    if (FAILED(hr)) return hr;
++    hr = IAsyncOperation_DisplayMonitor_QueryInterface( operation, &IID_IAsyncInfo, (void **)&info );
++    ok( hr == S_OK, "AsyncInfo hr %#lx.\n", hr );
++    if (FAILED(hr)) goto done;
++    for (start = GetTickCount(); status == Started && GetTickCount() - start < 5000; Sleep(1))
++        IAsyncInfo_get_Status( info, &status );
++    ok( status != Started, "Operation did not finish.\n" );
++    hr = IAsyncOperation_DisplayMonitor_GetResults( operation, monitor );
++    IAsyncInfo_Close( info );
++    IAsyncInfo_Release( info );
++done:
++    IAsyncOperation_DisplayMonitor_Release( operation );
++    return hr;
++}
++
++static void test_factory(void)
++{
++    IActivationFactory *factory;
++    IInspectable *instance;
++    IUnknown *identity, *other;
++    HSTRING selector, name;
++    ULONG count;
++    IID *iids;
++    HRESULT hr;
++
++    hr = IDisplayMonitorStatics_QueryInterface( statics, &IID_IActivationFactory, (void **)&factory );
++    ok( hr == S_OK, "Factory QI hr %#lx.\n", hr );
++    if (FAILED(hr)) return;
++    IActivationFactory_QueryInterface( factory, &IID_IUnknown, (void **)&identity );
++    IDisplayMonitorStatics_QueryInterface( statics, &IID_IUnknown, (void **)&other );
++    ok( identity == other, "Factory COM identity differs.\n" );
++    IUnknown_Release( identity );
++    IUnknown_Release( other );
++    hr = IActivationFactory_ActivateInstance( factory, &instance );
++    ok( FAILED(hr), "Class unexpectedly supports default construction.\n" );
++    if (SUCCEEDED(hr)) IInspectable_Release( instance );
++    hr = IDisplayMonitorStatics_GetIids( statics, &count, &iids );
++    ok( hr == S_OK && count, "Factory metadata hr %#lx, count %lu.\n", hr, count );
++    if (SUCCEEDED(hr)) CoTaskMemFree( iids );
++    hr = IDisplayMonitorStatics_GetRuntimeClassName( statics, &name );
++    ok( hr == S_OK, "Class name hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        ok( !wcscmp( WindowsGetStringRawBuffer(name, NULL), RuntimeClass_Windows_Devices_Display_DisplayMonitor ),
++            "Incorrect class name.\n" );
++        WindowsDeleteString( name );
++    }
++    hr = IDisplayMonitorStatics_GetDeviceSelector( statics, &selector );
++    ok( hr == S_OK && WindowsGetStringLen(selector), "Selector hr %#lx.\n", hr );
++    if (SUCCEEDED(hr)) WindowsDeleteString( selector );
++    IActivationFactory_Release( factory );
++}
++
++static void test_real_interfaces(void)
++{
++    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
++    SP_DEVICE_INTERFACE_DETAIL_DATA_W *detail;
++    SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
++    HDEVINFO set;
++    DWORD size, index;
++    IDisplayMonitor *monitor, *again;
++    HSTRING id;
++    HRESULT hr;
++
++    set = SetupDiGetClassDevsW( &monitor_interface, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT );
++    if (set == INVALID_HANDLE_VALUE) return;
++    for (index = 0; SetupDiEnumDeviceInterfaces( set, NULL, &monitor_interface, index, &iface ); index++)
++    {
++        SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, NULL );
++        detail = malloc( size );
++        detail->cbSize = sizeof(*detail);
++        if (!SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, &device ))
++        {
++            free( detail );
++            continue;
++        }
++        hr = get_monitor( detail->DevicePath, TRUE, &monitor );
++        ok( hr == S_OK, "Real monitor interface resolution hr %#lx.\n", hr );
++        if (SUCCEEDED(hr))
++        {
++            hr = IDisplayMonitor_get_DeviceId( monitor, &id );
++            ok( hr == S_OK && WindowsGetStringLen(id), "DeviceId hr %#lx.\n", hr );
++            if (SUCCEEDED(hr))
++            {
++                hr = get_monitor( WindowsGetStringRawBuffer(id, NULL), FALSE, &again );
++                ok( hr == S_OK, "DeviceId roundtrip hr %#lx.\n", hr );
++                if (SUCCEEDED(hr)) IDisplayMonitor_Release( again );
++                WindowsDeleteString( id );
++            }
++            IDisplayMonitor_Release( monitor );
++        }
++        free( detail );
++    }
++    /* Zero interfaces is a genuine headless result. Never synthesize one. */
++    SetupDiDestroyDeviceInfoList( set );
++}
++
++static void checksum( BYTE *data, UINT32 size )
++{
++    UINT32 i;
++    BYTE sum = 0;
++    data[size - 1] = 0;
++    for (i = 0; i < size - 1; i++) sum += data[i];
++    data[size - 1] = -sum;
++}
++
++static void make_edid( BYTE *edid )
++{
++    static const BYTE header[] = {0,255,255,255,255,255,255,0};
++    BYTE *section = edid + 129, *block = section + 4;
++    memset( edid, 0, 256 );
++    memcpy( edid, header, sizeof(header) );
++    edid[18] = 1;
++    edid[19] = 4;
++    edid[21] = 60; /* Deliberately differs from native 30 cm width. */
++    edid[22] = 40;
++    edid[126] = 1;
++    edid[128] = 0x70;
++    section[0] = 0x20;
++    section[1] = 32;
++    section[2] = 4;
++    block[0] = 0x21;
++    block[2] = 29;
++    block[3] = 0xb8; block[4] = 0x0b; /* 300 mm in 0.1 mm units. */
++    block[5] = 0xd0; block[6] = 7; /* 200 mm */
++    block[7] = 0x80; block[8] = 7; /* 1920 */
++    block[9] = 0x38; block[10] = 4; /* 1080 */
++    block[12] = 0x33; block[13] = 0x36; block[14] = 0x53;
++    block[24] = 0x40; block[25] = 0x5e; /* 400 */
++    block[26] = 0xd0; block[27] = 0x60; /* 616 */
++    block[28] = 0; block[29] = 0x34; /* 0.25 */
++    checksum( section, 37 );
++    checksum( edid, 128 );
++    checksum( edid + 128, 128 );
++}
++
++
++static void test_descriptor_cases( HKEY key, const WCHAR *id )
++{
++    static const struct
++    {
++        UINT32 offset;
++        UINT16 bits;
++        BOOL has_max, has_full, has_min, has_native;
++        FLOAT max;
++    } cases[] =
++    {
++        {26, 0x0000, TRUE, TRUE, TRUE, TRUE, 0},
++        {26, 0x0001, TRUE, TRUE, TRUE, TRUE, 1.0f / 16777216},
++        {26, 0x8000, FALSE, TRUE, TRUE, TRUE, 0},
++        {26, 0xbc00, FALSE, TRUE, TRUE, TRUE, 0},
++        {26, 0x7c00, FALSE, TRUE, TRUE, TRUE, 0},
++        {26, 0x7e00, FALSE, TRUE, TRUE, TRUE, 0},
++        {24, 0x7e00, TRUE, FALSE, TRUE, TRUE, 616},
++        {28, 0x8000, TRUE, TRUE, FALSE, TRUE, 616},
++        {1,  0x1d02, FALSE, FALSE, FALSE, FALSE, 0}, /* unknown revision, exact length */
++        {11, 0x3308, FALSE, FALSE, FALSE, TRUE, 0}, /* source guidance is not physical */
++        {2,  0xb81c, FALSE, FALSE, FALSE, FALSE, 0}, /* short block leaves malformed tail */
++    };
++    IDisplayMonitor *monitor;
++    SizeInt32 resolution;
++    BYTE edid[256], *copy;
++    UINT32 i, length;
++    FLOAT value;
++    HRESULT hr;
++
++    for (i = 0; i < ARRAY_SIZE(cases); i++)
++    {
++        make_edid( edid );
++        edid[133 + cases[i].offset] = cases[i].bits;
++        edid[134 + cases[i].offset] = cases[i].bits >> 8;
++        checksum( edid + 129, 37 );
++        checksum( edid + 128, 128 );
++        RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++        hr = get_monitor( id, FALSE, &monitor );
++        ok( hr == S_OK, "Descriptor case %u creation hr %#lx.\n", i, hr );
++        if (FAILED(hr)) continue;
++        value = -1;
++        hr = IDisplayMonitor_get_MaxLuminanceInNits( monitor, &value );
++        ok( hr == (cases[i].has_max ? S_OK : HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)),
++            "Case %u maximum hr %#lx.\n", i, hr );
++        if (cases[i].has_max) ok( value == cases[i].max, "Case %u maximum %f.\n", i, value );
++        hr = IDisplayMonitor_get_MaxAverageFullFrameLuminanceInNits( monitor, &value );
++        ok( hr == (cases[i].has_full ? S_OK : HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)),
++            "Case %u full-frame hr %#lx.\n", i, hr );
++        if (cases[i].has_full) ok( value == 400, "Case %u full-frame %f.\n", i, value );
++        hr = IDisplayMonitor_get_MinLuminanceInNits( monitor, &value );
++        ok( hr == (cases[i].has_min ? S_OK : HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)),
++            "Case %u minimum hr %#lx.\n", i, hr );
++        if (cases[i].has_min) ok( value == 0.25f, "Case %u minimum %f.\n", i, value );
++        hr = IDisplayMonitor_get_NativeResolutionInRawPixels( monitor, &resolution );
++        ok( hr == (cases[i].has_native ? S_OK : HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED)),
++            "Case %u native resolution hr %#lx.\n", i, hr );
++        IDisplayMonitor_Release( monitor );
++    }
++    /* A truncated extension list cannot claim native fields. Descriptor
++     * copies remain the actual bytes, not a replacement valid fixture. */
++    make_edid( edid );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, 128 );
++    hr = get_monitor( id, FALSE, &monitor );
++    ok( hr == S_OK, "Truncated descriptor object hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        hr = IDisplayMonitor_get_MaxLuminanceInNits( monitor, &value );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Truncated native field hr %#lx.\n", hr );
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
++        ok( hr == S_OK && length == 128 && !memcmp(copy, edid, 128), "Truncated descriptor was replaced.\n" );
++        IDisplayMonitor_Release( monitor );
++        if (SUCCEEDED(hr))
++        {
++            ok( !memcmp(copy, edid, 128), "Copy lifetime depends on object.\n" );
++            CoTaskMemFree( copy );
++        }
++    }
++}
++
++static void test_async_lifetime(void)
++{
++    static const WCHAR missing[] = L"ROOT\\WINETEST_MISSING_DISPLAYMONITOR\\0";
++    IAsyncOperation_DisplayMonitor *operation;
++    IAsyncInfo *info;
++    IDisplayMonitor *monitor;
++    IUnknown *identity, *other;
++    AsyncStatus before, after;
++    HSTRING id;
++    HRESULT hr;
++    DWORD start;
++
++    WindowsCreateString( missing, ARRAY_SIZE(missing) - 1, &id );
++    hr = IDisplayMonitorStatics_FromIdAsync( statics, id, &operation );
++    WindowsDeleteString( id );
++    ok( hr == S_OK, "Missing ID operation creation hr %#lx.\n", hr );
++    if (FAILED(hr)) return;
++    hr = IAsyncOperation_DisplayMonitor_QueryInterface( operation, &IID_IAsyncInfo, (void **)&info );
++    ok( hr == S_OK, "IAsyncInfo hr %#lx.\n", hr );
++    if (FAILED(hr)) goto done;
++    IAsyncOperation_DisplayMonitor_QueryInterface( operation, &IID_IUnknown, (void **)&identity );
++    IAsyncInfo_QueryInterface( info, &IID_IUnknown, (void **)&other );
++    ok( identity == other, "Async operation COM identity differs.\n" );
++    IUnknown_Release( identity );
++    IUnknown_Release( other );
++    IAsyncInfo_Cancel( info );
++    IAsyncInfo_get_Status( info, &before );
++    for (start = GetTickCount(); GetTickCount() - start < 50; Sleep(1))
++    {
++        IAsyncInfo_get_Status( info, &after );
++        ok( before == after, "Terminal state changed %u -> %u.\n", before, after );
++    }
++    monitor = (void *)0xdeadbeef;
++    hr = IAsyncOperation_DisplayMonitor_GetResults( operation, &monitor );
++    ok( FAILED(hr) && !monitor, "Missing/canceled operation returned a monitor, hr %#lx.\n", hr );
++    hr = IAsyncInfo_Close( info );
++    ok( hr == S_OK, "Close hr %#lx.\n", hr );
++    hr = IAsyncOperation_DisplayMonitor_GetResults( operation, &monitor );
++    ok( hr == E_ILLEGAL_METHOD_CALL, "Closed GetResults hr %#lx.\n", hr );
++    IAsyncInfo_Release( info );
++done:
++    IAsyncOperation_DisplayMonitor_Release( operation );
++}
++
++static void test_synthetic_descriptor(void)
++{
++    HDEVINFO set;
++    SP_DEVINFO_DATA device = {.cbSize = sizeof(device)};
++    SP_DEVICE_INTERFACE_DATA iface = {.cbSize = sizeof(iface)};
++    SP_DEVICE_INTERFACE_DETAIL_DATA_W *detail;
++    struct wine_monitor_properties properties = {0};
++    IDisplayMonitor *monitor, *again;
++    IReference_Size *reference;
++    DisplayMonitorConnectionKind connection;
++    DisplayMonitorPhysicalConnectorKind connector;
++    SizeInt32 resolution;
++    Size physical;
++    FLOAT value;
++    BYTE edid[256], *copy;
++    UINT32 length;
++    WCHAR id[128];
++    HSTRING device_id;
++    HKEY key;
++    DWORD size;
++    HRESULT hr;
++    BOOL ret;
++
++    /* Test-owned device nodes are created only under Wine, never on Windows
++     * or by the production implementation. They do not join the display
++     * topology and are removed on every completed fixture path. */
++    if (!winetest_platform || strcmp(winetest_platform, "wine")) return;
++    swprintf( id, ARRAY_SIZE(id), L"ROOT\\WINETEST_DISPLAYMONITOR\\%08lx", GetCurrentProcessId() );
++    set = SetupDiCreateDeviceInfoList( &GUID_DEVCLASS_MONITOR, NULL );
++    ret = SetupDiCreateDeviceInfoW( set, id, &GUID_DEVCLASS_MONITOR, L"Wine test monitor", NULL, 0, &device );
++    ok( ret, "Create test device error %lu.\n", GetLastError() );
++    if (!ret) goto done;
++    ret = SetupDiRegisterDeviceInfo( set, &device, 0, NULL, NULL, NULL );
++    ok( ret, "Register test device error %lu.\n", GetLastError() );
++    if (!ret) goto done;
++    ret = SetupDiCreateDeviceInterfaceW( set, &device, &monitor_interface, NULL, 0, &iface );
++    ok( ret, "Create test interface error %lu.\n", GetLastError() );
++    if (!ret) goto remove;
++    key = SetupDiCreateDevRegKeyW( set, &device, DICS_FLAG_GLOBAL, 0, DIREG_DEV, NULL, NULL );
++    ok( key != INVALID_HANDLE_VALUE, "Create test key error %lu.\n", GetLastError() );
++    if (key == INVALID_HANDLE_VALUE) goto remove;
++    make_edid( edid );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++    SetupDiSetDevicePropertyW( set, &device, &WINE_DEVPROPKEY_MONITOR_PROPERTIES,
++                              DEVPROP_TYPE_BINARY, (BYTE *)&properties, sizeof(properties), 0 );
++    SetupDiGetDeviceInterfaceDetailW( set, &iface, NULL, 0, &size, NULL );
++    detail = malloc( size );
++    detail->cbSize = sizeof(*detail);
++    ret = SetupDiGetDeviceInterfaceDetailW( set, &iface, detail, size, NULL, NULL );
++    ok( ret, "Interface detail error %lu.\n", GetLastError() );
++    if (!ret) goto close;
++    hr = get_monitor( detail->DevicePath, TRUE, &monitor );
++    ok( hr == S_OK, "Synthetic monitor hr %#lx.\n", hr );
++    if (FAILED(hr)) goto close;
++    hr = IDisplayMonitor_get_DeviceId( monitor, &device_id );
++    ok( hr == S_OK && !wcscmp( WindowsGetStringRawBuffer(device_id, NULL), id ), "Wrong device identity.\n" );
++    WindowsDeleteString( device_id );
++    hr = IDisplayMonitor_get_ConnectionKind( monitor, &connection );
++    ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Unknown connection hr %#lx.\n", hr );
++    hr = IDisplayMonitor_get_PhysicalConnector( monitor, &connector );
++    ok( hr == S_OK && connector == DisplayMonitorPhysicalConnectorKind_Unknown, "Unknown connector fabricated.\n" );
++    hr = IDisplayMonitor_get_NativeResolutionInRawPixels( monitor, &resolution );
++    ok( hr == S_OK && resolution.Width == 1920 && resolution.Height == 1080, "Native resolution hr %#lx.\n", hr );
++    hr = IDisplayMonitor_get_PhysicalSizeInInches( monitor, &reference );
++    ok( hr == S_OK && reference, "Physical size hr %#lx.\n", hr );
++    if (reference)
++    {
++        IReference_Size_get_Value( reference, &physical );
++        ok( physical.Width > 11.80f && physical.Width < 11.82f, "Wrong native physical width %f.\n", physical.Width );
++        IReference_Size_Release( reference );
++    }
++    hr = IDisplayMonitor_get_MaxLuminanceInNits( monitor, &value );
++    ok( hr == S_OK && value == 616, "Maximum hr %#lx, value %f.\n", hr, value );
++    hr = IDisplayMonitor_get_MinLuminanceInNits( monitor, &value );
++    ok( hr == S_OK && value == 0.25f, "Minimum hr %#lx, value %f.\n", hr, value );
++    hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
++    ok( hr == S_OK && length == sizeof(edid) && !memcmp(copy, edid, sizeof(edid)), "EDID byte copy differs.\n" );
++    if (SUCCEEDED(hr))
++    {
++        copy[0] = 17;
++        CoTaskMemFree( copy );
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
++        ok( hr == S_OK && !memcmp(copy, edid, sizeof(edid)), "Descriptor ownership differs.\n" );
++        CoTaskMemFree( copy );
++    }
++    /* Update registry after object creation: immutable snapshots remain valid. */
++    memset( edid, 0, sizeof(edid) );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++    hr = IDisplayMonitor_get_MaxLuminanceInNits( monitor, &value );
++    ok( hr == S_OK && value == 616, "Snapshot changed after registry update.\n" );
++    hr = get_monitor( id, FALSE, &again );
++    ok( hr == S_OK, "New instance resolution hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        hr = IDisplayMonitor_get_MaxLuminanceInNits( again, &value );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Invalid descriptor produced known luminance.\n" );
++        hr = IDisplayMonitor_get_PhysicalSizeInInches( again, &reference );
++        ok( hr == S_OK && !reference, "Unknown size is not null.\n" );
++        IDisplayMonitor_Release( again );
++    }
++    IDisplayMonitor_Release( monitor );
++    test_descriptor_cases( key, id );
++close:
++    free( detail );
++    RegCloseKey( key );
++remove:
++    SetupDiRemoveDevice( set, &device );
++done:
++    SetupDiDestroyDeviceInfoList( set );
++}
++
++START_TEST(displaymonitor)
++{
++    HSTRING name;
++    HRESULT hr;
++    hr = RoInitialize( RO_INIT_MULTITHREADED );
++    ok( SUCCEEDED(hr), "RoInitialize hr %#lx.\n", hr );
++    if (FAILED(hr)) return;
++    WindowsCreateString( RuntimeClass_Windows_Devices_Display_DisplayMonitor,
++                         wcslen(RuntimeClass_Windows_Devices_Display_DisplayMonitor), &name );
++    hr = RoGetActivationFactory( name, &IID_IDisplayMonitorStatics, (void **)&statics );
++    WindowsDeleteString( name );
++    if (FAILED(hr))
++    {
++        win_skip( "DisplayMonitor statics unavailable, hr %#lx.\n", hr );
++        RoUninitialize();
++        return;
++    }
++    test_factory();
++    test_async_lifetime();
++    test_real_interfaces();
++    test_synthetic_descriptor();
++    IDisplayMonitorStatics_Release( statics );
++    RoUninitialize();
++}
+diff --git a/dlls/windows.devices.display/windows.devices.display.spec b/dlls/windows.devices.display/windows.devices.display.spec
+new file mode 100644
+index 0000000..31a5eaf
+--- /dev/null
++++ b/dlls/windows.devices.display/windows.devices.display.spec
+@@ -0,0 +1,3 @@
++@ stdcall -private DllGetActivationFactory(ptr ptr)
++@ stdcall -private DllCanUnloadNow()
++@ stdcall -private DllGetClassObject(ptr ptr ptr)
+diff --git a/dlls/winex11.drv/xrandr.c b/dlls/winex11.drv/xrandr.c
+index 63030e1..1d8c7ef 100644
+--- a/dlls/winex11.drv/xrandr.c
++++ b/dlls/winex11.drv/xrandr.c
+@@ -589,12 +589,13 @@ static unsigned int get_edid( RROutput output, unsigned char **prop )
+     unsigned long bytes_after, len;
+     Atom actual_type;
+ 
+-    result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 128, FALSE, FALSE,
++    result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 8192, FALSE, FALSE,
+                                     AnyPropertyType, &actual_type, &actual_format, &len,
+                                     &bytes_after, prop );
+ 
+-    if (result != Success)
++    if (result != Success || actual_type != XA_INTEGER || actual_format != 8 || bytes_after || len > 32768)
+     {
++        if (*prop) XFree( *prop );
+         WARN("Could not retrieve EDID property for output %#lx.\n", output);
+         *prop = NULL;
+         return 0;
+diff --git a/include/Makefile.in b/include/Makefile.in
+index efb1add..8e0807f 100644
+--- a/include/Makefile.in
++++ b/include/Makefile.in
+@@ -880,6 +880,7 @@ SOURCES = \
+ 	windows.devices.bluetooth.genericattributeprofile.idl \
+ 	windows.devices.bluetooth.idl \
+ 	windows.devices.bluetooth.rfcomm.idl \
++	windows.devices.display.idl \
+ 	windows.devices.enumeration.idl \
+ 	windows.devices.geolocation.idl \
+ 	windows.devices.haptics.idl \
+diff --git a/include/windows.devices.display.idl b/include/windows.devices.display.idl
+new file mode 100644
+index 0000000..5a9300b
+--- /dev/null
++++ b/include/windows.devices.display.idl
+@@ -0,0 +1,112 @@
++/*
++ * Internal facts associated with Wine display monitors
++ *
++ * Copyright 2026 Codex
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
++ */
++
++#ifdef __WIDL__
++#pragma makedep header install winmd
++#pragma winrt ns_prefix
++#endif
++
++import "inspectable.idl";
++import "asyncinfo.idl";
++import "eventtoken.idl";
++import "windowscontracts.idl";
++import "windows.foundation.idl";
++import "windows.graphics.idl";
++
++namespace Windows.Devices.Display
++{
++    typedef enum DisplayMonitorConnectionKind DisplayMonitorConnectionKind;
++    typedef enum DisplayMonitorDescriptorKind DisplayMonitorDescriptorKind;
++    typedef enum DisplayMonitorPhysicalConnectorKind DisplayMonitorPhysicalConnectorKind;
++    typedef enum DisplayMonitorUsageKind DisplayMonitorUsageKind;
++    interface IDisplayMonitor;
++    interface IDisplayMonitor2;
++    interface IDisplayMonitorStatics;
++    runtimeclass DisplayMonitor;
++
++    declare
++    {
++        interface Windows.Foundation.AsyncOperationCompletedHandler<Windows.Devices.Display.DisplayMonitor*>;
++        interface Windows.Foundation.IAsyncOperation<Windows.Devices.Display.DisplayMonitor*>;
++    }
++
++    [contract(Windows.Foundation.UniversalApiContract, 6.0)]
++    enum DisplayMonitorConnectionKind { Internal = 0, Wired = 1, Wireless = 2, Virtual = 3 };
++    [contract(Windows.Foundation.UniversalApiContract, 6.0)]
++    enum DisplayMonitorDescriptorKind { Edid = 0, DisplayId = 1 };
++    [contract(Windows.Foundation.UniversalApiContract, 6.0)]
++    enum DisplayMonitorPhysicalConnectorKind
++    {
++        Unknown = 0, HD15 = 1, AnalogTV = 2, Dvi = 3, Hdmi = 4, Lvds = 5, Sdi = 6, DisplayPort = 7
++    };
++    [contract(Windows.Foundation.UniversalApiContract, 6.0)]
++    enum DisplayMonitorUsageKind { Standard = 0, HeadMounted = 1, SpecialPurpose = 2 };
++
++    [contract(Windows.Foundation.UniversalApiContract, 6.0),
++     exclusiveto(Windows.Devices.Display.DisplayMonitor), uuid(1f6b15d4-1d01-4c51-87e2-6f954a772b59)]
++    interface IDisplayMonitor : IInspectable
++    {
++        [propget] HRESULT DeviceId([out, retval] HSTRING *value);
++        [propget] HRESULT DisplayName([out, retval] HSTRING *value);
++        [propget] HRESULT ConnectionKind([out, retval] DisplayMonitorConnectionKind *value);
++        [propget] HRESULT PhysicalConnector([out, retval] DisplayMonitorPhysicalConnectorKind *value);
++        [propget] HRESULT DisplayAdapterDeviceId([out, retval] HSTRING *value);
++        [propget] HRESULT DisplayAdapterId([out, retval] Windows.Graphics.DisplayAdapterId *value);
++        [propget] HRESULT DisplayAdapterTargetId([out, retval] UINT32 *value);
++        [propget] HRESULT UsageKind([out, retval] DisplayMonitorUsageKind *value);
++        [propget] HRESULT NativeResolutionInRawPixels([out, retval] Windows.Graphics.SizeInt32 *value);
++        [propget] HRESULT PhysicalSizeInInches([out, retval] Windows.Foundation.IReference<Windows.Foundation.Size> **value);
++        [propget] HRESULT RawDpiX([out, retval] FLOAT *value);
++        [propget] HRESULT RawDpiY([out, retval] FLOAT *value);
++        [propget] HRESULT RedPrimary([out, retval] Windows.Foundation.Point *value);
++        [propget] HRESULT GreenPrimary([out, retval] Windows.Foundation.Point *value);
++        [propget] HRESULT BluePrimary([out, retval] Windows.Foundation.Point *value);
++        [propget] HRESULT WhitePoint([out, retval] Windows.Foundation.Point *value);
++        [propget] HRESULT MaxLuminanceInNits([out, retval] FLOAT *value);
++        [propget] HRESULT MinLuminanceInNits([out, retval] FLOAT *value);
++        [propget] HRESULT MaxAverageFullFrameLuminanceInNits([out, retval] FLOAT *value);
++        HRESULT GetDescriptor([in] DisplayMonitorDescriptorKind descriptorKind,
++                              [out] UINT32 *result_size, [out, retval, size_is(, *result_size)] BYTE **result);
++    }
++
++    /* SDK declaration only: no object or runtime metadata advertises this
++     * optional interface without a trustworthy special-Dolby-mode source. */
++    [contract(Windows.Foundation.UniversalApiContract, 10.0),
++     exclusiveto(Windows.Devices.Display.DisplayMonitor), uuid(023018e6-cb23-5830-96df-a7bf6e602577)]
++    interface IDisplayMonitor2 : IInspectable
++    {
++        [propget] HRESULT IsDolbyVisionSupportedInHdrMode([out, retval] boolean *value);
++    }
++
++    [contract(Windows.Foundation.UniversalApiContract, 6.0),
++     exclusiveto(Windows.Devices.Display.DisplayMonitor), uuid(6eae698f-a228-4c05-821d-b695d667de8e)]
++    interface IDisplayMonitorStatics : IInspectable
++    {
++        HRESULT GetDeviceSelector([out, retval] HSTRING *result);
++        HRESULT FromIdAsync([in] HSTRING deviceId,
++                           [out, retval] Windows.Foundation.IAsyncOperation<Windows.Devices.Display.DisplayMonitor*> **operation);
++        HRESULT FromInterfaceIdAsync([in] HSTRING deviceInterfaceId,
++                                    [out, retval] Windows.Foundation.IAsyncOperation<Windows.Devices.Display.DisplayMonitor*> **operation);
++    }
++
++    [contract(Windows.Foundation.UniversalApiContract, 6.0), marshaling_behavior(agile),
++     static(Windows.Devices.Display.IDisplayMonitorStatics, Windows.Foundation.UniversalApiContract, 6.0), threading(both)]
++    runtimeclass DisplayMonitor { [default] interface Windows.Devices.Display.IDisplayMonitor; }
++}
