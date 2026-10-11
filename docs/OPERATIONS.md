@@ -80,8 +80,9 @@ covers the hdr9 library (the reviewed hdr8 code with packaging fixes) and the
 the independent-review fixes. Both library architectures (i386 cross-built)
 and the compositor packages were built from the exact recorded source trees
 in a disposable Ubuntu 26.10 environment, with tests disabled deliberately.
-This is packaging evidence; it does not qualify active scanout. Nothing from
-this build is installed yet. Earlier receipts and builds were superseded
+This is packaging evidence; it does not qualify active scanout. These
+packages were installed and held on 2026-10-11
+([receipt](../evidence/install-2026-10-11.json)). Earlier receipts and builds were superseded
 before installation.
 
 The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
