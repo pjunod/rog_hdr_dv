@@ -233,7 +233,7 @@ These are scoped historical results, not freshly repeated tests.
 
 Two steps wait on the owner, and one comparison is optional. The KMS
 metadata question can be settled by an on-screen comparison if the owner
-wants it; the current picture is accepted. The Dolby processor's next
+wants it; the owner's subjective check of the current picture passed. The Dolby processor's next
 stage waits for the owner's scope confirmation and, before it can say
 anything about this panel, a monitor descriptor source in Wine
 ([prerequisites](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates)).
