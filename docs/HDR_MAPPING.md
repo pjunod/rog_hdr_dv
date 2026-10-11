@@ -2,8 +2,8 @@
 
 **Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`), 0039–0043
 (`nativehdr7`) and the review fixes 0044–0052 (`nativehdr8`); reviewed and
-fast-lane qualified (synthetic headless tests); packaged for amd64, not
-installed · **Date:** 2026-10-11.
+fast-lane qualified (synthetic headless tests); nativehdr8 installed
+2026-10-11 (owner HDR session check pending) · **Date:** 2026-10-11.
 
 This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-source-findings--input-contracts-and-mapping-ownership).
 `nativehdr5` fixed the input defects. This batch adds the two missing

@@ -29,7 +29,8 @@ remain separate evidence. No new Linux compilation or hardware test ran.
 Subsequent source changes append separate patches; the original import receipts
 remain historical. The [native luminance API](NATIVE_LUMINANCE_API.md) extends
 both library series beyond those imported candidates. Its qualification is
-recorded separately, and installed hdr6 remains pinned as the delivered prefix.
+recorded separately, and hdr6, the previously installed release and now the rollback, remains
+pinned as the delivered prefix; hdr9 was installed on 2026-10-11.
 
 Only the active source paths were imported. The earlier high-level native
 HDR promotion proposal is superseded by the additive parser/explicit-consumer

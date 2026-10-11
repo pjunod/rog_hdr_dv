@@ -94,8 +94,8 @@ library provides, so an archive library update cannot satisfy it. A
 simulated newer archive library (above the version floor, without the
 virtual package) could only be installed by removing the compositor library
 and the desktop, which a routine upgrade does not do.
-On the laptop, APT simulation reports six upgrades, zero additions and zero
-removals.
+On the laptop, APT simulation reported six upgrades, zero additions and zero
+removals, and the real transaction matched.
 
 A private copy of the installed package database, with only those six
 candidate control records substituted, resolves the six previously installed

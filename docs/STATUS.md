@@ -43,7 +43,8 @@ HDR API as a virtual package the compositor depends on) with `nativehdr8`
 ([receipt](../evidence/hdr9-nativehdr8-packages.json)). The install kit holds
 the six packages, checks the rollback packages first and snapshots the
 package state. The `nativehdr6` comparison set was dropped: it lacks the
-review fixes. It was installed on 2026-10-11 (see above).
+review fixes. The hdr9 + `nativehdr8` set was installed on 2026-10-11 (see
+above).
 
 ## Eighth batch — gamut compression and delivery (merged, PR 8)
 
@@ -117,7 +118,7 @@ all are addressed ([review](REVIEW.md#fifth-batch--display-contracts-pr-5)).
 The pre-merge fast lane then passed: library groups and legacy consumers,
 Mutter `native-hdr` and all Wayland target-volume invocations, 23 probe
 cases, and the Wine `displaymonitor` and `displayconfig` tests
-([receipt](../evidence/batch5-fast-lane.json)). Nothing is installed yet.
+([receipt](../evidence/batch5-fast-lane.json)). Nothing was installed at that point.
 
 On 2026-10-10 the previous agents' macOS temporary clones were gone and two
 local commits had never been pushed. Every unfinished change was recovered:
@@ -171,7 +172,7 @@ Mutter and matching amd64/i386 library packaging.
 | Physical luminance library | hdr9 (hdr8 luminance and gamut API) installed for amd64 and i386 | Wider hardware and upstream acceptance |
 | Compositor feedback | nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) installed | Owner HDR session check and active-output verification |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
-| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; visual check after installation |
+| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; visual check on the owner's HDR desktop session (pending) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 
@@ -202,13 +203,13 @@ values are not measurements of this particular unit.
 ## Installed baseline and inherited evidence
 
 - libdisplay-info `0.3.0-1ubuntu1~hdr9` (amd64, i386) and Mutter
-  `51.0-1ubuntu3+nativehdr8`, installed and held on 2026-10-11; the entries
-  below describe the earlier baseline they replaced.
+  `51.0-1ubuntu3+nativehdr8`, installed and held on 2026-10-11.
 - Kernel `7.3.0-rc5-nativehdr1`, from Ubuntu `7.3.0-8.8` plus four patches. The
   installed stock fallback kernel is now `7.3.0-9-generic` (the `7.3.0-8`
   image named in the older recovery notes has been removed).
-- libdisplay-info `0.3.0-1ubuntu1~hdr6`, amd64 and i386.
-- Mutter `51.0-1ubuntu3+nativehdr2`.
+- Replaced on 2026-10-11 and kept as the hash-verified rollback:
+  libdisplay-info `0.3.0-1ubuntu1~hdr6` (amd64, i386) and Mutter
+  `51.0-1ubuntu3+nativehdr2`.
 - NVIDIA `615.71.09`; Secure Boot remains enabled.
 - mpv `0.41.0`, libplacebo `7.360.1`, FFmpeg `8.1.2` at inspection.
 
@@ -250,8 +251,9 @@ Recorded for review; each can be revisited.
   the i386 library is cross-built; Wine tests use WineHQ 11.0 with the
   candidate modules overlaid). The Wine compiler and the Dolby activation
   probe run in agent-owned containers on the laptop (`lab5`) with no network,
-  mounts or GPU. Nothing is installed on the laptop host; package simulations
-  and staging happen there.
+  mounts or GPU. Package simulations and staging happened on the laptop
+  before the coordinated installation of 2026-10-11; agent build containers
+  from earlier batches were removed at the owner's request that day.
 - The Wine DisplayMonitor uses base EDID 1.4 facts where DisplayID declares
   none.
 - HLG is decoded for its declared nominal peak and then fitted by the common
@@ -270,5 +272,5 @@ Recorded for review; each can be revisited.
 - PQ content without a declared peak is not tone-mapped; its overshoot is
   left to the panel.
 - KMS static metadata keeps zero ("unknown") luminance fields; whether to
-  declare the target is decided by an on-screen comparison after
-  installation.
+  declare the target is decided by an on-screen comparison on the
+  owner's HDR desktop session.

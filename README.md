@@ -74,7 +74,9 @@ any live compositor or kernel update.
   proposals, with exact bases in `sources.json`.
 - `patches/ubuntu-libdisplay-info/` · `patches/ubuntu-mutter/` — complete
   local changes from authenticated Ubuntu source imports, including the
-  delivered prefixes and explicitly marked unreleased candidates. These are alternative packaging paths to the upstream series.
+  delivered prefixes and explicitly marked unreleased candidates. In
+  `sources.json` the `delivered_*` fields pin the earlier delivered prefix
+  (now the rollback); the installed release is the candidate. These are alternative packaging paths to the upstream series.
 - `patches/linux/` — four native luminance/backlight/parser-test patches.
 - `patches/wine/` — bounded Windows API compatibility work for processor investigation.
 - `sources.json` · `SHA256SUMS` — source identities and patch integrity.
