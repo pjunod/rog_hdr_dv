@@ -73,7 +73,8 @@ owner's session run on it with no colour messages. In the default mode, the
 session publishes sRGB with the fallback target. In native SDR mode
 (selected with `gdctl`), the encoding and target primaries are the panel's
 base EDID gamut ([receipt](../evidence/install-lab6-2026-10-11.json)). The
-owner's visual check is pending.
+owner then looked at it and reported that the image looks great; that is a
+subjective check, not a measurement.
 
 An independent Fable review of the whole plan followed (strategy, design,
 upstreaming, measurement, process). Its recommendations and the decisions it

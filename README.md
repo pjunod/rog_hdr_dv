@@ -63,6 +63,8 @@ generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides.
+[Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
+agent: state, next tasks, environments and commands.
 
 ## Work with the repository
 
@@ -98,6 +100,11 @@ any live compositor or kernel update.
 - `evidence/` — small reproducible migration/validation receipts. Large or
   private captures, OEM binaries and signing keys do not belong in Git.
 - `scripts/` — repository validation, with no installation side effects.
+- `tools/` — the reconstruction, build, test and packaging harness for
+  disposable containers ([development](docs/DEVELOPMENT.md#build-test-and-packaging-harness-tools)).
+- `wip/` — unreviewed work in progress, kept out of the pinned series.
+- Built packages are attached to draft GitHub releases (private to
+  collaborators), not committed.
 
 ## Progress
 

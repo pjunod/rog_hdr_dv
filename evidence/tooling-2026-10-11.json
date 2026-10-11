@@ -1,0 +1,34 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-11",
+ "status": "PASS",
+ "scope": "tools/ harness, moved from an agent workspace into the repository and run end to end on trees rebuilt from this repository",
+ "environment": "Ubuntu 26.10 amd64 containers (Wine reconstruction also in Ubuntu 26.10; Wine runtime script not re-run here)",
+ "reconstruct": {
+  "command": "tools/reconstruct.py COMPONENT WORKDIR",
+  "results": {
+   "mutter": "base 478ac554 OK; 49 patches; candidate 3f238d2e OK",
+   "ubuntu-mutter": "base 30242cc5 OK; 61 patches; candidate a1a83849 OK",
+   "libdisplay-info": "base 524c3dfd OK; 10 patches; candidate 72626245 OK",
+   "ubuntu-libdisplay-info": "base 5708d8b3 OK; 23 patches; candidate 96d65c11 OK",
+   "wine": "base c143c87e OK; 17 patches; candidate 85037f72 OK"
+  },
+  "finding": "docs/DEVELOPMENT.md said the Ubuntu import is staged with git add -f; that does not reproduce base_tree (it adds subprojects/gvdb and debian/tests/build, which the package .gitignore excludes). Corrected to git add without -f."
+ },
+ "build_upstream": "tools/build-upstream.sh on the reconstructed libdisplay-info and mutter trees with the pinned orig tarball for gvdb: build OK (-Dwerror=true)",
+ "test_mutter_colour": "tools/test-mutter-colour.sh on that build: 23/23 OK",
+ "package_ubuntu": {
+  "stages_run": "lib64, mutter (lib32 not re-run)",
+  "result": "OK; libdisplay-info3 0.3.0-1ubuntu1~hdr9 and libmutter-51-0 51.0-1ubuntu3+nativehdr9 built from the reconstructed Ubuntu trees; libmutter-51-0 file list identical to the delivered package (package bytes differ: builds are not bit-reproducible)",
+  "rebuilt_sha256": {
+   "libmutter-51-0_51.0-1ubuntu3+nativehdr9_amd64.deb": "e45a26e38601e0f8170dec1f223935a0f0909f14618a424a7955903cef50c88c",
+   "libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb": "080a4add280ebb94ed7d0da5a0b46fe259fd84b7f35a44d27a128dea24664949"
+  },
+  "fix": "copy_tree falls back to a tar copy when git is not installed in the packaging container"
+ },
+ "wip": "wip/mutter-nightlight head builds with -Werror and passes tools/test-mutter-colour.sh 24/24 (tree 14ce390c); unreviewed",
+ "releases": {
+  "packages/hdr9-nativehdr8": "draft, hdr9-nativehdr8-packages.tar sha256 4d8e5392a2218af565b11b9bb04292225bd9c06aba52c6006dc2e63e9aa9232d",
+  "packages/hdr9-nativehdr9": "draft, hdr9-nativehdr9-packages.tar sha256 addb9064dc863716f2de09d89ba233f4c3c20af27fdee44392b0319749fe7bb8"
+ }
+}

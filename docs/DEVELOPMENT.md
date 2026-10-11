@@ -41,8 +41,11 @@ snapshot and require the same hashes. Never substitute another version.
 On a Linux build host with `dpkg-dev`, fetch the three recorded artifacts into
 one empty directory, verify every hash, and run `dpkg-source -x` on the `.dsc`.
 Keep its normally applied quilt patches. Initialise Git in the extracted tree
-and stage source with `git add -f -- . ':(exclude).pc'`; `.pc/` is generated
-quilt bookkeeping, not part of the recorded imported tree. Check `git write-tree`
+and stage source with `git add -- . ':(exclude).pc'`; `.pc/` is generated
+quilt bookkeeping, not part of the recorded imported tree. Do not force-add:
+the recorded imports honour the package's own `.gitignore`, which keeps
+`subprojects/gvdb` and Mutter's `debian/tests/build` out (an earlier version
+of this page said `git add -f`, which does not reproduce `base_tree`). Check `git write-tree`
 against the component's `base_tree` before creating a baseline commit or
 applying any exported patch. Stop on a mismatch and report the differing
 paths. After applying the ordered series, require `candidate_tree` equality.
@@ -77,6 +80,15 @@ git -C work/libdisplay-info status  # Stop and resolve an interrupted am.
 For the exact imported content, verify the resulting tree against
 `candidate_tree` in `sources.json`. A fresh `git am` may produce different
 commit IDs because committer metadata changes; the source tree must match.
+
+### Reconstruct and verify automatically
+
+`tools/reconstruct.py COMPONENT WORKDIR` does all of the above for
+`libdisplay-info`, `mutter`, `wine`, `ubuntu-libdisplay-info` and
+`ubuntu-mutter`, and fails unless `base_tree` and `candidate_tree` match. On
+2026-10-11 all five reproduced their pinned trees exactly from this
+repository alone (Ubuntu 26.10 container; the Ubuntu artifacts from the
+archive URLs, the upstreams from their recorded Git URLs).
 
 ## 3. Establish the compiler loop before editing
 
@@ -116,11 +128,30 @@ Do not reuse stale affected objects after source archive replacement. Earlier
 warm KUnit objects and ineffective Meson CFLAGS reconfiguration produced
 invalid evidence; record actual compile commands and invalidate stale builds.
 
-Full packaging requires the matching Ubuntu build dependencies and the
-source's own packaging rules. The previous exact command logs remain in the
-historical workspace identified in [provenance](PROVENANCE.md). Transcribe and
-requalify those into maintained build automation as components change; this
-initial repository does not claim a newly tested all-component build script.
+### Build, test and packaging harness (`tools/`)
+
+The scripts the agent batches used are kept in `tools/`. They run in a
+disposable Ubuntu 26.10 container (Ubuntu 24.04 for Wine), never on a host
+or laptop:
+
+| Script | Purpose |
+|---|---|
+| `container-setup.sh` | Prepare the container: build tools and the Mutter and libdisplay-info build dependencies. Optional `HTTPS_PROXY`/`CA_BUNDLE`. |
+| `reconstruct.py` | Rebuild and verify a pinned tree (above). |
+| `build-upstream.sh LIB_SRC MUTTER_SRC OUT [ORIG]` | Upstream-facing libdisplay-info, then Mutter against it, both with warnings as errors. `ORIG` (Ubuntu's pinned `mutter_51.0.orig.tar.xz`) supplies `subprojects/gvdb` where gitlab.gnome.org is unreachable. |
+| `test-mutter-colour.sh BUILD` | The colour fast lane (every `wayland-color-management` invocation plus the clutter, monitor, colour-management and native-HDR suites), headless on llvmpipe, as an unprivileged user with no session variables. |
+| `check-each-commit.sh REPO BASE TIP BUILD LDI_PREFIX` | Build every commit of a range separately. |
+| `package-ubuntu.sh STAGE LIB_TREE MUTTER_TREE ORIG OUT` | Unsigned binary packages from the Ubuntu trees (library amd64 and i386 cross, Mutter amd64), refusing a tree whose quilt series is not fully applied. |
+| `wine-runtime-test.sh MODULES` | The Wine DisplayMonitor and display-configuration tests with WineHQ 11.0 and candidate modules overlaid. |
+| `export_series.py` | Export a work branch into `patches/<component>` and refresh `sources.json` and `SHA256SUMS`. |
+| `upstream_msg.py` | The commit-message rewrite used once to port the Ubuntu series to upstream form (subjects, package references). |
+| `scan_publication.sh RANGE` | Scan a range and the tree for addresses, tokens, keys and home paths before a push. |
+| `codex_apply.py` | Apply a Codex `apply_patch` envelope to a tree. |
+
+`build-upstream.sh` and `test-mutter-colour.sh` were run end to end on
+reconstructed trees on 2026-10-11 ([receipt](../evidence/tooling-2026-10-11.json)).
+Builds of the packages from these scripts are packaging evidence only, not
+installation qualification.
 
 ## 4. Record and ship only the result actually tested
 
