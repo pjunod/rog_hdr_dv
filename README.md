@@ -10,7 +10,7 @@ the operating-system display work independently.
 `nativehdr8` compositor are installed (the compositor and library since
 2026-10-11), and Secure Boot is enabled. The owner reported working HDR10 on
 the earlier stack; on the new compositor the HDR session runs in BT.2100 mode
-and the visual check is pending. Full Dolby Vision, measured calibration
+and the owner accepted the picture. Full Dolby Vision, measured calibration
 and remaining transition/resume acceptance are unfinished. The earlier mpv
 DV-to-PQ sample does not qualify full Dolby Vision.
 
