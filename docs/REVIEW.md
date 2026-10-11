@@ -321,6 +321,47 @@ Process note for batches six to eight: by the coordinator's record,
 receipts did not record it.
 Receipts from the ninth batch on record it.
 
+## Independent plan review (2026-10-11)
+
+At the owner's request, Fable reviewed the whole plan rather than the code:
+strategy, design decisions, upstreaming, quality and process. Its top
+recommendations, ranked:
+
+1. Boot the laptop's own Windows once and trace the OEM Dolby pipeline (files,
+   DisplayMonitor getters, media types, D3D device, sample attributes) before
+   further Wine work. Owner decision (BitLocker install, coordinated window).
+2. Make an open, RPU-aware display-management path (libplacebo reshaping and
+   L1, plus L2 trims) the generally available Dolby Vision track. Validate it
+   against the privately held Dolby reference renderer within a stated
+   ΔE_ITP. Keep the OEM-under-Wine route as a time-boxed, lab5-only
+   experiment. Owner decision on what counts as "actual Dolby Vision".
+3. Settle KMS HDR metadata with the planned on-screen A/B, then bound the
+   composition and declare the display's own values, as KWin and Windows
+   do. Upstream sent zero after 10000-nit values broke monitors; declaring
+   the panel's own values is different.
+4. Reshape the upstream series for acceptance under the owner's identity,
+   in slices, design discussions first. `@invalid` authorship cannot be
+   submitted. Upstream libdisplay-info would likely prefer one Display
+   Parameters struct to two narrow getters. The four kernel patches track
+   an existing intel-gfx series that should be followed, not resubmitted.
+5. Buy the instrument now, and build a small Wayland PQ patch client, because
+   ArgyllCMS cannot drive a PQ surface.
+
+Further findings: no per-output peak override for displays with wrong CTA
+values; colord-assigned measured ICC should beat base EDID as the native SDR
+target; SDR white in HDR mode is capped at 203 cd/m² (a daylight usability
+gap on a 616-nit OLED); Night Light is applied to PQ-encoded values (an
+upstream defect); apps must not apply a display ICC on top of the compositor;
+OLED ABL means full-frame scenes stay near 400 cd/m²; the test matrix lacks
+an HDMI HDR TV on the NVIDIA output, the MUX route and any AMD hardware; the
+ACES threshold was tuned for AP1 camera colours.
+
+Corrections applied: the stale nativehdr7 status line, the Dolby activation
+qualifier (Wine 0001–0009 only; Profile 7 not registered), the brightness
+statement in the tenth batch (the factor never exceeds 1), the
+DisplayMonitor descriptor wording (sysfs by connector name is now an open
+option), the ACES parameter provenance, and the dated baseline table.
+
 ## Tenth batch — general targets and upstream port
 
 An adversarial Fable review covered the upstream-facing Mutter port, the
@@ -350,9 +391,11 @@ update. Wayland identity excludes provenance, so a provenance-only change
 creates no new description. Ordinary sRGB clients in native SDR were already
 composited, so there is no new scanout regression.
 
-Recorded behaviour: with the brightness factor raised above a declared peak,
-SDR is highlight-mapped toward that peak on every output with a target
-(already true on the native route). A native SDR panel whose white lies far
+Recorded behaviour: the reference-white factor is the brightness setting
+divided by 100, so it never exceeds 1 and reference white stays at or below
+203 cd/m². With every accepted target above 203, SDR is therefore never
+highlight-mapped today. That changes only if the SDR white in HDR mode is
+allowed above 203 (an open owner decision). A native SDR panel whose white lies far
 from D65 can now compress sRGB content, which is the consistent result of
 the encoding's own white adaptation.
 

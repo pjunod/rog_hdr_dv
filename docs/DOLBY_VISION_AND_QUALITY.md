@@ -39,7 +39,9 @@ Factory binaries stay on the laptop; this ledger contains findings and hashes.
 ## 2. Verified laptop and Linux baseline
 
 Live inspection on October 8 used the existing laptop connection (`lab5`).
-The morning HDR work remains the foundation:
+This table is that snapshot; the installed set has since moved on (hdr9 and
+`nativehdr8` on 2026-10-11), and [status](STATUS.md) is current. The morning
+HDR work remains the foundation:
 
 | Component | Observed state |
 |---|---|
