@@ -316,8 +316,9 @@ The fast lane passed on its first run: all affected Clutter, backend, native
 and Wayland suites, including the new separate target-gamut invocation
 ([receipt](../evidence/mutter-gamut-compression.json)).
 
-Process note for batches six to eight: `scripts/check_repository.py` ran
-before each merge (and passed), but the batch receipts did not record it.
+Process note for batches six to eight: by the coordinator's record,
+`scripts/check_repository.py` ran and passed before each merge, but the batch
+receipts did not record it.
 Receipts from the ninth batch on record it.
 
 ## Ninth batch — independent review and fixes
@@ -337,7 +338,7 @@ checked the fixes. Findings and dispositions:
 | Mapping predicate recomputed per frame and per pointer motion; display targets inferred from any target volume; curve relied on infinities | Nit | One decision per state pair shared by renderer, scanout and cursor; explicit display-target constructor; finite two-branch curve (its first test had a duplicated sample point, fixed and rerun) |
 | Bounded-encoding proxy and the two D65 definitions undocumented | Nit | Documented in code |
 | The compositor depended on a library version floor that an archive build would satisfy, so an archive library update could leave GNOME unable to start | Should-fix | The library provides `libdisplay-info3-native-hdr-api (= 2)` and the compositor depends on it; the install kit holds the six packages |
-| A stale quilt entry in both packages was hidden by regenerated quilt bookkeeping | Should-fix | Removed (its attribution moved to `README.native-displayid`); the package build now fails if any series entry is not applied in the tree |
+| A stale quilt entry in both packages was hidden by regenerated quilt bookkeeping | Should-fix | Removed (its attribution moved to `README.native-displayid`); the private packaging harness now refuses to build unless every series entry reverse-applies (the debian sources do not enforce this) |
 | Wine Wayland driver supplies no monitor descriptor, so on the owner's desktop the processor sees no panel facts | Should-fix (plan) | Recorded as the governing prerequisite for the processor track ([Wine](WINE_DISPLAY_MONITOR.md#remaining-processor-boundary)) |
 | GDI driver ABI deployment set unnamed (`wineps.drv` would break) | Should-fix | Coherent module set documented |
 | DisplayMonitor read without the lock if the mutex failed; name coupled by string | Should-fix | Shared name; resolution fails closed |

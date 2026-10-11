@@ -1,7 +1,8 @@
 # Dolby activation probe — find the first compatibility boundary
 
 **Status:** the processor activates and describes its transform under Wine 11
-with the DisplayMonitor candidate; type negotiation and frames not started ·
+with the DisplayMonitor candidate (patches 0001–0009, before the 0010–0017
+review fixes); type negotiation and frames not started ·
 **Written:** 2026-10-08 · **Updated:** 2026-10-11.
 
 Companion to [Dolby Vision and quality](DOLBY_VISION_AND_QUALITY.md): this
@@ -89,12 +90,10 @@ timestamp disabled to avoid a changing timestamp in compiler receipts.
 
 ## Run after review — keep the execution private and bounded
 
-The commands below document the **original Wine 9 experiment** and are kept
-as its record. The later Wine 11 runs used the
+The commands below document the original, reviewed **Wine 9 experiment** and
+are kept as its record. The later Wine 11 runs used the
 [Wine 11 fixture](#wine-11-fixture--what-the-later-runs-used) below; follow
-that one for new executions.
-
-The commands below document the reviewed experiment. For a new execution,
+that one for new executions. For a new execution,
 first recheck the source and compilation, then supply the DLL from the
 private recovered inventory. Copy the exact approved DLL into
 `/private/oem/DolbyVisionPlugin.dll` inside this own container, without mounting
@@ -191,10 +190,13 @@ record ([boundary](../evidence/dolby-displaymonitor-boundary.json),
 - **Runtime:** WineHQ `wine-stable` 11.0 (Ubuntu 24.04 packages) in an
   agent-owned container image, with the candidate Wine modules copied over
   the packaged ones **before** the prefix is created. For the DisplayMonitor
-  run that set is the coherent GDI-driver set listed in
-  [Wine monitor discovery](WINE_DISPLAY_MONITOR.md#shared-topology-and-connector-facts)
-  plus kernelbase and windows.devices.display; each overlaid module's hash
-  is recorded.
+  run the overlay was win32u, winex11.drv, winewayland.drv, kernelbase and
+  windows.devices.display (plus user32, setupapi, cfgmgr32 and
+  windows.devices.enumeration from the same build); `wineps.drv` was not
+  replaced, which is outside the
+  [coherent set](WINE_DISPLAY_MONITOR.md#shared-topology-and-connector-facts)
+  but unused there. That run's receipt records the hashes of kernelbase,
+  windows.devices.display and win32u only.
 - **Prefix:** fresh, inside the container, created after the overlay with
   `WINEDLLOVERRIDES=mscoree,mshtml=` so no installer dialog blocks it.
 - **Isolation:** the container is created without any network, so it has

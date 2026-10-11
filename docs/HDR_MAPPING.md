@@ -111,8 +111,9 @@ reference-white scaling, exceeds the output target peak. It never expands.
   is no black adjustment: the mapping never raises black, and the target
   minimum is not used. Signal above the effective source peak is held at
   the target peak.
-- **Curve form:** BT.2390 as written; evaluated identically on the CPU and
-  in the shader.
+- **Curve form:** the BT.2390 Hermite knee (KS = 1.5 · maxLum − 0.5) in
+  normalized PQ, with the deviations listed in this section; identical on
+  the CPU and in the shader.
 - **Colour:** applied to max(R, G, B) of linear BT.2020, with all three
   channels scaled by the same ratio, so hue and saturation ratios are kept.
   Negative components are not lifted; max(R, G, B) ≤ 0 is unchanged.

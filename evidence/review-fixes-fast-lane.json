@@ -62,9 +62,9 @@
   "fast_lane": {
    "displaymonitor": "348 tests, 0 failures, 0 skipped",
    "displayconfig": "13 tests, 0 failures, 0 skipped",
-   "count_note": "The fifth-batch run counted 14 displayconfig tests and this one 13, with no failures or skips in either; the user32 test source is unchanged, and the cause of the one-test difference was not established"
+   "count_note": "The fifth-batch run counted 14 displayconfig tests and this one 13, with no failures or skips in either. user32_test.exe was rebuilt (its hash differs from the fifth batch): displayconfig.c includes the changed wine/monitor.h and wingdi.h, and win32u's output-technology handling changed (patch 0014). The one-test difference was not investigated."
   },
-  "harness_note": "A first attempt hung in wineboot because the harness script lacked the installer-dialog override; with it restored no test had run, so this is not a rerun of a failed check"
+  "harness_note": "A first attempt hung in wineboot before any test ran (the harness lacked the installer-dialog override); with it restored the run completed, so this is not a rerun of a failed check."
  },
  "libdisplay_info": {
   "base_tree": "004413f716800db397eb9739fd56ef71e979260f",

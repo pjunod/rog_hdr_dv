@@ -17,9 +17,10 @@ The most important finding: plain PQ video without a declared peak was being
 tone-mapped from the 10000 cd/m² encoding capacity, which would have dimmed
 ordinary HDR. `nativehdr8` (Mutter patches 0044–0052) now leaves such content
 unmapped, publishes descriptions on the renderer's exact identity, and
-applies the other fixes. The Wine DisplayMonitor took three robustness fixes
-(patches 0010–0017). A re-review approved the fixes, and the affected fast
-lanes passed (synthetic headless tests;
+applies the other fixes. The Wine DisplayMonitor took three fixes (lock, EDID copy, output
+technologies; patches 0010–0017). A Fable re-review found no blockers and
+approved the fixes (recorded in [review](REVIEW.md#ninth-batch--independent-review-and-fixes)),
+and the affected fast lanes passed (synthetic headless tests;
 [receipt](../evidence/review-fixes-fast-lane.json)).
 
 The delivery set is now the hdr9 library (hdr8 code; it provides the native
@@ -207,7 +208,7 @@ These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-Three steps wait on the owner. The packaged hdr9 + `nativehdr8` set needs a
+Four steps wait on the owner. The packaged hdr9 + `nativehdr8` set needs a
 coordinated installation (log out of GNOME, install, restart the display
 manager), followed by an active-output check, including an on-screen
 comparison of the KMS metadata question. The Dolby processor's next stage

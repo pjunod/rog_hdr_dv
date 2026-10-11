@@ -89,8 +89,10 @@ The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
 and `mutter-common-bin`. The two library architectures require the same
 version, and GIR requires the exact matching Mutter library. The compositor
 depends on `libdisplay-info3-native-hdr-api (>= 2)`, which only the private
-library provides, so an archive library update cannot satisfy it; APT would
-have to remove the compositor library, which a routine upgrade does not do.
+library provides, so an archive library update cannot satisfy it. A
+simulated newer archive library (above the version floor, without the
+virtual package) could only be installed by removing the compositor library
+and the desktop, which a routine upgrade does not do.
 On the laptop, APT simulation reports six upgrades, zero additions and zero
 removals.
 

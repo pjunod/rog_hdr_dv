@@ -14,7 +14,7 @@
   "dpkg_dev": "1.23.7ubuntu2",
   "environment": "disposable agent container; dependencies from the distribution archive; nothing installed on the laptop host",
   "warning_policy": "Debian packaging defaults; not a warnings-as-errors build (the source candidates were compiled with warnings as errors during qualification)",
-  "quilt_state": "imported trees are the quilt-applied state; .pc/applied-patches is regenerated from debian/patches/series, and since hdr9/nativehdr8 the build fails unless every series entry reverse-applies cleanly against the tree (the stale native-displayid-hdr.patch entries were removed)"
+  "quilt_state": "imported trees are the quilt-applied state; the private packaging harness regenerates .pc/applied-patches from debian/patches/series and, since hdr9/nativehdr8, refuses to build unless every series entry reverse-applies cleanly against the tree (the debian sources themselves do not enforce this); the stale native-displayid-hdr.patch entries were removed"
  },
  "artifact_sets": [
   {
@@ -265,10 +265,10 @@
   ],
   "candidate": "hdr9 library (amd64, i386) with nativehdr8 compositor",
   "api_dependency_simulation": {
-   "method": "from the modeled installed state, apt-get -s install of the archive libdisplay-info3 0.3.0-1",
-   "result": "APT can only do it by removing libmutter-51-0, so a routine upgrade keeps the private library; the install kit also holds the six packages"
+   "method": "from the modeled installed state (hdr9 + nativehdr8), apt-get -s install of a simulated newer archive libdisplay-info3 0.3.0-1ubuntu2 (amd64 and i386) that satisfies the version floor but lacks the native HDR API Provides",
+   "result": "APT can only install it by removing libmutter-51-0 and the desktop packages that depend on it, so a routine upgrade keeps the private library back; the install kit also holds the six packages"
   },
   "install_kit": "pre-flight hash checks of both package sets, a dpkg selections and status snapshot, apt-mark hold, and unhold in the recovery notes"
  },
- "scope": "hdr9 library (hdr8 code, PR 5; packaging PR 10) with nativehdr8 compositor (patches 0001-0052). hdr8 with nativehdr5, 6 and 7 were built first and superseded before installation."
+ "scope": "hdr9 library (hdr8 code from PR 5 with packaging fixes) with nativehdr8 compositor (patches 0001-0052). hdr8 with nativehdr5, 6 and 7 were built first and superseded before installation."
 }

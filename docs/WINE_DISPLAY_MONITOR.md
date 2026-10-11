@@ -55,8 +55,9 @@ candidate must be deployed as one coherent set: win32u (PE and Unix),
 winex11.drv, winewayland.drv and wineps.drv (PE and Unix each), plus
 winemac.drv or wineandroid.drv where built. A runtime that keeps a packaged
 wineps.drv loses printing ("wrong driver version"); one that keeps any
-packaged display driver is not valid evidence for this change. The fixture
-receipts record the hash of every overlaid module.
+packaged display driver is not valid evidence for this change. The test
+fixtures overlay win32u, winex11.drv and winewayland.drv; `wineps.drv` was
+not replaced, which does not affect the display tests.
 
 ## WinRT object and descriptor handling
 
@@ -170,7 +171,8 @@ are not carried. The [compiler receipt](../evidence/wine-displaymonitor-compile.
 records the affected modules and both test binaries built on native amd64
 with zero warnings. The [fast-lane receipt](../evidence/batch5-fast-lane.json)
 records `displaymonitor` (308 tests) and `displayconfig` (14 tests) passing
-with the candidate modules loaded into a WineHQ 11.0 runtime. After the review fixes below, `displaymonitor` (348 tests) and
+with the candidate modules loaded into a WineHQ 11.0 runtime. After the
+review fixes described below, `displaymonitor` (348 tests) and
 `displayconfig` (13 tests) passed again in the same kind of runtime
 ([receipt](../evidence/review-fixes-fast-lane.json)).
 
@@ -182,8 +184,8 @@ exposes no EDID property either. On the owner's GNOME Wayland desktop, every
 physical property except identity and name is therefore unavailable, exactly
 as in the display-less fixture. If the OEM processor branches on monitor
 facts, it cannot engage for this panel until a descriptor source with
-provenance exists. The legitimate one is the compositor: `nativehdr7`
-publishes the panel's declared target luminance and primaries through
+provenance exists. The legitimate one is the compositor: the compositor
+candidate (publishing since `nativehdr4`, currently `nativehdr8`) publishes the panel's declared target luminance and primaries through
 `wp_color_management_v1`, which the Wine Wayland driver can carry into the
 monitor record with a compositor origin. A raw EDID needs a real facility
 (a compositor protocol or DRM); matching a `wl_output` name to sysfs would be
