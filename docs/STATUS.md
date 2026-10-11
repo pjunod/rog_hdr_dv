@@ -8,26 +8,39 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Active seventh batch — delivery packages, HLG and tone mapping
+## Active eighth batch — gamut compression and delivery
 
-The reviewed hdr8 library and the `nativehdr6` compositor are packaged for
+The reviewed hdr8 library and the `nativehdr7` compositor are packaged for
 amd64, with the library also built for i386
-([receipt](../evidence/hdr8-nativehdr6-packages.json)). On the laptop, APT
+([receipt](../evidence/hdr8-nativehdr7-packages.json)). On the laptop, APT
 simulates six upgrades with no additions or removals, and a modeled rollback
-to the installed hdr6/nativehdr2 packages gives six downgrades. Installation
-needs a coordinated, recovery-ready window
+to the installed hdr6/nativehdr2 packages gives six downgrades. The
+`nativehdr6` packages are staged beside them for a comparison without gamut
+compression. Installation needs a coordinated, recovery-ready window
 ([operations](OPERATIONS.md#4-prepared-userspace-package-transaction)).
 Nothing is installed yet.
+
+`nativehdr7` (Mutter patches 0039–0043) compresses colours outside the
+panel's declared gamut into it, using the ACES reference gamut compression
+with limits derived from the source and target gamuts
+([contract](HDR_MAPPING.md#gamut-compression-nativehdr7)). It applies only
+when the content can exceed the declared gamut, so sRGB content on a
+panel whose declared gamut contains sRGB, and P3 masters on a P3 panel, are
+untouched. It was reviewed adversarially and
+passed its affected fast lane on the first run (synthetic headless tests,
+software rendering; [receipt](../evidence/mutter-gamut-compression.json)).
+Whether the panel itself clips out-of-gamut input, and so how much this
+changes on screen, needs the installed system and an instrument.
+
+## Seventh batch — HLG and tone mapping (merged, PR 7)
 
 `nativehdr6` (Mutter patches 0028–0038) implements the
 [HLG and tone-mapping contract](HDR_MAPPING.md): HLG decoding with its OOTF,
 validated source mastering metadata, and BT.2390 highlight mapping to the
 panel's declared target luminance. Mapping is applied once per surface and
 only when content exceeds that target. It was reviewed adversarially and
-passed its affected fast lane (synthetic headless tests, software rendering) ([receipt](../evidence/mutter-hdr-mapping.json)).
-It is packaged, and the coordinated installation delivers it directly
-instead of `nativehdr5`.
-Gamut compression and output characterization follow separately.
+passed its affected fast lane (synthetic headless tests, software rendering;
+[receipt](../evidence/mutter-hdr-mapping.json)).
 
 ## Sixth batch — colour input and processor activation (merged, PR 6)
 
@@ -129,9 +142,9 @@ Mutter and matching amd64/i386 library packaging.
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
 | Physical luminance library | hdr6 delivered; hdr8 (luminance and gamut) reviewed, fast-lane qualified and packaged for amd64 and i386 | Coordinated installation with the matching compositor |
-| Compositor feedback | nativehdr2 delivered; nativehdr6 (target luminance, gamut, colour input, HLG, highlight mapping) qualified and packaged | Coordinated installation and active-output verification |
+| Compositor feedback | nativehdr2 delivered; nativehdr7 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression) qualified and packaged | Coordinated installation and active-output verification |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
-| General colour quality | Audit complete; input defects fixed in nativehdr5; HLG and BT.2390 highlight mapping in nativehdr6 (reviewed, fast lane passed) | Gamut compression, output characterization, profile application, SDR/HDR consistency and cross-application checks; visual check after installation |
+| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization, profile application, SDR/HDR consistency and cross-application checks; visual check after installation |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 

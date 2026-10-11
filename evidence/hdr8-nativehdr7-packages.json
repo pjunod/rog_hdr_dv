@@ -126,6 +126,42 @@
      "bytes": 58664,
      "sha256": "38572d5d7cc36dd9cc0a040aaad753e1daeb83a2f410207ce3777602aaf893e7"
     }
+   ],
+   "delivery": "staged on the laptop as the comparison alternative without gamut compression (same compositor minus patches 0039-0043)"
+  },
+  {
+   "component": "mutter",
+   "architecture": "amd64",
+   "version": "51.0-1ubuntu3+nativehdr7",
+   "build_options": "nocheck parallel=2",
+   "source_commit": "892d3d3517a48733884460638cbca262c227929f",
+   "source_tree": "c0cd4688b33665d057fc8c4c0c6b0a6c0a8a4dca",
+   "source_archive_sha256": "044d5c6854093fad7d6c47c0a895910bbda0de866e23ac93b936bcc02d7bef14",
+   "subproject_note": "subprojects/gvdb ships in the pinned mutter_51.0.orig.tar.xz (sha256 5d28f3ae\u2026d983b3, verified) but upstream .gitignore keeps it out of the Git import; it was extracted from that tarball",
+   "built_against": "libdisplay-info-dev 0.3.0-1ubuntu1~hdr8 (this build)",
+   "libdisplay_info_dependency": "libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr8~)",
+   "symbols_check": "dpkg-gensymbols reported no differences against debian/libmutter-51-0.symbols",
+   "runtime_packages": [
+    {
+     "file": "libmutter-51-0_51.0-1ubuntu3+nativehdr7_amd64.deb",
+     "bytes": 1583280,
+     "sha256": "205718db5a1350c6dce65da30cff8cf3c17d1894962b6db0904513bf2d92091d"
+    },
+    {
+     "file": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr7_amd64.deb",
+     "bytes": 166646,
+     "sha256": "f44960cda6ced7c9df16125ea2c8a776d49623014fda360e88593dfe2f4ca07a"
+    },
+    {
+     "file": "mutter-common_51.0-1ubuntu3+nativehdr7_all.deb",
+     "bytes": 562574,
+     "sha256": "76a445b7c3289f5388584f2b95c3df7ec2f6ee03207b78b3ce2a07768dc184eb"
+    },
+    {
+     "file": "mutter-common-bin_51.0-1ubuntu3+nativehdr7_amd64.deb",
+     "bytes": 59278,
+     "sha256": "d3fbf547b3fa5fc495294273dc33b02bc76f4164ff69b0eb0fd143a1d5ee3c95"
+    }
    ]
   }
  ],
@@ -140,7 +176,7 @@
    "upgrades": 6,
    "new_installs": 0,
    "removals": 0,
-   "note": "repeated for nativehdr6 with the same result; nativehdr5 gave the same result earlier"
+   "note": "repeated for nativehdr7 with the same result (earlier also for nativehdr5 and nativehdr6)"
   },
   "rollback_model_simulation": {
    "method": "private copy of the installed dpkg status with only the six candidate control records substituted; apt-get -s install of the retained hdr6/nativehdr2 packages",
@@ -148,7 +184,7 @@
    "new_installs": 0,
    "removals": 0,
    "limitation": "modeled rollback; the host package database was not changed",
-   "note": "repeated for nativehdr6 with the same result"
+   "note": "repeated for nativehdr6 and nativehdr7 with the same result (first run on nativehdr5)"
   },
   "rollback_artifacts": "the six previously installed packages are retained privately on the laptop and their privately recorded hashes verified",
   "session": [
@@ -156,7 +192,13 @@
    "Keep a text-console or SSH recovery route",
    "No kernel, Secure Boot, bootloader, ICC profile, display mode or saved setting change"
   ],
-  "candidate": "hdr8 library (amd64, i386) with nativehdr6 compositor"
+  "candidate": "hdr8 library (amd64, i386) with nativehdr7 compositor",
+  "comparison_simulation": {
+   "method": "from the modeled nativehdr7 state, apt-get -s install of the four nativehdr6 compositor packages",
+   "downgrades": 4,
+   "new_installs": 0,
+   "removals": 0
+  }
  },
- "scope": "hdr8 library (PR 5) with nativehdr6 compositor (patches 0001-0038); the nativehdr5 set (PR 6) was built first and superseded before installation."
+ "scope": "hdr8 library (PR 5) with nativehdr7 compositor (patches 0001-0043). nativehdr5 was built first and superseded; nativehdr6 is kept as the comparison alternative."
 }

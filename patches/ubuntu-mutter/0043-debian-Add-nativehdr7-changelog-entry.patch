@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 21:05:07 -0400
+Subject: [PATCH] debian: Add nativehdr7 changelog entry
+
+Summarise the gamut compression batch: ACES 1.3 Reference Gamut
+Compression toward firmware-declared target primaries, following source
+colors as pixels are converted, only for content that can exceed the
+target, with limits exact over the source gamut boundary, the
+declaration's per-primary resolution as the containment tolerance, the
+nativehdr6 acceptance rule kept for client and EDID primaries, carried
+by the rendering color state next to the target peak, and decided by
+the single mapping predicate that also governs direct scanout and the
+hardware cursor plane. The new exported symbols were added to the
+symbols file with their commit, at 51.0-1ubuntu3+nativehdr7~.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ debian/changelog | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index 9fa163d..41869c2 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,36 @@
++mutter (51.0-1ubuntu3+nativehdr7) UNRELEASED; urgency=medium
++
++  * Compress colors outside a firmware-declared output target gamut with the
++    ACES 1.3 Reference Gamut Compression (threshold 0.8, power 1.2), in
++    linear RGB of the target primaries with absolute colorimetry, in the
++    surface to blending transform after highlight mapping. Source colors
++    are followed as the renderer converts them, white point adaptation to
++    D65 included. Only content that can exceed the target is compressed: a
++    bounded encoding must have a primary outside the target triangle, and
++    so must declared mastering primaries; content whose encoding fits the
++    target, such as sRGB on a wide gamut panel, never is. Extended-range
++    linear content is compressed only with declared mastering primaries,
++    which then bound it. Limits come from the mastering primaries when
++    declared, otherwise the encoding's, and are exact over the source gamut
++    boundary: no point of it, primaries or sides, ends beyond the target
++    boundary, and each channel's maximising point lands on it. Nothing is
++    compressed when the target primaries are the encoding fallback.
++  * Containment allows the resolution of the DisplayID declaration, per
++    primary (one 12-bit step in CIE 1931 xy, or its CIE 1976 equivalent at
++    that primary), carried with the target primaries, so content in the
++    declared gamut, such as P3 on a panel declaring P3, is not compressed
++    and keeps direct scanout.
++  * The rendering color state carries the firmware-declared target
++    primaries next to the target peak; display target primaries must also
++    pass an absolute matrix check, while client and EDID primaries keep the
++    nativehdr6 acceptance rule. Gamut compression is part of the single
++    mapping predicate, so direct scanout and the hardware cursor plane are
++    refused whenever it applies, and of the exact transform identity.
++  * KMS HDR metadata is unchanged. Source candidate only; runtime and
++    package qualification pending.
++
++ -- Claude Agent <claude-agent@invalid>  Sat, 10 Oct 2026 00:00:00 +0000
++
+ mutter (51.0-1ubuntu3+nativehdr6) UNRELEASED; urgency=medium
+ 
+   * Add the HLG transfer function (Rec. ITU-R BT.2100-2): decode with black

@@ -425,4 +425,6 @@ the affected fast lane and the remaining renderer limitation are in the
 
 HLG decoding and BT.2390 highlight mapping toward the declared target
 followed in `nativehdr6` ([contract and status](HDR_MAPPING.md)). Gamut
-compression and output characterization remain subsequent work.
+compression followed in `nativehdr7`
+([contract](HDR_MAPPING.md#gamut-compression-nativehdr7)); output
+characterization remains subsequent work.

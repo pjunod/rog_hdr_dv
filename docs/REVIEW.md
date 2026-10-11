@@ -288,3 +288,28 @@ compared after the first description could have been released for reuse. Only
 that invocation was rerun after each fix, and finally passed; the separate
 invocations sharing that client were rerun once and passed
 ([receipt](../evidence/mutter-hdr-mapping.json)).
+
+## Eighth batch — gamut compression (nativehdr7)
+
+The coordinator ruled on the first implementation, in five points. Only the
+boundary point that sets each channel's limit is guaranteed to land on the
+target boundary. Compression requires the encoding gamut, and the mastering
+gamut where declared, to exceed the target. Containment tolerates the
+declaration's own quantization. Absolute colorimetry is used in the
+compression space, with one shared conversion for pixels and limits.
+Display-target primaries are validated when constructed.
+
+An independent adversarial review found one blocker and three should-fix
+defects. All are fixed:
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| Limits and containment used unadapted primaries while pixels are white-adapted, so non-D65 sources (ProPhoto, DCI-P3) ended beyond the target or escaped compression | Blocker (computed) | Limits and containment use the same adapted chain as the pixels; non-D65 tests added |
+| Extended-range linear content with wide mastering primaries was never compressed | Should-fix | Unbounded encodings use declared mastering primaries; none declared, no compression |
+| The tightened shared matrix check narrowed client and EDID acceptance | Should-fix (measured) | Client and EDID acceptance restored to the previous rule; the absolute check applies only to display targets |
+| Points along source edges ended beyond the boundary | Should-fix (computed) | Limits include the edge points where two target channels are equal; boundary sampled densely in tests |
+| Predicate true with no operation, non-finite input, loose CIE 1976 tolerance, private structure layout, predicate cost | Nit | Predicate requires a limit above 1; non-finite input unchanged and overflow-safe curve; per-primary tolerance with vertex clamp; field appended; early exit where it cannot desynchronise |
+
+The fast lane passed on its first run: all affected Clutter, backend, native
+and Wayland suites, including the new separate target-gamut invocation
+([receipt](../evidence/mutter-gamut-compression.json)).
