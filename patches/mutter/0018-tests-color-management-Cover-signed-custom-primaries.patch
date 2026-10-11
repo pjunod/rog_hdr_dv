@@ -1,0 +1,718 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 16:57:20 -0400
+Subject: [PATCH] tests/color-management: Cover signed custom primaries end to
+ end
+
+Add regressions for the custom-primaries input path:
+
+ - /wayland/custom-primaries/negative-coordinate: the test client sends
+   ACES AP0, an encoding gamut whose blue primary has y = -0.077, through
+   set_primaries, sets it on a surface and commits. The compositor side
+   checks the surface's retained ClutterColorState holds the requested
+   coordinates (negative, unclamped) and that the matrices the color
+   transform renders with map test colors to linear BT.2020 as an
+   independent double-precision reference computes them (RGB->XYZ,
+   Bradford to D65, XYZ->BT.2020), and back.
+ - /wayland/custom-primaries/unsupported: collinear primaries, nearly
+   collinear primaries (with the white point inside and outside the
+   sliver they span), a white point with y = 0, with y < 0 and outside
+   the primaries' triangle, and a coordinate beyond 16 each produce an
+   image description that fails with the 'unsupported' cause, while a
+   large imaginary gamut at the 16 limit is accepted; the connection
+   survives and a following valid description is applied to the surface.
+ - /wayland/custom-primaries/info-round-trip: an output description with
+   the same AP0 primaries (driven through the synthetic output's native
+   SDR mode) reports every coordinate, including the negative one,
+   exactly in the image description information event. It rewrites the
+   fixture output, so it runs as a separate invocation.
+---
+ src/tests/meson.build                         |   4 +-
+ src/tests/wayland-color-management-test.c     | 342 ++++++++++++++++++
+ .../wayland-test-clients/color-management.c   | 257 +++++++++++++
+ 3 files changed, 602 insertions(+), 1 deletion(-)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 03fe6cc7d..b194642b3 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -949,13 +949,15 @@ wayland_test_cases = [
+     ],
+     # Target-volume cases rewrite the fixture output and the v2 cases dispose
+     # the shared Wayland colour manager, so each runs in its own invocation.
+-    # The SDR-native case rewrites the fixture output's EDID and colour mode.
++    # The SDR-native case and the info round trip rewrite the fixture
++    # output's EDID and colour mode.
+     'separate_cases': [
+       '/wayland/target-luminance/v1',
+       '/wayland/target-luminance/v2',
+       '/wayland/target-primaries/v1',
+       '/wayland/target-primaries/v2',
+       '/wayland/sdr-native/unusable-edid-primaries',
++      '/wayland/custom-primaries/info-round-trip',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 3ea3a73d9..15a4e37ef 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -33,6 +33,7 @@
+ #include "backends/meta-logical-monitor-private.h"
+ #include "backends/meta-monitor-manager-private.h"
+ #include "backends/meta-output.h"
++#include "clutter/clutter-color-utils-private.h"
+ #include "core/meta-debug-control-private.h"
+ #include "core/window-private.h"
+ #include "meta-test/meta-context-test.h"
+@@ -488,6 +489,341 @@ target_primaries (gconstpointer data)
+   g_signal_emit_by_name (monitor_manager, "monitors-changing");
+ }
+ 
++/* ACES AP0, sent by the test client in protocol units (1/1000000). Its blue
++ * primary has a negative y: an encoding gamut with an imaginary primary. */
++static const int32_t ap0_coordinates[8] = {
++  734700, 265300, 0, 1000000, 100, -77000, 321680, 337670,
++};
++
++static const double bt2020_xy[8] = {
++  0.708, 0.292, 0.170, 0.797, 0.131, 0.046, 0.3127, 0.3290,
++};
++
++/* Reference colorimetry in plain double precision, column-vector convention
++ * (out = M * in), written independently of Clutter's graphene code. */
++
++static void
++reference_xy_to_XYZ (double x,
++                     double y,
++                     double XYZ[3])
++{
++  XYZ[0] = x / y;
++  XYZ[1] = 1.0;
++  XYZ[2] = (1.0 - x - y) / y;
++}
++
++static void
++reference_invert (const double m[3][3],
++                  double       out[3][3])
++{
++  double det;
++  int r, c;
++
++  det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
++        m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
++        m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
++  g_assert_cmpfloat (fabs (det), >, 1e-12);
++
++  for (r = 0; r < 3; r++)
++    {
++      for (c = 0; c < 3; c++)
++        {
++          int r1 = (c + 1) % 3, r2 = (c + 2) % 3;
++          int c1 = (r + 1) % 3, c2 = (r + 2) % 3;
++
++          out[r][c] = (m[r1][c1] * m[r2][c2] - m[r1][c2] * m[r2][c1]) / det;
++        }
++    }
++}
++
++static void
++reference_multiply (const double a[3][3],
++                    const double b[3][3],
++                    double       out[3][3])
++{
++  double result[3][3];
++  int r, c, k;
++
++  for (r = 0; r < 3; r++)
++    {
++      for (c = 0; c < 3; c++)
++        {
++          result[r][c] = 0.0;
++          for (k = 0; k < 3; k++)
++            result[r][c] += a[r][k] * b[k][c];
++        }
++    }
++  memcpy (out, result, sizeof (result));
++}
++
++static void
++reference_apply (const double m[3][3],
++                 const double in[3],
++                 double       out[3])
++{
++  int r;
++
++  for (r = 0; r < 3; r++)
++    out[r] = m[r][0] * in[0] + m[r][1] * in[1] + m[r][2] * in[2];
++}
++
++static void
++reference_rgb_to_XYZ (const double xy[8],
++                      double       out[3][3])
++{
++  double primaries[3][3], inverse[3][3];
++  double white[3], scale[3];
++  int r, c;
++
++  for (c = 0; c < 3; c++)
++    {
++      primaries[0][c] = xy[2 * c];
++      primaries[1][c] = xy[2 * c + 1];
++      primaries[2][c] = 1.0 - xy[2 * c] - xy[2 * c + 1];
++    }
++  reference_invert (primaries, inverse);
++  reference_xy_to_XYZ (xy[6], xy[7], white);
++  reference_apply (inverse, white, scale);
++
++  for (r = 0; r < 3; r++)
++    {
++      for (c = 0; c < 3; c++)
++        out[r][c] = primaries[r][c] * scale[c];
++    }
++}
++
++static void
++reference_bradford (const double src[3],
++                    const double dst[3],
++                    double       out[3][3])
++{
++  const double bradford[3][3] = {
++    {  0.8951,  0.2664, -0.1614 },
++    { -0.7502,  1.7135,  0.0367 },
++    {  0.0389, -0.0685,  1.0296 },
++  };
++  double inverse[3][3], gain[3][3] = { { 0 } };
++  double src_lms[3], dst_lms[3];
++  int i;
++
++  reference_invert (bradford, inverse);
++  reference_apply (bradford, src, src_lms);
++  reference_apply (bradford, dst, dst_lms);
++  for (i = 0; i < 3; i++)
++    gain[i][i] = dst_lms[i] / src_lms[i];
++
++  reference_multiply (gain, bradford, out);
++  reference_multiply (inverse, out, out);
++}
++
++/* RGB in the given colorimetry -> XYZ -> Bradford to Clutter's D65 ->
++ * linear BT.2020, the connection space of ClutterColorTransform. */
++static void
++reference_to_linear_bt2020 (const double xy[8],
++                            double       out[3][3])
++{
++  const double d65[3] = { 0.95047, 1.0, 1.08883 };
++  double to_XYZ[3][3], adaptation[3][3], bt2020_to_XYZ[3][3];
++  double XYZ_to_bt2020[3][3], white[3];
++
++  reference_rgb_to_XYZ (xy, to_XYZ);
++  reference_xy_to_XYZ (xy[6], xy[7], white);
++  reference_bradford (white, d65, adaptation);
++  reference_rgb_to_XYZ (bt2020_xy, bt2020_to_XYZ);
++  reference_invert (bt2020_to_XYZ, XYZ_to_bt2020);
++
++  reference_multiply (adaptation, to_XYZ, out);
++  reference_multiply (XYZ_to_bt2020, out, out);
++}
++
++static void
++assert_renderer_matrices_match_reference (const ClutterColorimetry *colorimetry,
++                                          const double              xy[8])
++{
++  const float colors[][3] = {
++    { 1.0f, 0.0f, 0.0f },
++    { 0.0f, 1.0f, 0.0f },
++    { 0.0f, 0.0f, 1.0f },
++    { 1.0f, 1.0f, 1.0f },
++    { 0.25f, 0.5f, 0.75f },
++  };
++  g_autoptr (GError) error = NULL;
++  graphene_matrix_t to_linear, from_linear;
++  double expected_matrix[3][3];
++  unsigned int i;
++
++  /* The matrices the color transform renders with. */
++  g_assert_true (clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
++                                                                 &to_linear,
++                                                                 &from_linear,
++                                                                 &error));
++  g_assert_no_error (error);
++  reference_to_linear_bt2020 (xy, expected_matrix);
++
++  for (i = 0; i < G_N_ELEMENTS (colors); i++)
++    {
++      const double rgb[3] = { colors[i][0], colors[i][1], colors[i][2] };
++      graphene_vec3_t in, out, back;
++      double expected[3];
++
++      reference_apply (expected_matrix, rgb, expected);
++      graphene_vec3_init (&in, colors[i][0], colors[i][1], colors[i][2]);
++      graphene_matrix_transform_vec3 (&to_linear, &in, &out);
++      g_assert_cmpfloat_with_epsilon (graphene_vec3_get_x (&out), expected[0], 1e-4);
++      g_assert_cmpfloat_with_epsilon (graphene_vec3_get_y (&out), expected[1], 1e-4);
++      g_assert_cmpfloat_with_epsilon (graphene_vec3_get_z (&out), expected[2], 1e-4);
++
++      graphene_matrix_transform_vec3 (&from_linear, &out, &back);
++      g_assert_cmpfloat_with_epsilon (graphene_vec3_get_x (&back), rgb[0], 1e-4);
++      g_assert_cmpfloat_with_epsilon (graphene_vec3_get_y (&back), rgb[1], 1e-4);
++      g_assert_cmpfloat_with_epsilon (graphene_vec3_get_z (&back), rgb[2], 1e-4);
++    }
++}
++
++static void
++custom_primaries_negative_coordinate (void)
++{
++  MetaWaylandTestClient *client;
++  MetaWindow *window;
++  ClutterColorState *color_state;
++  const ClutterColorimetry *colorimetry;
++  const ClutterPrimaries *primaries;
++  const ClutterEOTF *eotf;
++  double xy[8];
++  float stored[8];
++  unsigned int i;
++
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "primaries-negative",
++                                                   NULL);
++  window = meta_wait_for_client_window (test_context,
++                                        "color-management-primaries");
++
++  wait_for_sync_point (0);
++  color_state = get_window_color_state (window);
++  g_assert_true (CLUTTER_IS_COLOR_STATE_PARAMS (color_state));
++  colorimetry =
++    clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_PRIMARIES);
++  eotf = clutter_color_state_params_get_eotf (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (eotf->type, ==, CLUTTER_EOTF_TYPE_NAMED);
++  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_LINEAR);
++
++  /* The retained state is the requested space: not wrapped, not clamped. */
++  primaries = colorimetry->primaries;
++  stored[0] = primaries->r_x;
++  stored[1] = primaries->r_y;
++  stored[2] = primaries->g_x;
++  stored[3] = primaries->g_y;
++  stored[4] = primaries->b_x;
++  stored[5] = primaries->b_y;
++  stored[6] = primaries->w_x;
++  stored[7] = primaries->w_y;
++  for (i = 0; i < G_N_ELEMENTS (stored); i++)
++    {
++      xy[i] = ap0_coordinates[i] / 1000000.0;
++      g_assert_cmpfloat_with_epsilon (stored[i], xy[i], 1e-7);
++    }
++  g_assert_cmpfloat (primaries->b_y, <, 0.0f);
++
++  assert_renderer_matrices_match_reference (colorimetry, xy);
++  emit_sync_event (0);
++
++  meta_wayland_test_client_finish (client);
++}
++
++static void
++custom_primaries_unsupported (void)
++{
++  MetaWaylandTestClient *client;
++  MetaWindow *window;
++  ClutterColorState *color_state;
++  const ClutterColorimetry *colorimetry;
++  const ClutterEOTF *eotf;
++
++  /* The client asserts each unsupported set (collinear and nearly collinear
++   * primaries, white points with y <= 0 or outside the primaries, and
++   * coordinates beyond [-16, 16]) fails with the 'unsupported' cause, that
++   * a large imaginary gamut at the coordinate limit is accepted, then proves
++   * the connection still works by setting this state. */
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "primaries-unsupported",
++                                                   NULL);
++  window = meta_wait_for_client_window (test_context,
++                                        "color-management-unsupported");
++
++  wait_for_sync_point (0);
++  color_state = get_window_color_state (window);
++  g_assert_true (CLUTTER_IS_COLOR_STATE_PARAMS (color_state));
++  colorimetry =
++    clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_COLORSPACE);
++  g_assert_cmpuint (colorimetry->colorspace, ==, CLUTTER_COLORSPACE_BT2020);
++  eotf = clutter_color_state_params_get_eotf (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_PQ);
++  emit_sync_event (0);
++
++  meta_wayland_test_client_finish (client);
++}
++
++static void
++custom_primaries_info_round_trip (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  MetaEdidInfo *fixture_edid_info = info->edid_info;
++  MetaWaylandTestClient *client;
++  ClutterColorState *color_state;
++  const ClutterColorimetry *colorimetry;
++
++  /* Drive a custom-primaries output description through the synthetic
++   * output's native SDR mode. This is a serialization fixture, not a claim
++   * about physical displays. */
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->default_gamma = 2.2;
++  info->edid_info->default_color_primaries = (struct di_color_primaries) {
++    .has_primaries = TRUE,
++    .has_default_white_point = TRUE,
++    .primary = {
++      { ap0_coordinates[0] / 1000000.0f, ap0_coordinates[1] / 1000000.0f },
++      { ap0_coordinates[2] / 1000000.0f, ap0_coordinates[3] / 1000000.0f },
++      { ap0_coordinates[4] / 1000000.0f, ap0_coordinates[5] / 1000000.0f },
++    },
++    .default_white = {
++      ap0_coordinates[6] / 1000000.0f, ap0_coordinates[7] / 1000000.0f,
++    },
++  };
++  set_test_color_mode (output, META_COLOR_MODE_SDR_NATIVE);
++  meta_color_device_update (device);
++
++  color_state = meta_color_device_get_color_state (device);
++  g_assert_true (CLUTTER_IS_COLOR_STATE_PARAMS (color_state));
++  colorimetry =
++    clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_PRIMARIES);
++  g_assert_cmpfloat (colorimetry->primaries->b_y, <, 0.0f);
++
++  /* The client compares every coordinate of the information event. */
++  meta_wayland_test_driver_set_property (test_driver, "target-output",
++                                         meta_output_get_name (output));
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "info-round-trip",
++                                                   NULL);
++  meta_wayland_test_client_finish (client);
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = fixture_edid_info;
++  meta_color_device_update (device);
++}
++
+ static void
+ sdr_native_unusable_edid_primaries (void)
+ {
+@@ -569,6 +905,12 @@ init_tests (void)
+   g_test_add_data_func ("/wayland/target-primaries/v2", GINT_TO_POINTER (2), target_primaries);
+   g_test_add_func ("/wayland/sdr-native/unusable-edid-primaries",
+                    sdr_native_unusable_edid_primaries);
++  g_test_add_func ("/wayland/custom-primaries/negative-coordinate",
++                   custom_primaries_negative_coordinate);
++  g_test_add_func ("/wayland/custom-primaries/unsupported",
++                   custom_primaries_unsupported);
++  g_test_add_func ("/wayland/custom-primaries/info-round-trip",
++                   custom_primaries_info_round_trip);
+ }
+ 
+ int
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 1c5b73917..2695f76a8 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -34,6 +34,7 @@ typedef struct _ImageDescriptionContext
+ {
+   uint32_t image_description_id;
+   gboolean creation_failed;
++  uint32_t failure_cause;
+ } ImageDescriptionContext;
+ 
+ typedef struct _Primaries
+@@ -117,6 +118,7 @@ handle_image_description_failed (void                           *data,
+   ImageDescriptionContext *image_description_context = data;
+ 
+   image_description_context->creation_failed = TRUE;
++  image_description_context->failure_cause = cause;
+ }
+ 
+ static void
+@@ -254,6 +256,199 @@ create_image_description_from_icc (WaylandDisplay                  *display,
+   g_assert_cmpint (image_description_context.image_description_id, >, 0);
+ }
+ 
++/* ACES AP0: a published encoding gamut whose blue primary has a negative
++ * y coordinate. Must match the compositor-side expectations. */
++static const int32_t ap0_coordinates[8] = {
++  734700, 265300, 0, 1000000, 100, -77000, 321680, 337670,
++};
++
++static struct wp_image_description_v1 *
++create_image_description_from_coordinates (WaylandDisplay          *display,
++                                           const int32_t            coordinates[8],
++                                           ImageDescriptionContext *context)
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++  struct wp_image_description_v1 *image_description;
++
++  creator_params =
++    wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++  wp_image_description_creator_params_v1_set_primaries (creator_params,
++                                                        coordinates[0],
++                                                        coordinates[1],
++                                                        coordinates[2],
++                                                        coordinates[3],
++                                                        coordinates[4],
++                                                        coordinates[5],
++                                                        coordinates[6],
++                                                        coordinates[7]);
++  wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                       WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR);
++
++  *context = (ImageDescriptionContext) { 0 };
++  image_description =
++    wp_image_description_creator_params_v1_create (creator_params);
++  wp_image_description_v1_add_listener (image_description,
++                                        &image_description_listener,
++                                        context);
++  wait_for_image_description_ready (context, display);
++
++  return image_description;
++}
++
++static void
++assert_unsupported_coordinates (WaylandDisplay *display,
++                                const int32_t   coordinates[8])
++{
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context;
++
++  image_description =
++    create_image_description_from_coordinates (display, coordinates, &context);
++  g_assert_true (context.creation_failed);
++  g_assert_cmpuint (context.failure_cause, ==,
++                    WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED);
++  g_assert_cmpuint (context.image_description_id, ==, 0);
++  wp_image_description_v1_destroy (image_description);
++
++  /* A failed image description is not a protocol error. */
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
++static void
++create_test_toplevel (WaylandDisplay                         *display,
++                      const char                             *title,
++                      struct wl_surface                     **surface,
++                      struct wp_color_management_surface_v1 **color_surface)
++{
++  struct xdg_surface *xdg_surface;
++  struct xdg_toplevel *xdg_toplevel;
++
++  *surface = wl_compositor_create_surface (display->compositor);
++  xdg_surface = xdg_wm_base_get_xdg_surface (display->xdg_wm_base, *surface);
++  xdg_surface_add_listener (xdg_surface, &xdg_surface_listener, display);
++  xdg_toplevel = xdg_surface_get_toplevel (xdg_surface);
++  xdg_toplevel_add_listener (xdg_toplevel, &xdg_toplevel_listener, NULL);
++  xdg_toplevel_set_title (xdg_toplevel, title);
++  *color_surface =
++    wp_color_manager_v1_get_surface (display->color_management_mgr, *surface);
++
++  wl_surface_commit (*surface);
++  wait_for_configure (display);
++}
++
++static void
++primaries_negative_client (WaylandDisplay *display)
++{
++  struct wl_surface *surface;
++  struct wp_color_management_surface_v1 *color_surface;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context;
++
++  create_test_toplevel (display, "color-management-primaries",
++                        &surface, &color_surface);
++
++  image_description =
++    create_image_description_from_coordinates (display, ap0_coordinates,
++                                               &context);
++  g_assert_false (context.creation_failed);
++  g_assert_cmpuint (context.image_description_id, >, 0);
++  wp_color_management_surface_v1_set_image_description (
++    color_surface,
++    image_description,
++    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++  wl_surface_commit (surface);
++  wp_image_description_v1_destroy (image_description);
++
++  test_driver_sync_point (display->test_driver, 0, NULL);
++  wait_for_sync_event (display, 0);
++
++  wp_color_management_surface_v1_destroy (color_surface);
++}
++
++static void
++primaries_unsupported_client (WaylandDisplay *display)
++{
++  /* All three primaries on the line x = y: the RGB columns are collinear. */
++  const int32_t collinear[8] = {
++    600000, 600000, 300000, 300000, 100000, 100000, 312700, 329000,
++  };
++  /* A white point with y = 0 has no XYZ. */
++  const int32_t white_y_zero[8] = {
++    640000, 330000, 300000, 600000, 150000, 60000, 312700, 0,
++  };
++  /* Nearly collinear primaries with the white point inside the sliver they
++   * span: invertible in single precision, but too ill-conditioned to convert
++   * accurately to and from linear BT.2020. */
++  const int32_t nearly_collinear[8] = {
++    600000, 600000, 300000, 300100, 100000, 100000, 333333, 333366,
++  };
++  /* Nearly collinear primaries around a white point outside their sliver. */
++  const int32_t nearly_collinear_d65[8] = {
++    600000, 600000, 300000, 300001, 100000, 100000, 312700, 329000,
++  };
++  /* A white point must have a positive y, even with imaginary primaries. */
++  const int32_t white_y_negative[8] = {
++    640000, 330000, 300000, 600000, 150000, 60000, 312700, -329000,
++  };
++  /* A white point outside the primaries' triangle needs a negative amount
++   * of a primary. */
++  const int32_t white_outside[8] = {
++    640000, 330000, 300000, 600000, 150000, 60000, 700000, 250000,
++  };
++  /* Coordinates are limited to [-16, 16]. */
++  const int32_t out_of_range[8] = {
++    16000001, -15000000, -15000000, 16000000, 100000, 100000, 312700, 329000,
++  };
++  /* A large imaginary gamut at that limit is a valid encoding gamut. */
++  const int32_t at_range_limit[8] = {
++    16000000, -15000000, -15000000, 16000000, 100000, 100000, 312700, 329000,
++  };
++  ImageDescriptionContext context;
++  struct wl_surface *surface;
++  struct wp_color_management_surface_v1 *color_surface;
++  struct wp_image_description_v1 *image_description;
++
++  create_test_toplevel (display, "color-management-unsupported",
++                        &surface, &color_surface);
++
++  assert_unsupported_coordinates (display, collinear);
++  assert_unsupported_coordinates (display, white_y_zero);
++  assert_unsupported_coordinates (display, nearly_collinear);
++  assert_unsupported_coordinates (display, nearly_collinear_d65);
++  assert_unsupported_coordinates (display, white_y_negative);
++  assert_unsupported_coordinates (display, white_outside);
++  assert_unsupported_coordinates (display, out_of_range);
++
++  image_description =
++    create_image_description_from_coordinates (display, at_range_limit,
++                                               &context);
++  g_assert_false (context.creation_failed);
++  g_assert_cmpuint (context.image_description_id, >, 0);
++  wp_image_description_v1_destroy (image_description);
++
++  /* The connection survives and keeps working after unsupported input. */
++  create_image_description_from_params (display,
++                                        &image_description,
++                                        WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
++                                        NULL,
++                                        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ,
++                                        -1.0f,
++                                        -1.0f,
++                                        -1.0f,
++                                        -1.0f);
++  wp_color_management_surface_v1_set_image_description (
++    color_surface,
++    image_description,
++    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++  wl_surface_commit (surface);
++  wp_image_description_v1_destroy (image_description);
++
++  test_driver_sync_point (display->test_driver, 0, NULL);
++  wait_for_sync_event (display, 0);
++
++  wp_color_management_surface_v1_destroy (color_surface);
++}
++
+ typedef struct
+ {
+   struct wl_output *output;
+@@ -986,6 +1181,55 @@ target_primaries_client (WaylandDisplay *display,
+   wl_display_roundtrip (display->display);
+ }
+ 
++static void
++info_round_trip_client (WaylandDisplay *display)
++{
++  TargetClient client = { .version = 1 };
++  struct wl_registry *registry = wl_display_get_registry (display->display);
++  const char *target_name = lookup_property_string (display, "target-output");
++  TargetOutput *target = NULL;
++  TargetSnapshot snapshot = { 0 };
++  TargetInfo info;
++  unsigned int i;
++
++  wl_registry_add_listener (registry, &target_registry_listener, &client);
++  wl_display_roundtrip (display->display);
++  wl_display_roundtrip (display->display);
++  g_assert_nonnull (client.manager);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      if (g_strcmp0 (client.outputs[i].name, target_name) == 0)
++        target = &client.outputs[i];
++    }
++  g_assert_nonnull (target);
++
++  target->color_output = wp_color_manager_v1_get_output (client.manager,
++                                                         target->output);
++  wp_color_management_output_v1_add_listener (target->color_output,
++                                              &target_color_output_listener,
++                                              target);
++  snapshot.description =
++    wp_color_management_output_v1_get_image_description (target->color_output);
++  wait_target_snapshot (display, &snapshot);
++
++  info = read_target_info (display, &snapshot);
++  /* Custom primaries carry no name, and signed values come back exactly. */
++  g_assert_cmpuint (info.primaries, ==, 0);
++  for (i = 0; i < G_N_ELEMENTS (ap0_coordinates); i++)
++    g_assert_cmpint (info.encoding_primaries[i], ==, ap0_coordinates[i]);
++
++  wp_image_description_v1_destroy (snapshot.description);
++  wp_color_management_output_v1_destroy (target->color_output);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      wl_output_release (client.outputs[i].output);
++      g_free (client.outputs[i].name);
++    }
++  wp_color_manager_v1_destroy (client.manager);
++  wl_registry_destroy (registry);
++  wl_display_roundtrip (display->display);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -1011,6 +1255,19 @@ main (int    argc,
+       return 0;
+     }
+ 
++  if (argc == 2)
++    {
++      if (strcmp (argv[1], "primaries-negative") == 0)
++        primaries_negative_client (display);
++      else if (strcmp (argv[1], "primaries-unsupported") == 0)
++        primaries_unsupported_client (display);
++      else if (strcmp (argv[1], "info-round-trip") == 0)
++        info_round_trip_client (display);
++      else
++        g_error ("Unknown color-management test mode '%s'", argv[1]);
++      return EXIT_SUCCESS;
++    }
++
+   surface = wl_compositor_create_surface (display->compositor);
+   xdg_surface = xdg_wm_base_get_xdg_surface (display->xdg_wm_base, surface);
+   xdg_surface_add_listener (xdg_surface, &xdg_surface_listener, display);

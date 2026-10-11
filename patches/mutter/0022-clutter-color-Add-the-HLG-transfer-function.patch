@@ -1,0 +1,1009 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:08:18 -0400
+Subject: [PATCH] clutter/color: Add the HLG transfer function
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add CLUTTER_TRANSFER_FUNCTION_HLG, appended to ClutterTransferFunction
+so existing values keep their numbers, following Rec. ITU-R BT.2100-2:
+
+ - Its default luminances are those wp_color_manager_v1 gives HLG:
+   minimum 0.005, maximum 1000, reference white 203 and mastering
+   maximum 1000 cd/m². A state may declare others; unlike PQ, the
+   maximum is taken as declared, since it is the nominal peak Lw.
+ - Decoding is a new color op, hlg_eotf, that sees the whole RGB
+   vector: black level lift max (0, (1 - beta) E' + beta), the inverse
+   OETF per channel to scene light E, then the OOTF
+   F = Ys^(gamma - 1) E. F is display light normalized to Lw, the
+   convention every other state uses for its linear values. With
+   Lw and Lb the state's maximum and minimum luminance,
+   gamma = 1.2 * 1.111^log2 (Lw / 1000) (the extended formula of
+   Report ITU-R BT.2390, used for every Lw) and
+   beta = sqrt (3 (Lb / Lw)^(1 / gamma)).
+ - Black lands in the inverse OETF's square-root segment only while
+   beta <= 0.5; beyond it decoding would invert, and at beta = 1
+   encoding would divide by zero. One exported definition,
+   clutter_luminance_get_hlg_parameters(), computes gamma and beta in
+   double precision and refuses luminances that are not finite with
+   0 <= Lb < Lw, or give beta > 0.5. The transform takes its parameters
+   from it, clutter_color_state_params_new_full(), through which every
+   parametric constructor goes, refuses such HLG luminances, and the
+   Wayland creator will use it to fail them as 'unsupported'.
+ - Ys is the luminance of E in the state's own primaries. Its
+   coefficients are the Y row of the primaries' RGB to XYZ matrix,
+   from the new clutter_colorimetry_get_luminance_coefficients(),
+   which accepts a colorimetry only if
+   clutter_colorimetry_get_linear_bt2020_matrices() does, so it shares
+   the single definition of a usable colorimetry. Because the OOTF
+   depends on luminance, the op runs before the primaries matrix.
+ - Encoding (HLG as a destination) is the exact inverse, hlg_inv_eotf:
+   inverse OOTF (Ys = Yd^(1 / gamma), E = F Ys^(1 - gamma)) in the
+   destination primaries after the matrix, OETF, then black removal.
+   Scene light outside [0, 1] and the resulting signal clip.
+
+Both ops have a CPU implementation, used by
+clutter_color_pipeline_do_transform(), and a GLSL function with the
+same maths; their parameters are uniforms. They are internal
+(clutter-color-op-private.h, not installed or exported).
+
+The parametric linear BT.2020 conversions now compute the matrices,
+luminance coefficients and HLG parameters before adding the EOTF, so an
+unusable colorimetry or HLG luminance range, which validated producers
+never create, leaves an empty pipeline rather than one holding only the
+EOTF.
+
+CICP transfer characteristics 18 now map to HLG. HLG states need at
+least 10 bits, and, like PQ, are blended in extended range gamma 2.2
+sRGB when used as an output. Image description information reports
+an HLG state as transfer_function.hlg; accepting HLG from clients is a
+separate change.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-op-private.h    |  61 +++++
+ clutter/clutter/clutter-color-op.c            | 232 ++++++++++++++++++
+ .../clutter/clutter-color-pipeline-shader.c   | 123 ++++++++++
+ clutter/clutter/clutter-color-state-params.c  |  24 +-
+ clutter/clutter/clutter-color-transform.c     | 110 +++++++--
+ clutter/clutter/clutter-color-utils-private.h |  12 +
+ clutter/clutter/clutter-color-utils.c         |  98 ++++++++
+ clutter/clutter/clutter-color-utils.h         |   1 +
+ clutter/clutter/meson.build                   |   1 +
+ src/wayland/meta-wayland-color-management.c   |   2 +
+ 10 files changed, 635 insertions(+), 29 deletions(-)
+ create mode 100644 clutter/clutter/clutter-color-op-private.h
+
+diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
+new file mode 100644
+index 000000000..097318be3
+--- /dev/null
++++ b/clutter/clutter/clutter-color-op-private.h
+@@ -0,0 +1,61 @@
++/*
++ * Clutter.
++ *
++ * An OpenGL based 'interactive canvas' library.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#pragma once
++
++#include "clutter/clutter-color-op.h"
++
++/*
++ * Color operations that act on the whole RGB vector rather than per channel.
++ * They are built only by ClutterColorTransform and are not part of the
++ * installed API.
++ */
++
++/*
++ * The Rec. ITU-R BT.2100-2 hybrid log-gamma EOTF: black level lift, inverse
++ * OETF to scene light, then the OOTF. The OOTF scales each sample by a power
++ * of its luminance, so it needs the luminance coefficients of the primaries
++ * the samples are in, and it runs before any primaries matrix. The result is
++ * display light normalized to the nominal peak luminance.
++ */
++#define CLUTTER_TYPE_COLOR_OP_HLG_EOTF (clutter_color_op_hlg_eotf_get_type ())
++G_DECLARE_FINAL_TYPE (ClutterColorOpHlgEotf,
++                      clutter_color_op_hlg_eotf,
++                      CLUTTER, COLOR_OP_HLG_EOTF,
++                      ClutterColorOp)
++
++ClutterColorOp * clutter_color_op_hlg_eotf_new (float       gamma,
++                                                float       beta,
++                                                const float coefficients[3]);
++
++/* The exact inverse of ClutterColorOpHlgEotf; out of range values clip. */
++#define CLUTTER_TYPE_COLOR_OP_HLG_INV_EOTF (clutter_color_op_hlg_inv_eotf_get_type ())
++G_DECLARE_FINAL_TYPE (ClutterColorOpHlgInvEotf,
++                      clutter_color_op_hlg_inv_eotf,
++                      CLUTTER, COLOR_OP_HLG_INV_EOTF,
++                      ClutterColorOp)
++
++ClutterColorOp * clutter_color_op_hlg_inv_eotf_new (float       gamma,
++                                                    float       beta,
++                                                    const float coefficients[3]);
++
++void clutter_color_op_hlg_get_parameters (ClutterColorOp *op,
++                                          float          *gamma,
++                                          float          *beta,
++                                          const float   **coefficients);
+diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
+index 2a11736c4..3f1704232 100644
+--- a/clutter/clutter/clutter-color-op.c
++++ b/clutter/clutter/clutter-color-op.c
+@@ -22,6 +22,7 @@
+ #include "config.h"
+ 
+ #include "clutter-color-op.h"
++#include "clutter-color-op-private.h"
+ 
+ #include <math.h>
+ 
+@@ -537,6 +538,237 @@ clutter_color_op_pq_inv_eotf_new (void)
+   return g_object_new (CLUTTER_TYPE_COLOR_OP_PQ_INV_EOTF, NULL);
+ }
+ 
++/* Rec. ITU-R BT.2100-2, Table 5: HLG OETF constants. */
++#define HLG_A 0.17883277f
++#define HLG_B 0.28466892f /* 1 - 4a */
++#define HLG_C 0.55991073f /* 0.5 - a ln (4a) */
++
++typedef struct _HlgParameters
++{
++  float gamma;
++  float beta;
++  float coefficients[3];
++} HlgParameters;
++
++static float
++hlg_inv_oetf (float signal)
++{
++  if (signal <= 0.5f)
++    return signal * signal / 3.0f;
++  else
++    return (expf ((signal - HLG_C) / HLG_A) + HLG_B) / 12.0f;
++}
++
++static float
++hlg_oetf (float scene)
++{
++  if (scene <= 1.0f / 12.0f)
++    return sqrtf (3.0f * scene);
++  else
++    return HLG_A * logf (12.0f * scene - HLG_B) + HLG_C;
++}
++
++static char *
++hlg_parameters_to_string (const char          *name,
++                          const HlgParameters *parameters)
++{
++  char gamma_str[G_ASCII_DTOSTR_BUF_SIZE];
++  char beta_str[G_ASCII_DTOSTR_BUF_SIZE];
++
++  g_ascii_formatd (gamma_str, sizeof (gamma_str), "%.4f", parameters->gamma);
++  g_ascii_formatd (beta_str, sizeof (beta_str), "%.4f", parameters->beta);
++
++  return g_strdup_printf ("%s(gamma %s, beta %s)", name, gamma_str, beta_str);
++}
++
++struct _ClutterColorOpHlgEotf
++{
++  ClutterColorOp parent;
++
++  HlgParameters parameters;
++};
++
++G_DEFINE_FINAL_TYPE (ClutterColorOpHlgEotf, clutter_color_op_hlg_eotf,
++                     CLUTTER_TYPE_COLOR_OP)
++
++static void
++clutter_color_op_hlg_eotf_do_transform (ClutterColorOp *op,
++                                        float          *data,
++                                        size_t          n_samples)
++{
++  const HlgParameters *parameters = &CLUTTER_COLOR_OP_HLG_EOTF (op)->parameters;
++
++  for (size_t i = 0; i < n_samples; i++)
++    {
++      float scene[3];
++      float luminance = 0.0f;
++      float scale = 0.0f;
++      int c;
++
++      for (c = 0; c < 3; c++)
++        {
++          float signal;
++
++          signal = MAX (0.0f,
++                        (1.0f - parameters->beta) * data[c] + parameters->beta);
++          scene[c] = hlg_inv_oetf (signal);
++          luminance += parameters->coefficients[c] * scene[c];
++        }
++
++      /* OOTF: F = Ys^(gamma - 1) E, normalized to the nominal peak. */
++      if (luminance > 0.0f)
++        scale = powf (luminance, parameters->gamma - 1.0f);
++
++      for (c = 0; c < 3; c++)
++        data[c] = scene[c] * scale;
++
++      data += 4;
++    }
++}
++
++static char *
++clutter_color_op_hlg_eotf_to_string (ClutterColorOp *op)
++{
++  return hlg_parameters_to_string ("hlg_eotf",
++                                   &CLUTTER_COLOR_OP_HLG_EOTF (op)->parameters);
++}
++
++static void
++clutter_color_op_hlg_eotf_class_init (ClutterColorOpHlgEotfClass *klass)
++{
++  ClutterColorOpClass *op_class = CLUTTER_COLOR_OP_CLASS (klass);
++
++  op_class->to_string = clutter_color_op_hlg_eotf_to_string;
++  op_class->do_transform = clutter_color_op_hlg_eotf_do_transform;
++}
++
++static void
++clutter_color_op_hlg_eotf_init (ClutterColorOpHlgEotf *op)
++{
++}
++
++ClutterColorOp *
++clutter_color_op_hlg_eotf_new (float       gamma,
++                               float       beta,
++                               const float coefficients[3])
++{
++  ClutterColorOpHlgEotf *op;
++
++  op = g_object_new (CLUTTER_TYPE_COLOR_OP_HLG_EOTF, NULL);
++  op->parameters = (HlgParameters) {
++    .gamma = gamma,
++    .beta = beta,
++    .coefficients = { coefficients[0], coefficients[1], coefficients[2] },
++  };
++
++  return CLUTTER_COLOR_OP (op);
++}
++
++struct _ClutterColorOpHlgInvEotf
++{
++  ClutterColorOp parent;
++
++  HlgParameters parameters;
++};
++
++G_DEFINE_FINAL_TYPE (ClutterColorOpHlgInvEotf, clutter_color_op_hlg_inv_eotf,
++                     CLUTTER_TYPE_COLOR_OP)
++
++static void
++clutter_color_op_hlg_inv_eotf_do_transform (ClutterColorOp *op,
++                                            float          *data,
++                                            size_t          n_samples)
++{
++  const HlgParameters *parameters =
++    &CLUTTER_COLOR_OP_HLG_INV_EOTF (op)->parameters;
++
++  for (size_t i = 0; i < n_samples; i++)
++    {
++      float luminance = 0.0f;
++      float scale = 0.0f;
++      int c;
++
++      for (c = 0; c < 3; c++)
++        luminance += parameters->coefficients[c] * data[c];
++
++      /* Inverse OOTF: Ys = Yd^(1 / gamma), E = F Ys^(1 - gamma). */
++      if (luminance > 0.0f)
++        scale = powf (luminance,
++                      (1.0f - parameters->gamma) / parameters->gamma);
++
++      for (c = 0; c < 3; c++)
++        {
++          float scene, signal;
++
++          scene = CLAMP (data[c] * scale, 0.0f, 1.0f);
++          signal = hlg_oetf (scene);
++          data[c] = CLAMP ((signal - parameters->beta) /
++                           (1.0f - parameters->beta),
++                           0.0f, 1.0f);
++        }
++
++      data += 4;
++    }
++}
++
++static char *
++clutter_color_op_hlg_inv_eotf_to_string (ClutterColorOp *op)
++{
++  return hlg_parameters_to_string ("hlg_inv_eotf",
++                                   &CLUTTER_COLOR_OP_HLG_INV_EOTF (op)->parameters);
++}
++
++static void
++clutter_color_op_hlg_inv_eotf_class_init (ClutterColorOpHlgInvEotfClass *klass)
++{
++  ClutterColorOpClass *op_class = CLUTTER_COLOR_OP_CLASS (klass);
++
++  op_class->to_string = clutter_color_op_hlg_inv_eotf_to_string;
++  op_class->do_transform = clutter_color_op_hlg_inv_eotf_do_transform;
++}
++
++static void
++clutter_color_op_hlg_inv_eotf_init (ClutterColorOpHlgInvEotf *op)
++{
++}
++
++ClutterColorOp *
++clutter_color_op_hlg_inv_eotf_new (float       gamma,
++                                   float       beta,
++                                   const float coefficients[3])
++{
++  ClutterColorOpHlgInvEotf *op;
++
++  op = g_object_new (CLUTTER_TYPE_COLOR_OP_HLG_INV_EOTF, NULL);
++  op->parameters = (HlgParameters) {
++    .gamma = gamma,
++    .beta = beta,
++    .coefficients = { coefficients[0], coefficients[1], coefficients[2] },
++  };
++
++  return CLUTTER_COLOR_OP (op);
++}
++
++void
++clutter_color_op_hlg_get_parameters (ClutterColorOp *op,
++                                     float          *gamma,
++                                     float          *beta,
++                                     const float   **coefficients)
++{
++  const HlgParameters *parameters;
++
++  if (CLUTTER_IS_COLOR_OP_HLG_EOTF (op))
++    parameters = &CLUTTER_COLOR_OP_HLG_EOTF (op)->parameters;
++  else if (CLUTTER_IS_COLOR_OP_HLG_INV_EOTF (op))
++    parameters = &CLUTTER_COLOR_OP_HLG_INV_EOTF (op)->parameters;
++  else
++    g_assert_not_reached ();
++
++  *gamma = parameters->gamma;
++  *beta = parameters->beta;
++  *coefficients = parameters->coefficients;
++}
++
+ typedef struct _ClutterColorOp3DLutPrivate
+ {
+   uint32_t size;
+diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
+index f5eddb2bf..306b01b8a 100644
+--- a/clutter/clutter/clutter-color-pipeline-shader.c
++++ b/clutter/clutter/clutter-color-pipeline-shader.c
+@@ -27,6 +27,7 @@
+ 
+ #include "clutter/clutter-backend-private.h"
+ #include "clutter/clutter-color-op.h"
++#include "clutter/clutter-color-op-private.h"
+ #include "clutter/clutter-color-pipeline.h"
+ #include "clutter/clutter-color-transform-private.h"
+ #include "clutter/clutter-main.h"
+@@ -213,6 +214,49 @@ static const char pq_inv_eotf_source[] =
+   "  return pow (num / den, vec3 (m2));\n"
+   "}\n";
+ 
++/* Rec. ITU-R BT.2100-2 HLG; must match ClutterColorOpHlgEotf. */
++static const char hlg_eotf_source[] =
++  "vec3 hlg_eotf (vec3 color, float gamma, float beta, vec3 coefficients)\n"
++  "{\n"
++  "  const float a = 0.17883277;\n"
++  "  const float b = 0.28466892;\n"
++  "  const float c = 0.55991073;\n"
++  "\n"
++  "  vec3 signal = max ((1.0 - beta) * color + beta, vec3 (0.0));\n"
++  "  vec3 lo_part = signal * signal / 3.0;\n"
++  "  vec3 hi_part = (exp ((signal - c) / a) + b) / 12.0;\n"
++  "  vec3 is_low = vec3 (lessThanEqual (signal, vec3 (0.5)));\n"
++  "  vec3 scene = mix (hi_part, lo_part, is_low);\n"
++  "  float luminance = dot (coefficients, scene);\n"
++  "\n"
++  "  if (luminance > 0.0)\n"
++  "    return scene * pow (luminance, gamma - 1.0);\n"
++  "  return vec3 (0.0);\n"
++  "}\n";
++
++/* The exact inverse of hlg_eotf; must match ClutterColorOpHlgInvEotf. */
++static const char hlg_inv_eotf_source[] =
++  "vec3 hlg_inv_eotf (vec3 color, float gamma, float beta, vec3 coefficients)\n"
++  "{\n"
++  "  const float a = 0.17883277;\n"
++  "  const float b = 0.28466892;\n"
++  "  const float c = 0.55991073;\n"
++  "\n"
++  "  float luminance = dot (coefficients, color);\n"
++  "  vec3 scene = vec3 (0.0);\n"
++  "\n"
++  "  if (luminance > 0.0)\n"
++  "    scene = clamp (color * pow (luminance, (1.0 - gamma) / gamma),\n"
++  "                   0.0, 1.0);\n"
++  "\n"
++  "  vec3 lo_part = sqrt (3.0 * scene);\n"
++  "  /* Keep the unused branch finite below 1/12. */\n"
++  "  vec3 hi_part = a * log (max (12.0 * scene - b, vec3 (1.0 - b))) + c;\n"
++  "  vec3 is_low = vec3 (lessThanEqual (scene, vec3 (1.0 / 12.0)));\n"
++  "  vec3 signal = mix (hi_part, lo_part, is_low);\n"
++  "  return clamp ((signal - beta) / (1.0 - beta), 0.0, 1.0);\n"
++  "}\n";
++
+ static const char lut_3d_source[] =
+   "// Tetrahedral interpolation\n"
+   "vec3 sample_3d_lut_SIZE (vec3 color, sampler2D lut_texture, float lut_size)\n"
+@@ -653,6 +697,71 @@ update_multiply_state (ClutterColorOp *op,
+   cogl_pipeline_set_uniform_1f (pipeline, uniform_location, value);
+ }
+ 
++static char *
++get_hlg_declarations (ClutterColorOp *op,
++                      size_t          op_id)
++{
++  return g_strdup_printf ("uniform float hlg_gamma_%zu;\n"
++                          "uniform float hlg_beta_%zu;\n"
++                          "uniform vec3 hlg_coefficients_%zu;\n",
++                          op_id, op_id, op_id);
++}
++
++static char *
++get_hlg_eotf_invocation (ClutterColorOp *op,
++                         size_t          op_id)
++{
++  return g_strdup_printf ("vec4 (hlg_eotf (color.rgb, hlg_gamma_%zu, "
++                          "hlg_beta_%zu, hlg_coefficients_%zu), color.a)",
++                          op_id, op_id, op_id);
++}
++
++static char *
++get_hlg_inv_eotf_invocation (ClutterColorOp *op,
++                             size_t          op_id)
++{
++  return g_strdup_printf ("vec4 (hlg_inv_eotf (color.rgb, hlg_gamma_%zu, "
++                          "hlg_beta_%zu, hlg_coefficients_%zu), color.a)",
++                          op_id, op_id, op_id);
++}
++
++static void
++set_uniform_1f (CoglPipeline *pipeline,
++                const char   *name,
++                size_t        op_id,
++                float         value)
++{
++  g_autofree char *uniform_name = NULL;
++  int uniform_location;
++
++  uniform_name = g_strdup_printf ("%s_%zu", name, op_id);
++  uniform_location = cogl_pipeline_get_uniform_location (pipeline,
++                                                         uniform_name);
++  cogl_pipeline_set_uniform_1f (pipeline, uniform_location, value);
++}
++
++static void
++update_hlg_state (ClutterColorOp *op,
++                  size_t          op_id,
++                  CoglPipeline   *pipeline)
++{
++  g_autofree char *uniform_name = NULL;
++  const float *coefficients;
++  float gamma, beta;
++  int uniform_location;
++
++  clutter_color_op_hlg_get_parameters (op, &gamma, &beta, &coefficients);
++
++  set_uniform_1f (pipeline, "hlg_gamma", op_id, gamma);
++  set_uniform_1f (pipeline, "hlg_beta", op_id, beta);
++
++  uniform_name = g_strdup_printf ("hlg_coefficients_%zu", op_id);
++  uniform_location = cogl_pipeline_get_uniform_location (pipeline,
++                                                         uniform_name);
++  cogl_pipeline_set_uniform_float (pipeline, uniform_location,
++                                   3, 1, coefficients);
++}
++
+ typedef struct _ShaderOpInfo
+ {
+   GType (*get_type) (void);
+@@ -693,6 +802,20 @@ static const ShaderOpInfo shader_op_infos[] = {
+     .shader_source = pq_inv_eotf_source,
+     .invocation = "vec4 (pq_inv_eotf (color.rgb), color.a)",
+   },
++  {
++    .get_type = clutter_color_op_hlg_eotf_get_type,
++    .shader_source = hlg_eotf_source,
++    .get_declarations = get_hlg_declarations,
++    .get_invocation = get_hlg_eotf_invocation,
++    .update_state = update_hlg_state,
++  },
++  {
++    .get_type = clutter_color_op_hlg_inv_eotf_get_type,
++    .shader_source = hlg_inv_eotf_source,
++    .get_declarations = get_hlg_declarations,
++    .get_invocation = get_hlg_inv_eotf_invocation,
++    .update_state = update_hlg_state,
++  },
+   {
+     .get_type = clutter_color_op_unpremultiply_get_type,
+     .shader_source = unpremultiply_source,
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index 3768bd9af..3bb7b0a85 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -29,7 +29,7 @@
+ #include "clutter/clutter-color-state-params.h"
+ 
+ #include "clutter/clutter-color-state.h"
+-#include "clutter/clutter-color-utils.h"
++#include "clutter/clutter-color-utils-private.h"
+ #include "clutter/clutter-context.h"
+ 
+ #define UNIFORM_NAME_GAMMA_EXP "gamma_exp"
+@@ -186,6 +186,7 @@ clutter_color_state_params_required_format (ClutterColorState *color_state)
+         case CLUTTER_TRANSFER_FUNCTION_GAMMA22:
+           return CLUTTER_ENCODING_REQUIRED_FORMAT_UINT8;
+         case CLUTTER_TRANSFER_FUNCTION_PQ:
++        case CLUTTER_TRANSFER_FUNCTION_HLG:
+           return CLUTTER_ENCODING_REQUIRED_FORMAT_UINT10;
+         case CLUTTER_TRANSFER_FUNCTION_LINEAR:
+           return CLUTTER_ENCODING_REQUIRED_FORMAT_FP16;
+@@ -199,7 +200,8 @@ clutter_color_state_params_required_format (ClutterColorState *color_state)
+ }
+ 
+ /*
+- * Currently all content is blended with gamma transfer characteristics.
++ * Currently all content is blended with gamma transfer characteristics. HDR
++ * signals (PQ and HLG) are blended in extended range gamma 2.2 sRGB.
+  */
+ static ClutterColorState *
+ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+@@ -221,7 +223,8 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+       blending_eotf.tf_name = CLUTTER_TRANSFER_FUNCTION_LINEAR;
+     }
+   else if (blending_eotf.type == CLUTTER_EOTF_TYPE_NAMED &&
+-           blending_eotf.tf_name == CLUTTER_TRANSFER_FUNCTION_PQ)
++           (blending_eotf.tf_name == CLUTTER_TRANSFER_FUNCTION_PQ ||
++            blending_eotf.tf_name == CLUTTER_TRANSFER_FUNCTION_HLG))
+     {
+       blending_colorimetry.type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE;
+       blending_colorimetry.colorspace = CLUTTER_COLORSPACE_SRGB;
+@@ -332,6 +335,18 @@ clutter_color_state_params_new_full (ClutterContext          *context,
+ {
+   ClutterColorStateParams *color_state_params;
+ 
++  /* HLG luminances that cannot be decoded make no color state: callers taking
++   * them from external input check them first with the same function. */
++  if (gamma_exp < 1.0f && transfer_function == CLUTTER_TRANSFER_FUNCTION_HLG &&
++      min_lum >= 0.0f && max_lum > 0.0f && ref_lum >= 0.0f)
++    {
++      g_return_val_if_fail (clutter_luminance_get_hlg_parameters (min_lum,
++                                                                  max_lum,
++                                                                  NULL, NULL,
++                                                                  NULL),
++                            NULL);
++    }
++
+   color_state_params = g_object_new (CLUTTER_TYPE_COLOR_STATE_PARAMS,
+                                      "context", context,
+                                      NULL);
+@@ -509,6 +524,9 @@ cicp_transfer_to_clutter (ClutterCicpTransfer   transfer,
+       eotf->tf_name = CLUTTER_TRANSFER_FUNCTION_PQ;
+       return TRUE;
+     case CLUTTER_CICP_TRANSFER_HLG:
++      eotf->type = CLUTTER_EOTF_TYPE_NAMED;
++      eotf->tf_name = CLUTTER_TRANSFER_FUNCTION_HLG;
++      return TRUE;
+     default:
+       g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+                    "Unhandled cicp transfer characteristics: %u",
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 2b756d3e2..465c29f60 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -59,9 +59,11 @@
+ #include "clutter/clutter-color-state-icc.h"
+ #include "clutter/clutter-color-state.h"
+ #include "clutter/clutter-color-op.h"
++#include "clutter/clutter-color-op-private.h"
+ #include "clutter/clutter-context.h"
+ 
+ #include <lcms2.h>
++#include <math.h>
+ 
+ #define LUT_3D_SIZE 33
+ 
+@@ -124,9 +126,54 @@ compute_chromatic_adaptation (graphene_vec3_t   *src_white_point_XYZ,
+     g_assert_not_reached ();
+ }
+ 
++/*
++ * What a parametric state's transfer function needs beyond its name: the
++ * luminance coefficients of its primaries and, for HLG, the system gamma and
++ * black level lift of its luminances. Only HLG, whose OOTF depends on
++ * luminance, uses them.
++ */
++typedef struct _EotfParameters
++{
++  float coefficients[3];
++  float hlg_gamma;
++  float hlg_beta;
++} EotfParameters;
++
++static gboolean
++get_eotf_parameters (ClutterColorStateParams  *params,
++                     EotfParameters           *parameters,
++                     GError                  **error)
++{
++  const ClutterColorimetry *colorimetry =
++    clutter_color_state_params_get_colorimetry (params);
++  const ClutterEOTF *eotf = clutter_color_state_params_get_eotf (params);
++
++  if (!clutter_colorimetry_get_luminance_coefficients (colorimetry,
++                                                       parameters->coefficients,
++                                                       error))
++    return FALSE;
++
++  if (eotf->type == CLUTTER_EOTF_TYPE_NAMED &&
++      eotf->tf_name == CLUTTER_TRANSFER_FUNCTION_HLG)
++    {
++      const ClutterLuminance *lum =
++        clutter_color_state_params_get_luminance (params);
++
++      return clutter_luminance_get_hlg_parameters (lum->min, lum->max,
++                                                   &parameters->hlg_gamma,
++                                                   &parameters->hlg_beta,
++                                                   error);
++    }
++
++  return TRUE;
++}
++
+ static ClutterColorOp *
+-create_eotf_op (const ClutterEOTF *eotf)
++create_eotf_op (ClutterColorStateParams *params,
++                const EotfParameters    *parameters)
+ {
++  const ClutterEOTF *eotf = clutter_color_state_params_get_eotf (params);
++
+   if (eotf->type == CLUTTER_EOTF_TYPE_GAMMA)
+     {
+       if (G_APPROX_VALUE (eotf->gamma_exp, 1.0f, FLT_EPSILON))
+@@ -147,14 +194,21 @@ create_eotf_op (const ClutterEOTF *eotf)
+       return clutter_color_op_gamma_power_new (2.2f);
+     case CLUTTER_TRANSFER_FUNCTION_LINEAR:
+       return NULL;
++    case CLUTTER_TRANSFER_FUNCTION_HLG:
++      return clutter_color_op_hlg_eotf_new (parameters->hlg_gamma,
++                                            parameters->hlg_beta,
++                                            parameters->coefficients);
+     }
+ 
+   g_assert_not_reached ();
+ }
+ 
+ static ClutterColorOp *
+-create_inv_eotf_op (const ClutterEOTF *eotf)
++create_inv_eotf_op (ClutterColorStateParams *params,
++                    const EotfParameters    *parameters)
+ {
++  const ClutterEOTF *eotf = clutter_color_state_params_get_eotf (params);
++
+   if (eotf->type == CLUTTER_EOTF_TYPE_GAMMA)
+     {
+       if (G_APPROX_VALUE (eotf->gamma_exp, 1.0f, FLT_EPSILON))
+@@ -175,6 +229,10 @@ create_inv_eotf_op (const ClutterEOTF *eotf)
+       return clutter_color_op_gamma_power_new (1.0f / 2.2f);
+     case CLUTTER_TRANSFER_FUNCTION_LINEAR:
+       return NULL;
++    case CLUTTER_TRANSFER_FUNCTION_HLG:
++      return clutter_color_op_hlg_inv_eotf_new (parameters->hlg_gamma,
++                                                parameters->hlg_beta,
++                                                parameters->coefficients);
+     }
+ 
+   g_assert_not_reached ();
+@@ -182,13 +240,15 @@ create_inv_eotf_op (const ClutterEOTF *eotf)
+ 
+ /*
+  * Every producer of a parametric color state from external input validates its
+- * colorimetry with clutter_colorimetry_get_linear_bt2020_matrices(), the same
+- * function used here, so reaching this is a bug in the producer. There is no
+- * matrix that would represent the requested space, so the transform is left
+- * incomplete and the producer is named loudly instead of substituting one.
++ * colorimetry with clutter_colorimetry_get_linear_bt2020_matrices(), and HLG
++ * luminances with clutter_luminance_get_hlg_parameters(), the same functions
++ * used here, so reaching this is a bug in the producer. There is no
++ * conversion that would represent the requested state, so the transform is
++ * left incomplete and the producer is named loudly instead of substituting
++ * one.
+  */
+ static void
+-warn_unusable_colorimetry (ClutterColorStateParams *params,
++warn_unusable_color_state (ClutterColorStateParams *params,
+                            const GError            *error)
+ {
+   static GQuark warned_quark = 0;
+@@ -212,31 +272,30 @@ add_params_to_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+ {
+   const ClutterColorimetry *colorimetry;
+   g_autoptr (GError) error = NULL;
+-  const ClutterEOTF *eotf;
+   graphene_matrix_t to_linear_bt2020_stack;
+   graphene_matrix_t *to_linear_bt2020;
++  EotfParameters eotf_parameters;
+ 
+-  eotf = clutter_color_state_params_get_eotf (params);
++  colorimetry = clutter_color_state_params_get_colorimetry (params);
++  if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
++                                                       &to_linear_bt2020_stack,
++                                                       NULL,
++                                                       &error) ||
++      !get_eotf_parameters (params, &eotf_parameters, &error))
++    {
++      warn_unusable_color_state (params, error);
++      return;
++    }
+ 
+   /* 1. Apply EOTF to get linear light in source colorspace */
+   {
+-    ClutterColorOp *eotf_op = create_eotf_op (eotf);
++    ClutterColorOp *eotf_op = create_eotf_op (params, &eotf_parameters);
+ 
+     if (eotf_op)
+       clutter_color_pipeline_take_op (pipeline, eotf_op);
+   }
+ 
+   /* 2. Transform to linear BT.2020 D65 (via XYZ) */
+-  colorimetry = clutter_color_state_params_get_colorimetry (params);
+-  if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
+-                                                       &to_linear_bt2020_stack,
+-                                                       NULL,
+-                                                       &error))
+-    {
+-      warn_unusable_colorimetry (params, error);
+-      return;
+-    }
+-
+   to_linear_bt2020 = graphene_matrix_alloc ();
+   graphene_matrix_init_from_matrix (to_linear_bt2020,
+                                     &to_linear_bt2020_stack);
+@@ -250,20 +309,19 @@ add_params_from_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+ {
+   const ClutterColorimetry *colorimetry;
+   g_autoptr (GError) error = NULL;
+-  const ClutterEOTF *eotf;
+   graphene_matrix_t from_linear_bt2020_stack;
+   graphene_matrix_t *from_linear_bt2020;
+-
+-  eotf = clutter_color_state_params_get_eotf (params);
++  EotfParameters eotf_parameters;
+ 
+   /* 1. Transform from linear BT.2020 D65 to target colorspace (via XYZ) */
+   colorimetry = clutter_color_state_params_get_colorimetry (params);
+   if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
+                                                        NULL,
+                                                        &from_linear_bt2020_stack,
+-                                                       &error))
++                                                       &error) ||
++      !get_eotf_parameters (params, &eotf_parameters, &error))
+     {
+-      warn_unusable_colorimetry (params, error);
++      warn_unusable_color_state (params, error);
+       return;
+     }
+ 
+@@ -275,7 +333,7 @@ add_params_from_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+ 
+   /* 2. Apply inverse EOTF */
+   {
+-    ClutterColorOp *inv_eotf_op = create_inv_eotf_op (eotf);
++    ClutterColorOp *inv_eotf_op = create_inv_eotf_op (params, &eotf_parameters);
+ 
+     if (inv_eotf_op)
+       clutter_color_pipeline_take_op (pipeline, inv_eotf_op);
+diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
+index 1fb8b8c89..2599ec9e8 100644
+--- a/clutter/clutter/clutter-color-utils-private.h
++++ b/clutter/clutter/clutter-color-utils-private.h
+@@ -39,3 +39,15 @@ gboolean clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetr
+                                                          graphene_matrix_t         *to_linear_bt2020,
+                                                          graphene_matrix_t         *from_linear_bt2020,
+                                                          GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
++
++gboolean clutter_colorimetry_get_luminance_coefficients (const ClutterColorimetry  *colorimetry,
++                                                         float                      coefficients[3],
++                                                         GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
++
++/* Exported for libmutter, which validates client HLG luminances. */
++CLUTTER_EXPORT
++gboolean clutter_luminance_get_hlg_parameters (float    min_lum,
++                                               float    max_lum,
++                                               float   *gamma,
++                                               float   *beta,
++                                               GError **error) G_GNUC_WARN_UNUSED_RESULT;
+diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
+index d5feb29d4..d2afe41cc 100644
+--- a/clutter/clutter/clutter-color-utils.c
++++ b/clutter/clutter/clutter-color-utils.c
+@@ -88,6 +88,8 @@ clutter_eotf_to_string (ClutterEOTF eotf)
+           return "BT.1886";
+         case CLUTTER_TRANSFER_FUNCTION_LINEAR:
+           return "linear";
++        case CLUTTER_TRANSFER_FUNCTION_HLG:
++          return "HLG";
+         }
+       break;
+     case CLUTTER_EOTF_TYPE_GAMMA:
+@@ -121,6 +123,15 @@ static const ClutterLuminance pq_default_luminance = {
+   .mastering_max = 10000.0f,
+ };
+ 
++/* The default luminances wp_color_manager_v1.transfer_function.hlg implies. */
++static const ClutterLuminance hlg_default_luminance = {
++  .type = CLUTTER_LUMINANCE_TYPE_DERIVED,
++  .min = 0.005f,
++  .max = 1000.0f,
++  .ref = 203.0f,
++  .mastering_max = 1000.0f,
++};
++
+ /* Primaries and white point retrieved from:
+  * https://www.color.org */
+ static const ClutterPrimaries srgb_primaries = {
+@@ -213,6 +224,8 @@ clutter_eotf_get_default_luminance (ClutterEOTF eotf)
+           return &bt1886_default_luminance;
+         case CLUTTER_TRANSFER_FUNCTION_PQ:
+           return &pq_default_luminance;
++        case CLUTTER_TRANSFER_FUNCTION_HLG:
++          return &hlg_default_luminance;
+         }
+       break;
+     case CLUTTER_EOTF_TYPE_GAMMA:
+@@ -754,3 +767,88 @@ clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *color
+ 
+   return TRUE;
+ }
++
++/*
++ * Computes the Rec. ITU-R BT.2100-2 HLG system gamma and black level lift for
++ * the nominal peak luminance @max_lum (Lw) and black level @min_lum (Lb),
++ * using the extended system gamma formula of Report ITU-R BT.2390 for every
++ * Lw:
++ *
++ *   gamma = 1.2 * 1.111^log2 (Lw / 1000)
++ *   beta = sqrt (3 * (Lb / Lw)^(1 / gamma))
++ *
++ * The black level lift maps black into the square-root segment of the
++ * inverse OETF, which holds only while beta <= 0.5; beyond it decoding would
++ * invert, and at beta = 1 encoding would divide by zero.
++ *
++ * Returns %FALSE, setting @error, unless the luminances are finite with
++ * 0 <= Lb < Lw and beta <= 0.5. Every HLG color state and every HLG pipeline
++ * is validated with this one definition.
++ */
++gboolean
++clutter_luminance_get_hlg_parameters (float    min_lum,
++                                      float    max_lum,
++                                      float   *gamma,
++                                      float   *beta,
++                                      GError **error)
++{
++  double system_gamma, black_lift;
++
++  if (!isfinite (min_lum) || !isfinite (max_lum) ||
++      !(min_lum >= 0.0f) || !(max_lum > min_lum))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "HLG luminances must be finite, with the minimum "
++                           "at least 0 and below the maximum");
++      return FALSE;
++    }
++
++  system_gamma = 1.2 * pow (1.111, log2 ((double) max_lum / 1000.0));
++  black_lift = sqrt (3.0 * pow ((double) min_lum / (double) max_lum,
++                                1.0 / system_gamma));
++
++  if (!isfinite (system_gamma) || !isfinite (black_lift) || black_lift > 0.5)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The HLG black level is too high for the nominal "
++                           "peak luminance");
++      return FALSE;
++    }
++
++  if (gamma)
++    *gamma = (float) system_gamma;
++  if (beta)
++    *beta = (float) black_lift;
++
++  return TRUE;
++}
++
++/*
++ * Retrieves the luminance coefficients of linear RGB in @colorimetry: the Y
++ * row of its RGB to CIE XYZ matrix, in its own white point, so that they sum
++ * to 1. For BT.2020 they are 0.2627, 0.6780 and 0.0593.
++ *
++ * The colorimetry is accepted only if it is usable for rendering, by the same
++ * definition as clutter_colorimetry_get_linear_bt2020_matrices(); otherwise
++ * %FALSE is returned and @error is set.
++ */
++gboolean
++clutter_colorimetry_get_luminance_coefficients (const ClutterColorimetry  *colorimetry,
++                                                float                      coefficients[3],
++                                                GError                   **error)
++{
++  graphene_matrix_t to_XYZ;
++  int i;
++
++  if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
++                                                       NULL, NULL,
++                                                       error) ||
++      !colorimetry_to_XYZ_checked (colorimetry, &to_XYZ, error))
++    return FALSE;
++
++  /* Row i of the matrix is the XYZ of primary i at full intensity. */
++  for (i = 0; i < 3; i++)
++    coefficients[i] = graphene_matrix_get_value (&to_XYZ, i, 1);
++
++  return TRUE;
++}
+diff --git a/clutter/clutter/clutter-color-utils.h b/clutter/clutter/clutter-color-utils.h
+index 3bc18457d..6f253d067 100644
+--- a/clutter/clutter/clutter-color-utils.h
++++ b/clutter/clutter/clutter-color-utils.h
+@@ -55,6 +55,7 @@ typedef enum _ClutterTransferFunction
+   CLUTTER_TRANSFER_FUNCTION_PQ,
+   CLUTTER_TRANSFER_FUNCTION_BT1886,
+   CLUTTER_TRANSFER_FUNCTION_LINEAR,
++  CLUTTER_TRANSFER_FUNCTION_HLG,
+ } ClutterTransferFunction;
+ 
+ typedef enum _ClutterColorimetryType
+diff --git a/clutter/clutter/meson.build b/clutter/clutter/meson.build
+index f30b15ab9..47409c51e 100644
+--- a/clutter/clutter/meson.build
++++ b/clutter/clutter/meson.build
+@@ -195,6 +195,7 @@ clutter_private_headers = [
+   'clutter-constraint-private.h',
+   'clutter-content-private.h',
+   'clutter-context-private.h',
++  'clutter-color-op-private.h',
+   'clutter-color-utils-private.h',
+   'clutter-cursor-private.h',
+   'clutter-damage-history.h',
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index ac20f449a..b6e3e66de 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -294,6 +294,8 @@ clutter_tf_to_wayland (struct wl_resource      *resource,
+       return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_BT1886;
+     case CLUTTER_TRANSFER_FUNCTION_LINEAR:
+       return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR;
++    case CLUTTER_TRANSFER_FUNCTION_HLG:
++      return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG;
+     }
+   g_assert_not_reached ();
+ }

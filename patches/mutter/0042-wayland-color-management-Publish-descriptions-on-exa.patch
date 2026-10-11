@@ -1,0 +1,331 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:19:52 -0400
+Subject: [PATCH] wayland/color-management: Publish descriptions on exact
+ identity
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The output's description and a surface's preferred description were
+republished only when the new color state differed by
+clutter_color_state_equals(), which treats luminances within 10% as
+equal, while the color device, the renderer and the mapping predicate
+use exact identity. A reference luminance factor change under 10%, such
+as 0.80 to 0.87 (reference white 162 to 177 cd/m²), changed the
+rendering without being published, so a client following the published
+description declared the old reference white and was mapped again.
+
+Compare with clutter_color_state_identical(), pointer equality included,
+next to the target comparison, as the renderer does.
+
+A new separate test case, /wayland/published/reference-factor, changes
+the factor within 10% and checks, at the published-record level, that
+the description is republished with the new reference white, and that
+a client copying the published reference white and target luminance is
+not mapped and keeps direct scanout after each change.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/tests/meson.build                         |   4 +-
+ src/tests/wayland-color-management-test.c     | 101 +++++++++++++++++
+ .../wayland-test-clients/color-management.c   | 105 ++++++++++++++++++
+ src/wayland/meta-wayland-color-management.c   |  11 +-
+ 4 files changed, 217 insertions(+), 4 deletions(-)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 62569367a..0fe8def97 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -952,7 +952,8 @@ wayland_test_cases = [
+     # The SDR-native case and the info round trip rewrite the fixture
+     # output's EDID and colour mode, and the zero-descriptor case replaces
+     # the process's descriptor 0. The mapping cases give the fixture output a
+-    # declared target peak or declared target primaries.
++    # declared target peak or declared target primaries, and the published
++    # case a declared target peak and reference luminance factors.
+     'separate_cases': [
+       '/wayland/target-luminance/v1',
+       '/wayland/target-luminance/v2',
+@@ -963,6 +964,7 @@ wayland_test_cases = [
+       '/wayland/icc-file/zero-descriptor',
+       '/wayland/mapping/blending-target',
+       '/wayland/mapping/target-gamut',
++      '/wayland/published/reference-factor',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 6f7792cee..3ac09f2b4 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1298,6 +1298,105 @@ mapping_blending_target (void)
+   meta_color_device_update (device);
+ }
+ 
++/*
++ * The published output description follows the color device on exact
++ * identity, like the renderer: a reference luminance factor change within
++ * the 10% that clutter_color_state_equals() tolerates (0.80 to 0.87, a
++ * reference white of 162 to 177 cd/m²) is republished, and a client that
++ * copies the published reference white and target luminance into its own
++ * description is not mapped, and keeps direct scanout, after each change.
++ * The client checks the republished description and its values.
++ */
++static void
++published_reference_factor (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  const float factors[] = { 0.80f, 0.87f };
++  MetaWaylandTestClient *client;
++  ClutterStageView *view;
++  MetaWindow *window;
++  unsigned int i;
++
++  /* A synthetic native HDR panel declaring a 600 cd/m² peak. */
++  info->connector_type = META_CONNECTOR_TYPE_eDP;
++  info->supported_hdr_eotfs = 1 << META_OUTPUT_HDR_METADATA_EOTF_PQ;
++  info->supported_color_spaces = 1 << META_OUTPUT_COLORSPACE_BT2020;
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->native_rgb_bt2020_pq = TRUE;
++  info->edid_info->native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
++  info->edid_info->native_luminance = (struct di_displayid2_luminance) {
++    .has_min_luminance = TRUE,
++    .has_max_luminance_10pct = TRUE,
++    .min_luminance = 1049.0f / 2097152.0f,
++    .max_luminance_10pct = 600,
++  };
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++  meta_color_device_set_reference_luminance_factor (device, factors[0]);
++
++  view = CLUTTER_STAGE_VIEW (meta_renderer_get_view_for_crtc (renderer,
++                                                              meta_output_get_assigned_crtc (output)));
++  g_assert_nonnull (view);
++
++  meta_wayland_test_driver_set_property (test_driver, "target-output",
++                                         meta_output_get_name (output));
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "published-reference",
++                                                   NULL);
++  window = meta_wait_for_client_window (test_context,
++                                        "color-management-published");
++
++  for (i = 0; i < G_N_ELEMENTS (factors); i++)
++    {
++      ClutterColorState *output_color_state, *blending, *surface_color_state;
++      float expected_ref = roundf (203.0f * factors[i]);
++
++      wait_for_sync_point (i);
++      output_color_state = clutter_stage_view_get_output_color_state (view);
++      blending = clutter_stage_view_get_color_state (view);
++      surface_color_state = get_window_color_state (window);
++      g_assert_cmpfloat (clutter_color_state_get_luminance (output_color_state)->ref,
++                         ==, expected_ref);
++      g_assert_cmpfloat (clutter_color_state_get_luminance (surface_color_state)->ref,
++                         ==, expected_ref);
++      g_assert_false (clutter_color_transform_requires_mapping (surface_color_state,
++                                                                blending));
++      g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (surface_color_state,
++                                                                                blending,
++                                                                                output_color_state));
++
++      if (i + 1 < G_N_ELEMENTS (factors))
++        {
++          g_autoptr (ClutterColorState) previous = g_object_ref (output_color_state);
++          ClutterColorState *next;
++
++          meta_color_device_set_reference_luminance_factor (device,
++                                                            factors[i + 1]);
++          next = meta_color_device_get_color_state (device);
++          /* Close enough for clutter_color_state_equals(), not identical. */
++          g_assert_true (clutter_color_state_equals (previous, next));
++          g_assert_false (clutter_color_state_identical (previous, next));
++          /* The client following the old description would now be mapped. */
++          g_assert_true (clutter_color_transform_requires_highlight_mapping (surface_color_state,
++                                                                             clutter_stage_view_get_color_state (view)));
++        }
++      emit_sync_event (i);
++    }
++
++  meta_wayland_test_client_finish (client);
++  meta_color_device_set_reference_luminance_factor (device, 1.0f);
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
+ /* Whether the conversion of @color to @blending differs from the same
+  * conversion to @untargeted, the blending state without a target. */
+ static gboolean
+@@ -1746,6 +1845,8 @@ init_tests (void)
+                    mastering_round_trip);
+   g_test_add_func ("/wayland/mapping/blending-target",
+                    mapping_blending_target);
++  g_test_add_func ("/wayland/published/reference-factor",
++                   published_reference_factor);
+   g_test_add_func ("/wayland/mapping/target-gamut",
+                    mapping_target_gamut);
+ }
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 6f63efcc9..27469debe 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -2060,6 +2060,109 @@ info_round_trip_client (WaylandDisplay *display)
+   wl_display_roundtrip (display->display);
+ }
+ 
++/*
++ * Follows the target output's published description: creates its own PQ
++ * description with the published luminances, reference white and target
++ * luminance, for the compositor to check that it is not mapped. Between
++ * the two phases the compositor changes the output's reference luminance
++ * factor by less than 10%, which must be republished.
++ */
++static void
++published_reference_client (WaylandDisplay *display)
++{
++  TargetClient client = { .version = 1 };
++  struct wl_registry *registry = wl_display_get_registry (display->display);
++  const char *target_name = lookup_property_string (display, "target-output");
++  const uint32_t references[] = { 162, 177 };
++  struct wl_surface *surface;
++  struct wp_color_management_surface_v1 *color_surface;
++  TargetOutput *target = NULL;
++  TargetSnapshot snapshots[G_N_ELEMENTS (references)] = { 0 };
++  unsigned int i, phase;
++
++  wl_registry_add_listener (registry, &target_registry_listener, &client);
++  wl_display_roundtrip (display->display);
++  wl_display_roundtrip (display->display);
++  g_assert_nonnull (client.manager);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      if (g_strcmp0 (client.outputs[i].name, target_name) == 0)
++        target = &client.outputs[i];
++    }
++  g_assert_nonnull (target);
++
++  target->color_output = wp_color_manager_v1_get_output (client.manager,
++                                                         target->output);
++  wp_color_management_output_v1_add_listener (target->color_output,
++                                              &target_color_output_listener,
++                                              target);
++  wl_display_roundtrip (display->display);
++  target->changed = target->done = 0;
++
++  create_test_toplevel (display, "color-management-published",
++                        &surface, &color_surface);
++
++  for (phase = 0; phase < G_N_ELEMENTS (references); phase++)
++    {
++      struct wp_image_description_creator_params_v1 *creator_params;
++      struct wp_image_description_v1 *image_description;
++      ImageDescriptionContext context;
++      TargetInfo info;
++
++      /* The change of reference white was announced, once. */
++      g_assert_cmpuint (target->changed, ==, phase == 0 ? 0 : 1);
++      g_assert_cmpuint (target->done, ==, phase == 0 ? 0 : 1);
++      g_assert_false (target->awaiting_done);
++      target->changed = target->done = 0;
++
++      snapshots[phase].description =
++        wp_color_management_output_v1_get_image_description (target->color_output);
++      wait_target_snapshot (display, &snapshots[phase]);
++      if (phase > 0)
++        g_assert_cmpuint (snapshots[phase].identity, !=, snapshots[phase - 1].identity);
++
++      info = read_target_info (display, &snapshots[phase]);
++      g_assert_cmpuint (info.primaries, ==, WP_COLOR_MANAGER_V1_PRIMARIES_BT2020);
++      g_assert_cmpuint (info.tf, ==, WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++      g_assert_cmpuint (info.reference, ==, references[phase]);
++      g_assert_cmpuint (info.target_max, ==, 600);
++
++      creator_params =
++        wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++      wp_image_description_creator_params_v1_set_primaries_named (creator_params,
++                                                                  WP_COLOR_MANAGER_V1_PRIMARIES_BT2020);
++      wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                           WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++      wp_image_description_creator_params_v1_set_luminances (creator_params,
++                                                             info.encoding_min,
++                                                             info.encoding_max,
++                                                             info.reference);
++      wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                      info.target_min,
++                                                                      info.target_max);
++      image_description = create_from_creator (display, creator_params, &context);
++      g_assert_false (context.creation_failed);
++      set_surface_description (surface, color_surface, image_description);
++
++      test_driver_sync_point (display->test_driver, phase, NULL);
++      wait_for_sync_event (display, phase);
++      wl_display_roundtrip (display->display);
++    }
++
++  for (i = 0; i < G_N_ELEMENTS (snapshots); i++)
++    wp_image_description_v1_destroy (snapshots[i].description);
++  wp_color_management_surface_v1_destroy (color_surface);
++  wp_color_management_output_v1_destroy (target->color_output);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      wl_output_release (client.outputs[i].output);
++      g_free (client.outputs[i].name);
++    }
++  wp_color_manager_v1_destroy (client.manager);
++  wl_registry_destroy (registry);
++  wl_display_roundtrip (display->display);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -2127,6 +2230,8 @@ main (int    argc,
+         mastering_v2_light_levels_client (display);
+       else if (strcmp (argv[1], "mastering-round-trip") == 0)
+         mastering_round_trip_client (display);
++      else if (strcmp (argv[1], "published-reference") == 0)
++        published_reference_client (display);
+       else
+         g_error ("Unknown color-management test mode '%s'", argv[1]);
+       return EXIT_SUCCESS;
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 1b7d364de..be7248359 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -563,8 +563,12 @@ update_output_record (MetaWaylandColorManagementOutput *cm_output)
+   record = description_record_get (color_manager->ids,
+                                    get_output_color_state (color_manager, monitor),
+                                    target, target_primaries);
++  /* On exact identity, as the color device and the renderer decide: a
++   * reference luminance change that clutter_color_state_equals() deems close
++   * enough still changes what a client following the description must
++   * declare to stay unmapped. */
+   if (cm_output->record &&
+-      clutter_color_state_equals (cm_output->record->color_state, record->color_state) &&
++      clutter_color_state_identical (cm_output->record->color_state, record->color_state) &&
+       description_target_equal (cm_output->record, record))
+     return FALSE;
+ 
+@@ -927,9 +931,10 @@ update_preferred_color_state (MetaWaylandColorManagementSurface *cm_surface)
+   if (!record)
+     record = color_manager->default_record;
+ 
++  /* On exact identity, like the output's description. */
+   if (cm_surface->preferred_record &&
+-      clutter_color_state_equals (record->color_state,
+-                                  cm_surface->preferred_record->color_state) &&
++      clutter_color_state_identical (record->color_state,
++                                     cm_surface->preferred_record->color_state) &&
+       description_target_equal (record, cm_surface->preferred_record))
+     return;
+ 

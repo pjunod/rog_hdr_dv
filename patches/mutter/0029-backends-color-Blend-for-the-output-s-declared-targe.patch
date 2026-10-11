@@ -1,0 +1,323 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:14:07 -0400
+Subject: [PATCH] backends/color: Blend for the output's declared target
+ luminance
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The colour device owns the output's target volume (already published to
+Wayland), but rendering never saw it. Add a rendering color state to the
+device, meta_color_device_get_rendering_color_state(): the
+output color state with the firmware-declared target luminance range as
+its target volume, when the target peak is declared, and otherwise the
+output color state itself. Only a declared peak counts; no constant is
+substituted, and a declared minimum with a fallback peak declares no
+target. The minimum is the published target minimum.
+
+The renderer view derives the view's blending color state from it, so
+the blending state carries the target (in the display's units, with the
+output's reference white luminance as its display reference) and the
+surface to blending transform maps highlights toward it. The view's
+output color state stays the encoding-only output color state, which
+declares no target, so the blending to output transform does not map
+again.
+
+Updates are coalesced: the device recomputes the rendering color state
+after the output color state and the target volume in every update,
+replaces it only when it is not exactly identical
+(clutter_color_state_identical()), and then emits the new
+rendering-color-state-changed signal once, whether the output color
+state, the target or both changed. The renderer view follows only that
+signal, so it rebuilds its color states once per update. The output
+color state is unchanged by a change of target, as before, and is now
+also replaced only when not exactly identical: the tolerant
+clutter_color_state_equals() let a reference luminance change of less
+than 10% go unnoticed.
+
+The output color state's reference white luminance is rounded to whole
+cd/m² after the reference luminance factor is applied. Image
+descriptions publish it as an integer, and the blending state's display
+reference is that same value, so a client that copies the published
+reference white and declares the published target peak as its own
+content peak has exactly the display's headroom and is not mapped, for
+any factor.
+
+A monitor screencast derives its blending state from the stream's color
+state, which has no physical display target: its content is
+intentionally not highlight mapped, unlike on the monitor. A comment
+says so where that blending state is derived.
+
+meta_color_device_get_rendering_color_state() and
+meta_color_device_set_reference_luminance_factor() are exported for
+tests.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/backends/meta-color-device.c          | 90 ++++++++++++++++++++++-
+ src/backends/meta-color-device.h          |  4 +
+ src/backends/meta-renderer-view.c         | 12 ++-
+ src/backends/meta-stream-source-monitor.c |  3 +
+ 4 files changed, 105 insertions(+), 4 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index c22253495..8306631ba 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -32,6 +32,7 @@
+ #include "backends/meta-color-store.h"
+ #include "backends/meta-crtc.h"
+ #include "backends/meta-monitor-private.h"
++#include "clutter/clutter-color-state-params-private.h"
+ #include "clutter/clutter-color-utils-private.h"
+ #include "core/meta-debug-control-private.h"
+ 
+@@ -44,6 +45,7 @@ enum
+   CALIBRATION_CHANGED,
+   COLOR_STATE_CHANGED,
+   TARGET_VOLUME_CHANGED,
++  RENDERING_COLOR_STATE_CHANGED,
+ 
+   N_SIGNALS
+ };
+@@ -55,6 +57,7 @@ typedef enum
+   UPDATE_RESULT_CALIBRATION = 1 << 0,
+   UPDATE_RESULT_COLOR_STATE = 1 << 1,
+   UPDATE_RESULT_TARGET_VOLUME = 1 << 2,
++  UPDATE_RESULT_RENDERING_COLOR_STATE = 1 << 3,
+ } UpdateResult;
+ 
+ typedef enum
+@@ -84,6 +87,7 @@ struct _MetaColorDevice
+   GCancellable *cancellable;
+ 
+   ClutterColorState *color_state;
++  ClutterColorState *rendering_color_state;
+   MetaColorTargetLuminance target_luminance;
+   MetaColorTargetPrimaries target_primaries;
+ 
+@@ -334,6 +338,7 @@ meta_color_device_dispose (GObject *object)
+   g_clear_object (&color_device->cd_device);
+   g_clear_object (&color_device->monitor);
+   g_clear_object (&color_device->color_state);
++  g_clear_object (&color_device->rendering_color_state);
+ 
+   G_OBJECT_CLASS (meta_color_device_parent_class)->dispose (object);
+ }
+@@ -383,6 +388,19 @@ meta_color_device_class_init (MetaColorDeviceClass *klass)
+                   G_SIGNAL_RUN_LAST, 0,
+                   NULL, NULL, NULL,
+                   G_TYPE_NONE, 0);
++  /*
++   * MetaColorDevice::rendering-color-state-changed:
++   *
++   * Emitted once per update in which the rendering color state (see
++   * meta_color_device_get_rendering_color_state()) changed, whether through
++   * the output color state, the target volume or both.
++   */
++  signals[RENDERING_COLOR_STATE_CHANGED] =
++    g_signal_new ("rendering-color-state-changed",
++                  G_TYPE_FROM_CLASS (klass),
++                  G_SIGNAL_RUN_LAST, 0,
++                  NULL, NULL, NULL,
++                  G_TYPE_NONE, 0);
+ }
+ 
+ static void
+@@ -1101,6 +1119,54 @@ update_target_volume (MetaColorDevice *color_device)
+   return UPDATE_RESULT_TARGET_VOLUME;
+ }
+ 
++/*
++ * The color state content is rendered for on this device: the output color
++ * state with the firmware-declared target luminance range, when the peak is
++ * declared, as its target volume. The blending state derived from it carries
++ * that target, so color transforms map highlights toward it. Without a
++ * declared peak, nothing is substituted: it is the output color state.
++ *
++ * The output color state itself stays the encoding only, so a change of
++ * target does not change it. The rendering color state is replaced only when
++ * it changes exactly, so that its users rebuild once per device update.
++ */
++static UpdateResult
++update_rendering_color_state (MetaColorDevice *color_device)
++{
++  const MetaColorTargetLuminance *target = &color_device->target_luminance;
++  g_autoptr (ClutterColorState) rendering_color_state = NULL;
++
++  if (!color_device->color_state)
++    return 0;
++
++  if (target->maximum_source != META_COLOR_TARGET_FIRMWARE_DECLARED ||
++      !CLUTTER_IS_COLOR_STATE_PARAMS (color_device->color_state))
++    {
++      rendering_color_state = g_object_ref (color_device->color_state);
++    }
++  else
++    {
++      /* The target luminances are in the output's absolute units. */
++      ClutterColorTargetVolume target_volume = {
++        .has_luminance = TRUE,
++        .min_lum = target->minimum,
++        .max_lum = target->maximum,
++      };
++
++      rendering_color_state =
++        clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
++                                                           &target_volume);
++    }
++
++  if (color_device->rendering_color_state &&
++      clutter_color_state_identical (color_device->rendering_color_state,
++                                     rendering_color_state))
++    return 0;
++
++  g_set_object (&color_device->rendering_color_state, rendering_color_state);
++  return UPDATE_RESULT_RENDERING_COLOR_STATE;
++}
++
+ static UpdateResult
+ update_color_state (MetaColorDevice *color_device)
+ {
+@@ -1126,15 +1192,19 @@ update_color_state (MetaColorDevice *color_device)
+     }
+ 
+   luminance = *clutter_eotf_get_default_luminance (eotf);
+-  luminance.ref = luminance.ref * color_device->reference_luminance_factor;
++  /* Whole cd/m², as the Wayland image descriptions publish it, so that a
++   * client copying the published reference luminance gets this one. */
++  luminance.ref = roundf (luminance.ref * color_device->reference_luminance_factor);
+ 
+   color_state = clutter_color_state_params_new_from_primitives (clutter_context,
+                                                                 colorimetry,
+                                                                 eotf,
+                                                                 luminance);
+ 
++  /* Exactly, so that a changed reference luminance always reaches the
++   * published image description and the blending state. */
+   if (!color_device->color_state ||
+-      !clutter_color_state_equals (color_device->color_state, color_state))
++      !clutter_color_state_identical (color_device->color_state, color_state))
+     {
+       g_set_object (&color_device->color_state, color_state);
+       result |= UPDATE_RESULT_COLOR_STATE;
+@@ -1161,6 +1231,7 @@ meta_color_device_new (MetaColorManager *color_manager,
+ 
+   update_color_state (color_device);
+   update_target_volume (color_device);
++  update_rendering_color_state (color_device);
+ 
+   if (meta_monitor_is_virtual (monitor))
+     {
+@@ -1829,6 +1900,18 @@ meta_color_device_get_target_luminance (MetaColorDevice *color_device)
+   return &color_device->target_luminance;
+ }
+ 
++/*
++ * The color state content is rendered for on this device, see
++ * update_rendering_color_state().
++ *
++ * Returns: (transfer none): the rendering color state
++ */
++ClutterColorState *
++meta_color_device_get_rendering_color_state (MetaColorDevice *color_device)
++{
++  return color_device->rendering_color_state;
++}
++
+ const MetaColorTargetPrimaries *
+ meta_color_device_get_target_primaries (MetaColorDevice *color_device)
+ {
+@@ -1967,6 +2050,7 @@ do_update (MetaColorDevice *color_device)
+       result |= update_color_state (color_device);
+     }
+   result |= update_target_volume (color_device);
++  result |= update_rendering_color_state (color_device);
+ 
+   if (result & UPDATE_RESULT_CALIBRATION)
+     g_signal_emit (color_device, signals[CALIBRATION_CHANGED], 0);
+@@ -1975,6 +2059,8 @@ do_update (MetaColorDevice *color_device)
+     g_signal_emit (color_device, signals[COLOR_STATE_CHANGED], 0);
+   if (result & UPDATE_RESULT_TARGET_VOLUME)
+     g_signal_emit (color_device, signals[TARGET_VOLUME_CHANGED], 0);
++  if (result & UPDATE_RESULT_RENDERING_COLOR_STATE)
++    g_signal_emit (color_device, signals[RENDERING_COLOR_STATE_CHANGED], 0);
+ }
+ 
+ void
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 7d58b1e0a..db0beae59 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -87,6 +87,9 @@ META_EXPORT_TEST
+ const MetaColorTargetLuminance *
+ meta_color_device_get_target_luminance (MetaColorDevice *color_device);
+ 
++META_EXPORT_TEST
++ClutterColorState * meta_color_device_get_rendering_color_state (MetaColorDevice *color_device);
++
+ META_EXPORT_TEST
+ void meta_color_target_luminance_init (MetaColorTargetLuminance *target,
+                                        const MetaEdidInfo       *edid_info,
+@@ -132,6 +135,7 @@ void meta_color_device_update (MetaColorDevice *color_device);
+ 
+ float meta_color_device_get_reference_luminance_factor (MetaColorDevice *color_device);
+ 
++META_EXPORT_TEST
+ void meta_color_device_set_reference_luminance_factor (MetaColorDevice *color_device,
+                                                        float            factor);
+ 
+diff --git a/src/backends/meta-renderer-view.c b/src/backends/meta-renderer-view.c
+index 113d8fbbd..25b3e25d1 100644
+--- a/src/backends/meta-renderer-view.c
++++ b/src/backends/meta-renderer-view.c
+@@ -80,6 +80,7 @@ set_color_states (MetaRendererView *view)
+   MetaContext *context = meta_backend_get_context (priv->backend);
+   MetaDebugControl *debug_control = meta_context_get_debug_control (context);
+   ClutterColorState *output_color_state;
++  ClutterColorState *rendering_color_state;
+   g_autoptr (ClutterColorState) view_color_state = NULL;
+   gboolean force_linear;
+ 
+@@ -87,8 +88,12 @@ set_color_states (MetaRendererView *view)
+ 
+   output_color_state = meta_color_device_get_color_state (priv->color_device);
+ 
++  /* Content is blended for the output's target, when it is declared, so
++   * that converting it to the view's color state maps its highlights. */
++  rendering_color_state =
++    meta_color_device_get_rendering_color_state (priv->color_device);
+   force_linear = meta_debug_control_is_linear_blending_forced (debug_control);
+-  view_color_state = clutter_color_state_get_blending (output_color_state,
++  view_color_state = clutter_color_state_get_blending (rendering_color_state,
+                                                        force_linear);
+ 
+   if (meta_is_topic_enabled (META_DEBUG_RENDER))
+@@ -186,7 +191,10 @@ meta_renderer_view_constructed (GObject *object)
+     {
+       set_color_states (view);
+ 
+-      g_signal_connect_object (priv->color_device, "color-state-changed",
++      /* Emitted once per device update that changes the output color state,
++       * its target, or both. */
++      g_signal_connect_object (priv->color_device,
++                               "rendering-color-state-changed",
+                                G_CALLBACK (on_color_state_changed),
+                                view,
+                                G_CONNECT_DEFAULT);
+diff --git a/src/backends/meta-stream-source-monitor.c b/src/backends/meta-stream-source-monitor.c
+index 63f4d82c9..d18f7ff3f 100644
+--- a/src/backends/meta-stream-source-monitor.c
++++ b/src/backends/meta-stream-source-monitor.c
+@@ -822,6 +822,9 @@ stage_paint:
+ 
+       force_linear = meta_debug_control_is_linear_blending_forced (debug_control);
+ 
++      /* The stream's color state has no physical display target, so its
++       * blending state declares none and content is not highlight mapped
++       * for it, unlike on the monitor itself. */
+       blending_color_state = clutter_color_state_get_blending (target_color_state,
+                                                                force_linear);
+ 

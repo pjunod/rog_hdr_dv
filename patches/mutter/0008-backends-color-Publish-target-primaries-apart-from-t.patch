@@ -1,0 +1,598 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Sat, 10 Oct 2026 15:21:42 -0400
+Subject: [PATCH] backends/color: Publish target primaries apart from the
+ encoding
+
+Retain raw native DisplayID v2 RGBW chromaticity declarations alongside the
+physical luminance declaration, with explicit unavailable, declared,
+invalid and conflicting states. On the validated internal native HDR
+route, convert complete CIE 1931 xy or CIE 1976 u'v' declarations to
+protocol xy with exact integer geometry, and require a non-degenerate
+triangle with the white point strictly inside both before and after
+protocol quantization; otherwise fall back to the complete encoding RGBW.
+
+Luminance and gamut availability stay independent. Both components update
+together and emit a single target-volume notification. Immutable Wayland
+description records carry the eight signed target coordinates; target
+primaries are sent separately from encoding primaries. PQ encoding,
+reference-white normalization and renderer colour state are unchanged.
+
+Require the additive libdisplay-info chromaticity API at configure/link
+time.
+
+Review corrections: classify every Display Parameters block before deciding,
+so status does not depend on block order; an uninterpretable block is
+reported as unsupported, separately from a recognized but unusable
+declaration (which keeps its raw counts).
+
+Co-Authored-By: Claude Agent <claude-agent@invalid>
+---
+ meson.build                                 |  11 +-
+ src/backends/edid-parse.c                   |  88 +++++++++++++
+ src/backends/edid.h                         |  13 ++
+ src/backends/meta-color-device.c            | 129 +++++++++++++++++++-
+ src/backends/meta-color-device.h            |  17 +++
+ src/wayland/meta-wayland-color-management.c |  83 +++++++++----
+ 6 files changed, 310 insertions(+), 31 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 11d573981..4d07a9eff 100644
+--- a/meson.build
++++ b/meson.build
+@@ -151,6 +151,8 @@ if not cc.links('''
+       di_displayid2_data_block_get_cta_data_blocks (*blocks);
+     const struct di_displayid2_luminance *luminance =
+       di_displayid2_data_block_get_luminance (*blocks);
++    const struct di_displayid2_native_chromaticities *chromaticities =
++      di_displayid2_data_block_get_native_chromaticities (*blocks);
+     return di_edid_has_extension_failures (0) +
+       di_displayid2_data_block_get_tag (*blocks) +
+       features->rgb_bit_depths + features->standard_combinations +
+@@ -162,11 +164,14 @@ if not cc.links('''
+       luminance->has_min_luminance + luminance->has_max_luminance_full +
+       luminance->has_max_luminance_10pct +
+       (luminance->min_luminance != 0) + (luminance->max_luminance_full != 0) +
+-      (luminance->max_luminance_10pct != 0);
++      (luminance->max_luminance_10pct != 0) +
++      chromaticities->revision + chromaticities->coordinates +
++      chromaticities->primaries[0].a + chromaticities->primaries[0].b +
++      chromaticities->primaries[0].valid + chromaticities->white_point.valid;
+   }
+ ''', dependencies: libdisplay_info_dep,
+-  name: 'parsed DisplayID v2 interface, luminance and nested CTA API')
+-  error('libdisplay-info needs the parsed DisplayID v2 interface, physical luminance and nested CTA API; install matching development and runtime packages')
++  name: 'parsed DisplayID v2 interface, native chromaticities, luminance and nested CTA API')
++  error('libdisplay-info needs the parsed DisplayID v2 interface, native chromaticities, physical luminance and nested CTA API; install matching development and runtime packages')
+ endif
+ 
+ libdrm_dep = dependency('libdrm', version: libdrm_req)
+diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
+index 07e071309..f4ee9d80a 100644
+--- a/src/backends/edid-parse.c
++++ b/src/backends/edid-parse.c
+@@ -203,6 +203,93 @@ read_native_luminance (MetaEdidInfo         *info,
+     info->native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
+ }
+ 
++static gboolean
++chromaticities_equal (const struct di_displayid2_native_chromaticities *a,
++                      const struct di_displayid2_native_chromaticities *b)
++{
++  unsigned int i;
++
++  if (a->revision != b->revision || a->coordinates != b->coordinates ||
++      a->white_point.a != b->white_point.a ||
++      a->white_point.b != b->white_point.b ||
++      a->white_point.valid != b->white_point.valid)
++    return FALSE;
++
++  for (i = 0; i < 3; i++)
++    if (a->primaries[i].a != b->primaries[i].a ||
++        a->primaries[i].b != b->primaries[i].b ||
++        a->primaries[i].valid != b->primaries[i].valid)
++      return FALSE;
++  return TRUE;
++}
++
++static void
++read_native_chromaticities (MetaEdidInfo         *info,
++                            const struct di_info *di_info)
++{
++  const struct di_edid_ext *const *extensions;
++  gboolean found = FALSE, unsupported = FALSE, conflict = FALSE;
++  unsigned int i;
++
++  if (di_edid_has_extension_failures (di_info_get_edid (di_info)))
++    {
++      info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_INVALID;
++      return;
++    }
++
++  /* Classify every Display Parameters block before deciding, so the result
++   * does not depend on block order. A block that cannot be interpreted means
++   * no declaration can be trusted; two recognized but different
++   * declarations (including different revisions) are a conflict. */
++  extensions = di_edid_get_extensions (di_info_get_edid (di_info));
++  for (; *extensions; extensions++)
++    {
++      const struct di_displayid2 *displayid = di_edid_ext_get_displayid2 (*extensions);
++      const struct di_displayid2_data_block *const *blocks;
++
++      if (!displayid)
++        continue;
++      blocks = di_displayid2_get_data_blocks (displayid);
++      for (; *blocks; blocks++)
++        {
++          const struct di_displayid2_native_chromaticities *native;
++
++          if (di_displayid2_data_block_get_tag (*blocks) !=
++              DI_DISPLAYID2_DATA_BLOCK_DISPLAY_PARAMS)
++            continue;
++
++          native = di_displayid2_data_block_get_native_chromaticities (*blocks);
++          if (!native)
++            unsupported = TRUE;
++          else if (!found)
++            {
++              info->native_chromaticities = *native;
++              found = TRUE;
++            }
++          else if (!chromaticities_equal (&info->native_chromaticities, native))
++            conflict = TRUE;
++        }
++    }
++
++  if (unsupported || conflict)
++    {
++      if (unsupported)
++        info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_UNSUPPORTED;
++      else
++        info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
++      memset (&info->native_chromaticities, 0, sizeof (info->native_chromaticities));
++      return;
++    }
++  if (!found)
++    return;
++  info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_INVALID;
++  for (i = 0; i < 3; i++)
++    if (!info->native_chromaticities.primaries[i].valid)
++      return;
++  if (info->native_chromaticities.white_point.valid)
++    info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED;
++}
++
+ MetaEdidInfo *
+ meta_edid_info_new_parse (const uint8_t *edid,
+                           size_t         size)
+@@ -286,6 +373,7 @@ meta_edid_info_new_parse (const uint8_t *edid,
+ 
+   info->native_rgb_bt2020_pq = has_native_rgb_bt2020_pq (di_info);
+   read_native_luminance (info, di_info);
++  read_native_chromaticities (info, di_info);
+ 
+   di_info_destroy (di_info);
+   return g_steal_pointer (&info);
+diff --git a/src/backends/edid.h b/src/backends/edid.h
+index 9a3b1ce06..35f3e13da 100644
+--- a/src/backends/edid.h
++++ b/src/backends/edid.h
+@@ -37,6 +37,17 @@ typedef enum
+   META_NATIVE_LUMINANCE_CONFLICT,
+ } MetaNativeLuminanceStatus;
+ 
++typedef enum
++{
++  META_NATIVE_CHROMATICITIES_UNAVAILABLE,
++  META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED,
++  /* Recognized declaration whose points are not all usable; raw counts kept. */
++  META_NATIVE_CHROMATICITIES_INVALID,
++  META_NATIVE_CHROMATICITIES_CONFLICT,
++  /* A Display Parameters block in a format this parser does not understand. */
++  META_NATIVE_CHROMATICITIES_UNSUPPORTED,
++} MetaNativeChromaticitiesStatus;
++
+ typedef struct _MetaEdidInfo
+ {
+   char *manufacturer_code;
+@@ -61,6 +72,8 @@ typedef struct _MetaEdidInfo
+   /* Physical declarations, never CTA content metadata or calibration. */
+   MetaNativeLuminanceStatus native_luminance_status;
+   struct di_displayid2_luminance native_luminance;
++  MetaNativeChromaticitiesStatus native_chromaticities_status;
++  struct di_displayid2_native_chromaticities native_chromaticities;
+ } MetaEdidInfo;
+ 
+ META_EXPORT_TEST
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index b2931e905..1a046fea6 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -84,6 +84,7 @@ struct _MetaColorDevice
+ 
+   ClutterColorState *color_state;
+   MetaColorTargetLuminance target_luminance;
++  MetaColorTargetPrimaries target_primaries;
+ 
+   PendingState pending_state;
+   gboolean is_ready;
+@@ -812,8 +813,113 @@ target_luminance_equal (const MetaColorTargetLuminance *a,
+          (!pa->has_max_luminance_10pct || pa->max_luminance_10pct == pb->max_luminance_10pct);
+ }
+ 
++typedef struct
++{
++  int64_t x, y, z;
++} TargetPoint;
++
++static int64_t
++target_orientation (const TargetPoint *a,
++                    const TargetPoint *b,
++                    const TargetPoint *c)
++{
++  return a->x * (b->y * c->z - b->z * c->y) -
++         a->y * (b->x * c->z - b->z * c->x) +
++         a->z * (b->x * c->y - b->y * c->x);
++}
++
++static gboolean
++target_geometry_valid (const TargetPoint points[4])
++{
++  int64_t orientation = target_orientation (&points[0], &points[1], &points[2]);
++  unsigned int i;
++
++  if (!orientation)
++    return FALSE;
++  for (i = 0; i < 3; i++)
++    {
++      int64_t side = target_orientation (&points[i], &points[(i + 1) % 3], &points[3]);
++
++      if (!side || (side > 0) != (orientation > 0))
++        return FALSE;
++    }
++  return TRUE;
++}
++
++void
++meta_color_target_primaries_init (MetaColorTargetPrimaries *target,
++                                  const MetaEdidInfo       *edid_info,
++                                  gboolean                  native_hdr,
++                                  const ClutterPrimaries   *encoding)
++{
++  const float fallback[8] = {
++    encoding->r_x, encoding->r_y, encoding->g_x, encoding->g_y,
++    encoding->b_x, encoding->b_y, encoding->w_x, encoding->w_y,
++  };
++  const struct di_displayid2_native_chromaticities *native;
++  TargetPoint points[4], published[4];
++  MetaColorTargetPrimaries physical = { .source = META_COLOR_TARGET_FIRMWARE_DECLARED };
++  unsigned int i;
++
++  *target = (MetaColorTargetPrimaries) { .source = META_COLOR_TARGET_ENCODING_FALLBACK };
++  for (i = 0; i < 8; i++)
++    target->coordinates[i] = (int32_t) (fallback[i] * 1000000);
++
++  if (!native_hdr || !edid_info ||
++      edid_info->native_chromaticities_status != META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED)
++    return;
++  native = &edid_info->native_chromaticities;
++  for (i = 0; i < 4; i++)
++    {
++      const struct di_displayid2_chromaticity_point *point =
++        i < 3 ? &native->primaries[i] : &native->white_point;
++
++      if (!point->valid || point->a >= 4096 || point->b >= 4096)
++        return;
++      switch (native->coordinates)
++        {
++        case DI_DISPLAYID2_CHROMATICITY_CIE1931:
++          points[i] = (TargetPoint) { point->a, point->b, 4096 };
++          break;
++        case DI_DISPLAYID2_CHROMATICITY_CIE1976:
++          /* Homogeneous inverse u'v' -> xy, retaining exact raw geometry. */
++          points[i] = (TargetPoint) { 9 * point->a, 4 * point->b,
++                                      6 * point->a - 16 * point->b + 12 * 4096 };
++          break;
++        default:
++          return;
++        }
++      if (points[i].z <= 0 || points[i].y <= 0 ||
++          points[i].x + points[i].y > points[i].z)
++        return;
++      physical.coordinates[2 * i] = (int32_t) ((points[i].x * 1000000) / points[i].z);
++      physical.coordinates[2 * i + 1] = (int32_t) ((points[i].y * 1000000) / points[i].z);
++      published[i] = (TargetPoint) { physical.coordinates[2 * i],
++                                     physical.coordinates[2 * i + 1], 1 };
++    }
++
++  /* 12-bit homogeneous and 1e6-scaled determinants fit int64. A complete
++   * RGBW target must remain usable after the protocol's quantization. */
++  if (target_geometry_valid (points) && target_geometry_valid (published))
++    *target = physical;
++}
++
++static gboolean
++target_primaries_equal (const MetaColorTargetPrimaries *a,
++                        const MetaColorTargetPrimaries *b)
++{
++  unsigned int i;
++
++  if (a->source != b->source)
++    return FALSE;
++  for (i = 0; i < 8; i++)
++    if (a->coordinates[i] != b->coordinates[i])
++      return FALSE;
++  return TRUE;
++}
++
+ static UpdateResult
+-update_target_luminance (MetaColorDevice *color_device)
++update_target_volume (MetaColorDevice *color_device)
+ {
+   MetaMonitor *monitor = color_device->monitor;
+   MetaOutput *output = meta_monitor_get_main_output (monitor);
+@@ -824,6 +930,12 @@ update_target_luminance (MetaColorDevice *color_device)
+   const ClutterLuminance *encoding =
+     clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state));
+   MetaColorTargetLuminance target;
++  const ClutterColorimetry *colorimetry =
++    clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state));
++  const ClutterPrimaries *encoding_primaries =
++    colorimetry->type == CLUTTER_COLORIMETRY_TYPE_COLORSPACE ?
++    clutter_colorspace_to_primaries (colorimetry->colorspace) : colorimetry->primaries;
++  MetaColorTargetPrimaries target_primaries;
+   gboolean native_hdr;
+ 
+   native_hdr = meta_monitor_is_active (monitor) &&
+@@ -834,10 +946,13 @@ update_target_luminance (MetaColorDevice *color_device)
+                (info->supported_hdr_eotfs & (1 << META_OUTPUT_HDR_METADATA_EOTF_PQ)) &&
+                (info->supported_color_spaces & (1 << META_OUTPUT_COLORSPACE_BT2020));
+   meta_color_target_luminance_init (&target, info->edid_info, native_hdr, encoding);
+-  if (target_luminance_equal (&color_device->target_luminance, &target))
++  meta_color_target_primaries_init (&target_primaries, info->edid_info, native_hdr, encoding_primaries);
++  if (target_luminance_equal (&color_device->target_luminance, &target) &&
++      target_primaries_equal (&color_device->target_primaries, &target_primaries))
+     return 0;
+ 
+   color_device->target_luminance = target;
++  color_device->target_primaries = target_primaries;
+   return UPDATE_RESULT_TARGET_VOLUME;
+ }
+ 
+@@ -901,7 +1016,7 @@ meta_color_device_new (MetaColorManager *color_manager,
+   color_device->reference_luminance_factor = 1.0;
+ 
+   update_color_state (color_device);
+-  update_target_luminance (color_device);
++  update_target_volume (color_device);
+ 
+   if (meta_monitor_is_virtual (monitor))
+     {
+@@ -1570,6 +1685,12 @@ meta_color_device_get_target_luminance (MetaColorDevice *color_device)
+   return &color_device->target_luminance;
+ }
+ 
++const MetaColorTargetPrimaries *
++meta_color_device_get_target_primaries (MetaColorDevice *color_device)
++{
++  return &color_device->target_primaries;
++}
++
+ MetaColorProfile *
+ meta_color_device_get_device_profile (MetaColorDevice *color_device)
+ {
+@@ -1701,7 +1822,7 @@ do_update (MetaColorDevice *color_device)
+       result |= update_white_point (color_device);
+       result |= update_color_state (color_device);
+     }
+-  result |= update_target_luminance (color_device);
++  result |= update_target_volume (color_device);
+ 
+   if (result & UPDATE_RESULT_CALIBRATION)
+     g_signal_emit (color_device, signals[CALIBRATION_CHANGED], 0);
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 563967bd6..8ca55741a 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -45,6 +45,23 @@ typedef struct
+   MetaColorTargetProvenance maximum_source;
+ } MetaColorTargetLuminance;
+ 
++typedef struct
++{
++  /* Published CIE1931 xy, signed protocol units of 1/1000000, RGB then white. */
++  int32_t coordinates[8];
++  MetaColorTargetProvenance source;
++} MetaColorTargetPrimaries;
++
++META_EXPORT_TEST
++const MetaColorTargetPrimaries *
++meta_color_device_get_target_primaries (MetaColorDevice *color_device);
++
++META_EXPORT_TEST
++void meta_color_target_primaries_init (MetaColorTargetPrimaries *target,
++                                       const MetaEdidInfo       *edid_info,
++                                       gboolean                  native_hdr,
++                                       const ClutterPrimaries   *encoding);
++
+ META_EXPORT_TEST
+ const MetaColorTargetLuminance *
+ meta_color_device_get_target_luminance (MetaColorDevice *color_device);
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 707791f3e..c216443db 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -143,6 +143,7 @@ struct _MetaWaylandDescriptionRecord
+   ClutterColorState *color_state;
+   uint32_t target_minimum;
+   uint32_t target_maximum;
++  int32_t target_primaries[8];
+   uint32_t identity;
+   uint64_t identity64;
+ };
+@@ -381,9 +382,28 @@ static guint
+ description_record_hash (gconstpointer data)
+ {
+   const MetaWaylandDescriptionRecord *record = data;
++  guint hash = g_direct_hash (record->color_state) ^
++               record->target_minimum ^ record->target_maximum;
++  unsigned int i;
+ 
+-  return g_direct_hash (record->color_state) ^
+-         record->target_minimum ^ record->target_maximum;
++  for (i = 0; i < 8; i++)
++    hash = hash * 33 ^ (guint) record->target_primaries[i];
++  return hash;
++}
++
++static gboolean
++description_target_equal (const MetaWaylandDescriptionRecord *a,
++                          const MetaWaylandDescriptionRecord *b)
++{
++  unsigned int i;
++
++  if (a->target_minimum != b->target_minimum ||
++      a->target_maximum != b->target_maximum)
++    return FALSE;
++  for (i = 0; i < 8; i++)
++    if (a->target_primaries[i] != b->target_primaries[i])
++      return FALSE;
++  return TRUE;
+ }
+ 
+ static gboolean
+@@ -394,8 +414,7 @@ description_record_equal (gconstpointer a,
+   const MetaWaylandDescriptionRecord *rb = b;
+ 
+   return ra->color_state == rb->color_state &&
+-         ra->target_minimum == rb->target_minimum &&
+-         ra->target_maximum == rb->target_maximum;
++         description_target_equal (ra, rb);
+ }
+ 
+ static MetaWaylandDescriptionIds *
+@@ -441,9 +460,10 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MetaWaylandDescriptionRecord,
+                                description_record_unref)
+ 
+ static MetaWaylandDescriptionRecord *
+-description_record_get (MetaWaylandDescriptionIds * ids,
+-                        ClutterColorState * color_state,
+-                        const MetaColorTargetLuminance * target)
++description_record_get (MetaWaylandDescriptionIds      *ids,
++                        ClutterColorState              *color_state,
++                        const MetaColorTargetLuminance *target,
++                        const MetaColorTargetPrimaries *target_primaries)
+ {
+   const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
+   MetaWaylandDescriptionRecord lookup = {
+@@ -453,6 +473,21 @@ description_record_get (MetaWaylandDescriptionIds * ids,
+     .target_maximum = (uint32_t) (target ? target->maximum : encoding->max),
+   };
+   MetaWaylandDescriptionRecord *record;
++  MetaColorTargetPrimaries fallback;
++
++  if (!target_primaries && CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
++    {
++      const ClutterColorimetry *colorimetry =
++        clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
++      const ClutterPrimaries *encoding_primaries =
++        colorimetry->type == CLUTTER_COLORIMETRY_TYPE_COLORSPACE ?
++        clutter_colorspace_to_primaries (colorimetry->colorspace) : colorimetry->primaries;
++
++      meta_color_target_primaries_init (&fallback, NULL, FALSE, encoding_primaries);
++      target_primaries = &fallback;
++    }
++  if (target_primaries)
++    memcpy (lookup.target_primaries, target_primaries->coordinates, sizeof (lookup.target_primaries));
+ 
+   record = g_hash_table_lookup (ids->records, &lookup);
+   if (record)
+@@ -464,6 +499,7 @@ description_record_get (MetaWaylandDescriptionIds * ids,
+   record->color_state = g_object_ref (color_state);
+   record->target_minimum = lookup.target_minimum;
+   record->target_maximum = lookup.target_maximum;
++  memcpy (record->target_primaries, lookup.target_primaries, sizeof (record->target_primaries));
+   if (!g_queue_is_empty (ids->to_reuse))
+     record->identity = GPOINTER_TO_UINT (g_queue_pop_head (ids->to_reuse));
+   else
+@@ -486,15 +522,16 @@ update_output_record (MetaWaylandColorManagementOutput *cm_output)
+     meta_color_manager_get_color_device (get_meta_color_manager (color_manager), monitor);
+   const MetaColorTargetLuminance *target =
+     device ? meta_color_device_get_target_luminance (device) : NULL;
++  const MetaColorTargetPrimaries *target_primaries =
++    device ? meta_color_device_get_target_primaries (device) : NULL;
+   g_autoptr (MetaWaylandDescriptionRecord) record = NULL;
+ 
+   record = description_record_get (color_manager->ids,
+                                    get_output_color_state (color_manager, monitor),
+-                                   target);
++                                   target, target_primaries);
+   if (cm_output->record &&
+       clutter_color_state_equals (cm_output->record->color_state, record->color_state) &&
+-      cm_output->record->target_minimum == record->target_minimum &&
+-      cm_output->record->target_maximum == record->target_maximum)
++      description_target_equal (cm_output->record, record))
+     return FALSE;
+ 
+   g_clear_pointer (&cm_output->record, description_record_unref);
+@@ -609,7 +646,7 @@ meta_wayland_image_description_set_ready (MetaWaylandImageDescription      *imag
+                                           MetaWaylandImageDescriptionFlags  flags)
+ {
+   g_autoptr (MetaWaylandDescriptionRecord) record =
+-    description_record_get (image_desc->ids, color_state, NULL);
++    description_record_get (image_desc->ids, color_state, NULL, NULL);
+ 
+   meta_wayland_image_description_set_ready_record (image_desc, record, flags);
+ }
+@@ -675,16 +712,6 @@ send_primaries (struct wl_resource     *resource,
+     float_to_scaled_uint32_chromaticity (primaries->b_y),
+     float_to_scaled_uint32_chromaticity (primaries->w_x),
+     float_to_scaled_uint32_chromaticity (primaries->w_y));
+-  wp_image_description_info_v1_send_target_primaries (
+-    resource,
+-    float_to_scaled_uint32_chromaticity (primaries->r_x),
+-    float_to_scaled_uint32_chromaticity (primaries->r_y),
+-    float_to_scaled_uint32_chromaticity (primaries->g_x),
+-    float_to_scaled_uint32_chromaticity (primaries->g_y),
+-    float_to_scaled_uint32_chromaticity (primaries->b_x),
+-    float_to_scaled_uint32_chromaticity (primaries->b_y),
+-    float_to_scaled_uint32_chromaticity (primaries->w_x),
+-    float_to_scaled_uint32_chromaticity (primaries->w_y));
+ }
+ 
+ static void
+@@ -752,6 +779,15 @@ send_information (struct wl_resource           *info_resource,
+   else if (CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
+     {
+       send_information_from_params (info_resource, color_state);
++      wp_image_description_info_v1_send_target_primaries (info_resource,
++                                                          record->target_primaries[0],
++                                                          record->target_primaries[1],
++                                                          record->target_primaries[2],
++                                                          record->target_primaries[3],
++                                                          record->target_primaries[4],
++                                                          record->target_primaries[5],
++                                                          record->target_primaries[6],
++                                                          record->target_primaries[7]);
+       wp_image_description_info_v1_send_target_luminance (info_resource,
+                                                           record->target_minimum,
+                                                           record->target_maximum);
+@@ -853,8 +889,7 @@ update_preferred_color_state (MetaWaylandColorManagementSurface *cm_surface)
+   if (cm_surface->preferred_record &&
+       clutter_color_state_equals (record->color_state,
+                                   cm_surface->preferred_record->color_state) &&
+-      record->target_minimum == cm_surface->preferred_record->target_minimum &&
+-      record->target_maximum == cm_surface->preferred_record->target_maximum)
++      description_target_equal (record, cm_surface->preferred_record))
+     return;
+ 
+   description_record_ref (record);
+@@ -2227,7 +2262,7 @@ meta_wayland_color_manager_new (MetaWaylandCompositor *compositor)
+   color_manager = g_object_new (META_TYPE_WAYLAND_COLOR_MANAGER, NULL);
+   color_manager->compositor = compositor;
+   color_manager->default_record =
+-    description_record_get (color_manager->ids, get_default_color_state (color_manager), NULL);
++    description_record_get (color_manager->ids, get_default_color_state (color_manager), NULL, NULL);
+ 
+   meta_color_manager = get_meta_color_manager (color_manager);
+   color_manager->color_state_changed_handler_id =

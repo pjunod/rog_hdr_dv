@@ -1,0 +1,53 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 15:04:53 -0400
+Subject: [PATCH] debian: Add nativehdr9 changelog entry
+
+Summarise the batch: display targets selected from DisplayID, CTA-861
+HDR static metadata and, in the native SDR mode, the base EDID on every
+eligible output; gamut containment judged in the pixels' frame; target
+provenance in the colour debug output; and two style corrections.
+meta_color_target_primaries_init() keeps its name with a sources
+argument in place of the native-route flag.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ debian/changelog | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index d6d17b2..cf1520e 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,30 @@
++mutter (51.0-1ubuntu3+nativehdr9) UNRELEASED; urgency=medium
++
++  * Select display targets on every output that declares one, not only on
++    an internal panel whose DisplayID declares native RGB BT.2020 PQ. In
++    BT.2100 the target peak and black come from the DisplayID physical
++    luminance when it declares the 10% window peak, else from the CTA-861
++    HDR static metadata (desired content maximum and minimum); a peak at
++    or below the encoding's nominal reference white is no target. The
++    BT.2100 target gamut still comes only from the DisplayID native
++    chromaticities. In the native SDR mode the target gamut is the base
++    EDID gamut, the encoding's own, so wider content is compressed into
++    it rather than clipped. Each source is taken whole; a failing source
++    falls through to the next. The default SDR mode and forced HDR keep
++    the encoding fallback.
++  * Judge gamut containment, and build the compression, in the frame the
++    pixels are in: the display target is adapted from its encoding's
++    white to D65 as the encoding itself is, so an output and the clients
++    that follow its description are never judged outside their own gamut.
++  * Record each target's provenance (DisplayID, CTA, base EDID or
++    encoding fallback) and name it in the colour debug output.
++  * Style only: indent the target primaries policy test and drop a split
++    ternary in the EDID parser.
++  * KMS HDR metadata is unchanged. Source candidate only; runtime and
++    package qualification pending.
++
++ -- Claude Agent <claude-agent@invalid>  Sun, 11 Oct 2026 19:00:00 +0000
++
+ mutter (51.0-1ubuntu3+nativehdr8) UNRELEASED; urgency=medium
+ 
+   * Leave PQ highlights unmapped without a declared peak: PQ's 10000 cd/m²

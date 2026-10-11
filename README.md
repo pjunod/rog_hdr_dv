@@ -11,7 +11,10 @@ the operating-system display work independently.
 2026-10-11), and Secure Boot is enabled. The owner reported working HDR10 on
 the earlier stack; on the new compositor the HDR session runs in BT.2100 mode
 and the owner accepted the picture. Full Dolby Vision, measured calibration
-and remaining transition/resume acceptance are unfinished. The earlier mpv
+and remaining transition/resume acceptance are unfinished. The next batch
+(`nativehdr9`) widens the colour targets to ordinary HDR and wide-gamut
+hardware; a second laptop (`lab6`, Intel graphics, SDR panel) is the test
+machine for that. The earlier mpv
 DV-to-PQ sample does not qualify full Dolby Vision.
 
 Start with [status](docs/STATUS.md) for what is proven, then
@@ -52,6 +55,9 @@ activation prerequisite, truthful topology and descriptor handling.
 highlights to the panel's declared target and compressing out-of-gamut
 colours toward its declared gamut in the compositor, and defines the
 deferred output-characterization contract.
+[Display target sources](docs/DISPLAY_TARGET_SOURCES.md) extends those targets
+beyond the ROG panel: DisplayID or CTA-861 luminance on any HDR output, and
+the base EDID gamut in the native SDR mode, for general availability.
 
 ## Work with the repository
 
@@ -72,7 +78,9 @@ any live compositor or kernel update.
 ## Repository layout
 
 - `patches/libdisplay-info/` · `patches/mutter/` — current upstream-facing
-  proposals, with exact bases in `sources.json`.
+  proposals, with exact bases in `sources.json`. The Mutter series carries
+  the whole colour programme ported to upstream main; neither series has
+  been submitted upstream.
 - `patches/ubuntu-libdisplay-info/` · `patches/ubuntu-mutter/` — complete
   local changes from authenticated Ubuntu source imports, including the
   delivered prefixes and explicitly marked unreleased candidates. In

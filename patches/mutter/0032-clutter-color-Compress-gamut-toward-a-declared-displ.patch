@@ -1,0 +1,1488 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:57:47 -0400
+Subject: [PATCH] clutter/color: Compress gamut toward a declared display
+ target gamut
+
+The output signal stays BT.2020/PQ, so a color outside the panel's own
+gamut was left to the panel firmware, whose handling (clipping or not)
+is unknown. Add gamut compression so that the decision has one known
+owner: the surface to blending transform, which already maps highlights
+toward the display's target.
+
+The op, gamut_compress, is the ACES 1.3 Reference Gamut Compression
+distance compression, in linear RGB of the target gamut. The
+achromatic value is ach = max (R, G, B); each channel's distance from
+it is d = (ach - c) / ach, 1 on the gamut boundary and above 1 outside
+it. Above the threshold t = 0.8 the distance is compressed with the
+published curve of power p = 1.2,
+
+  d' = t + s x / (1 + x^p)^(1/p), x = (d - t) / s,
+
+evaluated as t + s (1 + x^-p)^(-1/p), the same curve without overflow
+for large x, and the channel becomes ach - d' ach. Samples whose
+achromatic value is not positive or not finite, channels whose distance
+is not above the threshold (NaN included) and channels without a limit
+are not rewritten at all, so such values come out of the op bit for
+bit, and finite channels never become NaN. The scale s of each channel
+follows from its limit L, the distance mapped onto the boundary
+(d' = 1 at d = L): s = (L - t) / (((1 - t) / (L - t))^(-p) - 1)^(1/p),
+computed in double precision on the CPU when the op is built; a channel
+with L <= 1 is left untouched. The op has a CPU and a GLSL
+implementation with the same maths; the shader only evaluates.
+
+The transform adds it after highlight mapping, in linear light: linear
+BT.2020 is converted to linear RGB of the target primaries with absolute
+colorimetry, without chromatic adaptation (BT.2020 RGB to XYZ to target
+RGB, by the new clutter_colorimetry_get_absolute_bt2020_matrices()),
+compressed, and converted back before the conversion to the blending
+state.
+
+Whether to compress, and with which limits, is decided by one function
+that both clutter_color_transform_requires_gamut_compression() and the
+op builder call, so the two cannot disagree. It returns early, without
+any matrix, whenever the content is found within the target; otherwise
+it computes the limits, and compresses only if some channel's limit
+exceeds 1, the only case in which the op does anything.
+
+ - Only toward a display gamut target: a blending state whose target
+   volume has primaries and which carries a display reference (only
+   blending states derived from a display's target volume do; a
+   client's mastering primaries make no target).
+ - Source colors are followed to linear BT.2020 exactly as the renderer
+   converts pixels: the encoding primaries are the rows of the
+   encoding's adapted conversion to linear BT.2020, Bradford adaptation
+   of its white point to D65 included, and mastering display primaries
+   are their XYZ with that same adaptation. For a source whose white is
+   not D65 the unadapted chromaticities would be wrong: DCI-P3 with the
+   DCI white has P3's chromaticities, yet its red lands outside a
+   P3-D65 panel. Containment is decided on the adapted colors'
+   chromaticities, and the limits on the adapted colors.
+ - Only when the content can actually exceed the target: a bounded
+   encoding's primaries must not all lie within the target triangle,
+   and, when mastering display primaries are declared, neither must
+   they. Content whose encoding fits the target, such as sRGB on a wide
+   gamut panel, is never compressed, whatever its mastering metadata
+   says. An extended-range linear encoding (ext_linear, scRGB-style;
+   the notion highlight mapping uses for the peak) bounds no gamut: its
+   mastering primaries are the source gamut, and without them the
+   gamut's extent is unknown and nothing is compressed, as nothing is
+   highlight mapped without a known peak. ICC sources are not
+   compressed.
+ - The limits come from the mastering primaries when declared,
+   otherwise from the encoding primaries, and are exact over the source
+   gamut boundary. The distance is scale invariant, so a side of the
+   source gamut is the set of positive combinations of its two
+   primaries in target RGB; wherever its largest channel stays the
+   same, each channel's distance is a linear-fractional function along
+   the side, so its maximum lies at a primary or where two target
+   channels are equal. Those points, up to five per side, are
+   evaluated; the interior adds nothing. So no point of the source
+   gamut boundary, primaries and sides, ends beyond distance 1, and
+   each channel's maximising boundary point lands at 1. Points within
+   the target, by its tolerances, are ignored. If one of the evaluated
+   points has no positive achromatic value (the achromatic value is
+   convex and piecewise linear along a side, so its minimum is among
+   them) or is not finite, the boundary passes through directions the
+   compression cannot map, and nothing is compressed: never NaN.
+
+Containment, clutter_primaries_contain_chromaticity(), is defined once.
+Which side of a triangle side a chromaticity lies on is decided by the
+sign of a cross product of the xy coordinates in double precision, and
+each primary may be off by a tolerance: a point outside a side counts
+as inside if it lies no further from it than the larger tolerance of
+the side's two primaries (a point of a true side is a convex
+combination of its true primaries), and a point beyond both sides at a
+primary must moreover lie within that primary's tolerance of it, which
+clamps the band overlap that would otherwise reach
+tolerance / sin (angle / 2) beyond an acute primary. With tolerances of
+0 the test is exact. ClutterColorTargetVolume gains, at its end,
+primaries_tolerance[3], the resolution of each primary's declaration as
+an xy distance (0 for exact declarations such as a client's mastering
+primaries), which takes part in equality. The adapted chromaticities
+carry single precision rounding, so the decision adds a margin of the
+protocol's chromaticity unit, 1e-6, to every tolerance.
+
+clutter_colorimetry_get_linear_bt2020_matrices(), the shared definition
+client and EDID primaries are accepted with, keeps the existing rule,
+the adapted pair only. The absolute pair is required, by
+clutter_colorimetry_get_absolute_bt2020_matrices(), only of primaries
+used as a gamut target: clutter_color_state_params_new_with_target_volume()
+refuses, as a programming error, target primaries that fail the shared
+definition, or whose tolerances are not finite and non-negative, and,
+in a copy of a display target, primaries that fail the absolute check;
+deriving a display target from a state whose target primaries fail it
+drops them, loudly. A display gamut target therefore always has the
+matrices the decision needs. clutter_color_state_get_blending() derives
+a display target from a target volume with primaries as it does from
+one with a target luminance, so a blending state carries declared target
+primaries, with their tolerances, next to the target peak, with the
+display reference.
+
+The single "mapping required" predicate is now
+clutter_color_transform_requires_mapping(): highlight mapping or gamut
+compression. The transform builds a conversion between equal encodings
+exactly when it holds, and libmutter will refuse direct scanout and the
+hardware cursor plane with it.
+clutter_color_transform_requires_highlight_mapping() keeps its meaning
+and its export, as one part of it. Target primaries and their
+tolerances take part in clutter_color_state_identical(), so the exact
+transform cache tells targets with different primaries apart. The two
+new predicates (the gamut one for tests) and
+clutter_colorimetry_get_absolute_bt2020_matrices() (for the colour
+device) are exported.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-op-private.h    |  41 ++
+ clutter/clutter/clutter-color-op.c            | 132 ++++++
+ .../clutter/clutter-color-pipeline-shader.c   |  89 ++++
+ .../clutter-color-state-params-private.h      |  15 +
+ clutter/clutter/clutter-color-state-params.c  | 125 +++++-
+ .../clutter/clutter-color-transform-private.h |  12 +-
+ clutter/clutter/clutter-color-transform.c     | 409 +++++++++++++++++-
+ clutter/clutter/clutter-color-utils-private.h |  19 +
+ clutter/clutter/clutter-color-utils.c         | 269 ++++++++++--
+ 9 files changed, 1063 insertions(+), 48 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
+index a78ef3ef5..874e5f696 100644
+--- a/clutter/clutter/clutter-color-op-private.h
++++ b/clutter/clutter/clutter-color-op-private.h
+@@ -94,3 +94,44 @@ typedef struct _ClutterBt2390EetfParameters
+ ClutterColorOp * clutter_color_op_bt2390_eetf_new (const ClutterBt2390EetfParameters *parameters);
+ 
+ const ClutterBt2390EetfParameters * clutter_color_op_bt2390_eetf_get_parameters (ClutterColorOp *op);
++
++/*
++ * The ACES 1.3 Reference Gamut Compression distance compression, applied in
++ * linear RGB of a target gamut. The achromatic value of a sample is
++ * ach = max (R, G, B); each channel c has the distance d = (ach - c) / ach
++ * from it, which is 1 on the gamut boundary and above 1 outside it. A
++ * distance above @threshold is compressed with the published curve of
++ * @power:
++ *
++ *   d' = t + s x / (1 + x^p)^(1/p), x = (d - t) / s
++ *
++ * with the channel's @scale s, and the channel becomes ach - d' ach. The
++ * curve is evaluated as t + s (1 + x^-p)^(-1/p), which is the same and does
++ * not overflow for large x. A channel whose scale is 0 is left untouched, as
++ * is every channel of a sample whose achromatic value is not positive or not
++ * finite, and every channel whose distance is not above the threshold: such
++ * values are not rewritten at all. Finite channels never become NaN.
++ *
++ * @limit is the distance each channel maps onto the boundary (d' = 1); the
++ * scale is derived from it on construction, see
++ * clutter_color_op_gamut_compress_new(), and the shader only evaluates.
++ */
++#define CLUTTER_TYPE_COLOR_OP_GAMUT_COMPRESS (clutter_color_op_gamut_compress_get_type ())
++G_DECLARE_FINAL_TYPE (ClutterColorOpGamutCompress,
++                      clutter_color_op_gamut_compress,
++                      CLUTTER, COLOR_OP_GAMUT_COMPRESS,
++                      ClutterColorOp)
++
++typedef struct _ClutterGamutCompressParameters
++{
++  float threshold;
++  float power;
++  float limit[3];
++  float scale[3];
++} ClutterGamutCompressParameters;
++
++ClutterColorOp * clutter_color_op_gamut_compress_new (float       threshold,
++                                                      float       power,
++                                                      const float limit[3]);
++
++const ClutterGamutCompressParameters * clutter_color_op_gamut_compress_get_parameters (ClutterColorOp *op);
+diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
+index 6616e15fb..c366c3425 100644
+--- a/clutter/clutter/clutter-color-op.c
++++ b/clutter/clutter/clutter-color-op.c
+@@ -899,6 +899,138 @@ clutter_color_op_bt2390_eetf_get_parameters (ClutterColorOp *op)
+   return &CLUTTER_COLOR_OP_BT2390_EETF (op)->parameters;
+ }
+ 
++struct _ClutterColorOpGamutCompress
++{
++  ClutterColorOp parent;
++
++  ClutterGamutCompressParameters parameters;
++};
++
++G_DEFINE_FINAL_TYPE (ClutterColorOpGamutCompress, clutter_color_op_gamut_compress,
++                     CLUTTER_TYPE_COLOR_OP)
++
++static void
++clutter_color_op_gamut_compress_do_transform (ClutterColorOp *op,
++                                              float          *data,
++                                              size_t          n_samples)
++{
++  const ClutterGamutCompressParameters *parameters =
++    &CLUTTER_COLOR_OP_GAMUT_COMPRESS (op)->parameters;
++  float t = parameters->threshold;
++  float p = parameters->power;
++
++  for (size_t i = 0; i < n_samples; i++)
++    {
++      float ach = MAX (data[0], MAX (data[1], data[2]));
++
++      /* Without a positive, finite achromatic value there is no distance to
++       * take: such samples are left unchanged. */
++      if (ach > 0.0f && isfinite (ach))
++        {
++          for (int c = 0; c < 3; c++)
++            {
++              float s = parameters->scale[c];
++              float d, x, compressed;
++
++              if (s <= 0.0f)
++                continue;
++
++              /* Not above the threshold, including a NaN channel. */
++              d = (ach - data[c]) / ach;
++              if (!(d > t))
++                continue;
++
++              /* x / (1 + x^p)^(1/p) written as (1 + x^-p)^(-1/p), which
++               * neither overflows for large x nor divides infinity by
++               * infinity, and approaches 1 as x grows; x is kept positive so
++               * that x^-p is defined. */
++              x = MAX ((d - t) / s, G_MINFLOAT);
++              compressed = t + s * powf (1.0f + powf (x, -p), -1.0f / p);
++              data[c] = ach - compressed * ach;
++            }
++        }
++
++      data += 4;
++    }
++}
++
++static char *
++clutter_color_op_gamut_compress_to_string (ClutterColorOp *op)
++{
++  const ClutterGamutCompressParameters *parameters =
++    &CLUTTER_COLOR_OP_GAMUT_COMPRESS (op)->parameters;
++  char limit_str[3][G_ASCII_DTOSTR_BUF_SIZE];
++  int c;
++
++  for (c = 0; c < 3; c++)
++    {
++      g_ascii_formatd (limit_str[c], sizeof (limit_str[c]), "%.4f",
++                       parameters->scale[c] > 0.0f ? parameters->limit[c] : 0.0);
++    }
++
++  return g_strdup_printf ("gamut_compress(limits %s, %s, %s)",
++                          limit_str[0], limit_str[1], limit_str[2]);
++}
++
++static void
++clutter_color_op_gamut_compress_class_init (ClutterColorOpGamutCompressClass *klass)
++{
++  ClutterColorOpClass *op_class = CLUTTER_COLOR_OP_CLASS (klass);
++
++  op_class->to_string = clutter_color_op_gamut_compress_to_string;
++  op_class->do_transform = clutter_color_op_gamut_compress_do_transform;
++}
++
++static void
++clutter_color_op_gamut_compress_init (ClutterColorOpGamutCompress *op)
++{
++}
++
++/*
++ * Creates the compression for the given threshold t and power p, mapping the
++ * distance @limit[c] of each channel c onto the gamut boundary. The scale
++ * follows from requiring d' = 1 at d = L:
++ *
++ *   s = (L - t) / (((1 - t) / (L - t))^(-p) - 1)^(1/p)
++ *
++ * evaluated in double precision. A channel whose limit is at most 1 already
++ * lies within the boundary and is left untouched (scale 0); so is one whose
++ * scale would not be a positive single precision value.
++ */
++ClutterColorOp *
++clutter_color_op_gamut_compress_new (float       threshold,
++                                     float       power,
++                                     const float limit[3])
++{
++  ClutterColorOpGamutCompress *op;
++  int c;
++
++  op = g_object_new (CLUTTER_TYPE_COLOR_OP_GAMUT_COMPRESS, NULL);
++  op->parameters.threshold = threshold;
++  op->parameters.power = power;
++
++  for (c = 0; c < 3; c++)
++    {
++      double t = threshold, p = power, l = limit[c];
++      double scale = 0.0;
++
++      if (l > 1.0 && t < 1.0)
++        scale = (l - t) / pow (pow ((1.0 - t) / (l - t), -p) - 1.0, 1.0 / p);
++
++      op->parameters.limit[c] = limit[c];
++      op->parameters.scale[c] = scale > 0.0 && scale <= G_MAXFLOAT ?
++                                (float) scale : 0.0f;
++    }
++
++  return CLUTTER_COLOR_OP (op);
++}
++
++const ClutterGamutCompressParameters *
++clutter_color_op_gamut_compress_get_parameters (ClutterColorOp *op)
++{
++  return &CLUTTER_COLOR_OP_GAMUT_COMPRESS (op)->parameters;
++}
++
+ typedef struct _ClutterColorOp3DLutPrivate
+ {
+   uint32_t size;
+diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
+index 534a7d327..9a43e2a4d 100644
+--- a/clutter/clutter/clutter-color-pipeline-shader.c
++++ b/clutter/clutter/clutter-color-pipeline-shader.c
+@@ -313,6 +313,48 @@ static const char bt2390_eetf_source[] =
+   "  return color * (mapped / luminance);\n"
+   "}\n";
+ 
++/* ACES 1.3 Reference Gamut Compression; must match
++ * ClutterColorOpGamutCompress. */
++static const char gamut_compress_source[] =
++  "float gamut_compress_channel (float c,\n"
++  "                              float ach,\n"
++  "                              float threshold,\n"
++  "                              float power,\n"
++  "                              float scale)\n"
++  "{\n"
++  "  if (scale <= 0.0)\n"
++  "    return c;\n"
++  "\n"
++  "  float d = (ach - c) / ach;\n"
++  "  if (!(d > threshold))\n"
++  "    return c;\n"
++  "\n"
++  "  /* Overflow-safe form of x / (1 + x^p)^(1/p). */\n"
++  "  float x = max ((d - threshold) / scale, 1.17549435e-38);\n"
++  "  float compressed = threshold +\n"
++  "                     scale * pow (1.0 + pow (x, -power), -1.0 / power);\n"
++  "  return ach - compressed * ach;\n"
++  "}\n"
++  "\n"
++  "vec3 gamut_compress (vec3  color,\n"
++  "                     float threshold,\n"
++  "                     float power,\n"
++  "                     vec3  scale)\n"
++  "{\n"
++  "  float ach = max (color.r, max (color.g, color.b));\n"
++  "\n"
++  "  /* Not positive, or not finite. */\n"
++  "  if (!(ach > 0.0) || ach > 3.40282347e38)\n"
++  "    return color;\n"
++  "\n"
++  "  return vec3 (gamut_compress_channel (color.r, ach, threshold, power,\n"
++  "                                       scale.r),\n"
++  "               gamut_compress_channel (color.g, ach, threshold, power,\n"
++  "                                       scale.g),\n"
++  "               gamut_compress_channel (color.b, ach, threshold, power,\n"
++  "                                       scale.b));\n"
++  "}\n";
++
+ static const char lut_3d_source[] =
+   "// Tetrahedral interpolation\n"
+   "vec3 sample_3d_lut_SIZE (vec3 color, sampler2D lut_texture, float lut_size)\n"
+@@ -857,6 +899,46 @@ update_bt2390_eetf_state (ClutterColorOp *op,
+   set_uniform_1f (pipeline, "bt2390_max_lum", op_id, parameters->max_lum);
+ }
+ 
++static char *
++get_gamut_compress_declarations (ClutterColorOp *op,
++                                 size_t          op_id)
++{
++  return g_strdup_printf ("uniform float gamut_threshold_%zu;\n"
++                          "uniform float gamut_power_%zu;\n"
++                          "uniform vec3 gamut_scale_%zu;\n",
++                          op_id, op_id, op_id);
++}
++
++static char *
++get_gamut_compress_invocation (ClutterColorOp *op,
++                               size_t          op_id)
++{
++  return g_strdup_printf ("vec4 (gamut_compress (color.rgb, "
++                          "gamut_threshold_%zu, gamut_power_%zu, "
++                          "gamut_scale_%zu), color.a)",
++                          op_id, op_id, op_id);
++}
++
++static void
++update_gamut_compress_state (ClutterColorOp *op,
++                             size_t          op_id,
++                             CoglPipeline   *pipeline)
++{
++  const ClutterGamutCompressParameters *parameters =
++    clutter_color_op_gamut_compress_get_parameters (op);
++  g_autofree char *uniform_name = NULL;
++  int uniform_location;
++
++  set_uniform_1f (pipeline, "gamut_threshold", op_id, parameters->threshold);
++  set_uniform_1f (pipeline, "gamut_power", op_id, parameters->power);
++
++  uniform_name = g_strdup_printf ("gamut_scale_%zu", op_id);
++  uniform_location = cogl_pipeline_get_uniform_location (pipeline,
++                                                         uniform_name);
++  cogl_pipeline_set_uniform_float (pipeline, uniform_location,
++                                   3, 1, parameters->scale);
++}
++
+ typedef struct _ShaderOpInfo
+ {
+   GType (*get_type) (void);
+@@ -918,6 +1000,13 @@ static const ShaderOpInfo shader_op_infos[] = {
+     .get_invocation = get_bt2390_eetf_invocation,
+     .update_state = update_bt2390_eetf_state,
+   },
++  {
++    .get_type = clutter_color_op_gamut_compress_get_type,
++    .shader_source = gamut_compress_source,
++    .get_declarations = get_gamut_compress_declarations,
++    .get_invocation = get_gamut_compress_invocation,
++    .update_state = update_gamut_compress_state,
++  },
+   {
+     .get_type = clutter_color_op_unpremultiply_get_type,
+     .shader_source = unpremultiply_source,
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index 555688f72..c1d0ebd2d 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -32,6 +32,8 @@
+  * a blending state derived from a display's target: it keeps the display's
+  * values, and the display's reference white luminance as its display
+  * reference (see clutter_color_state_params_get_display_reference_luminance()).
++ * Primaries are CIE 1931 xy chromaticities: a client's mastering display
++ * primaries, or, in such a blending state, the display's own primaries.
+  * A value that was not declared is absent: has_primaries and has_luminance are
+  * FALSE, and max_cll and max_fall are 0.
+  *
+@@ -48,6 +50,13 @@ typedef struct _ClutterColorTargetVolume
+ 
+   float max_cll;
+   float max_fall;
++
++  /* The resolution of the declaration of the red, green and blue primaries,
++   * as a distance in CIE 1931 xy by which each may be off: chromaticities
++   * that far outside their triangle count as inside it (see
++   * clutter_primaries_contain_chromaticity()). 0 for exact declarations,
++   * such as a client's mastering primaries. */
++  float primaries_tolerance[3];
+ } ClutterColorTargetVolume;
+ 
+ /* Exported for libmutter, which creates color states from client input. */
+@@ -70,6 +79,12 @@ gboolean clutter_color_state_params_get_display_target (ClutterColorStateParams
+                                                         float                   *max_lum,
+                                                         float                   *display_reference_lum);
+ 
++gboolean clutter_color_state_params_get_display_gamut (ClutterColorStateParams *color_state_params,
++                                                       ClutterPrimaries        *primaries,
++                                                       float                    tolerance[3]);
++
++gboolean clutter_color_state_params_is_encoding_bounded (ClutterColorStateParams *color_state_params);
++
+ /* Exact identity, for caches whose entries must not be shared by states that
+  * clutter_color_state_equals() deems close enough. */
+ CLUTTER_EXPORT
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index cbf12351c..ae7278f49 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -120,12 +120,13 @@ clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_sta
+ }
+ 
+ /*
+- * Whether the encoding's signal range bounds the light the content can
+- * reach. Extended-range linear encodings (ext_linear, scRGB-style content)
+- * give meaning to values above 1.0, so their nominal maximum does not.
++ * Whether the encoding's signal range bounds the content: the light it can
++ * reach, and the colors. Extended-range linear encodings (ext_linear,
++ * scRGB-style content) give meaning to values above 1.0 and below 0.0, so
++ * neither their nominal maximum nor their primaries bound anything.
+  */
+-static gboolean
+-encoding_bounds_peak (ClutterColorStateParams *color_state_params)
++gboolean
++clutter_color_state_params_is_encoding_bounded (ClutterColorStateParams *color_state_params)
+ {
+   const ClutterEOTF *eotf = &color_state_params->eotf;
+ 
+@@ -169,7 +170,7 @@ clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_sta
+     clutter_color_state_params_get_display_reference_luminance (color_state_params);
+ 
+   /* Extended range states can exceed their nominal maximum. */
+-  if (encoding_bounds_peak (color_state_params))
++  if (clutter_color_state_params_is_encoding_bounded (color_state_params))
+     peak = (double) MAX (lum->max, lum->mastering_max) / lum->ref;
+   if (target_volume->has_luminance)
+     peak = MIN (peak, target_volume->max_lum / display_ref);
+@@ -244,7 +245,10 @@ target_volume_equal (const ClutterColorTargetVolume *target_volume,
+     return FALSE;
+ 
+   if (target_volume->has_primaries &&
+-      (primaries->r_x != other_primaries->r_x ||
++      (target_volume->primaries_tolerance[0] != other_target_volume->primaries_tolerance[0] ||
++       target_volume->primaries_tolerance[1] != other_target_volume->primaries_tolerance[1] ||
++       target_volume->primaries_tolerance[2] != other_target_volume->primaries_tolerance[2] ||
++       primaries->r_x != other_primaries->r_x ||
+        primaries->r_y != other_primaries->r_y ||
+        primaries->g_x != other_primaries->g_x ||
+        primaries->g_y != other_primaries->g_y ||
+@@ -427,9 +431,10 @@ clutter_color_state_params_get_display_reference_luminance (ClutterColorStatePar
+ 
+ /*
+  * Whether the state is a display target: a blending state derived from an
+- * output whose target luminance is known. Only such a state carries a
+- * display reference; it is what highlight mapping converts toward. Its
+- * target luminance range is in the display's cd/m².
++ * output whose target luminance is known. Only blending states derived from a
++ * display's target volume carry a display reference; one with a target
++ * luminance is what highlight mapping converts toward. Its target luminance
++ * range is in the display's cd/m².
+  */
+ gboolean
+ clutter_color_state_params_get_display_target (ClutterColorStateParams *color_state_params,
+@@ -454,19 +459,95 @@ clutter_color_state_params_get_display_target (ClutterColorStateParams *color_st
+   return TRUE;
+ }
+ 
++/*
++ * Whether the state is a display gamut target: a blending state derived from
++ * an output whose target primaries are declared. Like a display target, only
++ * such a state carries a display reference; it is what gamut compression
++ * converts toward. A client's mastering primaries do not make one. Its
++ * primaries have passed clutter_colorimetry_get_absolute_bt2020_matrices().
++ * @tolerance receives the resolution of each primary's declaration, see
++ * ClutterColorTargetVolume.
++ */
++gboolean
++clutter_color_state_params_get_display_gamut (ClutterColorStateParams *color_state_params,
++                                              ClutterPrimaries        *primaries,
++                                              float                    tolerance[3])
++{
++  const ClutterColorTargetVolume *target_volume =
++    &color_state_params->target_volume;
++
++  if (!target_volume->has_primaries ||
++      !(color_state_params->display_reference_lum > 0.0f))
++    return FALSE;
++
++  if (primaries)
++    *primaries = target_volume->primaries;
++  if (tolerance)
++    memcpy (tolerance, target_volume->primaries_tolerance, 3 * sizeof (float));
++
++  return TRUE;
++}
++
++/*
++ * Whether @target_volume's primaries can be stored in a color state: usable
++ * by the shared colorimetry definition, the one the Wayland creator checks
++ * client primaries with, with finite, non-negative tolerances; and, in a
++ * display target (@display_target), usable as a gamut target, which also
++ * needs the absolute matrices gamut compression works with.
++ */
++static gboolean
++target_primaries_usable (const ClutterColorTargetVolume *target_volume,
++                         gboolean                        display_target)
++{
++  ClutterColorimetry colorimetry = {
++    .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++    .primaries = (ClutterPrimaries *) &target_volume->primaries,
++  };
++  int i;
++
++  for (i = 0; i < 3; i++)
++    {
++      if (!isfinite (target_volume->primaries_tolerance[i]) ||
++          !(target_volume->primaries_tolerance[i] >= 0.0f))
++        return FALSE;
++    }
++
++  if (display_target)
++    {
++      return clutter_colorimetry_get_absolute_bt2020_matrices (&colorimetry,
++                                                               NULL, NULL,
++                                                               NULL);
++    }
++
++  return clutter_colorimetry_get_linear_bt2020_matrices (&colorimetry,
++                                                         NULL, NULL, NULL);
++}
++
+ /*
+  * A copy of @color_state_params blended for the display its target volume
+- * describes, recording the display's reference white luminance.
++ * describes, recording the display's reference white luminance. Target
++ * primaries a display target cannot use are a bug in the producer of
++ * @color_state_params, which validates them with the same function: they are
++ * dropped, loudly, so that no display target ever carries them.
+  */
+ static ClutterColorState *
+ new_display_target (ClutterColorStateParams *blending_params,
+                     ClutterColorStateParams *color_state_params)
+ {
++  ClutterColorTargetVolume target_volume = color_state_params->target_volume;
+   ClutterColorState *blending_color_state;
+ 
++  if (target_volume.has_primaries &&
++      !target_primaries_usable (&target_volume, TRUE))
++    {
++      g_critical ("Display target primaries cannot be used as a gamut "
++                  "target; dropping them");
++      target_volume.has_primaries = FALSE;
++    }
++
+   blending_color_state =
+     clutter_color_state_params_new_with_target_volume (blending_params,
+-                                                       &color_state_params->target_volume);
++                                                       &target_volume);
+   CLUTTER_COLOR_STATE_PARAMS (blending_color_state)->display_reference_lum =
+     clutter_color_state_params_get_display_reference_luminance (color_state_params);
+ 
+@@ -511,8 +592,10 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+       clutter_colorimetry_equal (&blending_colorimetry,
+                                  &color_state_params->colorimetry))
+     {
+-      /* A target luminance makes the blending state a display target. */
+-      if (!color_state_params->target_volume.has_luminance ||
++      /* A target luminance or target primaries make the blending state a
++       * display target. */
++      if (!(color_state_params->target_volume.has_luminance ||
++            color_state_params->target_volume.has_primaries) ||
+           color_state_params->display_reference_lum > 0.0f)
+         return g_object_ref (color_state);
+ 
+@@ -883,7 +966,15 @@ clutter_color_state_params_new_from_primitives (ClutterContext     *context,
+  *   @color_state_params
+  *
+  * Creates a copy of @color_state_params whose target color volume is
+- * @target_volume. The caller validates the target volume.
++ * @target_volume. The caller validates the target volume from external
++ * input. Target primaries must in any case be usable by
++ * clutter_colorimetry_get_linear_bt2020_matrices(), the shared definition the
++ * Wayland creator checks client primaries with, with finite, non-negative
++ * tolerances; in a copy of a display target, which is a gamut target, they
++ * must also pass clutter_colorimetry_get_absolute_bt2020_matrices(), as the
++ * colour device checks its declared target with. Primaries that do not make
++ * no color state, so gamut compression never has to decide what unusable
++ * target primaries mean.
+  *
+  * Returns: (transfer full): a new ClutterColorState
+  */
+@@ -897,6 +988,10 @@ clutter_color_state_params_new_with_target_volume (ClutterColorStateParams
+   g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
+                         NULL);
+   g_return_val_if_fail (target_volume != NULL, NULL);
++  g_return_val_if_fail (!target_volume->has_primaries ||
++                        target_primaries_usable (target_volume,
++                                                 color_state_params->display_reference_lum > 0.0f),
++                        NULL);
+ 
+   copy = g_object_new (CLUTTER_TYPE_COLOR_STATE_PARAMS,
+                        "context", clutter_color_state_get_context (color_state),
+diff --git a/clutter/clutter/clutter-color-transform-private.h b/clutter/clutter/clutter-color-transform-private.h
+index 2ffb19629..43e752a49 100644
+--- a/clutter/clutter/clutter-color-transform-private.h
++++ b/clutter/clutter/clutter-color-transform-private.h
+@@ -41,7 +41,17 @@ ClutterColorTransform * clutter_color_transform_from_color_states (ClutterContex
+ CLUTTER_EXPORT_TEST
+ ClutterColorPipeline * clutter_color_transform_get_pipeline (ClutterColorTransform *transform);
+ 
+-/* Exported for libmutter, whose direct scanout decision must agree with it. */
++/* The highlight part of clutter_color_transform_requires_mapping(). */
+ CLUTTER_EXPORT
+ gboolean clutter_color_transform_requires_highlight_mapping (ClutterColorState *source_color_state,
+                                                              ClutterColorState *target_color_state);
++
++CLUTTER_EXPORT_TEST
++gboolean clutter_color_transform_requires_gamut_compression (ClutterColorState *source_color_state,
++                                                             ClutterColorState *target_color_state);
++
++/* Exported for libmutter: direct scanout and the hardware cursor plane are
++ * refused exactly when it holds. */
++CLUTTER_EXPORT
++gboolean clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
++                                                   ClutterColorState *target_color_state);
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index f1f097027..f26514c6e 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1151,6 +1151,405 @@ add_highlight_mapping_op (ClutterColorPipeline *pipeline,
+                                   clutter_color_op_bt2390_eetf_new (&parameters));
+ }
+ 
++/* ACES 1.3 Reference Gamut Compression: threshold and power. */
++#define GAMUT_COMPRESSION_THRESHOLD 0.8f
++#define GAMUT_COMPRESSION_POWER 1.2f
++
++/*
++ * The adapted chromaticities carry single precision rounding, about 1e-7;
++ * a point closer than the protocol's chromaticity unit, 1e-6, to the outside
++ * of a side is taken to be on it.
++ */
++#define GAMUT_CONTAINMENT_MARGIN 1e-6f
++
++typedef struct _GamutCompression
++{
++  graphene_matrix_t from_linear_bt2020;
++  graphene_matrix_t to_linear_bt2020;
++  float limit[3];
++} GamutCompression;
++
++typedef struct _GamutTarget
++{
++  ClutterPrimaries primaries;
++  float tolerance[3];
++  graphene_matrix_t linear_bt2020_to_XYZ;
++} GamutTarget;
++
++/* @v times @matrix, row vector convention as graphene uses, in double. */
++static void
++transform_double (const graphene_matrix_t *matrix,
++                  const double             v[3],
++                  double                   out[3])
++{
++  int i, j;
++
++  for (j = 0; j < 3; j++)
++    {
++      out[j] = 0.0;
++      for (i = 0; i < 3; i++)
++        out[j] += v[i] * graphene_matrix_get_value (matrix, i, j);
++    }
++}
++
++static gboolean
++is_finite3 (const double v[3])
++{
++  return isfinite (v[0]) && isfinite (v[1]) && isfinite (v[2]);
++}
++
++/*
++ * Whether linear BT.2020 @bt2020 lies within the target triangle, with its
++ * tolerances, by its CIE 1931 chromaticity. Returns %FALSE if it has none
++ * (X + Y + Z not positive, or not finite).
++ */
++static gboolean
++gamut_target_contains (const GamutTarget *target,
++                       const double       bt2020[3],
++                       gboolean          *contains)
++{
++  double XYZ[3], sum;
++
++  transform_double (&target->linear_bt2020_to_XYZ, bt2020, XYZ);
++  sum = XYZ[0] + XYZ[1] + XYZ[2];
++  if (!is_finite3 (XYZ) || !(sum > 0.0))
++    return FALSE;
++
++  *contains = clutter_primaries_contain_chromaticity (&target->primaries,
++                                                      target->tolerance,
++                                                      XYZ[0] / sum,
++                                                      XYZ[1] / sum);
++  return TRUE;
++}
++
++/* Whether all three vertices lie within the target; %FALSE if one has no
++ * chromaticity. */
++static gboolean
++gamut_target_contains_all (const GamutTarget *target,
++                           const double       vertices[3][3],
++                           gboolean          *contains)
++{
++  int i;
++
++  *contains = TRUE;
++  for (i = 0; i < 3; i++)
++    {
++      gboolean vertex_contained;
++
++      if (!gamut_target_contains (target, vertices[i], &vertex_contained))
++        return FALSE;
++      if (!vertex_contained)
++        *contains = FALSE;
++    }
++
++  return TRUE;
++}
++
++/*
++ * The limits: for each channel, the largest distance a point of the source
++ * gamut boundary outside the target reaches in linear RGB of the target.
++ *
++ * The boundary is the three sides between the source primaries @vertices,
++ * given in linear BT.2020; the distance is scale invariant, so a side is the
++ * set of positive combinations v = (1 - l) a + l b of its two primaries in
++ * target RGB. Wherever the largest channel k of v stays the same, the
++ * distance 1 - v_c / v_k of a channel c is a linear-fractional function of
++ * l, so monotonic: on each side the maximum lies at a primary or where two
++ * channels of v are equal. These points are all that is evaluated, which
++ * makes the limits exact, so that no point of the boundary (primaries and
++ * sides) ends up beyond distance 1 and each channel's maximising point lands
++ * at 1. The interior adds nothing: along a line where two channels are
++ * equal the distance is again linear-fractional, with its maximum at the
++ * line's ends on the sides.
++ *
++ * Points within the target, by its tolerances, are ignored. The achromatic
++ * value max (R, G, B) is a convex, piecewise linear function along a side,
++ * so its minimum is among the same points: if one of them has no positive
++ * achromatic value, or any value is not finite, the side passes through
++ * directions the compression cannot map, and %FALSE is returned: nothing is
++ * compressed. Otherwise returns whether some channel's limit exceeds 1, the
++ * only case in which the op does anything.
++ */
++static gboolean
++compute_gamut_limits (const GamutTarget *target,
++                      const double       vertices[3][3],
++                      GamutCompression  *compression)
++{
++  double rgb[3][3];
++  int i, j, c, side;
++
++  for (i = 0; i < 3; i++)
++    {
++      transform_double (&compression->from_linear_bt2020, vertices[i], rgb[i]);
++      if (!is_finite3 (rgb[i]))
++        return FALSE;
++    }
++
++  for (c = 0; c < 3; c++)
++    compression->limit[c] = 0.0f;
++
++  for (side = 0; side < 3; side++)
++    {
++      const double *a = rgb[side], *b = rgb[(side + 1) % 3];
++      const double *bt2020_a = vertices[side];
++      const double *bt2020_b = vertices[(side + 1) % 3];
++      double candidates[5] = { 0.0, 1.0 };
++      int n_candidates = 2, n;
++
++      for (i = 0; i < 3; i++)
++        {
++          for (j = i + 1; j < 3; j++)
++            {
++              double denominator = (a[i] - a[j]) - (b[i] - b[j]);
++              double l;
++
++              if (denominator == 0.0)
++                continue;
++
++              l = (a[i] - a[j]) / denominator;
++              if (l > 0.0 && l < 1.0)
++                candidates[n_candidates++] = l;
++            }
++        }
++
++      for (n = 0; n < n_candidates; n++)
++        {
++          double l = candidates[n];
++          double v[3], bt2020[3], ach;
++          gboolean contained;
++
++          for (c = 0; c < 3; c++)
++            {
++              v[c] = (1.0 - l) * a[c] + l * b[c];
++              bt2020[c] = (1.0 - l) * bt2020_a[c] + l * bt2020_b[c];
++            }
++
++          ach = MAX (v[0], MAX (v[1], v[2]));
++          if (!is_finite3 (v) || !(ach > 0.0))
++            return FALSE;
++
++          if (!gamut_target_contains (target, bt2020, &contained))
++            return FALSE;
++          if (contained)
++            continue;
++
++          for (c = 0; c < 3; c++)
++            {
++              compression->limit[c] = MAX (compression->limit[c],
++                                           (float) ((ach - v[c]) / ach));
++            }
++        }
++    }
++
++  return compression->limit[0] > 1.0f ||
++         compression->limit[1] > 1.0f ||
++         compression->limit[2] > 1.0f;
++}
++
++/*
++ * The single decision on gamut compression, used both by
++ * clutter_color_transform_requires_gamut_compression() and by the op
++ * builder, so the two cannot disagree.
++ *
++ * Compression applies only toward a display gamut target (the blending state
++ * of an output whose target primaries are declared by its firmware), and only
++ * when the content can actually exceed the target. Every source color is
++ * followed to linear BT.2020 exactly as the renderer converts its pixels:
++ *
++ *  - the encoding primaries are the rows of the encoding's adapted
++ *    conversion to linear BT.2020, Bradford adaptation of its white point to
++ *    D65 included;
++ *  - mastering display primaries, declared for content in that encoding,
++ *    are their XYZ with the same adaptation of the encoding's white point.
++ *
++ * Containment is then decided on the chromaticities of those adapted
++ * colors, with clutter_primaries_contain_chromaticity() and the tolerances of
++ * the target's declaration. The encoding primaries must not all lie within
++ * the target, and, when mastering primaries are declared, neither must they:
++ * content whose encoding fits the target, such as sRGB on a wide gamut
++ * panel, is never compressed, whatever its mastering metadata says. An
++ * extended-range linear encoding bounds nothing, so its primaries are not
++ * tested: its mastering primaries are the source gamut, and without them the
++ * gamut's extent is unknown and nothing is compressed, as nothing is
++ * highlight mapped without a known peak. ICC sources are not compressed.
++ *
++ * The limits are computed from the mastering primaries when declared,
++ * otherwise from the encoding primaries, by compute_gamut_limits(), in the
++ * absolute linear RGB of the target that the op compresses in.
++ */
++static gboolean
++get_gamut_compression (ClutterColorState *source_color_state,
++                       ClutterColorState *target_color_state,
++                       GamutCompression  *compression)
++{
++  ClutterColorStateParams *source_params;
++  const ClutterColorTargetVolume *source_volume;
++  ClutterColorimetry target_colorimetry;
++  GamutTarget target;
++  graphene_matrix_t to_linear_bt2020, XYZ_to_D65, XYZ_to_linear_bt2020;
++  double encoding[3][3], mastering[3][3];
++  double (*limit_vertices)[3];
++  gboolean bounded, contained;
++  int i, c;
++
++  if (!CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state) ||
++      !clutter_color_state_params_get_display_gamut (CLUTTER_COLOR_STATE_PARAMS (target_color_state),
++                                                     &target.primaries,
++                                                     target.tolerance))
++    return FALSE;
++
++  if (!CLUTTER_IS_COLOR_STATE_PARAMS (source_color_state))
++    return FALSE;
++
++  source_params = CLUTTER_COLOR_STATE_PARAMS (source_color_state);
++  source_volume = clutter_color_state_params_get_target_volume (source_params);
++  bounded = clutter_color_state_params_is_encoding_bounded (source_params);
++  if (!bounded && !source_volume->has_primaries)
++    return FALSE;
++
++  for (i = 0; i < 3; i++)
++    target.tolerance[i] += GAMUT_CONTAINMENT_MARGIN;
++
++  /* Producers validate source colorimetry with the same definition. */
++  if (!clutter_colorimetry_get_source_matrices (clutter_color_state_params_get_colorimetry (source_params),
++                                                &to_linear_bt2020,
++                                                &XYZ_to_D65,
++                                                &XYZ_to_linear_bt2020,
++                                                &target.linear_bt2020_to_XYZ,
++                                                NULL))
++    return FALSE;
++
++  for (i = 0; i < 3; i++)
++    {
++      for (c = 0; c < 3; c++)
++        encoding[i][c] = graphene_matrix_get_value (&to_linear_bt2020, i, c);
++    }
++
++  if (bounded &&
++      (!gamut_target_contains_all (&target, encoding, &contained) || contained))
++    return FALSE;
++
++  if (source_volume->has_primaries)
++    {
++      const ClutterPrimaries *primaries = &source_volume->primaries;
++      const double xy[3][2] = {
++        { primaries->r_x, primaries->r_y },
++        { primaries->g_x, primaries->g_y },
++        { primaries->b_x, primaries->b_y },
++      };
++
++      for (i = 0; i < 3; i++)
++        {
++          double direction[3] = { xy[i][0], xy[i][1], 1.0 - xy[i][0] - xy[i][1] };
++          double adapted[3];
++
++          transform_double (&XYZ_to_D65, direction, adapted);
++          transform_double (&XYZ_to_linear_bt2020, adapted, mastering[i]);
++        }
++
++      if (!gamut_target_contains_all (&target, mastering, &contained) ||
++          contained)
++        return FALSE;
++
++      limit_vertices = mastering;
++    }
++  else
++    {
++      limit_vertices = encoding;
++    }
++
++  /* Display gamut targets pass this check when they are created. */
++  target_colorimetry = (ClutterColorimetry) {
++    .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++    .primaries = &target.primaries,
++  };
++  if (!clutter_colorimetry_get_absolute_bt2020_matrices (&target_colorimetry,
++                                                         &compression->from_linear_bt2020,
++                                                         &compression->to_linear_bt2020,
++                                                         NULL))
++    g_return_val_if_reached (FALSE);
++
++  return compute_gamut_limits (&target, (const double (*)[3]) limit_vertices,
++                               compression);
++}
++
++/*
++ * Whether converting @source_color_state to @target_color_state compresses
++ * the gamut, by get_gamut_compression(): toward a display gamut target, and
++ * only when the content can exceed it. The renderer adds the compression
++ * exactly when this returns %TRUE. It returns early, without computing any
++ * matrix, whenever the content is found within the target; when it is not,
++ * it computes the limits too, since whether any of them exceeds 1 is part of
++ * the decision the op builder makes.
++ */
++gboolean
++clutter_color_transform_requires_gamut_compression (ClutterColorState *source_color_state,
++                                                    ClutterColorState *target_color_state)
++{
++  GamutCompression compression;
++
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (target_color_state), FALSE);
++
++  return get_gamut_compression (source_color_state, target_color_state,
++                                &compression);
++}
++
++/*
++ * Whether converting @source_color_state to @target_color_state maps it
++ * toward a display's target: its highlights, its gamut, or both. This is the
++ * single "mapping required" predicate: the transform builds a conversion,
++ * even between equal encodings, exactly when it holds, and direct scanout and
++ * the hardware cursor plane, which bypass the conversion, must be refused
++ * when it does.
++ */
++gboolean
++clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
++                                          ClutterColorState *target_color_state)
++{
++  return clutter_color_transform_requires_highlight_mapping (source_color_state,
++                                                             target_color_state) ||
++         clutter_color_transform_requires_gamut_compression (source_color_state,
++                                                             target_color_state);
++}
++
++/*
++ * ACES 1.3 Reference Gamut Compression toward the target's declared
++ * primaries, in linear light after highlight mapping: linear BT.2020 is
++ * converted to linear RGB of the target primaries with absolute colorimetry
++ * (no chromatic adaptation), compressed there with the limits of
++ * get_gamut_compression() and a threshold of 0.8 in every channel, and
++ * converted back.
++ */
++static void
++add_gamut_compression_op (ClutterColorPipeline *pipeline,
++                          ClutterColorState    *source_color_state,
++                          ClutterColorState    *target_color_state)
++{
++  GamutCompression compression;
++  graphene_matrix_t *matrix;
++
++  /* clutter_color_transform_requires_gamut_compression() decided it. */
++  if (!get_gamut_compression (source_color_state, target_color_state,
++                              &compression))
++    g_return_if_reached ();
++
++  matrix = graphene_matrix_alloc ();
++  graphene_matrix_init_from_matrix (matrix, &compression.from_linear_bt2020);
++  clutter_color_pipeline_take_op (pipeline,
++                                  clutter_color_op_matrix_4x4_new (matrix));
++
++  clutter_color_pipeline_take_op (pipeline,
++                                  clutter_color_op_gamut_compress_new (GAMUT_COMPRESSION_THRESHOLD,
++                                                                       GAMUT_COMPRESSION_POWER,
++                                                                       compression.limit));
++
++  matrix = graphene_matrix_alloc ();
++  graphene_matrix_init_from_matrix (matrix, &compression.to_linear_bt2020);
++  clutter_color_pipeline_take_op (pipeline,
++                                  clutter_color_op_matrix_4x4_new (matrix));
++}
++
+ static void
+ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+                           ClutterColorState               *source_color_state,
+@@ -1175,6 +1574,9 @@ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+       if (clutter_color_transform_requires_highlight_mapping (source_color_state,
+                                                               target_color_state))
+         add_highlight_mapping_op (pipeline, source_color_state, target_color_state);
++      if (clutter_color_transform_requires_gamut_compression (source_color_state,
++                                                              target_color_state))
++        add_gamut_compression_op (pipeline, source_color_state, target_color_state);
+       add_from_linear_bt2020_ops (pipeline, target_color_state);
+     }
+ 
+@@ -1194,11 +1596,12 @@ clutter_color_transform_new (ClutterColorState               *source_color_state
+   pipeline = g_object_new (CLUTTER_TYPE_COLOR_PIPELINE, NULL);
+ 
+   /* A target color volume alone does not change how pixels are encoded, but
+-   * a target luminance below the source's peak maps its highlights. */
++   * a display target below the source's peak maps its highlights, and one
++   * whose gamut does not contain the source's compresses its gamut. */
+   if (!clutter_color_state_encoding_equals (source_color_state,
+                                             target_color_state) ||
+-      clutter_color_transform_requires_highlight_mapping (source_color_state,
+-                                                          target_color_state))
++      clutter_color_transform_requires_mapping (source_color_state,
++                                                target_color_state))
+     build_transform_pipeline (pipeline, source_color_state, target_color_state, flags);
+ 
+   clutter_color_pipeline_simplify (pipeline);
+diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
+index 2599ec9e8..84abd0957 100644
+--- a/clutter/clutter/clutter-color-utils-private.h
++++ b/clutter/clutter/clutter-color-utils-private.h
+@@ -44,6 +44,25 @@ gboolean clutter_colorimetry_get_luminance_coefficients (const ClutterColorimetr
+                                                          float                      coefficients[3],
+                                                          GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
+ 
++/* Exported for libmutter, which validates display target primaries. */
++CLUTTER_EXPORT
++gboolean clutter_colorimetry_get_absolute_bt2020_matrices (const ClutterColorimetry  *colorimetry,
++                                                           graphene_matrix_t         *from_linear_bt2020,
++                                                           graphene_matrix_t         *to_linear_bt2020,
++                                                           GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
++
++gboolean clutter_colorimetry_get_source_matrices (const ClutterColorimetry  *colorimetry,
++                                                  graphene_matrix_t         *to_linear_bt2020,
++                                                  graphene_matrix_t         *XYZ_to_D65,
++                                                  graphene_matrix_t         *XYZ_to_linear_bt2020,
++                                                  graphene_matrix_t         *linear_bt2020_to_XYZ,
++                                                  GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
++
++gboolean clutter_primaries_contain_chromaticity (const ClutterPrimaries *outer,
++                                                 const float             tolerance[3],
++                                                 double                  x,
++                                                 double                  y);
++
+ /* Exported for libmutter, which validates client HLG luminances. */
+ CLUTTER_EXPORT
+ gboolean clutter_luminance_get_hlg_parameters (float    min_lum,
+diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
+index d2afe41cc..480b5c912 100644
+--- a/clutter/clutter/clutter-color-utils.c
++++ b/clutter/clutter/clutter-color-utils.c
+@@ -684,26 +684,40 @@ round_trip_error (const graphene_matrix_t *a,
+   return max_error;
+ }
+ 
++typedef struct _Bt2020Matrices
++{
++  graphene_matrix_t to_linear_bt2020;
++  graphene_matrix_t from_linear_bt2020;
++  graphene_matrix_t absolute_to_linear_bt2020;
++  graphene_matrix_t absolute_from_linear_bt2020;
++  graphene_matrix_t XYZ_to_D65;
++  graphene_matrix_t XYZ_to_linear_bt2020;
++  graphene_matrix_t linear_bt2020_to_XYZ;
++} Bt2020Matrices;
++
++static gboolean
++matrices_are_inverse (const graphene_matrix_t *a,
++                      const graphene_matrix_t *b)
++{
++  return matrix_is_finite (a) &&
++         matrix_is_finite (b) &&
++         round_trip_error (a, b) <= LINEAR_BT2020_ROUND_TRIP_TOLERANCE &&
++         round_trip_error (b, a) <= LINEAR_BT2020_ROUND_TRIP_TOLERANCE;
++}
++
+ /*
+- * Computes the two matrices a ClutterColorTransform uses for a parametric
+- * color state with @colorimetry: RGB to XYZ, Bradford adaptation of the white
+- * point to D65, then XYZ to BT.2020 (@to_linear_bt2020, optional), and the
+- * reverse chain (@from_linear_bt2020, optional).
+- *
+- * Both directions are always computed and checked, so %TRUE means the
+- * colorimetry can be used both as a source and as a target. Producers of
+- * color states from untrusted input use this to decide whether the
+- * colorimetry is supported, so that acceptance and rendering share one
+- * definition.
+- *
+- * Returns %TRUE if both matrices are finite and are each other's inverse
+- * within LINEAR_BT2020_ROUND_TRIP_TOLERANCE; otherwise sets @error.
++ * Computes the matrices the renderer uses to convert between linear RGB in
++ * @colorimetry and linear BT.2020: the adapted pair (RGB to XYZ, Bradford
++ * adaptation of the white point to D65, XYZ to BT.2020, and the reverse
++ * chain), always checked, and the absolute pair (through XYZ without
++ * adapting the white point, so that every color keeps its XYZ), checked only
++ * if @check_absolute is set, since only gamut targets use it.
+  */
+-gboolean
+-clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *colorimetry,
+-                                                graphene_matrix_t         *to_linear_bt2020,
+-                                                graphene_matrix_t         *from_linear_bt2020,
+-                                                GError                   **error)
++static gboolean
++compute_bt2020_matrices (const ClutterColorimetry  *colorimetry,
++                         gboolean                   check_absolute,
++                         Bt2020Matrices            *matrices,
++                         GError                   **error)
+ {
+   const ClutterColorimetry bt2020_colorimetry = {
+     .type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE,
+@@ -711,8 +725,7 @@ clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *color
+   };
+   const ClutterPrimaries *primaries;
+   graphene_matrix_t to_XYZ, from_XYZ, to_XYZ_bt2020, from_XYZ_bt2020;
+-  graphene_matrix_t to_D65, from_D65;
+-  graphene_matrix_t to_bt2020, from_bt2020, temp;
++  graphene_matrix_t to_D65, from_D65, temp;
+   graphene_vec3_t white_point_XYZ, D65_XYZ;
+ 
+   if (!colorimetry_to_XYZ_checked (colorimetry, &to_XYZ, error) ||
+@@ -743,16 +756,29 @@ clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *color
+ 
+   /* source → XYZ → XYZ D65 → BT.2020 */
+   graphene_matrix_multiply (&to_XYZ, &to_D65, &temp);
+-  graphene_matrix_multiply (&temp, &from_XYZ_bt2020, &to_bt2020);
++  graphene_matrix_multiply (&temp, &from_XYZ_bt2020,
++                            &matrices->to_linear_bt2020);
+ 
+   /* BT.2020 → XYZ D65 → XYZ → target */
+   graphene_matrix_multiply (&to_XYZ_bt2020, &from_D65, &temp);
+-  graphene_matrix_multiply (&temp, &from_XYZ, &from_bt2020);
+-
+-  if (!matrix_is_finite (&to_bt2020) ||
+-      !matrix_is_finite (&from_bt2020) ||
+-      round_trip_error (&to_bt2020, &from_bt2020) > LINEAR_BT2020_ROUND_TRIP_TOLERANCE ||
+-      round_trip_error (&from_bt2020, &to_bt2020) > LINEAR_BT2020_ROUND_TRIP_TOLERANCE)
++  graphene_matrix_multiply (&temp, &from_XYZ,
++                            &matrices->from_linear_bt2020);
++
++  /* RGB → XYZ → BT.2020, and back, without adaptation. */
++  graphene_matrix_multiply (&to_XYZ, &from_XYZ_bt2020,
++                            &matrices->absolute_to_linear_bt2020);
++  graphene_matrix_multiply (&to_XYZ_bt2020, &from_XYZ,
++                            &matrices->absolute_from_linear_bt2020);
++
++  matrices->XYZ_to_D65 = to_D65;
++  matrices->XYZ_to_linear_bt2020 = from_XYZ_bt2020;
++  matrices->linear_bt2020_to_XYZ = to_XYZ_bt2020;
++
++  if (!matrices_are_inverse (&matrices->to_linear_bt2020,
++                             &matrices->from_linear_bt2020) ||
++      (check_absolute &&
++       !matrices_are_inverse (&matrices->absolute_to_linear_bt2020,
++                              &matrices->absolute_from_linear_bt2020)))
+     {
+       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+                            "The colorimetry is too close to degenerate for an "
+@@ -760,10 +786,195 @@ clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *color
+       return FALSE;
+     }
+ 
++  return TRUE;
++}
++
++/*
++ * Computes the two matrices a ClutterColorTransform uses for a parametric
++ * color state with @colorimetry: RGB to XYZ, Bradford adaptation of the white
++ * point to D65, then XYZ to BT.2020 (@to_linear_bt2020, optional), and the
++ * reverse chain (@from_linear_bt2020, optional).
++ *
++ * Both directions are always computed and checked, so %TRUE means the
++ * colorimetry can be used both as a source and as a target. Producers of
++ * color states from untrusted input use this to decide whether the
++ * colorimetry is supported, so that acceptance and rendering share one
++ * definition.
++ *
++ * Returns %TRUE if both matrices are finite and are each other's inverse
++ * within LINEAR_BT2020_ROUND_TRIP_TOLERANCE; otherwise sets @error.
++ */
++gboolean
++clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *colorimetry,
++                                                graphene_matrix_t         *to_linear_bt2020,
++                                                graphene_matrix_t         *from_linear_bt2020,
++                                                GError                   **error)
++{
++  Bt2020Matrices matrices;
++
++  if (!compute_bt2020_matrices (colorimetry, FALSE, &matrices, error))
++    return FALSE;
++
+   if (to_linear_bt2020)
+-    *to_linear_bt2020 = to_bt2020;
++    *to_linear_bt2020 = matrices.to_linear_bt2020;
+   if (from_linear_bt2020)
+-    *from_linear_bt2020 = from_bt2020;
++    *from_linear_bt2020 = matrices.from_linear_bt2020;
++
++  return TRUE;
++}
++
++/*
++ * Computes the matrices converting linear BT.2020 to linear RGB in
++ * @colorimetry (@from_linear_bt2020, optional) and back
++ * (@to_linear_bt2020, optional) with absolute colorimetry: through CIE XYZ
++ * without adapting the white point, so that every color keeps its XYZ. Gamut
++ * compression works in this space.
++ *
++ * The colorimetry must pass clutter_colorimetry_get_linear_bt2020_matrices(),
++ * and the absolute pair must pass the same round-trip check. Only primaries
++ * that are used as a gamut target must pass it: the display target primaries
++ * of the colour device and of the blending states derived from them.
++ *
++ * Returns %TRUE on success; otherwise sets @error.
++ */
++gboolean
++clutter_colorimetry_get_absolute_bt2020_matrices (const ClutterColorimetry  *colorimetry,
++                                                  graphene_matrix_t         *from_linear_bt2020,
++                                                  graphene_matrix_t         *to_linear_bt2020,
++                                                  GError                   **error)
++{
++  Bt2020Matrices matrices;
++
++  if (!compute_bt2020_matrices (colorimetry, TRUE, &matrices, error))
++    return FALSE;
++
++  if (from_linear_bt2020)
++    *from_linear_bt2020 = matrices.absolute_from_linear_bt2020;
++  if (to_linear_bt2020)
++    *to_linear_bt2020 = matrices.absolute_to_linear_bt2020;
++
++  return TRUE;
++}
++
++/*
++ * Computes what is needed to follow a source's colors on their way to linear
++ * BT.2020 exactly as the renderer converts its pixels: the adapted
++ * @to_linear_bt2020 of clutter_colorimetry_get_linear_bt2020_matrices(),
++ * @XYZ_to_D65, the Bradford adaptation of the colorimetry's white point to
++ * D65 it contains, and the conversions between CIE XYZ and linear BT.2020 it
++ * ends with (@XYZ_to_linear_bt2020) and their inverse
++ * (@linear_bt2020_to_XYZ). A chromaticity declared for content in this
++ * encoding (its mastering primaries) reaches linear BT.2020 as its XYZ
++ * through @XYZ_to_D65 and @XYZ_to_linear_bt2020.
++ *
++ * Succeeds exactly when clutter_colorimetry_get_linear_bt2020_matrices()
++ * does.
++ */
++gboolean
++clutter_colorimetry_get_source_matrices (const ClutterColorimetry  *colorimetry,
++                                         graphene_matrix_t         *to_linear_bt2020,
++                                         graphene_matrix_t         *XYZ_to_D65,
++                                         graphene_matrix_t         *XYZ_to_linear_bt2020,
++                                         graphene_matrix_t         *linear_bt2020_to_XYZ,
++                                         GError                   **error)
++{
++  Bt2020Matrices matrices;
++
++  if (!compute_bt2020_matrices (colorimetry, FALSE, &matrices, error))
++    return FALSE;
++
++  *to_linear_bt2020 = matrices.to_linear_bt2020;
++  *XYZ_to_D65 = matrices.XYZ_to_D65;
++  *XYZ_to_linear_bt2020 = matrices.XYZ_to_linear_bt2020;
++  *linear_bt2020_to_XYZ = matrices.linear_bt2020_to_XYZ;
++
++  return TRUE;
++}
++
++/*
++ * The cross product of @b - @a and @p - @a in the xy plane: positive when the
++ * turn from @a to @b to @p is counterclockwise.
++ */
++static double
++chromaticity_cross (double a_x,
++                    double a_y,
++                    double b_x,
++                    double b_y,
++                    double p_x,
++                    double p_y)
++{
++  return (b_x - a_x) * (p_y - a_y) - (b_y - a_y) * (p_x - a_x);
++}
++
++/*
++ * Whether the chromaticity (@x, @y) lies within the triangle of the red,
++ * green and blue primaries of @outer, allowing each primary to be off by its
++ * @tolerance (a distance in CIE 1931 xy, see ClutterColorTargetVolume):
++ *
++ *  - for every side the point lies outside of, its distance from that
++ *    side's line is at most the larger tolerance of the side's two
++ *    primaries: a point of a true side is a convex combination of the two
++ *    true primaries, so it lies no further outside the declared side than
++ *    the larger of their displacements;
++ *  - a point outside both sides that meet at a primary, in that primary's
++ *    outer wedge, is moreover within the primary's tolerance of it. Without
++ *    this, the two side bands alone would accept points up to
++ *    tolerance / sin (angle / 2) from an acute primary, more than any
++ *    displacement of it could explain.
++ *
++ * Which side a point lies on is decided by the sign of a cross product of the
++ * coordinates, evaluated in double precision, so with tolerances of 0 the
++ * test is exact and a point on the boundary is inside. A chromaticity inside
++ * the triangle is a non-negative combination of the three primaries, so it
++ * has no negative component in linear RGB of @outer. @outer must not be
++ * collinear.
++ */
++gboolean
++clutter_primaries_contain_chromaticity (const ClutterPrimaries *outer,
++                                        const float             tolerance[3],
++                                        double                  x,
++                                        double                  y)
++{
++  const double vertices[3][2] = {
++    { outer->r_x, outer->r_y },
++    { outer->g_x, outer->g_y },
++    { outer->b_x, outer->b_y },
++  };
++  gboolean violated[3] = { FALSE, FALSE, FALSE };
++  double orientation;
++  int i;
++
++  orientation = chromaticity_cross (vertices[0][0], vertices[0][1],
++                                    vertices[1][0], vertices[1][1],
++                                    vertices[2][0], vertices[2][1]);
++
++  /* Side i runs from primary i to primary i + 1. */
++  for (i = 0; i < 3; i++)
++    {
++      const double *a = vertices[i];
++      const double *b = vertices[(i + 1) % 3];
++      double cross = chromaticity_cross (a[0], a[1], b[0], b[1], x, y);
++
++      if ((orientation > 0.0 && cross < 0.0) ||
++          (orientation < 0.0 && cross > 0.0))
++        {
++          double length = hypot (b[0] - a[0], b[1] - a[1]);
++          double side_tolerance = MAX (tolerance[i], tolerance[(i + 1) % 3]);
++
++          if (fabs (cross) / length > side_tolerance)
++            return FALSE;
++
++          violated[i] = TRUE;
++        }
++    }
++
++  /* Primary i is where sides i - 1 and i meet. */
++  for (i = 0; i < 3; i++)
++    {
++      if (violated[i] && violated[(i + 2) % 3] &&
++          hypot (x - vertices[i][0], y - vertices[i][1]) > tolerance[i])
++        return FALSE;
++    }
+ 
+   return TRUE;
+ }

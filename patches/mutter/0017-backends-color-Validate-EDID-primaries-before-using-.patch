@@ -1,0 +1,425 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 16:56:23 -0400
+Subject: [PATCH] backends/color: Validate EDID primaries before using them for
+ native SDR
+
+In the native SDR color mode the output color state takes its
+colorimetry from the EDID's default color primaries, unchecked. Nothing
+guarantees those form a color space: zero, collinear or otherwise
+degenerate chromaticities (or a white point with y = 0) produced a color
+state for which ClutterColorTransform cannot build its matrices, and
+until now that rendered with an identity matrix in place of the
+display's gamut. This was the remaining producer of parametric color
+states that bypassed validation.
+
+Add meta_color_colorimetry_from_edid_primaries(), which accepts the
+EDID's primaries only if they are declared, can be published exactly
+(meta_color_primaries_to_fixed()) and pass
+clutter_colorimetry_get_linear_bt2020_matrices(), the function the color
+transform itself uses. When they are unusable, the native SDR mode keeps
+the colorimetry of the default mode (sRGB) and the EDID-derived EOTF,
+and logs a warning naming the connector once per color device. A
+missing EDID now takes the same path instead of being dereferenced.
+
+The function is exported for tests.
+
+Tests:
+ - /native-hdr/sdr-native-edid-primaries: usable primaries are taken
+   as-is; collinear primaries, white y = 0, a white point outside the
+   primaries, undeclared primaries and a missing EDID are rejected and
+   leave the colorimetry untouched.
+ - /wayland/sdr-native/unusable-edid-primaries: with collinear EDID
+   primaries in native SDR mode, the output color state uses sRGB with
+   the EDID's gamma 2.2 and the warning is logged exactly once across
+   repeated updates. It rewrites the fixture output, so it runs as a
+   separate invocation.
+---
+ src/backends/meta-color-device.c          | 118 ++++++++++++++++++----
+ src/backends/meta-color-device.h          |   5 +
+ src/tests/meson.build                     |   2 +
+ src/tests/native-hdr-tests.c              |  80 +++++++++++++++
+ src/tests/wayland-color-management-test.c |  53 ++++++++++
+ 5 files changed, 240 insertions(+), 18 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 169ccc6ac..c22253495 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -32,6 +32,7 @@
+ #include "backends/meta-color-store.h"
+ #include "backends/meta-crtc.h"
+ #include "backends/meta-monitor-private.h"
++#include "clutter/clutter-color-utils-private.h"
+ #include "core/meta-debug-control-private.h"
+ 
+ #define EFI_PANEL_COLOR_INFO_PATH \
+@@ -93,6 +94,8 @@ struct _MetaColorDevice
+   float reference_luminance_factor;
+ 
+   gboolean is_calibrating;
++
++  gboolean warned_unusable_edid_primaries;
+ };
+ 
+ G_DEFINE_TYPE (MetaColorDevice, meta_color_device,
+@@ -696,15 +699,82 @@ on_manager_ready (MetaColorManager *color_manager,
+   create_cd_device (color_device);
+ }
+ 
++/*
++ * The EDID's default color primaries describe the display's native SDR
++ * gamut, but nothing guarantees they form a usable color space. They are
++ * accepted only if they can be published exactly and the renderer can build
++ * both directions of its color transform from them, using the same function
++ * that the transform uses.
++ */
++gboolean
++meta_color_colorimetry_from_edid_primaries (const MetaEdidInfo  *edid_info,
++                                            ClutterColorimetry  *colorimetry,
++                                            GError             **error)
++{
++  const struct di_color_primaries *edid_primaries;
++  ClutterColorimetry candidate;
++  ClutterPrimaries primaries;
++  int32_t coordinates[8];
++
++  if (!edid_info)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
++                           "No EDID");
++      return FALSE;
++    }
++
++  edid_primaries = &edid_info->default_color_primaries;
++  if (!edid_primaries->has_primaries ||
++      !edid_primaries->has_default_white_point)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
++                           "The EDID does not declare color primaries and a "
++                           "default white point");
++      return FALSE;
++    }
++
++  primaries = (ClutterPrimaries) {
++    .r_x = edid_primaries->primary[0].x,
++    .r_y = edid_primaries->primary[0].y,
++    .g_x = edid_primaries->primary[1].x,
++    .g_y = edid_primaries->primary[1].y,
++    .b_x = edid_primaries->primary[2].x,
++    .b_y = edid_primaries->primary[2].y,
++    .w_x = edid_primaries->default_white.x,
++    .w_y = edid_primaries->default_white.y,
++  };
++
++  if (!meta_color_primaries_to_fixed (&primaries, coordinates))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The EDID color primaries cannot be represented");
++      return FALSE;
++    }
++
++  candidate = (ClutterColorimetry) {
++    .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++    .primaries = &primaries,
++  };
++  if (!clutter_colorimetry_get_linear_bt2020_matrices (&candidate,
++                                                       NULL, NULL,
++                                                       error))
++    return FALSE;
++
++  colorimetry->type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES;
++  colorimetry->primaries = g_memdup2 (&primaries, sizeof (primaries));
++  return TRUE;
++}
++
+ static void
+-get_color_metadata_from_monitor (MetaMonitor        *monitor,
++get_color_metadata_from_monitor (MetaColorDevice    *color_device,
+                                  ClutterColorimetry *colorimetry,
+                                  ClutterEOTF        *eotf)
+ {
++  MetaMonitor *monitor = color_device->monitor;
+   MetaOutput *output;
+   const MetaOutputInfo *output_info;
+   MetaEdidInfo *edid_info;
+-  const struct di_color_primaries *primaries;
++  g_autoptr (GError) error = NULL;
+ 
+   switch (meta_monitor_get_color_mode (monitor))
+     {
+@@ -724,28 +794,41 @@ get_color_metadata_from_monitor (MetaMonitor        *monitor,
+       output = meta_monitor_get_main_output (monitor);
+       output_info = meta_output_get_info (output);
+       edid_info = output_info->edid_info;
+-      primaries = &edid_info->default_color_primaries;
+-      colorimetry->type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES;
+-      colorimetry->primaries = g_new (ClutterPrimaries, 1);
+-      colorimetry->primaries->r_x = primaries->primary[0].x;
+-      colorimetry->primaries->r_y = primaries->primary[0].y;
+-      colorimetry->primaries->g_x = primaries->primary[1].x;
+-      colorimetry->primaries->g_y = primaries->primary[1].y;
+-      colorimetry->primaries->b_x = primaries->primary[2].x;
+-      colorimetry->primaries->b_y = primaries->primary[2].y;
+-      colorimetry->primaries->w_x = primaries->default_white.x;
+-      colorimetry->primaries->w_y = primaries->default_white.y;
+-
+-      if (G_APPROX_VALUE (edid_info->default_gamma, 2.2f, 0.0001f))
++
++      if (!meta_color_colorimetry_from_edid_primaries (edid_info,
++                                                       colorimetry,
++                                                       &error))
++        {
++          /* Without usable primaries, the native mode keeps the colorimetry
++           * of the default mode rather than rendering with a transform that
++           * does not exist. */
++          if (!color_device->warned_unusable_edid_primaries)
++            {
++              g_warning ("Ignoring unusable EDID color primaries of %s: %s",
++                         meta_monitor_get_connector (monitor),
++                         error->message);
++              color_device->warned_unusable_edid_primaries = TRUE;
++            }
++
++          colorimetry->type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE;
++          colorimetry->colorspace = CLUTTER_COLORSPACE_SRGB;
++        }
++
++      if (edid_info && G_APPROX_VALUE (edid_info->default_gamma, 2.2f, 0.0001f))
+         {
+           eotf->type = CLUTTER_EOTF_TYPE_NAMED;
+           eotf->tf_name = CLUTTER_TRANSFER_FUNCTION_GAMMA22;
+         }
+-      else
++      else if (edid_info)
+         {
+           eotf->type = CLUTTER_EOTF_TYPE_GAMMA;
+           eotf->gamma_exp = (float) edid_info->default_gamma;
+         }
++      else
++        {
++          eotf->type = CLUTTER_EOTF_TYPE_NAMED;
++          eotf->tf_name = CLUTTER_TRANSFER_FUNCTION_GAMMA22;
++        }
+ 
+       return;
+     }
+@@ -1021,7 +1104,6 @@ update_target_volume (MetaColorDevice *color_device)
+ static UpdateResult
+ update_color_state (MetaColorDevice *color_device)
+ {
+-  MetaMonitor *monitor = color_device->monitor;
+   MetaBackend *backend =
+     meta_color_manager_get_backend (color_device->color_manager);
+   MetaContext *context = meta_backend_get_context (backend);
+@@ -1033,7 +1115,7 @@ update_color_state (MetaColorDevice *color_device)
+   ClutterLuminance luminance;
+   UpdateResult result = 0;
+ 
+-  get_color_metadata_from_monitor (monitor, &colorimetry, &eotf);
++  get_color_metadata_from_monitor (color_device, &colorimetry, &eotf);
+ 
+   if (meta_debug_control_is_hdr_forced (debug_control))
+     {
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 63d620ba5..7d58b1e0a 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -68,6 +68,11 @@ META_EXPORT_TEST
+ gboolean meta_color_primaries_to_fixed (const ClutterPrimaries *primaries,
+                                         int32_t                 coordinates[8]);
+ 
++META_EXPORT_TEST
++gboolean meta_color_colorimetry_from_edid_primaries (const MetaEdidInfo  *edid_info,
++                                                     ClutterColorimetry  *colorimetry,
++                                                     GError             **error);
++
+ META_EXPORT_TEST
+ const MetaColorTargetPrimaries *
+ meta_color_device_get_target_primaries (MetaColorDevice *color_device);
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index c8c5607a6..03fe6cc7d 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -949,11 +949,13 @@ wayland_test_cases = [
+     ],
+     # Target-volume cases rewrite the fixture output and the v2 cases dispose
+     # the shared Wayland colour manager, so each runs in its own invocation.
++    # The SDR-native case rewrites the fixture output's EDID and colour mode.
+     'separate_cases': [
+       '/wayland/target-luminance/v1',
+       '/wayland/target-luminance/v2',
+       '/wayland/target-primaries/v1',
+       '/wayland/target-primaries/v2',
++      '/wayland/sdr-native/unusable-edid-primaries',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index 29e5a6347..f5b6cf11f 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -917,6 +917,85 @@ test_chromaticity_fixed_point (void)
+     g_assert_cmpint (fallback.coordinates[j], ==, coordinates[j]);
+ }
+ 
++static void
++test_sdr_native_edid_primaries (void)
++{
++  const struct di_color_primaries srgb_like = {
++    .has_primaries = TRUE,
++    .has_default_white_point = TRUE,
++    .primary = { { 0.640f, 0.330f }, { 0.300f, 0.600f }, { 0.150f, 0.060f } },
++    .default_white = { 0.3127f, 0.3290f },
++  };
++  MetaEdidInfo edid = { .default_color_primaries = srgb_like };
++  ClutterColorimetry untouched = {
++    .type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE,
++    .colorspace = CLUTTER_COLORSPACE_P3,
++  };
++  ClutterColorimetry colorimetry;
++  g_autoptr (GError) error = NULL;
++
++  /* Usable primaries are taken as they are. */
++  colorimetry = untouched;
++  g_assert_true (meta_color_colorimetry_from_edid_primaries (&edid,
++                                                             &colorimetry,
++                                                             &error));
++  g_assert_no_error (error);
++  g_assert_cmpint (colorimetry.type, ==, CLUTTER_COLORIMETRY_TYPE_PRIMARIES);
++  g_assert_cmpfloat (colorimetry.primaries->g_y, ==, 0.600f);
++  g_assert_cmpfloat (colorimetry.primaries->w_x, ==, 0.3127f);
++  clutter_colorimetry_clear (&colorimetry);
++
++  /* Collinear primaries: there is no RGB to XYZ matrix. */
++  edid.default_color_primaries.primary[0] = (struct di_chromaticity_cie1931) { 0.6f, 0.6f };
++  edid.default_color_primaries.primary[1] = (struct di_chromaticity_cie1931) { 0.3f, 0.3f };
++  edid.default_color_primaries.primary[2] = (struct di_chromaticity_cie1931) { 0.1f, 0.1f };
++  colorimetry = untouched;
++  g_assert_false (meta_color_colorimetry_from_edid_primaries (&edid,
++                                                              &colorimetry,
++                                                              &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_assert_cmpint (colorimetry.type, ==, untouched.type);
++  g_assert_cmpint (colorimetry.colorspace, ==, untouched.colorspace);
++  g_clear_error (&error);
++
++  /* A white point with y = 0 has no XYZ. */
++  edid.default_color_primaries = srgb_like;
++  edid.default_color_primaries.default_white.y = 0.0f;
++  colorimetry = untouched;
++  g_assert_false (meta_color_colorimetry_from_edid_primaries (&edid,
++                                                              &colorimetry,
++                                                              &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_assert_cmpint (colorimetry.type, ==, untouched.type);
++  g_clear_error (&error);
++
++  /* A white point outside the primaries' triangle is not physical. */
++  edid.default_color_primaries = srgb_like;
++  edid.default_color_primaries.default_white =
++    (struct di_chromaticity_cie1931) { 0.7f, 0.25f };
++  colorimetry = untouched;
++  g_assert_false (meta_color_colorimetry_from_edid_primaries (&edid,
++                                                              &colorimetry,
++                                                              &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_assert_cmpint (colorimetry.type, ==, untouched.type);
++  g_clear_error (&error);
++
++  /* Undeclared primaries and a missing EDID are not usable either. */
++  edid.default_color_primaries = srgb_like;
++  edid.default_color_primaries.has_primaries = FALSE;
++  g_assert_false (meta_color_colorimetry_from_edid_primaries (&edid,
++                                                              &colorimetry,
++                                                              &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND);
++  g_clear_error (&error);
++  g_assert_false (meta_color_colorimetry_from_edid_primaries (NULL,
++                                                              &colorimetry,
++                                                              &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND);
++  g_assert_cmpint (colorimetry.type, ==, untouched.type);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -934,5 +1013,6 @@ main (int    argc,
+   g_test_add_func ("/native-hdr/physical-chromaticities", test_physical_chromaticities);
+   g_test_add_func ("/native-hdr/target-primaries-policy", test_target_primaries_policy);
+   g_test_add_func ("/native-hdr/chromaticity-fixed-point", test_chromaticity_fixed_point);
++  g_test_add_func ("/native-hdr/sdr-native-edid-primaries", test_sdr_native_edid_primaries);
+   return g_test_run ();
+ }
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index a66efa64b..3ea3a73d9 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -488,6 +488,57 @@ target_primaries (gconstpointer data)
+   g_signal_emit_by_name (monitor_manager, "monitors-changing");
+ }
+ 
++static void
++sdr_native_unusable_edid_primaries (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  MetaEdidInfo *fixture_edid_info = info->edid_info;
++  ClutterColorState *color_state;
++  const ClutterColorimetry *colorimetry;
++  const ClutterEOTF *eotf;
++
++  /* Collinear default primaries: the native SDR mode has no usable gamut. */
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->default_gamma = 2.2;
++  info->edid_info->default_color_primaries = (struct di_color_primaries) {
++    .has_primaries = TRUE,
++    .has_default_white_point = TRUE,
++    .primary = { { 0.6f, 0.6f }, { 0.3f, 0.3f }, { 0.1f, 0.1f } },
++    .default_white = { 0.3127f, 0.3290f },
++  };
++  set_test_color_mode (output, META_COLOR_MODE_SDR_NATIVE);
++
++  g_test_expect_message ("libmutter", G_LOG_LEVEL_WARNING,
++                         "Ignoring unusable EDID color primaries of *");
++  meta_color_device_update (device);
++  g_test_assert_expected_messages ();
++
++  /* The colorimetry of the default mode is used instead; the EOTF still
++   * follows the EDID. */
++  color_state = meta_color_device_get_color_state (device);
++  g_assert_true (CLUTTER_IS_COLOR_STATE_PARAMS (color_state));
++  colorimetry =
++    clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_COLORSPACE);
++  g_assert_cmpuint (colorimetry->colorspace, ==, CLUTTER_COLORSPACE_SRGB);
++  eotf = clutter_color_state_params_get_eotf (CLUTTER_COLOR_STATE_PARAMS (color_state));
++  g_assert_cmpuint (eotf->type, ==, CLUTTER_EOTF_TYPE_NAMED);
++  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++
++  /* Logged once per device: a further update is silent. */
++  meta_color_device_update (device);
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = fixture_edid_info;
++  meta_color_device_update (device);
++}
++
+ static void
+ on_before_tests (void)
+ {
+@@ -516,6 +567,8 @@ init_tests (void)
+   g_test_add_data_func ("/wayland/target-luminance/v2", GINT_TO_POINTER (2), target_luminance);
+   g_test_add_data_func ("/wayland/target-primaries/v1", GINT_TO_POINTER (1), target_primaries);
+   g_test_add_data_func ("/wayland/target-primaries/v2", GINT_TO_POINTER (2), target_primaries);
++  g_test_add_func ("/wayland/sdr-native/unusable-edid-primaries",
++                   sdr_native_unusable_edid_primaries);
+ }
+ 
+ int

@@ -48,3 +48,33 @@ Software work can continue, but physical accuracy needs a suitable sensor
 with an appropriate OLED correction. Record brightness, power state, refresh
 rate, ambient light, warm-up, patch size and timing. Keep sustained luminance,
 small highlights, white point, gamut, near-black response and drift separate.
+
+## Second test machine (`lab6`)
+
+Added on 2026-10-11 to test general availability on hardware unlike the ROG.
+Observed read-only with [the inspector](DISPLAY_DIAGNOSTICS.md); nothing was
+changed on it. The EDID values are firmware declarations, not measurements.
+
+| Item | Observed value |
+|---|---|
+| Laptop | Lenovo ThinkPad X1 Extreme, first generation (20MF) |
+| Panel | AUO B156ZAN03.2, 3840×2160 at 60 Hz |
+| Internal route | Intel Coffee Lake UHD 630 (i915), eDP-1 |
+| Other GPU | NVIDIA GTX 1050 Ti Mobile; drives the external HDMI and DisplayPort outputs |
+| Software | Ubuntu 26.10, stock `libmutter-51-0` 51.0-1ubuntu3 and `libdisplay-info3` 0.3.0-1 |
+| EDID | 128-byte base block, EDID 1.4, 10 bpc DisplayPort, no extensions (no CTA or DisplayID) |
+| Base EDID primaries | R 0.6445, 0.3359 · G 0.3105, 0.6064 · B 0.1523, 0.0488 · W 0.3135, 0.3291; gamma 2.2 |
+| GNOME colour modes | Default and native SDR (no BT.2100) |
+
+EDID SHA-256:
+`88ad8e91f284265fa6bb9b8228d5d6663d0f5a94914a25f31e2b88e766fa3625`.
+
+The panel declares no HDR capability, so its built-in screen cannot use
+BT.2100 on any stack. Independently, the i915 driver attaches
+`HDR_OUTPUT_METADATA` to a port-A eDP connector only from display version 11
+(`intel_dp_has_gamut_metadata_dip()` in `intel_dp.c`). Coffee Lake is
+display version 9, so this generation could not drive internal-panel HDR
+even with an HDR panel. The machine tests the native SDR target path
+([display target sources](DISPLAY_TARGET_SOURCES.md)) on Intel graphics and
+a stock 26.10 baseline. External HDR monitors on its NVIDIA outputs would
+test the CTA path.

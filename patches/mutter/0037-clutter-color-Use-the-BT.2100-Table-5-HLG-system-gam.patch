@@ -1,0 +1,156 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:12:16 -0400
+Subject: [PATCH] clutter/color: Use the BT.2100 Table 5 HLG system gamma
+ within its range
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Rec. ITU-R BT.2100-2, Table 5, gives the HLG system gamma as
+1.2 + 0.42 log10 (Lw / 1000) for nominal peak luminances from 400 to
+2000 cd/m². The extended formula 1.2 * 1.111^log2 (Lw / 1000) of Report
+ITU-R BT.2390 applies only outside that range, but was used for every
+Lw, so a 400 or 2000 cd/m² HLG description decoded with a system gamma
+off by 0.011 or 0.007.
+
+Use Table 5 inside [400, 2000] inclusive and the extended formula
+outside, in the one function every HLG state and pipeline is validated
+and built with. The two meet closely but not exactly at the ends of the
+range; that step is documented.
+
+The test reference now follows the standard's formulas, written out
+independently, and the HLG cases add 300 and 4000 cd/m² peaks outside
+the Table 5 range; the parameter test checks the gamma on both sides of
+each end.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-utils.c | 28 ++++++++++++++---
+ src/tests/clutter/conform/color-hdr.c | 45 ++++++++++++++++++++++++++-
+ 2 files changed, 68 insertions(+), 5 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
+index 480b5c912..cb86532bb 100644
+--- a/clutter/clutter/clutter-color-utils.c
++++ b/clutter/clutter/clutter-color-utils.c
+@@ -979,13 +979,33 @@ clutter_primaries_contain_chromaticity (const ClutterPrimaries *outer,
+   return TRUE;
+ }
+ 
++/*
++ * The HLG system gamma for the nominal peak luminance @lw: Rec. ITU-R
++ * BT.2100-2, Table 5, within the range it is given for, 400 to 2000 cd/m²
++ * inclusive, and the extended formula of Report ITU-R BT.2390 outside it:
++ *
++ *   gamma = 1.2 + 0.42 * log10 (Lw / 1000)     400 <= Lw <= 2000
++ *   gamma = 1.2 * 1.111^log2 (Lw / 1000)       otherwise
++ *
++ * The two agree at 1000 cd/m² only. They meet closely but not exactly at the
++ * ends of the range: at 400 cd/m² Table 5 gives 1.0329 and the extended
++ * formula 1.0441, at 2000 cd/m² 1.3264 and 1.3332, so the system gamma
++ * steps by about 0.011 and 0.007 there.
++ */
++static double
++hlg_system_gamma (double lw)
++{
++  if (lw >= 400.0 && lw <= 2000.0)
++    return 1.2 + 0.42 * log10 (lw / 1000.0);
++
++  return 1.2 * pow (1.111, log2 (lw / 1000.0));
++}
++
+ /*
+  * Computes the Rec. ITU-R BT.2100-2 HLG system gamma and black level lift for
+  * the nominal peak luminance @max_lum (Lw) and black level @min_lum (Lb),
+- * using the extended system gamma formula of Report ITU-R BT.2390 for every
+- * Lw:
++ * with the system gamma of hlg_system_gamma():
+  *
+- *   gamma = 1.2 * 1.111^log2 (Lw / 1000)
+  *   beta = sqrt (3 * (Lb / Lw)^(1 / gamma))
+  *
+  * The black level lift maps black into the square-root segment of the
+@@ -1014,7 +1034,7 @@ clutter_luminance_get_hlg_parameters (float    min_lum,
+       return FALSE;
+     }
+ 
+-  system_gamma = 1.2 * pow (1.111, log2 ((double) max_lum / 1000.0));
++  system_gamma = hlg_system_gamma (max_lum);
+   black_lift = sqrt (3.0 * pow ((double) min_lum / (double) max_lum,
+                                 1.0 / system_gamma));
+ 
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 7983f56da..5f0d21b08 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -46,6 +46,11 @@ static const HlgCase hlg_cases[] = {
+     0.005f, 2000.0f, 203.0f },
+   { "BT.709, 400 cd/m²", CLUTTER_COLORSPACE_SRGB, bt709_coefficients,
+     0.01f, 400.0f, 100.0f },
++  /* Outside the range of BT.2100-2 Table 5: the extended formula. */
++  { "BT.709, 300 cd/m²", CLUTTER_COLORSPACE_SRGB, bt709_coefficients,
++    0.01f, 300.0f, 100.0f },
++  { "BT.2020, 4000 cd/m²", CLUTTER_COLORSPACE_BT2020, bt2020_coefficients,
++    0.005f, 4000.0f, 203.0f },
+ };
+ 
+ /* Signal levels 0%, 50%, 75% and 100%, neutral and mixed. */
+@@ -69,10 +74,21 @@ reference_hlg_inv_oetf (double signal)
+     return (exp ((signal - REF_HLG_C) / REF_HLG_A) + REF_HLG_B) / 12.0;
+ }
+ 
++/*
++ * The HLG system gamma: Rec. ITU-R BT.2100-2, Table 5, note 5f, for a
++ * nominal peak luminance from 400 to 2000 cd/m²; outside that range the
++ * extended model of Report ITU-R BT.2390, gamma = 1.2 * kappa^(log2 (Lw /
++ * 1000)) with kappa = 1.111.
++ */
+ static double
+ reference_hlg_gamma (double lw)
+ {
+-  return 1.2 * pow (1.111, log2 (lw / 1000.0));
++  const double kappa = 1.111;
++
++  if (lw >= 400.0 && lw <= 2000.0)
++    return 1.2 + 0.42 * log (lw / 1000.0) / log (10.0);
++
++  return 1.2 * exp (log (kappa) * log (lw / 1000.0) / log (2.0));
+ }
+ 
+ /* BT.2100-2 HLG EOTF, display light normalized to Lw. */
+@@ -347,6 +363,33 @@ hlg_parameters_validity (void)
+                                                        &gamma, &beta, NULL));
+   g_assert_cmpfloat (beta, ==, 0.0f);
+ 
++  /* BT.2100-2 Table 5 within 400 to 2000 cd/m², ends included; the extended
++   * formula outside. At the ends the two differ, by about 0.011 at 400 and
++   * 0.007 at 2000 cd/m². */
++  {
++    static const double peaks[] = {
++      100.0, 300.0, 399.0, 400.0, 600.0, 1000.0, 1500.0, 2000.0, 2001.0,
++      4000.0, 10000.0,
++    };
++    int i;
++
++    for (i = 0; i < G_N_ELEMENTS (peaks); i++)
++      {
++        g_assert_true (clutter_luminance_get_hlg_parameters (0.0f,
++                                                             (float) peaks[i],
++                                                             &gamma, NULL,
++                                                             NULL));
++        g_assert_cmpfloat_with_epsilon (gamma, reference_hlg_gamma (peaks[i]),
++                                        1e-6);
++      }
++
++    g_assert_cmpfloat_with_epsilon (reference_hlg_gamma (400.0), 1.03287, 1e-5);
++    g_assert_cmpfloat_with_epsilon (reference_hlg_gamma (2000.0), 1.32643, 1e-5);
++    g_assert_cmpfloat_with_epsilon (reference_hlg_gamma (399.0), 1.04372, 1e-5);
++    g_assert_cmpfloat_with_epsilon (reference_hlg_gamma (2001.0), 1.33330, 1e-5);
++    g_assert_cmpfloat_with_epsilon (reference_hlg_gamma (1000.0), 1.2, 1e-12);
++  }
++
+   /* beta = sqrt (3 * 0.3^(1 / 1.2)) = 1.05 */
+   g_assert_false (clutter_luminance_get_hlg_parameters (300.0f, 1000.0f,
+                                                         NULL, NULL, &error));

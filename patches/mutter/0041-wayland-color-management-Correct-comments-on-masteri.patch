@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:17:50 -0400
+Subject: [PATCH] wayland/color-management: Correct comments on mastering
+ primaries
+
+Two comments still said that target volumes are used only for their
+peak luminance and that no gamut is mapped with mastering primaries.
+Since gamut compression was added, declared mastering primaries set the
+limits of gamut compression toward an output's declared target gamut.
+Say so, and why an extended target volume remains safe to support as
+declared.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/wayland/meta-wayland-color-management.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index e7d34e7f1..1b7d364de 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -1537,10 +1537,15 @@ creator_params_destructor (struct wl_resource *resource)
+  *
+  * Mastering display primaries are validated the same way. They may lie
+  * outside the primary color volume (extended_target_volume is advertised):
+- * they are kept and take part in identity, but no gamut is mapped with them,
+- * so a target beyond the primary volume cannot cause artifacts. Likewise the
+- * mastering luminance may exceed the primary volume's range; only the smaller
+- * of the two bounds the content.
++ * they are kept and take part in identity, and when the content can exceed
++ * an output's declared target gamut they set the limits of the gamut
++ * compression toward it (see clutter_color_transform_requires_gamut_compression()).
++ * Content in a bounded encoding is compressed only if its encoding
++ * primaries exceed the target too, and limits from a mastering gamut wider
++ * than the encoding only move colors further inside the target, so a
++ * target beyond the primary volume cannot cause artifacts. Likewise the
++ * mastering luminance may exceed the primary volume's range; only the
++ * smaller of the two bounds the content.
+  */
+ static gboolean
+ creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
+@@ -2389,8 +2394,9 @@ color_manager_send_supported_events (struct wl_resource *resource)
+                                               WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES);
+   wp_color_manager_v1_send_supported_feature (resource,
+                                               WP_COLOR_MANAGER_V1_FEATURE_SET_MASTERING_DISPLAY_PRIMARIES);
+-  /* Target volumes are only used for their peak luminance, never to map
+-   * gamut, so one exceeding the primary volume is supported as declared. */
++  /* Target volumes give the content's peak luminance and, through
++   * mastering primaries, the limits of gamut compression; both handle a
++   * volume exceeding the primary volume, so one is supported as declared. */
+   wp_color_manager_v1_send_supported_feature (resource,
+                                               WP_COLOR_MANAGER_V1_FEATURE_EXTENDED_TARGET_VOLUME);
+   wp_color_manager_v1_send_supported_tf_named (resource,

@@ -2,8 +2,10 @@
 
 **Updated:** 2026-10-11 (America/New_York) · **State:** hdr9 library and
 `nativehdr8` compositor installed on 2026-10-11; the owner's HDR session runs
-on it and the owner accepted the picture. Full Dolby Vision and measured image-quality acceptance remain
-open.
+on it and the owner accepted the picture. The tenth batch (`nativehdr9`,
+general display targets, and the upstream-facing Mutter port) is reviewed
+and packaged, not yet installed. Full Dolby Vision and measured
+image-quality acceptance remain open.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
 distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
@@ -26,6 +28,43 @@ BT.2020/PQ encoding, with no colour warnings in the session journal. The owner t
 checked the picture and accepted it ("the picture looks awesome"); that is
 a subjective check, not an optical measurement. At the owner's request, the old agent build
 containers from earlier batches were removed.
+
+## Tenth batch — general availability: targets and upstream port
+
+Until now only an internal panel whose DisplayID declares native RGB
+BT.2020 PQ (the ROG route) had a declared colour target; every other output
+used the encoding fallback, so nothing was tone-mapped or gamut-compressed.
+[Display target sources](DISPLAY_TARGET_SOURCES.md) widens target selection
+in the colour device. In BT.2100, the peak and black come from DisplayID
+physical luminance (10% window peak required), else from CTA-861 HDR static
+metadata. A peak at or below the encoding's nominal reference white is not
+a target. The BT.2100 gamut still comes only from DisplayID. In the native
+SDR mode, the base EDID gamut (the encoding's own) is the target, so wider
+content is compressed rather than clipped. Gamut containment is now judged
+after adapting the target to D65, in the frame the pixels use. Otherwise a
+native SDR output whose white is not D65 judged its own encoding out of
+gamut.
+
+The whole colour programme was also ported to upstream Mutter main
+(`d82671c`) as the upstream-facing series (`patches/mutter/`, 49 patches):
+43 ported commits, debian excluded, with messages in upstream form, plus
+the six target commits. Every commit builds with warnings as errors against
+the upstream-facing libdisplay-info series. That series needed no rebase:
+upstream libdisplay-info is still at its base. Neither series has been
+submitted upstream. The Ubuntu series gained the same six commits as
+`nativehdr9` (Mutter patches 0053–0061).
+
+An adversarial Fable review found the white-point containment defect (by
+executing a probe), the low-peak risk and the base-EDID-gamut-in-HDR risk,
+plus smaller items. All were fixed or decided, and a Fable re-review found
+no remaining code defects ([findings](REVIEW.md#tenth-batch--general-targets-and-upstream-port)).
+The colour test set (23 invocations including two new compositor cases) passed on
+the upstream-facing head ([receipt](../evidence/general-targets-fast-lane.json)).
+
+A second test machine, `lab6` (ThinkPad X1 Extreme, Intel UHD 630, an SDR
+panel with base EDID only), was inspected read-only
+([hardware](HARDWARE.md#second-test-machine-lab6)). It cannot use BT.2100 on
+its built-in screen. It tests the native SDR target path on Intel graphics.
 
 ## Ninth batch — independent review and fixes
 
@@ -174,7 +213,8 @@ Mutter and matching amd64/i386 library packaging.
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
 | Physical luminance library | hdr9 (hdr8 luminance and gamut API) installed for amd64 and i386 | Wider hardware and upstream acceptance |
-| Compositor feedback | nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) installed | Optical verification needs an instrument |
+| Compositor feedback | nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) installed; nativehdr9 (targets on CTA HDR outputs and native SDR panels) packaged | Install and check nativehdr9 on lab5 and lab6; optical verification needs an instrument |
+| Upstream | Upstream-facing Mutter series (49) and libdisplay-info series (10) current on upstream main | Owner decides submission (merge requests under the owner's identity) |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; optical verification (the owner's visual check passed) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
@@ -231,7 +271,11 @@ These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-Two steps wait on the owner, and one comparison is optional. The KMS
+`nativehdr9` is ready to install, in a coordinated window, on `lab6` (stock
+26.10, native SDR path) and then `lab5`. An external HDR monitor on `lab6`
+would test the CTA path. Submitting the upstream-facing series is the
+owner's decision. Two further steps wait on the owner, and one comparison
+is optional. The KMS
 metadata question can be settled by an on-screen comparison if the owner
 wants it; the owner's subjective check of the current picture passed. The Dolby processor's next
 stage waits for the owner's scope confirmation and, before it can say
@@ -278,3 +322,19 @@ Recorded for review; each can be revisited.
 - KMS static metadata keeps zero ("unknown") luminance fields; whether to
   declare the target is decided by an on-screen comparison on the
   owner's HDR desktop session.
+- Display targets use CTA-861 desired content luminance as the BT.2100 peak
+  where DisplayID declares none. Its own provenance is `cta-declared`. It
+  is a content preference, not a measurement, but most HDR displays declare
+  no other peak.
+- A target peak at or below the encoding's nominal reference white
+  (203 cd/m² for PQ) is no target, so a bogus low peak cannot dim SDR. The
+  rule uses the nominal value, not the brightness-scaled one, so a target
+  does not appear and disappear with the brightness setting.
+- Base EDID primaries are not a BT.2100 gamut target. Many HDR displays
+  declare their SDR gamut there, so compressing toward it risks visible
+  desaturation without a measurement. They are the native SDR target only.
+- The upstream-facing Mutter series is a port of the reviewed Ubuntu series
+  to upstream main, with commit messages rewritten to upstream rules
+  (authorship, trailers and inherited validation claims preserved). A
+  separate test machine, `lab6`, was added for general-availability
+  checks; it stays a stock Ubuntu 26.10 baseline and is not used for builds.

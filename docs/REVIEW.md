@@ -321,6 +321,46 @@ Process note for batches six to eight: by the coordinator's record,
 receipts did not record it.
 Receipts from the ninth batch on record it.
 
+## Tenth batch — general targets and upstream port
+
+An adversarial Fable review covered the upstream-facing Mutter port, the
+[general display targets](DISPLAY_TARGET_SOURCES.md) and the Ubuntu
+`nativehdr9` port. It ran a scratch probe against the built tree. A Fable
+re-review then checked the fixes and ran the Wayland colour cases at the new
+head.
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| Gamut containment compared adapted source primaries with an unadapted target triangle. In native SDR, with the common EDID white (0.3135, 0.3291), the output's own encoding and every client following the preferred description were compressed and refused direct scanout (probe-confirmed) | Should-fix | The display target is adapted from its encoding's white to D65 before containment, limits and matrices (new commit "Judge gamut containment in the frame of the pixels"); tests fail with it reverted. BT.2100 targets move by under 3e-5 xy, inside their tolerance |
+| A CTA peak below the display reference white highlight-mapped and dimmed all SDR content (probe-confirmed) | Should-fix | A target peak must exceed the encoding's nominal reference white for every declared source; failing sources fall through |
+| Base EDID primaries as the BT.2100 gamut target risk desaturating wide-gamut content on displays that declare their SDR gamut there; the display may also tone-map on top, since KMS metadata stays unknown | Should-fix (design) | Base EDID is the native SDR gamut source only; BT.2100 keeps DisplayID-only gamut. Double mapping recorded as an evidence limit |
+| The ported first commit's inherited validation paragraph lost its qualifier and read as validation of upstream main | Should-fix | Qualifier "on the Ubuntu 51.0 source adaptation" and "private" restored; the claim is the owner's inherited one, kept distinct |
+| A minimum-only DisplayID declaration shadowed a CTA peak | Nit | DisplayID luminance needs the 10% window peak to be a source |
+| Base EDID primaries lacked the chromaticity domain check | Nit | x ≥ 0, y > 0, x + y ≤ 1 required |
+| Stale comments naming firmware as the only target source; contract doc behind the code | Nit | Corrected |
+| Ubuntu port stale after the fixes | Should-fix | `nativehdr9` regenerated from the six final upstream commits; non-debian content identical apart from Ubuntu's `extra_suites` |
+
+Checked and found correct by the reviewer: 38 of the 43 ported commits are
+byte-identical to their Ubuntu originals, and the others differ only by the
+documented squash, style fold and two style fixes. All subjects pass the
+upstream commit rules. Whole-source selection, fall-through and CTA zero
+semantics are correct (libdisplay-info leaves absent values 0). Integer
+geometry is exact. Refresh on mode and EDID changes goes through one device
+update. Wayland identity excludes provenance, so a provenance-only change
+creates no new description. Ordinary sRGB clients in native SDR were already
+composited, so there is no new scanout regression.
+
+Recorded behaviour: with the brightness factor raised above a declared peak,
+SDR is highlight-mapped toward that peak on every output with a target
+(already true on the native route). A native SDR panel whose white lies far
+from D65 can now compress sRGB content, which is the consistent result of
+the encoding's own white adaptation.
+
+The colour test set ran once at the final head: 23 of 23, including the two
+new compositor cases, with every rewritten commit building on its own.
+Every one of the 43 ported commits also builds with warnings as errors
+([receipt](../evidence/general-targets-fast-lane.json)).
+
 ## Ninth batch — independent review and fixes
 
 At the owner's request, three independent Fable 5.1 reviews covered the

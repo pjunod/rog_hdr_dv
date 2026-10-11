@@ -1,0 +1,180 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 14:54:30 -0400
+Subject: [PATCH] backends/color: Treat every declared target source as a
+ target
+
+Display targets have so far had one declared source, the DisplayID 2
+physical declaration, and the rendering color state took exactly that
+source as a target. Other declarations describe a display's capability
+too: CTA-861 HDR static metadata states the content luminance range a
+display considers optimal, and the base EDID color characteristics state
+the gamut of its native SDR mode.
+
+Give these their own provenance, next to the DisplayID one, so that a
+published target always says which declaration it came from, and make
+the rendering color state treat every source except the encoding
+fallback as a target. The fallback remains the encoding's own range and
+gamut, and is never one. The description of gamut compression in
+Clutter no longer names the firmware as the only source of a target.
+
+Name the source of each target component in the color debug output when
+the target changes, so that it is visible which declaration an output
+uses.
+
+No source produces the new values yet, so behavior is unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-transform.c |  6 +--
+ src/backends/meta-color-device.c          | 57 +++++++++++++++++++----
+ src/backends/meta-color-device.h          | 12 +++++
+ 3 files changed, 63 insertions(+), 12 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 7ee97db..2c60ed5 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1363,9 +1363,9 @@ compute_gamut_limits (const GamutTarget *target,
+  * read, so the two cannot disagree.
+  *
+  * Compression applies only toward a display target with target primaries
+- * (made for an output whose target primaries are declared by its firmware,
+- * or a blending state derived from one), and only
+- * when the content can actually exceed the target. Every source color is
++ * (made for an output whose display declares its target primaries, or a
++ * blending state derived from one), and only when the content can actually
++ * exceed the target. Every source color is
+  * followed to linear BT.2020 exactly as the renderer converts its pixels:
+  *
+  *  - the encoding primaries are the rows of the encoding's adapted
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 8bbd6ae..4f18455 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1137,6 +1137,24 @@ target_primaries_equal (const MetaColorTargetPrimaries *a,
+   return TRUE;
+ }
+ 
++static const char *
++target_provenance_to_string (MetaColorTargetProvenance provenance)
++{
++  switch (provenance)
++    {
++    case META_COLOR_TARGET_ENCODING_FALLBACK:
++      return "encoding-fallback";
++    case META_COLOR_TARGET_FIRMWARE_DECLARED:
++      return "firmware-declared";
++    case META_COLOR_TARGET_CTA_DECLARED:
++      return "cta-declared";
++    case META_COLOR_TARGET_EDID_DECLARED:
++      return "edid-declared";
++    }
++
++  g_assert_not_reached ();
++}
++
+ static UpdateResult
+ update_target_volume (MetaColorDevice *color_device)
+ {
+@@ -1172,16 +1190,37 @@ update_target_volume (MetaColorDevice *color_device)
+ 
+   color_device->target_luminance = target;
+   color_device->target_primaries = target_primaries;
++
++  meta_topic (META_DEBUG_COLOR,
++              "Target of color device '%s' (%s): luminance %f (%s) to %f (%s), "
++              "primaries R %f,%f G %f,%f B %f,%f W %f,%f (%s)",
++              meta_color_device_get_id (color_device),
++              meta_monitor_get_connector (monitor),
++              target.minimum,
++              target_provenance_to_string (target.minimum_source),
++              target.maximum,
++              target_provenance_to_string (target.maximum_source),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[0]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[1]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[2]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[3]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[4]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[5]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[6]),
++              meta_color_chromaticity_from_fixed (target_primaries.coordinates[7]),
++              target_provenance_to_string (target_primaries.source));
++
+   return UPDATE_RESULT_TARGET_VOLUME;
+ }
+ 
+ /*
+- * The firmware-declared target primaries, as published, if they are declared
+- * and usable as a gamut target: by
++ * The declared target primaries, as published, if they are declared and
++ * usable as a gamut target: by
+  * clutter_colorimetry_get_absolute_bt2020_matrices(), which also requires
+  * the shared colorimetry definition, the check
+- * clutter_color_state_params_new_display_target() repeats. The encoding
+- * fallback is not a physical gamut, and is never a target.
++ * clutter_color_state_params_new_display_target() repeats. Every declared
++ * source is a target; the encoding fallback is not a physical gamut, and is
++ * never one.
+  */
+ static gboolean
+ get_declared_target_primaries (MetaColorDevice  *color_device,
+@@ -1191,7 +1230,7 @@ get_declared_target_primaries (MetaColorDevice  *color_device,
+   const int32_t *coordinates = target->coordinates;
+   ClutterColorimetry colorimetry;
+ 
+-  if (target->source != META_COLOR_TARGET_FIRMWARE_DECLARED)
++  if (target->source == META_COLOR_TARGET_ENCODING_FALLBACK)
+     return FALSE;
+ 
+   *primaries = (ClutterPrimaries) {
+@@ -1215,9 +1254,9 @@ get_declared_target_primaries (MetaColorDevice  *color_device,
+ 
+ /*
+  * The color state content is rendered for on this device: the output color
+- * state made a display target with the firmware-declared target as its
+- * target volume: the target luminance range when the peak is declared, and
+- * the target primaries when they are declared. This is the only place a
++ * state made a display target with the declared target as its target
++ * volume: the target luminance range when the peak is declared, and the
++ * target primaries when they are declared, by whichever source. This is the only place a
+  * display target is made. The blending state derived from it stays one, so
+  * color transforms map highlights toward the peak and compress gamut toward
+  * the primaries. Without either declaration, nothing is substituted: it is
+@@ -1240,7 +1279,7 @@ update_rendering_color_state (MetaColorDevice *color_device)
+   if (CLUTTER_IS_COLOR_STATE_PARAMS (color_device->color_state))
+     {
+       /* The target luminances are in the output's absolute units. */
+-      if (target->maximum_source == META_COLOR_TARGET_FIRMWARE_DECLARED)
++      if (target->maximum_source != META_COLOR_TARGET_ENCODING_FALLBACK)
+         {
+           target_volume.has_luminance = TRUE;
+           target_volume.min_lum = target->minimum;
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 1c16b75..e33d9a1 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -30,10 +30,22 @@ G_DECLARE_FINAL_TYPE (MetaColorDevice, meta_color_device,
+                       META, COLOR_DEVICE,
+                       GObject)
+ 
++/*
++ * Where a display target comes from. Every source other than the encoding
++ * fallback is a declaration of the display, and a target; none is a
++ * measurement of it.
++ */
+ typedef enum
+ {
++  /* The encoding's own range or gamut: not a display target. */
+   META_COLOR_TARGET_ENCODING_FALLBACK,
++  /* A DisplayID 2 physical declaration (Display Parameters). */
+   META_COLOR_TARGET_FIRMWARE_DECLARED,
++  /* CTA-861 HDR static metadata: the content range the display considers
++   * optimal, not a physical measurement. */
++  META_COLOR_TARGET_CTA_DECLARED,
++  /* The base EDID color characteristics. */
++  META_COLOR_TARGET_EDID_DECLARED,
+ } MetaColorTargetProvenance;
+ 
+ typedef struct

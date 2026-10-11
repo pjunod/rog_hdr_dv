@@ -18,7 +18,7 @@ physical target. Gamut compression follows in
 |---|---|---|
 | HLG decode (inverse OETF, black level, OOTF) | Clutter colour pipeline, as the HLG state's EOTF | The HLG state's own luminance range |
 | Source target volume (mastering primaries/luminance, MaxCLL, MaxFALL) | Wayland image-description creator → `ClutterColorStateParams` | Client declaration, validated |
-| Output target volume | `MetaColorDevice` (already published to Wayland by `nativehdr4`) | Firmware-declared target luminance and primaries, with provenance |
+| Output target volume | `MetaColorDevice` (already published to Wayland by `nativehdr4`) | Declared target luminance and primaries (DisplayID; since `nativehdr9` also CTA-861 luminance and native SDR base EDID gamut), with provenance |
 | Highlight mapping | Clutter colour transform, once per surface, toward the output blending state | Source effective peak, output target peak |
 | KMS HDR metadata | Unchanged (zero luminance fields) | — (see [KMS metadata](#kms-hdr-metadata-stays-unknown)) |
 
@@ -180,11 +180,15 @@ before encoding, so the gamut decision has one known owner.
   "mapping required" predicate as highlight mapping. It runs after
   highlight mapping, in linear light. One function decides whether to
   compress and with which limits, for both the predicate and the operation.
-- **Target gamut:** the colour device's target primaries, only when the
-  firmware declares them (provenance `FIRMWARE_DECLARED`) and their matrices
-  round-trip. The encoding fallback is not a physical gamut. Without a
-  declaration, nothing is compressed. The blending state carries the target
-  primaries next to the target peak.
+- **Target gamut:** the colour device's target primaries, only when a
+  display declaration supplies them and their matrices round-trip. Since
+  `nativehdr9` that is DisplayID in BT.2100 and the base EDID in native SDR
+  ([sources](DISPLAY_TARGET_SOURCES.md)). The encoding fallback is not a
+  physical gamut. Without a declaration, nothing is compressed. The blending
+  state carries the target primaries next to the target peak. Since
+  `nativehdr9` the target is adapted from its encoding's white to D65 before
+  containment, limits and matrices are computed, so it is judged in the same
+  frame as the source primaries. An output is never outside its own gamut.
 - **Source gamut:** where the source primaries actually land in the pixel
   path (the encoding's white-adapted conversion; mastering primaries get the
   same adaptation). Compression applies only when the encoding gamut has a
