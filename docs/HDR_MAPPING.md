@@ -58,7 +58,9 @@ The creator accepts `set_mastering_display_primaries`, `set_mastering_luminance`
 - Mastering luminance: `0 ≤ min < max`, finite. Mastering primaries are
   validated with the shared matrix definition. They are not required to lie
   within the encoding primaries: `extended_target_volume` is advertised,
-  which is truthful because target primaries are never used to map gamut.
+  which is truthful: since nativehdr7, declared mastering primaries beyond the
+  encoding (for example on extended-range linear content) set the gamut
+  compression limits.
   (Common P3 mastering primaries lie just outside BT.2020.)
 - Repeated setters are `already_set` errors. A MaxCLL or MaxFALL of 0 means
   unknown. When both are known, MaxFALL above MaxCLL is the protocol's
@@ -132,3 +134,57 @@ Source-level, at the agreed pre-merge stage:
 Physical acceptance (what the panel actually emits) needs the
 [measurement procedure](PANEL_MEASUREMENT.md) and an instrument; no optical
 claim follows from these tests.
+
+## Gamut compression (nativehdr7)
+
+**Status:** implemented as Mutter patches 0039–0043 (`nativehdr7`); reviewed and
+fast-lane qualified (synthetic headless tests); packaged for amd64, not
+installed.
+
+The output signal stays BT.2020/PQ. A colour outside the panel's own gamut
+is otherwise left to the panel firmware, whose handling is unknown (it may
+clip). This step compresses such colours into the declared target gamut
+before encoding, so the gamut decision has one known owner.
+
+- **Owner and place:** the same surface → blending transform and the same
+  "mapping required" predicate as highlight mapping. It runs after
+  highlight mapping, in linear light. One function decides whether to
+  compress and with which limits, for both the predicate and the operation.
+- **Target gamut:** the colour device's target primaries, only when the
+  firmware declares them (provenance `FIRMWARE_DECLARED`) and their matrices
+  round-trip. The encoding fallback is not a physical gamut. Without a
+  declaration, nothing is compressed. The blending state carries the target
+  primaries next to the target peak.
+- **Source gamut:** where the source primaries actually land in the pixel
+  path (the encoding's white-adapted conversion; mastering primaries get the
+  same adaptation). Compression applies only when the encoding gamut has a
+  primary outside the target and, where mastering primaries are declared,
+  so does the mastering gamut. sRGB-encoded content is therefore never
+  compressed, whatever its metadata. Limits come from the mastering gamut
+  when declared, otherwise from the encoding gamut. For the extended-range
+  linear encoding, only declared mastering primaries count; without them
+  nothing is compressed.
+- **Containment tolerance:** a primary within the target declaration's own
+  quantization (one 12-bit step for CIE 1931 declarations; a per-primary
+  bound from the u′v′→xy Jacobian for CIE 1976) counts as inside. A P3
+  master on a panel that declares P3 is not compressed and keeps scanout.
+- **Algorithm:** the ACES Reference Gamut Compression (ACES 1.3) distance
+  compression, in linear RGB of the target primaries (absolute colorimetry;
+  no chromatic adaptation in that step). The achromatic value is
+  max(R, G, B). For each channel, the distance from it is compressed above
+  threshold 0.8 with the published power curve (power 1.2), evaluated in an
+  overflow-safe form. The limit for each channel is the largest distance any
+  point of the source gamut boundary reaches (primaries and the points
+  along each edge where two target channels are equal). So no point of the
+  source boundary ends beyond the target boundary, and each channel's
+  furthest point lands exactly on it. Non-finite or non-positive achromatic
+  values are unchanged.
+- **Parity:** part of transform identity and of the shared predicate, so
+  scanout and the cursor decide the same way.
+
+**Acceptance:** source-level, as tested. No change when the source gamut is
+inside the target or no target is declared; boundary property; colours
+within the threshold unchanged; monotonic; independent reference values;
+non-D65 sources; GPU and CPU agree; scanout parity. Whether the panel clips
+or maps on its own, and so whether this improves what is shown, needs the
+installed system and an instrument.

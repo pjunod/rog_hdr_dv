@@ -1,0 +1,61 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-10",
+ "status": "PASS",
+ "scope": "nativehdr7 gamut compression toward the declared target gamut: compile, coordinator rulings, adversarial review, affected fast lane",
+ "mutter": {
+  "base_tree": "8f3115e322e1961142c8f5119cec9ecf99dfc1c7",
+  "candidate_tree": "c0cd4688b33665d057fc8c4c0c6b0a6c0a8a4dca",
+  "appended_patches": "0039-0043"
+ },
+ "environment": {
+  "image_digest": "sha256:622755ac4289828beb0895ceb03a187ef104309713b82f6f65a39694f7d038fd",
+  "compiler": "gcc 15.3.0-4ubuntu1",
+  "meson": "1.10.1",
+  "werror": true,
+  "full_tree_build": "ninja over all targets with -Dwerror=true, exit 0, zero warnings; each of the five commits also compiled on its own",
+  "renderer": "llvmpipe software rendering"
+ },
+ "compiled_binary_sha256": {
+  "src/libmutter-51.so.0.0.0": "ab6568390bd9ca4602deea14ed308a431c2c87fd4da6f7e397d0e160ca2034ba",
+  "clutter/clutter/libmutter-clutter-51.so.0.0.0": "8fbfcedbd88c9910ca7259a9b107a2c1f2186ead89fef22c4cabab2150c2a645",
+  "src/tests/mutter-wayland-color-management": "a13e390b76194e61915616c1b9b08ff9ac73e60a3dd26cd120d0f8d3eb687664",
+  "src/tests/wayland-test-clients/color-management": "8d0dff81ae67203e5796c590d4d663a9311fa4152639dd55e305fe9a94f70370",
+  "src/tests/clutter/conform/color-hdr": "01fc5abc881f95d93c05826b1beb6f6f70d31ac49a41f6f46d363017b99652be",
+  "src/tests/mutter-native-hdr": "297b3360c3fc04b2d26f061847dd0d36199465755e413085da85761708d88184"
+ },
+ "public_abi": "Symbols additive only: new exports recorded in debian/libmutter-51-0.symbols at 51.0-1ubuntu3+nativehdr7~; the existing highlight-mapping predicate keeps its meaning; the private target-volume structure gained a trailing per-primary tolerance field.",
+ "fast_lane": {
+  "first_run": {
+   "mutter:actor-color-state": "OK",
+   "mutter:color-hdr": "OK (27 cases, 13 of them gamut)",
+   "mutter:color-pipeline": "OK",
+   "mutter:color-state-transform": "OK",
+   "mutter:monitor-color-tests": "OK",
+   "mutter:color-management": "OK",
+   "mutter:native-hdr": "OK",
+   "mutter:cursor-tests": "OK",
+   "mutter:wayland-color-management": "OK",
+   "nine separate wayland-color-management invocations (including mapping target-gamut)": "OK"
+  },
+  "reruns": "none needed"
+ },
+ "limits": [
+  "Synthetic headless tests with software rendering; no installation",
+  "Hardware-cursor plane path reviewed, not executed (no KMS CRTC in the test monitors)",
+  "Whether the panel itself clips or maps out-of-gamut input is unknown; the benefit on screen needs the installed system and an instrument"
+ ],
+ "logs_sha256": {
+  "first_run": "2c8b2aecef3eecd74b8ea8438fb5a5665146a874480d82bb69f8a8cf35dcdf57"
+ },
+ "review": {
+  "coordinator_rulings": 5,
+  "adversarial": {
+   "blockers": 1,
+   "should_fix": 3,
+   "nits": 5,
+   "all_addressed": true
+  },
+  "details": "docs/REVIEW.md#eighth-batch--gamut-compression-nativehdr7"
+ }
+}

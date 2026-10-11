@@ -71,12 +71,12 @@ its expected display mode and the Linux transform path are understood.
 
 ## 4. Prepared userspace package transaction
 
-The [current package receipt](../evidence/hdr8-nativehdr6-packages.json)
-covers the reviewed hdr8 library and the `nativehdr6` compositor (which
-contains `nativehdr5`, PR 6). Both library architectures (i386 cross-built)
-and the compositor packages were built from the exact recorded source trees
-in a disposable Ubuntu 26.10 environment, with tests disabled deliberately. This is packaging evidence; it
-does not qualify active scanout. Nothing from this build is installed yet. The
+The [current package receipt](../evidence/hdr8-nativehdr7-packages.json)
+covers the reviewed hdr8 library and the `nativehdr7` compositor (which
+contains every earlier compositor batch). Both library architectures (i386
+cross-built) and the compositor packages were built from the exact recorded
+source trees in a disposable Ubuntu 26.10 environment, with tests disabled
+deliberately. This is packaging evidence; it does not qualify active scanout. Nothing from this build is installed yet. The
 earlier [hdr7/nativehdr3 receipt](../evidence/baseline-native-packages.json)
 is superseded and was never installed.
 
@@ -90,9 +90,10 @@ upgrades, zero additions and zero removals.
 A private copy of the installed package database, with only those six
 candidate control records substituted, resolves the six previously installed
 hdr6/nativehdr2 packages as six downgrades without additions or removals.
-Both simulations were repeated after switching from `nativehdr5` to
-`nativehdr6` packages, with the same result.
-This is a modeled rollback, not an executed one. The packages, their hashes
+Both simulations were repeated for each newer compositor build, with the same
+result. This is a modeled rollback, not an executed one. The `nativehdr6`
+packages are staged as a comparison alternative without gamut compression;
+switching to them models as four downgrades. The packages, their hashes
 and step-by-step install and recovery notes are staged privately on the
 laptop.
 

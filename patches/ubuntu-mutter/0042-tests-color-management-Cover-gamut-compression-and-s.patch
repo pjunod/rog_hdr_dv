@@ -1,0 +1,1976 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 21:04:46 -0400
+Subject: [PATCH] tests/color-management: Cover gamut compression and scanout
+ parity
+
+Extend the color-hdr conformance test. Expected values come from the
+ACES 1.3 Reference Gamut Compression written out in the test, in double
+precision: RGB to XYZ matrices built from the chromaticities, Bradford
+adaptation of the encoding's white point to the renderer's D65 as
+pixels are converted, the per-channel limits found by sampling every
+side of the source gamut densely (100000 points per side), containment
+with per-primary tolerances, and the published scale and compression
+curve (threshold 0.8, power 1.2). The target is mostly a P3-D65-like
+gamut, declared exactly, whose blue primary lies just beyond sRGB's: it
+contains sRGB but not BT.2020. Blending states are built the way the
+renderer view builds them, from the output color state with the target
+primaries (and optionally the sample target peak) attached:
+
+ - /color-hdr/gamut/predicate: BT.2020, primaries 0.1% beyond a target
+   vertex, and BT.2020 on a declared sRGB target are compressed; sRGB,
+   content in the target's own primaries and sRGB on a declared sRGB
+   target (on the boundary within the declaration's resolution, after
+   adaptation to the renderer's D65), BT.2020 content mastered with sRGB
+   primaries and sRGB content mastered with BT.2020 primaries are not;
+   no compression without target primaries, toward the output state
+   (also with the primaries attached directly, without a display
+   reference), or from the blending state to the output or to itself;
+   clutter_color_transform_requires_mapping() is the union of both
+   predicates; the target primaries and their tolerances are part of the
+   exact identity; with both a peak and primaries the EETF precedes the
+   compression.
+ - /color-hdr/gamut/identity: when nothing is compressed, the conversion
+   through the transform cache is bit-identical to the one toward the
+   blending state without target primaries.
+ - /color-hdr/gamut/boundary: BT.2020, whose sides reach further than
+   its primaries in the target, is converted along its whole boundary
+   (4001 points per side, PQ encoded) to the forced-linear blending
+   state: no point ends beyond distance 1, and each channel's maximising
+   point lands at 1.
+ - /color-hdr/gamut/non-d65: DCI-P3 with the DCI white, whose
+   chromaticities are P3's, lands partly outside a P3-D65 target once
+   adapted and is compressed; ProPhoto (D50) too; both boundaries land
+   on the target as above.
+ - /color-hdr/gamut/extended-range: extended-range linear sRGB and
+   BT.2020 without mastering primaries are not compressed; extended sRGB
+   mastered on BT.2020 is, with the limits of BT.2020 adapted as sRGB's
+   white is, and the BT.2020 boundary, as extended sRGB values, lands on
+   the target.
+ - /color-hdr/gamut/extreme-mastering: ACES AP0 (a negative y) and a
+   gamut at the protocol's coordinate limit, which the nativehdr6
+   acceptance rule takes, are still accepted as mastering primaries;
+   the op is present exactly when the predicate holds, and the
+   conversion stays finite.
+ - /color-hdr/gamut/threshold-unchanged: samples within the threshold
+   (including d = 0.8 exactly), without a positive achromatic value,
+   and, for a source whose red primary alone exceeds the target, the
+   red and blue channels that have no limit above 1, come out of the op
+   bit for bit.
+ - /color-hdr/gamut/reference: the op matches the independent formula,
+   including far outside the gamut and for dark samples, and maps a
+   distance equal to a channel's limit onto the boundary.
+ - /color-hdr/gamut/monotonic: in each channel, compressed distances
+   increase with the input distance from 0 to 4, never exceed it, and
+   equal it bit for bit up to the threshold.
+ - /color-hdr/gamut/non-finite: samples with an infinite or not
+   positive achromatic value come out bit for bit; huge and infinitely
+   negative channels give no NaN.
+ - /color-hdr/gamut/source-gamut: sRGB encoded content mastered on
+   BT.2020 is not compressed, on a declared sRGB or a wider target;
+   BT.2020 content mastered on P3, on a declared sRGB target that
+   excludes part of P3, is compressed with the limits of P3, matching
+   the formula with them and not with BT.2020's.
+ - /color-hdr/gamut/tolerance: on a target declaring P3 through 12-bit
+   DisplayID coordinates, with one step as its tolerance, P3 primaries
+   lie a fraction of a step outside the quantized triangle and are not
+   compressed (an exact test would compress them), while a P3 red moved
+   five steps outside one side is; boundary points within the tolerance
+   set no limit, so the blue channel, beyond 1 only within the
+   tolerance, is never rewritten, and the op matches the formula with
+   the limits of the points outside.
+ - /color-hdr/gamut/shader-matches-cpu: the GLSL compression matches
+   the CPU one through the gamma 2.2 and forced-linear blending states
+   and together with highlight mapping, with exact floating point input.
+
+And a compositor regression, /wayland/mapping/target-gamut, run in its
+own invocation since it gives the fixture output declared primaries
+(DCI-P3 with a D65 white, rounded to DisplayID 2 12-bit CIE 1931
+coordinates, with no target peak): the view's blending state carries
+exactly the published target primaries, with the tolerances the device
+derived for the declaration, and no peak; a BT.2020 PQ surface, in the
+output's encoding, is compressed, refused scanout by
+meta_compositor_view_native_color_state_prevents_scanout() and rendered
+differently from the untargeted conversion; the same encoding mastered
+on real P3 primaries (0.680, 0.320 / 0.265, 0.690 / 0.150, 0.060) lies
+within the declaration's tolerance, so it is neither compressed nor
+refused scanout, while P3 with its red primary 1% further from white
+still compresses; content mastered with sRGB primaries is neither
+compressed nor refused scanout; an sRGB surface is never compressed;
+and once the primaries fall back to the encoding's, nothing is
+compressed and BT.2020 PQ is scanned out again.
+
+The nativehdr4 target-primaries fixture is not reused for it: its blue
+primary leaves sRGB's blue outside the triangle, so sRGB content would
+be compressed there.
+
+And /native-hdr/target-primaries-tolerance: declared target primaries
+carry one 12-bit step as each primary's tolerance for CIE 1931
+coordinates and none for the encoding fallback; for CIE 1976
+coordinates each primary's tolerance, which differs between primaries,
+is at least sqrt (2) times the exact xy displacement half a code step in
+any direction causes at that primary.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/tests/clutter/conform/color-hdr.c     | 1480 ++++++++++++++++++++-
+ src/tests/meson.build                     |    5 +-
+ src/tests/native-hdr-tests.c              |   74 ++
+ src/tests/wayland-color-management-test.c |  218 +++
+ 4 files changed, 1771 insertions(+), 6 deletions(-)
+
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index b0d3c1a..c8fe7f5 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -1,10 +1,11 @@
+ /*
+- * Regressions for HDR color operations: HLG decoding and encoding, and the
+- * BT.2390 highlight mapping toward a display's target luminance.
++ * Regressions for HDR color operations: HLG decoding and encoding, the
++ * BT.2390 highlight mapping toward a display's target luminance, and gamut
++ * compression toward a display's target primaries.
+  *
+  * Expected values are computed here, in double precision, directly from the
+- * formulas of Rec. ITU-R BT.2100-2 and Report ITU-R BT.2390, not by calling
+- * the code under test.
++ * formulas of Rec. ITU-R BT.2100-2, Report ITU-R BT.2390 and the ACES 1.3
++ * Reference Gamut Compression, not by calling the code under test.
+  */
+ 
+ #include <math.h>
+@@ -1183,6 +1184,1464 @@ mapping_shader_matches_cpu (void)
+                              G_N_ELEMENTS (hlg_signals), 2e-3f);
+ }
+ 
++/*
++ * Gamut compression: ACES 1.3 Reference Gamut Compression, written out
++ * separately from the code under test, in double precision. Source colors
++ * reach linear BT.2020 as the renderer converts pixels, with Bradford
++ * adaptation of the encoding's white point to the renderer's D65; the
++ * compression works in linear RGB of the target with absolute colorimetry.
++ */
++#define REF_GAMUT_THRESHOLD 0.8
++#define REF_GAMUT_POWER 1.2
++/* The renderer's margin for single precision rounding of chromaticities. */
++#define REF_GAMUT_MARGIN 1e-6
++/* Samples per side when searching a side for its largest distances. */
++#define REF_GAMUT_SIDE_SAMPLES 100000
++/* Samples per side when converting a gamut boundary. */
++#define BOUNDARY_SIDE_SAMPLES 4001
++
++static const double ref_d65[3] = { 0.95047, 1.0, 1.08883 };
++
++/*
++ * A P3-D65-like display gamut, declared exactly: its blue primary lies just
++ * beyond sRGB's, so it contains sRGB but not BT.2020.
++ */
++static const ClutterPrimaries target_gamut = {
++  .r_x = 0.679931f, .r_y = 0.320068f,
++  .g_x = 0.264892f, .g_y = 0.689941f,
++  .b_x = 0.147949f, .b_y = 0.058105f,
++  .w_x = 0.312744f, .w_y = 0.329101f,
++};
++
++static const ClutterPrimaries bt2020_gamut = {
++  .r_x = 0.708f, .r_y = 0.292f,
++  .g_x = 0.170f, .g_y = 0.797f,
++  .b_x = 0.131f, .b_y = 0.046f,
++  .w_x = 0.3127f, .w_y = 0.3290f,
++};
++
++static const ClutterPrimaries srgb_gamut = {
++  .r_x = 0.64f, .r_y = 0.33f,
++  .g_x = 0.30f, .g_y = 0.60f,
++  .b_x = 0.15f, .b_y = 0.06f,
++  .w_x = 0.3127f, .w_y = 0.3290f,
++};
++
++static const ClutterPrimaries p3_gamut = {
++  .r_x = 0.680f, .r_y = 0.320f,
++  .g_x = 0.265f, .g_y = 0.690f,
++  .b_x = 0.150f, .b_y = 0.060f,
++  .w_x = 0.3127f, .w_y = 0.3290f,
++};
++
++/* DCI-P3 with the DCI white point. */
++static const ClutterPrimaries dci_p3_gamut = {
++  .r_x = 0.680f, .r_y = 0.320f,
++  .g_x = 0.265f, .g_y = 0.690f,
++  .b_x = 0.150f, .b_y = 0.060f,
++  .w_x = 0.314f, .w_y = 0.351f,
++};
++
++/* ProPhoto RGB (ROMM), with a D50 white point. */
++static const ClutterPrimaries prophoto_gamut = {
++  .r_x = 0.7347f, .r_y = 0.2653f,
++  .g_x = 0.1596f, .g_y = 0.8404f,
++  .b_x = 0.0366f, .b_y = 0.0001f,
++  .w_x = 0.3457f, .w_y = 0.3585f,
++};
++
++static const float exact_tolerance[3] = { 0.0f, 0.0f, 0.0f };
++
++static void
++reference_invert (const double m[3][3],
++                  double       inverse[3][3])
++{
++  double det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
++               m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) +
++               m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
++
++  inverse[0][0] = (m[1][1] * m[2][2] - m[1][2] * m[2][1]) / det;
++  inverse[0][1] = (m[0][2] * m[2][1] - m[0][1] * m[2][2]) / det;
++  inverse[0][2] = (m[0][1] * m[1][2] - m[0][2] * m[1][1]) / det;
++  inverse[1][0] = (m[1][2] * m[2][0] - m[1][0] * m[2][2]) / det;
++  inverse[1][1] = (m[0][0] * m[2][2] - m[0][2] * m[2][0]) / det;
++  inverse[1][2] = (m[0][2] * m[1][0] - m[0][0] * m[1][2]) / det;
++  inverse[2][0] = (m[1][0] * m[2][1] - m[1][1] * m[2][0]) / det;
++  inverse[2][1] = (m[0][1] * m[2][0] - m[0][0] * m[2][1]) / det;
++  inverse[2][2] = (m[0][0] * m[1][1] - m[0][1] * m[1][0]) / det;
++}
++
++static void
++reference_apply (const double m[3][3],
++                 const double v[3],
++                 double       out[3])
++{
++  int i;
++
++  for (i = 0; i < 3; i++)
++    out[i] = m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2];
++}
++
++static void
++reference_multiply (const double a[3][3],
++                    const double b[3][3],
++                    double       out[3][3])
++{
++  int i, j, k;
++
++  for (i = 0; i < 3; i++)
++    {
++      for (j = 0; j < 3; j++)
++        {
++          out[i][j] = 0.0;
++          for (k = 0; k < 3; k++)
++            out[i][j] += a[i][k] * b[k][j];
++        }
++    }
++}
++
++static void
++reference_white_xyz (double x,
++                     double y,
++                     double xyz[3])
++{
++  xyz[0] = x / y;
++  xyz[1] = 1.0;
++  xyz[2] = (1.0 - x - y) / y;
++}
++
++/* RGB to XYZ, XYZ = m rgb, built from the chromaticities. */
++static void
++reference_rgb_to_xyz (const ClutterPrimaries *primaries,
++                      double                  m[3][3])
++{
++  const double xs[3] = { primaries->r_x, primaries->g_x, primaries->b_x };
++  const double ys[3] = { primaries->r_y, primaries->g_y, primaries->b_y };
++  double p[3][3], inverse[3][3], white[3], scale[3];
++  int i, j;
++
++  for (j = 0; j < 3; j++)
++    {
++      p[0][j] = xs[j];
++      p[1][j] = ys[j];
++      p[2][j] = 1.0 - xs[j] - ys[j];
++    }
++
++  reference_invert (p, inverse);
++  reference_white_xyz (primaries->w_x, primaries->w_y, white);
++  reference_apply (inverse, white, scale);
++
++  for (i = 0; i < 3; i++)
++    for (j = 0; j < 3; j++)
++      m[i][j] = p[i][j] * scale[j];
++}
++
++/* Bradford chromatic adaptation from @source_white to @target_white. */
++static void
++reference_bradford (const double source_white[3],
++                    const double target_white[3],
++                    double       m[3][3])
++{
++  const double bradford[3][3] = {
++    { 0.8951, 0.2664, -0.1614 },
++    { -0.7502, 1.7135, 0.0367 },
++    { 0.0389, -0.0685, 1.0296 },
++  };
++  double inverse[3][3], source_lms[3], target_lms[3], scaled[3][3];
++  int i, j;
++
++  reference_invert (bradford, inverse);
++  reference_apply (bradford, source_white, source_lms);
++  reference_apply (bradford, target_white, target_lms);
++
++  for (i = 0; i < 3; i++)
++    for (j = 0; j < 3; j++)
++      scaled[i][j] = bradford[i][j] * target_lms[i] / source_lms[i];
++
++  reference_multiply (inverse, scaled, m);
++}
++
++/* XYZ in @encoding's white to linear BT.2020, adapted to D65. */
++static void
++reference_adapted_xyz_to_bt2020 (const ClutterPrimaries *encoding,
++                                 double                  m[3][3])
++{
++  double white[3], adaptation[3][3], bt2020_to_xyz[3][3], xyz_to_bt2020[3][3];
++
++  reference_white_xyz (encoding->w_x, encoding->w_y, white);
++  reference_bradford (white, ref_d65, adaptation);
++  reference_rgb_to_xyz (&bt2020_gamut, bt2020_to_xyz);
++  reference_invert (bt2020_to_xyz, xyz_to_bt2020);
++  reference_multiply (xyz_to_bt2020, adaptation, m);
++}
++
++/* The encoding primaries in linear BT.2020, as the renderer converts. */
++static void
++reference_encoding_vertices (const ClutterPrimaries *encoding,
++                             double                  vertices[3][3])
++{
++  double rgb_to_xyz[3][3], xyz_to_bt2020[3][3], rgb_to_bt2020[3][3];
++  int i, c;
++
++  reference_rgb_to_xyz (encoding, rgb_to_xyz);
++  reference_adapted_xyz_to_bt2020 (encoding, xyz_to_bt2020);
++  reference_multiply (xyz_to_bt2020, rgb_to_xyz, rgb_to_bt2020);
++
++  for (i = 0; i < 3; i++)
++    for (c = 0; c < 3; c++)
++      vertices[i][c] = rgb_to_bt2020[c][i];
++}
++
++/* Mastering primaries declared for content in @encoding, in BT.2020. */
++static void
++reference_mastering_vertices (const ClutterPrimaries *mastering,
++                              const ClutterPrimaries *encoding,
++                              double                  vertices[3][3])
++{
++  const double xy[3][2] = {
++    { mastering->r_x, mastering->r_y },
++    { mastering->g_x, mastering->g_y },
++    { mastering->b_x, mastering->b_y },
++  };
++  double xyz_to_bt2020[3][3];
++  int i;
++
++  reference_adapted_xyz_to_bt2020 (encoding, xyz_to_bt2020);
++  for (i = 0; i < 3; i++)
++    {
++      double direction[3] = { xy[i][0], xy[i][1], 1.0 - xy[i][0] - xy[i][1] };
++
++      reference_apply (xyz_to_bt2020, direction, vertices[i]);
++    }
++}
++
++static void
++reference_xy (const double bt2020[3],
++              double      *x,
++              double      *y)
++{
++  double bt2020_to_xyz[3][3], xyz[3];
++
++  reference_rgb_to_xyz (&bt2020_gamut, bt2020_to_xyz);
++  reference_apply (bt2020_to_xyz, bt2020, xyz);
++  *x = xyz[0] / (xyz[0] + xyz[1] + xyz[2]);
++  *y = xyz[1] / (xyz[0] + xyz[1] + xyz[2]);
++}
++
++/*
++ * How far the chromaticity (@x, @y) lies outside the triangle of @target's
++ * primaries: the largest distance from the line of a side it lies outside
++ * of, or 0 inside.
++ */
++static double
++reference_outside_distance (const ClutterPrimaries *target,
++                            double                  x,
++                            double                  y)
++{
++  const double v[3][2] = {
++    { target->r_x, target->r_y },
++    { target->g_x, target->g_y },
++    { target->b_x, target->b_y },
++  };
++  double orientation, distance = 0.0;
++  int i;
++
++  orientation = (v[1][0] - v[0][0]) * (v[2][1] - v[0][1]) -
++                (v[1][1] - v[0][1]) * (v[2][0] - v[0][0]);
++  for (i = 0; i < 3; i++)
++    {
++      const double *a = v[i], *b = v[(i + 1) % 3];
++      double cross = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
++
++      if (cross * orientation < 0.0)
++        distance = MAX (distance, fabs (cross) / hypot (b[0] - a[0], b[1] - a[1]));
++    }
++
++  return distance;
++}
++
++/*
++ * Whether (@x, @y) is within @target with per-primary @tolerance plus the
++ * renderer's margin: each violated side by at most the larger tolerance of
++ * its primaries, and a point beyond both sides at a primary within that
++ * primary's tolerance of it.
++ */
++static gboolean
++reference_contains (const ClutterPrimaries *target,
++                    const float             tolerance[3],
++                    double                  x,
++                    double                  y)
++{
++  const double v[3][2] = {
++    { target->r_x, target->r_y },
++    { target->g_x, target->g_y },
++    { target->b_x, target->b_y },
++  };
++  double t[3];
++  gboolean violated[3] = { FALSE, FALSE, FALSE };
++  double orientation;
++  int i;
++
++  for (i = 0; i < 3; i++)
++    t[i] = tolerance[i] + REF_GAMUT_MARGIN;
++
++  orientation = (v[1][0] - v[0][0]) * (v[2][1] - v[0][1]) -
++                (v[1][1] - v[0][1]) * (v[2][0] - v[0][0]);
++  for (i = 0; i < 3; i++)
++    {
++      const double *a = v[i], *b = v[(i + 1) % 3];
++      double cross = (b[0] - a[0]) * (y - a[1]) - (b[1] - a[1]) * (x - a[0]);
++
++      if (cross * orientation < 0.0)
++        {
++          if (fabs (cross) / hypot (b[0] - a[0], b[1] - a[1]) >
++              MAX (t[i], t[(i + 1) % 3]))
++            return FALSE;
++          violated[i] = TRUE;
++        }
++    }
++
++  for (i = 0; i < 3; i++)
++    {
++      if (violated[i] && violated[(i + 2) % 3] &&
++          hypot (x - v[i][0], y - v[i][1]) > t[i])
++        return FALSE;
++    }
++
++  return TRUE;
++}
++
++/* Linear BT.2020 to linear RGB of @target, without chromatic adaptation. */
++static void
++reference_bt2020_to_target (const ClutterPrimaries *target,
++                            const double            bt2020[3],
++                            double                  rgb[3])
++{
++  double bt2020_to_xyz[3][3], target_to_xyz[3][3], xyz_to_target[3][3];
++  double xyz[3];
++
++  reference_rgb_to_xyz (&bt2020_gamut, bt2020_to_xyz);
++  reference_rgb_to_xyz (target, target_to_xyz);
++  reference_invert (target_to_xyz, xyz_to_target);
++  reference_apply (bt2020_to_xyz, bt2020, xyz);
++  reference_apply (xyz_to_target, xyz, rgb);
++}
++
++static void
++reference_distances (const double rgb[3],
++                     double       distances[3])
++{
++  double ach = MAX (rgb[0], MAX (rgb[1], rgb[2]));
++  int c;
++
++  for (c = 0; c < 3; c++)
++    distances[c] = (ach - rgb[c]) / fabs (ach);
++}
++
++/*
++ * The largest distance any point of the source gamut boundary, the sides
++ * between @vertices (in linear BT.2020), reaches in each channel of the
++ * target's RGB, among points outside the target with @tolerance. Found by
++ * sampling every side densely, independently of how the renderer locates
++ * the maxima.
++ */
++static void
++reference_limits (const double            vertices[3][3],
++                  const ClutterPrimaries *target,
++                  const float             tolerance[3],
++                  double                  limits[3])
++{
++  int side, n, c;
++
++  limits[0] = limits[1] = limits[2] = 0.0;
++  for (side = 0; side < 3; side++)
++    {
++      const double *a = vertices[side], *b = vertices[(side + 1) % 3];
++
++      for (n = 0; n <= REF_GAMUT_SIDE_SAMPLES; n++)
++        {
++          double l = n / (double) REF_GAMUT_SIDE_SAMPLES;
++          double bt2020[3], rgb[3], distances[3], x, y;
++
++          for (c = 0; c < 3; c++)
++            bt2020[c] = (1.0 - l) * a[c] + l * b[c];
++
++          reference_xy (bt2020, &x, &y);
++          if (reference_contains (target, tolerance, x, y))
++            continue;
++
++          reference_bt2020_to_target (target, bt2020, rgb);
++          reference_distances (rgb, distances);
++          for (c = 0; c < 3; c++)
++            limits[c] = MAX (limits[c], distances[c]);
++        }
++    }
++}
++
++/* ACES 1.3 RGC distance compression for one channel. */
++static double
++reference_compress_distance (double distance,
++                             double limit)
++{
++  const double t = REF_GAMUT_THRESHOLD;
++  const double p = REF_GAMUT_POWER;
++  double s, x;
++
++  if (limit <= 1.0 || distance <= t)
++    return distance;
++
++  s = (limit - t) / pow (pow ((1.0 - t) / (limit - t), -p) - 1.0, 1.0 / p);
++  x = (distance - t) / s;
++
++  return t + s * x / pow (1.0 + pow (x, p), 1.0 / p);
++}
++
++static void
++reference_compress (const double rgb[3],
++                    const double limits[3],
++                    double       out[3])
++{
++  double ach = MAX (rgb[0], MAX (rgb[1], rgb[2]));
++  double distances[3];
++  int c;
++
++  if (ach <= 0.0)
++    {
++      out[0] = rgb[0];
++      out[1] = rgb[1];
++      out[2] = rgb[2];
++      return;
++    }
++
++  reference_distances (rgb, distances);
++  for (c = 0; c < 3; c++)
++    out[c] = ach - reference_compress_distance (distances[c], limits[c]) * ach;
++}
++
++/* The blending state of @output with the target primaries, and optionally
++ * the sample target peak, declared, as the renderer view derives it. */
++static ClutterColorState *
++create_gamut_blending_full (ClutterColorState      *output,
++                            const ClutterPrimaries *primaries,
++                            float                   tolerance,
++                            gboolean                with_peak,
++                            gboolean                force_linear)
++{
++  ClutterColorTargetVolume target_volume = {
++    .has_primaries = TRUE,
++    .primaries = *primaries,
++    .has_luminance = with_peak,
++    .min_lum = TARGET_MIN_LUM,
++    .max_lum = TARGET_MAX_LUM,
++    .primaries_tolerance = { tolerance, tolerance, tolerance },
++  };
++  g_autoptr (ClutterColorState) targeted = NULL;
++
++  targeted =
++    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                       &target_volume);
++
++  return clutter_color_state_get_blending (targeted, force_linear);
++}
++
++/* With exact primaries: no declaration tolerance. */
++static ClutterColorState *
++create_gamut_blending (ClutterColorState      *output,
++                       const ClutterPrimaries *primaries,
++                       gboolean                with_peak,
++                       gboolean                force_linear)
++{
++  return create_gamut_blending_full (output, primaries, 0.0f, with_peak,
++                                     force_linear);
++}
++
++static ClutterColorState *
++create_with_mastering_primaries (ClutterColorState      *color_state,
++                                 const ClutterPrimaries *primaries)
++{
++  ClutterColorTargetVolume target_volume = {
++    .has_primaries = TRUE,
++    .primaries = *primaries,
++  };
++
++  return clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_state),
++                                                            &target_volume);
++}
++
++static ClutterColorState *
++create_with_primaries (const ClutterPrimaries  *primaries,
++                       ClutterTransferFunction  transfer_function)
++{
++  ClutterPrimaries copy = *primaries;
++
++  return clutter_color_state_params_new_full (clutter_test_get_context (),
++                                              CLUTTER_COLORSPACE_BT2020,
++                                              transfer_function,
++                                              &copy, -1.0f,
++                                              -1.0f, -1.0f, -1.0f, -1.0f);
++}
++
++static ClutterColorState *
++create_pq_with_primaries (const ClutterPrimaries *primaries)
++{
++  return create_with_primaries (primaries, CLUTTER_TRANSFER_FUNCTION_PQ);
++}
++
++static int
++find_op_index (ClutterColorTransform *transform,
++               const char            *type_name)
++{
++  const GList *l;
++  int i = 0;
++
++  for (l = clutter_color_pipeline_get_ops (clutter_color_transform_get_pipeline (transform));
++       l;
++       l = l->next, i++)
++    {
++      if (g_strcmp0 (G_OBJECT_TYPE_NAME (l->data), type_name) == 0)
++        return i;
++    }
++
++  return -1;
++}
++
++/* The gamut compression op of the conversion from @source to @target. */
++static ClutterColorOp *
++get_gamut_op (ClutterColorState *source,
++              ClutterColorState *target)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  ClutterColorTransform *transform;
++  int index;
++
++  transform = clutter_color_transform_from_color_states (context, source,
++                                                         target, 0);
++  index = find_op_index (transform, "ClutterColorOpGamutCompress");
++  g_assert_cmpint (index, >=, 0);
++
++  return g_list_nth_data ((GList *) clutter_color_pipeline_get_ops (clutter_color_transform_get_pipeline (transform)),
++                          index);
++}
++
++/*
++ * Converts the boundary of a source gamut, the sides between @vertices
++ * given in linear RGB of @source and sampled densely, through the transform
++ * to @blending (a forced-linear blending state, in linear BT.2020), and
++ * checks it in linear RGB of @target: no point ends beyond distance 1, and
++ * each channel whose reference limit exceeds 1 has a point landing at 1.
++ * Samples are PQ encoded when @pq_encoded, at an arbitrary scale: the
++ * distance is scale invariant.
++ */
++static void
++assert_boundary_lands_on_target (ClutterColorState      *source,
++                                 const double            vertices[3][3],
++                                 gboolean                pq_encoded,
++                                 ClutterColorState      *blending,
++                                 const ClutterPrimaries *target,
++                                 const double            limits[3])
++{
++  ClutterContext *context = clutter_test_get_context ();
++  ClutterColorTransform *transform;
++  g_autofree float *samples = NULL;
++  double landed[3] = { 0.0, 0.0, 0.0 };
++  int n_samples = 3 * BOUNDARY_SIDE_SAMPLES;
++  int side, n, i, c;
++
++  transform = clutter_color_transform_from_color_states (context, source,
++                                                         blending, 0);
++  samples = g_new (float, n_samples * 4);
++
++  for (side = 0, i = 0; side < 3; side++)
++    {
++      const double *a = vertices[side], *b = vertices[(side + 1) % 3];
++
++      for (n = 0; n < BOUNDARY_SIDE_SAMPLES; n++, i++)
++        {
++          double l = n / (double) (BOUNDARY_SIDE_SAMPLES - 1);
++
++          for (c = 0; c < 3; c++)
++            {
++              double value = (1.0 - l) * a[c] + l * b[c];
++
++              samples[i * 4 + c] = pq_encoded ?
++                                   (float) reference_pq_signal (value * 100.0) :
++                                   (float) value;
++            }
++          samples[i * 4 + 3] = 1.0f;
++        }
++    }
++
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                       samples, n_samples);
++
++  for (i = 0; i < n_samples; i++)
++    {
++      double bt2020[3] = { samples[i * 4], samples[i * 4 + 1], samples[i * 4 + 2] };
++      double rgb[3], distances[3];
++
++      reference_bt2020_to_target (target, bt2020, rgb);
++      if (!(MAX (rgb[0], MAX (rgb[1], rgb[2])) > 0.0))
++        continue;
++
++      reference_distances (rgb, distances);
++      for (c = 0; c < 3; c++)
++        {
++          g_assert_cmpfloat (distances[c], <=, 1.0 + 2e-4);
++          landed[c] = MAX (landed[c], distances[c]);
++        }
++    }
++
++  for (c = 0; c < 3; c++)
++    {
++      if (limits[c] > 1.0)
++        g_assert_cmpfloat_with_epsilon (landed[c], 1.0, 2e-3);
++    }
++}
++
++static void
++gamut_predicate (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  const float step = 1.0f / 4096.0f;
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) declared_blending = NULL;
++  g_autoptr (ClutterColorState) both = NULL;
++  g_autoptr (ClutterColorState) peak_only = NULL;
++  g_autoptr (ClutterColorState) srgb_target = NULL;
++  g_autoptr (ClutterColorState) output_with_primaries = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) own = NULL;
++  g_autoptr (ClutterColorState) beyond = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_srgb = NULL;
++  g_autoptr (ClutterColorState) srgb_mastered_bt2020 = NULL;
++  ClutterPrimaries beyond_primaries = target_gamut;
++  ClutterColorTargetVolume primaries_only = {
++    .has_primaries = TRUE,
++    .primaries = target_gamut,
++  };
++  ClutterColorTransform *transform;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  declared_blending = create_gamut_blending_full (output, &target_gamut, step,
++                                                  FALSE, FALSE);
++  both = create_gamut_blending (output, &target_gamut, TRUE, FALSE);
++  peak_only = create_targeted_blending (output, TARGET_MAX_LUM, FALSE);
++  srgb_target = create_gamut_blending_full (output, &srgb_gamut, step,
++                                            FALSE, FALSE);
++  output_with_primaries =
++    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                       &primaries_only);
++
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  own = create_pq_with_primaries (&target_gamut);
++  /* The red primary moved away from white by 0.1%: just outside. */
++  beyond_primaries.r_x = target_gamut.w_x + 1.001f * (target_gamut.r_x - target_gamut.w_x);
++  beyond_primaries.r_y = target_gamut.w_y + 1.001f * (target_gamut.r_y - target_gamut.w_y);
++  beyond = create_pq_with_primaries (&beyond_primaries);
++  pq_mastered_srgb = create_with_mastering_primaries (pq, &srgb_gamut);
++  srgb_mastered_bt2020 = create_with_mastering_primaries (srgb, &bt2020_gamut);
++
++  /* A source primary outside the target triangle: compressed. */
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq, blending));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (beyond, blending));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq, srgb_target));
++
++  /* Inside: never touched. A gamut equal to the target's lies on its
++   * boundary within the declaration's resolution; sRGB, adapted to the
++   * renderer's D65, lies on the boundary of a declared sRGB target. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (srgb, blending));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (own,
++                                                                      declared_blending));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (srgb,
++                                                                      srgb_target));
++
++  /* Content can exceed the target only if its encoding and, when declared,
++   * its mastering primaries both do: sRGB encoded content is never
++   * compressed on a target containing sRGB, whatever its mastering metadata
++   * says. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (pq_mastered_srgb,
++                                                                      blending));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (srgb_mastered_bt2020,
++                                                                      blending));
++
++  /* No target primaries, or primaries without a display reference (the
++   * output state with them attached directly): no display gamut target. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (pq, peak_only));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (pq, output));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (pq,
++                                                                      output_with_primaries));
++
++  /* Blended content is already compressed: not again to the output, and the
++   * blending state is within its own target. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (blending, output));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (blending, blending));
++
++  /* The single predicate: either mapping. */
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, blending));
++  g_assert_true (clutter_color_transform_requires_mapping (pq, blending));
++  g_assert_false (clutter_color_transform_requires_mapping (srgb, blending));
++  g_assert_true (clutter_color_transform_requires_mapping (pq, peak_only));
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq, both));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq, both));
++
++  /* The target primaries and their tolerance are part of the identity. */
++  g_assert_false (clutter_color_state_identical (blending, srgb_target));
++  g_assert_false (clutter_color_state_identical (blending, declared_blending));
++  g_assert_false (clutter_color_state_identical (blending, peak_only));
++
++  /* Highlights are mapped first, then the gamut is compressed, in linear
++   * light. */
++  transform = clutter_color_transform_from_color_states (context, pq, both, 0);
++  g_assert_cmpint (find_op_index (transform, "ClutterColorOpBt2390Eetf"), >=, 0);
++  g_assert_cmpint (find_op_index (transform, "ClutterColorOpBt2390Eetf"), <,
++                   find_op_index (transform, "ClutterColorOpGamutCompress"));
++  transform = clutter_color_transform_from_color_states (context, srgb,
++                                                         blending, 0);
++  g_assert_cmpint (find_op_index (transform, "ClutterColorOpGamutCompress"), ==, -1);
++}
++
++/* When nothing is compressed, the conversion is the one toward the blending
++ * state without target primaries, bit for bit. */
++static void
++gamut_identity (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) untargeted = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_srgb = NULL;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  untargeted = clutter_color_state_get_blending (output, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  pq_mastered_srgb = create_with_mastering_primaries (pq, &srgb_gamut);
++
++  assert_pipelines_equal (srgb, blending, untargeted);
++  assert_pipelines_equal (pq_mastered_srgb, blending, untargeted);
++
++  /* Content mastered within the target, in the output's encoding, needs no
++   * conversion to the output and no mapping. */
++  g_assert_false (clutter_color_pipeline_shader_needs_color_state (pq_mastered_srgb,
++                                                                   output, 0));
++  g_assert_false (clutter_color_transform_requires_mapping (pq_mastered_srgb,
++                                                            blending));
++}
++
++static const double unit_vertices[3][3] = {
++  { 1.0, 0.0, 0.0 },
++  { 0.0, 1.0, 0.0 },
++  { 0.0, 0.0, 1.0 },
++};
++
++/*
++ * No point of the source gamut boundary, primaries and sides, ends beyond
++ * distance 1 in the target, and each channel's maximising boundary point
++ * lands at 1: BT.2020 into the P3-like target, where points along the sides
++ * reach further than the primaries.
++ */
++static void
++gamut_boundary (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  double vertices[3][3], limits[3], vertex_limits[3] = { 0.0, 0.0, 0.0 };
++  int i, c;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, TRUE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++
++  reference_encoding_vertices (&bt2020_gamut, vertices);
++  reference_limits (vertices, &target_gamut, exact_tolerance, limits);
++
++  /* The sides reach further than the primaries in some channel. */
++  for (i = 0; i < 3; i++)
++    {
++      double rgb[3], distances[3];
++
++      reference_bt2020_to_target (&target_gamut, vertices[i], rgb);
++      reference_distances (rgb, distances);
++      for (c = 0; c < 3; c++)
++        vertex_limits[c] = MAX (vertex_limits[c], distances[c]);
++    }
++  g_assert_true (limits[0] > vertex_limits[0] + 1e-3 ||
++                 limits[1] > vertex_limits[1] + 1e-3 ||
++                 limits[2] > vertex_limits[2] + 1e-3);
++
++  assert_boundary_lands_on_target (pq, unit_vertices, TRUE, blending,
++                                   &target_gamut, limits);
++}
++
++/*
++ * Sources whose white point is not D65 are adapted to D65 on their way to
++ * BT.2020; containment and limits follow them there. DCI-P3 with the DCI
++ * white has P3's chromaticities, yet lands partly outside a P3-D65 panel;
++ * ProPhoto (D50) lies far outside it. Both land on the boundary.
++ */
++static void
++gamut_non_d65 (void)
++{
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) linear_blending = NULL;
++  const ClutterPrimaries *sources[] = { &dci_p3_gamut, &prophoto_gamut };
++  int i;
++
++  blending = create_gamut_blending (output, &p3_gamut, FALSE, FALSE);
++  linear_blending = create_gamut_blending (output, &p3_gamut, FALSE, TRUE);
++
++  /* Unadapted, DCI-P3's primaries are P3's. */
++  g_assert_cmpfloat (reference_outside_distance (&p3_gamut, dci_p3_gamut.r_x,
++                                                 dci_p3_gamut.r_y), ==, 0.0);
++
++  for (i = 0; i < G_N_ELEMENTS (sources); i++)
++    {
++      g_autoptr (ClutterColorState) source = create_pq_with_primaries (sources[i]);
++      double vertices[3][3], limits[3];
++      gboolean outside = FALSE;
++      int v;
++
++      reference_encoding_vertices (sources[i], vertices);
++      for (v = 0; v < 3; v++)
++        {
++          double x, y;
++
++          reference_xy (vertices[v], &x, &y);
++          if (!reference_contains (&p3_gamut, exact_tolerance, x, y))
++            outside = TRUE;
++        }
++      g_assert_true (outside);
++
++      g_assert_true (clutter_color_transform_requires_gamut_compression (source,
++                                                                         blending));
++      g_assert_true (clutter_color_transform_requires_gamut_compression (source,
++                                                                         linear_blending));
++
++      reference_limits (vertices, &p3_gamut, exact_tolerance, limits);
++      assert_boundary_lands_on_target (source, unit_vertices, TRUE,
++                                       linear_blending, &p3_gamut, limits);
++    }
++}
++
++/*
++ * Extended-range linear content bounds no gamut: its mastering primaries,
++ * when declared, are the source gamut, and otherwise nothing is compressed.
++ */
++static void
++gamut_extended_range (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) linear_blending = NULL;
++  g_autoptr (ClutterColorState) ext_srgb = NULL;
++  g_autoptr (ClutterColorState) ext_bt2020 = NULL;
++  g_autoptr (ClutterColorState) ext_srgb_mastered = NULL;
++  double vertices[3][3], encoding[3][3], inverse[3][3], source_vertices[3][3];
++  double limits[3];
++  ClutterColorOp *op;
++  int i, c;
++  const float samples[][3] = {
++    { 1.0f, -0.2f, 0.5f },
++    { 0.2f, 1.0f, -0.1f },
++    { -0.05f, 0.3f, 1.0f },
++    { 1.0f, 0.1f, 0.9f },
++  };
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  linear_blending = create_gamut_blending (output, &target_gamut, FALSE, TRUE);
++  ext_srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                             CLUTTER_TRANSFER_FUNCTION_LINEAR);
++  ext_bt2020 = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                               CLUTTER_TRANSFER_FUNCTION_LINEAR);
++  ext_srgb_mastered = create_with_mastering_primaries (ext_srgb, &bt2020_gamut);
++
++  /* Without mastering primaries the extent is unknown. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (ext_srgb,
++                                                                      blending));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (ext_bt2020,
++                                                                      blending));
++
++  /* sRGB primaries, yet BT.2020 mastering: compressed, with the limits of
++   * BT.2020 adapted as sRGB's white is. */
++  g_assert_true (clutter_color_transform_requires_gamut_compression (ext_srgb_mastered,
++                                                                     blending));
++  reference_mastering_vertices (&bt2020_gamut, &srgb_gamut, vertices);
++  reference_limits (vertices, &target_gamut, exact_tolerance, limits);
++
++  op = get_gamut_op (ext_srgb_mastered, blending);
++  for (i = 0; i < G_N_ELEMENTS (samples); i++)
++    {
++      float data[4] = { samples[i][0], samples[i][1], samples[i][2], 1.0f };
++      double rgb[3] = { samples[i][0], samples[i][1], samples[i][2] };
++      double expected[3];
++
++      clutter_color_op_do_transform (op, data, 1);
++      reference_compress (rgb, limits, expected);
++      for (c = 0; c < 3; c++)
++        g_assert_cmpfloat_with_epsilon (data[c], expected[c], 1e-4);
++    }
++
++  /* The BT.2020 boundary, as extended sRGB values, lands on the target. */
++  reference_encoding_vertices (&srgb_gamut, encoding);
++  {
++    double columns[3][3];
++    int j;
++
++    for (i = 0; i < 3; i++)
++      for (j = 0; j < 3; j++)
++        columns[j][i] = encoding[i][j];
++    reference_invert (columns, inverse);
++  }
++  for (i = 0; i < 3; i++)
++    reference_apply (inverse, vertices[i], source_vertices[i]);
++  assert_boundary_lands_on_target (ext_srgb_mastered, source_vertices, FALSE,
++                                   linear_blending, &target_gamut, limits);
++}
++
++/*
++ * Mastering primaries that the nativehdr6 acceptance rule takes, extreme as
++ * they are, are still accepted, and gamut compression with them is either
++ * well defined or not applied: never NaN.
++ */
++static void
++gamut_extreme_mastering (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  /* ACES AP0, whose blue primary has a negative y, with the ACES white. */
++  const ClutterPrimaries ap0 = {
++    .r_x = 0.7347f, .r_y = 0.2653f,
++    .g_x = 0.0f, .g_y = 1.0f,
++    .b_x = 0.0001f, .b_y = -0.077f,
++    .w_x = 0.32168f, .w_y = 0.33767f,
++  };
++  /* A large imaginary gamut at the protocol's coordinate limit. */
++  const ClutterPrimaries at_range_limit = {
++    .r_x = 16.0f, .r_y = -15.0f,
++    .g_x = -15.0f, .g_y = 16.0f,
++    .b_x = 0.1f, .b_y = 0.1f,
++    .w_x = 0.3127f, .w_y = 0.329f,
++  };
++  const ClutterPrimaries *mastering[] = { &ap0, &at_range_limit };
++  const float signals[][3] = {
++    { 0.75f, 0.1f, 0.1f },
++    { 0.1f, 0.75f, 0.1f },
++    { 0.1f, 0.1f, 0.75f },
++    { 0.5f, 0.5f, 0.5f },
++  };
++  int i, j, c;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++
++  for (i = 0; i < G_N_ELEMENTS (mastering); i++)
++    {
++      ClutterColorimetry colorimetry = {
++        .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++        .primaries = (ClutterPrimaries *) mastering[i],
++      };
++      g_autoptr (ClutterColorState) mastered = NULL;
++      ClutterColorTransform *transform;
++
++      g_assert_true (clutter_colorimetry_get_linear_bt2020_matrices (&colorimetry,
++                                                                     NULL, NULL,
++                                                                     NULL));
++      mastered = create_with_mastering_primaries (pq, mastering[i]);
++      g_assert_nonnull (mastered);
++
++      transform = clutter_color_transform_from_color_states (context, mastered,
++                                                             blending, 0);
++      g_assert_cmpint (find_op_index (transform, "ClutterColorOpGamutCompress") >= 0,
++                       ==,
++                       clutter_color_transform_requires_gamut_compression (mastered,
++                                                                           blending));
++
++      for (j = 0; j < G_N_ELEMENTS (signals); j++)
++        {
++          float data[4] = { signals[j][0], signals[j][1], signals[j][2], 1.0f };
++
++          clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                               data, 1);
++          for (c = 0; c < 3; c++)
++            g_assert_true (isfinite (data[c]));
++        }
++    }
++}
++
++/*
++ * Samples whose achromatic value is not positive, channels within the
++ * threshold, and channels no boundary point takes beyond the boundary come
++ * out of the op bit for bit.
++ */
++static void
++gamut_threshold_unchanged (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) red_beyond = NULL;
++  ClutterPrimaries red_beyond_primaries = srgb_gamut;
++  const float within[][4] = {
++    { 1.0f, 1.0f, 1.0f, 1.0f },
++    { 1.0f, 0.5f, 0.3f, 1.0f },
++    { 0.4f, 1.0f, 0.25f, 1.0f },
++    /* d = 0.8 exactly: at the threshold, not above it. */
++    { 0.25f, 0.25f, 1.25f, 1.0f },
++    { 100.0f, 60.0f, 30.0f, 1.0f },
++    { 0.0f, 0.0f, 0.0f, 1.0f },
++    { -0.1f, -0.2f, -0.3f, 1.0f },
++    { 0.0f, -1.0f, -5.0f, 1.0f },
++  };
++  float data[G_N_ELEMENTS (within)][4];
++  double vertices[3][3], limits[3];
++  ClutterColorOp *op;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++
++  op = get_gamut_op (pq, blending);
++  memcpy (data, within, sizeof (data));
++  clutter_color_op_do_transform (op, &data[0][0], G_N_ELEMENTS (within));
++  g_assert_cmpmem (data, sizeof (data), within, sizeof (within));
++
++  /* sRGB with its red primary beyond the target's: only the green channel
++   * has a limit above 1, so red and blue are never rewritten, even far
++   * beyond the threshold. */
++  red_beyond_primaries.r_x = 0.72f;
++  red_beyond_primaries.r_y = 0.28f;
++  red_beyond = create_pq_with_primaries (&red_beyond_primaries);
++  reference_encoding_vertices (&red_beyond_primaries, vertices);
++  reference_limits (vertices, &target_gamut, exact_tolerance, limits);
++  g_assert_cmpfloat (limits[0], <, 0.999);
++  g_assert_cmpfloat (limits[1], >, 1.0);
++  g_assert_cmpfloat (limits[2], <, 0.999);
++
++  op = get_gamut_op (red_beyond, blending);
++  {
++    const float untouched[][4] = {
++      { 0.05f, 1.0f, 1.0f, 1.0f },
++      { -0.5f, 1.0f, -0.25f, 1.0f },
++      { 1.0f, 1.0f, 0.0f, 1.0f },
++    };
++    float out[G_N_ELEMENTS (untouched)][4];
++    int i;
++
++    memcpy (out, untouched, sizeof (out));
++    clutter_color_op_do_transform (op, &out[0][0], G_N_ELEMENTS (untouched));
++    for (i = 0; i < G_N_ELEMENTS (untouched); i++)
++      {
++        g_assert_cmpmem (&out[i][0], sizeof (float), &untouched[i][0],
++                         sizeof (float));
++        g_assert_cmpmem (&out[i][2], sizeof (float), &untouched[i][2],
++                         sizeof (float));
++      }
++  }
++}
++
++/* The op against the ACES formula, with limits found independently. */
++static void
++gamut_reference (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  const float samples[][3] = {
++    { 1.0f, -0.2f, 0.5f },
++    { 0.2f, 1.0f, -0.1f },
++    { -0.05f, 0.3f, 1.0f },
++    { 1.0f, 0.15f, 0.9f },
++    { 50.0f, -5.0f, 20.0f },
++    { 0.01f, 0.0005f, -0.004f },
++    { 1.0f, -3.0f, -3.0f },
++  };
++  double vertices[3][3], limits[3];
++  ClutterColorOp *op;
++  int i, c;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  op = get_gamut_op (pq, blending);
++  reference_encoding_vertices (&bt2020_gamut, vertices);
++  reference_limits (vertices, &target_gamut, exact_tolerance, limits);
++
++  for (i = 0; i < G_N_ELEMENTS (samples); i++)
++    {
++      float data[4] = { samples[i][0], samples[i][1], samples[i][2], 1.0f };
++      double rgb[3] = { samples[i][0], samples[i][1], samples[i][2] };
++      double expected[3];
++      double ach = MAX (rgb[0], MAX (rgb[1], rgb[2]));
++
++      clutter_color_op_do_transform (op, data, 1);
++      reference_compress (rgb, limits, expected);
++
++      for (c = 0; c < 3; c++)
++        g_assert_cmpfloat_with_epsilon (data[c], expected[c], 1e-4 * ach);
++    }
++
++  /* A distance equal to a channel's limit lands on the boundary. */
++  for (c = 0; c < 3; c++)
++    {
++      float data[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
++
++      data[c] = (float) (1.0 - limits[c]);
++      clutter_color_op_do_transform (op, data, 1);
++      g_assert_cmpfloat_with_epsilon (data[c], 0.0f, 1e-4f);
++    }
++}
++
++/* Compressed distances increase with the input distance, never exceed it,
++ * and equal it up to the threshold. */
++static void
++gamut_monotonic (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  ClutterColorOp *op;
++  int c, i;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  op = get_gamut_op (pq, blending);
++
++  for (c = 0; c < 3; c++)
++    {
++      double previous = -1.0;
++
++      for (i = 0; i <= 4000; i++)
++        {
++          float distance = i / 1000.0f;
++          float data[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
++          double compressed;
++
++          data[c] = 1.0f - distance;
++          clutter_color_op_do_transform (op, data, 1);
++          compressed = 1.0 - data[c];
++
++          g_assert_cmpfloat (compressed, >=, previous);
++          g_assert_cmpfloat (compressed, <=, distance + 1e-6);
++          if (distance <= REF_GAMUT_THRESHOLD)
++            g_assert_cmpfloat (data[c], ==, 1.0f - distance);
++          previous = compressed;
++        }
++    }
++}
++
++/*
++ * Non-finite and huge input: a sample whose achromatic value is not finite
++ * is unchanged, finite channels never become NaN, and huge distances
++ * approach the curve's asymptote without overflowing.
++ */
++static void
++gamut_non_finite (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  const float unchanged[][4] = {
++    { INFINITY, 1.0f, 1.0f, 1.0f },
++    { INFINITY, -INFINITY, 0.0f, 1.0f },
++    { -INFINITY, -INFINITY, -INFINITY, 1.0f },
++  };
++  const float finite[][4] = {
++    { 1.0f, -1e30f, 1.0f, 1.0f },
++    { 1.0f, -INFINITY, 1.0f, 1.0f },
++    { 1e30f, -1e30f, 0.0f, 1.0f },
++    { 1e-30f, -1e-30f, 1e-30f, 1.0f },
++    { 1.0f, 0.8f - FLT_EPSILON, 1.0f, 1.0f },
++  };
++  float data[G_N_ELEMENTS (unchanged)][4];
++  ClutterColorOp *op;
++  int i, c;
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  op = get_gamut_op (pq, blending);
++
++  memcpy (data, unchanged, sizeof (data));
++  clutter_color_op_do_transform (op, &data[0][0], G_N_ELEMENTS (unchanged));
++  g_assert_cmpmem (data, sizeof (data), unchanged, sizeof (unchanged));
++
++  for (i = 0; i < G_N_ELEMENTS (finite); i++)
++    {
++      float out[4];
++
++      memcpy (out, finite[i], sizeof (out));
++      clutter_color_op_do_transform (op, out, 1);
++      for (c = 0; c < 3; c++)
++        g_assert_false (isnan (out[c]));
++      /* The compressed distance stays below the asymptote t + s, which is
++       * finite: the channel stays finite and above -ach (t + s). */
++      g_assert_true (isfinite (out[1]) || finite[i][0] > 1e29f);
++    }
++}
++
++/*
++ * The limits come from the mastering primaries when they are declared, and
++ * compression needs both the encoding and the mastering gamut to exceed the
++ * target.
++ */
++static void
++gamut_source_gamut (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  const float step = 1.0f / 4096.0f;
++  const float step_tolerance[3] = { step, step, step };
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) srgb_blending = NULL;
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_p3 = NULL;
++  g_autoptr (ClutterColorState) srgb_mastered_bt2020 = NULL;
++  const float samples[][3] = {
++    { 1.0f, -0.2f, 0.5f },
++    { 0.2f, 1.0f, -0.1f },
++    { -0.05f, 0.3f, 1.0f },
++    { 1.0f, 0.1f, 0.9f },
++  };
++  double p3_vertices[3][3], bt2020_vertices[3][3];
++  double p3_limits[3], bt2020_limits[3];
++  gboolean differs = FALSE;
++  ClutterColorOp *op;
++  int i, c;
++
++  /* A panel declaring sRGB, which excludes part of P3. */
++  srgb_blending = create_gamut_blending_full (output, &srgb_gamut, step,
++                                              FALSE, FALSE);
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  pq_mastered_p3 = create_with_mastering_primaries (pq, &p3_gamut);
++  srgb_mastered_bt2020 = create_with_mastering_primaries (srgb, &bt2020_gamut);
++
++  /* sRGB encoded content cannot leave sRGB, whatever it was mastered on. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (srgb_mastered_bt2020,
++                                                                      srgb_blending));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (srgb_mastered_bt2020,
++                                                                      blending));
++
++  /* BT.2020 content mastered on P3, on the sRGB panel: compressed, with the
++   * limits of P3, not of BT.2020. */
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq_mastered_p3,
++                                                                     srgb_blending));
++  reference_mastering_vertices (&p3_gamut, &bt2020_gamut, p3_vertices);
++  reference_encoding_vertices (&bt2020_gamut, bt2020_vertices);
++  reference_limits (p3_vertices, &srgb_gamut, step_tolerance, p3_limits);
++  reference_limits (bt2020_vertices, &srgb_gamut, step_tolerance, bt2020_limits);
++  op = get_gamut_op (pq_mastered_p3, srgb_blending);
++
++  for (i = 0; i < G_N_ELEMENTS (samples); i++)
++    {
++      float data[4] = { samples[i][0], samples[i][1], samples[i][2], 1.0f };
++      double rgb[3] = { samples[i][0], samples[i][1], samples[i][2] };
++      double expected[3], bt2020_expected[3];
++
++      clutter_color_op_do_transform (op, data, 1);
++      reference_compress (rgb, p3_limits, expected);
++      reference_compress (rgb, bt2020_limits, bt2020_expected);
++
++      for (c = 0; c < 3; c++)
++        {
++          g_assert_cmpfloat_with_epsilon (data[c], expected[c], 1e-4);
++          if (fabs (data[c] - bt2020_expected[c]) > 1e-3)
++            differs = TRUE;
++        }
++    }
++  g_assert_true (differs);
++}
++
++/*
++ * A target declared through DisplayID's 12-bit chromaticities, with the
++ * declaration's step as its tolerance: content in the declared gamut is
++ * not compressed, though its primaries lie a fraction of a step outside the
++ * quantized triangle; a primary more than a step outside still is, and
++ * boundary points within the tolerance set no limit.
++ */
++static void
++gamut_tolerance (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) exact_blending = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_p3 = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_beyond = NULL;
++  const double step = 1.0 / 4096.0;
++  const float step_tolerance[3] = { (float) step, (float) step, (float) step };
++  const double declared[3][2] = {
++    { p3_gamut.r_x, p3_gamut.r_y },
++    { p3_gamut.g_x, p3_gamut.g_y },
++    { p3_gamut.b_x, p3_gamut.b_y },
++  };
++  ClutterPrimaries quantized = p3_gamut;
++  ClutterPrimaries beyond = p3_gamut;
++  float *quantized_xy[3][2] = {
++    { &quantized.r_x, &quantized.r_y },
++    { &quantized.g_x, &quantized.g_y },
++    { &quantized.b_x, &quantized.b_y },
++  };
++  double edge[2], normal[2], length, vertices[3][3], limits[3], all_limits[3];
++  ClutterColorOp *op;
++  int i, j;
++
++  /* 12-bit codes, published in units of 1/1000000 by truncation. */
++  for (i = 0; i < 3; i++)
++    {
++      for (j = 0; j < 2; j++)
++        {
++          int64_t code = (int64_t) round (declared[i][j] * 4096.0);
++
++          *quantized_xy[i][j] = (float) ((code * 1000000 / 4096) / 1000000.0);
++        }
++    }
++
++  for (i = 0; i < 3; i++)
++    {
++      double outside = reference_outside_distance (&quantized, declared[i][0],
++                                                   declared[i][1]);
++
++      g_assert_cmpfloat (outside, >, 0.0);
++      g_assert_cmpfloat (outside, <, step);
++    }
++
++  blending = create_gamut_blending_full (output, &quantized, (float) step,
++                                         FALSE, FALSE);
++  exact_blending = create_gamut_blending (output, &quantized, FALSE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  pq_mastered_p3 = create_with_mastering_primaries (pq, &p3_gamut);
++
++  /* Within the tolerance: not compressed; an exact test would compress. */
++  g_assert_false (clutter_color_transform_requires_gamut_compression (pq_mastered_p3,
++                                                                      blending));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq_mastered_p3,
++                                                                     exact_blending));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq, blending));
++
++  /* P3 with its red primary moved five steps outside the quantized
++   * red-blue side only. */
++  edge[0] = quantized.r_x - quantized.b_x;
++  edge[1] = quantized.r_y - quantized.b_y;
++  length = hypot (edge[0], edge[1]);
++  normal[0] = edge[1] / length;
++  normal[1] = -edge[0] / length;
++  if (normal[0] * (quantized.g_x - quantized.b_x) +
++      normal[1] * (quantized.g_y - quantized.b_y) > 0.0)
++    {
++      normal[0] = -normal[0];
++      normal[1] = -normal[1];
++    }
++  beyond.r_x = (float) (p3_gamut.r_x + 5.0 * step * normal[0]);
++  beyond.r_y = (float) (p3_gamut.r_y + 5.0 * step * normal[1]);
++  g_assert_cmpfloat (reference_outside_distance (&quantized, beyond.r_x,
++                                                 beyond.r_y), >, 4.0 * step);
++  pq_mastered_beyond = create_with_mastering_primaries (pq, &beyond);
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq_mastered_beyond,
++                                                                     blending));
++
++  /* Only points outside the tolerance set limits. P3's green, a fraction of
++   * a step outside, reaches a blue distance above 1 that no point beyond the
++   * tolerance does: blue has no limit and is never rewritten. */
++  reference_mastering_vertices (&beyond, &bt2020_gamut, vertices);
++  reference_limits (vertices, &quantized, step_tolerance, limits);
++  reference_limits (vertices, &quantized, exact_tolerance, all_limits);
++  g_assert_cmpfloat (limits[1], >, 1.0);
++  g_assert_cmpfloat (limits[2], <=, 1.0);
++  g_assert_cmpfloat (all_limits[2], >, 1.0);
++
++  op = get_gamut_op (pq_mastered_beyond, blending);
++  {
++    const float samples[][4] = {
++      { 1.0f, 1.0f, 0.1f, 1.0f },
++      { 1.0f, 0.5f, -0.2f, 1.0f },
++      { 0.3f, 1.0f, 0.05f, 1.0f },
++      /* Green beyond the threshold: compressed. */
++      { 1.0f, 0.1f, 1.0f, 1.0f },
++    };
++
++    for (i = 0; i < G_N_ELEMENTS (samples); i++)
++      {
++        float data[4];
++        double rgb[3] = { samples[i][0], samples[i][1], samples[i][2] };
++        double expected[3];
++
++        memcpy (data, samples[i], sizeof (data));
++        clutter_color_op_do_transform (op, data, 1);
++        reference_compress (rgb, limits, expected);
++
++        g_assert_cmpmem (&data[2], sizeof (float), &samples[i][2],
++                         sizeof (float));
++        for (j = 0; j < 3; j++)
++          g_assert_cmpfloat_with_epsilon (data[j], expected[j], 1e-4);
++      }
++  }
++}
++
++static void
++gamut_shader_matches_cpu (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) linear_blending = NULL;
++  g_autoptr (ClutterColorState) both = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  /* Saturated BT.2020 PQ signals, outside the target gamut, and neutral and
++   * dark ones. */
++  const float signals[][3] = {
++    { 0.75f, 0.1f, 0.1f },
++    { 0.1f, 0.75f, 0.1f },
++    { 0.1f, 0.1f, 0.75f },
++    { 0.6f, 0.58f, 0.05f },
++    { 0.05f, 0.6f, 0.62f },
++    { 0.7f, 0.0f, 0.45f },
++    { 0.5f, 0.5f, 0.5f },
++    { 0.2f, 0.18f, 0.0f },
++    { 0.0f, 0.0f, 0.0f },
++  };
++
++  blending = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  linear_blending = create_gamut_blending (output, &target_gamut, FALSE, TRUE);
++  both = create_gamut_blending (output, &target_gamut, TRUE, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++
++  assert_shader_matches_cpu (pq, blending, signals, G_N_ELEMENTS (signals),
++                             2e-3f);
++  assert_shader_matches_cpu (pq, linear_blending, signals,
++                             G_N_ELEMENTS (signals), 1e-4f);
++  assert_shader_matches_cpu (pq, both, signals, G_N_ELEMENTS (signals),
++                             2e-3f);
++}
++
+ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference", hlg_decode_reference)
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference-white", hlg_decode_reference_white)
+@@ -1198,4 +2657,17 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/monotonic", mapping_monotonic)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/keeps-hue", mapping_keeps_hue)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/shader-matches-cpu", mapping_shader_matches_cpu)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/predicate", gamut_predicate)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/identity", gamut_identity)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/boundary", gamut_boundary)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/non-d65", gamut_non_d65)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/extended-range", gamut_extended_range)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/extreme-mastering", gamut_extreme_mastering)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/threshold-unchanged", gamut_threshold_unchanged)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/reference", gamut_reference)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/monotonic", gamut_monotonic)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/non-finite", gamut_non_finite)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/source-gamut", gamut_source_gamut)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/tolerance", gamut_tolerance)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/shader-matches-cpu", gamut_shader_matches_cpu)
+ )
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index e7fb33a..7e9a96d 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -952,8 +952,8 @@ wayland_test_cases = [
+     # the shared Wayland colour manager, so each runs in its own invocation.
+     # The SDR-native case and the info round trip rewrite the fixture
+     # output's EDID and colour mode, and the zero-descriptor case replaces
+-    # the process's descriptor 0. The mapping case gives the fixture output a
+-    # declared target peak.
++    # the process's descriptor 0. The mapping cases give the fixture output a
++    # declared target peak or declared target primaries.
+     'separate_cases': [
+       '/wayland/target-luminance/v1',
+       '/wayland/target-luminance/v2',
+@@ -963,6 +963,7 @@ wayland_test_cases = [
+       '/wayland/custom-primaries/info-round-trip',
+       '/wayland/icc-file/zero-descriptor',
+       '/wayland/mapping/blending-target',
++      '/wayland/mapping/target-gamut',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index d4b51a2..fa8df3b 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -844,6 +844,79 @@ edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
+     }
+ }
+ 
++/* The CIE 1931 xy of DisplayID 2 CIE 1976 coordinates, in code units. */
++static void
++uv_code_to_xy (double  a,
++               double  b,
++               double *x,
++               double *y)
++{
++  double u = a / 4096.0, v = b / 4096.0, d = 6.0 * u - 16.0 * v + 12.0;
++
++  *x = 9.0 * u / d;
++  *y = 4.0 * v / d;
++}
++
++/*
++ * The declared target primaries carry the resolution of their declaration,
++ * per primary: one 12-bit step for CIE 1931 coordinates, and for CIE 1976
++ * coordinates a bound on how far half a code step in any direction moves
++ * that primary in xy, with the margin the derivation claims.
++ */
++static void
++test_target_primaries_tolerance (void)
++{
++  const uint16_t xy[4][2] = {
++    { 2816, 1280 }, { 1024, 2816 }, { 512, 256 }, { 1280, 1344 },
++  };
++  const uint16_t uv[4][2] = {
++    { 1024, 2304 }, { 512, 2304 }, { 719, 647 }, { 810, 1918 },
++  };
++  MetaEdidInfo edid = { .native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED };
++  const ClutterPrimaries *encoding = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
++  MetaColorTargetPrimaries target, fallback;
++  unsigned int i;
++  int du, dv;
++
++  set_raw_points (&edid, xy);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  for (i = 0; i < 3; i++)
++    g_assert_cmpfloat (target.tolerance[i], ==, (float) (1.0 / 4096.0));
++
++  meta_color_target_primaries_init (&fallback, &edid, FALSE, encoding);
++  g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  for (i = 0; i < 3; i++)
++    g_assert_cmpfloat (fallback.tolerance[i], ==, 0.0f);
++
++  /* Per primary: here they differ. */
++  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
++  set_raw_points (&edid, uv);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpfloat (target.tolerance[0], !=, target.tolerance[2]);
++
++  for (i = 0; i < 3; i++)
++    {
++      double x0, y0;
++
++      g_assert_cmpfloat (target.tolerance[i], <, 8.0 / 4096.0);
++
++      uv_code_to_xy (uv[i][0], uv[i][1], &x0, &y0);
++      for (du = -1; du <= 1; du++)
++        {
++          for (dv = -1; dv <= 1; dv++)
++            {
++              double x, y;
++
++              uv_code_to_xy (uv[i][0] + du * 0.5, uv[i][1] + dv * 0.5, &x, &y);
++              g_assert_cmpfloat (hypot (x - x0, y - y0) * G_SQRT2, <=,
++                                 target.tolerance[i]);
++            }
++        }
++    }
++}
++
+ static void
+ test_chromaticity_fixed_point (void)
+ {
+@@ -1012,6 +1085,7 @@ main (int    argc,
+   g_test_add_func ("/native-hdr/target-luminance-policy", test_target_luminance_policy);
+   g_test_add_func ("/native-hdr/physical-chromaticities", test_physical_chromaticities);
+   g_test_add_func ("/native-hdr/target-primaries-policy", test_target_primaries_policy);
++  g_test_add_func ("/native-hdr/target-primaries-tolerance", test_target_primaries_tolerance);
+   g_test_add_func ("/native-hdr/chromaticity-fixed-point", test_chromaticity_fixed_point);
+   g_test_add_func ("/native-hdr/sdr-native-edid-primaries", test_sdr_native_edid_primaries);
+   return g_test_run ();
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index a3d0d56..983d4ff 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1292,6 +1292,222 @@ mapping_blending_target (void)
+   meta_color_device_update (device);
+ }
+ 
++/* Whether the conversion of @color to @blending differs from the same
++ * conversion to @untargeted, the blending state without a target. */
++static gboolean
++renderer_changes_color (ClutterColorState *source,
++                        ClutterColorState *blending,
++                        ClutterColorState *untargeted,
++                        const float        color[3])
++{
++  ClutterContext *context = clutter_color_state_get_context (source);
++  ClutterColorTransform *transform, *untargeted_transform;
++  float mapped[4] = { color[0], color[1], color[2], 1.0f };
++  float unmapped[4] = { color[0], color[1], color[2], 1.0f };
++
++  transform = clutter_color_transform_from_color_states (context, source,
++                                                         blending, 0);
++  untargeted_transform =
++    clutter_color_transform_from_color_states (context, source, untargeted, 0);
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                       mapped, 1);
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (untargeted_transform),
++                                       unmapped, 1);
++
++  return memcmp (mapped, unmapped, sizeof (mapped)) != 0;
++}
++
++static void
++mapping_target_gamut (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  ClutterContext *context = meta_backend_get_clutter_context (backend);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  const MetaColorTargetPrimaries *target_primaries;
++  const ClutterColorTargetVolume *target_volume;
++  ClutterStageView *view;
++  ClutterColorState *blending, *output_color_state;
++  g_autoptr (ClutterColorState) untargeted = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_srgb = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_p3 = NULL;
++  g_autoptr (ClutterColorState) pq_mastered_beyond = NULL;
++  ClutterColorTargetVolume srgb_mastering = {
++    .has_primaries = TRUE,
++    .primaries = *clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_SRGB),
++  };
++  /* DCI-P3 with a D65 white point, as content declares it. */
++  ClutterColorTargetVolume p3_mastering = {
++    .has_primaries = TRUE,
++    .primaries = {
++      .r_x = 0.680f, .r_y = 0.320f,
++      .g_x = 0.265f, .g_y = 0.690f,
++      .b_x = 0.150f, .b_y = 0.060f,
++      .w_x = 0.3127f, .w_y = 0.3290f,
++    },
++  };
++  ClutterColorTargetVolume beyond_mastering = p3_mastering;
++  /* Saturated BT.2020 green as a PQ signal: outside the panel gamut. */
++  const float bt2020_green[3] = { 0.1f, 0.75f, 0.1f };
++  const float neutral[3] = { 0.5f, 0.5f, 0.5f };
++  unsigned int i;
++
++  /*
++   * A synthetic native HDR panel declaring DCI-P3 with a D65 white point,
++   * rounded to DisplayID's 12-bit CIE 1931 coordinates, and no target peak,
++   * so that nothing is highlight mapped.
++   */
++  info->connector_type = META_CONNECTOR_TYPE_eDP;
++  info->supported_hdr_eotfs = 1 << META_OUTPUT_HDR_METADATA_EOTF_PQ;
++  info->supported_color_spaces = 1 << META_OUTPUT_COLORSPACE_BT2020;
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->native_rgb_bt2020_pq = TRUE;
++  info->edid_info->native_luminance_status = META_NATIVE_LUMINANCE_INVALID;
++  info->edid_info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED;
++  info->edid_info->native_chromaticities = (struct di_displayid2_native_chromaticities) {
++    .primaries = { { 2785, 1311, TRUE }, { 1085, 2826, TRUE }, { 614, 246, TRUE } },
++    .white_point = { 1281, 1348, TRUE },
++  };
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++  target_primaries = meta_color_device_get_target_primaries (device);
++  g_assert_cmpint (target_primaries->source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
++                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  view = CLUTTER_STAGE_VIEW (meta_renderer_get_view_for_crtc (renderer,
++                                                              meta_output_get_assigned_crtc (output)));
++  g_assert_nonnull (view);
++
++  /* The blending state carries the published primaries, and no peak; the
++   * output color state stays the encoding. */
++  output_color_state = clutter_stage_view_get_output_color_state (view);
++  g_assert_true (output_color_state == meta_color_device_get_color_state (device));
++  blending = clutter_stage_view_get_color_state (view);
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending));
++  g_assert_true (target_volume->has_primaries);
++  g_assert_false (target_volume->has_luminance);
++  g_assert_cmpfloat (target_volume->primaries.r_x, ==,
++                     (float) (target_primaries->coordinates[0] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.r_y, ==,
++                     (float) (target_primaries->coordinates[1] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.g_x, ==,
++                     (float) (target_primaries->coordinates[2] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.g_y, ==,
++                     (float) (target_primaries->coordinates[3] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.b_x, ==,
++                     (float) (target_primaries->coordinates[4] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.b_y, ==,
++                     (float) (target_primaries->coordinates[5] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.w_x, ==,
++                     (float) (target_primaries->coordinates[6] / 1000000.0));
++  g_assert_cmpfloat (target_volume->primaries.w_y, ==,
++                     (float) (target_primaries->coordinates[7] / 1000000.0));
++  /* With the resolution of the declaration. */
++  for (i = 0; i < 3; i++)
++    {
++      g_assert_cmpfloat (target_primaries->tolerance[i], >, 0.0f);
++      g_assert_cmpfloat (target_volume->primaries_tolerance[i], ==,
++                         target_primaries->tolerance[i]);
++    }
++
++  untargeted = clutter_color_state_get_blending (output_color_state, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  pq_mastered_srgb =
++    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (pq),
++                                                       &srgb_mastering);
++  pq_mastered_p3 =
++    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (pq),
++                                                       &p3_mastering);
++  /* P3 with its red primary 1% further from white: far more than one
++   * declaration step outside the declared gamut. */
++  beyond_mastering.primaries.r_x = 0.3127f + 1.01f * (0.680f - 0.3127f);
++  beyond_mastering.primaries.r_y = 0.3290f + 1.01f * (0.320f - 0.3290f);
++  pq_mastered_beyond =
++    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (pq),
++                                                       &beyond_mastering);
++
++  /* BT.2020 PQ, the output's own encoding: its gamut exceeds the panel's, so
++   * it is compressed and scanout is refused, by the same predicate. */
++  g_assert_false (clutter_color_pipeline_shader_needs_color_state (pq,
++                                                                   output_color_state,
++                                                                   0));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, blending));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq, blending));
++  g_assert_true (clutter_color_transform_requires_mapping (pq, blending));
++  g_assert_true (meta_compositor_view_native_color_state_prevents_scanout (pq,
++                                                                           blending,
++                                                                           output_color_state));
++  g_assert_true (renderer_changes_color (pq, blending, untargeted, bt2020_green));
++
++  /* P3 content on the panel declaring P3: its primaries lie a fraction of a
++   * declaration step outside the quantized triangle, within the tolerance
++   * the device carries with the declaration, so it is not compressed and is
++   * scanned out. */
++  g_assert_false (clutter_color_transform_requires_mapping (pq_mastered_p3, blending));
++  g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (pq_mastered_p3,
++                                                                            blending,
++                                                                            output_color_state));
++  g_assert_false (renderer_changes_color (pq_mastered_p3, blending, untargeted,
++                                          bt2020_green));
++
++  /* A mastering primary clearly outside still compresses. */
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq_mastered_beyond,
++                                                                     blending));
++  g_assert_true (meta_compositor_view_native_color_state_prevents_scanout (pq_mastered_beyond,
++                                                                           blending,
++                                                                           output_color_state));
++
++  /* The same encoding mastered in sRGB lies within the panel gamut: not
++   * compressed, and scanned out. */
++  g_assert_false (clutter_color_pipeline_shader_needs_color_state (pq_mastered_srgb,
++                                                                   output_color_state,
++                                                                   0));
++  g_assert_false (clutter_color_transform_requires_mapping (pq_mastered_srgb, blending));
++  g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (pq_mastered_srgb,
++                                                                            blending,
++                                                                            output_color_state));
++  g_assert_false (renderer_changes_color (pq_mastered_srgb, blending, untargeted,
++                                          bt2020_green));
++
++  /* An sRGB surface is never compressed; it is composited only because its
++   * encoding differs. */
++  g_assert_false (clutter_color_transform_requires_mapping (srgb, blending));
++  g_assert_false (renderer_changes_color (srgb, blending, untargeted, neutral));
++  g_assert_false (renderer_changes_color (srgb, blending, untargeted,
++                                          (const float[3]) { 1.0f, 0.0f, 0.0f }));
++
++  /* Without declared primaries the target primaries are the encoding
++   * fallback, which is not a physical gamut: nothing is compressed. */
++  info->edid_info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_INVALID;
++  meta_color_device_update (device);
++  g_assert_cmpint (meta_color_device_get_target_primaries (device)->source,
++                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  blending = clutter_stage_view_get_color_state (view);
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending));
++  g_assert_false (target_volume->has_primaries);
++  g_assert_false (clutter_color_transform_requires_mapping (pq, blending));
++  g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (pq,
++                                                                            blending,
++                                                                            output_color_state));
++  g_assert_false (renderer_changes_color (pq, blending, untargeted, bt2020_green));
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
+ static void
+ client_mode_case (gconstpointer data)
+ {
+@@ -1524,6 +1740,8 @@ init_tests (void)
+                    mastering_round_trip);
+   g_test_add_func ("/wayland/mapping/blending-target",
+                    mapping_blending_target);
++  g_test_add_func ("/wayland/mapping/target-gamut",
++                   mapping_target_gamut);
+ }
+ 
+ int
