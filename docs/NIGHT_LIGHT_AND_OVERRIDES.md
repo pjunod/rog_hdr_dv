@@ -1,6 +1,8 @@
 # Night Light in HDR, and per-monitor target overrides (nativehdr10)
 
-**Status:** specified · **Date:** 2026-10-11.
+**Status:** configuration/API source stage compiled and exported; complete
+source integration, adversarial review and unit validation pending ·
+**Date:** 2026-10-11.
 
 Two compositor changes for general availability, specified together because
 both change how the colour device builds an output's rendering colour state.
@@ -23,10 +25,17 @@ Nothing excludes BT.2100. Upstream has the same behaviour.
   gamma LUT or CTM. Both stay at identity (calibration ramps from an
   assigned profile are an SDR concept and are not applied to PQ either).
 - The white-point shift is part of the output's rendering colour state.
-  It is a chromatic adaptation from the encoding white (D65) to the
-  blackbody white at the Night Light temperature, in linear light. It runs
-  in the blending → output conversion before PQ encoding, and it is
-  normalised so that no channel exceeds its unadapted value. Night Light
+  It uses diagonal von Kries channel factors in the output's linear RGB
+  frame, derived from the Planckian white at the Night Light temperature.
+  Negative factors are clamped to zero at parameter construction and the
+  factors are divided by their largest value; no per-pixel clipping is added.
+  This projects an out-of-gamut Planckian white (notably at 1000 K) into
+  nonnegative output RGB, rather than claiming exact chromaticity there.
+  Representable whites, including the 4000 K acceptance point, retain the
+  requested chromaticity. It runs
+  in the blending → output conversion before PQ encoding, wrapped in the
+  output-RGB/linear-BT.2020 conversions, so that no output RGB channel
+  exceeds its unadapted value. Night Light
   therefore warms and very slightly dims, as in SDR, but never brightens.
 - One owner: the colour device sets it on the rendering colour state, next
   to the target volume. Every reader gets the same state, as with highlight
@@ -92,3 +101,61 @@ sources in BT.2100; native SDR unaffected by `hdr-gamut-source`).
 Monitor-configuration tests for parse, store and round trip, including
 configurations without the fields. A D-Bus test that applies an override
 and reads back the effective target and provenance.
+
+### Configuration and API semantics
+
+The [unreviewed source stage](../wip/mutter-target-overrides/README.md) stores
+`<targetpeakluminance>`, `<targetminluminance>` and `<hdrgamutsource>` under
+each `<monitor>`; unset fields are omitted. Zero is an explicit black level,
+not a reset sentinel. XML and D-Bus reject nonfinite values, wrong D-Bus types,
+duplicate declarations, unknown gamut enums, minimum without peak, peak at or
+below nominal PQ white (203 cd/m²), and ranges outside the target wire limits.
+The optional black must be below the integer part of the peak. Validation
+uses nominal white, not brightness-scaled white: a 400 cd/m² peak remains
+valid at reference-luminance factor 2.1 (~426 cd/m² white).
+
+ApplyMonitorsConfig replaces override fields, like colour mode: omitted peak
+removes the luminance override, omitted minimum restores encoding black,
+and omitted gamut source restores `auto`. VERIFY does not change the output.
+Persistent requests use the existing confirmation and restore lifecycle.
+Configuration copies retain colour mode, RGB range and overrides; generated
+layouts recover each monitor's declarations through existing configuration
+history. This is separate from explicit D-Bus replacement semantics.
+
+gdctl performs read-modify-write of configured fields, preserving colour mode,
+RGB range and overrides when changing unrelated layout options. Per-monitor
+options are `--target-peak-luminance CD_M2|auto`,
+`--target-min-luminance CD_M2|auto` and
+`--hdr-gamut-source auto|base-edid|none`. Clearing peak with `auto` clears the
+whole luminance override; clearing only minimum keeps peak. There is no zero
+sentinel. `show --properties` and `show --verbose` print effective targets and
+provenance. They do not label declarations as measurements.
+
+GetCurrentState reports configured peak/minimum as doubles and configured
+gamut source as a string (automatic/unset fields are absent). Its effective
+properties come from the applied colour device, only when active and with an
+initialized colour state:
+
+| Property | Type and meaning |
+|---|---|
+| `target-luminance` | `(dd)`: minimum, maximum in cd/m² |
+| `target-min-luminance-source` | string: minimum provenance |
+| `target-max-luminance-source` | string: maximum provenance |
+| `target-primaries` | eight doubles: CIE1931 xy for R, G, B, W |
+| `target-primaries-source` | string: gamut provenance |
+
+The shared provenance names are `encoding-fallback`, `firmware-declared`,
+`cta-declared`, `edid-declared` and (after selector integration)
+`user-declared`. In BT.2100, a valid explicitly chosen base-EDID gamut is
+user-declared. An unusable base-EDID candidate falls through to DisplayID,
+then encoding fallback. `none` is a valid terminal request for encoding
+fallback, suppressing other gamut candidates. Native SDR is unaffected.
+
+Known compatibility limit: a client that does not know these properties
+(including today's Settings) drops overrides when it replaces the layout.
+The Settings UI is later work. Older compositors reject the new monitor XML
+children rather than ignoring them; see [rollback preparation](OPERATIONS.md#2-protect-the-working-installation).
+
+This stage is compiled and replay-verified, not unit-qualified. Its effective
+override assertions await Opus's target selector. Both source parts require
+the agreed adversarial reviews and one affected unit batch before acceptance.

@@ -63,6 +63,9 @@ generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides.
+The [unreviewed override source stage](wip/mutter-target-overrides/README.md)
+is compiled and exported; integration, adversarial review and unit validation
+remain pending. It is not the pinned or deployed candidate.
 [Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
 agent: state, next tasks, environments and commands.
 

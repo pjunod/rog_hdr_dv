@@ -4,8 +4,11 @@ These three patches are an implementation agent's partial start on part 1 of
 [Night Light and target overrides](../../docs/NIGHT_LIGHT_AND_OVERRIDES.md).
 The batch was interrupted before review, so they are kept here rather than
 in `patches/`. They are not pinned in `sources.json`, not reviewed, not
-packaged and not installed anywhere. Part 2 (per-monitor overrides) has not
-been started.
+packaged and not installed anywhere. The configuration/API portion of part 2
+is now compiled and exported separately in
+[the override stage](../mutter-target-overrides/README.md); its target selector
+and both source parts' final integration/qualification remain pending. These
+original Night Light patch bytes are still unchanged.
 
 - **Base:** the upstream-facing Mutter series in `patches/mutter` (candidate
   tree `3f238d2e9227dacd578f5a673c04ac10de5caac8`); reconstruct it with

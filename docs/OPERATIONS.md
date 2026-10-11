@@ -57,6 +57,16 @@ uses additive private APIs. Preserve Secure Boot. Kernel image signing and
 NVIDIA module signing are separate checks; the original module-only trust
 configuration did not automatically authorize the test image.
 
+For a future rollback from nativehdr10, preserve a compatible pre-override
+`monitors.xml` before the coordinated deployment window. Older compositors
+reject the new `<targetpeakluminance>`, `<targetminluminance>` and
+`<hdrgamutsource>` children under `<monitor>`; they do not safely ignore them.
+Prepare a compatible recovery configuration (or deliberately remove those
+fields from a recovery copy), alongside the matching recovery packages.
+Unset fields are omitted by the new writer, but that does not make a saved
+override compatible with the old parser. No live configuration is changed
+by this source stage.
+
 ## 3. Run a bounded physical test
 
 Capture settings before changing one variable. Use reproducible patches and

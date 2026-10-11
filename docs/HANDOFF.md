@@ -34,6 +34,27 @@ agent's workspace.
 
 ## Next tasks, in order
 
+### nativehdr10 source checkpoint (Sol stage, 2026-10-11)
+
+The [override configuration/API source stage](../wip/mutter-target-overrides/README.md)
+is compiled and exported in six authored patches, with native replay tree
+`ebe9aeb880eab66fcfc5cbf34a97d9eaf6cd30f5`. See the
+[stage receipt](../evidence/nativehdr10-sol-stage.json). The warm native source
+is at `9b2886d826a577c866c5cd26533a1109c9aba9c7` on
+`codex/sol-overrides`; do not reconstruct over it. Complete Night Light and
+target selection through the dependent Opus stage, then export the integrated
+candidate with the unchanged 49-patch prefix. The shared provenance converter
+is now `meta_color_target_provenance_to_string`; extend its one table.
+
+No units ran here. New D-Bus regressions intentionally depend on selector
+integration; golden gdctl show fixtures are source-derived expectations, not
+execution output. Both adversarial review lanes and their fixes precede the
+single affected validation batch. PR16 remains held unmerged, and the current
+pins still describe the qualified baseline. No push, merge or display change
+is authorized by this checkpoint. Ubuntu port/packaging and optical acceptance
+remain separate stages; only Mutter's orig tar is recorded in the offline
+Ubuntu cache, not the exact packaging imports.
+
 1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Review and
    complete part 1 from `wip/mutter-nightlight`, implement part 2 (overrides
    with precedence measured > user > DisplayID > CTA > fallback), build each
