@@ -255,3 +255,36 @@ the disconnect warning libwayland-server logs, so the harness aborted the
 compositor and the client saw EPIPE. The cases now expect that warning, as
 the other Mutter protocol-error tests do. Only that invocation was rerun,
 and it passed ([receipt](../evidence/mutter-colour-input.json)).
+
+## Seventh batch — HLG and highlight mapping (nativehdr6)
+
+The coordinator ruled on the implementation's deviations from the
+[contract](HDR_MAPPING.md). MaxFALL above MaxCLL is a protocol error when both
+are known, as the protocol requires; zero means unknown. Mastering primaries
+are not tested for containment. Instead, `extended_target_volume` is
+advertised, which is truthful because target primaries are not used to map
+gamut. The mapping never lifts black. Monitor screencasts are deliberately not
+mapped.
+
+An independent adversarial review then found two blockers and five should-fix
+defects. All are fixed:
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| GPU-vs-CPU tests compared an 8-bit-quantized GPU input with exact CPU floats; they would fail on any GPU | Blocker (computed) | The CPU reference receives the value the GPU receives; tolerances kept |
+| The transform cache used the 10%-tolerant colour-state equality, so a mapped and an unmapped surface could share a pipeline while scanout disagreed | Blocker | Exact cache equality and hash, including the target volume and display reference |
+| Published reference white was the truncated integer of the internal float, so clients following the preferred description were mapped at any brightness other than 100% | Should-fix | The output state's reference white is rounded once, at its source |
+| Client HLG black levels with β > 0.5 inverted the decode or divided by zero in the encode | Should-fix | One shared HLG validity check; invalid descriptions fail as unsupported |
+| The hardware cursor re-evaluated mapping only on cursor updates | Should-fix | The view's colour-state changes invalidate it, and the next frame updates it |
+| Extended-range (linear) encodings were capped by their nominal maximum and never mapped | Should-fix | Their effective peak comes from declared MaxCLL or mastering maximum; without one, no mapping |
+| Missing tests at brightness factors other than 1 and for cache parity | Should-fix | Added |
+| Double invalidation, duplicate peak definition, stale comment, bisectability, display-target predicate | Nit | Coalesced exact updates, one definition, comment fixed, history folded per slice, predicate requires a display reference |
+
+The fast lane ran once over the affected suites. The main Wayland invocation
+failed in three test-client defects, found one after another: a create-time
+error was asserted on an interface the client had already destroyed, the
+shared listener had no handler for version 2's `ready2`, and identities were
+compared after the first description could have been released for reuse. Only
+that invocation was rerun after each fix, and finally passed; the separate
+invocations sharing that client were rerun once and passed
+([receipt](../evidence/mutter-hdr-mapping.json)).

@@ -421,5 +421,8 @@ Mutter patches 0016–0027 (`nativehdr5`) implement this batch:
 
 The review findings are in [review](REVIEW.md#sixth-batch--compositor-colour-input-nativehdr5);
 the affected fast lane and the remaining renderer limitation are in the
-[receipt](../evidence/mutter-colour-input.json). HLG, output
-characterization and physical mapping remain subsequent work.
+[receipt](../evidence/mutter-colour-input.json).
+
+HLG decoding and BT.2390 highlight mapping toward the declared target
+followed in `nativehdr6` ([contract and status](HDR_MAPPING.md)). Gamut
+compression and output characterization remain subsequent work.

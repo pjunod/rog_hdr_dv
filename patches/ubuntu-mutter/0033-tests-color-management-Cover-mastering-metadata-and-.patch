@@ -1,0 +1,708 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:12:11 -0400
+Subject: [PATCH] tests/color-management: Cover mastering metadata and light
+ levels
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Replace the two regressions that expected set_mastering_display_primaries
+and set_mastering_luminance to raise unsupported_feature, now that they
+are supported, with:
+
+ - /wayland/creator-params/mastering-luminance-invalid: a mastering
+   maximum equal to the minimum (1 cd/m² both) raises
+   invalid_luminance on the creator-params interface.
+ - /wayland/creator-params/mastering-primaries-twice,
+   .../mastering-luminance-twice, .../max-cll-twice and
+   .../max-fall-twice: a repeated request raises already_set.
+ - /wayland/creator-params/max-fall-above-max-cll: create raises
+   invalid_luminance for MaxFALL 401 with MaxCLL 400.
+ - /wayland/creator-params/v1-max-cll-above-mastering: on a version 1
+   creator, MaxCLL above the mastering maximum raises
+   invalid_luminance at create; .../v2-light-levels: the same values
+   are accepted on version 2.
+ - /wayland/creator-params/extended-target-volume: collinear mastering
+   primaries and an unrepresentable coordinate fail with the
+   'unsupported' cause and the connection survives; P3-D65 and BT.2020
+   mastering primaries in a BT.2020 volume, BT.2020 mastering primaries
+   in a BT.709 volume, and reference white above the maximum luminance
+   are accepted.
+ - /wayland/creator-params/mastering-round-trip: the client finds
+   set_mastering_display_primaries and extended_target_volume
+   advertised. HDR10 metadata (P3-D65, 0.0001 to 1000 cd/m², MaxCLL 800,
+   MaxFALL 300) is retained exactly on the surface's color state, gives
+   an effective peak of 800 cd/m² (from
+   clutter_color_state_params_get_peak_headroom(), against 10000 for
+   plain PQ), makes a state unequal to the same encoding without
+   metadata yet needing no conversion to or from it; MaxCLL and MaxFALL
+   of 0 declare nothing (equal state, equal hash); MaxFALL alone is kept
+   and does not lower the effective peak.
+
+Protocol error cases expect the disconnect warning, as the existing
+ones do.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/tests/wayland-color-management-test.c     | 131 ++++-
+ .../wayland-test-clients/color-management.c   | 467 ++++++++++++++++--
+ 2 files changed, 556 insertions(+), 42 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 0053775..ea43ec5 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -38,6 +38,7 @@
+ #include "backends/meta-logical-monitor-private.h"
+ #include "backends/meta-monitor-manager-private.h"
+ #include "backends/meta-output.h"
++#include "clutter/clutter-color-state-params-private.h"
+ #include "clutter/clutter-color-utils-private.h"
+ #include "core/meta-debug-control-private.h"
+ #include "core/window-private.h"
+@@ -935,6 +936,112 @@ hlg_creation (void)
+   meta_wayland_test_client_finish (client);
+ }
+ 
++static const ClutterColorTargetVolume *
++get_window_target_volume (MetaWindow *window)
++{
++  ClutterColorState *color_state = get_window_color_state (window);
++
++  g_assert_true (CLUTTER_IS_COLOR_STATE_PARAMS (color_state));
++
++  return clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_state));
++}
++
++/* The effective peak in the state's own luminance units. */
++static double
++get_peak_luminance (ClutterColorState *color_state)
++{
++  ClutterColorStateParams *params = CLUTTER_COLOR_STATE_PARAMS (color_state);
++  double peak_headroom;
++
++  g_assert_true (clutter_color_state_params_get_peak_headroom (params, NULL,
++                                                               &peak_headroom));
++
++  return peak_headroom * clutter_color_state_params_get_luminance (params)->ref;
++}
++
++static void
++mastering_round_trip (void)
++{
++  MetaWaylandTestClient *client;
++  MetaWindow *window;
++  g_autoptr (ClutterColorState) plain = NULL;
++  ClutterColorState *color_state;
++  const ClutterColorTargetVolume *target_volume;
++  double peak;
++
++  /* The client also checks the advertised features. */
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "mastering-round-trip",
++                                                   NULL);
++  window = meta_wait_for_client_window (test_context,
++                                        "color-management-mastering");
++
++  wait_for_sync_point (0);
++  plain = g_object_ref (get_window_color_state (window));
++  target_volume = get_window_target_volume (window);
++  g_assert_false (target_volume->has_primaries);
++  g_assert_false (target_volume->has_luminance);
++  g_assert_cmpfloat (target_volume->max_cll, ==, 0.0f);
++  g_assert_cmpfloat (target_volume->max_fall, ==, 0.0f);
++  /* PQ's default range: 10000 cd/m², reference white 203 cd/m². */
++  peak = get_peak_luminance (plain);
++  g_assert_cmpfloat_with_epsilon (peak, 10000.0, 0.01);
++  emit_sync_event (0);
++
++  /* The declared values survive, and make a different color state, which
++   * still needs no conversion to or from the plain one. */
++  wait_for_sync_point (1);
++  color_state = get_window_color_state (window);
++  target_volume = get_window_target_volume (window);
++  g_assert_true (target_volume->has_primaries);
++  g_assert_cmpfloat (target_volume->primaries.r_x, ==, 0.68f);
++  g_assert_cmpfloat (target_volume->primaries.r_y, ==, 0.32f);
++  g_assert_cmpfloat (target_volume->primaries.g_x, ==, 0.265f);
++  g_assert_cmpfloat (target_volume->primaries.g_y, ==, 0.69f);
++  g_assert_cmpfloat (target_volume->primaries.b_x, ==, 0.15f);
++  g_assert_cmpfloat (target_volume->primaries.b_y, ==, 0.06f);
++  g_assert_cmpfloat (target_volume->primaries.w_x, ==, 0.3127f);
++  g_assert_cmpfloat (target_volume->primaries.w_y, ==, 0.329f);
++  g_assert_true (target_volume->has_luminance);
++  g_assert_cmpfloat_with_epsilon (target_volume->min_lum, 0.0001f, 1e-9f);
++  g_assert_cmpfloat (target_volume->max_lum, ==, 1000.0f);
++  g_assert_cmpfloat (target_volume->max_cll, ==, 800.0f);
++  g_assert_cmpfloat (target_volume->max_fall, ==, 300.0f);
++  peak = get_peak_luminance (color_state);
++  g_assert_cmpfloat_with_epsilon (peak, 800.0, 1e-3);
++  g_assert_false (clutter_color_state_equals (color_state, plain));
++  g_assert_false (clutter_color_pipeline_shader_needs_color_state (color_state, plain, 0));
++  g_assert_false (clutter_color_pipeline_shader_needs_color_state (plain, color_state, 0));
++  emit_sync_event (1);
++
++  /* Unknown light levels declare nothing. */
++  wait_for_sync_point (2);
++  color_state = get_window_color_state (window);
++  target_volume = get_window_target_volume (window);
++  g_assert_false (target_volume->has_primaries);
++  g_assert_false (target_volume->has_luminance);
++  g_assert_cmpfloat (target_volume->max_cll, ==, 0.0f);
++  g_assert_cmpfloat (target_volume->max_fall, ==, 0.0f);
++  g_assert_true (clutter_color_state_equals (color_state, plain));
++  g_assert_cmpuint (clutter_color_state_hash (color_state), ==,
++                    clutter_color_state_hash (plain));
++  emit_sync_event (2);
++
++  /* MaxFALL alone is kept but does not lower the peak. */
++  wait_for_sync_point (3);
++  color_state = get_window_color_state (window);
++  target_volume = get_window_target_volume (window);
++  g_assert_cmpfloat (target_volume->max_cll, ==, 0.0f);
++  g_assert_cmpfloat (target_volume->max_fall, ==, 250.0f);
++  peak = get_peak_luminance (color_state);
++  g_assert_cmpfloat_with_epsilon (peak, 10000.0, 0.01);
++  g_assert_false (clutter_color_state_equals (color_state, plain));
++  emit_sync_event (3);
++
++  meta_wayland_test_client_finish (client);
++}
++
+ static void
+ client_mode_case (gconstpointer data)
+ {
+@@ -1145,10 +1252,26 @@ init_tests (void)
+   g_test_add_func ("/wayland/hlg/creation", hlg_creation);
+   g_test_add_data_func ("/wayland/hlg/invalid-black-level",
+                         "hlg-invalid-black-level", client_mode_case);
+-  g_test_add_data_func ("/wayland/creator-params/mastering-primaries-unsupported",
+-                        "mastering-primaries", client_protocol_error_case);
+-  g_test_add_data_func ("/wayland/creator-params/mastering-luminance-unsupported",
+-                        "mastering-luminance", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/mastering-luminance-invalid",
++                        "mastering-luminance-invalid", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/mastering-primaries-twice",
++                        "mastering-primaries-twice", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/mastering-luminance-twice",
++                        "mastering-luminance-twice", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/max-cll-twice",
++                        "max-cll-twice", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/max-fall-twice",
++                        "max-fall-twice", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/max-fall-above-max-cll",
++                        "max-fall-above-max-cll", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/v1-max-cll-above-mastering",
++                        "v1-max-cll-above-mastering", client_protocol_error_case);
++  g_test_add_data_func ("/wayland/creator-params/v2-light-levels",
++                        "v2-light-levels", client_mode_case);
++  g_test_add_data_func ("/wayland/creator-params/extended-target-volume",
++                        "extended-target-volume", client_mode_case);
++  g_test_add_func ("/wayland/creator-params/mastering-round-trip",
++                   mastering_round_trip);
+ }
+ 
+ int
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index ed0ba65..6f63efc 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -133,9 +133,22 @@ handle_image_description_ready (void                           *data,
+   image_description_context->image_description_id = identity;
+ }
+ 
++/* Version 2 objects deliver ready2 instead of ready. */
++static void
++handle_image_description_ready2 (void                           *data,
++                                 struct wp_image_description_v1 *image_description_v4,
++                                 uint32_t                        identity_hi,
++                                 uint32_t                        identity_lo)
++{
++  ImageDescriptionContext *image_description_context = data;
++
++  image_description_context->image_description_id = identity_lo;
++}
++
+ static const struct wp_image_description_v1_listener image_description_listener = {
+-  handle_image_description_failed,
+-  handle_image_description_ready,
++  .failed = handle_image_description_failed,
++  .ready = handle_image_description_ready,
++  .ready2 = handle_image_description_ready2,
+ };
+ 
+ static void
+@@ -646,38 +659,6 @@ icc_unsupported_content_client (WaylandDisplay *display)
+   g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
+ }
+ 
+-static void
+-mastering_unsupported_client (WaylandDisplay *display,
+-                              gboolean        primaries)
+-{
+-  struct wp_image_description_creator_params_v1 *creator_params;
+-  const struct wl_interface *interface = NULL;
+-
+-  creator_params =
+-    wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
+-  if (primaries)
+-    {
+-      wp_image_description_creator_params_v1_set_mastering_display_primaries (
+-        creator_params,
+-        640000, 330000, 300000, 600000, 150000, 60000, 312700, 329000);
+-    }
+-  else
+-    {
+-      wp_image_description_creator_params_v1_set_mastering_luminance (
+-        creator_params, 50, 1000);
+-    }
+-
+-  /* The error is the creator-params interface's own unsupported_feature,
+-   * not the color manager's (whose value would mean incomplete_set here). */
+-  g_assert_cmpint (wl_display_roundtrip (display->display), ==, -1);
+-  g_assert_cmpint (wl_display_get_error (display->display), ==, EPROTO);
+-  g_assert_cmpuint (wl_display_get_protocol_error (display->display,
+-                                                   &interface, NULL),
+-                    ==,
+-                    WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE);
+-  g_assert_true (interface == &wp_image_description_creator_params_v1_interface);
+-}
+-
+ typedef struct
+ {
+   uint32_t features;
+@@ -904,6 +885,400 @@ hlg_invalid_black_level_client (WaylandDisplay *display)
+   g_assert_false (create_hlg_with_luminances (display, 110 * 10000, 4000, 203));
+ }
+ 
++/* SMPTE ST 2086 metadata as HDR10 content commonly declares it: DCI-P3
++ * primaries with a D65 white point. P3's red lies just outside BT.2020. */
++static const int32_t p3_d65_coordinates[8] = {
++  680000, 320000, 265000, 690000, 150000, 60000, 312700, 329000,
++};
++
++static const int32_t bt2020_coordinates[8] = {
++  708000, 292000, 170000, 797000, 131000, 46000, 312700, 329000,
++};
++
++static void
++assert_creator_params_error (WaylandDisplay *display,
++                             uint32_t        error_code)
++{
++  const struct wl_interface *interface = NULL;
++
++  g_assert_cmpint (wl_display_roundtrip (display->display), ==, -1);
++  g_assert_cmpint (wl_display_get_error (display->display), ==, EPROTO);
++  g_assert_cmpuint (wl_display_get_protocol_error (display->display,
++                                                   &interface, NULL),
++                    ==,
++                    error_code);
++  g_assert_true (interface == &wp_image_description_creator_params_v1_interface);
++}
++
++/* 'create' is a destructor request: the client has already destroyed its
++ * creator proxy when an error raised by 'create' arrives, so libwayland
++ * reports the error without an interface. */
++static void
++assert_create_error (WaylandDisplay *display,
++                     uint32_t        error_code)
++{
++  const struct wl_interface *interface = NULL;
++
++  g_assert_cmpint (wl_display_roundtrip (display->display), ==, -1);
++  g_assert_cmpint (wl_display_get_error (display->display), ==, EPROTO);
++  g_assert_cmpuint (wl_display_get_protocol_error (display->display,
++                                                   &interface, NULL),
++                    ==,
++                    error_code);
++  g_assert_null (interface);
++}
++
++static struct wp_image_description_creator_params_v1 *
++create_pq_creator (struct wp_color_manager_v1 *manager)
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++
++  creator_params = wp_color_manager_v1_create_parametric_creator (manager);
++  wp_image_description_creator_params_v1_set_primaries_named (creator_params,
++                                                              WP_COLOR_MANAGER_V1_PRIMARIES_BT2020);
++  wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                       WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++
++  return creator_params;
++}
++
++static void
++set_mastering_primaries (struct wp_image_description_creator_params_v1 *creator_params,
++                         const int32_t                                  coordinates[8])
++{
++  wp_image_description_creator_params_v1_set_mastering_display_primaries (creator_params,
++                                                                          coordinates[0],
++                                                                          coordinates[1],
++                                                                          coordinates[2],
++                                                                          coordinates[3],
++                                                                          coordinates[4],
++                                                                          coordinates[5],
++                                                                          coordinates[6],
++                                                                          coordinates[7]);
++}
++
++typedef enum
++{
++  MASTERING_ERROR_LUMINANCE_NOT_ABOVE_MINIMUM,
++  MASTERING_ERROR_PRIMARIES_TWICE,
++  MASTERING_ERROR_LUMINANCE_TWICE,
++  MASTERING_ERROR_MAX_CLL_TWICE,
++  MASTERING_ERROR_MAX_FALL_TWICE,
++  MASTERING_ERROR_MAX_FALL_ABOVE_MAX_CLL,
++  MASTERING_ERROR_V1_MAX_CLL_ABOVE_MASTERING,
++} MasteringError;
++
++static void
++mastering_error_client (WaylandDisplay *display,
++                        MasteringError  error)
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++
++  creator_params = create_pq_creator (display->color_management_mgr);
++
++  switch (error)
++    {
++    case MASTERING_ERROR_LUMINANCE_NOT_ABOVE_MINIMUM:
++      /* Maximum 1 cd/m² equal to the minimum, 10000 / 10000 cd/m². */
++      wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                      10000, 1);
++      assert_creator_params_error (display,
++                                   WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_INVALID_LUMINANCE);
++      return;
++    case MASTERING_ERROR_PRIMARIES_TWICE:
++      set_mastering_primaries (creator_params, p3_d65_coordinates);
++      set_mastering_primaries (creator_params, p3_d65_coordinates);
++      break;
++    case MASTERING_ERROR_LUMINANCE_TWICE:
++      wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                      1, 1000);
++      wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                      1, 1000);
++      break;
++    case MASTERING_ERROR_MAX_CLL_TWICE:
++      wp_image_description_creator_params_v1_set_max_cll (creator_params, 800);
++      wp_image_description_creator_params_v1_set_max_cll (creator_params, 800);
++      break;
++    case MASTERING_ERROR_MAX_FALL_TWICE:
++      wp_image_description_creator_params_v1_set_max_fall (creator_params, 300);
++      wp_image_description_creator_params_v1_set_max_fall (creator_params, 300);
++      break;
++    case MASTERING_ERROR_MAX_FALL_ABOVE_MAX_CLL:
++      wp_image_description_creator_params_v1_set_max_cll (creator_params, 400);
++      wp_image_description_creator_params_v1_set_max_fall (creator_params, 401);
++      wp_image_description_creator_params_v1_create (creator_params);
++      assert_create_error (display,
++                           WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_INVALID_LUMINANCE);
++      return;
++    case MASTERING_ERROR_V1_MAX_CLL_ABOVE_MASTERING:
++      /* The test display binds version 1, which bounds MaxCLL by the
++       * mastering luminance range. */
++      g_assert_cmpuint (wp_color_manager_v1_get_version (display->color_management_mgr),
++                        ==, 1);
++      wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                      1, 1000);
++      wp_image_description_creator_params_v1_set_max_cll (creator_params, 1001);
++      wp_image_description_creator_params_v1_create (creator_params);
++      assert_create_error (display,
++                           WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_INVALID_LUMINANCE);
++      return;
++    }
++
++  assert_creator_params_error (display,
++                               WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_ALREADY_SET);
++}
++
++static struct wp_image_description_v1 *
++create_from_creator (WaylandDisplay                                *display,
++                     struct wp_image_description_creator_params_v1 *creator_params,
++                     ImageDescriptionContext                       *context)
++{
++  struct wp_image_description_v1 *image_description;
++
++  *context = (ImageDescriptionContext) { 0 };
++  image_description =
++    wp_image_description_creator_params_v1_create (creator_params);
++  wp_image_description_v1_add_listener (image_description,
++                                        &image_description_listener,
++                                        context);
++  wait_for_image_description_ready (context, display);
++
++  return image_description;
++}
++
++static void
++assert_mastering_unsupported (WaylandDisplay *display,
++                              int             primaries_named,
++                              const int32_t   mastering[8])
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context;
++
++  creator_params =
++    wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++  wp_image_description_creator_params_v1_set_primaries_named (creator_params,
++                                                              primaries_named);
++  wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                       WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++  set_mastering_primaries (creator_params, mastering);
++  image_description = create_from_creator (display, creator_params, &context);
++  g_assert_true (context.creation_failed);
++  g_assert_cmpuint (context.failure_cause, ==,
++                    WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED);
++  wp_image_description_v1_destroy (image_description);
++
++  /* A failed image description is not a protocol error. */
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
++static void
++assert_mastering_accepted (WaylandDisplay *display,
++                           int             primaries_named,
++                           const int32_t   mastering[8])
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context;
++
++  creator_params =
++    wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++  wp_image_description_creator_params_v1_set_primaries_named (creator_params,
++                                                              primaries_named);
++  wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                       WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++  set_mastering_primaries (creator_params, mastering);
++  image_description = create_from_creator (display, creator_params, &context);
++  g_assert_false (context.creation_failed);
++  g_assert_cmpuint (context.image_description_id, >, 0);
++  wp_image_description_v1_destroy (image_description);
++}
++
++static void
++extended_target_client (WaylandDisplay *display)
++{
++  /* Collinear: they do not span a color space. */
++  const int32_t collinear[8] = {
++    600000, 600000, 300000, 300000, 100000, 100000, 312700, 329000,
++  };
++  /* Representable only approximately. */
++  const int32_t out_of_range[8] = {
++    16000001, 330000, 300000, 600000, 150000, 60000, 312700, 329000,
++  };
++  struct wp_image_description_v1 *image_description;
++
++  /* Mastering primaries are validated like encoding primaries: unusable or
++   * unrepresentable ones fail the image description. */
++  assert_mastering_unsupported (display, WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
++                                collinear);
++  assert_mastering_unsupported (display, WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
++                                out_of_range);
++
++  /* P3-D65 on BT.2020, the common HDR10 declaration, whose red primary lies
++   * just outside BT.2020, mastering primaries equal to the encoding's, and,
++   * with extended_target_volume, a target exceeding the primary volume. */
++  assert_mastering_accepted (display, WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
++                             p3_d65_coordinates);
++  assert_mastering_accepted (display, WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
++                             bt2020_coordinates);
++  assert_mastering_accepted (display, WP_COLOR_MANAGER_V1_PRIMARIES_SRGB,
++                             bt2020_coordinates);
++
++  /* With extended_target_volume, reference white may exceed the primary
++   * volume's maximum luminance. */
++  create_image_description_from_params (display,
++                                        &image_description,
++                                        WP_COLOR_MANAGER_V1_PRIMARIES_SRGB,
++                                        NULL,
++                                        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22,
++                                        -1.0f,
++                                        0.2f,
++                                        80.0f,
++                                        100.0f);
++  wp_image_description_v1_destroy (image_description);
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
++static void
++bind_registry_global (void               *data,
++                      struct wl_registry *registry,
++                      uint32_t            name,
++                      const char         *interface,
++                      uint32_t            version)
++{
++  struct wp_color_manager_v1 **manager = data;
++
++  if (strcmp (interface, wp_color_manager_v1_interface.name) == 0)
++    {
++      g_assert_cmpuint (version, >=, 2);
++      *manager = wl_registry_bind (registry, name,
++                                   &wp_color_manager_v1_interface, 2);
++    }
++}
++
++static void
++bind_registry_remove (void               *data,
++                      struct wl_registry *registry,
++                      uint32_t            name)
++{
++}
++
++static const struct wl_registry_listener bind_v2_registry_listener = {
++  .global = bind_registry_global,
++  .global_remove = bind_registry_remove,
++};
++
++/* Version 2 no longer bounds MaxCLL by the mastering luminance range. */
++static void
++mastering_v2_light_levels_client (WaylandDisplay *display)
++{
++  struct wl_registry *registry = wl_display_get_registry (display->display);
++  struct wp_color_manager_v1 *manager = NULL;
++  struct wp_image_description_creator_params_v1 *creator_params;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context;
++
++  wl_registry_add_listener (registry, &bind_v2_registry_listener, &manager);
++  wl_display_roundtrip (display->display);
++  g_assert_nonnull (manager);
++
++  creator_params = create_pq_creator (manager);
++  wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                  1, 1000);
++  wp_image_description_creator_params_v1_set_max_cll (creator_params, 1001);
++  image_description = create_from_creator (display, creator_params, &context);
++  g_assert_false (context.creation_failed);
++  wp_image_description_v1_destroy (image_description);
++
++  wp_color_manager_v1_destroy (manager);
++  wl_registry_destroy (registry);
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
++static void
++set_surface_description (struct wl_surface                     *surface,
++                         struct wp_color_management_surface_v1 *color_surface,
++                         struct wp_image_description_v1        *image_description)
++{
++  wp_color_management_surface_v1_set_image_description (
++    color_surface,
++    image_description,
++    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++  wl_surface_commit (surface);
++  wp_image_description_v1_destroy (image_description);
++}
++
++static void
++mastering_round_trip_client (WaylandDisplay *display)
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++  struct wp_image_description_v1 *plain_description;
++  struct wp_image_description_v1 *image_description;
++  struct wl_surface *surface;
++  struct wp_color_management_surface_v1 *color_surface;
++  ImageDescriptionContext context;
++  ManagerSupport support;
++  uint32_t plain_identity;
++
++  read_manager_support (display, &support);
++  g_assert_true (support.features &
++                 (1u << WP_COLOR_MANAGER_V1_FEATURE_SET_MASTERING_DISPLAY_PRIMARIES));
++  g_assert_true (support.features &
++                 (1u << WP_COLOR_MANAGER_V1_FEATURE_EXTENDED_TARGET_VOLUME));
++
++  create_test_toplevel (display, "color-management-mastering",
++                        &surface, &color_surface);
++
++  /* PQ without a target volume. It stays alive while the next description
++   * is created: a version 1 identity may be reused once its description is
++   * gone. */
++  creator_params = create_pq_creator (display->color_management_mgr);
++  plain_description = create_from_creator (display, creator_params, &context);
++  g_assert_false (context.creation_failed);
++  plain_identity = context.image_description_id;
++
++  /* The same encoding with HDR10 static metadata. */
++  creator_params = create_pq_creator (display->color_management_mgr);
++  set_mastering_primaries (creator_params, p3_d65_coordinates);
++  wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                  1, 1000);
++  wp_image_description_creator_params_v1_set_max_cll (creator_params, 800);
++  wp_image_description_creator_params_v1_set_max_fall (creator_params, 300);
++  image_description = create_from_creator (display, creator_params, &context);
++  g_assert_false (context.creation_failed);
++  g_assert_cmpuint (context.image_description_id, !=, plain_identity);
++
++  set_surface_description (surface, color_surface, plain_description);
++  test_driver_sync_point (display->test_driver, 0, NULL);
++  wait_for_sync_event (display, 0);
++
++  set_surface_description (surface, color_surface, image_description);
++  test_driver_sync_point (display->test_driver, 1, NULL);
++  wait_for_sync_event (display, 1);
++
++  /* MaxCLL and MaxFALL of 0 are unknown (CTA-861-H): no target volume. */
++  creator_params = create_pq_creator (display->color_management_mgr);
++  wp_image_description_creator_params_v1_set_max_cll (creator_params, 0);
++  wp_image_description_creator_params_v1_set_max_fall (creator_params, 0);
++  image_description = create_from_creator (display, creator_params, &context);
++  g_assert_false (context.creation_failed);
++  set_surface_description (surface, color_surface, image_description);
++  test_driver_sync_point (display->test_driver, 2, NULL);
++  wait_for_sync_event (display, 2);
++
++  /* MaxFALL above MaxCLL is an error only when both are known. */
++  creator_params = create_pq_creator (display->color_management_mgr);
++  wp_image_description_creator_params_v1_set_max_cll (creator_params, 0);
++  wp_image_description_creator_params_v1_set_max_fall (creator_params, 250);
++  image_description = create_from_creator (display, creator_params, &context);
++  g_assert_false (context.creation_failed);
++  set_surface_description (surface, color_surface, image_description);
++  test_driver_sync_point (display->test_driver, 3, NULL);
++  wait_for_sync_event (display, 3);
++
++  wp_color_management_surface_v1_destroy (color_surface);
++}
++
+ typedef struct
+ {
+   struct wl_output *output;
+@@ -1732,10 +2107,26 @@ main (int    argc,
+         hlg_client (display);
+       else if (strcmp (argv[1], "hlg-invalid-black-level") == 0)
+         hlg_invalid_black_level_client (display);
+-      else if (strcmp (argv[1], "mastering-primaries") == 0)
+-        mastering_unsupported_client (display, TRUE);
+-      else if (strcmp (argv[1], "mastering-luminance") == 0)
+-        mastering_unsupported_client (display, FALSE);
++      else if (strcmp (argv[1], "mastering-luminance-invalid") == 0)
++        mastering_error_client (display, MASTERING_ERROR_LUMINANCE_NOT_ABOVE_MINIMUM);
++      else if (strcmp (argv[1], "mastering-primaries-twice") == 0)
++        mastering_error_client (display, MASTERING_ERROR_PRIMARIES_TWICE);
++      else if (strcmp (argv[1], "mastering-luminance-twice") == 0)
++        mastering_error_client (display, MASTERING_ERROR_LUMINANCE_TWICE);
++      else if (strcmp (argv[1], "max-cll-twice") == 0)
++        mastering_error_client (display, MASTERING_ERROR_MAX_CLL_TWICE);
++      else if (strcmp (argv[1], "max-fall-twice") == 0)
++        mastering_error_client (display, MASTERING_ERROR_MAX_FALL_TWICE);
++      else if (strcmp (argv[1], "max-fall-above-max-cll") == 0)
++        mastering_error_client (display, MASTERING_ERROR_MAX_FALL_ABOVE_MAX_CLL);
++      else if (strcmp (argv[1], "v1-max-cll-above-mastering") == 0)
++        mastering_error_client (display, MASTERING_ERROR_V1_MAX_CLL_ABOVE_MASTERING);
++      else if (strcmp (argv[1], "extended-target-volume") == 0)
++        extended_target_client (display);
++      else if (strcmp (argv[1], "v2-light-levels") == 0)
++        mastering_v2_light_levels_client (display);
++      else if (strcmp (argv[1], "mastering-round-trip") == 0)
++        mastering_round_trip_client (display);
+       else
+         g_error ("Unknown color-management test mode '%s'", argv[1]);
+       return EXIT_SUCCESS;
