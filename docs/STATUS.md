@@ -8,7 +8,7 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Active eighth batch — gamut compression and delivery
+## Eighth batch — gamut compression and delivery (merged, PR 8)
 
 The reviewed hdr8 library and the `nativehdr7` compositor are packaged for
 amd64, with the library also built for i386
@@ -144,7 +144,7 @@ Mutter and matching amd64/i386 library packaging.
 | Physical luminance library | hdr6 delivered; hdr8 (luminance and gamut) reviewed, fast-lane qualified and packaged for amd64 and i386 | Coordinated installation with the matching compositor |
 | Compositor feedback | nativehdr2 delivered; nativehdr7 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression) qualified and packaged | Coordinated installation and active-output verification |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
-| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization, profile application, SDR/HDR consistency and cross-application checks; visual check after installation |
+| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; visual check after installation |
 | Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 
@@ -194,9 +194,37 @@ These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-Continue the bounded processor activation experiment and native/full-DV
-route evaluation alongside
-colour-pipeline implementation. Install the packaged components
-in a coordinated recovery-ready window; qualify actual output before optical
-calibration. The staged acceptance criteria remain in
+Two steps wait on the owner. The packaged hdr8 + `nativehdr7` set needs a
+coordinated installation (log out of GNOME, install, restart the display
+manager), followed by an active-output check and an on-screen comparison with
+`nativehdr6`. The Dolby processor's next stage (type negotiation and a traced
+frame, in the same isolated container) waits for the owner's scope
+confirmation. Output characterization waits for a measurement instrument.
+The staged acceptance criteria remain in
 [Dolby Vision and display quality](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance).
+
+## Decisions taken without the owner
+
+Recorded for review; each can be revisited.
+
+- Agent commits use a neutral identity (`Claude Agent`) with a co-author
+  trailer; recovered work keeps its original authorship.
+- Implementation and review agents are Claude agents.
+- Builds and packages run in disposable cloud containers (native amd64; the
+  i386 library is cross-built); nothing is built or installed on the laptop
+  host. Wine runtime tests used WineHQ 11.0 with the candidate modules
+  overlaid.
+- The Wine DisplayMonitor uses base EDID 1.4 facts where DisplayID declares
+  none.
+- HLG is decoded for its declared nominal peak and then fitted by the common
+  tone mapper, rather than rendered for the panel's peak.
+- The tone mapper only compresses highlights above the declared peak and
+  never raises black; monitor screencasts are not mapped.
+- `extended_target_volume` is advertised; declared mastering primaries set
+  gamut-compression limits.
+- Gamut compression uses ACES reference gamut compression with limits derived
+  from the source and target gamuts, tolerating the declaration's own
+  quantization.
+- Output characterization is not applied until a measurement exists.
+- The delivery set is `nativehdr7`, with `nativehdr6` staged beside it for an
+  on-screen comparison.

@@ -8,8 +8,8 @@ This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-so
 `nativehdr5` fixed the input defects. This batch adds the two missing
 operations the audit names: HLG input, and mapping highlights to the output's
 physical target. Gamut compression follows in
-[nativehdr7](#gamut-compression-nativehdr7); output characterization remains
-later work.
+[nativehdr7](#gamut-compression-nativehdr7); output characterization is
+[defined and deferred until measured](#output-characterization--defined-deferred-until-measured).
 
 ## Ownership
 
@@ -194,3 +194,54 @@ within the threshold unchanged; monotonic; independent reference values;
 non-D65 sources; GPU and CPU agree; scanout parity. Whether the panel clips
 or maps on its own, and so whether this improves what is shown, needs the
 installed system and an instrument.
+
+## Output characterization — defined, deferred until measured
+
+**Status:** contract defined; implementation deliberately deferred until a
+measurement exists. Nothing is applied today.
+
+Output characterization corrects for how this panel actually turns the
+BT.2020/PQ signal into light. The steps above stop at the signal: they target
+the gamut and peak the firmware declares, and leave the conversion from
+BT.2020 to the panel's native primaries and to emitted luminance to the
+panel firmware.
+
+No available data describes that firmware conversion:
+
+- The DisplayID declarations give the target gamut and peak. They are
+  already used, and they say nothing about how accurately the firmware
+  reaches them.
+- The OEM ICC profiles describe Windows' profile connection for each GPU
+  route; their MHC2 transforms are identity
+  ([inspection](ICC_CHARACTERISATION.md)). They are not measurements of this
+  unit's response to PQ input, and their curves are for a different
+  pipeline.
+- The colour device's EDID-derived profile is model metadata.
+
+Applying a correction built from any of these would guess at the panel's
+behaviour and could correct twice (once in the compositor, once in the
+firmware). The demonstrated cause of any inaccuracy is not known yet, so
+there is nothing to fix at its source.
+
+**Contract for the implementation, once measured:**
+
+- **Input:** a characterization measured in HDR mode with the
+  [measurement procedure](PANEL_MEASUREMENT.md): per-channel and neutral PQ
+  ramps, primaries and white at several signal levels, recorded with the
+  instrument, mode, brightness factor and date. The record carries
+  provenance `MEASURED`; firmware or profile values never take that
+  provenance.
+- **Correction:** a 3×3 matrix and per-channel 1D curves in the PQ domain,
+  or a 3D LUT if the measured error is not separable. The choice follows the
+  measured residuals, not a default.
+- **Owner and place:** the colour device holds the record. It is applied
+  once, in the blending → output conversion, so every surface, the cursor and
+  any direct-scanout decision see the same output. A non-identity correction
+  refuses direct scanout through the shared predicate.
+- **Validation:** held-out patches measured after applying it, against the
+  accuracy goals in the measurement procedure. A correction that does not
+  improve the held-out patches is not kept.
+
+**Decision:** until an instrument is available, the compositor applies no
+output characterization, and gamut and highlight mapping use only the
+firmware declarations.
