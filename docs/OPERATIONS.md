@@ -80,8 +80,9 @@ covers the hdr9 library (the reviewed hdr8 code with packaging fixes) and the
 the independent-review fixes. Both library architectures (i386 cross-built)
 and the compositor packages were built from the exact recorded source trees
 in a disposable Ubuntu 26.10 environment, with tests disabled deliberately.
-This is packaging evidence; it does not qualify active scanout. Nothing from
-this build is installed yet. Earlier receipts and builds were superseded
+This is packaging evidence; it does not qualify active scanout. These
+packages were installed and held on 2026-10-11
+([receipt](../evidence/install-2026-10-11.json)). Earlier receipts and builds were superseded
 before installation.
 
 The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
@@ -93,8 +94,8 @@ library provides, so an archive library update cannot satisfy it. A
 simulated newer archive library (above the version floor, without the
 virtual package) could only be installed by removing the compositor library
 and the desktop, which a routine upgrade does not do.
-On the laptop, APT simulation reports six upgrades, zero additions and zero
-removals.
+On the laptop, APT simulation reported six upgrades, zero additions and zero
+removals, and the real transaction matched.
 
 A private copy of the installed package database, with only those six
 candidate control records substituted, resolves the six previously installed

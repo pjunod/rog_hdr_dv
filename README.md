@@ -6,9 +6,10 @@ panel calibration and full Dolby Vision. macOS-like consistency and ease of
 use are the quality reference. Plurx is one consumer; this repository owns
 the operating-system display work independently.
 
-**Current status:** the earlier patched HDR stack (kernel `nativehdr1`, library
-hdr6, Mutter nativehdr2) is installed, Secure Boot is enabled, and the owner
-reports working HDR10. Newer reviewed packages are staged, not installed. Full Dolby Vision, measured calibration
+**Current status:** the patched kernel (`nativehdr1`), the hdr9 library and the
+`nativehdr8` compositor are installed (the compositor and library since
+2026-10-11), and Secure Boot is enabled. The owner reported working HDR10 on
+the earlier stack; the HDR check on the new compositor is pending. Full Dolby Vision, measured calibration
 and remaining transition/resume acceptance are unfinished. The earlier mpv
 DV-to-PQ sample does not qualify full Dolby Vision.
 
@@ -73,7 +74,9 @@ any live compositor or kernel update.
   proposals, with exact bases in `sources.json`.
 - `patches/ubuntu-libdisplay-info/` · `patches/ubuntu-mutter/` — complete
   local changes from authenticated Ubuntu source imports, including the
-  delivered prefixes and explicitly marked unreleased candidates. These are alternative packaging paths to the upstream series.
+  delivered prefixes and explicitly marked unreleased candidates. In
+  `sources.json` the `delivered_*` fields pin the earlier delivered prefix
+  (now the rollback); the installed release is the candidate. These are alternative packaging paths to the upstream series.
 - `patches/linux/` — four native luminance/backlight/parser-test patches.
 - `patches/wine/` — bounded Windows API compatibility work for processor investigation.
 - `sources.json` · `SHA256SUMS` — source identities and patch integrity.

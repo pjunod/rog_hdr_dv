@@ -49,7 +49,8 @@ The Ubuntu prefix through patch 14 is the delivered hdr6 source. Patch 15
 adds an **UNRELEASED hdr7** changelog and introduces the symbol at
 `0.3.0-1ubuntu1~hdr7~`. That records the new ABI requirement without claiming
 that installed hdr6 exports it. Candidate and delivered pins are separate in
-the manifest. Neither new candidate is installed or package-qualified.
+the manifest. Neither new candidate is installed or package-qualified (their code later
+shipped in hdr9/nativehdr8, installed on 2026-10-11).
 
 | Source | Candidate commit | Candidate tree |
 |---|---|---|
