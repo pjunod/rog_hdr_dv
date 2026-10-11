@@ -19,12 +19,12 @@ needs a coordinated, recovery-ready window
 ([operations](OPERATIONS.md#4-prepared-userspace-package-transaction)).
 Nothing is installed yet.
 
-The compositor's next batch, `nativehdr6` (Mutter patches 0028–0038), implements the
+`nativehdr6` (Mutter patches 0028–0038) implements the
 [HLG and tone-mapping contract](HDR_MAPPING.md): HLG decoding with its OOTF,
 validated source mastering metadata, and BT.2390 highlight mapping to the
 panel's declared target luminance. Mapping is applied once per surface and
 only when content exceeds that target. It was reviewed adversarially and
-passed its affected fast lane ([receipt](../evidence/mutter-hdr-mapping.json)).
+passed its affected fast lane (synthetic headless tests, software rendering) ([receipt](../evidence/mutter-hdr-mapping.json)).
 It is packaged, and the coordinated installation delivers it directly
 instead of `nativehdr5`.
 Gamut compression and output characterization follow separately.
@@ -183,7 +183,7 @@ These are scoped historical results, not freshly repeated tests.
 
 Continue the bounded processor activation experiment and native/full-DV
 route evaluation alongside
-colour-pipeline implementation. Package and install source-qualified components
+colour-pipeline implementation. Install the packaged components
 in a coordinated recovery-ready window; qualify actual output before optical
 calibration. The staged acceptance criteria remain in
 [Dolby Vision and display quality](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance).

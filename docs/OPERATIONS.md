@@ -74,9 +74,8 @@ its expected display mode and the Linux transform path are understood.
 The [current package receipt](../evidence/hdr8-nativehdr6-packages.json)
 covers the reviewed hdr8 library and the `nativehdr6` compositor (which
 contains `nativehdr5`, PR 6). Both library architectures (i386 cross-built)
-and the compositor packages were
-built from the exact recorded source trees in a disposable Ubuntu 26.10
-environment, with tests disabled deliberately. This is packaging evidence; it
+and the compositor packages were built from the exact recorded source trees
+in a disposable Ubuntu 26.10 environment, with tests disabled deliberately. This is packaging evidence; it
 does not qualify active scanout. Nothing from this build is installed yet. The
 earlier [hdr7/nativehdr3 receipt](../evidence/baseline-native-packages.json)
 is superseded and was never installed.

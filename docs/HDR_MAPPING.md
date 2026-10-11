@@ -1,7 +1,7 @@
 # HLG and target-aware tone mapping — compositor contract (nativehdr6)
 
 **Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`); reviewed and
-fast-lane qualified; not packaged or installed · **Date:** 2026-10-10.
+fast-lane qualified (synthetic headless tests); packaged for amd64, not installed · **Date:** 2026-10-10.
 
 This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-source-findings--input-contracts-and-mapping-ownership).
 `nativehdr5` fixed the input defects. This batch adds the two missing
@@ -19,9 +19,9 @@ work with their own contracts.
 | Highlight mapping | Clutter colour transform, once per surface, toward the output blending state | Source effective peak, output target peak |
 | KMS HDR metadata | Unchanged (zero luminance fields) | — |
 
-Applications that map to the published preferred target themselves (and tag
-their output with that target) need no further mapping; the compositor must
-then leave them unchanged.
+Applications that map to the published preferred target themselves, and tag
+their output with that target including its published reference luminance,
+need no further mapping; the compositor must then leave them unchanged.
 
 ## HLG
 
@@ -62,7 +62,11 @@ The creator accepts `set_mastering_display_primaries`, `set_mastering_luminance`
   (Common P3 mastering primaries lie just outside BT.2020.)
 - Repeated setters are `already_set` errors. A MaxCLL or MaxFALL of 0 means
   unknown. When both are known, MaxFALL above MaxCLL is the protocol's
-  `invalid_luminance` error.
+  `invalid_luminance` error. For version 1 clients, a known MaxCLL or
+  MaxFALL must also lie above the target minimum and at or below the target
+  maximum (`invalid_luminance`), as version 1 of the protocol requires.
+- With `extended_target_volume` advertised, `set_luminances` accepts a
+  reference white above the maximum luminance.
 - The values are stored in the colour state's private target volume and take
   part in equality, hashing and image-description identity. The public
   `ClutterLuminance` structure is not changed.
@@ -92,16 +96,19 @@ reference-white scaling, exceeds the output target peak. It never expands.
   Ltgt_peak]`, both converted to PQ. Normalize, knee start
   `KS = 1.5 · maxLum − 0.5`, Hermite spline above `KS`, denormalize. There
   is no black adjustment: the mapping never raises black, and the target
-  minimum is not used.
+  minimum is not used. Signal above the effective source peak is held at
+  the target peak.
 - **Colour:** applied to max(R, G, B) of linear BT.2020, with all three
   channels scaled by the same ratio, so hue and saturation ratios are kept.
   Negative components are not lifted; max(R, G, B) ≤ 0 is unchanged.
 - **Scanout parity:** a surface or cursor whose transform includes mapping
   is composited, not scanned out directly. The decision uses the same
   "mapping required" test as the renderer, and the transform cache compares
-  states exactly.
+  states exactly. The hardware-cursor plane decision is reviewed but not
+  executed by the tests (the test monitors have no KMS CRTC).
 - **Units:** both peaks are compared as multiples of reference white. The
-  output's reference white (203 cd/m² × the brightness factor, rounded to
+  output's reference white (the output encoding's default reference white
+  × the brightness factor, 203 cd/m² × the factor for PQ, rounded to
   whole cd/m² as published) is the display reference carried by the blending
   state, so mapping happens once, toward the blending state, and the
   blending → output conversion never maps again.
@@ -120,7 +127,7 @@ Source-level, at the agreed pre-merge stage:
 - Mapping: no change when the source peak is at or below the target or when no
   target is declared; the curve matches an independent BT.2390 computation at
   sample points; monotonic; hue ratios kept; scanout rejected exactly when
-  mapping applies.
+  mapping applies. The cursor-plane path is covered by review only.
 
 Physical acceptance (what the panel actually emits) needs the
 [measurement procedure](PANEL_MEASUREMENT.md) and an instrument; no optical

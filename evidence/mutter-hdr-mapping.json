@@ -23,7 +23,7 @@
   "src/tests/wayland-test-clients/color-management": "8d0dff81ae67203e5796c590d4d663a9311fa4152639dd55e305fe9a94f70370",
   "src/tests/clutter/conform/color-hdr": "d3733579b48cfeeaa5ea409775f26105354eef7ede2276dfc0e31ad8369fac6e"
  },
- "public_abi": "Additive only: one appended ClutterTransferFunction value and six new exported functions recorded in debian/libmutter-51-0.symbols at 51.0-1ubuntu3+nativehdr6~; no public structure changed",
+ "public_abi": "Symbols additive only: one appended ClutterTransferFunction value and nine new exported symbols in debian/libmutter-51-0.symbols at 51.0-1ubuntu3+nativehdr6~ (six in libmutter-clutter, three in libmutter for tests); no public structure changed. Behaviour change: colour-state equality and hashing now include the private target volume.",
  "fast_lane": {
   "first_run": {
    "mutter:actor-color-state": "OK",
@@ -71,5 +71,6 @@
    "all_addressed": true
   },
   "details": "docs/REVIEW.md#seventh-batch--hlg-and-highlight-mapping-nativehdr6"
- }
+ },
+ "binary_note": "The wayland-test-clients/color-management hash is the final build after the three test-client fixes; the compositor libraries and other binaries are those of the first run."
 }
