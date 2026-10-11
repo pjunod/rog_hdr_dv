@@ -42,7 +42,10 @@ bundle from the coordinated morning installation. Read that exact local
 procedure and reverify its package/image hashes before using it. Historical
 workstation procedures are in the previous HDR workspace; see
 [provenance](PROVENANCE.md). Neither file location proves the artifacts are
-still present or compatible after later upgrades.
+still present or compatible after later upgrades. That note names the stock
+kernel `7.3.0-8-generic`, which has since been removed; the installed stock
+fallback is `7.3.0-9-generic` (check with `dpkg-query -W 'linux-image*'`).
+The temporary visible-menu GRUB setting it describes is still in place.
 
 Keep a bootable stock kernel, matching recovery userspace, sufficient `/boot`
 space and a local way to use the boot menu. The test kernel was the persistent
@@ -71,33 +74,37 @@ its expected display mode and the Linux transform path are understood.
 
 ## 4. Prepared userspace package transaction
 
-The [current package receipt](../evidence/hdr8-nativehdr7-packages.json)
-covers the reviewed hdr8 library and the `nativehdr7` compositor (which
-contains every earlier compositor batch). Both library architectures (i386
-cross-built) and the compositor packages were built from the exact recorded
-source trees in a disposable Ubuntu 26.10 environment, with tests disabled
-deliberately. This is packaging evidence; it does not qualify active
-scanout. Nothing from this build is installed yet. The earlier
-[hdr7/nativehdr3 receipt](../evidence/baseline-native-packages.json) is
-superseded and was never installed.
+The [current package receipt](../evidence/hdr9-nativehdr8-packages.json)
+covers the hdr9 library (the reviewed hdr8 code with packaging fixes) and the
+`nativehdr8` compositor, which contains every earlier compositor batch and
+the independent-review fixes. Both library architectures (i386 cross-built)
+and the compositor packages were built from the exact recorded source trees
+in a disposable Ubuntu 26.10 environment, with tests disabled deliberately.
+This is packaging evidence; it does not qualify active scanout. Nothing from
+this build is installed yet. Earlier receipts and builds were superseded
+before installation.
 
 The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
 `libdisplay-info3:i386`, `libmutter-51-0`, `gir1.2-mutter-51`, `mutter-common`
 and `mutter-common-bin`. The two library architectures require the same
 version, and GIR requires the exact matching Mutter library. The compositor
-depends on the hdr8 library. On the laptop, APT simulation reports six
-upgrades, zero additions and zero removals.
+depends on `libdisplay-info3-native-hdr-api (>= 2)`, which only the private
+library provides, so an archive library update cannot satisfy it. A
+simulated newer archive library (above the version floor, without the
+virtual package) could only be installed by removing the compositor library
+and the desktop, which a routine upgrade does not do.
+On the laptop, APT simulation reports six upgrades, zero additions and zero
+removals.
 
 A private copy of the installed package database, with only those six
 candidate control records substituted, resolves the six previously installed
 hdr6/nativehdr2 packages as six downgrades without additions or removals.
-Both simulations were repeated for each newer compositor build, with the same
-result. This is a modeled rollback, not an executed one. The `nativehdr6`
-packages are staged as a comparison alternative without gamut compression;
-switching to them models as four downgrades. The packages, their hashes
+This is a modeled rollback, not an executed one. The packages, their hashes
 and step-by-step install and recovery notes are staged privately on the
-laptop.
+laptop. The install notes check both package sets' hashes, save the package
+state, and hold the six packages; the recovery notes unhold them first.
 
 Log out of GNOME before replacement, then restart the display manager so a new
-GNOME Shell loads the new library. Retain an independent text-console or SSH
-recovery route; do not terminate the desktop automatically.
+GNOME Shell loads the new library. Retain an independent recovery route; SSH
+is the practical one, because a failing login screen keeps reclaiming the
+console. Do not terminate the desktop automatically.

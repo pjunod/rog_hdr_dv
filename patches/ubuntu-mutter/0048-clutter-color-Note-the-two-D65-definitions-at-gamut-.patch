@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:17:27 -0400
+Subject: [PATCH] clutter/color: Note the two D65 definitions at gamut
+ containment
+
+The renderer adapts source colors to CLUTTER_D65 (0.95047, 1, 1.08883),
+whose chromaticity is (0.312727, 0.329023), while target primaries and
+the colorspace tables use the rounded (0.3127, 0.3290). Document the
+resulting shift where containment is decided: about 3.6e-5 for the
+white and up to about 2e-5 for primaries, well inside the tolerance of
+a firmware declaration, so it decides no containment of a declared
+target. The upstream constant is left unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-transform.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index ec48003..7ee97db 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1200,6 +1200,18 @@ is_finite3 (const double v[3])
+  * Whether linear BT.2020 @bt2020 lies within the target triangle, with its
+  * tolerances, by its CIE 1931 chromaticity. Returns %FALSE if it has none
+  * (X + Y + Z not positive, or not finite).
++ *
++ * Two definitions of D65 meet here. Source colors reach linear BT.2020 by
++ * Bradford adaptation to the renderer's CLUTTER_D65 (0.95047, 1, 1.08883),
++ * whose chromaticity is (0.312727, 0.329023), while the target primaries and
++ * the colorspace tables use the rounded (0.3127, 0.3290). Content whose white
++ * point is the rounded D65 is therefore moved by the adaptation: its white by
++ * about 3.6e-5 in xy, and its primaries by up to about 2e-5 (2.7e-5 for the
++ * BT.2020 green primary). That is well inside the tolerance of a firmware
++ * declaration, one 12-bit step (about 2.4e-4) or more, so it decides no
++ * containment of a declared target; only targets declared exactly, without
++ * a tolerance, see it beyond GAMUT_CONTAINMENT_MARGIN. The upstream constant
++ * is kept as it is.
+  */
+ static gboolean
+ gamut_target_contains (const GamutTarget *target,

@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:05:15 -0400
+Subject: [PATCH] win32u: Define the display device init mutex name in the
+ internal monitor header.
+
+windows.devices.display opens the same session mutex to read a consistent
+monitor snapshot. Name the object once so the two sides cannot drift apart.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/win32u/sysparams.c | 2 +-
+ include/wine/monitor.h  | 6 ++++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/win32u/sysparams.c b/dlls/win32u/sysparams.c
+index 1a641bc..16ab96f 100644
+--- a/dlls/win32u/sysparams.c
++++ b/dlls/win32u/sysparams.c
+@@ -335,7 +335,7 @@ static HANDLE get_display_device_init_mutex( void )
+     char buffer[256];
+     HANDLE mutex;
+ 
+-    snprintf( buffer, ARRAY_SIZE(buffer), "\\Sessions\\%u\\BaseNamedObjects\\display_device_init",
++    snprintf( buffer, ARRAY_SIZE(buffer), "\\Sessions\\%u\\BaseNamedObjects\\" WINE_DISPLAY_DEVICE_INIT_MUTEX,
+               NtCurrentTeb()->Peb->SessionId );
+     name.MaximumLength = asciiz_to_unicode( bufferW, buffer );
+     name.Length = name.MaximumLength - sizeof(WCHAR);
+diff --git a/include/wine/monitor.h b/include/wine/monitor.h
+index 0d02a4c..455d4e3 100644
+--- a/include/wine/monitor.h
++++ b/include/wine/monitor.h
+@@ -46,4 +46,10 @@ struct wine_monitor_properties
+ DEFINE_DEVPROPKEY( WINE_DEVPROPKEY_MONITOR_PROPERTIES, 0x233a9ef3, 0xafc4, 0x4abd,
+                   0xb5, 0x64, 0xc3, 0x2f, 0x21, 0xf1, 0x53, 0x5b, 7 );
+ 
++/* Session mutex held by win32u while it rebuilds the display device nodes.
++ * win32u opens it by its full session path; Win32 code opens the same object
++ * through the local namespace, e.g. CreateMutexW( NULL, FALSE,
++ * L"" WINE_DISPLAY_DEVICE_INIT_MUTEX ). */
++#define WINE_DISPLAY_DEVICE_INIT_MUTEX "display_device_init"
++
+ #endif /* __WINE_MONITOR_H */

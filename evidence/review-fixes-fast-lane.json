@@ -1,0 +1,85 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-11",
+ "status": "PASS",
+ "scope": "Ninth batch: fixes from the independent Fable 5.1 reviews \u2014 Mutter nativehdr8, Wine DisplayMonitor fixes, libdisplay-info hdr9 packaging",
+ "repository_check": "python3 scripts/check_repository.py PASS before merge",
+ "mutter": {
+  "base_tree": "c0cd4688b33665d057fc8c4c0c6b0a6c0a8a4dca",
+  "candidate_tree": "8de2497c392a7ae16f6257090a451c6b35231471",
+  "appended_patches": "0044-0052",
+  "environment": "Ubuntu 26.10 amd64 container, gcc 15.3.0, meson 1.10.1, -Dwerror=true; llvmpipe software rendering",
+  "compiled_binary_sha256": {
+   "src/libmutter-51.so.0.0.0": "5e19fbb97d8c03d8f8f1c44ee419168b2482c5fc1ddd82dba8cfc75a1ce08d7a",
+   "clutter/clutter/libmutter-clutter-51.so.0.0.0": "0869a78e69f1e3a64182ff5396a2da5e44390ef2140fef52942064e48c891641",
+   "src/tests/mutter-wayland-color-management": "9c32dd98291840e5029c9487aeed5fce7fcf31f692aad6f6322f7d79781e2195",
+   "src/tests/wayland-test-clients/color-management": "c2b329ed7442bbaf6a4dbbd1a3c965f4a83b3797f71eed71db58c46d024746cd",
+   "src/tests/clutter/conform/color-hdr": "0124347b3b0b347a638ac445d76f4a2615790615066f8b471f9a3a5291480932",
+   "src/tests/mutter-native-hdr": "297b3360c3fc04b2d26f061847dd0d36199465755e413085da85761708d88184"
+  },
+  "fast_lane": {
+   "first_run": {
+    "mutter:actor-color-state": "OK",
+    "mutter:color-pipeline": "OK",
+    "mutter:color-state-transform": "OK",
+    "mutter:monitor-color-tests": "OK",
+    "mutter:color-management": "OK",
+    "mutter:native-hdr": "OK",
+    "mutter:cursor-tests": "OK",
+    "mutter:wayland-color-management and its ten separate invocations (including the new published-reference-factor)": "OK",
+    "mutter:color-hdr": "FAIL (/color-hdr/gamut/curve-form: its sampling loop visited one distance twice, so 'strictly increasing' compared equal values)"
+   },
+   "fix": "Test-only: the second sampling range starts one step later",
+   "rerun": {
+    "mutter:color-hdr": "OK"
+   },
+   "not_invalidated": "Only the color-hdr test source changed; the compositor libraries are those of the first run"
+  },
+  "binary_note": "The color-hdr hash is the rebuilt test after the fix; the other binaries are from the first run"
+ },
+ "wine": {
+  "base_tree": "905b2ed5509c7d09490a5dd16735381979c2a51e",
+  "tested_tree": "3bc9a27bd4b4a8a6e0ee61de4499e41908fea03e",
+  "candidate_tree": "85037f72cf1a9e47e766dbd2513f70699f3197c6",
+  "appended_patches": "0010-0017",
+  "tested_vs_candidate": "The candidate adds one comment-only commit (0017) to the tested tree",
+  "compile": "Laptop offline compiler container, --enable-werror, 0 warnings",
+  "runtime": "WineHQ wine-stable 11.0 (Ubuntu 24.04) in a disposable container, candidate modules overlaid before a fresh prefix, WINEDLLOVERRIDES=mscoree,mshtml=, Xvfb",
+  "overlaid_module_sha256": {
+   "win32u.so": "40f91237c87a5a3310ef572612357287cbd5ade7c5fdd440dbca580cf56df2c7",
+   "win32u.dll": "1bd9ab33875ac68eb41b46b306cff576ba56f50004852cea4d5f538c2d985688",
+   "windows.devices.display.dll": "f49c6033cacbd0107eae52e89cf4c6813e39ecf47e4a5aa1ad62073a8f80cd0a",
+   "winex11.so": "ec88e6c5d8683e5cb5f865a9f6089f6f2b6cb8aaae396702bc4164956b13a569",
+   "winex11.drv": "34e11ae50ff58d407057f82ceb1b22d34d1a4299993eec1562285611cdaf9b4d",
+   "winewayland.so": "3eaba4f7baf337fcaa15bf9d74a6b3d64570bc703792874f72964b6e27eae694",
+   "winewayland.drv": "8977d1148b145d367cdf19efe6f37066829e26985a23ef61e685b8711d5c456c"
+  },
+  "unchanged_overlaid_modules": "user32, setupapi, cfgmgr32 and windows.devices.enumeration from the fifth-batch build (no source change affects them)",
+  "test_binary_sha256": {
+   "windows.devices.display_test.exe": "174efc90614c06b06b59e903b778af146a973b78e2b6680deb02857f067fdf11",
+   "user32_test.exe": "4e27015013a429e374f1479749bb0601855cbfa3ddb6034dce9797d11e070102"
+  },
+  "fast_lane": {
+   "displaymonitor": "348 tests, 0 failures, 0 skipped",
+   "displayconfig": "13 tests, 0 failures, 0 skipped",
+   "count_note": "The fifth-batch run counted 14 displayconfig tests and this one 13, with no failures or skips in either. user32_test.exe was rebuilt (its hash differs from the fifth batch): displayconfig.c includes the changed wine/monitor.h and wingdi.h, and win32u's output-technology handling changed (patch 0014). The one-test difference was not investigated."
+  },
+  "harness_note": "A first attempt hung in wineboot before any test ran (the harness lacked the installer-dialog override); with it restored the run completed, so this is not a rerun of a failed check."
+ },
+ "libdisplay_info": {
+  "base_tree": "004413f716800db397eb9739fd56ef71e979260f",
+  "candidate_tree": "96d65c11ed0f408792c41cd42c2866255b1089d0",
+  "appended_patches": "0022-0023",
+  "note": "Packaging only (Provides, quilt series, README); library code and tests unchanged, so no library tests were rerun"
+ },
+ "logs_sha256": {
+  "mutter_first_run": "bbc61390f4ee45d1cbdcbf7ac83251e52a7c1c048d043196f4fe8cc4b85c4afb",
+  "mutter_rerun": "b5dd4542a2e588148c7d4f9f168591f56d68254a7061d263835b1bbcf30234a6",
+  "wine": "d1d4e43dba4bc0bf77b431dfe9f322612d683e683b71fccec4870b2e1baeffc4"
+ },
+ "limits": [
+  "Synthetic headless tests; no installation",
+  "Hardware-cursor plane path reviewed, not executed",
+  "No optical measurement"
+ ]
+}

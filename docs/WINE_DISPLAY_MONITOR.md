@@ -49,10 +49,15 @@ Display-server provenance identifies where information came from; it does not
 prove that a monitor is physical. XRandR's typed `ConnectorType` property may
 supply a recognized technology; output-name prefixes do not establish one.
 
-Changing `gdi_monitor` changes the internal driver ABI. The candidate bumps
-that ABI and must be deployed with matching source-built win32u and applicable
-driver PE/Unix components. A runtime assembled with stale packaged drivers is
-not valid evidence for this change.
+Changing `gdi_monitor` changes the internal driver ABI (GDI driver version
+108 → 109). win32u rejects any GDI driver built for another version, so the
+candidate must be deployed as one coherent set: win32u (PE and Unix),
+winex11.drv, winewayland.drv and wineps.drv (PE and Unix each), plus
+winemac.drv or wineandroid.drv where built. A runtime that keeps a packaged
+wineps.drv loses printing ("wrong driver version"); one that keeps any
+packaged display driver is not valid evidence for this change. The test
+fixtures overlay win32u, winex11.drv and winewayland.drv; `wineps.drv` was
+not replaced, which does not affect the display tests.
 
 ## WinRT object and descriptor handling
 
@@ -146,15 +151,46 @@ The adversarial review then led to these changes:
 - A DisplayID section with a reserved product primary use is opaque.
 - Virtual monitors no longer get a guessed usage kind.
 
+An independent review (Fable, 2026-10-11) led to these further changes:
+
+- The `display_device_init` mutex name is defined once, in the internal
+  monitor header, and shared by win32u and the WinRT component. Resolution
+  fails when the lock cannot be taken or was abandoned, instead of reading
+  without it. An abandoned lock is reported to the first waiter only.
+- `GetDescriptor(Edid)` returns data only for a validated EDID, as a copy of
+  exactly the declared blocks; trailing registry bytes are not part of it.
+- The indirect (wired, virtual) and DisplayPort-over-USB-tunnel output
+  technologies are accepted from drivers and reported as Wired, Virtual and
+  Wired/DisplayPort. These mappings follow the SDK definitions and are not
+  yet verified against native Windows, like the other qualification gaps
+  above.
+
 The configure change is the three module lines that GNU Autoconf 2.72
 generates. Other generator differences belong to Wine's release tooling and
 are not carried. The [compiler receipt](../evidence/wine-displaymonitor-compile.json)
 records the affected modules and both test binaries built on native amd64
 with zero warnings. The [fast-lane receipt](../evidence/batch5-fast-lane.json)
 records `displaymonitor` (308 tests) and `displayconfig` (14 tests) passing
-with the candidate modules loaded into a WineHQ 11.0 runtime.
+with the candidate modules loaded into a WineHQ 11.0 runtime. After the
+review fixes described below, `displaymonitor` (348 tests) and
+`displayconfig` (13 tests) passed again in the same kind of runtime
+([receipt](../evidence/review-fixes-fast-lane.json)).
 
 ## Remaining processor boundary
+
+**On this laptop the monitor API has little to report.** The Wayland driver
+obtains no EDID or DisplayID (it records only the provenance), and Xwayland
+exposes no EDID property either. On the owner's GNOME Wayland desktop, every
+physical property except identity and name is therefore unavailable, exactly
+as in the display-less fixture. If the OEM processor branches on monitor
+facts, it cannot engage for this panel until a descriptor source with
+provenance exists. The legitimate one is the compositor: the compositor
+candidate (publishing since `nativehdr4`, currently `nativehdr8`) publishes the panel's declared target luminance and primaries through
+`wp_color_management_v1`, which the Wine Wayland driver can carry into the
+monitor record with a compositor origin. A raw EDID needs a real facility
+(a compositor protocol or DRM); matching a `wl_output` name to sysfs would be
+a guess the contract forbids. Until then, a traced frame answers the API
+contract only, not whether the processor engages Dolby Vision for this panel.
 
 A working monitor API may only reveal the next missing dependency. Dolby
 object creation, supported formats, frame/metadata transport, panel-profile

@@ -1,0 +1,71 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:49:08 -0400
+Subject: [PATCH] debian: Keep the native DisplayID attribution and define the
+ API level
+
+The removed quilt patch header was the package's record of the backported
+upstream commits and their authors; carry it in README.native-displayid,
+and define what libdisplay-info3-native-hdr-api level 2 means.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ debian/README.native-displayid | 40 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 1 deletion(-)
+
+diff --git a/debian/README.native-displayid b/debian/README.native-displayid
+index 46798d9..a8218aa 100644
+--- a/debian/README.native-displayid
++++ b/debian/README.native-displayid
+@@ -42,7 +42,7 @@ this bounded stack until separately tested. No Type 1/content metadata is
+ fabricated, and native panel brightness is not mastering/content metadata.
+ 
+ The source preserves the attributed historical CTA/lifecycle backports and
+-local parser changes identified in the quilt header. The additive API derives
++local parser changes listed under "Attribution" below. The additive API derives
+ from the locally reviewed, unpushed parser proposal 533a338, not an accepted
+ upstream release. Human DCO, normative section verification, maintainer review
+ and any public submission remain separate gates.
+@@ -53,3 +53,41 @@ hardening and all ownership/failure assertions remain. Production keeps the
+ distribution architecture's normal LTO policy (enabled on qualified amd64,
+ not present in the qualified i386 distribution flags).
+ The private observed panel capture is excluded from source/package payloads.
++
++API level
++---------
++
++libdisplay-info3 provides the virtual package libdisplay-info3-native-hdr-api
++at API level 2: the native DisplayID 2.x physical luminance getter
++(di_displayid2_data_block_get_luminance, added in hdr7) and the native
++chromaticity getter (di_displayid2_data_block_get_native_chromaticities, added
++in hdr8). Consumers of these private getters depend on the virtual package so
++that an archive libdisplay-info3 without them can never satisfy the
++dependency.
++
++Attribution
++-----------
++
++The native DisplayID changes were carried as the quilt patch
++native-displayid-hdr.patch until hdr8; its content is in the source tree and
++the patch entry was removed in hdr9. Its attribution record is kept here:
++
++Author: Simon Ser <contact@emersion.fr>
++Author: Paul Junod <donujp@gmail.com>
++Origin: other, adapted backports from six genuine historical upstream commits:
++ https://gitlab.freedesktop.org/emersion/libdisplay-info/-/commit/788c056e24eaf412832889afd46aaa41bec94e6a
++ https://gitlab.freedesktop.org/emersion/libdisplay-info/-/commit/d535192adc496335b9ff2268398709e4cd566e68
++ https://gitlab.freedesktop.org/emersion/libdisplay-info/-/commit/34b36355078e3b1c40d4608fe7a2ccaa8df4fdb4
++ https://gitlab.freedesktop.org/emersion/libdisplay-info/-/commit/471350512d14d6a95fa5aa5447ef9e26298394f6
++ https://gitlab.freedesktop.org/emersion/libdisplay-info/-/commit/7324cca007730b9534c691f2c59ce941c68eb5cd
++ https://gitlab.freedesktop.org/emersion/libdisplay-info/-/commit/73ec53d800275cce4b8a4af6af03ea2aac9912fd
++ Local proposed, unpushed source commits (not hosted/accepted upstream):
++ da6168b6c046a11036c79d32df0c2c8e68e73f60 (section bounds prerequisite)
++ 533a33802bab516d005700dee6baf2e3fe37a1fc (parsed interface API)
++ 87d3b113382a2f0e08f9d290e06d1f37b6d266ad (nested parent diagnostics/tests)
++ 01e210d3b7e2539f5cd5c4eb2dd33c61ca933903 (structured extension failure API)
++ Local Ubuntu opt-in adaptation: 1045a031d1489711858e6b5168eeb1e1d41ab964.
++ Qualification receipt: evidence/stack-preparation/NATIVE_API_SOURCE_GATES.md.
++ Legacy native-promotion proposal 4adfd788 is deliberately not included.
++ Local adaptations have no invented upstream commit ID or acceptance claim.
++Forwarded: no

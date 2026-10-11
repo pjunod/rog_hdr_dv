@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:05:30 -0400
+Subject: [PATCH] include: Add the indirect and USB tunnel display output
+ technologies.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ include/wingdi.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/wingdi.h b/include/wingdi.h
+index 559f659..ac50b8f 100644
+--- a/include/wingdi.h
++++ b/include/wingdi.h
+@@ -3475,6 +3475,9 @@ typedef enum
+     DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EMBEDDED = (int) 13,
+     DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDTVDONGLE = (int) 14,
+     DISPLAYCONFIG_OUTPUT_TECHNOLOGY_MIRACAST = (int) 15,
++    DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED = (int) 16,
++    DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_VIRTUAL = (int) 17,
++    DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_USB_TUNNEL = (int) 18,
+     DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL = (int) 0x80000000,
+     DISPLAYCONFIG_OUTPUT_TECHNOLOGY_FORCE_UINT32 = (int) 0xffffffff
+ } DISPLAYCONFIG_VIDEO_OUTPUT_TECHNOLOGY;

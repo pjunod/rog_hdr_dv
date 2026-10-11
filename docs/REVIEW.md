@@ -1,7 +1,8 @@
 # Review — adversarial findings and the current implementation batch
 
-**Updated:** 2026-10-10 UTC · **State:** fifth batch merged; sixth batch
-(nativehdr5) reviewed, findings addressed, fast lane passed.
+**Updated:** 2026-10-11 UTC · **State:** batches through PR 9 merged; ninth
+batch (independent review fixes) reviewed, findings addressed, fast lane
+passed.
 
 Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
@@ -314,3 +315,43 @@ defects. All are fixed:
 The fast lane passed on its first run: all affected Clutter, backend, native
 and Wayland suites, including the new separate target-gamut invocation
 ([receipt](../evidence/mutter-gamut-compression.json)).
+
+Process note for batches six to eight: by the coordinator's record,
+`scripts/check_repository.py` ran and passed before each merge, but the batch
+receipts did not record it.
+Receipts from the ninth batch on record it.
+
+## Ninth batch — independent review and fixes
+
+At the owner's request, three independent Fable 5.1 reviews covered the
+compositor stack (`nativehdr4`–`7`), the library, Wine and Dolby activation
+work, and the evidence, packaging and delivery kit. A Fable re-review then
+checked the fixes. Findings and dispositions:
+
+| Finding | Severity | Disposition |
+|---|---|---|
+| PQ content without a declared peak was tone-mapped from the 10000 cd/m² encoding capacity: plain HDR video was dimmed from about 150 cd/m², lost reference-white anchoring and lost direct scanout | Blocker (computed) | The encoding maximum counts as the content peak only for SDR-type encodings and HLG; PQ and linear need a declared peak, otherwise nothing is mapped (`nativehdr8`) |
+| Published output and preferred descriptions used the 10%-tolerant equality while rendering is exact, so clients following them were mapped again after small brightness changes | Should-fix | Published on the renderer's exact identity |
+| KMS static metadata stays zero while the compositor maps | Should-fix (design) | Kept: with unmapped plain PQ the composition is not bounded by the target, so declaring the target would be untrue; compare on screen after installation ([contract](HDR_MAPPING.md#kms-hdr-metadata-stays-unknown)) |
+| Stale comments: mastering primaries "never map gamut" | Should-fix | Corrected |
+| HLG system gamma used the extended formula everywhere | Nit | BT.2100-2 Table 5 within 400–2000 cd/m², extended form outside; independent test reference |
+| Mapping predicate recomputed per frame and per pointer motion; display targets inferred from any target volume; curve relied on infinities | Nit | One decision per state pair shared by renderer, scanout and cursor; explicit display-target constructor; finite two-branch curve (its first test had a duplicated sample point, fixed and rerun) |
+| Bounded-encoding proxy and the two D65 definitions undocumented | Nit | Documented in code |
+| The compositor depended on a library version floor that an archive build would satisfy, so an archive library update could leave GNOME unable to start | Should-fix | The library provides `libdisplay-info3-native-hdr-api (= 2)` and the compositor depends on it; the install kit holds the six packages |
+| A stale quilt entry in both packages was hidden by regenerated quilt bookkeeping | Should-fix | Removed (its attribution moved to `README.native-displayid`); the private packaging harness now refuses to build unless every series entry reverse-applies (the debian sources do not enforce this) |
+| Wine Wayland driver supplies no monitor descriptor, so on the owner's desktop the processor sees no panel facts | Should-fix (plan) | Recorded as the governing prerequisite for the processor track ([Wine](WINE_DISPLAY_MONITOR.md#remaining-processor-boundary)) |
+| GDI driver ABI deployment set unnamed (`wineps.drv` would break) | Should-fix | Coherent module set documented |
+| DisplayMonitor read without the lock if the mutex failed; name coupled by string | Should-fix | Shared name; resolution fails closed |
+| `GetDescriptor` returned unvalidated or over-long EDID bytes; three output technologies unmapped | Nit | Validated, exactly bounded copy; technologies mapped from SDK definitions |
+| Dolby probe recipe stale; next step under-specified (descriptor source, device, oracle, getter traces); network-count wording inconsistent | Should-fix | Wine 11 fixture documented; four prerequisites listed |
+| Upstream library API shape (narrow getters, reserved values not diagnosed) | Should-fix (upstream) | Recorded as upstream follow-up; the Ubuntu delivery keeps its compatible behaviour |
+| Stale stock-kernel name in recovery notes; install kit lacked pre-flight checks, a package-state snapshot, holds and failure guidance; agent containers left on the laptop | Should-fix | Kit and operations notes corrected; containers listed for the owner's decision |
+| Status pages and README inconsistent in places | Nit | Corrected |
+
+The fast lane ran once over the affected suites. The Mutter run passed
+except one new test, whose sampling loop visited one distance twice; after
+that test-only fix, only it was rerun and passed. The Wine `displaymonitor`
+and `displayconfig` tests passed with the rebuilt modules
+([receipt](../evidence/review-fixes-fast-lane.json)).
+`scripts/check_repository.py` passed before merge.
+

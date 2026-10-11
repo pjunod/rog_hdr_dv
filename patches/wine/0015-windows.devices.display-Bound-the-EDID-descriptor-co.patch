@@ -1,0 +1,91 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:26:14 -0400
+Subject: [PATCH] windows.devices.display: Bound the EDID descriptor copy to
+ the validated length.
+
+A registry value may carry whole blocks after the extensions the base
+block declares. Record the validated length, the base block plus the
+declared extensions, and return exactly those bytes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/windows.devices.display/descriptor.c     |  1 +
+ dlls/windows.devices.display/main.c           |  5 +++--
+ dlls/windows.devices.display/private.h        |  1 +
+ .../tests/displaymonitor.c                    | 20 +++++++++++++++++++
+ 4 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/dlls/windows.devices.display/descriptor.c b/dlls/windows.devices.display/descriptor.c
+index 09b4ef1..75b0a06 100644
+--- a/dlls/windows.devices.display/descriptor.c
++++ b/dlls/windows.devices.display/descriptor.c
+@@ -167,6 +167,7 @@ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_des
+     if (count * 128 > size) return;
+     for (i = 0; i < count; i++) if (!checksum_valid( edid + 128 * i, 128 )) return;
+     descriptor->flags |= MONITOR_EDID_VALID;
++    descriptor->edid_size = count * 128;
+     if (edid_chromaticities( edid, descriptor->primaries )) descriptor->flags |= MONITOR_NATIVE_PRIMARIES;
+     if (edid_native_resolution( edid, &descriptor->native_resolution )) descriptor->flags |= MONITOR_NATIVE_RESOLUTION;
+ 
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index 7acc90b..38500b7 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -292,9 +292,10 @@ static HRESULT WINAPI monitor_GetDescriptor( IDisplayMonitor *iface, DisplayMoni
+     *value = NULL;
+     if (kind == DisplayMonitorDescriptorKind_Edid)
+     {
+-        /* Bytes the parser rejected are not this monitor's EDID. */
++        /* Bytes the parser rejected are not this monitor's EDID, and blocks
++         * beyond the declared extension count are not part of it. */
+         if (!(impl->descriptor.flags & MONITOR_EDID_VALID)) return DISPLAYMONITOR_UNAVAILABLE;
+-        length = impl->edid_size;
++        length = impl->descriptor.edid_size;
+     }
+     else if (kind == DisplayMonitorDescriptorKind_DisplayId)
+     {
+diff --git a/dlls/windows.devices.display/private.h b/dlls/windows.devices.display/private.h
+index 609d59a..1ec2989 100644
+--- a/dlls/windows.devices.display/private.h
++++ b/dlls/windows.devices.display/private.h
+@@ -60,6 +60,7 @@ struct monitor_descriptor
+     FLOAT max_luminance, min_luminance, full_luminance;
+     DisplayMonitorUsageKind usage;
+     UINT32 displayid_offset, displayid_size;
++    UINT32 edid_size; /* validated base block plus declared extensions */
+ };
+ 
+ void monitor_descriptor_parse( const BYTE *edid, UINT32 size, struct monitor_descriptor *descriptor );
+diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
+index 0d9dd8c..c3076a5 100644
+--- a/dlls/windows.devices.display/tests/displaymonitor.c
++++ b/dlls/windows.devices.display/tests/displaymonitor.c
+@@ -280,6 +280,26 @@ static void test_descriptor_cases( HKEY key, const WCHAR *id )
+         }
+     }
+ 
++    /* A trailing block beyond the declared extension count is not part of
++     * the descriptor. */
++    make_edid( edid );
++    edid[126] = 0;
++    checksum( edid, 128 );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++    hr = get_monitor( id, FALSE, &monitor );
++    ok( hr == S_OK, "Trailing block descriptor object hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
++        ok( hr == S_OK && length == 128 && !memcmp(copy, edid, 128),
++            "Trailing block descriptor hr %#lx, length %u.\n", hr, length );
++        if (SUCCEEDED(hr)) CoTaskMemFree( copy );
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_DisplayId, &length, &copy );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Trailing block DisplayID hr %#lx.\n", hr );
++        if (SUCCEEDED(hr)) CoTaskMemFree( copy );
++        IDisplayMonitor_Release( monitor );
++    }
++
+     /* A truncated extension list cannot claim native fields, and the
+      * rejected bytes are not returned as the monitor's EDID. */
+     make_edid( edid );

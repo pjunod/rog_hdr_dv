@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:05:30 -0400
+Subject: [PATCH] win32u: Accept the indirect and USB tunnel output
+ technologies from drivers.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/win32u/sysparams.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/dlls/win32u/sysparams.c b/dlls/win32u/sysparams.c
+index 16ab96f..56bc667 100644
+--- a/dlls/win32u/sysparams.c
++++ b/dlls/win32u/sysparams.c
+@@ -749,6 +749,9 @@ static struct wine_monitor_properties sanitize_monitor_properties( const struct
+         case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EMBEDDED:
+         case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDTVDONGLE:
+         case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_MIRACAST:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_VIRTUAL:
++        case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_USB_TUNNEL:
+         case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INTERNAL:
+             break;
+         default:

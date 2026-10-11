@@ -5,9 +5,9 @@
     {
       "component": "ubuntu-libdisplay-info",
       "base_commit": "fc100604841ba8f8a9f88ea4ebfb6a522a9a73fb",
-      "candidate_commit": "b5657d5ca0e845c6528f6a54056ee153e74053f7",
-      "patch_count": 21,
-      "candidate_tree": "004413f716800db397eb9739fd56ef71e979260f",
+      "candidate_commit": "b25ae1cbe5a98d433450be37d00d69a9979d8ebd",
+      "patch_count": 23,
+      "candidate_tree": "96d65c11ed0f408792c41cd42c2866255b1089d0",
       "patch_order": [
         "0001-displayid2-privately-backport-native-HDR-detection-f.patch",
         "0002-test-cover-private-DisplayID-parsing-precedence-and-.patch",
@@ -29,7 +29,9 @@
         "0018-Clarify-unusable-declarations-and-correct-signal-fix.patch",
         "0019-Fix-truncated-extension-fixture-and-check-literal-co.patch",
         "0020-Strengthen-native-chromaticity-tests-against-silent-.patch",
-        "0021-Expect-an-oversized-block-to-leave-no-declaration-no.patch"
+        "0021-Expect-an-oversized-block-to-leave-no-declaration-no.patch",
+        "0022-debian-Provide-the-native-HDR-API-and-drop-the-stale.patch",
+        "0023-debian-Keep-the-native-DisplayID-attribution-and-def.patch"
       ],
       "base_tree": "5708d8b3c49f6fbb9adaf777487ffe353dd0946f",
       "historical_workspace_subdirectory": "ubuntu/native-api",
@@ -59,22 +61,22 @@
           }
         ]
       },
-      "previous_candidate_commit": "051af9ad21839a017f9fcc6d2f291902eb82136e",
-      "previous_candidate_tree": "dd88089aed845002aae17b08ca4cbc9939f3a476",
+      "previous_candidate_commit": "b5657d5ca0e845c6528f6a54056ee153e74053f7",
+      "previous_candidate_tree": "004413f716800db397eb9739fd56ef71e979260f",
       "delivered_candidate_commit": "e1e1ddf4270db27acf984ab1f005daf64e9f0038",
       "delivered_candidate_tree": "33c4658ced7128e82cd707593784ef7f8748309f",
       "delivered_patch_count": 14,
       "delivered_version": "0.3.0-1ubuntu1~hdr6",
-      "candidate_status": "native luminance and chromaticity API (hdr8); reviewed fast lane passed (four chromaticity groups, legacy consumers); packaged for amd64 and i386 (evidence/hdr8-nativehdr7-packages.json); not installed"
+      "candidate_status": "hdr9: hdr8 library code with the native HDR API virtual package and the stale quilt entry removed (packaging only); packaged for amd64 and i386; not installed"
     },
     {
       "component": "ubuntu-mutter",
       "base_commit": "f8b113189f8c67beabf7475adf26f6ebcbf36684",
-      "candidate_commit": "892d3d3517a48733884460638cbca262c227929f",
-      "patch_count": 43,
-      "candidate_tree": "c0cd4688b33665d057fc8c4c0c6b0a6c0a8a4dca",
-      "previous_candidate_tree": "8f3115e322e1961142c8f5119cec9ecf99dfc1c7",
-      "previous_candidate_note": "nativehdr6 (patches 0001-0038), merged in PR 7; packaged and superseded by nativehdr7 before installation",
+      "candidate_commit": "9662e286f537e120005863c9613828bd9764bbdd",
+      "patch_count": 52,
+      "candidate_tree": "8de2497c392a7ae16f6257090a451c6b35231471",
+      "previous_candidate_tree": "c0cd4688b33665d057fc8c4c0c6b0a6c0a8a4dca",
+      "previous_candidate_note": "nativehdr7 (patches 0001-0043), merged in PR 8; packaged and superseded by nativehdr8 before installation",
       "patch_order": [
         "0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch",
         "0002-backends-native-scope-native-capability-veto-to-exte.patch",
@@ -118,7 +120,16 @@
         "0040-native-Composite-surfaces-and-cursors-whose-gamut-is.patch",
         "0041-backends-color-Render-for-the-output-s-declared-targ.patch",
         "0042-tests-color-management-Cover-gamut-compression-and-s.patch",
-        "0043-debian-Add-nativehdr7-changelog-entry.patch"
+        "0043-debian-Add-nativehdr7-changelog-entry.patch",
+        "0044-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch",
+        "0045-clutter-color-Use-the-BT.2100-Table-5-HLG-system-gam.patch",
+        "0046-clutter-color-Make-display-targets-only-through-an-e.patch",
+        "0047-clutter-color-Decide-mapping-once-per-source-and-tar.patch",
+        "0048-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch",
+        "0049-wayland-color-management-Correct-comments-on-masteri.patch",
+        "0050-wayland-color-management-Publish-descriptions-on-exa.patch",
+        "0051-clutter-color-Evaluate-gamut-compression-without-cla.patch",
+        "0052-debian-Add-nativehdr8-changelog-entry-and-native-HDR.patch"
       ],
       "base_tree": "30242cc54cebe1ec524a6d79473b41be5f07d05b",
       "historical_workspace_subdirectory": "mutter/work",
@@ -152,7 +163,7 @@
       "delivered_candidate_tree": "61bf80d9dea0995f98120f783155eb79029d6be1",
       "delivered_patch_count": 5,
       "delivered_version": "51.0-1ubuntu3+nativehdr2",
-      "candidate_status": "source-qualified gamut compression toward the declared target gamut (nativehdr7) on nativehdr6; native amd64 -Werror compile passed; adversarial review addressed; affected fast lane passed; packaged for amd64 (evidence/hdr8-nativehdr7-packages.json); not installed"
+      "candidate_status": "nativehdr8: independent-review fixes on nativehdr7 (undeclared PQ peak unmapped, exact publication identity, BT.2100 Table 5 HLG gamma, one mapping decision per state pair, explicit display targets, finite gamut curve, native HDR API dependency); native amd64 -Werror compile passed; re-reviewed; affected fast lane passed; packaged for amd64; not installed"
     },
     {
       "component": "libdisplay-info",
@@ -217,10 +228,10 @@
       "base_tag": "wine-11.0",
       "base_commit": "db11d0fe6a169c457e23d007e20404643d067aa8",
       "base_tree": "c143c87e72ecf5e6795b7bd802983bec54c345f4",
-      "candidate_commit": "9e058319a8cf43517be7018da29d364d8caa88ed",
-      "candidate_tree": "905b2ed5509c7d09490a5dd16735381979c2a51e",
+      "candidate_commit": "05f60d4ace5958361c5ff1b67e767db20ec44eda",
+      "candidate_tree": "85037f72cf1a9e47e766dbd2513f70699f3197c6",
       "upstream": "https://github.com/wine-mirror/wine.git",
-      "patch_count": 9,
+      "patch_count": 17,
       "patch_order": [
         "0001-kernelbase-implement-CreateFileFromAppW.patch",
         "0002-test-trace-CreateFileFromAppW-module-relative-address.patch",
@@ -230,9 +241,17 @@
         "0006-windows.devices.display-Add-DisplayMonitor-statics-b.patch",
         "0007-configure-Generate-the-windows.devices.display-makef.patch",
         "0008-windows.devices.display-Validate-native-chromaticiti.patch",
-        "0009-windows.devices.display-Resolve-only-reported-monito.patch"
+        "0009-windows.devices.display-Resolve-only-reported-monito.patch",
+        "0010-win32u-Define-the-display-device-init-mutex-name-in-.patch",
+        "0011-windows.devices.display-Fail-monitor-resolution-with.patch",
+        "0012-windows.devices.display-Return-the-EDID-descriptor-o.patch",
+        "0013-include-Add-the-indirect-and-USB-tunnel-display-outp.patch",
+        "0014-win32u-Accept-the-indirect-and-USB-tunnel-output-tec.patch",
+        "0015-windows.devices.display-Bound-the-EDID-descriptor-co.patch",
+        "0016-windows.devices.display-Map-the-indirect-and-USB-tun.patch",
+        "0017-windows.devices.display-Note-that-an-abandoned-lock-.patch"
       ],
-      "candidate_status": "source-only DisplayMonitor discovery; native amd64 -Werror compile and reviewed fast lane passed (displaymonitor 308, displayconfig 14, no failures); not installed on host"
+      "candidate_status": "DisplayMonitor with independent-review fixes (shared init mutex name and fail-closed lock, validated and bounded EDID copy, indirect and USB tunnel technologies); compiled with -Werror; displaymonitor and displayconfig passed in a WineHQ 11.0 runtime with candidate modules overlaid; not installed"
     }
   ]
 }
