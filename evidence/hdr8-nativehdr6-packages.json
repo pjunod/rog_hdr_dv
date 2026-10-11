@@ -90,6 +90,42 @@
      "bytes": 57854,
      "sha256": "9fe20926650bfe6017fa444317c7e291fb72a65a610aed0256028cbaf99badf9"
     }
+   ],
+   "delivery": "superseded by nativehdr6 before installation; built and simulated, not delivered"
+  },
+  {
+   "component": "mutter",
+   "architecture": "amd64",
+   "version": "51.0-1ubuntu3+nativehdr6",
+   "build_options": "nocheck parallel=2",
+   "source_commit": "6f356d6",
+   "source_tree": "8f3115e322e1961142c8f5119cec9ecf99dfc1c7",
+   "source_archive_sha256": "7c8bac1d0daaadb11322c1c5abb60eeff55616548bfd627ad8ec5f7c7f069600",
+   "subproject_note": "subprojects/gvdb ships in the pinned mutter_51.0.orig.tar.xz (sha256 5d28f3ae\u2026d983b3, verified) but upstream .gitignore keeps it out of the Git import; it was extracted from that tarball",
+   "built_against": "libdisplay-info-dev 0.3.0-1ubuntu1~hdr8 (this build)",
+   "libdisplay_info_dependency": "libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr8~)",
+   "symbols_check": "dpkg-gensymbols reported no differences against debian/libmutter-51-0.symbols",
+   "runtime_packages": [
+    {
+     "file": "libmutter-51-0_51.0-1ubuntu3+nativehdr6_amd64.deb",
+     "bytes": 1575016,
+     "sha256": "69e423a80a12f8a1797778c641069ac4f025cf22b50d98c135a666d6644ab86e"
+    },
+    {
+     "file": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr6_amd64.deb",
+     "bytes": 165986,
+     "sha256": "97829229c9c2978ac07703e5b136c768cdd1c3c2997f7ea67ff30a5a38f0ef30"
+    },
+    {
+     "file": "mutter-common_51.0-1ubuntu3+nativehdr6_all.deb",
+     "bytes": 561402,
+     "sha256": "46a20fc6b0e743f7aaf79f0ac5d8dd5dc7d352ae9a4825cf08005846e414234b"
+    },
+    {
+     "file": "mutter-common-bin_51.0-1ubuntu3+nativehdr6_amd64.deb",
+     "bytes": 58664,
+     "sha256": "38572d5d7cc36dd9cc0a040aaad753e1daeb83a2f410207ce3777602aaf893e7"
+    }
    ]
   }
  ],
@@ -103,21 +139,24 @@
    "method": "apt-get -s install of the six local packages on the laptop, as an unprivileged user",
    "upgrades": 6,
    "new_installs": 0,
-   "removals": 0
+   "removals": 0,
+   "note": "repeated for nativehdr6 with the same result; nativehdr5 gave the same result earlier"
   },
   "rollback_model_simulation": {
    "method": "private copy of the installed dpkg status with only the six candidate control records substituted; apt-get -s install of the retained hdr6/nativehdr2 packages",
    "downgrades": 6,
    "new_installs": 0,
    "removals": 0,
-   "limitation": "modeled rollback; the host package database was not changed"
+   "limitation": "modeled rollback; the host package database was not changed",
+   "note": "repeated for nativehdr6 with the same result"
   },
   "rollback_artifacts": "the six previously installed packages are retained privately on the laptop and their recorded hashes verified",
   "session": [
    "Log out of GNOME before replacement; restart the display manager so a new GNOME Shell loads the new library",
    "Keep a text-console or SSH recovery route",
    "No kernel, Secure Boot, bootloader, ICC profile, display mode or saved setting change"
-  ]
+  ],
+  "candidate": "hdr8 library (amd64, i386) with nativehdr6 compositor"
  },
- "scope": "hdr8 library and nativehdr5 compositor (PR 6). Later compositor batches are not covered."
+ "scope": "hdr8 library (PR 5) with nativehdr6 compositor (patches 0001-0038); the nativehdr5 set (PR 6) was built first and superseded before installation."
 }
