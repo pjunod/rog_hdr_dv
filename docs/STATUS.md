@@ -299,6 +299,25 @@ obtain).
 The staged acceptance criteria remain in
 [Dolby Vision and display quality](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance).
 
+## Owner decisions (2026-10-11)
+
+- The generally available Dolby Vision track is open, player-side
+  RPU-aware display management validated against Dolby's reference renderer
+  ([contract](OPEN_DV_DISPLAY_MANAGEMENT.md)). The OEM processor under Wine
+  is a time-boxed experiment with a one-frame go/no-go.
+- The owner will boot the laptop's Windows installation for a coordinated
+  trace of the OEM Dolby pipeline (private results).
+- KMS HDR metadata: run the on-screen comparison on `lab5`, then bound the
+  composition and declare the display's own values if the comparison
+  supports it.
+- Upstream submission: yes, under the owner's identity, in slices, design
+  discussions first.
+- Measurement: a Calibrite ColorChecker Display Plus / X-Rite i1Display Pro
+  Plus class colourimeter (supported by ArgyllCMS; not an "HL" model), plus
+  one spectrophotometer session for a panel-specific correction, is the
+  recommendation; purchase pending.
+- A measured colour profile takes priority over EDID declarations.
+
 ## Decisions taken without the owner
 
 Recorded for review; each can be revisited.

@@ -172,7 +172,7 @@ output stage, and prevent the compositor from mapping it a second time.
 |---|---|---|
 | Native Dolby/OEM component | Establish availability and supported Linux/GPU/display interface for a full display-management implementation. | No compatible native package identified in this investigation. Do not assume a Windows licence or binary supplies one. |
 | Compatibility host for the recovered processor | Build an isolated COM/WinRT/MF/D3D11 probe; establish activation, formats, metadata transport, profile loading and output semantics before player integration. | Feasibility unproven. Wine installation alone is not evidence. Record the first missing API/driver contract; do not assume it is a trivial DLL wrapper. |
-| Open implementation | Audit metadata/reconstruction/display-management coverage and compare output with controlled Dolby reference cases, including trims and target changes. | Parsing metadata and matching a pleasant-looking sample do not demonstrate a complete Dolby display manager. |
+| Open implementation (main track since 2026-10-11, [contract](OPEN_DV_DISPLAY_MANAGEMENT.md)) | Audit metadata/reconstruction/display-management coverage and compare output with controlled Dolby reference cases, including trims and target changes. | Parsing metadata and matching a pleasant-looking sample do not demonstrate a complete Dolby display manager. |
 
 An additional source lead is
 [CroqueMr's experimental Linux DV project](https://github.com/CroqueMr/libreelec-x86-DV).

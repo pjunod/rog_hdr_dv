@@ -349,16 +349,20 @@ recommendations, ranked:
 
 Further findings: no per-output peak override for displays with wrong CTA
 values; colord-assigned measured ICC should beat base EDID as the native SDR
-target; SDR white in HDR mode is capped at 203 cd/m² (a daylight usability
-gap on a 616-nit OLED); Night Light is applied to PQ-encoded values (an
+target; Night Light is applied to PQ-encoded values (an
 upstream defect); apps must not apply a display ICC on top of the compositor;
 OLED ABL means full-frame scenes stay near 400 cd/m²; the test matrix lacks
 an HDMI HDR TV on the NVIDIA output, the MUX route and any AMD hardware; the
 ACES threshold was tuned for AP1 camera colours.
 
+One finding was wrong on checking the code: the review said SDR white in
+HDR mode is capped at 203 cd/m² and that the reference-white factor never
+exceeds 1. The ref-white backlight's range is 10–210, so the factor reaches
+2.1 and SDR white about 426 cd/m². The cap, and the corresponding owner
+decision, were withdrawn.
+
 Corrections applied: the stale nativehdr7 status line, the Dolby activation
-qualifier (Wine 0001–0009 only; Profile 7 not registered), the brightness
-statement in the tenth batch (the factor never exceeds 1), the
+qualifier (Wine 0001–0009 only; Profile 7 not registered), the
 DisplayMonitor descriptor wording (sysfs by connector name is now an open
 option), the ACES parameter provenance, and the dated baseline table.
 
@@ -391,11 +395,12 @@ update. Wayland identity excludes provenance, so a provenance-only change
 creates no new description. Ordinary sRGB clients in native SDR were already
 composited, so there is no new scanout regression.
 
-Recorded behaviour: the reference-white factor is the brightness setting
-divided by 100, so it never exceeds 1 and reference white stays at or below
-203 cd/m². With every accepted target above 203, SDR is therefore never
-highlight-mapped today. That changes only if the SDR white in HDR mode is
-allowed above 203 (an open owner decision). A native SDR panel whose white lies far
+Recorded behaviour: in BT.2100 the brightness slider sets the reference-white
+factor over 0.1–2.1 (`meta-backlight-ref-white.c`, brightness range
+10–210), so SDR white reaches about 426 cd/m². On an output whose declared
+peak is below that, for example an HDR400 monitor, the top of the slider
+highlight-maps SDR toward the peak (already true on the native route). A
+native SDR panel whose white lies far
 from D65 can now compress sRGB content, which is the consistent result of
 the encoding's own white adaptation.
 

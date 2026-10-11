@@ -58,6 +58,9 @@ deferred output-characterization contract.
 [Display target sources](docs/DISPLAY_TARGET_SOURCES.md) extends those targets
 beyond the ROG panel: DisplayID or CTA-861 luminance on any HDR output, and
 the base EDID gamut in the native SDR mode, for general availability.
+[Open RPU-aware display management](docs/OPEN_DV_DISPLAY_MANAGEMENT.md) is the
+generally available Dolby Vision track: player-side mapping from the RPU,
+validated against Dolby's reference renderer.
 
 ## Work with the repository
 
