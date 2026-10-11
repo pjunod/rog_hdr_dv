@@ -2,7 +2,7 @@
 
 **Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`) and 0039–0043
 (`nativehdr7`); reviewed and fast-lane qualified (synthetic headless tests);
-packaged for amd64, not installed · **Date:** 2026-10-10.
+packaged for amd64, not installed · **Date:** 2026-10-11.
 
 This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-source-findings--input-contracts-and-mapping-ownership).
 `nativehdr5` fixed the input defects. This batch adds the two missing
@@ -211,11 +211,11 @@ No available data describes that firmware conversion:
 - The DisplayID declarations give the target gamut and peak. They are
   already used, and they say nothing about how accurately the firmware
   reaches them.
-- The OEM ICC profiles describe Windows' profile connection for each GPU
-  route; their MHC2 transforms are identity
-  ([inspection](ICC_CHARACTERISATION.md)). They are not measurements of this
-  unit's response to PQ input, and their curves are for a different
-  pipeline.
+- The OEM ICC profiles hold factory SDR characterisation (sampled TRCs and
+  luminance) that differs by GPU route; the CMDEF variants' MHC2 transforms
+  are identity ([inspection](ICC_CHARACTERISATION.md)). Their operating
+  conditions are not established, they are not measurements of this unit's
+  response to PQ input, and their TRCs must not be applied to a PQ stage.
 - The colour device's EDID-derived profile is model metadata.
 
 Applying a correction built from any of these would guess at the panel's
@@ -226,18 +226,23 @@ there is nothing to fix at its source.
 **Contract for the implementation, once measured:**
 
 - **Input:** a characterization measured in HDR mode with the
-  [measurement procedure](PANEL_MEASUREMENT.md): per-channel and neutral PQ
-  ramps, primaries and white at several signal levels, recorded with the
+  [measurement procedure](PANEL_MEASUREMENT.md): neutral PQ ramps (grey
+  balance and EOTF), primaries and white at several luminances (§4), plus
+  per-channel PQ ramps added for this purpose, recorded with the
   instrument, mode, brightness factor and date. The record carries
-  provenance `MEASURED`; firmware or profile values never take that
-  provenance.
-- **Correction:** a 3×3 matrix and per-channel 1D curves in the PQ domain,
-  or a 3D LUT if the measured error is not separable. The choice follows the
+  a new provenance value, `MEASURED`; firmware or profile values never take
+  it.
+- **Correction:** a 3×3 matrix in linear light plus per-channel 1D curves on
+  the PQ-encoded signal, or a 3D LUT in the PQ domain if the measured error
+  is not separable. The choice follows the
   measured residuals, not a default.
 - **Owner and place:** the colour device holds the record. It is applied
   once, in the blending → output conversion, so every surface, the cursor and
-  any direct-scanout decision see the same output. A non-identity correction
-  refuses direct scanout through the shared predicate.
+  any direct-scanout decision see the same output. While non-identity, the
+  shared scanout predicate refuses direct scanout of every surface and the
+  hardware cursor plane.
+- **Targets:** measured peak and gamut, when recorded, replace the firmware
+  declarations as the mapping targets, with their own provenance.
 - **Validation:** held-out patches measured after applying it, against the
   accuracy goals in the measurement procedure. A correction that does not
   improve the held-out patches is not kept.

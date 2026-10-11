@@ -16,7 +16,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>HDR, Dolby Vision<br>and display quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 10, 2026 · PR 7 merged; hdr8 + nativehdr7 packaged; gamut compression qualified (synthetic tests); nothing installed</p></header>
+<p class="muted">Updated October 10, 2026 · PR 8 merged; hdr8 + nativehdr7 packaged; gamut compression qualified (synthetic tests); output characterization defined, deferred until measured; nothing installed</p></header>
 <div class="callout"><strong>Current physical result:</strong> the owner reports
 working HDR10 on the patched stack with Secure Boot enabled. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
@@ -32,6 +32,7 @@ and measured calibration are not yet qualified.</div>
 <tr><td>HLG and tone mapping</td><td class="state active">Qualified source</td><td>nativehdr6: HLG decoding with its OOTF, validated mastering metadata and MaxCLL/MaxFALL, and BT.2390 highlight mapping to the panel's declared peak, applied once per surface and only above that peak. Reviewed; affected fast lane passed.</td></tr>
 <tr><td>Gamut compression</td><td class="state active">Qualified source</td><td>nativehdr7: colours beyond the panel's declared gamut are compressed into it (ACES reference gamut compression with derived limits), only when content can exceed it. Reviewed; fast lane passed first time (synthetic headless tests). On-screen benefit unverified.</td></tr>
 <tr><td>Linux package delivery</td><td class="state active">Packaged</td><td>hdr8 library (amd64, i386) and nativehdr7 compositor packaged (nativehdr6 staged for comparison); on the laptop the six-package upgrade and modeled rollback resolve without additions or removals. A coordinated installation with the owner remains.</td></tr>
+<tr><td>Output characterization</td><td class="state pending">Contract defined</td><td>Deferred until an instrument measures how this unit renders PQ; firmware and factory-profile values are not used as a correction.</td></tr>
 <tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>Four factory profiles parsed privately. MHC2 transforms are identity; standard ICC characterisation differs by GPU route. Optical acceptance remains.</td></tr>
 <tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
 </tbody></table>
