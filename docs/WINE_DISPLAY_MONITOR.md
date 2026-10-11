@@ -187,10 +187,17 @@ facts, it cannot engage for this panel until a descriptor source with
 provenance exists. The legitimate one is the compositor: the compositor
 candidate (publishing since `nativehdr4`, currently `nativehdr8`) publishes the panel's declared target luminance and primaries through
 `wp_color_management_v1`, which the Wine Wayland driver can carry into the
-monitor record with a compositor origin. A raw EDID needs a real facility
-(a compositor protocol or DRM); matching a `wl_output` name to sysfs would be
-a guess the contract forbids. Until then, a traced frame answers the API
-contract only, not whether the processor engages Dolby Vision for this panel.
+monitor record with a compositor origin. The processor
+appears to key on display identity (the private panel configuration's name
+matches the EDID vendor and product), which colourimetry cannot supply. A raw
+EDID can come from a compositor protocol, or from sysfs by connector name:
+Mutter's `wl_output.name` is the connector (`eDP-2`), and the match can be
+verified against the EDID product name Mutter sends as `wl_output.model`.
+The contract so far excluded that route. An independent review (2026-10-11)
+judged it deterministic and verifiable, and it is now an open option for the
+processor track rather than a prohibition. Until a descriptor source exists,
+a traced frame answers the API contract only, not whether the processor
+engages Dolby Vision for this panel.
 
 A working monitor API may only reveal the next missing dependency. Dolby
 object creation, supported formats, frame/metadata transport, panel-profile

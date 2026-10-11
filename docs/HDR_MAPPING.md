@@ -168,8 +168,8 @@ claim follows from these tests.
 ## Gamut compression (nativehdr7)
 
 **Status:** implemented as Mutter patches 0039–0043 (`nativehdr7`), with review
-fixes in `nativehdr8`; reviewed and fast-lane qualified (synthetic headless tests); packaged for amd64, not
-installed.
+fixes in `nativehdr8`; reviewed and fast-lane qualified (synthetic headless tests); installed with
+`nativehdr8` on 2026-10-11.
 
 The output signal stays BT.2020/PQ. A colour outside the panel's own gamut
 is otherwise left to the panel firmware, whose handling is unknown (it may
@@ -216,6 +216,12 @@ before encoding, so the gamut decision has one known owner.
   declaration's tolerance, and each channel's furthest point beyond that
   tolerance lands exactly on it. Non-finite or non-positive achromatic
   values are unchanged.
+- **Parameter provenance:** the threshold 0.8 and power 1.2 are ACES 1.3's
+  published values, which were tuned for camera colours compressed into AP1.
+  Deriving the limits from the source and target gamuts is this project's
+  own design. Whether a higher threshold (less compression of honest
+  saturated colours near the boundary) suits a real panel better is open
+  until it is measured.
 - **Parity:** part of transform identity and of the shared predicate, so
   scanout and the cursor decide the same way.
 

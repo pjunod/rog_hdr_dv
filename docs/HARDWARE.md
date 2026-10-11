@@ -77,4 +77,5 @@ display version 9, so this generation could not drive internal-panel HDR
 even with an HDR panel. The machine tests the native SDR target path
 ([display target sources](DISPLAY_TARGET_SOURCES.md)) on Intel graphics and
 a stock 26.10 baseline. External HDR monitors on its NVIDIA outputs would
-test the CTA path.
+test the CTA path. `nativehdr9` was installed on it on 2026-10-11
+([receipt](../evidence/install-lab6-2026-10-11.json)).

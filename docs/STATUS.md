@@ -4,8 +4,9 @@
 `nativehdr8` compositor installed on 2026-10-11; the owner's HDR session runs
 on it and the owner accepted the picture. The tenth batch (`nativehdr9`,
 general display targets, and the upstream-facing Mutter port) is reviewed
-and packaged, not yet installed. Full Dolby Vision and measured
-image-quality acceptance remain open.
+and packaged. It is installed on the second test machine `lab6`, where
+native SDR mode publishes the panel's EDID gamut as its target. Full Dolby
+Vision and measured image-quality acceptance remain open.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
 distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
@@ -65,6 +66,18 @@ A second test machine, `lab6` (ThinkPad X1 Extreme, Intel UHD 630, an SDR
 panel with base EDID only), was inspected read-only
 ([hardware](HARDWARE.md#second-test-machine-lab6)). It cannot use BT.2100 on
 its built-in screen. It tests the native SDR target path on Intel graphics.
+
+`nativehdr9` was installed on `lab6` in a coordinated window: 5 upgrades, 0
+added, 0 removed, held, with a stock rollback set. The login screen and the
+owner's session run on it with no colour messages. In the default mode, the
+session publishes sRGB with the fallback target. In native SDR mode
+(selected with `gdctl`), the encoding and target primaries are the panel's
+base EDID gamut ([receipt](../evidence/install-lab6-2026-10-11.json)). The
+owner's visual check is pending.
+
+An independent Fable review of the whole plan followed (strategy, design,
+upstreaming, measurement, process). Its recommendations and the decisions it
+puts to the owner are in [review](REVIEW.md#independent-plan-review-2026-10-11).
 
 ## Ninth batch — independent review and fixes
 
@@ -215,7 +228,7 @@ Mutter and matching amd64/i386 library packaging.
 | Physical luminance library | hdr9 (hdr8 luminance and gamut API) installed for amd64 and i386 | Wider hardware and upstream acceptance |
 | Compositor feedback | nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) installed; nativehdr9 (targets on CTA HDR outputs and native SDR panels) packaged | Install and check nativehdr9 on lab5 and lab6; optical verification needs an instrument |
 | Upstream | Upstream-facing Mutter series (49) and libdisplay-info series (10) current on upstream main | Owner decides submission (merge requests under the owner's identity) |
-| Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
+| Full Dolby Vision | OEM processor activates and describes its transform under Wine (proven with Wine patches 0001–0009; the review-fix modules 0010–0017 passed the DisplayMonitor tests but have not been re-run against the processor); reference workflow available; the OEM plugin does not register Profile 7, so P7 FEL is outside this route | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; optical verification (the owner's visual check passed) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |

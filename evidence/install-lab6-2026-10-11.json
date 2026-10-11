@@ -1,0 +1,36 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-11",
+ "host": "lab6",
+ "status": "PASS (runtime, synthetic-free; visual check pending)",
+ "window": "Coordinated: the owner logged out of GNOME; an SSH session remained",
+ "before": {
+  "libdisplay-info3": "0.3.0-1",
+  "libmutter-51-0": "51.0-1ubuntu3",
+  "gir1.2-mutter-51": "51.0-1ubuntu3",
+  "mutter-common": "51.0-1ubuntu3",
+  "mutter-common-bin": "51.0-1ubuntu3"
+ },
+ "installed": {
+  "libdisplay-info3": "0.3.0-1ubuntu1~hdr9",
+  "libmutter-51-0": "51.0-1ubuntu3+nativehdr9",
+  "gir1.2-mutter-51": "51.0-1ubuntu3+nativehdr9",
+  "mutter-common": "51.0-1ubuntu3+nativehdr9",
+  "mutter-common-bin": "51.0-1ubuntu3+nativehdr9"
+ },
+ "package_sha256": "as in evidence/general-targets-fast-lane.json; candidate and rollback hashes verified before install",
+ "transaction": "5 upgraded, 0 newly installed, 0 removed; apt-get check clean; the five packages held",
+ "rollback": "Stock 51.0-1ubuntu3 / 0.3.0-1 packages downloaded from the archive and hash-recorded beside the kit, with recovery notes; not exercised",
+ "display_manager": "gdm3 restarted; the login screen ran libmutter-51 and libdisplay-info from the new packages (no deleted mappings) with no colour or EDID messages",
+ "session": {
+  "default_mode": "Wayland colour probe: sRGB primaries (named), gamma 2.2, luminance 0.2/80/80, target = encoding fallback (sRGB, 0.2-80)",
+  "native_sdr_mode": "Selected with gdctl (persistent). Probe: encoding primaries = target primaries = base EDID (0.644531,0.335938 0.310547,0.606445 0.152344,0.048828 W 0.313477,0.329102), gamma 2.2, 0.2-80; no colour messages in the session journal",
+  "probe": "probes/wayland_color_info built in the agent container (sha256 a5e203b3c6040d24ce1ba4a9a3296ce2d30aa1deabef0154d4e2748d86c2e5f0), run as the desktop user"
+ },
+ "unchanged": "Kernel, boot selection, profiles and other display settings",
+ "limits": [
+  "The probe shows the published description, not the target provenance or rendering; MUTTER_DEBUG=color was not enabled",
+  "sRGB green lies outside the declared panel triangle, so saturated greens are compressed in native SDR (predicted, colorimetrically consistent); not measured",
+  "No optical measurement"
+ ]
+}
