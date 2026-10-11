@@ -1,0 +1,455 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Sun, 11 Oct 2026 23:25:39 +0000
+Subject: [PATCH 5/6] gdctl: Preserve per-monitor target declarations and
+ support explicit clearing
+
+Expose configured peak, optional black and HDR gamut policy with uniform auto reset tokens. Preserve configured target fields, color mode and RGB range when changing unrelated layout options. Print effective targets and provenance in properties/verbose output. Add deferred two-monitor preservation, clearing, VERIFY and invalid-range regressions; fixtures are source-derived expectations, not execution receipts.
+---
+ src/tests/gdctl/show-properties |  18 ++++-
+ src/tests/gdctl/show-verbose    |  18 ++++-
+ src/tests/monitor-gdctl-tests.c | 126 ++++++++++++++++++++++++++++++--
+ tools/gdctl                     | 101 ++++++++++++++++++++++---
+ 4 files changed, 239 insertions(+), 24 deletions(-)
+
+diff --git a/src/tests/gdctl/show-properties b/src/tests/gdctl/show-properties
+index fc106c6..c975e54 100644
+--- a/src/tests/gdctl/show-properties
++++ b/src/tests/gdctl/show-properties
+@@ -14,13 +14,18 @@ Monitors:
+ │  │           └──is-preferred ⇒  yes
+ │  ├──Preferences
+ │  │   └──Backlight: None
+-│  └──Properties: (6)
++│  └──Properties: (11)
+ │      ├──is-builtin ⇒  no
+ │      ├──display-name ⇒  MetaProduct's Inc. 14"
+ │      ├──is-for-lease ⇒  no
+ │      ├──color-mode ⇒  default
+ │      ├──supported-color-modes ⇒  [default]
+-│      └──rgb-range ⇒  auto
++│      ├──rgb-range ⇒  auto
++│      ├──target-luminance ⇒  0.2–80 cd/m²
++│      ├──target-min-luminance-source ⇒  encoding-fallback
++│      ├──target-max-luminance-source ⇒  encoding-fallback
++│      ├──target-primaries ⇒  R (0.640000, 0.330000), G (0.300000, 0.600000), B (0.150000, 0.060000), W (0.312700, 0.329000)
++│      └──target-primaries-source ⇒  encoding-fallback
+ └──Monitor DP-2 (MetaProduct's Inc. 13")
+    ├──Vendor: MetaProduct's Inc.
+    ├──Product: MetaMonitor
+@@ -36,13 +41,18 @@ Monitors:
+    │           └──is-preferred ⇒  yes
+    ├──Preferences
+    │   └──Backlight: None
+-   └──Properties: (6)
++   └──Properties: (11)
+        ├──is-builtin ⇒  no
+        ├──display-name ⇒  MetaProduct's Inc. 13"
+        ├──is-for-lease ⇒  no
+        ├──color-mode ⇒  default
+        ├──supported-color-modes ⇒  [default]
+-       └──rgb-range ⇒  auto
++       ├──rgb-range ⇒  auto
++       ├──target-luminance ⇒  0.2–80 cd/m²
++       ├──target-min-luminance-source ⇒  encoding-fallback
++       ├──target-max-luminance-source ⇒  encoding-fallback
++       ├──target-primaries ⇒  R (0.640000, 0.330000), G (0.300000, 0.600000), B (0.150000, 0.060000), W (0.312700, 0.329000)
++       └──target-primaries-source ⇒  encoding-fallback
+ 
+ Logical monitors:
+ ├──Logical monitor #1
+diff --git a/src/tests/gdctl/show-verbose b/src/tests/gdctl/show-verbose
+index 594e585..7964ef1 100644
+--- a/src/tests/gdctl/show-verbose
++++ b/src/tests/gdctl/show-verbose
+@@ -32,13 +32,18 @@ Monitors:
+ │  │       └──Properties: (0)
+ │  ├──Preferences
+ │  │   └──Backlight: None
+-│  └──Properties: (6)
++│  └──Properties: (11)
+ │      ├──is-builtin ⇒  no
+ │      ├──display-name ⇒  MetaProduct's Inc. 14"
+ │      ├──is-for-lease ⇒  no
+ │      ├──color-mode ⇒  default
+ │      ├──supported-color-modes ⇒  [default]
+-│      └──rgb-range ⇒  auto
++│      ├──rgb-range ⇒  auto
++│      ├──target-luminance ⇒  0.2–80 cd/m²
++│      ├──target-min-luminance-source ⇒  encoding-fallback
++│      ├──target-max-luminance-source ⇒  encoding-fallback
++│      ├──target-primaries ⇒  R (0.640000, 0.330000), G (0.300000, 0.600000), B (0.150000, 0.060000), W (0.312700, 0.329000)
++│      └──target-primaries-source ⇒  encoding-fallback
+ └──Monitor DP-2 (MetaProduct's Inc. 13")
+    ├──Vendor: MetaProduct's Inc.
+    ├──Product: MetaMonitor
+@@ -72,13 +77,18 @@ Monitors:
+    │       └──Properties: (0)
+    ├──Preferences
+    │   └──Backlight: None
+-   └──Properties: (6)
++   └──Properties: (11)
+        ├──is-builtin ⇒  no
+        ├──display-name ⇒  MetaProduct's Inc. 13"
+        ├──is-for-lease ⇒  no
+        ├──color-mode ⇒  default
+        ├──supported-color-modes ⇒  [default]
+-       └──rgb-range ⇒  auto
++       ├──rgb-range ⇒  auto
++       ├──target-luminance ⇒  0.2–80 cd/m²
++       ├──target-min-luminance-source ⇒  encoding-fallback
++       ├──target-max-luminance-source ⇒  encoding-fallback
++       ├──target-primaries ⇒  R (0.640000, 0.330000), G (0.300000, 0.600000), B (0.150000, 0.060000), W (0.312700, 0.329000)
++       └──target-primaries-source ⇒  encoding-fallback
+ 
+ Logical monitors:
+ ├──Logical monitor #1
+diff --git a/src/tests/monitor-gdctl-tests.c b/src/tests/monitor-gdctl-tests.c
+index 3d371fa..1635926 100644
+--- a/src/tests/monitor-gdctl-tests.c
++++ b/src/tests/monitor-gdctl-tests.c
+@@ -319,11 +319,11 @@ run_diff (const char *output_path,
+ }
+ 
+ static void
+-check_gdctl_result (const char *first_argument,
+-                    ...)
++run_gdctl (gboolean    expect_success,
++           const char *first_argument,
++           va_list     va_args)
+ {
+   g_autoptr (GPtrArray) args = NULL;
+-  va_list va_args;
+   char *arg;
+   g_autoptr (GSubprocessLauncher) launcher = NULL;
+   g_autoptr (GSubprocess) subprocess = NULL;
+@@ -333,10 +333,8 @@ check_gdctl_result (const char *first_argument,
+   args = g_ptr_array_new ();
+   g_ptr_array_add (args, gdctl_path);
+   g_ptr_array_add (args, (char *) first_argument);
+-  va_start (va_args, first_argument);
+   while ((arg = va_arg (va_args, char *)))
+     g_ptr_array_add (args, arg);
+-  va_end (va_args);
+   g_ptr_array_add (args, NULL);
+ 
+   launcher = g_subprocess_launcher_new (G_SUBPROCESS_FLAGS_NONE);
+@@ -350,7 +348,32 @@ check_gdctl_result (const char *first_argument,
+   while (!wait_data.done)
+     g_main_context_iteration (NULL, TRUE);
+ 
+-  g_assert_no_error (wait_data.error);
++  if (expect_success)
++    g_assert_no_error (wait_data.error);
++  else
++    g_assert_error (wait_data.error, G_SPAWN_EXIT_ERROR, 1);
++}
++
++static void
++check_gdctl_result (const char *first_argument,
++                    ...)
++{
++  va_list va_args;
++
++  va_start (va_args, first_argument);
++  run_gdctl (TRUE, first_argument, va_args);
++  va_end (va_args);
++}
++
++static void
++check_gdctl_failure (const char *first_argument,
++                     ...)
++{
++  va_list va_args;
++
++  va_start (va_args, first_argument);
++  run_gdctl (FALSE, first_argument, va_args);
++  va_end (va_args);
+ }
+ 
+ static void
+@@ -701,9 +724,100 @@ meta_test_monitor_dbus_apply_for_lease (void)
+                                                         &expect));
+ }
+ 
++static void
++assert_gdctl_target_override (const char                    *connector,
++                              const MetaColorTargetOverride *expected)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *manager = meta_backend_get_monitor_manager (backend);
++  GList *l;
++
++  for (l = meta_monitor_manager_get_monitors (manager); l; l = l->next)
++    {
++      MetaMonitor *monitor = l->data;
++
++      if (g_str_equal (meta_monitor_get_connector (monitor), connector))
++        {
++          g_assert_true (meta_color_target_override_equal (
++                           meta_monitor_get_target_override (monitor), expected));
++          return;
++        }
++    }
++  g_assert_not_reached ();
++}
++
++static void
++meta_test_monitor_gdctl_target_overrides (void)
++{
++  const MetaColorTargetOverride first = {
++    .has_peak = TRUE, .peak = 400, .has_min = TRUE, .min = 0,
++    .gamut_source = META_HDR_GAMUT_SOURCE_BASE_EDID,
++  };
++  const MetaColorTargetOverride second = {
++    .has_peak = TRUE, .peak = 600,
++    .gamut_source = META_HDR_GAMUT_SOURCE_NONE,
++  };
++  MetaColorTargetOverride changed = first;
++  const MetaColorTargetOverride cleared = { 0 };
++
++  setup_apply_configuration_test ();
++  check_gdctl_result ("set", "--logical-monitor", "--primary",
++                      "--monitor", "DP-1", "--target-peak-luminance", "400",
++                      "--target-min-luminance", "0", "--hdr-gamut-source", "base-edid",
++                      "--logical-monitor", "--monitor", "DP-2", "--right-of", "DP-1",
++                      "--target-peak-luminance", "600", "--hdr-gamut-source", "none", NULL);
++  assert_gdctl_target_override ("DP-1", &first);
++  assert_gdctl_target_override ("DP-2", &second);
++
++  /* VERIFY must not mutate either output, including an explicit clear. */
++  check_gdctl_result ("set", "--verify", "--logical-monitor", "--primary",
++                      "--monitor", "DP-1", "--target-peak-luminance", "auto",
++                      "--hdr-gamut-source", "auto", "--logical-monitor",
++                      "--monitor", "DP-2", "--right-of", "DP-1", NULL);
++  assert_gdctl_target_override ("DP-1", &first);
++  assert_gdctl_target_override ("DP-2", &second);
++
++  /* An unrelated layout change preserves each monitor's configured fields. */
++  check_gdctl_result ("set", "--logical-monitor", "--primary",
++                      "--monitor", "DP-1", "--logical-monitor", "--monitor", "DP-2",
++                      "--left-of", "DP-1", NULL);
++  assert_gdctl_target_override ("DP-1", &first);
++  assert_gdctl_target_override ("DP-2", &second);
++
++  check_gdctl_result ("set", "--logical-monitor", "--primary",
++                      "--monitor", "DP-1", "--target-min-luminance", "auto",
++                      "--logical-monitor", "--monitor", "DP-2", "--right-of", "DP-1", NULL);
++  changed.has_min = FALSE;
++  assert_gdctl_target_override ("DP-1", &changed);
++  assert_gdctl_target_override ("DP-2", &second);
++
++  check_gdctl_result ("set", "--logical-monitor", "--primary",
++                      "--monitor", "DP-1", "--target-min-luminance", "0",
++                      "--logical-monitor", "--monitor", "DP-2", "--right-of", "DP-1", NULL);
++  assert_gdctl_target_override ("DP-1", &first);
++  check_gdctl_result ("set", "--logical-monitor", "--primary",
++                      "--monitor", "DP-1", "--target-peak-luminance", "auto",
++                      "--hdr-gamut-source", "auto", "--logical-monitor",
++                      "--monitor", "DP-2", "--right-of", "DP-1", NULL);
++  assert_gdctl_target_override ("DP-1", &cleared);
++  assert_gdctl_target_override ("DP-2", &second);
++
++  check_gdctl_failure ("set", "--logical-monitor", "--primary",
++                       "--monitor", "DP-1", "--target-min-luminance", "0", NULL);
++  check_gdctl_failure ("set", "--logical-monitor", "--primary",
++                       "--monitor", "DP-1", "--target-peak-luminance", "203", NULL);
++  check_gdctl_failure ("set", "--logical-monitor", "--primary",
++                       "--monitor", "DP-1", "--target-peak-luminance", "400",
++                       "--target-min-luminance", "400", NULL);
++  assert_gdctl_target_override ("DP-1", &cleared);
++  assert_gdctl_target_override ("DP-2", &second);
++}
++
+ static void
+ init_tests (void)
+ {
++  g_test_add_func ("/backends/native/monitor/dbus/apply/target-overrides",
++                   meta_test_monitor_gdctl_target_overrides);
+   g_test_add_func ("/backends/native/monitor/dbus/get-state",
+                    meta_test_monitor_dbus_get_state);
+   g_test_add_func ("/backends/native/monitor/dbus/apply/verify",
+diff --git a/tools/gdctl b/tools/gdctl
+index 0aea515..fd138e4 100755
+--- a/tools/gdctl
++++ b/tools/gdctl
+@@ -3,6 +3,7 @@
+ # ruff: noqa: BLE001
+ 
+ import argparse
++import math
+ import sys
+ from dataclasses import dataclass, field
+ from enum import Enum, Flag
+@@ -200,7 +201,15 @@ def print_properties(*, level, lines, properties):
+         is_last = key == property_keys[-1]
+ 
+         value = properties[key]
+-        if isinstance(value, list):
++        if key == "target-luminance":
++            minimum, maximum = value
++            value_string = f"{minimum:.6g}–{maximum:.6g} cd/m²"
++        elif key == "target-primaries":
++            value_string = ", ".join(
++                f"{label} ({value[i]:.6f}, {value[i + 1]:.6f})"
++                for label, i in zip("RGBW", range(0, 8, 2), strict=True)
++            )
++        elif isinstance(value, list):
+             elements_string = ", ".join([str(element) for element in value])
+             value_string = f"[{elements_string}]"
+         elif isinstance(value, bool):
+@@ -423,6 +432,7 @@ class Monitor:
+     color_mode: ColorMode | None
+     supported_color_modes: list[ColorMode]
+     rgb_range: RgbRange | None
++    target_override: dict[str, Any]
+ 
+     @classmethod
+     def from_variant(cls, variant):
+@@ -464,6 +474,15 @@ class Monitor:
+             color_mode=color_mode,
+             supported_color_modes=supported_color_modes,
+             rgb_range=rgb_range,
++            target_override={
++                key: properties[key]
++                for key in (
++                    "target-peak-luminance",
++                    "target-min-luminance",
++                    "hdr-gamut-source",
++                )
++                if key in properties
++            },
+         )
+ 
+ 
+@@ -857,12 +876,36 @@ def create_logical_monitor(monitors_state, layout_mode, logical_monitor_args):
+                 )
+ 
+         monitor.mode = mode
+-        monitor.color_mode = ColorMode.maybe_from_string(
+-            monitor_args.get("color_mode", None)
+-        )
+-        monitor.rgb_range = RgbRange.maybe_from_string(
+-            monitor_args.get("rgb_range", None)
+-        )
++        if "color_mode" in monitor_args:
++            monitor.color_mode = ColorMode.from_string(monitor_args["color_mode"])
++        if "rgb_range" in monitor_args:
++            monitor.rgb_range = RgbRange.from_string(monitor_args["rgb_range"])
++
++        # ApplyMonitorsConfig replaces fields; perform read-modify-write of
++        # configured overrides only, never the effective target/provenance.
++        override = monitor.target_override.copy()
++        for key in ("target-peak-luminance", "target-min-luminance", "hdr-gamut-source"):
++            argument = key.replace("-", "_")
++            if argument not in monitor_args:
++                continue
++            value = monitor_args[argument]
++            if value == "auto":
++                override.pop(key, None)
++                if key == "target-peak-luminance":
++                    override.pop("target-min-luminance", None)
++            else:
++                override[key] = value
++
++        peak = override.get("target-peak-luminance")
++        minimum = override.get("target-min-luminance", 0.0)
++        if peak is None and "target-min-luminance" in override:
++            raise ValueError("Target minimum luminance requires a peak")
++        if peak is not None and (
++            peak <= 203 or peak > 4294967295
++            or minimum >= math.floor(peak) or minimum * 10000 > 4294967295
++        ):
++            raise ValueError("Invalid target luminance range")
++        monitor.target_override = override
+ 
+         monitors.append(monitor)
+ 
+@@ -990,25 +1033,28 @@ def print_config(config):
+             )
+             print_data(
+                 level=4,
+-                is_last=not monitor.color_mode and not monitor.rgb_range,
++                is_last=not monitor.color_mode and not monitor.rgb_range and not monitor.target_override,
+                 lines=lines,
+                 data=f"Mode: {monitor.mode.name}",
+             )
+             if monitor.color_mode:
+                 print_data(
+                     level=4,
+-                    is_last=not monitor.rgb_range,
++                    is_last=not monitor.rgb_range and not monitor.target_override,
+                     lines=lines,
+                     data=f"Color mode: {monitor.color_mode}",
+                 )
+             if monitor.rgb_range:
+                 print_data(
+                     level=4,
+-                    is_last=True,
++                    is_last=not monitor.target_override,
+                     lines=lines,
+                     data=f"RGB mode: {monitor.rgb_range}",
+                 )
+ 
++            if monitor.target_override:
++                print_properties(level=4, lines=lines, properties=monitor.target_override)
++
+         index += 1
+ 
+     print_data(
+@@ -1281,6 +1327,9 @@ class Config:
+                     "u", monitor.rgb_range.value
+                 )
+ 
++            for key, value in monitor.target_override.items():
++                options[key] = GLib.Variant("s" if key == "hdr-gamut-source" else "d", value)
++
+             # Variant type: (ssa{sv})
+             tuples.append(
+                 (
+@@ -1328,6 +1377,18 @@ class Config:
+         return tuples
+ 
+ 
++def target_luminance_argument(value):
++    if value == "auto":
++        return value
++    try:
++        number = float(value)
++    except ValueError as error:
++        raise argparse.ArgumentTypeError("Expected cd/m² or auto") from error
++    if not math.isfinite(number) or number < 0:
++        raise argparse.ArgumentTypeError("Luminance must be finite and nonnegative")
++    return number
++
++
+ class GroupAction(argparse.Action):
+     def __call__(self, parser, namespace, values, option_string=None):
+         if len(values) == 1:
+@@ -1592,6 +1653,26 @@ if __name__ == "__main__":
+         choices=[str(rgb_range) for rgb_range in list(RgbRange)],
+         type=str,
+     ).completer = RgbRangeCompleter()  # type: ignore[attr-defined]
++    monitor_parser.add_argument(
++        "--target-peak-luminance",
++        action=AppendToSubGroup,
++        type=target_luminance_argument,
++        metavar="CD_M2|auto",
++        help="Override target peak; auto clears the whole luminance override",
++    )
++    monitor_parser.add_argument(
++        "--target-min-luminance",
++        action=AppendToSubGroup,
++        type=target_luminance_argument,
++        metavar="CD_M2|auto",
++        help="Override target black (requires peak); auto restores encoding black",
++    )
++    monitor_parser.add_argument(
++        "--hdr-gamut-source",
++        action=AppendToSubGroup,
++        choices=["auto", "base-edid", "none"],
++        help="HDR target gamut policy; auto clears the configured policy",
++    )
+     logical_monitor_parser.add_argument(
+         "--primary",
+         "-p",
