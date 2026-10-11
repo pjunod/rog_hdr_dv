@@ -24,8 +24,9 @@ Nothing is installed yet.
 panel's declared gamut into it, using the ACES reference gamut compression
 with limits derived from the source and target gamuts
 ([contract](HDR_MAPPING.md#gamut-compression-nativehdr7)). It applies only
-when the content can exceed the declared gamut, so sRGB content and P3
-masters on a P3 panel are untouched. It was reviewed adversarially and
+when the content can exceed the declared gamut, so sRGB content on a
+panel whose declared gamut contains sRGB, and P3 masters on a P3 panel, are
+untouched. It was reviewed adversarially and
 passed its affected fast lane on the first run (synthetic headless tests,
 software rendering; [receipt](../evidence/mutter-gamut-compression.json)).
 Whether the panel itself clips out-of-gamut input, and so how much this

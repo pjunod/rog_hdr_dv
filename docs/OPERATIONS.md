@@ -76,9 +76,10 @@ covers the reviewed hdr8 library and the `nativehdr7` compositor (which
 contains every earlier compositor batch). Both library architectures (i386
 cross-built) and the compositor packages were built from the exact recorded
 source trees in a disposable Ubuntu 26.10 environment, with tests disabled
-deliberately. This is packaging evidence; it does not qualify active scanout. Nothing from this build is installed yet. The
-earlier [hdr7/nativehdr3 receipt](../evidence/baseline-native-packages.json)
-is superseded and was never installed.
+deliberately. This is packaging evidence; it does not qualify active
+scanout. Nothing from this build is installed yet. The earlier
+[hdr7/nativehdr3 receipt](../evidence/baseline-native-packages.json) is
+superseded and was never installed.
 
 The minimal runtime transaction has six packages: `libdisplay-info3:amd64`,
 `libdisplay-info3:i386`, `libmutter-51-0`, `gir1.2-mutter-51`, `mutter-common`

@@ -45,8 +45,9 @@ initial accuracy targets and evidence required before calibration claims.
 chromaticity declarations and independent compositor feedback.
 [Wine monitor discovery](docs/WINE_DISPLAY_MONITOR.md) defines the next
 activation prerequisite, truthful topology and descriptor handling.
-[HLG and tone mapping](docs/HDR_MAPPING.md) defines HLG decoding and mapping
-highlights to the panel's declared target in the compositor.
+[HLG and tone mapping](docs/HDR_MAPPING.md) defines HLG decoding, mapping
+highlights to the panel's declared target and compressing out-of-gamut
+colours toward its declared gamut in the compositor.
 
 ## Work with the repository
 

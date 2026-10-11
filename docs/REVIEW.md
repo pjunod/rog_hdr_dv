@@ -291,11 +291,13 @@ invocations sharing that client were rerun once and passed
 
 ## Eighth batch — gamut compression (nativehdr7)
 
-The coordinator ruled on the first implementation. Only the primaries that
-set a channel's limit are guaranteed to land on the target boundary.
-Compression requires the encoding gamut, and the mastering gamut where
-declared, to exceed the target. Containment tolerates the declaration's own
-quantization. Display-target primaries are validated when constructed.
+The coordinator ruled on the first implementation, in five points. Only the
+boundary point that sets each channel's limit is guaranteed to land on the
+target boundary. Compression requires the encoding gamut, and the mastering
+gamut where declared, to exceed the target. Containment tolerates the
+declaration's own quantization. Absolute colorimetry is used in the
+compression space, with one shared conversion for pixels and limits.
+Display-target primaries are validated when constructed.
 
 An independent adversarial review found one blocker and three should-fix
 defects. All are fixed:

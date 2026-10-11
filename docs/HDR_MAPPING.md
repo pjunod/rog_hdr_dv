@@ -1,13 +1,15 @@
-# HLG and target-aware tone mapping — compositor contract (nativehdr6)
+# HLG, tone mapping and gamut compression — compositor contract (nativehdr6, nativehdr7)
 
-**Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`); reviewed and
-fast-lane qualified (synthetic headless tests); packaged for amd64, not installed · **Date:** 2026-10-10.
+**Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`) and 0039–0043
+(`nativehdr7`); reviewed and fast-lane qualified (synthetic headless tests);
+packaged for amd64, not installed · **Date:** 2026-10-10.
 
 This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-source-findings--input-contracts-and-mapping-ownership).
 `nativehdr5` fixed the input defects. This batch adds the two missing
 operations the audit names: HLG input, and mapping highlights to the output's
-physical target. Gamut compression and output characterization remain later
-work with their own contracts.
+physical target. Gamut compression follows in
+[nativehdr7](#gamut-compression-nativehdr7); output characterization remains
+later work.
 
 ## Ownership
 
@@ -58,9 +60,10 @@ The creator accepts `set_mastering_display_primaries`, `set_mastering_luminance`
 - Mastering luminance: `0 ≤ min < max`, finite. Mastering primaries are
   validated with the shared matrix definition. They are not required to lie
   within the encoding primaries: `extended_target_volume` is advertised,
-  which is truthful: since nativehdr7, declared mastering primaries beyond the
-  encoding (for example on extended-range linear content) set the gamut
-  compression limits.
+  which is truthful: mastering primaries beyond the encoding primaries are
+  kept as declared and, since nativehdr7, set the gamut-compression limits
+  when compression applies (for extended-range linear content they are the
+  only source gamut).
   (Common P3 mastering primaries lie just outside BT.2020.)
 - Repeated setters are `already_set` errors. A MaxCLL or MaxFALL of 0 means
   unknown. When both are known, MaxFALL above MaxCLL is the protocol's
@@ -160,14 +163,16 @@ before encoding, so the gamut decision has one known owner.
   same adaptation). Compression applies only when the encoding gamut has a
   primary outside the target and, where mastering primaries are declared,
   so does the mastering gamut. sRGB-encoded content is therefore never
-  compressed, whatever its metadata. Limits come from the mastering gamut
+  compressed on a target that contains sRGB (any wide-gamut panel), whatever
+  its metadata. ICC sources are not compressed. Limits come from the mastering gamut
   when declared, otherwise from the encoding gamut. For the extended-range
   linear encoding, only declared mastering primaries count; without them
   nothing is compressed.
 - **Containment tolerance:** a primary within the target declaration's own
   quantization (one 12-bit step for CIE 1931 declarations; a per-primary
   bound from the u′v′→xy Jacobian for CIE 1976) counts as inside. A P3
-  master on a panel that declares P3 is not compressed and keeps scanout.
+  master on a panel that declares P3 is not compressed and is not refused
+  scanout on gamut grounds.
 - **Algorithm:** the ACES Reference Gamut Compression (ACES 1.3) distance
   compression, in linear RGB of the target primaries (absolute colorimetry;
   no chromatic adaptation in that step). The achromatic value is
@@ -176,8 +181,9 @@ before encoding, so the gamut decision has one known owner.
   overflow-safe form. The limit for each channel is the largest distance any
   point of the source gamut boundary reaches (primaries and the points
   along each edge where two target channels are equal). So no point of the
-  source boundary ends beyond the target boundary, and each channel's
-  furthest point lands exactly on it. Non-finite or non-positive achromatic
+  source boundary ends beyond the target boundary by more than the
+  declaration's tolerance, and each channel's furthest point beyond that
+  tolerance lands exactly on it. Non-finite or non-positive achromatic
   values are unchanged.
 - **Parity:** part of transform identity and of the shared predicate, so
   scanout and the cursor decide the same way.
