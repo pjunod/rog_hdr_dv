@@ -1,0 +1,245 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 14:54:38 -0400
+Subject: [PATCH] clutter/color: Judge gamut containment in the frame of the
+ pixels
+
+Gamut compression follows every source color to linear BT.2020 as the
+renderer converts it, with the Bradford adaptation of the source's white
+point to D65, and then tests that color against the display target's
+primaries as declared, in the colors the display shows. The renderer
+converts linear BT.2020 to the target's encoding with the adaptation of
+D65 to the encoding's white point, so the two are only in the same frame
+when that white point is D65.
+
+A display target whose gamut is its encoding's own, with a white point
+other than D65, as a panel's native gamut with its own white point,
+then finds the output's own encoding, and content following its
+description, outside the target: it is compressed toward a gamut it
+already lies in, and refused direct scanout and the cursor plane.
+
+Adapt the target's primaries and white point from the white point of
+the target's encoding to D65, with the same Bradford adaptation the
+renderer applies to colors of that encoding, before containment and
+before building the space the compression works in. A color then lies
+within the adapted target exactly when the display shows it within the
+declared one. For an encoding with the rounded D65 white point, the
+target moves by the same few 1e-5 in xy as content with that white
+point already did.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-transform.c | 91 +++++++++++++++++++----
+ src/tests/clutter/conform/color-hdr.c     | 47 ++++++++++++
+ 2 files changed, 123 insertions(+), 15 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 2c60ed5fd..469c72dfa 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1203,15 +1203,15 @@ is_finite3 (const double v[3])
+  *
+  * Two definitions of D65 meet here. Source colors reach linear BT.2020 by
+  * Bradford adaptation to the renderer's CLUTTER_D65 (0.95047, 1, 1.08883),
+- * whose chromaticity is (0.312727, 0.329023), while the target primaries and
+- * the colorspace tables use the rounded (0.3127, 0.3290). Content whose white
+- * point is the rounded D65 is therefore moved by the adaptation: its white by
+- * about 3.6e-5 in xy, and its primaries by up to about 2e-5 (2.7e-5 for the
+- * BT.2020 green primary). That is well inside the tolerance of a firmware
+- * declaration, one 12-bit step (about 2.4e-4) or more, so it decides no
+- * containment of a declared target; only targets declared exactly, without
+- * a tolerance, see it beyond GAMUT_CONTAINMENT_MARGIN. The upstream constant
+- * is kept as it is.
++ * whose chromaticity is (0.312727, 0.329023), while the colorspace tables use
++ * the rounded (0.3127, 0.3290). Content whose white point is the rounded D65
++ * is therefore moved by the adaptation: its white by about 3.6e-5 in xy, and
++ * its primaries by up to about 2e-5 (2.7e-5 for the BT.2020 green primary).
++ * The target gamut is adapted from the white point of its encoding the same
++ * way (see adapt_display_gamut()), so content sharing that white point, the
++ * rounded D65 of a BT.2020 output among others, moves exactly as the target
++ * does, and an encoding equal to its target stays within it. The upstream
++ * constant is kept as it is.
+  */
+ static gboolean
+ gamut_target_contains (const GamutTarget *target,
+@@ -1255,6 +1255,61 @@ gamut_target_contains_all (const GamutTarget *target,
+   return TRUE;
+ }
+ 
++/*
++ * Expresses the display gamut @primaries of @target_params, declared in the
++ * colors the display shows, in the frame source colors are followed in:
++ * linear BT.2020, whose white is CLUTTER_D65. The renderer converts linear
++ * BT.2020 to the target's encoding with the Bradford adaptation of
++ * CLUTTER_D65 to the encoding's white point, so a color it shows lies within
++ * the declared gamut exactly when, before that adaptation, it lies within
++ * the gamut adapted back from the encoding's white point to CLUTTER_D65:
++ * each primary and the white point, as XYZ directions, through the same
++ * Bradford adaptation the renderer applies to colors of that encoding on
++ * their way to linear BT.2020. Without it, an encoding whose white point is
++ * not D65, such as a panel's native gamut with its own white point, would
++ * find its own primaries outside a target equal to them.
++ */
++static gboolean
++adapt_display_gamut (ClutterColorStateParams *target_params,
++                     ClutterPrimaries        *primaries)
++{
++  graphene_matrix_t to_linear_bt2020, XYZ_to_D65, XYZ_to_linear_bt2020;
++  graphene_matrix_t linear_bt2020_to_XYZ;
++  float *xy[4][2] = {
++    { &primaries->r_x, &primaries->r_y },
++    { &primaries->g_x, &primaries->g_y },
++    { &primaries->b_x, &primaries->b_y },
++    { &primaries->w_x, &primaries->w_y },
++  };
++  int i;
++
++  /* Producers validate the target's colorimetry with the same definition. */
++  if (!clutter_colorimetry_get_source_matrices (clutter_color_state_params_get_colorimetry (target_params),
++                                                &to_linear_bt2020,
++                                                &XYZ_to_D65,
++                                                &XYZ_to_linear_bt2020,
++                                                &linear_bt2020_to_XYZ,
++                                                NULL))
++    return FALSE;
++
++  for (i = 0; i < 4; i++)
++    {
++      double x = *xy[i][0], y = *xy[i][1];
++      double direction[3] = { x, y, 1.0 - x - y };
++      double adapted[3], sum;
++
++      transform_double (&XYZ_to_D65, direction, adapted);
++      sum = adapted[0] + adapted[1] + adapted[2];
++      if (!is_finite3 (adapted) || !(sum > 0.0))
++        return FALSE;
++
++      *xy[i][0] = (float) (adapted[0] / sum);
++      *xy[i][1] = (float) (adapted[1] / sum);
++    }
++
++  return TRUE;
++}
++
+ /*
+  * The limits: for each channel, the largest distance a point of the source
+  * gamut boundary outside the target reaches in linear RGB of the target.
+@@ -1375,8 +1430,10 @@ compute_gamut_limits (const GamutTarget *target,
+  *    are their XYZ with the same adaptation of the encoding's white point.
+  *
+  * Containment is then decided on the chromaticities of those adapted
+- * colors, with clutter_primaries_contain_chromaticity() and the tolerances of
+- * the target's declaration. The encoding primaries must not all lie within
++ * colors, against the target gamut in the same frame, adapted from the white
++ * point of the target's encoding by adapt_display_gamut(), with
++ * clutter_primaries_contain_chromaticity() and the tolerances of the
++ * target's declaration. The encoding primaries must not all lie within
+  * the target, and, when mastering primaries are declared, neither must they:
+  * content whose encoding fits the target, such as sRGB on a wide gamut
+  * panel, is never compressed, whatever its mastering metadata says. An
+@@ -1387,7 +1444,8 @@ compute_gamut_limits (const GamutTarget *target,
+  *
+  * The limits are computed from the mastering primaries when declared,
+  * otherwise from the encoding primaries, by compute_gamut_limits(), in the
+- * absolute linear RGB of the target that the op compresses in.
++ * absolute linear RGB of the adapted target that the op compresses in: the
++ * linear RGB of the target's encoding, when its gamut is the target.
+  */
+ static gboolean
+ get_gamut_compression (ClutterColorState *source_color_state,
+@@ -1407,7 +1465,9 @@ get_gamut_compression (ClutterColorState *source_color_state,
+   if (!CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state) ||
+       !clutter_color_state_params_get_display_gamut (CLUTTER_COLOR_STATE_PARAMS (target_color_state),
+                                                      &target.primaries,
+-                                                     target.tolerance))
++                                                     target.tolerance) ||
++      !adapt_display_gamut (CLUTTER_COLOR_STATE_PARAMS (target_color_state),
++                            &target.primaries))
+     return FALSE;
+ 
+   if (!CLUTTER_IS_COLOR_STATE_PARAMS (source_color_state))
+@@ -1470,7 +1530,8 @@ get_gamut_compression (ClutterColorState *source_color_state,
+       limit_vertices = encoding;
+     }
+ 
+-  /* Display gamut targets pass this check when they are created. */
++  /* Display gamut targets pass this check when they are created; the
++   * adapted gamut, a near identity transform of one, is checked again. */
+   target_colorimetry = (ClutterColorimetry) {
+     .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
+     .primaries = &target.primaries,
+@@ -1479,7 +1540,7 @@ get_gamut_compression (ClutterColorState *source_color_state,
+                                                          &compression->from_linear_bt2020,
+                                                          &compression->to_linear_bt2020,
+                                                          NULL))
+-    g_return_val_if_reached (FALSE);
++    return FALSE;
+ 
+   return compute_gamut_limits (&target, (const double (*)[3]) limit_vertices,
+                                compression);
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 6a7e29d3d..8245365ed 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -2264,6 +2264,52 @@ gamut_non_d65 (void)
+     }
+ }
+ 
++/*
++ * A display target whose gamut is its own encoding's, with a white point
++ * that is not D65, as a panel's native gamut declares it: the renderer
++ * adapts linear BT.2020 to that white point on the way out, so the target is
++ * judged in the same frame. The output's own encoding, and content in the
++ * same colorimetry, lie within it and are not mapped, even without a
++ * tolerance; BT.2020 content is still compressed toward it.
++ */
++static void
++gamut_encoding_white (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  /* 10-bit EDID steps, white (321, 337) / 1024. */
++  const ClutterPrimaries panel_gamut = {
++    .r_x = 697.0f / 1024.0f, .r_y = 327.0f / 1024.0f,
++    .g_x = 271.0f / 1024.0f, .g_y = 706.0f / 1024.0f,
++    .b_x = 154.0f / 1024.0f, .b_y = 61.0f / 1024.0f,
++    .w_x = 321.0f / 1024.0f, .w_y = 337.0f / 1024.0f,
++  };
++  g_autoptr (ClutterColorState) output = NULL;
++  g_autoptr (ClutterColorState) client = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  const float tolerances[] = { 0.0f, 1.0f / 1024.0f };
++  int i, linear;
++
++  output = create_with_primaries (&panel_gamut, CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  client = create_with_primaries (&panel_gamut, CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++
++  for (i = 0; i < G_N_ELEMENTS (tolerances); i++)
++    {
++      for (linear = 0; linear < 2; linear++)
++        {
++          g_autoptr (ClutterColorState) blending = NULL;
++
++          blending = create_gamut_blending_full (output, &panel_gamut,
++                                                 tolerances[i], FALSE,
++                                                 linear);
++          g_assert_false (clutter_color_transform_requires_mapping (output, blending));
++          g_assert_false (clutter_color_transform_requires_mapping (client, blending));
++          g_assert_true (clutter_color_transform_requires_gamut_compression (pq, blending));
++        }
++    }
++}
++
+ /*
+  * Extended-range linear content bounds no gamut: its mastering primaries,
+  * when declared, are the source gamut, and otherwise nothing is compressed.
+@@ -3116,6 +3162,7 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/identity", gamut_identity)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/boundary", gamut_boundary)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/non-d65", gamut_non_d65)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/encoding-white", gamut_encoding_white)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/extended-range", gamut_extended_range)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/extreme-mastering", gamut_extreme_mastering)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/threshold-unchanged", gamut_threshold_unchanged)

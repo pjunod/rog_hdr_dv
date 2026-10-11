@@ -1,0 +1,328 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 14:54:30 -0400
+Subject: [PATCH] backends/color: Take the target peak from CTA HDR static
+ metadata
+
+An output only had a declared target luminance on one route: an
+internal panel whose DisplayID 2 extension declares native RGB BT.2020
+PQ, in BT.2100 mode. Most HDR displays do not take it. External
+monitors and most HDR laptops declare their HDR capability through
+CTA-861 HDR static metadata, and their target was always the encoding's
+range, so content with a known peak above theirs was never highlight
+mapped.
+
+Select the target luminance for every active output in BT.2100 whose
+HDR is not forced, from one source as a whole, the first one usable:
+
+ - the DisplayID 2 physical luminance, wherever it is declared, not
+   only on the native route, when it declares the 10% window peak; its
+   minimum when declared, otherwise the encoding's, never another
+   source's; a minimum alone is no target and does not shadow another
+   source's peak;
+ - the CTA-861 HDR static metadata, its desired content maximum
+   luminance as the peak and its desired content minimum luminance as
+   black, when it declares a desired maximum; without a desired minimum,
+   black stays at the encoding's.
+
+Every source is validated as before, and its peak must also exceed the
+encoding's nominal reference white: a peak at or below it is no HDR
+target, and mapping highlights toward it would dim ordinary SDR
+content. The reference luminance factor does not enter this, so that a
+target follows the declarations and not that setting. A source that
+fails falls through to the next instead of straight to the fallback.
+
+CTA-861 defines its values as the content range the display considers
+optimal, not as a measurement, so they carry their own provenance. KMS
+HDR metadata, the encoding and its identity are unchanged.
+
+The native route fixture phases that leave the route now also withdraw
+the DisplayID declaration to reach the fallback, and check that leaving
+the route alone keeps it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/backends/meta-color-device.c          | 175 +++++++++++++++++-----
+ src/backends/meta-color-device.h          |   2 +-
+ src/tests/wayland-color-management-test.c |  22 ++-
+ 3 files changed, 160 insertions(+), 39 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 4f18455..fe233be 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -854,10 +854,115 @@ get_color_metadata_from_monitor (MetaColorDevice    *color_device,
+   g_assert_not_reached ();
+ }
+ 
++/*
++ * Whether an effective target range is usable: finite, ordered,
++ * representable on the wire, and with a peak of at least 1 cd/m² above a
++ * lower minimum, also once the maximum is published in whole cd/m². The peak
++ * must also lie above the encoding's reference white: a peak at or below it
++ * is no HDR target, and mapping highlights toward it would dim ordinary SDR
++ * content.
++ */
++static gboolean
++target_luminance_valid (float                   minimum,
++                        float                   maximum,
++                        const ClutterLuminance *encoding)
++{
++  return isfinite (minimum) && isfinite (maximum) &&
++         minimum >= 0 && maximum >= 1 &&
++         minimum <= maximum &&
++         (double) minimum < floor ((double) maximum) &&
++         (double) minimum * 10000 <= G_MAXUINT32 &&
++         (double) maximum <= G_MAXUINT32 &&
++         maximum > encoding->ref;
++}
++
++/*
++ * The DisplayID 2 physical luminance: the minimum and the 10% window peak.
++ * The declaration is usable when it declares the peak and the effective
++ * range is valid; a minimum alone is no target, and does not shadow another
++ * source's peak. Without a declared minimum, black stays at the encoding's,
++ * never another source's.
++ */
++static gboolean
++select_displayid_luminance (MetaColorTargetLuminance *target,
++                            const MetaEdidInfo       *edid_info,
++                            const ClutterLuminance   *encoding)
++{
++  const struct di_displayid2_luminance *physical = &edid_info->native_luminance;
++  MetaColorTargetLuminance declared = {
++    .physical = *physical,
++    .minimum = encoding->min,
++    .maximum = encoding->max,
++  };
++
++  if (edid_info->native_luminance_status != META_NATIVE_LUMINANCE_FIRMWARE_DECLARED ||
++      !physical->has_max_luminance_10pct)
++    return FALSE;
++
++  declared.maximum = physical->max_luminance_10pct;
++  declared.maximum_source = META_COLOR_TARGET_FIRMWARE_DECLARED;
++  if (physical->has_min_luminance)
++    {
++      declared.minimum = physical->min_luminance;
++      declared.minimum_source = META_COLOR_TARGET_FIRMWARE_DECLARED;
++    }
++
++  if (!target_luminance_valid (declared.minimum, declared.maximum, encoding))
++    return FALSE;
++
++  *target = declared;
++  return TRUE;
++}
++
++/*
++ * The CTA-861 HDR static metadata: the desired content maximum luminance as
++ * the peak and the desired content minimum luminance as black. These are
++ * the content range the display considers optimal rather than a physical
++ * measurement, but most HDR displays declare no other peak. The block is
++ * usable when it declares a desired maximum; without a desired minimum,
++ * black stays at the encoding's.
++ */
++static gboolean
++select_cta_luminance (MetaColorTargetLuminance *target,
++                      const MetaEdidInfo       *edid_info,
++                      const ClutterLuminance   *encoding)
++{
++  const struct di_hdr_static_metadata *metadata = &edid_info->hdr_static_metadata;
++  MetaColorTargetLuminance declared = {
++    .minimum = encoding->min,
++    .maximum = metadata->desired_content_max_luminance,
++    .maximum_source = META_COLOR_TARGET_CTA_DECLARED,
++  };
++
++  if (!(metadata->desired_content_max_luminance > 0))
++    return FALSE;
++
++  if (metadata->desired_content_min_luminance > 0)
++    {
++      declared.minimum = metadata->desired_content_min_luminance;
++      declared.minimum_source = META_COLOR_TARGET_CTA_DECLARED;
++    }
++
++  if (!target_luminance_valid (declared.minimum, declared.maximum, encoding))
++    return FALSE;
++
++  *target = declared;
++  return TRUE;
++}
++
++/*
++ * Selects the target luminance of an output in an eligible mode (@eligible:
++ * active, BT.2100, HDR not forced). Each source is taken as a whole, the
++ * first usable one: the DisplayID 2 physical luminance, then the CTA-861 HDR
++ * static metadata. A source that is unusable falls through to the next.
++ * Otherwise the target is the encoding's range, the explicit fallback.
++ * @encoding gives that range, and the reference white a declared peak must
++ * exceed.
++ */
+ void
+ meta_color_target_luminance_init (MetaColorTargetLuminance *target,
+                                   const MetaEdidInfo       *edid_info,
+-                                  gboolean                  native_hdr,
++                                  gboolean                  eligible,
+                                   const ClutterLuminance   *encoding)
+ {
+   *target = (MetaColorTargetLuminance) {
+@@ -865,35 +970,13 @@ meta_color_target_luminance_init (MetaColorTargetLuminance *target,
+     .maximum = encoding->max,
+   };
+ 
+-  if (!native_hdr || !edid_info ||
+-      edid_info->native_luminance_status != META_NATIVE_LUMINANCE_FIRMWARE_DECLARED)
++  if (!eligible || !edid_info)
+     return;
+ 
+-  target->physical = edid_info->native_luminance;
+-  if (target->physical.has_min_luminance)
+-    {
+-      target->minimum = target->physical.min_luminance;
+-      target->minimum_source = META_COLOR_TARGET_FIRMWARE_DECLARED;
+-    }
+-  if (target->physical.has_max_luminance_10pct)
+-    {
+-      target->maximum = target->physical.max_luminance_10pct;
+-      target->maximum_source = META_COLOR_TARGET_FIRMWARE_DECLARED;
+-    }
++  if (select_displayid_luminance (target, edid_info, encoding))
++    return;
+ 
+-  /* A partial declaration must also agree with the explicit fallback. */
+-  if (!isfinite (target->minimum) || !isfinite (target->maximum) ||
+-      target->minimum < 0 || target->maximum < 1 ||
+-      target->minimum > target->maximum ||
+-      (double) target->minimum >= floor ((double) target->maximum) ||
+-      (double) target->minimum * 10000 > G_MAXUINT32 ||
+-      (double) target->maximum > G_MAXUINT32)
+-    {
+-      target->minimum = encoding->min;
+-      target->maximum = encoding->max;
+-      target->minimum_source = META_COLOR_TARGET_ENCODING_FALLBACK;
+-      target->maximum_source = META_COLOR_TARGET_ENCODING_FALLBACK;
+-    }
++  select_cta_luminance (target, edid_info, encoding);
+ }
+ 
+ static gboolean
+@@ -1155,6 +1238,24 @@ target_provenance_to_string (MetaColorTargetProvenance provenance)
+   g_assert_not_reached ();
+ }
+ 
++/*
++ * The encoding's luminance as target selection uses it: its range, which is
++ * the fallback, and its nominal reference white, which a declared peak must
++ * exceed. The reference luminance factor scales the output's reference white
++ * but not the display: a target follows the declarations alone, and does
++ * not come and go with that setting.
++ */
++static const ClutterLuminance *
++get_target_encoding_luminance (ClutterColorStateParams *color_state_params,
++                               ClutterLuminance        *luminance)
++{
++  const ClutterEOTF *eotf = clutter_color_state_params_get_eotf (color_state_params);
++
++  *luminance = *clutter_color_state_params_get_luminance (color_state_params);
++  luminance->ref = clutter_eotf_get_default_luminance (*eotf)->ref;
++  return luminance;
++}
++
+ static UpdateResult
+ update_target_volume (MetaColorDevice *color_device)
+ {
+@@ -1164,8 +1265,10 @@ update_target_volume (MetaColorDevice *color_device)
+   MetaBackend *backend = meta_color_manager_get_backend (color_device->color_manager);
+   MetaDebugControl *debug_control =
+     meta_context_get_debug_control (meta_backend_get_context (backend));
++  ClutterLuminance encoding_luminance;
+   const ClutterLuminance *encoding =
+-    clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state));
++    get_target_encoding_luminance (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
++                                   &encoding_luminance);
+   MetaColorTargetLuminance target;
+   const ClutterColorimetry *colorimetry =
+     clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state));
+@@ -1173,16 +1276,20 @@ update_target_volume (MetaColorDevice *color_device)
+     colorimetry->type == CLUTTER_COLORIMETRY_TYPE_COLORSPACE ?
+     clutter_colorspace_to_primaries (colorimetry->colorspace) : colorimetry->primaries;
+   MetaColorTargetPrimaries target_primaries;
+-  gboolean native_hdr;
+-
+-  native_hdr = meta_monitor_is_active (monitor) &&
+-               meta_monitor_get_color_mode (monitor) == META_COLOR_MODE_BT2100 &&
+-               !meta_debug_control_is_hdr_forced (debug_control) &&
++  gboolean declared, hdr, native_hdr;
++
++  /* The default SDR mode renders into an assumed sRGB encoding, and forced
++   * HDR into an encoding the output did not choose: neither has a target. */
++  declared = meta_monitor_is_active (monitor) &&
++             !meta_debug_control_is_hdr_forced (debug_control);
++  hdr = declared &&
++        meta_monitor_get_color_mode (monitor) == META_COLOR_MODE_BT2100;
++  native_hdr = hdr &&
+                info->connector_type == META_CONNECTOR_TYPE_eDP &&
+                info->edid_info && info->edid_info->native_rgb_bt2020_pq &&
+                (info->supported_hdr_eotfs & (1 << META_OUTPUT_HDR_METADATA_EOTF_PQ)) &&
+                (info->supported_color_spaces & (1 << META_OUTPUT_COLORSPACE_BT2020));
+-  meta_color_target_luminance_init (&target, info->edid_info, native_hdr, encoding);
++  meta_color_target_luminance_init (&target, info->edid_info, hdr, encoding);
+   meta_color_target_primaries_init (&target_primaries, info->edid_info, native_hdr, encoding_primaries);
+   if (target_luminance_equal (&color_device->target_luminance, &target) &&
+       target_primaries_equal (&color_device->target_primaries, &target_primaries))
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index e33d9a1..28febff 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -109,7 +109,7 @@ ClutterColorState * meta_color_device_get_rendering_color_state (MetaColorDevice
+ META_EXPORT_TEST
+ void meta_color_target_luminance_init (MetaColorTargetLuminance *target,
+                                        const MetaEdidInfo       *edid_info,
+-                                       gboolean                  native_hdr,
++                                       gboolean                  eligible,
+                                        const ClutterLuminance   *encoding);
+ 
+ MetaColorDevice * meta_color_device_new (MetaColorManager *color_manager,
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 3ac09f2..ce4801e 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -303,10 +303,20 @@ target_luminance (gconstpointer data)
+   emit_sync_event (3);
+ 
+   wait_for_sync_point (4);
+-  info->edid_info->native_rgb_bt2020_pq = FALSE;
+-  info->edid_info->hdr_static_metadata.type1 = TRUE;
+-  info->edid_info->hdr_static_metadata.pq = TRUE;
+-  info->edid_info->colorimetry.bt2020_rgb = TRUE;
++  {
++    unsigned int old_target_changes = target_changes;
++
++    /* Off the native route, the DisplayID declaration is still the target. */
++    info->edid_info->native_rgb_bt2020_pq = FALSE;
++    info->edid_info->hdr_static_metadata.type1 = TRUE;
++    info->edid_info->hdr_static_metadata.pq = TRUE;
++    info->edid_info->colorimetry.bt2020_rgb = TRUE;
++    meta_color_device_update (device);
++    g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 700);
++    g_assert_cmpuint (target_changes, ==, old_target_changes);
++  }
++  /* Without it, a CTA block declaring no desired maximum keeps the fallback. */
++  info->edid_info->native_luminance_status = META_NATIVE_LUMINANCE_UNAVAILABLE;
+   meta_color_device_update (device);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, encoding_luminance->max);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+@@ -464,6 +474,10 @@ target_primaries (gconstpointer data)
+           info->edid_info->hdr_static_metadata.type1 = TRUE;
+           info->edid_info->hdr_static_metadata.pq = TRUE;
+           info->edid_info->colorimetry.bt2020_rgb = TRUE;
++          /* A DisplayID luminance declaration stays the target off the
++           * native route; without it, a CTA block declaring no desired
++           * maximum keeps the fallback. */
++          info->edid_info->native_luminance_status = META_NATIVE_LUMINANCE_UNAVAILABLE;
+           break;
+         case 9:
+           set_test_color_mode (output, META_COLOR_MODE_DEFAULT);

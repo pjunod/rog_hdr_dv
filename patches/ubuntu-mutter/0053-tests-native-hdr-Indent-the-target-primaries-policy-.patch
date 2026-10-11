@@ -1,0 +1,62 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 14:20:43 -0400
+Subject: [PATCH] tests/native-hdr: Indent the target primaries policy test
+
+Part of the body of test_target_primaries_policy() was not indented.
+Whitespace only; the upstream-facing series carries the fix in the
+commit that added the test.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/tests/native-hdr-tests.c | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
+
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index fa8df3b..e7d86b6 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -787,24 +787,24 @@ test_target_primaries_policy (void)
+   const uint16_t quantized[4][2] = {
+     { 1, 1000 }, { 1501, 1001 }, { 1301, 1002 }, { 1500, 1001 },
+   };
+-MetaEdidInfo edid = { .native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED };
+-const ClutterPrimaries *encoding = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
+-MetaColorTargetPrimaries target, fallback;
+-unsigned int i;
+-
+-set_raw_points (&edid, xy);
+-meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
+-g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
+-g_assert_cmpint (target.coordinates[0], ==, 687500);
+-g_assert_cmpint (target.coordinates[1], ==, 312500);
+-g_assert_cmpint (target.coordinates[6], ==, 312500);
+-g_assert_cmpint (target.coordinates[7], ==, 328125);
+-meta_color_target_primaries_init (&fallback, &edid, FALSE, encoding);
+-g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
+-g_assert_cmpint (fallback.coordinates[0], ==, 708000);
+-g_assert_cmpfloat (encoding->r_x, ==, 0.708f);
+-
+-edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
++  MetaEdidInfo edid = { .native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED };
++  const ClutterPrimaries *encoding = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
++  MetaColorTargetPrimaries target, fallback;
++  unsigned int i;
++
++  set_raw_points (&edid, xy);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpint (target.coordinates[0], ==, 687500);
++  g_assert_cmpint (target.coordinates[1], ==, 312500);
++  g_assert_cmpint (target.coordinates[6], ==, 312500);
++  g_assert_cmpint (target.coordinates[7], ==, 328125);
++  meta_color_target_primaries_init (&fallback, &edid, FALSE, encoding);
++  g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (fallback.coordinates[0], ==, 708000);
++  g_assert_cmpfloat (encoding->r_x, ==, 0.708f);
++
++  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
+   set_raw_points (&edid, uv);
+   meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
+   g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);

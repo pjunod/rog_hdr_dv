@@ -1,0 +1,264 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:58:50 -0400
+Subject: [PATCH] backends/color: Render for the output's declared target
+ primaries
+
+The colour device already publishes the output's target primaries, and
+rendering already blends for the declared target peak, but rendering
+never saw the primaries: the target peak change deliberately
+left them off the blending state because nothing consumed them. Gamut
+compression now does, so the rendering color state carries them next to
+the target peak.
+
+The rendering color state's target volume now holds the target
+primaries when, and only when, their provenance is
+META_COLOR_TARGET_FIRMWARE_DECLARED: the encoding fallback is not a
+physical gamut, and without a declaration nothing is compressed. They
+are the published coordinates, converted back with
+meta_color_chromaticity_from_fixed(), so the gamut content is compressed
+toward is exactly the one clients are told about, and are used only if
+clutter_colorimetry_get_absolute_bt2020_matrices() accepts them: the
+check a gamut target must pass, the shared colorimetry definition
+included, which the blending states derived from them repeat. The
+target peak and the target primaries are independent: either alone
+makes the rendering color state a target, and the blending state
+derived from it a display target with the output's reference white as
+its display reference.
+
+The declaration's resolution travels with the primaries:
+MetaColorTargetPrimaries gains a tolerance per primary, the xy distance
+by which the published primary may be off the true one, and the
+rendering color state passes them on as the target primaries'
+tolerances. DisplayID 2 declares each coordinate in 12-bit steps of
+1/4096. A primary declared by rounding is within half a step of the true
+one in each coordinate, so displaced by at most sqrt (2) / 2 steps;
+publishing truncates by less than sqrt (2) * 1e-6 more. For CIE 1931
+declarations every primary's tolerance is therefore one step. For CIE
+1976 u'v' declarations each primary's tolerance is one step times the
+Frobenius norm of the Jacobian of u'v' to xy at that primary: the
+Frobenius norm bounds the spectral norm, and the remaining factor of
+sqrt (2) covers the truncation and the linearization. Containment
+allows each side of the triangle the larger tolerance of its two
+primaries. The encoding fallback has none. The tolerances take part in
+the target primaries' equality.
+
+The rendering color state is still replaced only when it changes
+exactly, and a change of target primaries emits
+rendering-color-state-changed once, like a change of peak.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/backends/meta-color-device.c | 141 +++++++++++++++++++++++++++----
+ src/backends/meta-color-device.h |   4 +
+ 2 files changed, 129 insertions(+), 16 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 8306631ba..4eebbdd1b 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -947,6 +947,58 @@ target_geometry_valid (const TargetPoint points[4])
+   return TRUE;
+ }
+ 
++/*
++ * The resolution of a DisplayID 2 native chromaticity declaration: for each
++ * of the red, green and blue primaries, a distance in CIE 1931 xy by which
++ * the published primary may be off the true one, used as its tolerance when
++ * deciding whether a chromaticity lies within the declared gamut (see
++ * clutter_primaries_contain_chromaticity(), which allows each side of the
++ * triangle the larger tolerance of its two primaries).
++ *
++ * DisplayID 2 declares each primary with two 12-bit coordinates, in steps of
++ * 1/4096. A primary declared by rounding lies within half a step of the true
++ * one in each coordinate, so it is displaced by at most sqrt (2) / 2 steps.
++ * Publishing truncates to 1/1000000, which adds less than sqrt (2) * 1e-6.
++ *
++ * For CIE 1931 coordinates that is below one step, 1/4096, the tolerance of
++ * every primary. For CIE 1976 u'v' coordinates, a displacement (du, dv)
++ * becomes J (du, dv) in xy, with J the Jacobian of
++ * x = 9u / (6u - 16v + 12), y = 4v / (6u - 16v + 12) at the primary, so at
++ * most ||J||_2 * sqrt (2) / 2 steps. Each primary's tolerance is one step
++ * times the Frobenius norm ||J||_F >= ||J||_2 at that primary: the remaining
++ * factor of sqrt (2) covers the publication truncation and the second-order
++ * terms of the linearization, which are about a step times the curvature,
++ * three orders of magnitude below the first-order term.
++ */
++static void
++declaration_tolerance (const struct di_displayid2_native_chromaticities *native,
++                       float                                             tolerance[3])
++{
++  const double step = 1.0 / 4096.0;
++  unsigned int i;
++
++  for (i = 0; i < 3; i++)
++    {
++      double u = native->primaries[i].a * step;
++      double v = native->primaries[i].b * step;
++      double d = 6.0 * u - 16.0 * v + 12.0;
++      double dx_du, dx_dv, dy_du, dy_dv;
++
++      if (native->coordinates != DI_DISPLAYID2_CHROMATICITY_CIE1976)
++        {
++          tolerance[i] = (float) step;
++          continue;
++        }
++
++      dx_du = 9.0 * (12.0 - 16.0 * v) / (d * d);
++      dx_dv = 144.0 * u / (d * d);
++      dy_du = -24.0 * v / (d * d);
++      dy_dv = 4.0 * (6.0 * u + 12.0) / (d * d);
++      tolerance[i] = (float) (sqrt (dx_du * dx_du + dx_dv * dx_dv +
++                                    dy_du * dy_du + dy_dv * dy_dv) * step);
++    }
++}
++
+ /*
+  * Rounds to the nearest 1/1000000 in double precision. A value that is not
+  * finite or whose rounded value lies outside the int32 range cannot be
+@@ -1032,6 +1084,7 @@ meta_color_target_primaries_init (MetaColorTargetPrimaries *target,
+       edid_info->native_chromaticities_status != META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED)
+     return;
+   native = &edid_info->native_chromaticities;
++  declaration_tolerance (native, physical.tolerance);
+   for (i = 0; i < 4; i++)
+     {
+       const struct di_displayid2_chromaticity_point *point =
+@@ -1073,7 +1126,10 @@ target_primaries_equal (const MetaColorTargetPrimaries *a,
+ {
+   unsigned int i;
+ 
+-  if (a->source != b->source)
++  if (a->source != b->source ||
++      a->tolerance[0] != b->tolerance[0] ||
++      a->tolerance[1] != b->tolerance[1] ||
++      a->tolerance[2] != b->tolerance[2])
+     return FALSE;
+   for (i = 0; i < 8; i++)
+     if (a->coordinates[i] != b->coordinates[i])
+@@ -1119,12 +1175,52 @@ update_target_volume (MetaColorDevice *color_device)
+   return UPDATE_RESULT_TARGET_VOLUME;
+ }
+ 
++/*
++ * The firmware-declared target primaries, as published, if they are declared
++ * and usable as a gamut target: by
++ * clutter_colorimetry_get_absolute_bt2020_matrices(), which also requires
++ * the shared colorimetry definition, the check the blending states derived
++ * from them repeat. The encoding fallback is not a physical gamut, and is
++ * never a target.
++ */
++static gboolean
++get_declared_target_primaries (MetaColorDevice  *color_device,
++                               ClutterPrimaries *primaries)
++{
++  const MetaColorTargetPrimaries *target = &color_device->target_primaries;
++  const int32_t *coordinates = target->coordinates;
++  ClutterColorimetry colorimetry;
++
++  if (target->source != META_COLOR_TARGET_FIRMWARE_DECLARED)
++    return FALSE;
++
++  *primaries = (ClutterPrimaries) {
++    .r_x = meta_color_chromaticity_from_fixed (coordinates[0]),
++    .r_y = meta_color_chromaticity_from_fixed (coordinates[1]),
++    .g_x = meta_color_chromaticity_from_fixed (coordinates[2]),
++    .g_y = meta_color_chromaticity_from_fixed (coordinates[3]),
++    .b_x = meta_color_chromaticity_from_fixed (coordinates[4]),
++    .b_y = meta_color_chromaticity_from_fixed (coordinates[5]),
++    .w_x = meta_color_chromaticity_from_fixed (coordinates[6]),
++    .w_y = meta_color_chromaticity_from_fixed (coordinates[7]),
++  };
++  colorimetry = (ClutterColorimetry) {
++    .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++    .primaries = primaries,
++  };
++
++  return clutter_colorimetry_get_absolute_bt2020_matrices (&colorimetry,
++                                                           NULL, NULL, NULL);
++}
++
+ /*
+  * The color state content is rendered for on this device: the output color
+- * state with the firmware-declared target luminance range, when the peak is
+- * declared, as its target volume. The blending state derived from it carries
+- * that target, so color transforms map highlights toward it. Without a
+- * declared peak, nothing is substituted: it is the output color state.
++ * state with the firmware-declared target as its target volume: the target
++ * luminance range when the peak is declared, and the target primaries when
++ * they are declared. The blending state derived from it carries that target,
++ * so color transforms map highlights toward the peak and compress gamut
++ * toward the primaries. Without either declaration, nothing is substituted:
++ * it is the output color state.
+  *
+  * The output color state itself stays the encoding only, so a change of
+  * target does not change it. The rendering color state is replaced only when
+@@ -1135,28 +1231,41 @@ update_rendering_color_state (MetaColorDevice *color_device)
+ {
+   const MetaColorTargetLuminance *target = &color_device->target_luminance;
+   g_autoptr (ClutterColorState) rendering_color_state = NULL;
++  ClutterColorTargetVolume target_volume = { 0 };
+ 
+   if (!color_device->color_state)
+     return 0;
+ 
+-  if (target->maximum_source != META_COLOR_TARGET_FIRMWARE_DECLARED ||
+-      !CLUTTER_IS_COLOR_STATE_PARAMS (color_device->color_state))
+-    {
+-      rendering_color_state = g_object_ref (color_device->color_state);
+-    }
+-  else
++  if (CLUTTER_IS_COLOR_STATE_PARAMS (color_device->color_state))
+     {
+       /* The target luminances are in the output's absolute units. */
+-      ClutterColorTargetVolume target_volume = {
+-        .has_luminance = TRUE,
+-        .min_lum = target->minimum,
+-        .max_lum = target->maximum,
+-      };
++      if (target->maximum_source == META_COLOR_TARGET_FIRMWARE_DECLARED)
++        {
++          target_volume.has_luminance = TRUE;
++          target_volume.min_lum = target->minimum;
++          target_volume.max_lum = target->maximum;
++        }
++
++      target_volume.has_primaries =
++        get_declared_target_primaries (color_device, &target_volume.primaries);
++      if (target_volume.has_primaries)
++        {
++          memcpy (target_volume.primaries_tolerance,
++                  color_device->target_primaries.tolerance,
++                  sizeof (target_volume.primaries_tolerance));
++        }
++    }
+ 
++  if (target_volume.has_luminance || target_volume.has_primaries)
++    {
+       rendering_color_state =
+         clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+                                                            &target_volume);
+     }
++  else
++    {
++      rendering_color_state = g_object_ref (color_device->color_state);
++    }
+ 
+   if (color_device->rendering_color_state &&
+       clutter_color_state_identical (color_device->rendering_color_state,
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index db0beae59..1c16b75ae 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -50,6 +50,10 @@ typedef struct
+   /* Published CIE1931 xy, signed protocol units of 1/1000000, RGB then white. */
+   int32_t coordinates[8];
+   MetaColorTargetProvenance source;
++  /* The resolution of the declaration of each of the red, green and blue
++   * primaries, as a distance in CIE 1931 xy by which the published primary
++   * may be off the true one; 0 for the encoding fallback. */
++  float tolerance[3];
+ } MetaColorTargetPrimaries;
+ 
+ /*

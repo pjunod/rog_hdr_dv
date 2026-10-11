@@ -1,0 +1,899 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:09:53 -0400
+Subject: [PATCH] tests/color-management: Cover HLG decoding, encoding and
+ creation
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add a Clutter conformance test, color-hdr, whose expected values are
+computed in the test itself, in double precision, from the formulas of
+Rec. ITU-R BT.2100-2 written out separately (inverse OETF, black level
+lift, OOTF with the published BT.2020 and BT.709 luminance
+coefficients), not by calling the code under test:
+
+ - /color-hdr/hlg/decode-reference: HLG to linear light in the same
+   primaries and luminance range, for BT.2020 and BT.709 primaries at
+   a 1000 cd/m² nominal peak, BT.2020 at 2000 cd/m² and BT.709 at
+   400 cd/m² (two non-1000 Lw, so the system gamma differs from 1.2),
+   at signal levels 0, 0.5, 0.75 and 1.0, neutral and mixed, so the
+   luminance coefficients of the primaries matter.
+ - /color-hdr/hlg/decode-reference-white: 75% HLG with no black lift
+   is 203 cd/m² on a 1000 cd/m² display (BT.2408).
+ - /color-hdr/hlg/round-trip: encoding then decoding display light,
+   and decoding then encoding signals, return the input.
+ - /color-hdr/hlg/cicp: CICP transfer 18 creates an HLG state with the
+   protocol's default luminances, for BT.2020 and sRGB primaries.
+ - /color-hdr/hlg/parameters-validity: the system gamma and black
+   level lift of the shared definition, and its refusal of a black
+   level lift above 0.5 (300 cd/m² at a 1000 cd/m² peak), of a minimum
+   not below the maximum, of a negative minimum and of an infinite
+   peak.
+ - /color-hdr/hlg/shader-matches-cpu: the GLSL implementation of HLG
+   decoding and encoding, drawn to a floating point framebuffer,
+   matches the CPU implementation. The input colors reach the shader
+   exactly, from a single precision floating point texture sampled
+   without filtering, since a pipeline color is quantized to 8 bits.
+
+And a Wayland regression, /wayland/hlg/creation: the test client finds
+transfer_function.hlg advertised, creates BT.2020 HLG with default
+luminances and BT.709 HLG with a 400 cd/m² peak, and the compositor
+checks the surface color states it retains; and
+/wayland/hlg/invalid-black-level: HLG luminances whose black level lift
+exceeds 0.5 (black at 300, 60 or 80 cd/m² for a 1000 cd/m² peak, 110 for
+4000) fail with the 'unsupported' cause and the connection survives,
+while 40 and 1 cd/m² at 1000 and 80 at 4000 (system gamma 1.48) are
+accepted.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/tests/clutter/conform/color-hdr.c         | 500 ++++++++++++++++++
+ src/tests/clutter/conform/meson.build         |   1 +
+ src/tests/wayland-color-management-test.c     |  57 ++
+ .../wayland-test-clients/color-management.c   | 230 ++++++++
+ 4 files changed, 788 insertions(+)
+ create mode 100644 src/tests/clutter/conform/color-hdr.c
+
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+new file mode 100644
+index 000000000..190024438
+--- /dev/null
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -0,0 +1,500 @@
++/*
++ * Regressions for HDR color operations: HLG decoding and encoding.
++ *
++ * Expected values are computed here, in double precision, directly from the
++ * formulas of Rec. ITU-R BT.2100-2, not by calling the code under test.
++ */
++
++#include <math.h>
++
++#include "clutter-mutter.h"
++#include "clutter/clutter/clutter-color-transform-private.h"
++#include "clutter/clutter/clutter-color-utils-private.h"
++#include "clutter/clutter/clutter-color-pipeline.h"
++#include "clutter/clutter/clutter-color-pipeline-shader.h"
++#include "tests/clutter-test-utils.h"
++
++/* Rec. ITU-R BT.2100-2, Table 5. */
++#define REF_HLG_A 0.17883277
++#define REF_HLG_B (1.0 - 4.0 * REF_HLG_A)
++#define REF_HLG_C (0.5 - REF_HLG_A * log (4.0 * REF_HLG_A))
++
++/* Rec. ITU-R BT.2100-2 and BT.709 luminance coefficients, as published. */
++static const double bt2020_coefficients[3] = { 0.2627, 0.6780, 0.0593 };
++static const double bt709_coefficients[3] = { 0.2126, 0.7152, 0.0722 };
++
++typedef struct _HlgCase
++{
++  const char *name;
++  ClutterColorspace colorspace;
++  const double *coefficients;
++  float min_lum;
++  float max_lum;
++  float ref_lum;
++} HlgCase;
++
++static const HlgCase hlg_cases[] = {
++  { "BT.2020, 1000 cd/m²", CLUTTER_COLORSPACE_BT2020, bt2020_coefficients,
++    0.005f, 1000.0f, 203.0f },
++  { "BT.709, 1000 cd/m²", CLUTTER_COLORSPACE_SRGB, bt709_coefficients,
++    0.005f, 1000.0f, 203.0f },
++  { "BT.2020, 2000 cd/m²", CLUTTER_COLORSPACE_BT2020, bt2020_coefficients,
++    0.005f, 2000.0f, 203.0f },
++  { "BT.709, 400 cd/m²", CLUTTER_COLORSPACE_SRGB, bt709_coefficients,
++    0.01f, 400.0f, 100.0f },
++};
++
++/* Signal levels 0%, 50%, 75% and 100%, neutral and mixed. */
++static const float hlg_signals[][3] = {
++  { 0.0f, 0.0f, 0.0f },
++  { 0.5f, 0.5f, 0.5f },
++  { 0.75f, 0.75f, 0.75f },
++  { 1.0f, 1.0f, 1.0f },
++  { 1.0f, 0.5f, 0.75f },
++  { 0.75f, 0.0f, 0.5f },
++  { 0.0f, 1.0f, 0.0f },
++  { 0.5f, 0.75f, 1.0f },
++};
++
++static double
++reference_hlg_inv_oetf (double signal)
++{
++  if (signal <= 0.5)
++    return signal * signal / 3.0;
++  else
++    return (exp ((signal - REF_HLG_C) / REF_HLG_A) + REF_HLG_B) / 12.0;
++}
++
++static double
++reference_hlg_gamma (double lw)
++{
++  return 1.2 * pow (1.111, log2 (lw / 1000.0));
++}
++
++/* BT.2100-2 HLG EOTF, display light normalized to Lw. */
++static void
++reference_hlg_eotf (const float    signal[3],
++                    const HlgCase *hlg_case,
++                    double         display[3])
++{
++  double lw = hlg_case->max_lum;
++  double lb = hlg_case->min_lum;
++  double gamma = reference_hlg_gamma (lw);
++  double beta = sqrt (3.0 * pow (lb / lw, 1.0 / gamma));
++  double scene[3];
++  double ys = 0.0;
++  int i;
++
++  for (i = 0; i < 3; i++)
++    {
++      scene[i] = reference_hlg_inv_oetf (MAX (0.0, (1.0 - beta) * signal[i] + beta));
++      ys += hlg_case->coefficients[i] * scene[i];
++    }
++
++  for (i = 0; i < 3; i++)
++    display[i] = ys > 0.0 ? pow (ys, gamma - 1.0) * scene[i] : 0.0;
++}
++
++static gboolean
++approx_equal (double value,
++              double expected,
++              double tolerance)
++{
++  return fabs (value - expected) <= tolerance + tolerance * fabs (expected);
++}
++
++static ClutterColorState *
++create_hlg_color_state (const HlgCase           *hlg_case,
++                        ClutterTransferFunction  transfer_function)
++{
++  return clutter_color_state_params_new_full (clutter_test_get_context (),
++                                              hlg_case->colorspace,
++                                              transfer_function,
++                                              NULL,
++                                              -1.0f,
++                                              hlg_case->min_lum,
++                                              hlg_case->max_lum,
++                                              hlg_case->ref_lum,
++                                              -1.0f);
++}
++
++static void
++transform_one (ClutterColorState *source,
++               ClutterColorState *target,
++               const float        input[3],
++               float              output[4])
++{
++  g_autoptr (ClutterColorTransform) transform = NULL;
++
++  transform = clutter_color_transform_new (source, target,
++                                           CLUTTER_COLOR_STATE_TRANSFORM_OPAQUE);
++  output[0] = input[0];
++  output[1] = input[1];
++  output[2] = input[2];
++  output[3] = 1.0f;
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                       output, 1);
++}
++
++static void
++hlg_decode_reference (void)
++{
++  int i, j, c;
++
++  for (i = 0; i < G_N_ELEMENTS (hlg_cases); i++)
++    {
++      const HlgCase *hlg_case = &hlg_cases[i];
++      g_autoptr (ClutterColorState) hlg = NULL;
++      g_autoptr (ClutterColorState) linear = NULL;
++
++      /* Linear light in the same primaries and luminance range: the
++       * transform is the HLG EOTF alone. */
++      hlg = create_hlg_color_state (hlg_case, CLUTTER_TRANSFER_FUNCTION_HLG);
++      linear = create_hlg_color_state (hlg_case,
++                                       CLUTTER_TRANSFER_FUNCTION_LINEAR);
++
++      for (j = 0; j < G_N_ELEMENTS (hlg_signals); j++)
++        {
++          float output[4];
++          double expected[3];
++
++          transform_one (hlg, linear, hlg_signals[j], output);
++          reference_hlg_eotf (hlg_signals[j], hlg_case, expected);
++
++          for (c = 0; c < 3; c++)
++            {
++              if (!approx_equal (output[c], expected[c], 2e-4))
++                {
++                  g_error ("HLG decode (%s) of (%.2f, %.2f, %.2f), channel %d: "
++                           "%.6f, expected %.6f",
++                           hlg_case->name,
++                           hlg_signals[j][0], hlg_signals[j][1],
++                           hlg_signals[j][2], c, output[c], expected[c]);
++                }
++            }
++        }
++    }
++}
++
++/* BT.2408: 75% HLG is reference white, 203 cd/m², on a 1000 cd/m² display
++ * with no black lift. */
++static void
++hlg_decode_reference_white (void)
++{
++  const HlgCase no_lift = {
++    "BT.2020, 1000 cd/m², black 0", CLUTTER_COLORSPACE_BT2020,
++    bt2020_coefficients, 0.0f, 1000.0f, 203.0f,
++  };
++  const float signal[3] = { 0.75f, 0.75f, 0.75f };
++  g_autoptr (ClutterColorState) hlg = NULL;
++  g_autoptr (ClutterColorState) linear = NULL;
++  float output[4];
++
++  hlg = create_hlg_color_state (&no_lift, CLUTTER_TRANSFER_FUNCTION_HLG);
++  linear = create_hlg_color_state (&no_lift, CLUTTER_TRANSFER_FUNCTION_LINEAR);
++  transform_one (hlg, linear, signal, output);
++
++  g_assert_cmpfloat_with_epsilon (output[0] * 1000.0f, 203.0f, 0.5f);
++  g_assert_cmpfloat_with_epsilon (output[1], output[0], 1e-6f);
++  g_assert_cmpfloat_with_epsilon (output[2], output[0], 1e-6f);
++}
++
++static void
++hlg_round_trip (void)
++{
++  /* Display light inside the encodable range of every case. */
++  static const float display_values[][3] = {
++    { 0.05f, 0.05f, 0.05f },
++    { 0.2f, 0.2f, 0.2f },
++    { 1.0f, 1.0f, 1.0f },
++    { 0.6f, 0.3f, 0.1f },
++    { 0.02f, 0.4f, 0.2f },
++    { 0.15f, 0.1f, 0.4f },
++  };
++  int i, j, c;
++
++  for (i = 0; i < G_N_ELEMENTS (hlg_cases); i++)
++    {
++      const HlgCase *hlg_case = &hlg_cases[i];
++      g_autoptr (ClutterColorState) hlg = NULL;
++      g_autoptr (ClutterColorState) linear = NULL;
++
++      hlg = create_hlg_color_state (hlg_case, CLUTTER_TRANSFER_FUNCTION_HLG);
++      linear = create_hlg_color_state (hlg_case,
++                                       CLUTTER_TRANSFER_FUNCTION_LINEAR);
++
++      /* Encode, then decode. */
++      for (j = 0; j < G_N_ELEMENTS (display_values); j++)
++        {
++          float signal[4], display[4];
++
++          transform_one (linear, hlg, display_values[j], signal);
++          for (c = 0; c < 3; c++)
++            {
++              g_assert_cmpfloat (signal[c], >=, 0.0f);
++              g_assert_cmpfloat (signal[c], <=, 1.0f);
++            }
++
++          transform_one (hlg, linear, signal, display);
++          for (c = 0; c < 3; c++)
++            {
++              if (!approx_equal (display[c], display_values[j][c], 5e-4))
++                {
++                  g_error ("HLG round trip (%s) of (%.3f, %.3f, %.3f), "
++                           "channel %d: %.6f",
++                           hlg_case->name, display_values[j][0],
++                           display_values[j][1], display_values[j][2],
++                           c, display[c]);
++                }
++            }
++        }
++
++      /* Decode, then encode. */
++      for (j = 0; j < G_N_ELEMENTS (hlg_signals); j++)
++        {
++          float display[4], signal[4];
++
++          transform_one (hlg, linear, hlg_signals[j], display);
++          transform_one (linear, hlg, display, signal);
++          for (c = 0; c < 3; c++)
++            {
++              if (!approx_equal (signal[c], hlg_signals[j][c], 5e-4))
++                {
++                  g_error ("HLG round trip (%s) of signal "
++                           "(%.2f, %.2f, %.2f), channel %d: %.6f",
++                           hlg_case->name, hlg_signals[j][0],
++                           hlg_signals[j][1], hlg_signals[j][2],
++                           c, signal[c]);
++                }
++            }
++        }
++    }
++}
++
++static void
++hlg_from_cicp (void)
++{
++  static const struct {
++    ClutterCicpPrimaries primaries;
++    ClutterColorspace colorspace;
++  } cases[] = {
++    { CLUTTER_CICP_PRIMARIES_BT2020, CLUTTER_COLORSPACE_BT2020 },
++    { CLUTTER_CICP_PRIMARIES_SRGB, CLUTTER_COLORSPACE_SRGB },
++  };
++  int i;
++
++  for (i = 0; i < G_N_ELEMENTS (cases); i++)
++    {
++      ClutterCicp cicp = {
++        .primaries = cases[i].primaries,
++        .transfer = CLUTTER_CICP_TRANSFER_HLG,
++        .matrix_coefficients = 0,
++        .video_full_range_flag = 1,
++      };
++      g_autoptr (ClutterColorState) color_state = NULL;
++      g_autoptr (GError) error = NULL;
++      ClutterColorStateParams *params;
++      const ClutterColorimetry *colorimetry;
++      const ClutterEOTF *eotf;
++      const ClutterLuminance *lum;
++
++      g_assert_cmpint (CLUTTER_CICP_TRANSFER_HLG, ==, 18);
++
++      color_state = clutter_color_state_params_new_from_cicp (clutter_test_get_context (),
++                                                              &cicp, &error);
++      g_assert_no_error (error);
++      g_assert_nonnull (color_state);
++
++      params = CLUTTER_COLOR_STATE_PARAMS (color_state);
++      colorimetry = clutter_color_state_params_get_colorimetry (params);
++      g_assert_cmpint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_COLORSPACE);
++      g_assert_cmpint (colorimetry->colorspace, ==, cases[i].colorspace);
++      eotf = clutter_color_state_params_get_eotf (params);
++      g_assert_cmpint (eotf->type, ==, CLUTTER_EOTF_TYPE_NAMED);
++      g_assert_cmpint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_HLG);
++
++      /* The protocol's HLG defaults. */
++      lum = clutter_color_state_params_get_luminance (params);
++      g_assert_cmpfloat_with_epsilon (lum->min, 0.005f, 1e-6f);
++      g_assert_cmpfloat (lum->max, ==, 1000.0f);
++      g_assert_cmpfloat (lum->ref, ==, 203.0f);
++      g_assert_cmpfloat (lum->mastering_max, ==, 1000.0f);
++    }
++}
++
++/*
++ * HLG luminances are decodable only while the black level lift stays in the
++ * inverse OETF's square-root segment: beta <= 0.5.
++ */
++static void
++hlg_parameters_validity (void)
++{
++  g_autoptr (GError) error = NULL;
++  float gamma, beta;
++
++  g_assert_true (clutter_luminance_get_hlg_parameters (0.005f, 1000.0f,
++                                                       &gamma, &beta, NULL));
++  g_assert_cmpfloat_with_epsilon (gamma, 1.2f, 1e-6f);
++  g_assert_cmpfloat_with_epsilon (beta,
++                                  sqrt (3.0 * pow (0.005 / 1000.0, 1.0 / 1.2)),
++                                  1e-6);
++
++  g_assert_true (clutter_luminance_get_hlg_parameters (0.0f, 400.0f,
++                                                       &gamma, &beta, NULL));
++  g_assert_cmpfloat (beta, ==, 0.0f);
++
++  /* beta = sqrt (3 * 0.3^(1 / 1.2)) = 1.05 */
++  g_assert_false (clutter_luminance_get_hlg_parameters (300.0f, 1000.0f,
++                                                        NULL, NULL, &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_clear_error (&error);
++
++  g_assert_false (clutter_luminance_get_hlg_parameters (1000.0f, 1000.0f,
++                                                        NULL, NULL, NULL));
++  g_assert_false (clutter_luminance_get_hlg_parameters (-1.0f, 1000.0f,
++                                                        NULL, NULL, NULL));
++  g_assert_false (clutter_luminance_get_hlg_parameters (0.005f, INFINITY,
++                                                        NULL, NULL, NULL));
++}
++
++/*
++ * Draws @colors through the GPU implementation of @source to @target and
++ * compares each pixel with the CPU implementation of the same pipeline. The
++ * colors reach the shader exactly, through a single precision floating point
++ * texture sampled without filtering: a pipeline color would be quantized to 8
++ * bits first.
++ */
++static void
++assert_shader_matches_cpu (ClutterColorState *source,
++                           ClutterColorState *target,
++                           const float        colors[][3],
++                           int                n_colors,
++                           float              tolerance)
++{
++  ClutterBackend *backend = clutter_test_get_backend ();
++  CoglContext *cogl_context = clutter_backend_get_cogl_context (backend);
++  g_autoptr (ClutterColorTransform) transform = NULL;
++  g_autoptr (CoglPipeline) pipeline = NULL;
++  g_autoptr (CoglOffscreen) offscreen = NULL;
++  g_autoptr (CoglTexture) texture = NULL;
++  g_autoptr (CoglTexture) input = NULL;
++  g_autoptr (GError) error = NULL;
++  g_autofree float *input_data = NULL;
++  ClutterColorPipeline *color_pipeline;
++  CoglFramebuffer *fb;
++  int i, c;
++
++  transform = clutter_color_transform_new (source, target,
++                                           CLUTTER_COLOR_STATE_TRANSFORM_OPAQUE);
++  color_pipeline = clutter_color_transform_get_pipeline (transform);
++
++  input_data = g_new (float, n_colors * 4);
++  for (i = 0; i < n_colors; i++)
++    {
++      input_data[i * 4 + 0] = colors[i][0];
++      input_data[i * 4 + 1] = colors[i][1];
++      input_data[i * 4 + 2] = colors[i][2];
++      input_data[i * 4 + 3] = 1.0f;
++    }
++  input = cogl_texture_2d_new_from_data (cogl_context, n_colors, 1,
++                                         COGL_PIXEL_FORMAT_RGBA_FP_32323232,
++                                         n_colors * 4 * sizeof (float),
++                                         (uint8_t *) input_data,
++                                         &error);
++  g_assert_no_error (error);
++
++  texture = cogl_texture_2d_new_with_format (cogl_context, n_colors, 1,
++                                             COGL_PIXEL_FORMAT_RGBA_FP_32323232);
++  offscreen = cogl_offscreen_new_with_texture (texture);
++  fb = COGL_FRAMEBUFFER (offscreen);
++  g_assert_true (cogl_framebuffer_allocate (fb, &error));
++  cogl_framebuffer_orthographic (fb, 0, 0, n_colors, 1, -1, 1);
++  cogl_framebuffer_clear4f (fb, COGL_BUFFER_BIT_COLOR, 0.0f, 0.0f, 0.0f, 0.0f);
++
++  pipeline = cogl_pipeline_new (cogl_context);
++  cogl_pipeline_set_layer_texture (pipeline, 0, input);
++  cogl_pipeline_set_layer_filters (pipeline, 0,
++                                   COGL_PIPELINE_FILTER_NEAREST,
++                                   COGL_PIPELINE_FILTER_NEAREST);
++  cogl_pipeline_set_layer_combine (pipeline, 0,
++                                   "RGBA = REPLACE (TEXTURE)", NULL);
++  clutter_color_pipeline_shader_add_transform (color_pipeline, pipeline);
++
++  /* Pixel i samples texel i at its center. */
++  cogl_framebuffer_draw_textured_rectangle (fb, pipeline,
++                                            0, 0, n_colors, 1,
++                                            0.0f, 0.0f, 1.0f, 1.0f);
++  cogl_framebuffer_finish (fb);
++
++  for (i = 0; i < n_colors; i++)
++    {
++      float gpu[4], cpu[4];
++
++      cogl_framebuffer_read_pixels (fb, i, 0, 1, 1,
++                                    COGL_PIXEL_FORMAT_RGBA_FP_32323232_PRE,
++                                    (uint8_t *) gpu);
++      cpu[0] = colors[i][0];
++      cpu[1] = colors[i][1];
++      cpu[2] = colors[i][2];
++      cpu[3] = 1.0f;
++      clutter_color_pipeline_do_transform (color_pipeline, cpu, 1);
++
++      for (c = 0; c < 3; c++)
++        {
++          if (!G_APPROX_VALUE (gpu[c], cpu[c], tolerance))
++            {
++              g_autofree char *pipeline_str =
++                clutter_color_pipeline_to_string (color_pipeline);
++
++              g_error ("Shader and CPU disagree for %s, input "
++                       "(%.4f, %.4f, %.4f), channel %d: GPU %.6f, CPU %.6f",
++                       pipeline_str, colors[i][0], colors[i][1],
++                       colors[i][2], c, gpu[c], cpu[c]);
++            }
++        }
++    }
++}
++
++static void
++hlg_shader_matches_cpu (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  int i;
++
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++
++  for (i = 0; i < G_N_ELEMENTS (hlg_cases); i++)
++    {
++      g_autoptr (ClutterColorState) hlg = NULL;
++      g_autoptr (ClutterColorState) linear = NULL;
++
++      hlg = create_hlg_color_state (&hlg_cases[i],
++                                    CLUTTER_TRANSFER_FUNCTION_HLG);
++      linear = create_hlg_color_state (&hlg_cases[i],
++                                       CLUTTER_TRANSFER_FUNCTION_LINEAR);
++
++      /* Decoding alone, decoding to PQ, and encoding from sRGB. */
++      assert_shader_matches_cpu (hlg, linear, hlg_signals,
++                                 G_N_ELEMENTS (hlg_signals), 1e-3f);
++      assert_shader_matches_cpu (hlg, pq, hlg_signals,
++                                 G_N_ELEMENTS (hlg_signals), 1e-3f);
++      assert_shader_matches_cpu (srgb, hlg, hlg_signals,
++                                 G_N_ELEMENTS (hlg_signals), 1e-3f);
++      assert_shader_matches_cpu (linear, hlg, hlg_signals,
++                                 G_N_ELEMENTS (hlg_signals), 1e-3f);
++    }
++}
++
++CLUTTER_TEST_SUITE (
++  CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference", hlg_decode_reference)
++  CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference-white", hlg_decode_reference_white)
++  CLUTTER_TEST_UNIT ("/color-hdr/hlg/round-trip", hlg_round_trip)
++  CLUTTER_TEST_UNIT ("/color-hdr/hlg/cicp", hlg_from_cicp)
++  CLUTTER_TEST_UNIT ("/color-hdr/hlg/parameters-validity", hlg_parameters_validity)
++  CLUTTER_TEST_UNIT ("/color-hdr/hlg/shader-matches-cpu", hlg_shader_matches_cpu)
++)
+diff --git a/src/tests/clutter/conform/meson.build b/src/tests/clutter/conform/meson.build
+index f540972ea..7093257ab 100644
+--- a/src/tests/clutter/conform/meson.build
++++ b/src/tests/clutter/conform/meson.build
+@@ -41,6 +41,7 @@ endif
+ clutter_conform_tests_general_tests = [
+   'binding-pool',
+   'event-delivery',
++  'color-hdr',
+   'color-pipeline',
+   'color-state-transform',
+   'frame-clock',
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index f82e817a7..0053775e3 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -881,6 +881,60 @@ sdr_native_unusable_edid_primaries (void)
+   meta_color_device_update (device);
+ }
+ 
++static void
++assert_hlg_color_state (MetaWindow        *window,
++                        ClutterColorspace  colorspace,
++                        float              min_lum,
++                        float              max_lum,
++                        float              ref_lum)
++{
++  ClutterColorStateParams *params;
++  const ClutterColorimetry *colorimetry;
++  const ClutterEOTF *eotf;
++  const ClutterLuminance *lum;
++
++  params = CLUTTER_COLOR_STATE_PARAMS (get_window_color_state (window));
++  colorimetry = clutter_color_state_params_get_colorimetry (params);
++  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_COLORSPACE);
++  g_assert_cmpuint (colorimetry->colorspace, ==, colorspace);
++  eotf = clutter_color_state_params_get_eotf (params);
++  g_assert_cmpuint (eotf->type, ==, CLUTTER_EOTF_TYPE_NAMED);
++  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_HLG);
++  lum = clutter_color_state_params_get_luminance (params);
++  g_assert_cmpfloat_with_epsilon (lum->min, min_lum, TEST_COLOR_EPSILON);
++  g_assert_cmpfloat_with_epsilon (lum->max, max_lum, TEST_COLOR_EPSILON);
++  g_assert_cmpfloat_with_epsilon (lum->ref, ref_lum, TEST_COLOR_EPSILON);
++  g_assert_cmpfloat_with_epsilon (lum->mastering_max, max_lum, TEST_COLOR_EPSILON);
++}
++
++static void
++hlg_creation (void)
++{
++  MetaWaylandTestClient *client;
++  MetaWindow *window;
++
++  /* The client also checks that HLG is advertised. */
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "hlg",
++                                                   NULL);
++  window = meta_wait_for_client_window (test_context, "color-management-hlg");
++
++  /* Without set_luminances, the HLG defaults of the protocol. */
++  wait_for_sync_point (0);
++  assert_hlg_color_state (window, CLUTTER_COLORSPACE_BT2020,
++                          0.005f, 1000.0f, 203.0f);
++  emit_sync_event (0);
++
++  /* A declared maximum is the nominal peak; HLG does not replace it. */
++  wait_for_sync_point (1);
++  assert_hlg_color_state (window, CLUTTER_COLORSPACE_SRGB,
++                          0.01f, 400.0f, 100.0f);
++  emit_sync_event (1);
++
++  meta_wayland_test_client_finish (client);
++}
++
+ static void
+ client_mode_case (gconstpointer data)
+ {
+@@ -1088,6 +1142,9 @@ init_tests (void)
+                         "icc-truncated", client_mode_case);
+   g_test_add_func ("/wayland/icc-file/zero-descriptor",
+                    icc_file_zero_descriptor);
++  g_test_add_func ("/wayland/hlg/creation", hlg_creation);
++  g_test_add_data_func ("/wayland/hlg/invalid-black-level",
++                        "hlg-invalid-black-level", client_mode_case);
+   g_test_add_data_func ("/wayland/creator-params/mastering-primaries-unsupported",
+                         "mastering-primaries", client_protocol_error_case);
+   g_test_add_data_func ("/wayland/creator-params/mastering-luminance-unsupported",
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index e404e5023..ed0ba65e5 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -678,6 +678,232 @@ mastering_unsupported_client (WaylandDisplay *display,
+   g_assert_true (interface == &wp_image_description_creator_params_v1_interface);
+ }
+ 
++typedef struct
++{
++  uint32_t features;
++  uint64_t transfer_functions;
++  gboolean done;
++} ManagerSupport;
++
++static void
++support_intent (void                       *data,
++                struct wp_color_manager_v1 *manager,
++                uint32_t                    intent)
++{
++}
++
++static void
++support_feature (void                       *data,
++                 struct wp_color_manager_v1 *manager,
++                 uint32_t                    feature)
++{
++  ManagerSupport *support = data;
++
++  g_assert_cmpuint (feature, <, 32);
++  support->features |= 1u << feature;
++}
++
++static void
++support_tf_named (void                       *data,
++                  struct wp_color_manager_v1 *manager,
++                  uint32_t                    tf)
++{
++  ManagerSupport *support = data;
++
++  g_assert_cmpuint (tf, <, 64);
++  support->transfer_functions |= G_GUINT64_CONSTANT (1) << tf;
++}
++
++static void
++support_primaries_named (void                       *data,
++                         struct wp_color_manager_v1 *manager,
++                         uint32_t                    primaries)
++{
++}
++
++static void
++support_done (void                       *data,
++              struct wp_color_manager_v1 *manager)
++{
++  ManagerSupport *support = data;
++
++  support->done = TRUE;
++}
++
++static const struct wp_color_manager_v1_listener support_listener = {
++  .supported_intent = support_intent,
++  .supported_feature = support_feature,
++  .supported_tf_named = support_tf_named,
++  .supported_primaries_named = support_primaries_named,
++  .done = support_done,
++};
++
++static void
++support_registry_global (void               *data,
++                         struct wl_registry *registry,
++                         uint32_t            name,
++                         const char         *interface,
++                         uint32_t            version)
++{
++  struct wp_color_manager_v1 **manager = data;
++
++  if (strcmp (interface, wp_color_manager_v1_interface.name) == 0)
++    *manager = wl_registry_bind (registry, name, &wp_color_manager_v1_interface, 1);
++}
++
++static void
++support_registry_remove (void               *data,
++                         struct wl_registry *registry,
++                         uint32_t            name)
++{
++}
++
++static const struct wl_registry_listener support_registry_listener = {
++  .global = support_registry_global,
++  .global_remove = support_registry_remove,
++};
++
++/* Binds a second color manager to observe what the compositor advertises. */
++static void
++read_manager_support (WaylandDisplay *display,
++                      ManagerSupport *support)
++{
++  struct wl_registry *registry = wl_display_get_registry (display->display);
++  struct wp_color_manager_v1 *manager = NULL;
++
++  wl_registry_add_listener (registry, &support_registry_listener, &manager);
++  wl_display_roundtrip (display->display);
++  g_assert_nonnull (manager);
++
++  *support = (ManagerSupport) { 0 };
++  wp_color_manager_v1_add_listener (manager, &support_listener, support);
++  while (!support->done)
++    wayland_display_dispatch (display);
++
++  wp_color_manager_v1_destroy (manager);
++  wl_registry_destroy (registry);
++}
++
++static void
++hlg_client (WaylandDisplay *display)
++{
++  struct wl_surface *surface;
++  struct wp_color_management_surface_v1 *color_surface;
++  struct wp_image_description_v1 *image_description;
++  ManagerSupport support;
++
++  read_manager_support (display, &support);
++  g_assert_true (support.transfer_functions &
++                 (G_GUINT64_CONSTANT (1) << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG));
++
++  create_test_toplevel (display, "color-management-hlg",
++                        &surface, &color_surface);
++
++  /* BT.2100 HLG with the protocol's default luminances. */
++  create_image_description_from_params (display,
++                                        &image_description,
++                                        WP_COLOR_MANAGER_V1_PRIMARIES_BT2020,
++                                        NULL,
++                                        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG,
++                                        -1.0f,
++                                        -1.0f,
++                                        -1.0f,
++                                        -1.0f);
++  wp_color_management_surface_v1_set_image_description (
++    color_surface,
++    image_description,
++    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++  wl_surface_commit (surface);
++  wp_image_description_v1_destroy (image_description);
++
++  test_driver_sync_point (display->test_driver, 0, NULL);
++  wait_for_sync_event (display, 0);
++
++  /* HLG in BT.709 primaries for a 400 cd/m² nominal peak. */
++  create_image_description_from_params (display,
++                                        &image_description,
++                                        WP_COLOR_MANAGER_V1_PRIMARIES_SRGB,
++                                        NULL,
++                                        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG,
++                                        -1.0f,
++                                        0.01f,
++                                        400.0f,
++                                        100.0f);
++  wp_color_management_surface_v1_set_image_description (
++    color_surface,
++    image_description,
++    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++  wl_surface_commit (surface);
++  wp_image_description_v1_destroy (image_description);
++
++  test_driver_sync_point (display->test_driver, 1, NULL);
++  wait_for_sync_event (display, 1);
++
++  wp_color_management_surface_v1_destroy (color_surface);
++}
++
++static gboolean
++create_hlg_with_luminances (WaylandDisplay *display,
++                            uint32_t        min_lum,
++                            uint32_t        max_lum,
++                            uint32_t        reference_lum)
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context = { 0 };
++
++  creator_params =
++    wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++  wp_image_description_creator_params_v1_set_primaries_named (creator_params,
++                                                              WP_COLOR_MANAGER_V1_PRIMARIES_BT2020);
++  wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                       WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG);
++  wp_image_description_creator_params_v1_set_luminances (creator_params,
++                                                         min_lum,
++                                                         max_lum,
++                                                         reference_lum);
++  image_description =
++    wp_image_description_creator_params_v1_create (creator_params);
++  wp_image_description_v1_add_listener (image_description,
++                                        &image_description_listener,
++                                        &context);
++  wait_for_image_description_ready (&context, display);
++  wp_image_description_v1_destroy (image_description);
++
++  if (context.creation_failed)
++    {
++      g_assert_cmpuint (context.failure_cause, ==,
++                        WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED);
++      g_assert_cmpuint (context.image_description_id, ==, 0);
++    }
++  else
++    {
++      g_assert_cmpuint (context.image_description_id, >, 0);
++    }
++
++  /* A failed image description is not a protocol error. */
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++
++  return !context.creation_failed;
++}
++
++static void
++hlg_invalid_black_level_client (WaylandDisplay *display)
++{
++  /* BT.2100 HLG decodes black levels only up to a black level lift of 0.5,
++   * reached at about 50.7 cd/m² for a 1000 cd/m² peak (system gamma 1.2).
++   * Luminances are in units of 0.0001 cd/m² for the minimum. */
++  g_assert_false (create_hlg_with_luminances (display, 300 * 10000, 1000, 500));
++  g_assert_false (create_hlg_with_luminances (display, 60 * 10000, 1000, 203));
++  g_assert_true (create_hlg_with_luminances (display, 40 * 10000, 1000, 203));
++  g_assert_true (create_hlg_with_luminances (display, 1 * 10000, 1000, 203));
++  /* The limit follows the peak through the system gamma: about 101 cd/m²
++   * at 4000 cd/m² (gamma 1.48). */
++  g_assert_false (create_hlg_with_luminances (display, 80 * 10000, 1000, 203));
++  g_assert_true (create_hlg_with_luminances (display, 80 * 10000, 4000, 203));
++  g_assert_false (create_hlg_with_luminances (display, 110 * 10000, 4000, 203));
++}
++
+ typedef struct
+ {
+   struct wl_output *output;
+@@ -1502,6 +1728,10 @@ main (int    argc,
+         icc_unsupported_content_client (display);
+       else if (strcmp (argv[1], "icc-truncated") == 0)
+         icc_truncated_client (display);
++      else if (strcmp (argv[1], "hlg") == 0)
++        hlg_client (display);
++      else if (strcmp (argv[1], "hlg-invalid-black-level") == 0)
++        hlg_invalid_black_level_client (display);
+       else if (strcmp (argv[1], "mastering-primaries") == 0)
+         mastering_unsupported_client (display, TRUE);
+       else if (strcmp (argv[1], "mastering-luminance") == 0)

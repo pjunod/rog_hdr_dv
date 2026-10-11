@@ -1,0 +1,69 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-11",
+ "status": "PASS",
+ "scope": "Tenth batch: upstream-facing Mutter port and general display targets (nativehdr9)",
+ "repository_check": "python3 scripts/check_repository.py PASS before merge",
+ "upstream_mutter": {
+  "base_commit": "d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7",
+  "base_note": "GNOME Mutter main via the GitHub mirror on 2026-10-11 (51.0 plus 26 commits)",
+  "candidate_tree": "3f238d2e9227dacd578f5a673c04ac10de5caac8",
+  "patches": "0001-0049 (0001-0043 port of the reviewed Ubuntu series, 0044-0049 general display targets)",
+  "libdisplay_info": "upstream-facing series candidate 481a4c8 (tree 72626245), installed in the container prefix /opt/ldi; upstream libdisplay-info main is still at the series base 62a9346",
+  "environment": "Ubuntu 26.10 amd64 container, gcc 15.3.0, meson 1.10.1, -Dwerror=true; llvmpipe software rendering",
+  "per_commit_build": "0001-0043: each commit built with -Dwerror=true in a separate worktree, 43/43 OK (identical trees; messages were reworded afterwards). 0044-0049: each commit built by the implementation agent, OK",
+  "port_fidelity": "Non-debian content of the Ubuntu series f8b7147..nativehdr8 equals the port apart from the Ubuntu-only extra_suites in src/tests/meson.build, two style fixes and one folded style commit; confirmed independently by the reviewer",
+  "style": "check-style.py advisory: remaining suggestions are uncrustify mis-parses (labels, array parameters, the CLUTTER_TEST_SUITE closing parenthesis)",
+  "compiled_binary_sha256": {
+   "src/libmutter-51.so.0.0.0": "efb5f30e6825ca6f54c201c9ee4b30dca6ca3b7987e4daa79a6fb114426ee91a",
+   "clutter/clutter/libmutter-clutter-51.so.0.0.0": "6396cf884de4bc54f424eaa2fe6b8ad14e9ec843e24a38d15454435b9886e2b7",
+   "src/tests/mutter-native-hdr": "500ddac704c2ff0fc2d7c581942a5d52506d3e71783c84b157a44b5c385f86ba",
+   "src/tests/mutter-wayland-color-management": "cfe175200ebea0722ec2c62cd3fdbd39ab39cdb749d8fb99611f6ac2cfdc15f4",
+   "src/tests/clutter/conform/color-hdr": "cd9e90b98b67059ab86ee1758b195f014a13d328ea5993b390ac59911aa73a8d"
+  },
+  "fast_lane": {
+   "run": "once, after the review fixes, at the candidate tree",
+   "result": "23/23 OK",
+   "tests": [
+    "mutter:actor-color-state",
+    "mutter:color-hdr",
+    "mutter:color-pipeline",
+    "mutter:color-state-transform",
+    "mutter:monitor-color-tests",
+    "mutter:monitor-config-tests",
+    "mutter:color-management",
+    "mutter:color-management-profile-conflict",
+    "mutter:native-hdr",
+    "mutter:wayland-color-management",
+    "mutter:wayland-color-representation",
+    "mutter:wayland-color-management-wayland-{target-luminance-v1,target-luminance-v2,target-primaries-v1,target-primaries-v2,sdr-native-unusable-edid-primaries,custom-primaries-info-round-trip,icc-file-zero-descriptor,mapping-blending-target,mapping-target-gamut,published-reference-factor,display-targets-cta,display-targets-sdr-native}"
+   ]
+  }
+ },
+ "ubuntu_mutter": {
+  "candidate_tree": "a1a83849955917b1866b38c31b5873fcea7fac6c",
+  "appended_patches": "0053-0061",
+  "equivalence": "Non-debian content equals the upstream-facing candidate apart from extra_suites",
+  "package_build": "dpkg-buildpackage -b with DEB_BUILD_OPTIONS=nocheck in a disposable Ubuntu 26.10 container against the hdr9 library; every quilt series entry reverse-applies",
+  "source_tarball_sha256": "c4bb5e704ecfc54b506e1cbc0c9d26a55f4e80e1e2aedc2554e19bcbeec4f4fc",
+  "libmutter_depends": [
+   "libdisplay-info3-native-hdr-api (>= 2)",
+   "libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr8~)"
+  ],
+  "package_sha256": {
+   "libmutter-51-0_51.0-1ubuntu3+nativehdr9_amd64.deb": "5cd7493a350104c6a7a346bcf7e9c5e1cad9dd3ff6c8d5f78261bb9d3b8f4aec",
+   "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr9_amd64.deb": "2fcdde6ae69903b449ef7fe7732a12c086e53ba131122b6d7b2a72eeafd89c6e",
+   "mutter-common_51.0-1ubuntu3+nativehdr9_all.deb": "c85152c32d80b27ded80e8e4dac1dcd71bc10900b4de021c39327299adaf5f53",
+   "mutter-common-bin_51.0-1ubuntu3+nativehdr9_amd64.deb": "a83836379754530f203b8e51ff6d87a2f1f5ad515afa4082d8a7e0b6e94bb06d",
+   "libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb (unchanged hdr9)": "57a5ee5dc8f1284eae4947066b179635cc6f84461a37f3ef8719e6e653b31234",
+   "libdisplay-info3_0.3.0-1ubuntu1~hdr9_i386.deb (unchanged hdr9)": "4698c91856cd14329d4580a7904c0c97e3645941bf6bf3fc1ab90691b0ae6150"
+  },
+  "boundary": "Packaging evidence only; not installed. Runtime qualification on lab6 (native SDR) and lab5 (BT.2100) pending"
+ },
+ "review": "Adversarial Fable review with a probe, fixes, Fable re-review: no remaining code defects (docs/REVIEW.md, tenth batch)",
+ "evidence_limits": [
+  "Synthetic headless tests only; no panel has run nativehdr9",
+  "CTA desired content luminance and base EDID primaries are firmware declarations, not measurements",
+  "KMS HDR metadata remains unknown, so a CTA display may also tone-map"
+ ]
+}

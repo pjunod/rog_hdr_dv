@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 17:51:41 -0400
+Subject: [PATCH] tests/color-management: Expect the disconnect warning for
+ protocol errors
+
+libwayland-server logs 'error in client communication' when it
+disconnects a client after a protocol error, and the test harness makes
+warnings fatal. The ICC range and creator-params error cases therefore
+aborted the compositor before the client could read the error, and the
+client saw EPIPE instead of EPROTO. Expect that warning for exactly these
+cases, as the other Wayland protocol-error tests do.
+---
+ src/tests/wayland-color-management-test.c | 25 +++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index ce2d3c2e2..f82e817a7 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -894,6 +894,23 @@ client_mode_case (gconstpointer data)
+   meta_wayland_test_client_finish (client);
+ }
+ 
++static void
++client_protocol_error_case (gconstpointer data)
++{
++  MetaWaylandTestClient *client;
++
++  /* The client asserts the exact protocol error; libwayland-server reports
++   * the resulting disconnect of that client as a warning. */
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   data,
++                                                   NULL);
++  g_test_expect_message ("libmutter", G_LOG_LEVEL_WARNING,
++                         "WL: error in client communication*");
++  meta_wayland_test_client_finish (client);
++  g_test_assert_expected_messages ();
++}
++
+ static int
+ create_sized_memfd (off_t size)
+ {
+@@ -1060,9 +1077,9 @@ init_tests (void)
+   g_test_add_func ("/wayland/custom-primaries/info-round-trip",
+                    custom_primaries_info_round_trip);
+   g_test_add_data_func ("/wayland/icc-file/wrapping-range",
+-                        "icc-wrapping-range", client_mode_case);
++                        "icc-wrapping-range", client_protocol_error_case);
+   g_test_add_data_func ("/wayland/icc-file/past-end",
+-                        "icc-past-end", client_mode_case);
++                        "icc-past-end", client_protocol_error_case);
+   g_test_add_data_func ("/wayland/icc-file/exact-end",
+                         "icc-exact-end", client_mode_case);
+   g_test_add_data_func ("/wayland/icc-file/unsupported-content",
+@@ -1072,9 +1089,9 @@ init_tests (void)
+   g_test_add_func ("/wayland/icc-file/zero-descriptor",
+                    icc_file_zero_descriptor);
+   g_test_add_data_func ("/wayland/creator-params/mastering-primaries-unsupported",
+-                        "mastering-primaries", client_mode_case);
++                        "mastering-primaries", client_protocol_error_case);
+   g_test_add_data_func ("/wayland/creator-params/mastering-luminance-unsupported",
+-                        "mastering-luminance", client_mode_case);
++                        "mastering-luminance", client_protocol_error_case);
+ }
+ 
+ int

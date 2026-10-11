@@ -1,0 +1,91 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 17:44:45 -0400
+Subject: [PATCH] tests/color-management: Cover the creator-params
+ unsupported_feature error
+
+Add client regressions for the error code fixed in "Post the creator's
+own unsupported_feature error":
+
+ - /wayland/creator-params/mastering-primaries-unsupported
+ - /wayland/creator-params/mastering-luminance-unsupported
+
+Each test client sends the request on a parametric creator and asserts
+that the connection fails with protocol error 2,
+WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE, raised
+on the wp_image_description_creator_params_v1 interface, rather than the
+color manager's code 0, which on this interface means incomplete_set.
+---
+ src/tests/wayland-color-management-test.c     |  4 +++
+ .../wayland-test-clients/color-management.c   | 36 +++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index dec6f5ab6..ce2d3c2e2 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1071,6 +1071,10 @@ init_tests (void)
+                         "icc-truncated", client_mode_case);
+   g_test_add_func ("/wayland/icc-file/zero-descriptor",
+                    icc_file_zero_descriptor);
++  g_test_add_data_func ("/wayland/creator-params/mastering-primaries-unsupported",
++                        "mastering-primaries", client_mode_case);
++  g_test_add_data_func ("/wayland/creator-params/mastering-luminance-unsupported",
++                        "mastering-luminance", client_mode_case);
+ }
+ 
+ int
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 1df1c17fb..e404e5023 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -646,6 +646,38 @@ icc_unsupported_content_client (WaylandDisplay *display)
+   g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
+ }
+ 
++static void
++mastering_unsupported_client (WaylandDisplay *display,
++                              gboolean        primaries)
++{
++  struct wp_image_description_creator_params_v1 *creator_params;
++  const struct wl_interface *interface = NULL;
++
++  creator_params =
++    wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++  if (primaries)
++    {
++      wp_image_description_creator_params_v1_set_mastering_display_primaries (
++        creator_params,
++        640000, 330000, 300000, 600000, 150000, 60000, 312700, 329000);
++    }
++  else
++    {
++      wp_image_description_creator_params_v1_set_mastering_luminance (
++        creator_params, 50, 1000);
++    }
++
++  /* The error is the creator-params interface's own unsupported_feature,
++   * not the color manager's (whose value would mean incomplete_set here). */
++  g_assert_cmpint (wl_display_roundtrip (display->display), ==, -1);
++  g_assert_cmpint (wl_display_get_error (display->display), ==, EPROTO);
++  g_assert_cmpuint (wl_display_get_protocol_error (display->display,
++                                                   &interface, NULL),
++                    ==,
++                    WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE);
++  g_assert_true (interface == &wp_image_description_creator_params_v1_interface);
++}
++
+ typedef struct
+ {
+   struct wl_output *output;
+@@ -1470,6 +1502,10 @@ main (int    argc,
+         icc_unsupported_content_client (display);
+       else if (strcmp (argv[1], "icc-truncated") == 0)
+         icc_truncated_client (display);
++      else if (strcmp (argv[1], "mastering-primaries") == 0)
++        mastering_unsupported_client (display, TRUE);
++      else if (strcmp (argv[1], "mastering-luminance") == 0)
++        mastering_unsupported_client (display, FALSE);
+       else
+         g_error ("Unknown color-management test mode '%s'", argv[1]);
+       return EXIT_SUCCESS;

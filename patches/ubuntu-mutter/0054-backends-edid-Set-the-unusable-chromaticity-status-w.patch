@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 14:20:43 -0400
+Subject: [PATCH] backends/edid: Set the unusable chromaticity status without a
+ split ternary
+
+The project style checker re-indents the continued conditional
+expression. Choose the status with an if statement instead; no
+behaviour changes. The upstream-facing series carries this in the
+commit that added it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/backends/edid-parse.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
+index c58a6a2..f4ee9d8 100644
+--- a/src/backends/edid-parse.c
++++ b/src/backends/edid-parse.c
+@@ -273,8 +273,10 @@ read_native_chromaticities (MetaEdidInfo         *info,
+ 
+   if (unsupported || conflict)
+     {
+-      info->native_chromaticities_status = unsupported ?
+-        META_NATIVE_CHROMATICITIES_UNSUPPORTED : META_NATIVE_CHROMATICITIES_CONFLICT;
++      if (unsupported)
++        info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_UNSUPPORTED;
++      else
++        info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
+       memset (&info->native_chromaticities, 0, sizeof (info->native_chromaticities));
+       return;
+     }

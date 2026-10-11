@@ -1,0 +1,489 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 14:54:31 -0400
+Subject: [PATCH] tests/native-hdr: Cover CTA and base EDID target sources
+
+Cover the selection of target luminance and target primaries from
+whole sources, in order:
+
+ - CTA-only HDR static metadata publishes its desired content range
+   with CTA provenance; a missing desired minimum leaves black at the
+   encoding's, a desired minimum without a maximum is ignored, and a
+   range failing validation, or a peak at or below the reference white,
+   keeps the fallback;
+ - DisplayID physical luminance beside a CTA block wins; without a
+   minimum it leaves black at the encoding's, never CTA's; without the
+   10% window peak, with an invalid range, with a peak at or below the
+   reference white, or in conflict, it falls through to CTA as a whole;
+ - in BT.2100 the target gamut is the DisplayID native chromaticities
+   only: base EDID primaries are no target there, and unusable
+   DisplayID chromaticities leave the fallback;
+ - in the native SDR mode the target is the base EDID gamut, equal to
+   the encoding and with a tolerance of one 10-bit step, also when
+   DisplayID chromaticities are declared; base primaries the mode
+   rejects, or imaginary ones outside the chromaticity domain, leave
+   the fallback, never DisplayID.
+
+A synthetic EDID with a CTA extension and base color characteristics,
+and no DisplayID, checks the same selection from parsed bytes.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/tests/native-hdr-tests.c | 427 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 427 insertions(+)
+
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index 1ae7f23..a9139af 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -627,6 +627,255 @@ test_target_luminance_policy (void)
+   g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
+ }
+ 
++/*
++ * Target luminance from one source as a whole: DisplayID 2 physical
++ * luminance, then CTA-861 HDR static metadata, then the encoding fallback.
++ */
++static void
++test_target_luminance_sources (void)
++{
++  const struct di_displayid2_luminance physical = {
++    .has_min_luminance = TRUE,
++    .has_max_luminance_10pct = TRUE,
++    .min_luminance = 1049.0f / 2097152.0f,
++    .max_luminance_10pct = 616,
++  };
++  MetaEdidInfo edid = {
++    .hdr_static_metadata = {
++      .desired_content_max_luminance = 600,
++      .desired_content_min_luminance = 0.05f,
++      .type1 = TRUE,
++      .pq = TRUE,
++    },
++  };
++  ClutterLuminance encoding = { .min = 0.005f, .max = 10000, .ref = 203 };
++  MetaColorTargetLuminance target;
++
++  /* A CTA-only display declares its target through the desired content
++   * range, with its own provenance. */
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, 0.05f);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_false (target.physical.has_min_luminance);
++  g_assert_false (target.physical.has_max_luminance_10pct);
++  g_assert_cmpfloat (encoding.max, ==, 10000);
++
++  /* Ineligible outputs keep the fallback. */
++  meta_color_target_luminance_init (&target, &edid, FALSE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, encoding.min);
++  g_assert_cmpfloat (target.maximum, ==, encoding.max);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* Without a desired minimum, black stays at the encoding's. */
++  edid.hdr_static_metadata.desired_content_min_luminance = 0;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, encoding.min);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++
++  /* Without a desired maximum, there is no CTA target: a desired minimum
++   * alone is ignored. */
++  edid.hdr_static_metadata.desired_content_min_luminance = 0.05f;
++  edid.hdr_static_metadata.desired_content_max_luminance = 0;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, encoding.min);
++  g_assert_cmpfloat (target.maximum, ==, encoding.max);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* A CTA range failing validation keeps the fallback: a peak below 1 cd/m²,
++   * and a range that is empty once the peak is published in whole cd/m². */
++  edid.hdr_static_metadata.desired_content_max_luminance = 0.5f;
++  edid.hdr_static_metadata.desired_content_min_luminance = 0;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpfloat (target.maximum, ==, encoding.max);
++  edid.hdr_static_metadata.desired_content_max_luminance = 1.5f;
++  edid.hdr_static_metadata.desired_content_min_luminance = 1.2f;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpfloat (target.minimum, ==, encoding.min);
++  g_assert_cmpfloat (target.maximum, ==, encoding.max);
++  edid.hdr_static_metadata.desired_content_max_luminance = NAN;
++  edid.hdr_static_metadata.desired_content_min_luminance = 0;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* A peak at or below the encoding's reference white is no HDR target. */
++  edid.hdr_static_metadata.desired_content_min_luminance = 0.05f;
++  edid.hdr_static_metadata.desired_content_max_luminance = 100;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpfloat (target.maximum, ==, encoding.max);
++  edid.hdr_static_metadata.desired_content_max_luminance = encoding.ref;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpfloat (target.minimum, ==, encoding.min);
++  edid.hdr_static_metadata.desired_content_max_luminance = encoding.ref + 1;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpfloat (target.maximum, ==, 204);
++
++  /* A DisplayID physical declaration beside a CTA block wins, wherever it
++   * is declared. */
++  edid.hdr_static_metadata.desired_content_max_luminance = 600;
++  edid.hdr_static_metadata.desired_content_min_luminance = 0.05f;
++  edid.native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
++  edid.native_luminance = physical;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, physical.min_luminance);
++  g_assert_cmpfloat (target.maximum, ==, 616);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_true (target.physical.has_max_luminance_10pct);
++
++  /* A DisplayID declaration of the peak without a minimum leaves black at
++   * the encoding's, never CTA's. */
++  edid.native_luminance.has_min_luminance = FALSE;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, encoding.min);
++  g_assert_cmpfloat (target.maximum, ==, 616);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++
++  /* A DisplayID declaration without the 10% window peak is no luminance
++   * source: a minimum alone does not shadow the CTA peak. */
++  edid.native_luminance = physical;
++  edid.native_luminance.has_max_luminance_10pct = FALSE;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, 0.05f);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_false (target.physical.has_min_luminance);
++
++  /* An unusable DisplayID declaration falls through to CTA as a whole: an
++   * invalid effective range, a peak at or below the reference white, a
++   * conflict, or only a full-frame peak. */
++  edid.native_luminance = physical;
++  edid.native_luminance.min_luminance = 15000;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpfloat (target.minimum, ==, 0.05f);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_false (target.physical.has_min_luminance);
++  edid.native_luminance = physical;
++  edid.native_luminance.max_luminance_10pct = encoding.ref;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++  edid.native_luminance.max_luminance_10pct = encoding.ref + 1;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpfloat (target.maximum, ==, 204);
++  edid.native_luminance = physical;
++  edid.native_luminance_status = META_NATIVE_LUMINANCE_CONFLICT;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++  edid.native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
++  edid.native_luminance = (struct di_displayid2_luminance) {
++    .has_max_luminance_full = TRUE,
++    .max_luminance_full = 400,
++  };
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpfloat (target.maximum, ==, 600);
++
++  /* With no usable source left, the fallback. */
++  edid.hdr_static_metadata.desired_content_max_luminance = encoding.ref;
++  meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++}
++
++/* Writes the base EDID color characteristics, ten bits per coordinate. */
++static void
++set_base_chromaticities (uint8_t        edid[128],
++                         const uint16_t codes[8])
++{
++  unsigned int i;
++
++  edid[25] = 0;
++  edid[26] = 0;
++  for (i = 0; i < 8; i++)
++    {
++      edid[25 + i / 4] |= (codes[i] & 3) << (6 - 2 * (i % 4));
++      edid[27 + i] = codes[i] >> 2;
++    }
++  checksum (edid, 128);
++}
++
++/*
++ * Both declarations an external HDR display typically has, parsed from
++ * EDID bytes: CTA-861 HDR static metadata in a CTA extension and the base
++ * color characteristics, with no DisplayID.
++ */
++static void
++test_cta_display_targets (void)
++{
++  /* SDR and PQ, Type 1, desired maximum 50 * 2^(115/32) cd/m², desired
++   * frame average 50 * 2^(100/32) cd/m², desired minimum
++   * maximum * (23/255)² / 100 cd/m². */
++  const uint8_t hdr_static_metadata[] = { 0xe6, 6, 5, 1, 115, 100, 23 };
++  const uint16_t codes[8] = { 697, 327, 271, 706, 154, 61, 321, 337 };
++  const ClutterPrimaries *bt2020 = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
++  ClutterLuminance encoding = { .min = 0.005f, .max = 10000, .ref = 203 };
++  g_autoptr (MetaOutputInfo) info = NULL;
++  MetaColorTargetLuminance target;
++  MetaColorTargetPrimaries target_primaries;
++  uint8_t edid[384] = { 0 };
++  size_t size;
++  unsigned int i;
++
++  size = make_edid (edid, hdr_static_metadata, sizeof (hdr_static_metadata),
++                    NULL, 0, TRUE, FALSE);
++  set_base_chromaticities (edid, codes);
++  info = parse_bytes (edid, size);
++  g_assert_false (info->edid_info->native_rgb_bt2020_pq);
++  g_assert_cmpint (info->edid_info->native_luminance_status, ==,
++                   META_NATIVE_LUMINANCE_UNAVAILABLE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_UNAVAILABLE);
++  g_assert_true (info->edid_info->hdr_static_metadata.pq);
++  g_assert_cmpfloat_with_epsilon (info->edid_info->hdr_static_metadata.desired_content_max_luminance,
++                                  50.0 * pow (2.0, 115.0 / 32.0), 0.01);
++  g_assert_cmpfloat_with_epsilon (info->edid_info->hdr_static_metadata.desired_content_min_luminance,
++                                  50.0 * pow (2.0, 115.0 / 32.0) * (23.0 / 255.0) * (23.0 / 255.0) / 100.0,
++                                  0.0001);
++
++  meta_color_target_luminance_init (&target, info->edid_info, TRUE, &encoding);
++  g_assert_cmpint (target.minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpfloat (target.maximum, ==,
++                     info->edid_info->hdr_static_metadata.desired_content_max_luminance);
++  g_assert_cmpfloat (target.minimum, ==,
++                     info->edid_info->hdr_static_metadata.desired_content_min_luminance);
++
++  /* In BT.2100 the base primaries, the default SDR colorimetry, are no
++   * target; in the native SDR mode they are. */
++  meta_color_target_primaries_init (&target_primaries, info->edid_info,
++                                    META_COLOR_TARGET_PRIMARIES_SOURCES_DISPLAYID, bt2020);
++  g_assert_cmpint (target_primaries.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target_primaries.coordinates[0], ==, 708000);
++  meta_color_target_primaries_init (&target_primaries, info->edid_info,
++                                    META_COLOR_TARGET_PRIMARIES_SOURCES_BASE_EDID, bt2020);
++  g_assert_cmpint (target_primaries.source, ==, META_COLOR_TARGET_EDID_DECLARED);
++  for (i = 0; i < 8; i++)
++    g_assert_cmpint (target_primaries.coordinates[i], ==,
++                     (int32_t) round (codes[i] * 1000000.0 / 1024.0));
++}
++
+ static void
+ chromaticities (uint8_t data[32])
+ {
+@@ -850,6 +1099,181 @@ test_target_primaries_policy (void)
+     }
+ }
+ 
++/* Selects the target primaries of @edid for the native SDR mode, whose
++ * encoding primaries are the base EDID primaries when the mode accepts them,
++ * and sRGB otherwise. */
++static void
++init_sdr_native_target (MetaColorTargetPrimaries *target,
++                        const MetaEdidInfo       *edid,
++                        int32_t                   encoding[8])
++{
++  g_auto (ClutterColorimetry) colorimetry = { 0 };
++  const ClutterPrimaries *primaries;
++
++  if (meta_color_colorimetry_from_edid_primaries (edid, &colorimetry, NULL))
++    primaries = colorimetry.primaries;
++  else
++    primaries = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_SRGB);
++  meta_color_primaries_to_fixed (primaries, encoding);
++  meta_color_target_primaries_init (target, edid, META_COLOR_TARGET_PRIMARIES_SOURCES_BASE_EDID,
++                                    primaries);
++}
++
++/*
++ * Target primaries from the one source a mode allows, as a whole, then the
++ * encoding fallback: in BT.2100, DisplayID 2 native chromaticities only; in
++ * the native SDR mode, which encodes in the base EDID color characteristics,
++ * only those.
++ */
++static void
++test_target_primaries_sources (void)
++{
++  const uint16_t xy[4][2] = {
++    { 2816, 1280 }, { 1024, 2816 }, { 512, 256 }, { 1280, 1344 },
++  };
++  /* A wide gamut panel, in exact 10-bit EDID steps. */
++  const uint16_t codes[8] = { 697, 327, 271, 706, 154, 61, 321, 337 };
++  const ClutterPrimaries *bt2020 = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
++  struct di_color_primaries base = {
++    .has_primaries = TRUE,
++    .has_default_white_point = TRUE,
++  };
++  MetaEdidInfo edid = { 0 };
++  MetaColorTargetPrimaries target;
++  int32_t expected[8], encoding[8];
++  unsigned int i, unusable;
++
++  for (i = 0; i < 3; i++)
++    base.primary[i] = (struct di_chromaticity_cie1931) {
++      codes[2 * i] / 1024.0f, codes[2 * i + 1] / 1024.0f,
++    };
++  base.default_white = (struct di_chromaticity_cie1931) {
++    codes[6] / 1024.0f, codes[7] / 1024.0f,
++  };
++  for (i = 0; i < 8; i++)
++    expected[i] = (int32_t) round (codes[i] * 1000000.0 / 1024.0);
++  edid.default_color_primaries = base;
++
++  /* In the native SDR mode, the base EDID primaries are the target, equal to
++   * the encoding primaries, with one 10-bit step as the tolerance of each
++   * primary. */
++  init_sdr_native_target (&target, &edid, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_EDID_DECLARED);
++  for (i = 0; i < 8; i++)
++    {
++      g_assert_cmpint (encoding[i], ==, expected[i]);
++      g_assert_cmpint (target.coordinates[i], ==, expected[i]);
++    }
++  for (i = 0; i < 3; i++)
++    g_assert_cmpfloat (target.tolerance[i], ==, (float) (1.0 / 1024.0));
++
++  /* In BT.2100 they are no target: they describe the default SDR
++   * colorimetry, not what the display shows in HDR. */
++  meta_color_target_primaries_init (&target, &edid, META_COLOR_TARGET_PRIMARIES_SOURCES_DISPLAYID, bt2020);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.coordinates[0], ==, 708000);
++  for (i = 0; i < 3; i++)
++    g_assert_cmpfloat (target.tolerance[i], ==, 0.0f);
++
++  /* Ineligible outputs keep the fallback. */
++  meta_color_target_primaries_init (&target, &edid, META_COLOR_TARGET_PRIMARIES_SOURCES_NONE, bt2020);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* With both declarations, BT.2100 takes the DisplayID native
++   * chromaticities, and the native SDR mode still the gamut it encodes in. */
++  edid.native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED;
++  set_raw_points (&edid, xy);
++  meta_color_target_primaries_init (&target, &edid, META_COLOR_TARGET_PRIMARIES_SOURCES_DISPLAYID, bt2020);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpint (target.coordinates[0], ==, 687500);
++  g_assert_cmpfloat (target.tolerance[0], ==, (float) (1.0 / 4096.0));
++  init_sdr_native_target (&target, &edid, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_EDID_DECLARED);
++  for (i = 0; i < 8; i++)
++    g_assert_cmpint (target.coordinates[i], ==, expected[i]);
++  for (i = 0; i < 3; i++)
++    g_assert_cmpfloat (target.tolerance[i], ==, (float) (1.0 / 1024.0));
++
++  /* Unusable DisplayID chromaticities leave BT.2100 the fallback, not the
++   * base EDID primaries. */
++  edid.native_chromaticities.white_point = edid.native_chromaticities.primaries[0];
++  meta_color_target_primaries_init (&target, &edid, META_COLOR_TARGET_PRIMARIES_SOURCES_DISPLAYID, bt2020);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  edid.native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
++  meta_color_target_primaries_init (&target, &edid, META_COLOR_TARGET_PRIMARIES_SOURCES_DISPLAYID, bt2020);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* Base primaries the native SDR mode rejects leave its fallback, sRGB. */
++  for (unusable = 0; unusable < 5; unusable++)
++    {
++      g_auto (ClutterColorimetry) colorimetry = { 0 };
++
++      edid.default_color_primaries = base;
++      switch (unusable)
++        {
++        case 0:
++          /* Collinear primaries. */
++          edid.default_color_primaries.primary[0] = (struct di_chromaticity_cie1931) { 0.6f, 0.6f };
++          edid.default_color_primaries.primary[1] = (struct di_chromaticity_cie1931) { 0.3f, 0.3f };
++          edid.default_color_primaries.primary[2] = (struct di_chromaticity_cie1931) { 0.1f, 0.1f };
++          break;
++        case 1:
++          /* A white point outside the triangle. */
++          edid.default_color_primaries.default_white = (struct di_chromaticity_cie1931) { 0.7f, 0.25f };
++          break;
++        case 2:
++          /* A white point with y = 0. */
++          edid.default_color_primaries.default_white.y = 0.0f;
++          break;
++        case 3:
++          edid.default_color_primaries.has_default_white_point = FALSE;
++          break;
++        case 4:
++          edid.default_color_primaries.has_primaries = FALSE;
++          break;
++        }
++      g_assert_false (meta_color_colorimetry_from_edid_primaries (&edid, &colorimetry, NULL));
++
++      init_sdr_native_target (&target, &edid, encoding);
++      g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++      g_assert_cmpint (target.coordinates[0], ==, 640000);
++      g_assert_cmpint (encoding[0], ==, 640000);
++    }
++
++  /* Imaginary primaries the native SDR mode renders with are outside the
++   * chromaticity domain a target is held to: a negative y, and x + y above
++   * 1. The target is then the encoding fallback, equal to them. */
++  for (unusable = 0; unusable < 2; unusable++)
++    {
++      g_auto (ClutterColorimetry) colorimetry = { 0 };
++
++      edid.default_color_primaries = base;
++      if (unusable == 0)
++        edid.default_color_primaries.primary[2] = (struct di_chromaticity_cie1931) { 0.0001f, -0.077f };
++      else
++        edid.default_color_primaries.primary[1] = (struct di_chromaticity_cie1931) { 0.2f, 0.85f };
++      g_assert_true (meta_color_colorimetry_from_edid_primaries (&edid, &colorimetry, NULL));
++
++      init_sdr_native_target (&target, &edid, encoding);
++      g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++      for (i = 0; i < 8; i++)
++        g_assert_cmpint (target.coordinates[i], ==, encoding[i]);
++    }
++
++  /* With unusable base primaries and usable DisplayID chromaticities, BT.2100
++   * takes DisplayID, and the native SDR mode keeps its fallback rather than
++   * take DisplayID. */
++  edid.default_color_primaries = base;
++  edid.default_color_primaries.has_primaries = FALSE;
++  edid.native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED;
++  set_raw_points (&edid, xy);
++  meta_color_target_primaries_init (&target, &edid, META_COLOR_TARGET_PRIMARIES_SOURCES_DISPLAYID, bt2020);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  init_sdr_native_target (&target, &edid, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target.coordinates[0], ==, 640000);
++}
++
+ /* The CIE 1931 xy of DisplayID 2 CIE 1976 coordinates, in code units. */
+ static void
+ uv_code_to_xy (double  a,
+@@ -1095,8 +1519,11 @@ main (int    argc,
+                    test_cta_with_extension_failure);
+   g_test_add_func ("/native-hdr/physical-luminance", test_physical_luminance);
+   g_test_add_func ("/native-hdr/target-luminance-policy", test_target_luminance_policy);
++  g_test_add_func ("/native-hdr/target-luminance-sources", test_target_luminance_sources);
++  g_test_add_func ("/native-hdr/cta-display-targets", test_cta_display_targets);
+   g_test_add_func ("/native-hdr/physical-chromaticities", test_physical_chromaticities);
+   g_test_add_func ("/native-hdr/target-primaries-policy", test_target_primaries_policy);
++  g_test_add_func ("/native-hdr/target-primaries-sources", test_target_primaries_sources);
+   g_test_add_func ("/native-hdr/target-primaries-tolerance", test_target_primaries_tolerance);
+   g_test_add_func ("/native-hdr/chromaticity-fixed-point", test_chromaticity_fixed_point);
+   g_test_add_func ("/native-hdr/sdr-native-edid-primaries", test_sdr_native_edid_primaries);

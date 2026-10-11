@@ -1,0 +1,498 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 16:57:41 -0400
+Subject: [PATCH] tests/color-management: Cover ICC file ranges, descriptor 0
+ and content
+
+Add regressions for wp_image_description_creator_icc_v1:
+
+ - /wayland/icc-file/wrapping-range: offset UINT32_MAX - 15 with length
+   32 wraps to 16 in 32 bits; the client must get the out_of_file
+   protocol error on the ICC creator.
+ - /wayland/icc-file/past-end: a range one byte past the end of the file
+   raises out_of_file.
+ - /wayland/icc-file/exact-end: a profile stored after a 7 byte prefix,
+   addressed by a range ending exactly at the end of the file, is
+   accepted and becomes ready. The client leaves the shared file
+   position inside the prefix, so this also checks that the profile is
+   read at the absolute offset.
+ - /wayland/icc-file/unsupported-content: readable data that is not an
+   ICC profile fails with the 'unsupported' cause, not
+   'operating_system', and the connection survives. The file position is
+   left at the end; since a short read fails as 'operating_system', the
+   'unsupported' result shows the whole range was read.
+ - /wayland/icc-file/truncated-before-read: the file is valid for the
+   range when set_icc_file is processed and truncated before create, the
+   point at which the compositor reads it; the short read fails with the
+   'operating_system' cause and is never parsed.
+ - /wayland/icc-file/zero-descriptor: a stored descriptor 0 counts as set.
+
+The descriptor-0 case cannot be driven through a client, because the
+descriptor number the compositor receives is chosen by the kernel on
+reception. It is instead a compositor-side unit test of the creator's
+file state, using the exported meta_wayland_icc_file_set(): the test
+places a memfd on descriptor 0 of the test process, stores it, and checks
+that a second set raises already_set while the stored descriptor stays
+open and the rejected one is consumed (compared by inode, so descriptor
+reuse by another thread cannot fool it). The same test covers the
+wrapping, past-end and exact-end ranges directly. It works whether or
+not the test process starts with stdin closed (the memfd may itself be
+descriptor 0), and restores stdin with a single dup2() over the stored
+descriptor, so descriptor 0 is never free for another thread in between.
+It replaces the process's descriptor 0, so it runs as a separate
+invocation.
+---
+ src/tests/meson.build                         |   4 +-
+ src/tests/wayland-color-management-test.c     | 160 ++++++++++++++
+ .../wayland-test-clients/color-management.c   | 207 ++++++++++++++++++
+ 3 files changed, 370 insertions(+), 1 deletion(-)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index b194642b3..c4390330e 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -950,7 +950,8 @@ wayland_test_cases = [
+     # Target-volume cases rewrite the fixture output and the v2 cases dispose
+     # the shared Wayland colour manager, so each runs in its own invocation.
+     # The SDR-native case and the info round trip rewrite the fixture
+-    # output's EDID and colour mode.
++    # output's EDID and colour mode, and the zero-descriptor case replaces
++    # the process's descriptor 0.
+     'separate_cases': [
+       '/wayland/target-luminance/v1',
+       '/wayland/target-luminance/v2',
+@@ -958,6 +959,7 @@ wayland_test_cases = [
+       '/wayland/target-primaries/v2',
+       '/wayland/sdr-native/unusable-edid-primaries',
+       '/wayland/custom-primaries/info-round-trip',
++      '/wayland/icc-file/zero-descriptor',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 15a4e37ef..dec6f5ab6 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -22,8 +22,13 @@
+ 
+ #include "config.h"
+ 
++#include <errno.h>
++#include <fcntl.h>
+ #include <glib/gstdio.h>
+ #include <stdint.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <unistd.h>
+ 
+ #include "backends/meta-virtual-monitor.h"
+ #include "backends/meta-backend-private.h"
+@@ -40,6 +45,7 @@
+ #include "tests/meta-test-utils.h"
+ #include "tests/meta-wayland-test-driver.h"
+ #include "tests/meta-wayland-test-utils.h"
++#include "wayland/meta-wayland-color-management.h"
+ #include "wayland/meta-wayland-surface-private.h"
+ 
+ #define TEST_COLOR_EPSILON 0.0001f
+@@ -875,6 +881,148 @@ sdr_native_unusable_edid_primaries (void)
+   meta_color_device_update (device);
+ }
+ 
++static void
++client_mode_case (gconstpointer data)
++{
++  MetaWaylandTestClient *client;
++
++  /* The client asserts the protocol error or result for its mode. */
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   data,
++                                                   NULL);
++  meta_wayland_test_client_finish (client);
++}
++
++static int
++create_sized_memfd (off_t size)
++{
++  int fd;
++
++  fd = memfd_create ("wayland-color-management-test", MFD_CLOEXEC);
++  g_assert_cmpint (fd, !=, -1);
++  g_assert_cmpint (ftruncate (fd, size), ==, 0);
++
++  return fd;
++}
++
++static ino_t
++get_inode (int fd)
++{
++  struct stat stat_buf;
++
++  g_assert_cmpint (fstat (fd, &stat_buf), ==, 0);
++  return stat_buf.st_ino;
++}
++
++/* Whether @fd still refers to the file with inode @inode. Comparing inodes
++ * rather than testing for EBADF keeps this robust if another thread reuses
++ * the descriptor number after it was closed. */
++static gboolean
++fd_refers_to (int   fd,
++              ino_t inode)
++{
++  struct stat stat_buf;
++
++  if (fstat (fd, &stat_buf) == -1)
++    {
++      g_assert_cmpint (errno, ==, EBADF);
++      return FALSE;
++    }
++
++  return stat_buf.st_ino == inode;
++}
++
++static void
++icc_file_zero_descriptor (void)
++{
++  MetaWaylandIccFile icc_file;
++  enum wp_image_description_creator_icc_v1_error error_code;
++  const char *error_message;
++  int saved_stdin, fd, second_fd;
++  ino_t zero_inode, second_inode;
++
++  /* A client cannot choose the descriptor number the compositor receives,
++   * so exercise the creator state directly with a file on descriptor 0, as
++   * received by a compositor that runs with stdin closed. If stdin is closed
++   * here too, the memfd itself lands on 0. */
++  saved_stdin = fcntl (0, F_DUPFD_CLOEXEC, 3);
++  fd = create_sized_memfd (4096);
++  zero_inode = get_inode (fd);
++  if (fd != 0)
++    {
++      g_assert_cmpint (dup2 (fd, 0), ==, 0);
++      close (fd);
++    }
++
++  meta_wayland_icc_file_init (&icc_file);
++  g_assert_cmpint (icc_file.fd, ==, -1);
++
++  /* A range ending exactly at the end of the file is accepted. */
++  g_assert_true (meta_wayland_icc_file_set (&icc_file, 0, 96, 4000,
++                                            &error_code, &error_message));
++  g_assert_cmpint (icc_file.fd, ==, 0);
++  g_assert_cmpuint (icc_file.offset, ==, 96);
++  g_assert_cmpuint (icc_file.length, ==, 4000);
++
++  /* Descriptor 0 counts as set. */
++  second_fd = create_sized_memfd (4096);
++  second_inode = get_inode (second_fd);
++  g_assert_false (meta_wayland_icc_file_set (&icc_file, second_fd, 0, 16,
++                                             &error_code, &error_message));
++  g_assert_cmpuint (error_code, ==,
++                    WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_ALREADY_SET);
++  /* The stored file is untouched; the rejected descriptor was consumed. */
++  g_assert_cmpint (icc_file.fd, ==, 0);
++  g_assert_cmpuint (icc_file.offset, ==, 96);
++  g_assert_cmpuint (icc_file.length, ==, 4000);
++  g_assert_true (fd_refers_to (0, zero_inode));
++  g_assert_false (fd_refers_to (second_fd, second_inode));
++
++  if (saved_stdin != -1)
++    {
++      /* Put stdin back over the stored descriptor in one step, so that
++       * descriptor 0 is never free for another thread, and take it out of
++       * the state so that clearing does not close it. */
++      g_assert_cmpint (dup2 (saved_stdin, 0), ==, 0);
++      close (saved_stdin);
++      icc_file.fd = -1;
++    }
++  meta_wayland_icc_file_clear (&icc_file);
++  g_assert_cmpint (icc_file.fd, ==, -1);
++  g_assert_false (fd_refers_to (0, zero_inode));
++
++  /* offset + length wraps to 16 in 32 bits. */
++  fd = create_sized_memfd (4096);
++  second_inode = get_inode (fd);
++  g_assert_false (meta_wayland_icc_file_set (&icc_file, fd, UINT32_MAX - 15, 32,
++                                             &error_code, &error_message));
++  g_assert_cmpuint (error_code, ==,
++                    WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_OUT_OF_FILE);
++  g_assert_cmpint (icc_file.fd, ==, -1);
++  g_assert_false (fd_refers_to (fd, second_inode));
++
++  /* One byte past the end of the file. */
++  fd = create_sized_memfd (4096);
++  g_assert_false (meta_wayland_icc_file_set (&icc_file, fd, 4096 - 15, 16,
++                                             &error_code, &error_message));
++  g_assert_cmpuint (error_code, ==,
++                    WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_OUT_OF_FILE);
++  g_assert_cmpint (icc_file.fd, ==, -1);
++
++  /* Exactly the last 16 bytes. */
++  fd = create_sized_memfd (4096);
++  second_inode = get_inode (fd);
++  g_assert_true (meta_wayland_icc_file_set (&icc_file, fd, 4096 - 16, 16,
++                                            &error_code, &error_message));
++  g_assert_cmpint (icc_file.fd, ==, fd);
++
++  /* Clearing closes the stored descriptor. */
++  meta_wayland_icc_file_clear (&icc_file);
++  g_assert_cmpint (icc_file.fd, ==, -1);
++  g_assert_false (fd_refers_to (fd, second_inode));
++}
++
+ static void
+ on_before_tests (void)
+ {
+@@ -911,6 +1059,18 @@ init_tests (void)
+                    custom_primaries_unsupported);
+   g_test_add_func ("/wayland/custom-primaries/info-round-trip",
+                    custom_primaries_info_round_trip);
++  g_test_add_data_func ("/wayland/icc-file/wrapping-range",
++                        "icc-wrapping-range", client_mode_case);
++  g_test_add_data_func ("/wayland/icc-file/past-end",
++                        "icc-past-end", client_mode_case);
++  g_test_add_data_func ("/wayland/icc-file/exact-end",
++                        "icc-exact-end", client_mode_case);
++  g_test_add_data_func ("/wayland/icc-file/unsupported-content",
++                        "icc-unsupported-content", client_mode_case);
++  g_test_add_data_func ("/wayland/icc-file/truncated-before-read",
++                        "icc-truncated", client_mode_case);
++  g_test_add_func ("/wayland/icc-file/zero-descriptor",
++                   icc_file_zero_descriptor);
+ }
+ 
+ int
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 2695f76a8..1df1c17fb 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -22,7 +22,9 @@
+ 
+ #include "config.h"
+ 
++#include <errno.h>
+ #include <fcntl.h>
++#include <sys/mman.h>
+ #include <sys/stat.h>
+ #include <string.h>
+ #include <unistd.h>
+@@ -449,6 +451,201 @@ primaries_unsupported_client (WaylandDisplay *display)
+   wp_color_management_surface_v1_destroy (color_surface);
+ }
+ 
++static int
++open_icc_profile (const char *name,
++                  off_t      *size)
++{
++  g_autofree char *icc_path = NULL;
++  struct stat stat_buf;
++  int fd;
++
++  icc_path = g_build_filename (g_getenv ("G_TEST_SRCDIR"),
++                               "icc-profiles", name, NULL);
++  fd = open (icc_path, O_RDONLY | O_CLOEXEC);
++  g_assert_cmpint (fd, !=, -1);
++  g_assert_cmpint (fstat (fd, &stat_buf), ==, 0);
++  g_assert_cmpint (stat_buf.st_size, >, 0);
++  *size = stat_buf.st_size;
++
++  return fd;
++}
++
++static int
++create_memfd_with_contents (const uint8_t *prefix,
++                            size_t         prefix_size,
++                            int            source_fd,
++                            off_t          source_size)
++{
++  g_autofree uint8_t *contents = NULL;
++  int fd;
++
++  contents = g_malloc (source_size);
++  g_assert_cmpint (pread (source_fd, contents, source_size, 0), ==, source_size);
++
++  fd = memfd_create ("color-management-icc", MFD_CLOEXEC);
++  g_assert_cmpint (fd, !=, -1);
++  if (prefix_size > 0)
++    g_assert_cmpint (write (fd, prefix, prefix_size), ==, (ssize_t) prefix_size);
++  g_assert_cmpint (write (fd, contents, source_size), ==, source_size);
++
++  return fd;
++}
++
++static void
++assert_icc_protocol_error (WaylandDisplay *display,
++                           uint32_t        expected_error)
++{
++  const struct wl_interface *interface = NULL;
++
++  g_assert_cmpint (wl_display_roundtrip (display->display), ==, -1);
++  g_assert_cmpint (wl_display_get_error (display->display), ==, EPROTO);
++  g_assert_cmpuint (wl_display_get_protocol_error (display->display,
++                                                   &interface, NULL),
++                    ==, expected_error);
++  g_assert_true (interface == &wp_image_description_creator_icc_v1_interface);
++}
++
++static void
++icc_out_of_file_client (WaylandDisplay *display,
++                        gboolean        wrapping)
++{
++  struct wp_image_description_creator_icc_v1 *creator_icc;
++  off_t size;
++  int fd;
++
++  fd = open_icc_profile ("sRGB.icc", &size);
++  creator_icc =
++    wp_color_manager_v1_create_icc_creator (display->color_management_mgr);
++
++  if (wrapping)
++    {
++      /* offset + length wraps to 16 in 32 bits, well inside the file. */
++      wp_image_description_creator_icc_v1_set_icc_file (creator_icc, fd,
++                                                        UINT32_MAX - 15, 32);
++    }
++  else
++    {
++      /* One byte past the end of the file. */
++      wp_image_description_creator_icc_v1_set_icc_file (creator_icc, fd,
++                                                        1, (uint32_t) size);
++    }
++  close (fd);
++
++  assert_icc_protocol_error (display,
++                             WP_IMAGE_DESCRIPTION_CREATOR_ICC_V1_ERROR_OUT_OF_FILE);
++}
++
++static void
++icc_exact_end_client (WaylandDisplay *display)
++{
++  const uint8_t prefix[7] = { 'p', 'r', 'e', 'f', 'i', 'x', 0 };
++  struct wp_image_description_creator_icc_v1 *creator_icc;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context = { 0 };
++  off_t size;
++  int profile_fd, fd;
++
++  profile_fd = open_icc_profile ("sRGB.icc", &size);
++  fd = create_memfd_with_contents (prefix, sizeof (prefix), profile_fd, size);
++  close (profile_fd);
++
++  /* The compositor shares this file position; reading must not depend on
++   * it. Leave it in the middle of the prefix. */
++  g_assert_cmpint (lseek (fd, 3, SEEK_SET), ==, 3);
++
++  /* The range ends exactly at the end of the file. */
++  creator_icc =
++    wp_color_manager_v1_create_icc_creator (display->color_management_mgr);
++  wp_image_description_creator_icc_v1_set_icc_file (creator_icc, fd,
++                                                    sizeof (prefix),
++                                                    (uint32_t) size);
++  close (fd);
++
++  image_description = wp_image_description_creator_icc_v1_create (creator_icc);
++  wp_image_description_v1_add_listener (image_description,
++                                        &image_description_listener,
++                                        &context);
++  wait_for_image_description_ready (&context, display);
++  g_assert_false (context.creation_failed);
++  g_assert_cmpuint (context.image_description_id, >, 0);
++  wp_image_description_v1_destroy (image_description);
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
++static void
++icc_truncated_client (WaylandDisplay *display)
++{
++  struct wp_image_description_creator_icc_v1 *creator_icc;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context = { 0 };
++  off_t size;
++  int profile_fd, fd;
++
++  profile_fd = open_icc_profile ("sRGB.icc", &size);
++  fd = create_memfd_with_contents (NULL, 0, profile_fd, size);
++  close (profile_fd);
++
++  creator_icc =
++    wp_color_manager_v1_create_icc_creator (display->color_management_mgr);
++  wp_image_description_creator_icc_v1_set_icc_file (creator_icc, fd,
++                                                    0, (uint32_t) size);
++  /* The range is validated against the full file... */
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++
++  /* ...which shrinks before the compositor reads it, on create. */
++  g_assert_cmpint (ftruncate (fd, size / 2), ==, 0);
++  close (fd);
++
++  image_description = wp_image_description_creator_icc_v1_create (creator_icc);
++  wp_image_description_v1_add_listener (image_description,
++                                        &image_description_listener,
++                                        &context);
++  wait_for_image_description_ready (&context, display);
++
++  /* A short read is never parsed; it fails as a read error. */
++  g_assert_true (context.creation_failed);
++  g_assert_cmpuint (context.failure_cause, ==,
++                    WP_IMAGE_DESCRIPTION_V1_CAUSE_OPERATING_SYSTEM);
++  wp_image_description_v1_destroy (image_description);
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
++static void
++icc_unsupported_content_client (WaylandDisplay *display)
++{
++  struct wp_image_description_creator_icc_v1 *creator_icc;
++  struct wp_image_description_v1 *image_description;
++  ImageDescriptionContext context = { 0 };
++  uint8_t garbage[256];
++  int fd;
++
++  memset (garbage, 0x5a, sizeof (garbage));
++  fd = memfd_create ("color-management-garbage", MFD_CLOEXEC);
++  g_assert_cmpint (fd, !=, -1);
++  g_assert_cmpint (write (fd, garbage, sizeof (garbage)), ==, sizeof (garbage));
++
++  creator_icc =
++    wp_color_manager_v1_create_icc_creator (display->color_management_mgr);
++  wp_image_description_creator_icc_v1_set_icc_file (creator_icc, fd,
++                                                    0, sizeof (garbage));
++  close (fd);
++
++  image_description = wp_image_description_creator_icc_v1_create (creator_icc);
++  wp_image_description_v1_add_listener (image_description,
++                                        &image_description_listener,
++                                        &context);
++  wait_for_image_description_ready (&context, display);
++
++  /* The file was read in full (the position was left at its end, and a
++   * short read would fail with 'operating_system'); its content is not a
++   * supported profile. */
++  g_assert_true (context.creation_failed);
++  g_assert_cmpuint (context.failure_cause, ==,
++                    WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED);
++  wp_image_description_v1_destroy (image_description);
++  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
++}
++
+ typedef struct
+ {
+   struct wl_output *output;
+@@ -1263,6 +1460,16 @@ main (int    argc,
+         primaries_unsupported_client (display);
+       else if (strcmp (argv[1], "info-round-trip") == 0)
+         info_round_trip_client (display);
++      else if (strcmp (argv[1], "icc-wrapping-range") == 0)
++        icc_out_of_file_client (display, TRUE);
++      else if (strcmp (argv[1], "icc-past-end") == 0)
++        icc_out_of_file_client (display, FALSE);
++      else if (strcmp (argv[1], "icc-exact-end") == 0)
++        icc_exact_end_client (display);
++      else if (strcmp (argv[1], "icc-unsupported-content") == 0)
++        icc_unsupported_content_client (display);
++      else if (strcmp (argv[1], "icc-truncated") == 0)
++        icc_truncated_client (display);
+       else
+         g_error ("Unknown color-management test mode '%s'", argv[1]);
+       return EXIT_SUCCESS;

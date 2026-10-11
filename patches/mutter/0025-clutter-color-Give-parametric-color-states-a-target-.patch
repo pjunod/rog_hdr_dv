@@ -1,0 +1,522 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:11:14 -0400
+Subject: [PATCH] clutter/color: Give parametric color states a target color
+ volume
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A parametric color state only described its encoding: primaries,
+transfer function and the primary color volume's luminances. Add the
+target color volume its content was prepared for, as
+wp_image_description_creator_params_v1 declares it: mastering display
+primaries, mastering luminance range (SMPTE ST 2086), and the maximum
+content and frame-average light levels (CTA-861-H).
+
+It is held privately in ClutterColorStateParams, as
+ClutterColorTargetVolume from the uninstalled
+clutter-color-state-params-private.h; the public ClutterLuminance and
+the other installed structures are unchanged. Undeclared parts are
+absent (has_primaries and has_luminance FALSE, max_cll and max_fall 0);
+luminances are in the units of the state's own ClutterLuminance.
+Additive API, exported for libmutter (which creates states from client
+input):
+
+ - clutter_color_state_params_new_with_target_volume(): a copy of a
+   parametric state with the given target volume, validated by the
+   caller.
+ - clutter_color_state_params_get_target_volume().
+ - clutter_color_state_params_get_peak_headroom(): the content's range
+   as multiples of its reference white, which every conversion
+   anchors. The effective peak is the smallest of MaxCLL (if declared),
+   the target maximum luminance (if declared) and, for an encoding
+   whose signal range bounds it, the encoding's maximum, the larger of
+   its nominal and extended maximum. Without any declaration it is the
+   encoding maximum, 10000 cd/m² for PQ; MaxFALL, an average, never
+   lowers it. Extended-range linear encodings (ext_linear, scRGB-style
+   content) give meaning to values above 1.0, so their nominal maximum
+   bounds nothing: their peak is the smaller of MaxCLL and the target
+   maximum, whichever are declared, and with neither it is unknown and
+   the function returns FALSE. This is the single definition of the
+   effective peak.
+
+The target volume takes part in equality and hashing. It is compared
+exactly, unlike the encoding luminances: its values are declarations,
+not derived, and a different declaration is a different state. So the
+color transform cache, keyed by state equality, tells such states
+apart.
+
+Equality is also what decided whether a transform needs any
+operation. Two states that differ only in their target volume encode
+pixels identically, and treating them as different would have added
+an EOTF, two matrices and an inverse EOTF to an identity conversion,
+which also blocks direct scanout. The transform now builds a pipeline
+only when the encodings differ, using the new internal
+clutter_color_state_encoding_equals(), which is equality without the
+target volume. Nothing renders the target volume yet.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ .../clutter-color-state-params-private.h      |  64 +++++
+ clutter/clutter/clutter-color-state-params.c  | 264 +++++++++++++++++-
+ clutter/clutter/clutter-color-transform.c     |   6 +-
+ clutter/clutter/meson.build                   |   1 +
+ 4 files changed, 324 insertions(+), 11 deletions(-)
+ create mode 100644 clutter/clutter/clutter-color-state-params-private.h
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+new file mode 100644
+index 000000000..17ff0fb3d
+--- /dev/null
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -0,0 +1,64 @@
++/*
++ * Clutter.
++ *
++ * An OpenGL based 'interactive canvas' library.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#pragma once
++
++#include "clutter/clutter-color-state-params.h"
++
++/*
++ * The target color volume of a parametric color state: the color volume its
++ * content was prepared for, as opposed to the encoding's primary color
++ * volume. For client content these are the mastering display primaries and
++ * luminance range and the maximum content and frame-average light levels of
++ * wp_image_description_creator_params_v1 (SMPTE ST 2086, CTA-861-H).
++ *
++ * Luminances are in the units of the state's own ClutterLuminance. A value
++ * that was not declared is absent: has_primaries and has_luminance are FALSE,
++ * and max_cll and max_fall are 0.
++ *
++ * Not part of the installed API.
++ */
++typedef struct _ClutterColorTargetVolume
++{
++  gboolean has_primaries;
++  ClutterPrimaries primaries;
++
++  gboolean has_luminance;
++  float min_lum;
++  float max_lum;
++
++  float max_cll;
++  float max_fall;
++} ClutterColorTargetVolume;
++
++/* Exported for libmutter, which creates color states from client input. */
++CLUTTER_EXPORT
++ClutterColorState * clutter_color_state_params_new_with_target_volume (ClutterColorStateParams        *color_state_params,
++                                                                       const ClutterColorTargetVolume *target_volume);
++
++CLUTTER_EXPORT
++const ClutterColorTargetVolume * clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_state_params);
++
++CLUTTER_EXPORT
++gboolean clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_state_params,
++                                                       double                  *min_headroom,
++                                                       double                  *peak_headroom);
++
++gboolean clutter_color_state_encoding_equals (ClutterColorState *color_state,
++                                              ClutterColorState *other_color_state);
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index 3bb7b0a85..2b61c83bf 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -26,7 +26,10 @@
+ 
+ #include "config.h"
+ 
+-#include "clutter/clutter-color-state-params.h"
++#include "clutter/clutter-color-state-params-private.h"
++
++#include <math.h>
++#include <string.h>
+ 
+ #include "clutter/clutter-color-state.h"
+ #include "clutter/clutter-color-utils-private.h"
+@@ -53,6 +56,8 @@ typedef struct _ClutterColorStateParams
+   ClutterColorimetry colorimetry;
+   ClutterEOTF eotf;
+   ClutterLuminance luminance;
++
++  ClutterColorTargetVolume target_volume;
+ } ClutterColorStateParams;
+ 
+ G_DEFINE_TYPE (ClutterColorStateParams,
+@@ -93,6 +98,86 @@ clutter_color_state_params_get_luminance (ClutterColorStateParams *color_state_p
+     }
+ }
+ 
++/*
++ * clutter_color_state_params_get_target_volume:
++ *
++ * Returns: (transfer none): the target color volume declared for the
++ *   content, whose undeclared parts are absent.
++ */
++const ClutterColorTargetVolume *
++clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_state_params)
++{
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
++                        NULL);
++
++  return &color_state_params->target_volume;
++}
++
++/*
++ * Whether the encoding's signal range bounds the light the content can
++ * reach. Extended-range linear encodings (ext_linear, scRGB-style content)
++ * give meaning to values above 1.0, so their nominal maximum does not.
++ */
++static gboolean
++encoding_bounds_peak (ClutterColorStateParams *color_state_params)
++{
++  const ClutterEOTF *eotf = &color_state_params->eotf;
++
++  return !(eotf->type == CLUTTER_EOTF_TYPE_NAMED &&
++           eotf->tf_name == CLUTTER_TRANSFER_FUNCTION_LINEAR);
++}
++
++/*
++ * clutter_color_state_params_get_peak_headroom:
++ * @min_headroom: (out) (optional): the lowest luminance of the range
++ * @peak_headroom: (out) (optional): the effective peak luminance
++ *
++ * The range of the content as multiples of its reference white luminance,
++ * which every conversion anchors. The effective peak is the smallest of the
++ * declared maximum content light level, the declared target (mastering)
++ * maximum luminance and, for an encoding whose signal range bounds it, the
++ * encoding's own maximum. MaxFALL, an average, never lowers it.
++ *
++ * Returns: %FALSE if the effective peak is unknown: an extended-range
++ *   encoding with neither MaxCLL nor a target maximum declared.
++ */
++gboolean
++clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_state_params,
++                                              double                  *min_headroom,
++                                              double                  *peak_headroom)
++{
++  const ClutterColorTargetVolume *target_volume;
++  const ClutterLuminance *lum;
++  double ref;
++  double peak = INFINITY;
++
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
++                        FALSE);
++
++  target_volume = &color_state_params->target_volume;
++  lum = clutter_color_state_params_get_luminance (color_state_params);
++  ref = lum->ref;
++
++  /* Extended range states can exceed their nominal maximum. */
++  if (encoding_bounds_peak (color_state_params))
++    peak = MAX (lum->max, lum->mastering_max) / ref;
++  if (target_volume->has_luminance)
++    peak = MIN (peak, target_volume->max_lum / ref);
++  if (target_volume->max_cll > 0.0f)
++    peak = MIN (peak, target_volume->max_cll / ref);
++
++  if (min_headroom)
++    {
++      *min_headroom = target_volume->has_luminance ?
++                      target_volume->min_lum / ref :
++                      lum->min / ref;
++    }
++  if (peak_headroom)
++    *peak_headroom = peak;
++
++  return isfinite (peak);
++}
++
+ static void
+ clutter_color_state_params_finalize (GObject *object)
+ {
+@@ -113,13 +198,9 @@ clutter_color_state_params_get_luminance_vfunc (ClutterColorState *color_state)
+ }
+ 
+ static gboolean
+-clutter_color_state_params_equals (ClutterColorState *color_state,
+-                                   ClutterColorState *other_color_state)
++clutter_color_state_params_encoding_equals (ClutterColorStateParams *color_state_params,
++                                            ClutterColorStateParams *other_color_state_params)
+ {
+-  ClutterColorStateParams *color_state_params =
+-    CLUTTER_COLOR_STATE_PARAMS (color_state);
+-  ClutterColorStateParams *other_color_state_params =
+-    CLUTTER_COLOR_STATE_PARAMS (other_color_state);
+   const ClutterLuminance *lum, *target_lum;
+ 
+   if (!clutter_colorimetry_equal (&color_state_params->colorimetry,
+@@ -135,12 +216,88 @@ clutter_color_state_params_equals (ClutterColorState *color_state,
+   return clutter_luminance_equal (lum, target_lum);
+ }
+ 
++/*
++ * Target volumes are compared exactly: they are declared values, not derived
++ * ones, and a different declaration is a different image description.
++ */
++static gboolean
++target_volume_equal (const ClutterColorTargetVolume *target_volume,
++                     const ClutterColorTargetVolume *other_target_volume)
++{
++  const ClutterPrimaries *primaries = &target_volume->primaries;
++  const ClutterPrimaries *other_primaries = &other_target_volume->primaries;
++
++  if (target_volume->has_primaries != other_target_volume->has_primaries ||
++      target_volume->has_luminance != other_target_volume->has_luminance ||
++      target_volume->max_cll != other_target_volume->max_cll ||
++      target_volume->max_fall != other_target_volume->max_fall)
++    return FALSE;
++
++  if (target_volume->has_primaries &&
++      (primaries->r_x != other_primaries->r_x ||
++       primaries->r_y != other_primaries->r_y ||
++       primaries->g_x != other_primaries->g_x ||
++       primaries->g_y != other_primaries->g_y ||
++       primaries->b_x != other_primaries->b_x ||
++       primaries->b_y != other_primaries->b_y ||
++       primaries->w_x != other_primaries->w_x ||
++       primaries->w_y != other_primaries->w_y))
++    return FALSE;
++
++  if (target_volume->has_luminance &&
++      (target_volume->min_lum != other_target_volume->min_lum ||
++       target_volume->max_lum != other_target_volume->max_lum))
++    return FALSE;
++
++  return TRUE;
++}
++
++static gboolean
++clutter_color_state_params_equals (ClutterColorState *color_state,
++                                   ClutterColorState *other_color_state)
++{
++  ClutterColorStateParams *color_state_params =
++    CLUTTER_COLOR_STATE_PARAMS (color_state);
++  ClutterColorStateParams *other_color_state_params =
++    CLUTTER_COLOR_STATE_PARAMS (other_color_state);
++
++  return clutter_color_state_params_encoding_equals (color_state_params,
++                                                     other_color_state_params) &&
++         target_volume_equal (&color_state_params->target_volume,
++                              &other_color_state_params->target_volume);
++}
++
++/*
++ * clutter_color_state_encoding_equals:
++ *
++ * Like clutter_color_state_equals(), but ignores the target color volume of
++ * parametric color states: whether the two states encode pixels the same
++ * way, so that converting between them needs no operation.
++ */
++gboolean
++clutter_color_state_encoding_equals (ClutterColorState *color_state,
++                                     ClutterColorState *other_color_state)
++{
++  if (CLUTTER_IS_COLOR_STATE_PARAMS (color_state) &&
++      CLUTTER_IS_COLOR_STATE_PARAMS (other_color_state))
++    {
++      return clutter_color_state_params_encoding_equals (
++        CLUTTER_COLOR_STATE_PARAMS (color_state),
++        CLUTTER_COLOR_STATE_PARAMS (other_color_state));
++    }
++
++  return clutter_color_state_equals (color_state, other_color_state);
++}
++
+ static char *
+ clutter_color_state_params_to_string (ClutterColorState *color_state)
+ {
+   ClutterColorStateParams *color_state_params =
+     CLUTTER_COLOR_STATE_PARAMS (color_state);
++  const ClutterColorTargetVolume *target_volume =
++    &color_state_params->target_volume;
+   g_autofree char *primaries_name = NULL;
++  g_autoptr (GString) string = NULL;
+   const char *transfer_function_name;
+   const ClutterLuminance *lum;
+   uint64_t id;
+@@ -150,10 +307,12 @@ clutter_color_state_params_to_string (ClutterColorState *color_state)
+   transfer_function_name = clutter_eotf_to_string (color_state_params->eotf);
+   lum = clutter_color_state_params_get_luminance (color_state_params);
+ 
+-  return g_strdup_printf ("ClutterColorState %" G_GUINT64_FORMAT " "
++  string = g_string_new (NULL);
++  g_string_append_printf (string,
++                          "ClutterColorState %" G_GUINT64_FORMAT " "
+                           "(primaries: %s, transfer function: %s, "
+                           "min lum: %f, max lum: %f, ref lum: %f, "
+-                          "mastering max lum: %f)",
++                          "mastering max lum: %f",
+                           id,
+                           primaries_name,
+                           transfer_function_name,
+@@ -162,7 +321,33 @@ clutter_color_state_params_to_string (ClutterColorState *color_state)
+                           lum->ref,
+                           lum->mastering_max);
+ 
++  if (target_volume->has_primaries)
++    {
++      const ClutterPrimaries *primaries = &target_volume->primaries;
++
++      g_string_append_printf (string,
++                              ", target primaries: [R: %f, %f G: %f, %f "
++                              "B: %f, %f W: %f, %f]",
++                              primaries->r_x, primaries->r_y,
++                              primaries->g_x, primaries->g_y,
++                              primaries->b_x, primaries->b_y,
++                              primaries->w_x, primaries->w_y);
++    }
++  if (target_volume->has_luminance)
++    {
++      g_string_append_printf (string,
++                              ", target min lum: %f, target max lum: %f",
++                              target_volume->min_lum,
++                              target_volume->max_lum);
++    }
++  if (target_volume->max_cll > 0.0f)
++    g_string_append_printf (string, ", max cll: %f", target_volume->max_cll);
++  if (target_volume->max_fall > 0.0f)
++    g_string_append_printf (string, ", max fall: %f", target_volume->max_fall);
++
++  g_string_append (string, ")");
+ 
++  return g_string_free_and_steal (g_steal_pointer (&string));
+ }
+ 
+ static ClutterEncodingRequiredFormat
+@@ -258,6 +443,20 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+                                                          blending_luminance);
+ }
+ 
++static guint
++float_hash (float value)
++{
++  uint32_t bits;
++
++  /* 0.0 and -0.0 compare equal. */
++  if (value == 0.0f)
++    return 0;
++
++  memcpy (&bits, &value, sizeof (bits));
++
++  return bits;
++}
++
+ static guint
+ clutter_color_state_params_hash (ClutterColorState *color_state)
+ {
+@@ -272,6 +471,14 @@ clutter_color_state_params_hash (ClutterColorState *color_state)
+   if (params->eotf.type == CLUTTER_EOTF_TYPE_NAMED)
+     hash = hash * 31 + params->eotf.tf_name;
+ 
++  /* Target volumes compare exactly, so their values can be hashed. */
++  hash = hash * 31 + params->target_volume.has_primaries;
++  hash = hash * 31 + params->target_volume.has_luminance;
++  if (params->target_volume.has_luminance)
++    hash = hash * 31 + float_hash (params->target_volume.max_lum);
++  hash = hash * 31 + float_hash (params->target_volume.max_cll);
++  hash = hash * 31 + float_hash (params->target_volume.max_fall);
++
+   return hash;
+ }
+ 
+@@ -453,6 +660,45 @@ clutter_color_state_params_new_from_primitives (ClutterContext     *context,
+                                               luminance.mastering_max);
+ }
+ 
++/*
++ * clutter_color_state_params_new_with_target_volume:
++ * @color_state_params: the color state to copy
++ * @target_volume: the target color volume, in the units of the luminance of
++ *   @color_state_params
++ *
++ * Creates a copy of @color_state_params whose target color volume is
++ * @target_volume. The caller validates the target volume.
++ *
++ * Returns: (transfer full): a new ClutterColorState
++ */
++ClutterColorState *
++clutter_color_state_params_new_with_target_volume (ClutterColorStateParams        *color_state_params,
++                                                   const ClutterColorTargetVolume *target_volume)
++{
++  ClutterColorState *color_state = CLUTTER_COLOR_STATE (color_state_params);
++  ClutterColorStateParams *copy;
++
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
++                        NULL);
++  g_return_val_if_fail (target_volume != NULL, NULL);
++
++  copy = g_object_new (CLUTTER_TYPE_COLOR_STATE_PARAMS,
++                       "context", clutter_color_state_get_context (color_state),
++                       NULL);
++  copy->colorimetry = color_state_params->colorimetry;
++  if (copy->colorimetry.type == CLUTTER_COLORIMETRY_TYPE_PRIMARIES)
++    {
++      copy->colorimetry.primaries =
++        g_memdup2 (color_state_params->colorimetry.primaries,
++                   sizeof (ClutterPrimaries));
++    }
++  copy->eotf = color_state_params->eotf;
++  copy->luminance = color_state_params->luminance;
++  copy->target_volume = *target_volume;
++
++  return CLUTTER_COLOR_STATE (copy);
++}
++
+ static gboolean
+ cicp_primaries_to_clutter (ClutterCicpPrimaries   primaries,
+                            ClutterColorimetry    *colorimetry,
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 465c29f60..65c03f297 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -55,7 +55,7 @@
+ 
+ #include "clutter/clutter-color-transform-private.h"
+ #include "clutter/clutter-color-utils-private.h"
+-#include "clutter/clutter-color-state-params.h"
++#include "clutter/clutter-color-state-params-private.h"
+ #include "clutter/clutter-color-state-icc.h"
+ #include "clutter/clutter-color-state.h"
+ #include "clutter/clutter-color-op.h"
+@@ -1047,7 +1047,9 @@ clutter_color_transform_new (ClutterColorState               *source_color_state
+   transform = g_object_new (CLUTTER_TYPE_COLOR_TRANSFORM, NULL);
+   pipeline = g_object_new (CLUTTER_TYPE_COLOR_PIPELINE, NULL);
+ 
+-  if (!clutter_color_state_equals (source_color_state, target_color_state))
++  /* A target color volume alone does not change how pixels are encoded. */
++  if (!clutter_color_state_encoding_equals (source_color_state,
++                                            target_color_state))
+     build_transform_pipeline (pipeline, source_color_state, target_color_state, flags);
+ 
+   clutter_color_pipeline_simplify (pipeline);
+diff --git a/clutter/clutter/meson.build b/clutter/clutter/meson.build
+index 47409c51e..980d60f27 100644
+--- a/clutter/clutter/meson.build
++++ b/clutter/clutter/meson.build
+@@ -196,6 +196,7 @@ clutter_private_headers = [
+   'clutter-content-private.h',
+   'clutter-context-private.h',
+   'clutter-color-op-private.h',
++  'clutter-color-state-params-private.h',
+   'clutter-color-utils-private.h',
+   'clutter-cursor-private.h',
+   'clutter-damage-history.h',
