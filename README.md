@@ -47,7 +47,8 @@ chromaticity declarations and independent compositor feedback.
 activation prerequisite, truthful topology and descriptor handling.
 [HLG and tone mapping](docs/HDR_MAPPING.md) defines HLG decoding, mapping
 highlights to the panel's declared target and compressing out-of-gamut
-colours toward its declared gamut in the compositor.
+colours toward its declared gamut in the compositor, and defines the
+deferred output-characterization contract.
 
 ## Work with the repository
 

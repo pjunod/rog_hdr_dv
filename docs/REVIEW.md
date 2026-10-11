@@ -44,8 +44,9 @@ in the published tracked files. Scanners do not establish that every future
 capture is safe to publish; inspect each candidate tree and its metadata.
 
 The initial commit used the owner's configured author email. A decision about
-rewriting that existing public metadata is pending. New agent commits use
-`Codex <codex@invalid>`. No credential from the conversation is stored here.
+rewriting that existing public metadata is pending. Agent commits used
+`Codex <codex@invalid>` until the fifth batch and `Claude Agent
+<claude-agent@invalid>` since. No credential from the conversation is stored here.
 
 ## Validation boundary
 

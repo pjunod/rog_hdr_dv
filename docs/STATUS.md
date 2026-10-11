@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-10 (America/New_York) · **State:** HDR10 operational by owner
+**Updated:** 2026-10-11 (America/New_York) · **State:** HDR10 operational by owner
 report; full Dolby Vision and measured image-quality acceptance remain open.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
@@ -8,7 +8,7 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Active eighth batch — gamut compression and delivery
+## Eighth batch — gamut compression and delivery (merged, PR 8)
 
 The reviewed hdr8 library and the `nativehdr7` compositor are packaged for
 amd64, with the library also built for i386
@@ -144,8 +144,8 @@ Mutter and matching amd64/i386 library packaging.
 | Physical luminance library | hdr6 delivered; hdr8 (luminance and gamut) reviewed, fast-lane qualified and packaged for amd64 and i386 | Coordinated installation with the matching compositor |
 | Compositor feedback | nativehdr2 delivered; nativehdr7 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression) qualified and packaged | Coordinated installation and active-output verification |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
-| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization, profile application, SDR/HDR consistency and cross-application checks; visual check after installation |
-| Exact-panel tuning | Four factory profiles inspected privately | Implement characterisation/calibration path, obtain measurement equipment and measure this unit |
+| General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; visual check after installation |
+| Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
 
 The owner has no colourimeter or spectrophotometer yet and is open to obtaining
@@ -194,9 +194,42 @@ These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-Continue the bounded processor activation experiment and native/full-DV
-route evaluation alongside
-colour-pipeline implementation. Install the packaged components
-in a coordinated recovery-ready window; qualify actual output before optical
-calibration. The staged acceptance criteria remain in
+Three steps wait on the owner. The packaged hdr8 + `nativehdr7` set needs a
+coordinated installation (log out of GNOME, install, restart the display
+manager), followed by an active-output check and an on-screen comparison with
+`nativehdr6`. The Dolby processor's next stage (type negotiation and a traced
+frame, in the same isolated container) waits for the owner's scope
+confirmation. Output characterization waits for a measurement instrument (owner to obtain).
+The staged acceptance criteria remain in
 [Dolby Vision and display quality](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance).
+
+## Decisions taken without the owner
+
+Recorded for review; each can be revisited.
+
+- Since the fifth batch, agent commits use `Claude Agent <claude-agent@invalid>`
+  with a co-author trailer, and implementation and review agents are Claude
+  agents. Earlier agent commits used `Codex <codex@invalid>`; recovered work
+  keeps its original authorship.
+- Compositor and library builds, compositor tests, the Wine fast lane and the
+  packages run in disposable agent containers off the laptop (native amd64;
+  the i386 library is cross-built; Wine tests use WineHQ 11.0 with the
+  candidate modules overlaid). The Wine compiler and the Dolby activation
+  probe run in agent-owned containers on the laptop (`lab5`) with no network,
+  mounts or GPU. Nothing is installed on the laptop host; package simulations
+  and staging happen there.
+- The Wine DisplayMonitor uses base EDID 1.4 facts where DisplayID declares
+  none.
+- HLG is decoded for its declared nominal peak and then fitted by the common
+  tone mapper, rather than rendered for the panel's peak.
+- The BT.2390 tone mapper applies only when the content's effective peak
+  exceeds the panel's declared peak. It never expands or raises black, and
+  monitor screencasts are not mapped.
+- `extended_target_volume` is advertised; declared mastering primaries set
+  gamut-compression limits when compression applies.
+- Gamut compression uses ACES reference gamut compression with limits derived
+  from the source and target gamuts, tolerating the declaration's own
+  quantization.
+- Output characterization is not applied until a measurement exists.
+- The delivery set is `nativehdr7`, with `nativehdr6` staged beside it for an
+  on-screen comparison.
