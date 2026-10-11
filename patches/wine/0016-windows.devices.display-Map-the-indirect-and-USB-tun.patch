@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:26:34 -0400
+Subject: [PATCH] windows.devices.display: Map the indirect and USB tunnel
+ output technologies.
+
+An indirect virtual display is a virtual connection; an indirect wired
+display and a DisplayPort USB tunnel are wired, and the tunnel carries
+DisplayPort.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/windows.devices.display/main.c                 | 8 +++++++-
+ dlls/windows.devices.display/tests/displaymonitor.c | 7 +++++++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index 38500b7..2fc81c2 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -154,6 +154,9 @@ static HRESULT WINAPI monitor_get_ConnectionKind( IDisplayMonitor *iface, Displa
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_MIRACAST:
+         *value = DisplayMonitorConnectionKind_Wireless;
+         break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_VIRTUAL:
++        *value = DisplayMonitorConnectionKind_Virtual;
++        break;
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_HD15:
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SVIDEO:
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_COMPOSITE_VIDEO:
+@@ -164,6 +167,8 @@ static HRESULT WINAPI monitor_get_ConnectionKind( IDisplayMonitor *iface, Displa
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDI:
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL:
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_UDI_EXTERNAL:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_USB_TUNNEL:
+         *value = DisplayMonitorConnectionKind_Wired;
+         break;
+     default: return DISPLAYMONITOR_UNAVAILABLE;
+@@ -188,7 +193,8 @@ static HRESULT WINAPI monitor_get_PhysicalConnector( IDisplayMonitor *iface, Dis
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_LVDS: *value = DisplayMonitorPhysicalConnectorKind_Lvds; break;
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_SDI: *value = DisplayMonitorPhysicalConnectorKind_Sdi; break;
+     case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EXTERNAL:
+-    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED: *value = DisplayMonitorPhysicalConnectorKind_DisplayPort; break;
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_EMBEDDED:
++    case DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_USB_TUNNEL: *value = DisplayMonitorPhysicalConnectorKind_DisplayPort; break;
+     }
+     return S_OK;
+ }
+diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
+index c3076a5..2aace60 100644
+--- a/dlls/windows.devices.display/tests/displaymonitor.c
++++ b/dlls/windows.devices.display/tests/displaymonitor.c
+@@ -465,6 +465,13 @@ static void test_connector_properties( HDEVINFO set, SP_DEVINFO_DATA *device, HK
+          S_OK, DisplayMonitorConnectionKind_Internal, DisplayMonitorPhysicalConnectorKind_DisplayPort},
+         {{0, WINE_MONITOR_ORIGIN_VIRTUAL, 0},
+          S_OK, DisplayMonitorConnectionKind_Virtual, DisplayMonitorPhysicalConnectorKind_Unknown},
++        /* Indirect displays name no physical connector; a USB tunnel carries DisplayPort. */
++        {{WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID, WINE_MONITOR_ORIGIN_DISPLAY_SERVER, DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_WIRED},
++         S_OK, DisplayMonitorConnectionKind_Wired, DisplayMonitorPhysicalConnectorKind_Unknown},
++        {{WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID, WINE_MONITOR_ORIGIN_DISPLAY_SERVER, DISPLAYCONFIG_OUTPUT_TECHNOLOGY_INDIRECT_VIRTUAL},
++         S_OK, DisplayMonitorConnectionKind_Virtual, DisplayMonitorPhysicalConnectorKind_Unknown},
++        {{WINE_MONITOR_OUTPUT_TECHNOLOGY_VALID, WINE_MONITOR_ORIGIN_DISPLAY_SERVER, DISPLAYCONFIG_OUTPUT_TECHNOLOGY_DISPLAYPORT_USB_TUNNEL},
++         S_OK, DisplayMonitorConnectionKind_Wired, DisplayMonitorPhysicalConnectorKind_DisplayPort},
+     };
+     DisplayMonitorPhysicalConnectorKind connector;
+     DisplayMonitorConnectionKind connection;

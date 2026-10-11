@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:49:34 -0400
+Subject: [PATCH] windows.devices.display: Note that an abandoned lock is
+ reported once.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/windows.devices.display/main.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index 2fc81c2..c8ffd72 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -479,7 +479,9 @@ static HRESULT lock_display_devices( HANDLE *mutex )
+         return S_OK;
+     case WAIT_ABANDONED:
+         /* The previous owner exited while rebuilding the device nodes, so
+-         * they are not known to describe one configuration. */
++         * they are not known to describe one configuration. Only this first
++         * waiter is told; later resolutions acquire the mutex normally and
++         * read whatever win32u's next display cache update leaves. */
+         ReleaseMutex( *mutex );
+         hr = HRESULT_FROM_WIN32(ERROR_ABANDONED_WAIT_0);
+         break;

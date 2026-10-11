@@ -6,8 +6,9 @@ panel calibration and full Dolby Vision. macOS-like consistency and ease of
 use are the quality reference. Plurx is one consumer; this repository owns
 the operating-system display work independently.
 
-**Current status:** the patched HDR stack is installed, Secure Boot is enabled,
-and the owner reports working HDR10. Full Dolby Vision, measured calibration
+**Current status:** the earlier patched HDR stack (kernel `nativehdr1`, library
+hdr6, Mutter nativehdr2) is installed, Secure Boot is enabled, and the owner
+reports working HDR10. Newer reviewed packages are staged, not installed. Full Dolby Vision, measured calibration
 and remaining transition/resume acceptance are unfinished. The earlier mpv
 DV-to-PQ sample does not qualify full Dolby Vision.
 

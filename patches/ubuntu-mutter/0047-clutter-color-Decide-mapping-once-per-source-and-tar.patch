@@ -1,0 +1,466 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:16:37 -0400
+Subject: [PATCH] clutter/color: Decide mapping once per source and target pair
+
+Direct scanout asks clutter_color_transform_requires_mapping() for
+every frame and the hardware cursor plane for every pointer motion, and
+the gamut part computed Bradford adaptations and matrix inversions
+before it could find the content within the target, every time.
+
+Make the decision once per pair of color states and keep it with the
+transform cache, under the same exact key (without flags, which do not
+take part), invalidated when either state is destroyed, like the
+transforms. The highlight and gamut predicates, the combined predicate
+and the transform builder all read the one recorded decision, gamut
+compression limits included, so scanout, the cursor plane and the
+renderer still cannot diverge; there is no second decision path.
+
+A new test checks that the pipeline holds the mapping ops exactly when
+the predicates say so, on repeated questions, and that a decision ends
+with its states.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ clutter/clutter/clutter-color-transform.c | 179 ++++++++++++++++------
+ src/tests/clutter/conform/color-hdr.c     |  98 ++++++++++++
+ 2 files changed, 233 insertions(+), 44 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 5605c40..ec48003 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1050,20 +1050,18 @@ get_source_headroom (ClutterColorState *color_state,
+  * a state never exceeds its own target, and content declaring the target as
+  * its own mastering peak is not mapped.
+  *
+- * The renderer adds the mapping exactly when this returns %TRUE, and direct
+- * scanout of a surface must be refused when it does.
++ * This is the decision get_mapping_decision() records for the pair; the
++ * renderer adds the mapping exactly when it holds, and direct scanout of a
++ * surface must be refused when it does.
+  */
+-gboolean
+-clutter_color_transform_requires_highlight_mapping (ClutterColorState *source_color_state,
+-                                                    ClutterColorState *target_color_state)
++static gboolean
++compute_highlight_mapping (ClutterColorState *source_color_state,
++                           ClutterColorState *target_color_state)
+ {
+   const ClutterLuminance *source_lum;
+   double source_min, source_peak;
+   float target_max, display_ref;
+ 
+-  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
+-  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (target_color_state), FALSE);
+-
+   if (!CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state) ||
+       !clutter_color_state_params_get_display_target (CLUTTER_COLOR_STATE_PARAMS (target_color_state),
+                                                       NULL, &target_max,
+@@ -1125,7 +1123,7 @@ add_highlight_mapping_op (ClutterColorPipeline *pipeline,
+   double max_lum;
+   float target_max, display_ref;
+ 
+-  /* clutter_color_transform_requires_highlight_mapping() checked these. */
++  /* compute_highlight_mapping() checked these. */
+   if (!clutter_color_state_params_get_display_target (target_params, NULL,
+                                                       &target_max,
+                                                       &display_ref) ||
+@@ -1347,9 +1345,10 @@ compute_gamut_limits (const GamutTarget *target,
+ }
+ 
+ /*
+- * The single decision on gamut compression, used both by
+- * clutter_color_transform_requires_gamut_compression() and by the op
+- * builder, so the two cannot disagree.
++ * The single decision on gamut compression, recorded with its limits by
++ * get_mapping_decision() for the pair, which both
++ * clutter_color_transform_requires_gamut_compression() and the op builder
++ * read, so the two cannot disagree.
+  *
+  * Compression applies only toward a display target with target primaries
+  * (made for an output whose target primaries are declared by its firmware,
+@@ -1474,26 +1473,57 @@ get_gamut_compression (ClutterColorState *source_color_state,
+                                compression);
+ }
+ 
++/*
++ * The mapping decision for a pair of color states: whether converting the
++ * source to the target maps its highlights, compresses its gamut, and, when
++ * it does, with which limits. It is made once per pair, by
++ * compute_highlight_mapping() and get_gamut_compression(), and kept with the
++ * transform cache under the same exact key, so that the per frame and per
++ * pointer motion questions of direct scanout and the hardware cursor plane
++ * cost a lookup, and every reader, the renderer included, gets the same
++ * answer.
++ */
++typedef struct _MappingDecision
++{
++  GamutCompression compression;
++  gboolean highlight;
++  gboolean gamut;
++} MappingDecision;
++
++static const MappingDecision * get_mapping_decision (ClutterColorState *source_color_state,
++                                                     ClutterColorState *target_color_state);
++
++/*
++ * Whether converting @source_color_state to @target_color_state maps its
++ * highlights, by compute_highlight_mapping(): toward a display target, and
++ * only when the source's effective peak is known and exceeds the target's.
++ */
++gboolean
++clutter_color_transform_requires_highlight_mapping (ClutterColorState *source_color_state,
++                                                    ClutterColorState *target_color_state)
++{
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (target_color_state), FALSE);
++
++  return get_mapping_decision (source_color_state,
++                               target_color_state)->highlight;
++}
++
+ /*
+  * Whether converting @source_color_state to @target_color_state compresses
+  * the gamut, by get_gamut_compression(): toward a display gamut target, and
+  * only when the content can exceed it. The renderer adds the compression
+- * exactly when this returns %TRUE. It returns early, without computing any
+- * matrix, whenever the content is found within the target; when it is not,
+- * it computes the limits too, since whether any of them exceeds 1 is part of
+- * the decision the op builder makes.
++ * exactly when this returns %TRUE.
+  */
+ gboolean
+ clutter_color_transform_requires_gamut_compression (ClutterColorState *source_color_state,
+                                                     ClutterColorState *target_color_state)
+ {
+-  GamutCompression compression;
+-
+   g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
+   g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (target_color_state), FALSE);
+ 
+-  return get_gamut_compression (source_color_state, target_color_state,
+-                                &compression);
++  return get_mapping_decision (source_color_state,
++                               target_color_state)->gamut;
+ }
+ 
+ /*
+@@ -1508,10 +1538,14 @@ gboolean
+ clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
+                                           ClutterColorState *target_color_state)
+ {
+-  return clutter_color_transform_requires_highlight_mapping (source_color_state,
+-                                                             target_color_state) ||
+-         clutter_color_transform_requires_gamut_compression (source_color_state,
+-                                                             target_color_state);
++  const MappingDecision *decision;
++
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (target_color_state), FALSE);
++
++  decision = get_mapping_decision (source_color_state, target_color_state);
++
++  return decision->highlight || decision->gamut;
+ }
+ 
+ /*
+@@ -1523,30 +1557,23 @@ clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
+  * converted back.
+  */
+ static void
+-add_gamut_compression_op (ClutterColorPipeline *pipeline,
+-                          ClutterColorState    *source_color_state,
+-                          ClutterColorState    *target_color_state)
++add_gamut_compression_op (ClutterColorPipeline   *pipeline,
++                          const GamutCompression *compression)
+ {
+-  GamutCompression compression;
+   graphene_matrix_t *matrix;
+ 
+-  /* clutter_color_transform_requires_gamut_compression() decided it. */
+-  if (!get_gamut_compression (source_color_state, target_color_state,
+-                              &compression))
+-    g_return_if_reached ();
+-
+   matrix = graphene_matrix_alloc ();
+-  graphene_matrix_init_from_matrix (matrix, &compression.from_linear_bt2020);
++  graphene_matrix_init_from_matrix (matrix, &compression->from_linear_bt2020);
+   clutter_color_pipeline_take_op (pipeline,
+                                   clutter_color_op_matrix_4x4_new (matrix));
+ 
+   clutter_color_pipeline_take_op (pipeline,
+                                   clutter_color_op_gamut_compress_new (GAMUT_COMPRESSION_THRESHOLD,
+                                                                        GAMUT_COMPRESSION_POWER,
+-                                                                       compression.limit));
++                                                                       compression->limit));
+ 
+   matrix = graphene_matrix_alloc ();
+-  graphene_matrix_init_from_matrix (matrix, &compression.to_linear_bt2020);
++  graphene_matrix_init_from_matrix (matrix, &compression->to_linear_bt2020);
+   clutter_color_pipeline_take_op (pipeline,
+                                   clutter_color_op_matrix_4x4_new (matrix));
+ }
+@@ -1555,6 +1582,7 @@ static void
+ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+                           ClutterColorState               *source_color_state,
+                           ClutterColorState               *target_color_state,
++                          const MappingDecision           *decision,
+                           ClutterColorStateTransformFlags  flags)
+ {
+   if (!(flags & CLUTTER_COLOR_STATE_TRANSFORM_OPAQUE))
+@@ -1572,12 +1600,10 @@ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+       /* source → linear BT.2020 D65 → target */
+       add_to_linear_bt2020_ops (pipeline, source_color_state);
+       add_luminance_mapping_op (pipeline, source_color_state, target_color_state);
+-      if (clutter_color_transform_requires_highlight_mapping (source_color_state,
+-                                                              target_color_state))
++      if (decision->highlight)
+         add_highlight_mapping_op (pipeline, source_color_state, target_color_state);
+-      if (clutter_color_transform_requires_gamut_compression (source_color_state,
+-                                                              target_color_state))
+-        add_gamut_compression_op (pipeline, source_color_state, target_color_state);
++      if (decision->gamut)
++        add_gamut_compression_op (pipeline, &decision->compression);
+       add_from_linear_bt2020_ops (pipeline, target_color_state);
+     }
+ 
+@@ -1592,18 +1618,24 @@ clutter_color_transform_new (ClutterColorState               *source_color_state
+ {
+   g_autoptr (ClutterColorTransform) transform = NULL;
+   g_autoptr (ClutterColorPipeline) pipeline = NULL;
++  MappingDecision decision;
+ 
+   transform = g_object_new (CLUTTER_TYPE_COLOR_TRANSFORM, NULL);
+   pipeline = g_object_new (CLUTTER_TYPE_COLOR_PIPELINE, NULL);
+ 
++  /* A copy: building the pipeline must not depend on the cache entry. */
++  decision = *get_mapping_decision (source_color_state, target_color_state);
++
+   /* A target color volume alone does not change how pixels are encoded, but
+    * a display target below the source's peak maps its highlights, and one
+    * whose gamut does not contain the source's compresses its gamut. */
+   if (!clutter_color_state_encoding_equals (source_color_state,
+                                             target_color_state) ||
+-      clutter_color_transform_requires_mapping (source_color_state,
+-                                                target_color_state))
+-    build_transform_pipeline (pipeline, source_color_state, target_color_state, flags);
++      decision.highlight || decision.gamut)
++    {
++      build_transform_pipeline (pipeline, source_color_state,
++                                target_color_state, &decision, flags);
++    }
+ 
+   clutter_color_pipeline_simplify (pipeline);
+   clutter_color_pipeline_combine (pipeline);
+@@ -1628,6 +1660,9 @@ typedef struct _ColorTransformCacheKey
+ typedef struct _ColorTransformCache
+ {
+   GHashTable *transforms; /* ColorTransformCacheKey * -> ClutterColorTransform * */
++  /* Keyed exactly like the transforms, with no flags: they do not take part
++   * in the decision. */
++  GHashTable *mapping_decisions; /* ColorTransformCacheKey * -> MappingDecision * */
+   GHashTable *tracked_states; /* ClutterColorState * (set) */
+   ClutterContext *context;
+ } ColorTransformCache;
+@@ -1679,6 +1714,7 @@ color_transform_cache_free (gpointer data)
+     }
+ 
+   g_hash_table_unref (cache->transforms);
++  g_hash_table_unref (cache->mapping_decisions);
+   g_hash_table_unref (cache->tracked_states);
+   g_free (cache);
+ }
+@@ -1699,6 +1735,11 @@ get_color_transform_cache (ClutterContext *context)
+                                color_transform_cache_key_equal,
+                                g_free,
+                                g_object_unref);
++      cache->mapping_decisions =
++        g_hash_table_new_full (color_transform_cache_key_hash,
++                               color_transform_cache_key_equal,
++                               g_free,
++                               g_aligned_free);
+       cache->tracked_states =
+         g_hash_table_new (g_direct_hash, g_direct_equal);
+       g_object_set_data_full (G_OBJECT (context),
+@@ -1732,6 +1773,15 @@ on_color_state_destroyed (ClutterColorState *color_state,
+         g_hash_table_iter_remove (&iter);
+     }
+ 
++  g_hash_table_iter_init (&iter, cache->mapping_decisions);
++  while (g_hash_table_iter_next (&iter, &key, NULL))
++    {
++      const ColorTransformCacheKey *k = key;
++
++      if (k->source == color_state || k->target == color_state)
++        g_hash_table_iter_remove (&iter);
++    }
++
+   g_hash_table_remove (cache->tracked_states, color_state);
+ }
+ 
+@@ -1749,6 +1799,47 @@ ensure_color_state_tracking (ColorTransformCache *cache,
+   g_hash_table_add (cache->tracked_states, color_state);
+ }
+ 
++/*
++ * The mapping decision for the pair, made on first use and kept until either
++ * state is destroyed. The returned decision belongs to the cache and is
++ * valid until a color state is next destroyed.
++ */
++static const MappingDecision *
++get_mapping_decision (ClutterColorState *source_color_state,
++                      ClutterColorState *target_color_state)
++{
++  ClutterContext *context = clutter_color_state_get_context (source_color_state);
++  ColorTransformCache *cache = get_color_transform_cache (context);
++  ColorTransformCacheKey lookup_key = {
++    .source = source_color_state,
++    .target = target_color_state,
++    .flags = 0,
++  };
++  MappingDecision *decision;
++
++  decision = g_hash_table_lookup (cache->mapping_decisions, &lookup_key);
++  if (decision)
++    return decision;
++
++  /* Aligned for the matrices it holds. */
++  decision = g_aligned_alloc0 (1, sizeof (MappingDecision),
++                               G_ALIGNOF (MappingDecision));
++  decision->highlight = compute_highlight_mapping (source_color_state,
++                                                   target_color_state);
++  decision->gamut = get_gamut_compression (source_color_state,
++                                           target_color_state,
++                                           &decision->compression);
++
++  ensure_color_state_tracking (cache, source_color_state);
++  ensure_color_state_tracking (cache, target_color_state);
++
++  g_hash_table_insert (cache->mapping_decisions,
++                       g_memdup2 (&lookup_key, sizeof (ColorTransformCacheKey)),
++                       decision);
++
++  return decision;
++}
++
+ ClutterColorTransform *
+ clutter_color_transform_from_color_states (ClutterContext                  *context,
+                                            ClutterColorState               *source_color_state,
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 575404b..086b47f 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -2873,6 +2873,103 @@ gamut_shader_matches_cpu (void)
+                              2e-3f);
+ }
+ 
++/*
++ * The mapping decision is made once per pair of states and kept with the
++ * transform cache: every reader gets the decision the renderer builds from,
++ * the pipeline holds the mapping ops exactly when the predicates say so,
++ * repeated questions get the same answer, and a decision does not outlive
++ * the states it was made for, even when a new state takes a destroyed
++ * one's address.
++ */
++static void
++mapping_decision_cache (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) hlg = NULL;
++  ClutterColorState *sources[6];
++  ClutterColorState *targets[4];
++  int i, j, round;
++
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  hlg = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                        CLUTTER_TRANSFER_FUNCTION_HLG);
++  sources[0] = g_object_ref (pq);
++  sources[1] = g_object_ref (srgb);
++  sources[2] = g_object_ref (hlg);
++  sources[3] = create_with_target_volume (pq, 4000.0f, 0.0f);
++  sources[4] = create_with_target_volume (pq, 400.0f, 0.0f);
++  sources[5] = create_with_mastering_primaries (pq, &srgb_gamut);
++  targets[0] = create_targeted_blending (output, TARGET_MAX_LUM, FALSE);
++  targets[1] = create_gamut_blending (output, &target_gamut, FALSE, FALSE);
++  targets[2] = create_gamut_blending (output, &target_gamut, TRUE, TRUE);
++  targets[3] = clutter_color_state_get_blending (output, FALSE);
++
++  for (round = 0; round < 2; round++)
++    {
++      for (i = 0; i < G_N_ELEMENTS (sources); i++)
++        {
++          for (j = 0; j < G_N_ELEMENTS (targets); j++)
++            {
++              ClutterColorTransform *transform;
++              gboolean highlight, gamut;
++
++              highlight =
++                clutter_color_transform_requires_highlight_mapping (sources[i],
++                                                                    targets[j]);
++              gamut =
++                clutter_color_transform_requires_gamut_compression (sources[i],
++                                                                    targets[j]);
++              g_assert_cmpint (clutter_color_transform_requires_mapping (sources[i],
++                                                                         targets[j]),
++                               ==, highlight || gamut);
++
++              transform = clutter_color_transform_from_color_states (context,
++                                                                     sources[i],
++                                                                     targets[j],
++                                                                     0);
++              g_assert_cmpint (find_op_index (transform,
++                                              "ClutterColorOpBt2390Eetf") >= 0,
++                               ==, highlight);
++              g_assert_cmpint (find_op_index (transform,
++                                              "ClutterColorOpGamutCompress") >= 0,
++                               ==, gamut);
++            }
++        }
++    }
++
++  /* Sanity: the set holds both outcomes of both mappings. */
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (sources[3], targets[0]));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (sources[4], targets[0]));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (sources[0], targets[1]));
++  g_assert_false (clutter_color_transform_requires_gamut_compression (sources[5], targets[1]));
++
++  /* A decision ends with its states. */
++  for (round = 0; round < 8; round++)
++    {
++      g_autoptr (ClutterColorState) above = NULL;
++      g_autoptr (ClutterColorState) below = NULL;
++
++      above = create_with_target_volume (pq, 4000.0f, 0.0f);
++      g_assert_true (clutter_color_transform_requires_mapping (above, targets[0]));
++      g_clear_object (&above);
++
++      below = create_with_target_volume (pq, 400.0f, 0.0f);
++      g_assert_false (clutter_color_transform_requires_mapping (below, targets[0]));
++      g_clear_object (&below);
++    }
++
++  for (i = 0; i < G_N_ELEMENTS (sources); i++)
++    g_object_unref (sources[i]);
++  for (j = 0; j < G_N_ELEMENTS (targets); j++)
++    g_object_unref (targets[j]);
++}
++
+ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference", hlg_decode_reference)
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference-white", hlg_decode_reference_white)
+@@ -2884,6 +2981,7 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/extended-range-peak", mapping_extended_range_peak)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/undeclared-pq-peak", mapping_undeclared_pq_peak)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/cache-parity", mapping_cache_parity)
++  CLUTTER_TEST_UNIT ("/color-hdr/mapping/decision-cache", mapping_decision_cache)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/identity", mapping_identity)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/bt2390-reference", mapping_bt2390_reference)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/monotonic", mapping_monotonic)

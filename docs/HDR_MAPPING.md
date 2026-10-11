@@ -1,8 +1,9 @@
-# HLG, tone mapping and gamut compression — compositor contract (nativehdr6, nativehdr7)
+# HLG, tone mapping and gamut compression — compositor contract (nativehdr6–8)
 
-**Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`) and 0039–0043
-(`nativehdr7`); reviewed and fast-lane qualified (synthetic headless tests);
-packaged for amd64, not installed · **Date:** 2026-10-11.
+**Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`), 0039–0043
+(`nativehdr7`) and the review fixes 0044–0052 (`nativehdr8`); reviewed and
+fast-lane qualified (synthetic headless tests); packaged for amd64, not
+installed · **Date:** 2026-10-11.
 
 This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-source-findings--input-contracts-and-mapping-ownership).
 `nativehdr5` fixed the input defects. This batch adds the two missing
@@ -19,7 +20,7 @@ physical target. Gamut compression follows in
 | Source target volume (mastering primaries/luminance, MaxCLL, MaxFALL) | Wayland image-description creator → `ClutterColorStateParams` | Client declaration, validated |
 | Output target volume | `MetaColorDevice` (already published to Wayland by `nativehdr4`) | Firmware-declared target luminance and primaries, with provenance |
 | Highlight mapping | Clutter colour transform, once per surface, toward the output blending state | Source effective peak, output target peak |
-| KMS HDR metadata | Unchanged (zero luminance fields) | — |
+| KMS HDR metadata | Unchanged (zero luminance fields) | — (see [KMS metadata](#kms-hdr-metadata-stays-unknown)) |
 
 Applications that map to the published preferred target themselves, and tag
 their output with that target including its published reference luminance,
@@ -32,7 +33,10 @@ the Wayland protocol: minimum 0.005, maximum 1000, reference white 203 cd/m²,
 mastering maximum 1000. A client may declare other luminances.
 
 - **Decode:** with `Lw` = the state's maximum and `Lb` = its minimum,
-  γ = 1.2 · 1.111^log2(Lw / 1000) (the extended system-gamma formula), and
+  γ = 1.2 + 0.42 · log10(Lw / 1000) for 400 ≤ Lw ≤ 2000 (BT.2100-2
+  Table 5) and the extended form γ = 1.2 · 1.111^log2(Lw / 1000) (BT.2390)
+  outside that range (the two meet closely, not exactly, at 400 and 2000),
+  and
   β = √(3 · (Lb / Lw)^(1/γ)). Lift black with `max(0, (1 − β)E′ + β)`, apply
   the inverse OETF per channel to scene light `E`, then the OOTF
   `F = Y_s^(γ−1) · E`, where `Y_s` is the luminance of `E` in the **source
@@ -76,11 +80,15 @@ The creator accepts `set_mastering_display_primaries`, `set_mastering_luminance`
   part in equality, hashing and image-description identity. The public
   `ClutterLuminance` structure is not changed.
 - **Effective source peak** = the smallest of: MaxCLL (if set), mastering
-  maximum (if set), and the encoding maximum. Without any declaration it is
-  the encoding maximum (10000 cd/m² for PQ). For the extended-range linear
-  encoding, whose nominal maximum does not bound the signal, only the
-  declared values count; without one the peak is unknown and nothing is
-  mapped.
+  maximum (if set), and the encoding maximum — but the encoding maximum
+  counts only where it describes the content's peak: SDR-type transfer
+  functions and HLG (whose nominal maximum is a display-referred peak). For
+  PQ (10000 cd/m² is the encoding's capacity) and the extended-range linear
+  encoding, only declared values count; without one the peak is unknown and
+  nothing is mapped, so plain PQ video keeps its reference white and direct
+  scanout and its overshoot is left to the panel. This notion is separate
+  from whether an encoding bounds its signal range, which the gamut rule
+  uses.
 - HLG luminances must satisfy β ≤ 0.5; otherwise the description fails as
   unsupported.
 
@@ -103,21 +111,39 @@ reference-white scaling, exceeds the output target peak. It never expands.
   is no black adjustment: the mapping never raises black, and the target
   minimum is not used. Signal above the effective source peak is held at
   the target peak.
+- **Curve form:** BT.2390 as written; evaluated identically on the CPU and
+  in the shader.
 - **Colour:** applied to max(R, G, B) of linear BT.2020, with all three
   channels scaled by the same ratio, so hue and saturation ratios are kept.
   Negative components are not lifted; max(R, G, B) ≤ 0 is unchanged.
 - **Scanout parity:** a surface or cursor whose transform includes mapping
   is composited, not scanned out directly. The decision uses the same
-  "mapping required" test as the renderer, and the transform cache compares
-  states exactly. The hardware-cursor plane decision is reviewed but not
+  "mapping required" test as the renderer: the decision is made once per
+  (source, target) pair and reused by the renderer, scanout and the cursor,
+  and the transform cache compares states exactly. The hardware-cursor plane decision is reviewed but not
   executed by the tests (the test monitors have no KMS CRTC).
 - **Units:** both peaks are compared as multiples of reference white. The
   output's reference white (the output encoding's default reference white
   × the brightness factor, 203 cd/m² × the factor for PQ, rounded to
   whole cd/m² as published) is the display reference carried by the blending
   state, so mapping happens once, toward the blending state, and the
-  blending → output conversion never maps again.
+  blending → output conversion never maps again. Only the colour device
+  creates a display target, through an explicit constructor; a client
+  state with mastering metadata never becomes one.
+- **Publication:** output and preferred image descriptions are republished
+  on the same exact identity the renderer uses, so a client that follows
+  the published description after any brightness change is not mapped
+  again.
 - **Screencasts** of a monitor have no physical target and are not mapped.
+
+### KMS HDR metadata stays unknown
+
+The connector's static metadata keeps zero luminance fields ("unknown").
+Declaring the target peak there would claim the composition never exceeds
+it, but unmapped content (plain PQ without a declared peak) can. Whether the
+panel firmware then applies its own roll-off is a question for the
+installed system: compare what is shown with and without a declared peak
+before changing this.
 
 ## Acceptance
 
@@ -129,8 +155,8 @@ Source-level, at the agreed pre-merge stage:
   within tolerance. Wayland and CICP both create HLG states.
 - Target volume: invalid mastering values fail as the protocol requires; valid
   ones survive the round trip and change image-description identity.
-- Mapping: no change when the source peak is at or below the target or when no
-  target is declared; the curve matches an independent BT.2390 computation at
+- Mapping: no change when the source peak is at or below the target, when
+  PQ declares no peak, or when no target is declared; the curve matches an independent BT.2390 computation at
   sample points; monotonic; hue ratios kept; scanout rejected exactly when
   mapping applies. The cursor-plane path is covered by review only.
 
@@ -140,8 +166,8 @@ claim follows from these tests.
 
 ## Gamut compression (nativehdr7)
 
-**Status:** implemented as Mutter patches 0039–0043 (`nativehdr7`); reviewed and
-fast-lane qualified (synthetic headless tests); packaged for amd64, not
+**Status:** implemented as Mutter patches 0039–0043 (`nativehdr7`), with review
+fixes in `nativehdr8`; reviewed and fast-lane qualified (synthetic headless tests); packaged for amd64, not
 installed.
 
 The output signal stays BT.2020/PQ. A colour outside the panel's own gamut
@@ -177,8 +203,8 @@ before encoding, so the gamut decision has one known owner.
   compression, in linear RGB of the target primaries (absolute colorimetry;
   no chromatic adaptation in that step). The achromatic value is
   max(R, G, B). For each channel, the distance from it is compressed above
-  threshold 0.8 with the published power curve (power 1.2), evaluated in an
-  overflow-safe form. The limit for each channel is the largest distance any
+  threshold 0.8 with the published power curve (power 1.2), evaluated in a
+  two-branch form that stays finite without clamping or infinities. The limit for each channel is the largest distance any
   point of the source gamut boundary reaches (primaries and the points
   along each edge where two target channels are equal). So no point of the
   source boundary ends beyond the target boundary by more than the

@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "date": "2026-10-10",
+ "date": "2026-10-11",
  "qualification": "binary package build and APT transaction simulation only; no host installation, unit suites or runtime/display acceptance",
  "compiler": {
   "architecture": "native amd64",
@@ -14,7 +14,7 @@
   "dpkg_dev": "1.23.7ubuntu2",
   "environment": "disposable agent container; dependencies from the distribution archive; nothing installed on the laptop host",
   "warning_policy": "Debian packaging defaults; not a warnings-as-errors build (the source candidates were compiled with warnings as errors during qualification)",
-  "quilt_state": "imported trees are the quilt-applied state; .pc/applied-patches regenerated from debian/patches/series so dpkg-source does not reapply"
+  "quilt_state": "imported trees are the quilt-applied state; .pc/applied-patches is regenerated from debian/patches/series, and since hdr9/nativehdr8 the build fails unless every series entry reverse-applies cleanly against the tree (the stale native-displayid-hdr.patch entries were removed)"
  },
  "artifact_sets": [
   {
@@ -35,7 +35,8 @@
    "exported_symbols_checked": [
     "di_displayid2_data_block_get_luminance",
     "di_displayid2_data_block_get_native_chromaticities"
-   ]
+   ],
+   "delivery": "superseded by hdr9 (packaging only) before installation"
   },
   {
    "component": "libdisplay-info",
@@ -56,7 +57,8 @@
    "exported_symbols_checked": [
     "di_displayid2_data_block_get_luminance",
     "di_displayid2_data_block_get_native_chromaticities"
-   ]
+   ],
+   "delivery": "superseded by hdr9 (packaging only) before installation"
   },
   {
    "component": "mutter",
@@ -91,7 +93,7 @@
      "sha256": "9fe20926650bfe6017fa444317c7e291fb72a65a610aed0256028cbaf99badf9"
     }
    ],
-   "delivery": "superseded by nativehdr6 before installation; built and simulated, not delivered"
+   "delivery": "superseded by nativehdr8 before installation"
   },
   {
    "component": "mutter",
@@ -127,7 +129,7 @@
      "sha256": "38572d5d7cc36dd9cc0a040aaad753e1daeb83a2f410207ce3777602aaf893e7"
     }
    ],
-   "delivery": "staged on the laptop as the comparison alternative without gamut compression (same compositor minus patches 0039-0043)"
+   "delivery": "superseded by nativehdr8 before installation"
   },
   {
    "component": "mutter",
@@ -162,6 +164,75 @@
      "bytes": 59278,
      "sha256": "d3fbf547b3fa5fc495294273dc33b02bc76f4164ff69b0eb0fd143a1d5ee3c95"
     }
+   ],
+   "delivery": "superseded by nativehdr8 before installation"
+  },
+  {
+   "component": "libdisplay-info",
+   "architecture": "amd64",
+   "version": "0.3.0-1ubuntu1~hdr9",
+   "build_options": "nocheck parallel=2",
+   "source_commit": "b25ae1cbe5a98d433450be37d00d69a9979d8ebd",
+   "source_tree": "96d65c11ed0f408792c41cd42c2866255b1089d0",
+   "source_archive_sha256": "7719f55e4490b59ef4f2ab1ae960432cf4ee221965de316297d2c5489d888448",
+   "provides": "libdisplay-info3-native-hdr-api (= 2)",
+   "runtime_packages": [
+    {
+     "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb",
+     "bytes": 95300,
+     "sha256": "57a5ee5dc8f1284eae4947066b179635cc6f84461a37f3ef8719e6e653b31234"
+    }
+   ]
+  },
+  {
+   "component": "libdisplay-info",
+   "architecture": "i386",
+   "version": "0.3.0-1ubuntu1~hdr9",
+   "build_options": "nocheck parallel=2; cross-built with dpkg-buildpackage -a i386 -B",
+   "source_commit": "b25ae1cbe5a98d433450be37d00d69a9979d8ebd",
+   "source_tree": "96d65c11ed0f408792c41cd42c2866255b1089d0",
+   "source_archive_sha256": "7719f55e4490b59ef4f2ab1ae960432cf4ee221965de316297d2c5489d888448",
+   "provides": "libdisplay-info3-native-hdr-api (= 2)",
+   "runtime_packages": [
+    {
+     "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr9_i386.deb",
+     "bytes": 94932,
+     "sha256": "4698c91856cd14329d4580a7904c0c97e3645941bf6bf3fc1ab90691b0ae6150"
+    }
+   ]
+  },
+  {
+   "component": "mutter",
+   "architecture": "amd64",
+   "version": "51.0-1ubuntu3+nativehdr8",
+   "build_options": "nocheck parallel=2",
+   "source_commit": "9662e286f537e120005863c9613828bd9764bbdd",
+   "source_tree": "8de2497c392a7ae16f6257090a451c6b35231471",
+   "source_archive_sha256": "90d31dbb2277af38aa9925749dbb9a961253b06fca99286632b71475ba95eb08",
+   "built_against": "libdisplay-info-dev 0.3.0-1ubuntu1~hdr9 (this build)",
+   "libdisplay_info_dependency": "libdisplay-info3-native-hdr-api (>= 2), libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr8~)",
+   "symbols_check": "dpkg-gensymbols reported no differences against debian/libmutter-51-0.symbols",
+   "runtime_packages": [
+    {
+     "file": "libmutter-51-0_51.0-1ubuntu3+nativehdr8_amd64.deb",
+     "bytes": 1581100,
+     "sha256": "03f2eaa225506516cefc66c47f7454a8336c573355476447acd279133b962b19"
+    },
+    {
+     "file": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr8_amd64.deb",
+     "bytes": 167626,
+     "sha256": "75fc82788c74d5b0292aedd26b78255b807966707f11e6658e697ba971d77a23"
+    },
+    {
+     "file": "mutter-common_51.0-1ubuntu3+nativehdr8_all.deb",
+     "bytes": 564378,
+     "sha256": "842380be719cf27340f198d0e34eccaabedc9df33cff02be9ae20e0a3e7347b4"
+    },
+    {
+     "file": "mutter-common-bin_51.0-1ubuntu3+nativehdr8_amd64.deb",
+     "bytes": 60226,
+     "sha256": "a8db7a9e0e0474b7bf665ae542edce727c59b71652a290f71301fc3deec55e96"
+    }
    ]
   }
  ],
@@ -176,7 +247,7 @@
    "upgrades": 6,
    "new_installs": 0,
    "removals": 0,
-   "note": "repeated for nativehdr7 with the same result (earlier also for nativehdr5 and nativehdr6)"
+   "note": "repeated for each build (nativehdr5 to nativehdr8) with the same result"
   },
   "rollback_model_simulation": {
    "method": "private copy of the installed dpkg status with only the six candidate control records substituted; apt-get -s install of the retained hdr6/nativehdr2 packages",
@@ -184,7 +255,7 @@
    "new_installs": 0,
    "removals": 0,
    "limitation": "modeled rollback; the host package database was not changed",
-   "note": "repeated for nativehdr6 and nativehdr7 with the same result (first run on nativehdr5)"
+   "note": "repeated for nativehdr6, nativehdr7 and nativehdr8 with the same result (first run on nativehdr5)"
   },
   "rollback_artifacts": "the six previously installed packages are retained privately on the laptop and their privately recorded hashes verified",
   "session": [
@@ -192,13 +263,12 @@
    "Keep a text-console or SSH recovery route",
    "No kernel, Secure Boot, bootloader, ICC profile, display mode or saved setting change"
   ],
-  "candidate": "hdr8 library (amd64, i386) with nativehdr7 compositor",
-  "comparison_simulation": {
-   "method": "from the modeled nativehdr7 state, apt-get -s install of the four nativehdr6 compositor packages",
-   "downgrades": 4,
-   "new_installs": 0,
-   "removals": 0
-  }
+  "candidate": "hdr9 library (amd64, i386) with nativehdr8 compositor",
+  "api_dependency_simulation": {
+   "method": "from the modeled installed state, apt-get -s install of the archive libdisplay-info3 0.3.0-1",
+   "result": "APT can only do it by removing libmutter-51-0, so a routine upgrade keeps the private library; the install kit also holds the six packages"
+  },
+  "install_kit": "pre-flight hash checks of both package sets, a dpkg selections and status snapshot, apt-mark hold, and unhold in the recovery notes"
  },
- "scope": "hdr8 library (PR 5) with nativehdr7 compositor (patches 0001-0043). nativehdr5 was built first and superseded; nativehdr6 is kept as the comparison alternative."
+ "scope": "hdr9 library (hdr8 code, PR 5; packaging PR 10) with nativehdr8 compositor (patches 0001-0052). hdr8 with nativehdr5, 6 and 7 were built first and superseded before installation."
 }

@@ -1,0 +1,80 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:05:29 -0400
+Subject: [PATCH] windows.devices.display: Fail monitor resolution without the
+ display device lock.
+
+The snapshot guarantee depends on holding win32u's display device init
+mutex. Creating or waiting on it could fail and resolution then carried
+on unlocked. Return the error instead, and treat an abandoned mutex as a
+failure too, because its previous owner may have left the device nodes
+half rebuilt.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/windows.devices.display/main.c | 38 +++++++++++++++++++++++------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
+
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index ce140f3..51c2a2c 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -453,18 +453,38 @@ static BOOL monitor_interface_active( const WCHAR *instance )
+ 
+ /* win32u rebuilds the monitor device nodes under this session mutex when the
+  * display configuration changes. Holding it while resolving and reading a
+- * monitor yields a snapshot of one consistent configuration. */
+-static HANDLE lock_display_devices(void)
++ * monitor yields a snapshot of one consistent configuration, so resolution
++ * fails rather than proceed without it. */
++static HRESULT lock_display_devices( HANDLE *mutex )
+ {
+-    HANDLE mutex = CreateMutexW( NULL, FALSE, L"display_device_init" );
++    HRESULT hr;
+ 
+-    if (mutex) WaitForSingleObject( mutex, INFINITE );
+-    return mutex;
++    if (!(*mutex = CreateMutexW( NULL, FALSE, L"" WINE_DISPLAY_DEVICE_INIT_MUTEX )))
++        return HRESULT_FROM_WIN32(GetLastError());
++    switch (WaitForSingleObject( *mutex, INFINITE ))
++    {
++    case WAIT_OBJECT_0:
++        return S_OK;
++    case WAIT_ABANDONED:
++        /* The previous owner exited while rebuilding the device nodes, so
++         * they are not known to describe one configuration. */
++        ReleaseMutex( *mutex );
++        hr = HRESULT_FROM_WIN32(ERROR_ABANDONED_WAIT_0);
++        break;
++    case WAIT_FAILED:
++        hr = HRESULT_FROM_WIN32(GetLastError());
++        break;
++    default:
++        hr = E_UNEXPECTED;
++        break;
++    }
++    CloseHandle( *mutex );
++    *mutex = NULL;
++    return hr;
+ }
+ 
+ static void unlock_display_devices( HANDLE mutex )
+ {
+-    if (!mutex) return;
+     ReleaseMutex( mutex );
+     CloseHandle( mutex );
+ }
+@@ -482,7 +502,11 @@ static HRESULT monitor_create( HSTRING id, BOOL interface_id, IInspectable **res
+ 
+     *result = NULL;
+     TRACE( "Resolving monitor, interface_id %d.\n", interface_id );
+-    mutex = lock_display_devices();
++    if (FAILED(hr = lock_display_devices( &mutex )))
++    {
++        WARN( "Failed to lock the display devices, hr %#lx.\n", hr );
++        return hr;
++    }
+     set = SetupDiCreateDeviceInfoList( NULL, NULL );
+     if (set == INVALID_HANDLE_VALUE)
+     {

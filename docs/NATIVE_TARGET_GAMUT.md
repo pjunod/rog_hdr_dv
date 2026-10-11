@@ -145,10 +145,17 @@ Tone/gamut mapping, ICC output characterization, HLG and optical calibration
 remain separate implementation and measurement work. This correction supplies
 target information to consumers; it does not claim those consumers use it.
 
-## Current implementation receipt
+## Implementation receipt (historical, before recovery)
 
-The Ubuntu hdr8 candidate is `805d07b9116cd1fc7bcc7446617ef13f92857b9c`;
-the upstream candidate is `1462cebeac89a5f5f5b7fa475b7501eb21158b53`. The
+This records the first compile of the candidates, whose commit IDs
+(`805d07b9…` Ubuntu, `1462cebe…` upstream) predate the recovery and are no
+longer in the working clones. The merged trees are bound by
+[the fifth-batch fast-lane receipt](../evidence/batch5-fast-lane.json) and
+[the source pins](../sources.json); the Ubuntu library is now packaged as
+hdr9, which adds packaging only. At the time:
+
+The Ubuntu hdr8 candidate was `805d07b9116cd1fc7bcc7446617ef13f92857b9c`;
+the upstream candidate was `1462cebeac89a5f5f5b7fa475b7501eb21158b53`. The
 [compiler receipt](../evidence/native-chromaticities-compile.json) records that
 production libraries and synthetic test binaries compile on native amd64 with
 GCC 15.3.0, Meson 1.10.1 and warnings as errors. No new runtime checks have

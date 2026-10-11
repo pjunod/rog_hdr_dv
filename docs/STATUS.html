@@ -16,7 +16,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>HDR, Dolby Vision<br>and display quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 10, 2026 · PR 8 merged; hdr8 + nativehdr7 packaged; gamut compression qualified (synthetic tests); output characterization defined, deferred until measured; nothing installed</p></header>
+<p class="muted">Updated October 11, 2026 · PR 9 merged; independent Fable review fixes (nativehdr8, Wine) qualified; hdr9 + nativehdr8 packaged; nothing installed</p></header>
 <div class="callout"><strong>Current physical result:</strong> the owner reports
 working HDR10 on the patched stack with Secure Boot enabled. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
@@ -29,9 +29,10 @@ and measured calibration are not yet qualified.</div>
 <tr><td>General colour correctness</td><td class="state active">API qualified</td><td>Delivered-source audit complete. Additive library API reviewed, compiled and focused checks passed. Mutter target feedback compiled with warnings as errors; all eleven selected checks passed after reviewed corrections and focused retries. PQ normalization is unchanged.</td></tr>
 <tr><td>Physical target gamut</td><td class="state active">Qualified source</td><td>Both library series and the nativehdr4 compositor candidate passed adversarial review and the pre-merge fast lane. The compositor publishes the native target gamut separately from the PQ encoding. Now packaged with nativehdr7; active-output verification remains.</td></tr>
 <tr><td>Colour input correctness</td><td class="state active">Qualified source</td><td>nativehdr5: signed custom primaries with one fallible matrix definition shared by renderer and protocol, exact encoding/target serialization, ICC range and read fixes, EDID primaries validation. Reviewed; affected fast lane passed.</td></tr>
-<tr><td>HLG and tone mapping</td><td class="state active">Qualified source</td><td>nativehdr6: HLG decoding with its OOTF, validated mastering metadata and MaxCLL/MaxFALL, and BT.2390 highlight mapping to the panel's declared peak, applied once per surface and only above that peak. Reviewed; affected fast lane passed.</td></tr>
+<tr><td>HLG and tone mapping</td><td class="state active">Qualified source</td><td>nativehdr6: HLG decoding with its OOTF, validated mastering metadata and MaxCLL/MaxFALL, and BT.2390 highlight mapping to the panel's declared peak, applied once per surface and only when the content's declared peak exceeds it (plain PQ without a declared peak is left alone since nativehdr8). Reviewed; affected fast lane passed.</td></tr>
+<tr><td>Independent review</td><td class="state active">Fixes qualified</td><td>Fable 5.1 reviewed the whole stack. nativehdr8 stops tone-mapping undeclared PQ, publishes on exact identity and takes the other fixes; Wine got three robustness fixes; packaging now depends on the native HDR API. Re-reviewed; fast lanes passed.</td></tr>
 <tr><td>Gamut compression</td><td class="state active">Qualified source</td><td>nativehdr7: colours beyond the panel's declared gamut are compressed into it (ACES reference gamut compression with derived limits), only when content can exceed it. Reviewed; fast lane passed first time (synthetic headless tests). On-screen benefit unverified.</td></tr>
-<tr><td>Linux package delivery</td><td class="state active">Packaged</td><td>hdr8 library (amd64, i386) and nativehdr7 compositor packaged (nativehdr6 staged for comparison); on the laptop the six-package upgrade and modeled rollback resolve without additions or removals. A coordinated installation with the owner remains.</td></tr>
+<tr><td>Linux package delivery</td><td class="state active">Packaged</td><td>hdr9 library (hdr8 code; amd64, i386) and nativehdr8 compositor packaged; the kit holds the packages and checks the rollback set first; on the laptop the six-package upgrade and modeled rollback resolve without additions or removals. A coordinated installation with the owner remains.</td></tr>
 <tr><td>Output characterization</td><td class="state pending">Contract defined</td><td>Deferred until an instrument measures how this unit renders PQ; firmware and factory-profile values are not used as a correction.</td></tr>
 <tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>Four factory profiles parsed privately. MHC2 transforms are identity; standard ICC characterisation differs by GPU route. Optical acceptance remains.</td></tr>
 <tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
@@ -48,7 +49,7 @@ lane. Failed or invalidated checks are rerun individually. No automatic public
 CI job changes the laptop or runs proprietary components.</p>
 <h2>Decisions and limits</h2>
 <ul><li>Keep system display work in this repository; Plurx is an independent consumer.</li>
-<li>Use GPT-6.1 Sol agents for specified implementation; coordinating review owns integration.</li>
+<li>Implementation and review agents are Claude agents (Codex agents before the fifth batch); the independent review used Fable 5.1. The coordinator owns integration.</li>
 <li>Do not replace full Dolby Vision with a DV-to-HDR10 result.</li>
 <li>Use root-cause evidence before output changes; no forced capability claims or watchdog workarounds.</li>
 <li>Keep OEM payloads, raw captures, credentials and signing material private. Publication scans run before pushes.</li></ul>

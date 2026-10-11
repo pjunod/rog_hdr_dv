@@ -8,17 +8,28 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Eighth batch — gamut compression and delivery (merged, PR 8)
+## Ninth batch — independent review and fixes
 
-The reviewed hdr8 library and the `nativehdr7` compositor are packaged for
-amd64, with the library also built for i386
-([receipt](../evidence/hdr8-nativehdr7-packages.json)). On the laptop, APT
-simulates six upgrades with no additions or removals, and a modeled rollback
-to the installed hdr6/nativehdr2 packages gives six downgrades. The
-`nativehdr6` packages are staged beside them for a comparison without gamut
-compression. Installation needs a coordinated, recovery-ready window
-([operations](OPERATIONS.md#4-prepared-userspace-package-transaction)).
-Nothing is installed yet.
+At the owner's request, independent Fable 5.1 reviews covered the whole
+compositor stack, the library, Wine and Dolby activation work, and the
+evidence, packaging and install kit ([findings](REVIEW.md#ninth-batch--independent-review-and-fixes)).
+The most important finding: plain PQ video without a declared peak was being
+tone-mapped from the 10000 cd/m² encoding capacity, which would have dimmed
+ordinary HDR. `nativehdr8` (Mutter patches 0044–0052) now leaves such content
+unmapped, publishes descriptions on the renderer's exact identity, and
+applies the other fixes. The Wine DisplayMonitor took three robustness fixes
+(patches 0010–0017). A re-review approved the fixes, and the affected fast
+lanes passed (synthetic headless tests;
+[receipt](../evidence/review-fixes-fast-lane.json)).
+
+The delivery set is now the hdr9 library (hdr8 code; it provides the native
+HDR API as a virtual package the compositor depends on) with `nativehdr8`
+([receipt](../evidence/hdr9-nativehdr8-packages.json)). The install kit holds
+the six packages, checks the rollback packages first and snapshots the
+package state. The `nativehdr6` comparison set was dropped: it lacks the
+review fixes. Nothing is installed yet.
+
+## Eighth batch — gamut compression and delivery (merged, PR 8)
 
 `nativehdr7` (Mutter patches 0039–0043) compresses colours outside the
 panel's declared gamut into it, using the ACES reference gamut compression
@@ -141,8 +152,8 @@ Mutter and matching amd64/i386 library packaging.
 |---|---|---|
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
-| Physical luminance library | hdr6 delivered; hdr8 (luminance and gamut) reviewed, fast-lane qualified and packaged for amd64 and i386 | Coordinated installation with the matching compositor |
-| Compositor feedback | nativehdr2 delivered; nativehdr7 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression) qualified and packaged | Coordinated installation and active-output verification |
+| Physical luminance library | hdr6 delivered; hdr8 code (luminance and gamut) reviewed and fast-lane qualified; packaged as hdr9 for amd64 and i386 | Coordinated installation with the matching compositor |
+| Compositor feedback | nativehdr2 delivered; nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) qualified and packaged | Coordinated installation and active-output verification |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; visual check after installation |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
@@ -174,7 +185,9 @@ values are not measurements of this particular unit.
 
 ## Installed baseline and inherited evidence
 
-- Kernel `7.3.0-rc5-nativehdr1`, from Ubuntu `7.3.0-8.8` plus four patches.
+- Kernel `7.3.0-rc5-nativehdr1`, from Ubuntu `7.3.0-8.8` plus four patches. The
+  installed stock fallback kernel is now `7.3.0-9-generic` (the `7.3.0-8`
+  image named in the older recovery notes has been removed).
 - libdisplay-info `0.3.0-1ubuntu1~hdr6`, amd64 and i386.
 - Mutter `51.0-1ubuntu3+nativehdr2`.
 - NVIDIA `615.71.09`; Secure Boot remains enabled.
@@ -194,12 +207,16 @@ These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-Three steps wait on the owner. The packaged hdr8 + `nativehdr7` set needs a
+Three steps wait on the owner. The packaged hdr9 + `nativehdr8` set needs a
 coordinated installation (log out of GNOME, install, restart the display
-manager), followed by an active-output check and an on-screen comparison with
-`nativehdr6`. The Dolby processor's next stage (type negotiation and a traced
-frame, in the same isolated container) waits for the owner's scope
-confirmation. Output characterization waits for a measurement instrument (owner to obtain).
+manager), followed by an active-output check, including an on-screen
+comparison of the KMS metadata question. The Dolby processor's next stage
+waits for the owner's scope confirmation and, before it can say anything
+about this panel, a monitor descriptor source in Wine
+([prerequisites](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates)).
+Output characterization waits for a measurement instrument (owner to
+obtain). Agent containers left on the laptop by earlier batches await the
+owner's decision before removal.
 The staged acceptance criteria remain in
 [Dolby Vision and display quality](DOLBY_VISION_AND_QUALITY.md#5-work-in-stages-with-observable-acceptance).
 
@@ -231,5 +248,10 @@ Recorded for review; each can be revisited.
   from the source and target gamuts, tolerating the declaration's own
   quantization.
 - Output characterization is not applied until a measurement exists.
-- The delivery set is `nativehdr7`, with `nativehdr6` staged beside it for an
-  on-screen comparison.
+- The delivery set is hdr9 with `nativehdr8`; the earlier `nativehdr6`
+  comparison set was dropped because it lacks the review fixes.
+- PQ content without a declared peak is not tone-mapped; its overshoot is
+  left to the panel.
+- KMS static metadata keeps zero ("unknown") luminance fields; whether to
+  declare the target is decided by an on-screen comparison after
+  installation.

@@ -1,0 +1,107 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 10:05:30 -0400
+Subject: [PATCH] windows.devices.display: Return the EDID descriptor only when
+ it was validated.
+
+GetDescriptor(Edid) copied the registry blob even when parsing rejected
+it for a bad checksum or a truncated extension list. Report such a
+descriptor as unavailable, as for a missing one.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ dlls/windows.devices.display/main.c           |  7 ++-
+ .../tests/displaymonitor.c                    | 50 ++++++++++++++++---
+ 2 files changed, 48 insertions(+), 9 deletions(-)
+
+diff --git a/dlls/windows.devices.display/main.c b/dlls/windows.devices.display/main.c
+index 51c2a2c..7acc90b 100644
+--- a/dlls/windows.devices.display/main.c
++++ b/dlls/windows.devices.display/main.c
+@@ -290,7 +290,12 @@ static HRESULT WINAPI monitor_GetDescriptor( IDisplayMonitor *iface, DisplayMoni
+     if (!size || !value) return E_POINTER;
+     *size = 0;
+     *value = NULL;
+-    if (kind == DisplayMonitorDescriptorKind_Edid) length = impl->edid_size;
++    if (kind == DisplayMonitorDescriptorKind_Edid)
++    {
++        /* Bytes the parser rejected are not this monitor's EDID. */
++        if (!(impl->descriptor.flags & MONITOR_EDID_VALID)) return DISPLAYMONITOR_UNAVAILABLE;
++        length = impl->edid_size;
++    }
+     else if (kind == DisplayMonitorDescriptorKind_DisplayId)
+     {
+         offset = impl->descriptor.displayid_offset;
+diff --git a/dlls/windows.devices.display/tests/displaymonitor.c b/dlls/windows.devices.display/tests/displaymonitor.c
+index 83c3419..0d9dd8c 100644
+--- a/dlls/windows.devices.display/tests/displaymonitor.c
++++ b/dlls/windows.devices.display/tests/displaymonitor.c
+@@ -262,25 +262,59 @@ static void test_descriptor_cases( HKEY key, const WCHAR *id )
+             "Case %u native resolution hr %#lx.\n", i, hr );
+         IDisplayMonitor_Release( monitor );
+     }
+-    /* A truncated extension list cannot claim native fields. Descriptor
+-     * copies remain the actual bytes, not a replacement valid fixture. */
++    /* A validated EDID is returned as an owned copy of its actual bytes. */
+     make_edid( edid );
+-    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, 128 );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
+     hr = get_monitor( id, FALSE, &monitor );
+-    ok( hr == S_OK, "Truncated descriptor object hr %#lx.\n", hr );
++    ok( hr == S_OK, "Valid descriptor object hr %#lx.\n", hr );
+     if (SUCCEEDED(hr))
+     {
+-        hr = IDisplayMonitor_get_MaxLuminanceInNits( monitor, &value );
+-        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Truncated native field hr %#lx.\n", hr );
+         hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
+-        ok( hr == S_OK && length == 128 && !memcmp(copy, edid, 128), "Truncated descriptor was replaced.\n" );
++        ok( hr == S_OK && length == sizeof(edid) && !memcmp(copy, edid, sizeof(edid)),
++            "Valid descriptor hr %#lx, length %u.\n", hr, length );
+         IDisplayMonitor_Release( monitor );
+         if (SUCCEEDED(hr))
+         {
+-            ok( !memcmp(copy, edid, 128), "Copy lifetime depends on object.\n" );
++            ok( !memcmp(copy, edid, sizeof(edid)), "Copy lifetime depends on object.\n" );
+             CoTaskMemFree( copy );
+         }
+     }
++
++    /* A truncated extension list cannot claim native fields, and the
++     * rejected bytes are not returned as the monitor's EDID. */
++    make_edid( edid );
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, 128 );
++    hr = get_monitor( id, FALSE, &monitor );
++    ok( hr == S_OK, "Truncated descriptor object hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        hr = IDisplayMonitor_get_MaxLuminanceInNits( monitor, &value );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Truncated native field hr %#lx.\n", hr );
++        copy = (BYTE *)0xdeadbeef;
++        length = 0xdeadbeef;
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Truncated descriptor hr %#lx.\n", hr );
++        ok( !length && !copy, "Truncated descriptor length %u, copy %p.\n", length, copy );
++        if (SUCCEEDED(hr)) CoTaskMemFree( copy );
++        IDisplayMonitor_Release( monitor );
++    }
++
++    /* A block with a bad checksum invalidates the whole EDID. */
++    make_edid( edid );
++    edid[200] ^= 0x01;
++    RegSetValueExW( key, L"EDID", 0, REG_BINARY, edid, sizeof(edid) );
++    hr = get_monitor( id, FALSE, &monitor );
++    ok( hr == S_OK, "Bad checksum descriptor object hr %#lx.\n", hr );
++    if (SUCCEEDED(hr))
++    {
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_Edid, &length, &copy );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Bad checksum descriptor hr %#lx.\n", hr );
++        if (SUCCEEDED(hr)) CoTaskMemFree( copy );
++        hr = IDisplayMonitor_GetDescriptor( monitor, DisplayMonitorDescriptorKind_DisplayId, &length, &copy );
++        ok( hr == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED), "Bad checksum DisplayID hr %#lx.\n", hr );
++        if (SUCCEEDED(hr)) CoTaskMemFree( copy );
++        IDisplayMonitor_Release( monitor );
++    }
+ }
+ 
+ static void set_point( BYTE *data, UINT16 a, UINT16 b )

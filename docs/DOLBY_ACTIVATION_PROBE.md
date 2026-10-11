@@ -1,7 +1,8 @@
 # Dolby activation probe — find the first compatibility boundary
 
-**Status:** DLL loading passed; internal DisplayMonitor activation boundary identified ·
-**Written:** 2026-10-08.
+**Status:** the processor activates and describes its transform under Wine 11
+with the DisplayMonitor candidate; type negotiation and frames not started ·
+**Written:** 2026-10-08 · **Updated:** 2026-10-11.
 
 Companion to [Dolby Vision and quality](DOLBY_VISION_AND_QUALITY.md): this
 document answers how to inspect the recovered Windows processor's activation
@@ -87,6 +88,11 @@ executables and runtime logs in ignored storage. The executable has its PE
 timestamp disabled to avoid a changing timestamp in compiler receipts.
 
 ## Run after review — keep the execution private and bounded
+
+The commands below document the **original Wine 9 experiment** and are kept
+as its record. The later Wine 11 runs used the
+[Wine 11 fixture](#wine-11-fixture--what-the-later-runs-used) below; follow
+that one for new executions.
 
 The commands below document the reviewed experiment. For a new execution,
 first recheck the source and compilation, then supply the DLL from the
@@ -175,6 +181,29 @@ Remove only this own container when finished:
 ```bash
 docker rm -f rog-dv-agent-probe  # Deletes its compiler, prefix and OEM copy.
 ```
+
+## Wine 11 fixture — what the later runs used
+
+The two Wine 11 runs differ from the Wine 9 recipe above as their receipts
+record ([boundary](../evidence/dolby-displaymonitor-boundary.json),
+[activation](../evidence/dolby-displaymonitor-activation.json)):
+
+- **Runtime:** WineHQ `wine-stable` 11.0 (Ubuntu 24.04 packages) in an
+  agent-owned container image, with the candidate Wine modules copied over
+  the packaged ones **before** the prefix is created. For the DisplayMonitor
+  run that set is the coherent GDI-driver set listed in
+  [Wine monitor discovery](WINE_DISPLAY_MONITOR.md#shared-topology-and-connector-facts)
+  plus kernelbase and windows.devices.display; each overlaid module's hash
+  is recorded.
+- **Prefix:** fresh, inside the container, created after the overlay with
+  `WINEDLLOVERRIDES=mscoree,mshtml=` so no installer dialog blocks it.
+- **Isolation:** the container is created without any network, so it has
+  zero attachments throughout. The Wine 9 recipe instead attached its
+  setup bridge to install packages and disconnected it; both reach zero
+  attachments before any native code runs. No mounts, devices, GPU or
+  display bus; not privileged, `no-new-privileges`, 1 CPU, 2 GiB, 512 pids.
+- **Execution:** UID 1000, `C.UTF-8`, a 60 s deadline, 4 MiB per saved
+  stream, loader and `displaymonitor` traces. Raw logs stay private.
 
 ## Runtime receipt — a missing Wine API-set stops DLL loading
 
@@ -270,6 +299,25 @@ resolves are Wine's fallback monitor, not the laptop panel.
 The next stage would negotiate the transform's own offered types and trace
 which standard and private sample attributes it requests, without supplying
 invented metadata. That stage has not started; see [status](STATUS.md).
+Before it runs, four things need settling:
+
+1. **A descriptor source.** In this fixture, and on the owner's Wayland
+   desktop, the monitor API reports no physical facts
+   ([why](WINE_DISPLAY_MONITOR.md#remaining-processor-boundary)). A traced
+   frame here answers the API contract only, not whether the processor
+   engages Dolby Vision for this panel.
+2. **The device.** A renderer effect is normally given a D3D11 device and
+   DXGI textures. The container has no GPU, so either a software Vulkan
+   implementation joins the fixture or the experiment moves to the laptop's
+   GPU, which changes the isolation claims and needs its own review.
+3. **An oracle.** Output must be compared against a reference to tell Dolby
+   display management from pass-through: the same synthetic master and
+   metadata rendered for the same target by the private Professional Tools
+   reference workflow. Define that comparison before running.
+4. **What the processor reads.** Trace every DisplayMonitor property getter,
+   not only creation, so the run records which monitor facts the processor
+   reads. Synthetic media types and frames are labelled synthetic; they are
+   not invented metadata.
 
 ## Read the JSONL — an HRESULT belongs to one call
 
