@@ -1,0 +1,238 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:14:57 -0400
+Subject: [PATCH] native: Composite surfaces and cursors whose highlights are
+ mapped
+
+Direct scanout bypasses the blending state, so a surface whose
+rendering would map highlights toward the output's target must not be
+scanned out: the panel would receive the unmapped signal. The scanout
+decision only asked whether the surface's color state needs any
+conversion to the output's, which says nothing about the mapping: the
+output color state declares no target.
+
+Factor the color-state part of the decision into
+meta_compositor_view_native_color_state_prevents_scanout(), exported for
+tests: a surface is composited if converting it to the output state is
+not empty, or if clutter_color_transform_requires_highlight_mapping()
+holds from the surface's color state to the view's blending state, the
+same predicate, with the same pair of states, by which the renderer
+adds the mapping. So direct scanout is refused exactly when the mapping
+applies to a surface in the output's encoding. Content declaring the
+target as its own peak, or mastered below it, is still scanned out
+when its encoding matches.
+
+The hardware cursor plane bypasses the blending state too: the cursor
+sprite is converted straight to the output color state. When the same
+predicate holds from the cursor's color state to the view's blending
+state (for example SDR white with a reference luminance above the
+declared target peak), the view uses no hardware cursor and the cursor
+is drawn in the stage, mapped like everything else; the sprite is
+marked invalid so that it is realized again once mapping no longer
+applies.
+
+The decision is re-evaluated whenever the view's blending or output
+color state changes: both notifications invalidate the view's hardware
+cursor and mark the view as needing a cursor update, and the cursor
+renderer's prepare_frame, run for every frame of the view, forces that
+update on the first frame after the change, rather than waiting for the
+cursor to move or change. The update clears the mark, so no frame
+afterwards pays for it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ debian/libmutter-51-0.symbols                 |  1 +
+ .../native/meta-cursor-renderer-native.c      | 36 +++++++++++++++++--
+ src/compositor/meta-compositor-view-native.c  | 30 ++++++++++++++--
+ src/compositor/meta-compositor-view-native.h  |  6 ++++
+ 4 files changed, 68 insertions(+), 5 deletions(-)
+
+diff --git a/debian/libmutter-51-0.symbols b/debian/libmutter-51-0.symbols
+index cd9f6cb..70c8602 100644
+--- a/debian/libmutter-51-0.symbols
++++ b/debian/libmutter-51-0.symbols
+@@ -139,6 +139,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_compositor_get_window_actors@Base 48.0
+  meta_compositor_get_window_group@Base 48.0
+  meta_compositor_set_background_blur_params@Base 51~rc
++ meta_compositor_view_native_color_state_prevents_scanout@Base 51.0-1ubuntu3+nativehdr6~
+  meta_connector_type_get_name@Base 49.0
+  meta_context_add_option_entries@Base 43.0
+  meta_context_add_option_group@Base 43.0
+diff --git a/src/backends/native/meta-cursor-renderer-native.c b/src/backends/native/meta-cursor-renderer-native.c
+index 7269212..026e6c8 100644
+--- a/src/backends/native/meta-cursor-renderer-native.c
++++ b/src/backends/native/meta-cursor-renderer-native.c
+@@ -71,6 +71,8 @@ typedef struct _CursorStageView
+   gboolean has_hw_cursor;
+ 
+   gboolean is_hw_cursor_valid;
++  /* A color state of the view changed since the cursor was last updated. */
++  gboolean needs_update;
+ } CursorStageView;
+ 
+ struct _MetaCursorRendererNative
+@@ -139,8 +141,8 @@ get_cursor_stage_view (MetaStageView *view)
+ }
+ 
+ static void
+-on_output_color_state_changed (MetaStageView *view,
+-                               gpointer       user_data)
++on_view_color_state_changed (MetaStageView *view,
++                             gpointer       user_data)
+ {
+   CursorStageView *cursor_stage_view;
+ 
+@@ -149,6 +151,7 @@ on_output_color_state_changed (MetaStageView *view,
+     return;
+ 
+   cursor_stage_view->is_hw_cursor_valid = FALSE;
++  cursor_stage_view->needs_update = TRUE;
+ }
+ 
+ static CursorStageView *
+@@ -164,7 +167,13 @@ ensure_cursor_stage_view (MetaStageView *view)
+ 
+       g_signal_connect (G_OBJECT (view),
+                         "notify::output-color-state",
+-                        G_CALLBACK (on_output_color_state_changed),
++                        G_CALLBACK (on_view_color_state_changed),
++                        NULL);
++      /* The blending color state decides whether the cursor plane may be
++       * used at all (see update_cursor). */
++      g_signal_connect (G_OBJECT (view),
++                        "notify::color-state",
++                        G_CALLBACK (on_view_color_state_changed),
+                         NULL);
+ 
+       g_object_set_qdata_full (G_OBJECT (view),
+@@ -241,6 +250,12 @@ meta_cursor_renderer_native_prepare_frame (MetaCursorRendererNative *cursor_rend
+     return;
+ 
+   cursor_stage_view = get_cursor_stage_view (META_STAGE_VIEW (view));
++
++  /* Apply a color state change to the cursor on the frame that applies it
++   * to the view, rather than at the next cursor update. */
++  if (cursor_stage_view && cursor_stage_view->needs_update)
++    meta_cursor_renderer_force_update (cursor_renderer);
++
+   if (cursor_stage_view &&
+       cursor_stage_view->needs_emit_painted)
+     {
+@@ -401,11 +416,16 @@ meta_cursor_renderer_native_update_cursor (MetaCursorRenderer *cursor_renderer,
+       MetaGpu *gpu = meta_crtc_get_gpu (crtc);
+       ClutterColorState *target_color_state =
+         clutter_stage_view_get_output_color_state (CLUTTER_STAGE_VIEW (view));
++      ClutterColorState *blending_color_state =
++        clutter_stage_view_get_color_state (CLUTTER_STAGE_VIEW (view));
++      ClutterColorState *cursor_color_state =
++        cursor ? clutter_cursor_get_color_state (cursor) : NULL;
+       CursorStageView *cursor_stage_view = NULL;
+       gboolean has_hw_cursor = FALSE;
+ 
+       cursor_stage_view = get_cursor_stage_view (view);
+       g_assert (cursor_stage_view);
++      cursor_stage_view->needs_update = FALSE;
+ 
+       if (!META_IS_CRTC_KMS (crtc) ||
+           !is_hw_cursor_available_for_gpu (META_GPU_KMS (gpu)) ||
+@@ -414,6 +434,16 @@ meta_cursor_renderer_native_update_cursor (MetaCursorRenderer *cursor_renderer,
+           cursor_stage_view->is_hw_cursor_valid = TRUE;
+           has_hw_cursor = FALSE;
+         }
++      else if (cursor_color_state && blending_color_state &&
++               clutter_color_transform_requires_highlight_mapping (cursor_color_state,
++                                                                   blending_color_state))
++        {
++          /* Like direct scanout, the cursor plane bypasses the blending
++           * state, whose conversion would map the cursor's highlights
++           * toward the output's target: draw the cursor there instead. */
++          cursor_stage_view->is_hw_cursor_valid = FALSE;
++          has_hw_cursor = FALSE;
++        }
+       else if (cursor && !meta_backend_is_hw_cursors_inhibited (backend))
+         {
+           if (cursor_changed ||
+diff --git a/src/compositor/meta-compositor-view-native.c b/src/compositor/meta-compositor-view-native.c
+index 340fcdd..05c96dd 100644
+--- a/src/compositor/meta-compositor-view-native.c
++++ b/src/compositor/meta-compositor-view-native.c
+@@ -29,6 +29,7 @@
+ #include "backends/native/meta-crtc-kms.h"
+ #include "backends/native/meta-onscreen-native.h"
+ #include "clutter/clutter.h"
++#include "clutter/clutter-color-transform-private.h"
+ #include "compositor/compositor-private.h"
+ #include "compositor/meta-window-actor-private.h"
+ #include "compositor/meta-surface-actor-wayland.h"
+@@ -261,6 +262,27 @@ surface_actor_has_overlapping_cursor_overlays (MetaCompositor     *compositor,
+   return data.has_overlap;
+ }
+ 
++/*
++ * Whether a surface in @surface_color_state must be composited rather than
++ * scanned out to an output in @output_color_state, whose content is blended
++ * in @blending_color_state: if rendering it would either convert its encoding
++ * or map its highlights toward the output's target. The latter uses the same
++ * test as the color transform that would otherwise apply the mapping.
++ */
++gboolean
++meta_compositor_view_native_color_state_prevents_scanout (ClutterColorState *surface_color_state,
++                                                          ClutterColorState *blending_color_state,
++                                                          ClutterColorState *output_color_state)
++{
++  if (clutter_color_pipeline_shader_needs_color_state (surface_color_state,
++                                                       output_color_state, 0))
++    return TRUE;
++
++  return surface_color_state && blending_color_state &&
++         clutter_color_transform_requires_highlight_mapping (surface_color_state,
++                                                             blending_color_state);
++}
++
+ static gboolean
+ find_scanout_candidate (MetaCompositorView  *compositor_view,
+                         MetaCompositor      *compositor,
+@@ -335,14 +357,18 @@ find_scanout_candidate (MetaCompositorView  *compositor_view,
+         META_DEBUG_PAINT_IGNORE_COLOR_STATE_FOR_DIRECT_SCANOUT))
+     {
+       ClutterColorState *output_color_state;
++      ClutterColorState *blending_color_state;
+       ClutterColorState *surface_color_state;
+ 
+       output_color_state =
+         clutter_stage_view_get_output_color_state (CLUTTER_STAGE_VIEW (view));
++      blending_color_state =
++        clutter_stage_view_get_color_state (CLUTTER_STAGE_VIEW (view));
+       surface_color_state =
+         clutter_actor_get_color_state (CLUTTER_ACTOR (surface_actor));
+-      if (clutter_color_pipeline_shader_needs_color_state (surface_color_state,
+-                                                           output_color_state, 0))
++      if (meta_compositor_view_native_color_state_prevents_scanout (surface_color_state,
++                                                                    blending_color_state,
++                                                                    output_color_state))
+         {
+           meta_topic (META_DEBUG_RENDER,
+                       "No direct scanout candidate: "
+diff --git a/src/compositor/meta-compositor-view-native.h b/src/compositor/meta-compositor-view-native.h
+index 0e91388..baf29db 100644
+--- a/src/compositor/meta-compositor-view-native.h
++++ b/src/compositor/meta-compositor-view-native.h
+@@ -24,6 +24,7 @@
+ 
+ #include "clutter/clutter-mutter.h"
+ #include "compositor/meta-compositor-view.h"
++#include "core/util-private.h"
+ #include "meta/compositor.h"
+ 
+ #define META_TYPE_COMPOSITOR_VIEW_NATIVE (meta_compositor_view_native_get_type ())
+@@ -37,3 +38,8 @@ void meta_compositor_view_native_maybe_assign_scanout (MetaCompositorViewNative
+ 
+ void meta_compositor_view_native_maybe_update_fullscreen_actor (MetaCompositorViewNative *view_native,
+                                                                 MetaCompositor           *compositor);
++
++META_EXPORT_TEST
++gboolean meta_compositor_view_native_color_state_prevents_scanout (ClutterColorState *surface_color_state,
++                                                                   ClutterColorState *blending_color_state,
++                                                                   ClutterColorState *output_color_state);

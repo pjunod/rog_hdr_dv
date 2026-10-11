@@ -1,0 +1,75 @@
+{
+ "schema_version": 1,
+ "date": "2026-10-10",
+ "status": "PASS",
+ "scope": "nativehdr6 HLG, source target volume and BT.2390 highlight mapping: compile, coordinator rulings, adversarial review, affected fast lane",
+ "mutter": {
+  "base_tree": "164c2252d41dc5631b72587ac4431186541bdc6a",
+  "candidate_tree": "8f3115e322e1961142c8f5119cec9ecf99dfc1c7",
+  "appended_patches": "0028-0038"
+ },
+ "environment": {
+  "image_digest": "sha256:622755ac4289828beb0895ceb03a187ef104309713b82f6f65a39694f7d038fd",
+  "compiler": "gcc 15.3.0-4ubuntu1",
+  "meson": "1.10.1",
+  "werror": true,
+  "full_tree_build": "ninja over all targets with -Dwerror=true, exit 0, zero warnings; each of the eleven commits also compiled on its own with zero warnings",
+  "renderer": "llvmpipe software rendering (LIBGL_ALWAYS_SOFTWARE=1)"
+ },
+ "compiled_binary_sha256": {
+  "src/libmutter-51.so.0.0.0": "8c90bc90fde35668acff8875e036a84cf9769d5e3aeff882bcb2c9359217d958",
+  "clutter/clutter/libmutter-clutter-51.so.0.0.0": "41d628aa9395480dc0ef2194e8e452238135ab58c3e93e8c38d42e8bb654a53b",
+  "src/tests/mutter-wayland-color-management": "199159184a2c00faf81e0970582b68455c2726412ef916ec7ead860f404afbad",
+  "src/tests/wayland-test-clients/color-management": "8d0dff81ae67203e5796c590d4d663a9311fa4152639dd55e305fe9a94f70370",
+  "src/tests/clutter/conform/color-hdr": "d3733579b48cfeeaa5ea409775f26105354eef7ede2276dfc0e31ad8369fac6e"
+ },
+ "public_abi": "Additive only: one appended ClutterTransferFunction value and six new exported functions recorded in debian/libmutter-51-0.symbols at 51.0-1ubuntu3+nativehdr6~; no public structure changed",
+ "fast_lane": {
+  "first_run": {
+   "mutter:actor-color-state": "OK",
+   "mutter:color-hdr": "OK",
+   "mutter:color-pipeline": "OK",
+   "mutter:color-state-transform": "OK",
+   "mutter:monitor-color-tests": "OK",
+   "mutter:color-management": "OK",
+   "mutter:native-hdr": "OK",
+   "mutter:cursor-tests": "OK",
+   "mutter:wayland-color-management": "FAIL (/wayland/creator-params/max-fall-above-max-cll: the test expected the error on the creator interface, but create is a destructor request, so libwayland reports it without an interface)",
+   "eight separate wayland-color-management invocations (target luminance v1/v2, target primaries v1/v2, unusable EDID primaries, custom-primaries info round trip, ICC zero descriptor, mapping blending target)": "OK"
+  },
+  "fixes": [
+   "Create-time protocol errors are asserted with no interface (test only)",
+   "The shared image-description listener handles ready2, which version 2 objects deliver; it was NULL and crashed the v2 light-level client (test only)",
+   "The mastering round trip keeps the first description alive while comparing identities, since a version 1 identity may be reused after its description is destroyed (test only)"
+  ],
+  "reruns": {
+   "mutter:wayland-color-management (after fix 1)": "FAIL (/wayland/creator-params/v2-light-levels, fix 2)",
+   "mutter:wayland-color-management (after fix 2)": "FAIL (/wayland/creator-params/mastering-round-trip, fix 3)",
+   "mutter:wayland-color-management (after fix 3)": "OK",
+   "eight separate invocations (the shared test client changed)": "OK"
+  },
+  "not_invalidated": "The fixes changed only the Wayland test client; the compositor libraries and other test binaries are those of the first run."
+ },
+ "limits": [
+  "Synthetic headless tests with software rendering; no live compositor replacement or installation",
+  "No hardware-cursor plane test: the test monitors have no KMS CRTC, so that path is reviewed but not executed",
+  "No optical measurement; the firmware-declared target is an input, not a calibrated value"
+ ],
+ "logs_sha256": {
+  "first_run": "23155688a03bfbf04d61a8dbf102bc9b2ea494fe003167d8d7cd01a7afb75d1e",
+  "rerun_1": "d262a2ebf09beaacc97d361a3c745a3ac1e5fdf6d82f7cb5c3fadd7a709f3800",
+  "rerun_2": "65647f099b1b22afb4a00e1a9e524fa669376cb0b36cbe51e6053b8dd11c3770",
+  "rerun_3": "955520c8dc92c9c26dcea9f7a3a4143ee41f91e22c9a848c08fb27bd9a1fe949",
+  "separate_rerun": "7554b28335f194f7118469218b77fb53a3b7375c1268c9137fa0d465667855e8"
+ },
+ "review": {
+  "coordinator_rulings": 8,
+  "adversarial": {
+   "blockers": 2,
+   "should_fix": 5,
+   "nits": 5,
+   "all_addressed": true
+  },
+  "details": "docs/REVIEW.md#seventh-batch--hlg-and-highlight-mapping-nativehdr6"
+ }
+}

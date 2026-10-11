@@ -1,6 +1,7 @@
 # HLG and target-aware tone mapping — compositor contract (nativehdr6)
 
-**Status:** contract defined; implementation in progress · **Date:** 2026-10-10.
+**Status:** implemented as Mutter patches 0028–0038 (`nativehdr6`); reviewed and
+fast-lane qualified; not packaged or installed · **Date:** 2026-10-10.
 
 This continues the [colour pipeline audit](COLOUR_PIPELINE_AUDIT.md#follow-up-source-findings--input-contracts-and-mapping-ownership).
 `nativehdr5` fixed the input defects. This batch adds the two missing
@@ -55,17 +56,24 @@ The creator accepts `set_mastering_display_primaries`, `set_mastering_luminance`
 `set_max_cll` and `set_max_fall` and advertises the matching features. Rules:
 
 - Mastering luminance: `0 ≤ min < max`, finite. Mastering primaries are
-  validated like other primaries and must lie within the encoding primaries
-  unless `extended_target_volume` is advertised; this batch does not
-  advertise it.
-- MaxCLL and MaxFALL are positive and are kept as declared; MaxFALL above
-  MaxCLL is kept but MaxFALL never raises the effective peak.
+  validated with the shared matrix definition. They are not required to lie
+  within the encoding primaries: `extended_target_volume` is advertised,
+  which is truthful because target primaries are never used to map gamut.
+  (Common P3 mastering primaries lie just outside BT.2020.)
+- Repeated setters are `already_set` errors. A MaxCLL or MaxFALL of 0 means
+  unknown. When both are known, MaxFALL above MaxCLL is the protocol's
+  `invalid_luminance` error.
 - The values are stored in the colour state's private target volume and take
   part in equality, hashing and image-description identity. The public
   `ClutterLuminance` structure is not changed.
 - **Effective source peak** = the smallest of: MaxCLL (if set), mastering
   maximum (if set), and the encoding maximum. Without any declaration it is
-  the encoding maximum (10000 cd/m² for PQ).
+  the encoding maximum (10000 cd/m² for PQ). For the extended-range linear
+  encoding, whose nominal maximum does not bound the signal, only the
+  declared values count; without one the peak is unknown and nothing is
+  mapped.
+- HLG luminances must satisfy β ≤ 0.5; otherwise the description fails as
+  unsupported.
 
 ## Highlight mapping
 
@@ -82,14 +90,22 @@ reference-white scaling, exceeds the output target peak. It never expands.
   substituted.
 - **Curve:** source range `[Lsrc_min, Lsrc_peak]` → target `[Ltgt_min,
   Ltgt_peak]`, both converted to PQ. Normalize, knee start
-  `KS = 1.5 · maxLum − 0.5`, Hermite spline above `KS`, black adjustment
-  `E + b · (1 − E)^4`, denormalize.
+  `KS = 1.5 · maxLum − 0.5`, Hermite spline above `KS`, denormalize. There
+  is no black adjustment: the mapping never raises black, and the target
+  minimum is not used.
 - **Colour:** applied to max(R, G, B) of linear BT.2020, with all three
   channels scaled by the same ratio, so hue and saturation ratios are kept.
-  Negative components are not lifted.
-- **Scanout parity:** a surface whose transform includes mapping cannot be
-  scanned out directly. The decision uses the same "mapping required" test
-  as the renderer, not encoding equality alone.
+  Negative components are not lifted; max(R, G, B) ≤ 0 is unchanged.
+- **Scanout parity:** a surface or cursor whose transform includes mapping
+  is composited, not scanned out directly. The decision uses the same
+  "mapping required" test as the renderer, and the transform cache compares
+  states exactly.
+- **Units:** both peaks are compared as multiples of reference white. The
+  output's reference white (203 cd/m² × the brightness factor, rounded to
+  whole cd/m² as published) is the display reference carried by the blending
+  state, so mapping happens once, toward the blending state, and the
+  blending → output conversion never maps again.
+- **Screencasts** of a monitor have no physical target and are not mapped.
 
 ## Acceptance
 

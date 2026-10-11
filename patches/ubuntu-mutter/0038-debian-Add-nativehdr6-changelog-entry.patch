@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:15:52 -0400
+Subject: [PATCH] debian: Add nativehdr6 changelog entry
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Summarise the HLG and target-aware tone mapping batch: the HLG transfer
+function, its shared luminance validity check and its Wayland and CICP
+mappings; the source target color volume from mastering metadata and
+content light levels, with extended_target_volume advertised and the
+single effective peak definition, unknown for extended-range content
+without declarations; and BT.2390 highlight compression toward a
+declared output target peak, with matching direct scanout and hardware
+cursor plane decisions, exact transform caching and the output's
+reference white in whole cd/m². The new exported symbols were added to
+the symbols file with their commits, at 51.0-1ubuntu3+nativehdr6~.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ debian/changelog | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index 1035f1c..9fa163d 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,38 @@
++mutter (51.0-1ubuntu3+nativehdr6) UNRELEASED; urgency=medium
++
++  * Add the HLG transfer function (Rec. ITU-R BT.2100-2): decode with black
++    level lift, inverse OETF and the luminance-dependent OOTF in the source
++    primaries (system gamma 1.2 * 1.111^log2 (Lw / 1000)), with its exact
++    inverse for HLG destinations; accept and advertise
++    transfer_function.hlg, and map CICP transfer characteristics 18. HLG
++    luminances whose black level lift would exceed 0.5 are refused by one
++    shared check: the Wayland creator fails them with 'unsupported'.
++  * Keep a private target color volume in parametric color states: accept
++    and validate mastering display primaries and luminance, MaxCLL and
++    MaxFALL from Wayland clients, advertise set_mastering_display_primaries
++    and extended_target_volume (target primaries are never used to map
++    gamut), and let the declaration take part in color state equality,
++    hashing and image description identity without adding conversions
++    between otherwise equal encodings. The effective source peak is the
++    lowest of the encoding's range, the mastering peak and MaxCLL; for
++    extended-range linear encodings, without either declaration, it is
++    unknown.
++  * Compress highlights toward a firmware-declared output target peak with
++    the Report ITU-R BT.2390 EETF on max (R, G, B), without a black level
++    lift, once, in the surface to blending transform, only when the
++    source's known effective peak exceeds the target after reference-white
++    scaling. Direct scanout is refused exactly when that mapping applies,
++    by the predicate the renderer uses; the hardware cursor plane is not
++    used for a cursor that would be mapped, re-evaluated on the first frame
++    after a view's color states change.
++    Without a declared peak nothing changes. Color transforms are cached by
++    exact color state identity, and the output reference luminance is kept
++    in whole cd/m², as published.
++  * KMS HDR metadata is unchanged. Source candidate only; runtime and
++    package qualification pending.
++
++ -- Claude Agent <claude-agent@invalid>  Sat, 10 Oct 2026 00:00:00 +0000
++
+ mutter (51.0-1ubuntu3+nativehdr5) UNRELEASED; urgency=medium
+ 
+   * Accept signed custom primaries for encoding gamuts within [-16, 16]

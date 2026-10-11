@@ -1,0 +1,87 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 10 Oct 2026 20:09:09 -0400
+Subject: [PATCH] wayland/color-management: Accept and advertise HLG
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Map wp_color_manager_v1.transfer_function.hlg to
+CLUTTER_TRANSFER_FUNCTION_HLG in set_tf_named and advertise it with
+supported_tf_named. Its implied default luminances (minimum 0.005,
+maximum 1000, reference white 203 cd/m²) are the HLG state's derived
+defaults; set_luminances may override them, and the maximum is then
+taken as the HLG nominal peak.
+
+HLG luminances the renderer cannot decode, those that are not finite
+with 0 <= minimum < maximum or whose black level lift exceeds 0.5 (for
+example a 300 cd/m² black at a 1000 cd/m² peak), fail the image
+description with the 'unsupported' cause. The check is
+clutter_luminance_get_hlg_parameters(), the definition the transform
+decodes with, applied to the declared luminances or, without
+set_luminances, to the defaults.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/wayland/meta-wayland-color-management.c | 32 +++++++++++++++++----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
+
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index b6e3e66..d02c095 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -267,6 +267,10 @@ wayland_tf_to_clutter (struct wl_resource                         *resource,
+       eotf->type = CLUTTER_EOTF_TYPE_NAMED;
+       eotf->tf_name = CLUTTER_TRANSFER_FUNCTION_SRGB_PIECEWISE;
+       return TRUE;
++    case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG:
++      eotf->type = CLUTTER_EOTF_TYPE_NAMED;
++      eotf->tf_name = CLUTTER_TRANSFER_FUNCTION_HLG;
++      return TRUE;
+     default:
+       return FALSE;
+     }
+@@ -1510,12 +1514,28 @@ creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
+       return FALSE;
+     }
+ 
+-  if (creator_params->colorimetry.type != CLUTTER_COLORIMETRY_TYPE_PRIMARIES)
+-    return TRUE;
++  if (creator_params->colorimetry.type == CLUTTER_COLORIMETRY_TYPE_PRIMARIES &&
++      !clutter_colorimetry_get_linear_bt2020_matrices (&creator_params->colorimetry,
++                                                       NULL, NULL,
++                                                       error))
++    return FALSE;
++
++  /* HLG luminances must leave black in the inverse OETF's square-root
++   * segment, by the definition the renderer decodes with. */
++  if (creator_params->eotf.type == CLUTTER_EOTF_TYPE_NAMED &&
++      creator_params->eotf.tf_name == CLUTTER_TRANSFER_FUNCTION_HLG)
++    {
++      const ClutterLuminance *lum =
++        creator_params->is_luminance_set ?
++        &creator_params->lum :
++        clutter_eotf_get_default_luminance (creator_params->eotf);
++
++      if (!clutter_luminance_get_hlg_parameters (lum->min, lum->max,
++                                                 NULL, NULL, error))
++        return FALSE;
++    }
+ 
+-  return clutter_colorimetry_get_linear_bt2020_matrices (&creator_params->colorimetry,
+-                                                         NULL, NULL,
+-                                                         error);
++  return TRUE;
+ }
+ 
+ static void
+@@ -2142,6 +2162,8 @@ color_manager_send_supported_events (struct wl_resource *resource)
+                                                WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_BT1886);
+   wp_color_manager_v1_send_supported_tf_named (resource,
+                                                WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR);
++  wp_color_manager_v1_send_supported_tf_named (resource,
++                                               WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG);
+   wp_color_manager_v1_send_supported_primaries_named (resource,
+                                                       WP_COLOR_MANAGER_V1_PRIMARIES_SRGB);
+   wp_color_manager_v1_send_supported_primaries_named (resource,
