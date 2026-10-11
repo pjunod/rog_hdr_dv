@@ -1,8 +1,8 @@
 # Status — what is working and what remains
 
 **Updated:** 2026-10-11 (America/New_York) · **State:** hdr9 library and
-`nativehdr8` compositor installed on 2026-10-11; the owner's HDR session check
-is pending. Full Dolby Vision and measured image-quality acceptance remain
+`nativehdr8` compositor installed on 2026-10-11; the owner's HDR session runs
+on it, the visual check is pending. Full Dolby Vision and measured image-quality acceptance remain
 open.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
@@ -19,8 +19,10 @@ colour or EDID warnings; it is in SDR mode and publishes a coherent
 description ([receipt](../evidence/install-2026-10-11.json)). The kernel,
 boot selection, Secure Boot, profiles and display settings are unchanged.
 The previous hdr6/nativehdr2 packages remain the hash-verified rollback.
-Still open: the owner's HDR desktop session, the description it reports
-to clients, and a visual check. At the owner's request, the old agent build
+The owner's HDR desktop session then started on the new compositor in
+BT.2100 mode. It now reports the panel's firmware-declared target to clients
+(native primaries and 0.0004–616 cd/m²) separately from the BT.2020/PQ
+encoding, with no warnings. Still open: the owner's visual check. At the owner's request, the old agent build
 containers from earlier batches were removed.
 
 ## Ninth batch — independent review and fixes
@@ -170,7 +172,7 @@ Mutter and matching amd64/i386 library packaging.
 | Native HDR detection | Implemented and installed | Wider hardware and upstream acceptance |
 | Kernel and AUX brightness | Test kernel booted with Secure Boot | HDR/SDR transitions, DPMS, suspend/resume, brightness and display-mode coverage |
 | Physical luminance library | hdr9 (hdr8 luminance and gamut API) installed for amd64 and i386 | Wider hardware and upstream acceptance |
-| Compositor feedback | nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) installed | Owner HDR session check and active-output verification |
+| Compositor feedback | nativehdr8 (target luminance and gamut, colour input, HLG, highlight mapping, gamut compression, review fixes) installed | Owner visual check; optical verification needs an instrument |
 | Full Dolby Vision | OEM processor activates and describes its transform under Wine; reference workflow available | Negotiate types, establish the device and metadata contract, process frames, validate profiles and trims, integrate playback |
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; visual check on the owner's HDR desktop session (pending) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
@@ -227,9 +229,8 @@ These are scoped historical results, not freshly repeated tests.
 
 ## Next work
 
-Three steps wait on the owner. Log in to the HDR desktop on the installed
-compositor so its reported colour description and the picture can be
-checked, including the KMS metadata question. The Dolby processor's next
+Three steps wait on the owner. Check the picture on the installed
+compositor, including the KMS metadata question. The Dolby processor's next
 stage waits for the owner's scope confirmation and, before it can say
 anything about this panel, a monitor descriptor source in Wine
 ([prerequisites](DOLBY_ACTIVATION_PROBE.md#displaymonitor-follow-up--the-processor-activates)).

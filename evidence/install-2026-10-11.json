@@ -47,13 +47,51 @@
  ],
  "rollback": "RECOVERY.txt in the private kit: unhold, then the hash-verified hdr6/nativehdr2 packages (modeled as 6 downgrades)",
  "not_yet_verified": [
-  "owner desktop session on the new compositor",
-  "active output description reported to clients",
-  "visual check"
+  "visual check by the owner"
  ],
  "login_screen_description": {
   "method": "read-only Wayland colour inspector (probes/wayland_color_info) against the login screen's compositor",
   "result": "complete; the login screen runs in SDR mode (sRGB primaries, gamma 2.2, 0.2/80/80 cd/m2) and publishes the encoding fallback as its target, as expected outside HDR mode",
   "binary_sha256": "a5e203b3c6040d24ce1ba4a9a3296ce2d30aa1deabef0154d4e2748d86c2e5f0"
+ },
+ "desktop_session_description": {
+  "method": "read-only Wayland colour inspector in the owner's logged-in session (same binary)",
+  "colour_mode": "BT.2100 (Mutter DisplayConfig colour mode 1)",
+  "shell_maps_installed_libmutter": true,
+  "encoding": {
+   "primaries": "BT.2020 (named)",
+   "transfer": "ST 2084 PQ (named)",
+   "luminances_cd_m2": {
+    "min": 0.005,
+    "max": 10000,
+    "reference": 203
+   }
+  },
+  "target": {
+   "primaries_xy": {
+    "red": [
+     0.679931,
+     0.320068
+    ],
+    "green": [
+     0.23706,
+     0.7229
+    ],
+    "blue": [
+     0.139892,
+     0.050048
+    ],
+    "white": [
+     0.312744,
+     0.329101
+    ]
+   },
+   "luminance_cd_m2": {
+    "min": 0.0004,
+    "max": 616
+   },
+   "source": "firmware DisplayID declaration (not a measurement)"
+  },
+  "warnings": "none logged by the session's gnome-shell"
  }
 }
