@@ -21,8 +21,8 @@ boot selection, Secure Boot, profiles and display settings are unchanged.
 The previous hdr6/nativehdr2 packages remain the hash-verified rollback.
 The owner's HDR desktop session then started on the new compositor in
 BT.2100 mode. It now reports the panel's firmware-declared target to clients
-(native primaries and 0.0004–616 cd/m²) separately from the BT.2020/PQ
-encoding, with no warnings. Still open: the owner's visual check. At the owner's request, the old agent build
+(primaries and 0.0004–616 cd/m², not a measurement) separately from the
+BT.2020/PQ encoding, with no colour warnings in the session journal. Still open: the owner's visual check. At the owner's request, the old agent build
 containers from earlier batches were removed.
 
 ## Ninth batch — independent review and fixes
