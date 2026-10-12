@@ -4,10 +4,12 @@
 
 This runner and its regression coverage are integrated in the owned
 `codex/team-hdr-nativehdr10-20261011` candidate. Both adversarial reviews and
-focused reviews are delivered; Sol is closing the pre-freeze signal-handler
-findings. Syntax/static checks only have run; the regression tests have
-**not been executed**. Freeze the corrected runner before the single affected
-unit batch, because its bytes are included in every check fingerprint.
+focused reviews are delivered and signal-handler findings addressed. Runner
+bytes were frozen at `e4f981d` before execution; all **29 individual Linux
+regression methods passed**. The first full affected batch returned 69 passes
+and two native failures, not candidate acceptance. See the
+[original receipts](../evidence/nativehdr10-validation-attempt1.json).
+Do not edit the frozen runner or repeat successful methods for another reviewer.
 
 The existing [colour harness](../tools/test-mutter-colour.sh) selects tests and
 sets up their environment, but does not keep per-check retry receipts. Existing

@@ -59,6 +59,19 @@ directory is verified; D-Bus duplicate-key and gdctl readiness await the batch.
 All actionable pre-freeze findings are addressed; runtime acceptance remains
 pending. Sol has exclusive native source/build and Mac integration ownership.
 
+Runtime checkpoint: first batch executed all 71 planned checks; **69 passed,
+2 failed**. All 29 runner methods passed, including real descendant SIGTERM,
+mixed launch cancellation, handler restoration and interrupted mask cleanup.
+40 native checks passed including capture, override isolation, gdctl and
+other monitor/backend/cursor cases. F10's gdctl readiness has a passing
+receipt; D-Bus confirmation/restore still fails and its later coverage is not
+claimed. Colour channel-bound fails for a near-zero value0.000403328064 versus
+allowed0.0001. Opus `t_0b47678a` owns native diagnosis/correction/compile;
+Fable `t_bedcc81f` owns focused review and minimal-retry evidence decision.
+No retry has run and no passing suite is repeated. The
+[original batch receipt](../evidence/nativehdr10-validation-attempt1.json)
+retains exact results and log hashes. Source acceptance remains incomplete.
+
 ## Initial repository review
 
 | Finding | Evidence | Disposition |

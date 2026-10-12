@@ -65,13 +65,16 @@ validated against Dolby's reference renderer.
 Night Light in linear light for HDR and per-monitor target overrides, and
 records their implementation as Mutter patches 0050–0068. That candidate is
 compiled and pinned; both adversarial and focused reviews are delivered and
-pre-freeze findings addressed. It is not yet unit-validated, packaged or deployed.
+pre-freeze findings addressed. The single affected batch returned 69 passes
+and two failures awaiting correction; it is not accepted, packaged or deployed.
 The earlier work-in-progress directories under `wip/` now only
 point to it.
 [nativehdr10 validation receipts](docs/NATIVEHDR10_VALIDATION.md) describes
 the runner that executes a reviewed list of affected checks once. It records
 source-bound receipts, so later runs retry only failed or explicitly
-invalidated checks. It has not been executed yet.
+invalidated checks. All 29 individual runner methods passed in the first
+Linux batch; [batch evidence](evidence/nativehdr10-validation-attempt1.json)
+retains the 71 original attempts and two native failures.
 [Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
 agent: state, next tasks, environments and commands.
 

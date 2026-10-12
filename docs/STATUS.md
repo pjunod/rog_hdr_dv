@@ -67,7 +67,18 @@ Night Light factors, a bounded observable-state restore wait, isolated
 user-override registration, real headless capture/readback coverage and
 SIGTERM child cleanup. Review completion is not candidate acceptance.
 
-**Current:** review corrections 0062–0068 are integrated and pinned at native
+**Current:** the single affected batch executed 71 checks on native
+`9570f9bb` / tree `ac02a18f`: **69 passed, 2 failed** in 134.99 seconds.
+All 29 individual Linux runner methods passed; 40 of 42 native checks passed,
+including the real capture case, isolated override case, gdctl, remaining
+monitor/backend and cursor cases. The failures are `mutter:color-hdr`
+(near-zero channel-bound assertion) and `mutter:monitor-dbus-tests`
+(restored-peak wait timeout). The candidate is **not accepted**.
+The [first batch receipt](../evidence/nativehdr10-validation-attempt1.json)
+records every original attempt, command, source identity and log hash.
+All 71 logs were retrieved and hash-verified; no retry has run.
+
+Review corrections 0062–0068 are integrated and pinned at native
 `9570f9bb` / tree `ac02a18f`, with unchanged 0001–0061 prefix, individual
 warnings-as-errors builds and replay equality. See the
 [correction receipt](../evidence/nativehdr10-review-corrections.json).
@@ -76,19 +87,21 @@ Opus completed the requested successful/nonempty capture readback sanity
 in 0068 and released native source/build ownership to Sol. Fable confirmed
 runner `cc82113`; Sol folded the scoped mask/replay hygiene into `e4f981d`
 before freezing it. Documentation precision is fixed in `4846eda`.
-Sol exclusively owns integration/native validation now. No units have
-executed at this freeze checkpoint. Fable's
+Sol owns Mac integration/evidence/validation. Opus exclusively owns native
+source/build for the two scoped failure diagnoses (`t_0b47678a`), compilation
+and exports only; Fable reviews the correction and exact retry evidence
+policy (`t_bedcc81f`). Fable's
 recorded decision anchors the diagonal factors at the default temperature's
 Planckian white, preserving exact off-state identity and continuous onset;
 absolute Planckian-white accuracy is no longer the acceptance claim.
 
-**Remaining:** run the frozen affected manifest once on the native builder
-through `.peer-linux/run.py`: colour fast lane, all Wayland colour cases,
-the complete backend monitor suite, monitor-utils, cursor tests and
-one receipt per Python runner method. Declare full Mutter/library trees for
-native checks and only the runner/test files for Python methods. Resume the
-same ledger, retrying only failures and genuinely invalidated checks. Golden
-gdctl fixtures remain expectations until that batch passes. Final integrity
+**Remaining:** diagnose/fix, compile/export and focused-review the two failures,
+then retry only failed or genuinely invalidated checks against the same
+persistent ledger. Original native receipts declare whole Mutter/library
+trees; the thinker decision must reconcile test-only tree changes with exact
+unchanged dependency/binary evidence without shrinking scopes or needlessly
+rerunning 40 successes. Golden gdctl fixtures now have a passing execution
+receipt. No second candidate-wide unit batch is planned. Final integrity
 is executed after all evidence/docs edits and their commit; its receipt
 stays outside tracked source to avoid receipt-in-tree circularity. The
 final-delivery child reuses receipts without rerunning successful tests.

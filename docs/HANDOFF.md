@@ -46,8 +46,12 @@ native source is branch `codex/opus-nightlight` in the persistent peer work
 directory; do not reconstruct over it. A Git bundle of the range is in the
 ignored `.peer-linux/deliverables/opus-nightlight.bundle`.
 
-No unit test has run on the candidate. Golden gdctl show fixtures are
-source-derived expectations, not execution output. PR16 remains held unmerged.
+The first affected batch passed 69/71 checks on native `9570f9bb`/tree
+`ac02a18f`; all29 runner methods and40 native invocations passed, including
+gdctl, capture, isolated override and remaining backend/cursor cases. Colour
+channel-bound and D-Bus restored-peak wait failed; acceptance is incomplete.
+See [all original attempts](../evidence/nativehdr10-validation-attempt1.json).
+PR16 remains held unmerged.
 No push, merge or display change is authorized. Ubuntu port/packaging and
 optical acceptance remain separate stages; only Mutter's orig tar is recorded
 in the offline Ubuntu cache, not the exact packaging imports.
@@ -59,10 +63,12 @@ in the offline Ubuntu cache, not the exact packaging imports.
    into canonical patches/pins with individual -Werror builds and replay.
    Astra approves the anchored production design; 0068 hardens capture sanity.
    Fable confirms runner `cc82113`; mask/replay hygiene is fixed in `e4f981d`.
-   Opus released native ownership; Sol now exclusively owns native validation
-   and Mac integration/docs. Execute the frozen affected manifest once using
-   per-invocation and per-Python-method receipts, resume the same ledger, retry
-   failures/invalidated checks only. Final integrity runs after final evidence
+   Sol owns validation/Mac integration; Opus exclusively diagnoses the two
+   native failures with compilation/export only (`t_0b47678a`). Fable reviews
+   corrections and minimal retry policy (`t_bedcc81f`). Preserve all original
+   passes, retry only failures/genuinely invalidated checks after those gates.
+   Do not reconstruct, edit the frozen runner or start another full batch.
+   Final integrity runs after final evidence
    and docs commit with receipt outside tracked source. Then
    the repository pre-merge lane and one substantial PR that depends on
    held PR16. After that, port to the Ubuntu series as 0062+ and package.

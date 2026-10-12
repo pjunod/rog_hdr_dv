@@ -5,7 +5,8 @@ review corrections 0062–0068 appended (native candidate 9570f9bb, tree
 ac02a18f). Every commit compiled with warnings as errors and the exported
 series replays to the built tree. Both adversarial and focused reviews are
 delivered; pre-freeze findings are addressed. The single affected validation
-batch is next; no unit test has run on this candidate yet ·
+batch returned 69 passes and two failures awaiting correction; candidate
+acceptance is incomplete ·
 **Date:** 2026-10-11.
 
 Two compositor changes for general availability, specified together because
@@ -157,7 +158,9 @@ reads), the view's onscreen (the output encoding) and
 behind the monitor stream repaint, area and virtual streams). With Night
 Light on, the test requires the output pixels to warm while both captures
 stay within one 8-bit code value; at the default temperature the output must
-return. These are pending regression assertions, not runtime passes.
+return. This case passed in the first affected batch on tree `ac02a18f`;
+the [receipt](../evidence/nativehdr10-validation-attempt1.json) retains its
+exact command and log hash. It does not qualify either PipeWire stream entry point.
 
 Scope limit: neither PipeWire monitor-stream entry point is invoked. The
 shared-memory coverage reads the source framebuffer directly; the stage
@@ -331,6 +334,8 @@ Dispositions:
   decision about upstream submission or agent identity has been made.
 - **F12.** The transient `NightLightSupported` flip on hotplug (above).
 
-The integrated candidate is compiled, reviewed and replay-verified, not yet
-unit-qualified. The single affected unit batch precedes acceptance. Ubuntu
-packaging, deployment and optical measurement are separate later stages.
+The integrated candidate is compiled, reviewed and replay-verified. Its first
+single affected batch has 69 passes and two failures (colour channel-bound
+near zero and D-Bus restored-peak wait); correction and focused retries are
+still required, so it is not accepted. Ubuntu packaging, deployment and
+optical measurement remain separate later stages.
