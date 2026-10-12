@@ -52,12 +52,13 @@ No push, merge or display change is authorized. Ubuntu port/packaging and
 optical acceptance remain separate stages; only Mutter's orig tar is recorded
 in the offline Ubuntu cache, not the exact packaging imports.
 
-1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Integrate Sol's
-   validation-ledger tooling (t_b51b86c0). Then Astra and Fable each review
-   the same candidate adversarially. Fix the findings, rebuilding each
-   affected commit, and run one affected unit batch. Then the repository
-   pre-merge lane and one substantial PR that depends on held PR16. After
-   that, port to the Ubuntu series as 0062+ and package.
+1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Sol's
+   [validation receipt runner](NATIVEHDR10_VALIDATION.md) is integrated.
+   Astra and Fable each review the same candidate adversarially. Fix the
+   findings, rebuilding each affected commit. Then write the affected-check
+   manifest and run it once through the runner on the native builder. Then
+   the repository pre-merge lane and one substantial PR that depends on
+   held PR16. After that, port to the Ubuntu series as 0062+ and package.
 2. **Open Dolby Vision track, stage 1** ([contract](OPEN_DV_DISPLAY_MANAGEMENT.md)):
    a headless libplacebo harness and ΔE_ITP comparison, then the baseline
    against the private reference renders on lab5. Today libplacebo uses only

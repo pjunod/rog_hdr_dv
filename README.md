@@ -67,6 +67,10 @@ records their implementation as Mutter patches 0050–0061. That candidate is
 compiled and pinned but not yet reviewed, unit-validated, packaged or
 deployed. The earlier work-in-progress directories under `wip/` now only
 point to it.
+[nativehdr10 validation receipts](docs/NATIVEHDR10_VALIDATION.md) describes
+the runner that executes a reviewed list of affected checks once. It records
+source-bound receipts, so later runs retry only failed or explicitly
+invalidated checks. It has not been executed yet.
 [Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
 agent: state, next tasks, environments and commands.
 
@@ -103,7 +107,9 @@ any live compositor or kernel update.
 - `docs/` — maintained technical documentation, indexed above.
 - `evidence/` — small reproducible migration/validation receipts. Large or
   private captures, OEM binaries and signing keys do not belong in Git.
-- `scripts/` — repository validation, with no installation side effects.
+- `scripts/` — repository validation, with no installation side effects,
+  and the nativehdr10 receipt runner, which executes only the commands in a
+  reviewed manifest.
 - `tools/` — the reconstruction, build, test and packaging harness for
   disposable containers ([development](docs/DEVELOPMENT.md#build-test-and-packaging-harness-tools)).
 - `wip/` — unreviewed work in progress, kept out of the pinned series.

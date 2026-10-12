@@ -50,15 +50,28 @@ diagnostics. The exported series replays onto the base to the same tree.
 [earlier stage receipt](../evidence/nativehdr10-sol-stage.json) and the
 [contract and implementation notes](NIGHT_LIGHT_AND_OVERRIDES.md).
 
-**Current:** integration task `t_b51b86c0` brings in Sol's validation-ledger
-tooling. Then Astra and Fable each review the same exported candidate.
+**Done (validation tooling, compiled):** Sol's runner, 24 regression
+methods and [instructions](NATIVEHDR10_VALIDATION.md) are integrated with
+authorship kept (Sol's commit `e0742e8`, cherry-picked as `b9837a4`). The
+runner executes a reviewed manifest of affected checks, one argument vector
+per check, with an explicit environment. It keeps receipts tied to the
+source tree and its own bytes. Later runs skip receipts that still match and
+retry failures. Changed inputs stop the whole batch until the affected checks
+are invalidated with a reason. Its files were only syntax-compiled; the
+regressions have not run. The Mutter source and native build tree are
+unchanged by this integration, so no rebuild was needed.
 
-**Remaining:** fix the review findings, then run one affected unit batch,
-retrying only failures and checks the fixes invalidate. No unit test has run
-on this candidate. Golden gdctl fixtures are expectations, not execution
-evidence. After that come the repository pre-merge lane and one substantial
-PR that declares its dependency on the held PR 16. Ubuntu port (0062+) and
-packaging, physical deployment, optical accuracy and Dolby Vision remain
+**Current:** Astra and Fable each review the same complete candidate:
+patches 0050–0061 and the validation runner in this repository.
+
+**Remaining:** fix the review findings. Then write the affected-check
+manifest from existing Meson test names and run it once on the native
+builder through `.peer-linux/run.py`, retrying only failures and checks the
+fixes invalidate. No unit test has run on this candidate. Golden gdctl
+fixtures are expectations, not execution evidence. After that come the
+repository pre-merge lane and one substantial PR that declares its
+dependency on the held PR 16. Ubuntu port (0062+) and packaging, physical
+deployment, optical accuracy and Dolby Vision remain
 separate qualification stages. No laptop or display configuration change is
 authorized in this source batch.
 
