@@ -14,6 +14,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 
@@ -290,43 +291,60 @@ def output_location(path, sources):
 
 
 def execute(command, log):
-    # Defer catchable cancellation over launch: a handler must not unwind
-    # Popen before we have a handle with which to clean up the session. Unlike
-    # blocking signals, this does not leave a blocked mask in the child.
+    # No handler may unwind launch, cleanup or partial handler restoration.
+    # Block only while changing handlers (never across Popen), so the child
+    # inherits no blocked cancellation mask. Defer signals until after reap.
+    numbers = (signal.SIGTERM, signal.SIGINT)
     pending = []
     previous = {}
     process = None
+
+    def defer(signum, frame):
+        if signum not in pending:
+            pending.append(signum)
+
+    mask = signal.pthread_sigmask(signal.SIG_BLOCK, numbers)
     try:
         try:
-            for number in (signal.SIGTERM, signal.SIGINT):
-                previous[number] = signal.signal(number, lambda signum, frame: pending.append(signum))
+            for number in numbers:
+                previous[number] = signal.signal(number, defer)
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+        try:
             process = subprocess.Popen(command["argv"], cwd=command["cwd"], env=command["env"],
                                        stdout=log, stderr=subprocess.STDOUT, shell=False,
                                        start_new_session=True)
+            deadline = time.monotonic() + command["timeout_seconds"]
+            while not pending:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command["argv"], command["timeout_seconds"])
+                try:
+                    return process.wait(timeout=min(0.1, remaining))
+                except subprocess.TimeoutExpired:
+                    pass
         finally:
-            for number, handler in previous.items():
-                signal.signal(number, handler)
-        if signal.SIGTERM in pending:
-            raise TerminationRequested("SIGTERM during launch")
-        if pending:
-            raise KeyboardInterrupt
-        return process.wait(timeout=command["timeout_seconds"])
-    except BaseException:
-        if process is not None:
-            # Do not let another catchable cancellation interrupt reaping.
-            cleanup_handlers = {}
-            try:
-                for number in (signal.SIGTERM, signal.SIGINT):
-                    cleanup_handlers[number] = signal.signal(number, signal.SIG_IGN)
+            if process is not None and (pending or process.returncode is None):
                 try:
                     os.killpg(process.pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
                 process.wait()
-            finally:
-                for number, handler in cleanup_handlers.items():
-                    signal.signal(number, handler)
-        raise
+    finally:
+        mask = signal.pthread_sigmask(signal.SIG_BLOCK, numbers)
+        try:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+        # Replay through the caller-owned handler: termination_handler sets
+        # its coalescing flag even for cancellation received during launch.
+        for number in pending:
+            signal.raise_signal(number)
+        if pending:
+            if signal.SIGTERM in pending:
+                raise TerminationRequested("SIGTERM")
+            raise KeyboardInterrupt
 
 
 def run_batch(manifest_path, ledger_path, invalidate=(), reason=None):
@@ -428,6 +446,9 @@ def _run_batch(manifest_path, ledger_path, invalidate=(), reason=None):
                 attempt["log_sha256"] = file_digest(log_path)
                 attempt["status"] = ("passed" if attempt["returncode"] == 0
                                      and "error" not in attempt else "failed")
+            except KeyboardInterrupt as exc:
+                attempt["error"] = f"cancelled: {type(exc).__name__}"
+                raise
             finally:
                 attempt["finished_at"] = timestamp()
                 save(ledger_path, ledger)

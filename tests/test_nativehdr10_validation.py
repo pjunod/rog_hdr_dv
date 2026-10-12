@@ -281,6 +281,7 @@ class ValidationTests(unittest.TestCase):
             with self.assertRaises(KeyboardInterrupt):
                 self.run_batch()
         self.assertEqual(self.receipts()[-1]["status"], "running")
+        self.assertEqual(self.receipts()[-1]["error"], "cancelled: KeyboardInterrupt")
         self.assertEqual(self.run_batch(), 0)
         self.assertEqual(self.runs(), ["one"])
 
@@ -339,6 +340,12 @@ class ValidationTests(unittest.TestCase):
     @staticmethod
     def process_running(pid):
         # Container init may retain adopted zombies: those cannot execute.
+        if sys.platform.startswith("linux"):
+            try:
+                state = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+            except FileNotFoundError:
+                return False
+            return state != "Z"
         result = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)],
                                 capture_output=True, text=True, timeout=5)
         state = result.stdout.strip()
@@ -348,6 +355,7 @@ class ValidationTests(unittest.TestCase):
         original = {number: signal.getsignal(number)
                     for number in (signal.SIGTERM, signal.SIGINT)}
         popen = subprocess.Popen
+        killpg = os.killpg
         launched = []
 
         def cancel_launch(*args, **kwargs):
@@ -356,14 +364,58 @@ class ValidationTests(unittest.TestCase):
             os.kill(os.getpid(), signal.SIGTERM)
             return process
 
+        def repeated_cancel(pid, number):
+            # Neither a second TERM nor a double Ctrl-C may unwind reap.
+            os.kill(os.getpid(), signal.SIGTERM)
+            os.kill(os.getpid(), signal.SIGINT)
+            killpg(pid, number)
+
         command = {"argv": [sys.executable, "-c", "import time; time.sleep(60)"],
                    "cwd": str(self.source), "env": {}, "timeout_seconds": 10}
         with (self.root / "launch.log").open("wb") as log:
             with validation.termination_handler():
                 with mock.patch.object(validation.subprocess, "Popen", side_effect=cancel_launch):
-                    with self.assertRaises(validation.TerminationRequested):
-                        validation.execute(command, log)
+                    with mock.patch.object(validation.os, "killpg", side_effect=repeated_cancel):
+                        with self.assertRaises(validation.TerminationRequested):
+                            validation.execute(command, log)
+                # Replay must set termination_handler's coalescing flag.
+                os.kill(os.getpid(), signal.SIGTERM)
         self.assertEqual(len(launched), 1)
+        self.assertIsNotNone(launched[0].returncode)
+        for number, handler in original.items():
+            self.assertEqual(signal.getsignal(number), handler)
+
+    def test_signal_during_handler_restoration_cannot_leak_other_handler(self):
+        original = {number: signal.getsignal(number)
+                    for number in (signal.SIGTERM, signal.SIGINT)}
+        install = signal.signal
+        launched = []
+        popen = subprocess.Popen
+        injected = []
+
+        def remember(*args, **kwargs):
+            process = popen(*args, **kwargs)
+            launched.append(process)
+            return process
+
+        with validation.termination_handler():
+            caller_term = signal.getsignal(signal.SIGTERM)
+
+            def cancel_restoration(number, handler):
+                result = install(number, handler)
+                if number == signal.SIGTERM and handler is caller_term and not injected:
+                    injected.append(True)
+                    os.kill(os.getpid(), signal.SIGTERM)
+                return result
+
+            command = {"argv": [sys.executable, "-c", "pass"], "cwd": str(self.source),
+                       "env": {}, "timeout_seconds": 10}
+            with (self.root / "restore.log").open("wb") as log:
+                with mock.patch.object(validation.subprocess, "Popen", side_effect=remember):
+                    with mock.patch.object(validation.signal, "signal", side_effect=cancel_restoration):
+                        with self.assertRaises(validation.TerminationRequested):
+                            validation.execute(command, log)
+        self.assertEqual(injected, [True])
         self.assertIsNotNone(launched[0].returncode)
         for number, handler in original.items():
             self.assertEqual(signal.getsignal(number), handler)

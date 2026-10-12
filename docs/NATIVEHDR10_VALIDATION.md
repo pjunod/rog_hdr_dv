@@ -2,13 +2,12 @@
 
 ## Implementation status and ownership
 
-This runner and its regression coverage are implemented in Sol's isolated
-`codex/hdr-validation-ledger` branch. Syntax/static checks only are authorized
-for this implementation stage; the regression tests have **not been executed**.
-Opus integrates these commits into the complete source candidate before both
-adversarial reviews. Review findings must be addressed before the first affected
-unit batch. The integration owner maintains the canonical status pages and adds
-this document to the README topic index, avoiding concurrent README edits.
+This runner and its regression coverage are integrated in the owned
+`codex/team-hdr-nativehdr10-20261011` candidate. Both adversarial reviews and
+focused reviews are delivered; Sol is closing the pre-freeze signal-handler
+findings. Syntax/static checks only have run; the regression tests have
+**not been executed**. Freeze the corrected runner before the single affected
+unit batch, because its bytes are included in every check fingerprint.
 
 The existing [colour harness](../tools/test-mutter-colour.sh) selects tests and
 sets up their environment, but does not keep per-check retry receipts. Existing
@@ -96,9 +95,16 @@ Each check requires:
   SIGTERM kills the child process group and reaps the check, not just a wrapper
   process.
   Catchable cancellation during launch is deferred until its process handle
-  exists; imported batches restore the caller's signal handlers. Batches must
-  run on the main thread. SIGKILL, host loss and descendants that deliberately
-  escape the process group cannot be cleaned up by the runner; reconcile those
+  exists, and throughout execution/reaping. Bounded wait slices limit cancellation
+  latency to about 0.1 seconds. Signal-handler installation/restoration is masked
+  atomically; the child inherits no newly blocked signals. After reap, deferred
+  cancellation is replayed through the restored caller-owned handler, including
+  the batch's coalescing SIGTERM handler. Imported batches restore the caller's
+  signal handlers. `TerminationRequested` subclasses `KeyboardInterrupt`, so an
+  importer's `except KeyboardInterrupt` also catches SIGTERM. Batches must run
+  on the main thread. SIGHUP is deliberately unhandled. SIGHUP, SIGKILL, host
+  loss and descendants that deliberately escape the process group cannot be
+  cleaned up by the runner; reconcile those
   externally before retrying a nonpassing receipt.
 - Optional `paths`: mapping from a listed source ID to nonempty lists of
   literal tracked file/directory paths relative to that source. No globs,
