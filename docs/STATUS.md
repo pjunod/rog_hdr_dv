@@ -187,8 +187,9 @@ three commits. The substantial PR is therefore opened as a draft from
 `codex/team-hdr-nativehdr10-20261011` against `codex/open-dv-track`, PR 16's
 head. It cannot merge independently: merging it into `main` would land PR 16,
 and merging it into `codex/open-dv-track` would move PR 16's head. It stays
-reviewable and unmerged until the owner releases PR 16. The PR number is
-recorded in [handoff](HANDOFF.md) once opened.
+reviewable and unmerged until the owner releases PR 16. It is
+[PR 17](https://github.com/pjunod/rog_hdr_dv/pull/17) (23 commits, head
+`004a9fb`); `main` and `codex/open-dv-track` were not moved.
 
 **Remaining:** no second candidate-wide batch. Separate optimization
 `t_38887c3f` and base async lifetime assessment `t_3502f623` are released by

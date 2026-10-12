@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Delivered source candidate | nativehdr10, `patches/mutter` 0050–0077, native `de09d575` / tree `058bbf97`, all 71 unit receipts valid and verified read-only ([delivery receipt](../evidence/nativehdr10-delivery-verification.json)); published as a draft PR stacked on the held PR 16 (see [status](STATUS.md#nativehdr10--reviewed-source-batch-and-validation)) |
+| Delivered source candidate | nativehdr10, `patches/mutter` 0050–0077, native `de09d575` / tree `058bbf97`, all 71 unit receipts valid and verified read-only ([delivery receipt](../evidence/nativehdr10-delivery-verification.json)); draft [PR 17](https://github.com/pjunod/rog_hdr_dv/pull/17) stacked on the held PR 16 (see [status](STATUS.md#nativehdr10--reviewed-source-batch-and-validation)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -114,7 +114,9 @@ in the offline Ubuntu cache, not the exact packaging imports.
    the head of the held PR 16, because `main` has not moved since PR 16
    branched and the candidate history contains its three commits. The PR
    cannot merge independently of PR 16 and stays unmerged until the owner
-   releases it; the PR number is recorded below once opened.
+   releases it: [PR 17](https://github.com/pjunod/rog_hdr_dv/pull/17), head
+   `004a9fb`, 23 commits over `7c78457`. When PR 16 is released, merge or
+   rebase in order (16 then 17); do not merge 17 into `main` on its own.
    Optimization `t_38887c3f` and async lifetime assessment `t_3502f623` are
    released by delivery, use separate ownership and must not change the frozen candidate.
    Ubuntu port as0062+ and packaging remain later work with exact imports missing
