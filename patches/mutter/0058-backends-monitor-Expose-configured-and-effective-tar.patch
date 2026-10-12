@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Codex <codex@invalid>
 Date: Sun, 11 Oct 2026 23:22:27 +0000
-Subject: [PATCH 4/6] backends/monitor: Expose configured and effective targets
+Subject: [PATCH] backends/monitor: Expose configured and effective targets
  over DisplayConfig
 
 Validate target properties by presence and type before configuration mutation, with replacement/reset semantics. Report effective RGBW/luminance and individual provenance from the applied color device, using its shared source table. Add deferred API regressions for VERIFY, invalid input, persistent rejection/restore and a 400-nit user target at scaled reference white. Selector integration and unit execution are deferred to the full reviewed candidate.
@@ -62,7 +62,7 @@ index 1fdc2ef..f435eb8 100644
  	@properties may effect the global monitor configuration state. Possible
  	properties are:
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index dabe55d..eb722ff 100644
+index 7be961d..fc8dba6 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -1311,8 +1311,8 @@ target_primaries_equal (const MetaColorTargetPrimaries *a,

@@ -1,8 +1,8 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Codex <codex@invalid>
 Date: Sun, 11 Oct 2026 22:55:06 +0000
-Subject: [PATCH 08/11] backends/monitor: Retain color settings when copying
- and synthesizing layouts
+Subject: [PATCH] backends/monitor: Retain color settings when copying and
+ synthesizing layouts
 
 Preserve color mode, RGB range and target overrides in amendment and orientation copies. Recover target declarations by monitor identity from the existing configuration history when synthesizing layouts; explicit D-Bus replacement remains separate. Use each mirror member for its own color-mode history. Add deferred copy, history, VERIFY nonmutation and override-only reapply regressions.
 ---

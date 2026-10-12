@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Codex <codex@invalid>
 Date: Sun, 11 Oct 2026 22:52:33 +0000
-Subject: [PATCH 2/6] backends/monitor: Persist and validate target overrides
+Subject: [PATCH] backends/monitor: Persist and validate target overrides
 
 Parse explicit peak, optional minimum and HDR gamut policy under each monitor. Reject nonfinite, unusable and duplicate declarations; preserve zero black and omit unset fields on save. Validate against nominal PQ white and target wire limits, independent of brightness. Accumulate XML text through element close and reject unterminated XML. Add deferred two-monitor round-trip and malformed-input regressions; no unit execution during building.
 ---
