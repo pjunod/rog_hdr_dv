@@ -474,3 +474,16 @@ independent reviewer rechecked both plan corrections and the narrow scanner
 exception with no remaining blockers. No C, kernel, patch bytes or runtime
 Python code changed in this documentation batch, so compiler/physical audio
 tests are pending the implementation lanes, not claimed here.
+
+## Audio repository split — pre-merge validation, 2026-10-12
+
+Independent source review covered the audio-document migration and scope
+restoration. Its stale private-OEM wording finding was corrected in `248674f`.
+Active audio implementation and published ASUS tuning now belong to
+[rog_audio](https://github.com/pjunod/rog_audio); historical display receipts
+remain in this repository. No display code, patch bytes or build inputs changed.
+
+After the fix, `python3 scripts/check_repository.py` passed for 164 patches
+and six series, and `git diff --check` passed. Gitleaks found no leaks in the
+working tree or all 98 then-reachable commits. Existing display unit suites
+were not rerun for this documentation-only migration.
