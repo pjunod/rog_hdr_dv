@@ -25,6 +25,29 @@ class ValidationError(ValueError):
     """Invalid inputs or evidence; no implicit rerun is permitted."""
 
 
+class TerminationRequested(KeyboardInterrupt):
+    """A catchable termination, propagated only after child cleanup."""
+
+
+@contextmanager
+def termination_handler():
+    # Imported batches must restore their caller's handler. After the first
+    # request, coalesce further SIGTERMs so cleanup/receipt saving can finish.
+    requested = False
+
+    def terminate(signum, frame):
+        nonlocal requested
+        if not requested:
+            requested = True
+            raise TerminationRequested("SIGTERM")
+
+    previous = signal.signal(signal.SIGTERM, terminate)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -267,22 +290,51 @@ def output_location(path, sources):
 
 
 def execute(command, log):
-    # A timed-out or interrupted wrapper must not leave its tests running.
-    with subprocess.Popen(command["argv"], cwd=command["cwd"], env=command["env"],
-                          stdout=log, stderr=subprocess.STDOUT, shell=False,
-                          start_new_session=True) as process:
+    # Defer catchable cancellation over launch: a handler must not unwind
+    # Popen before we have a handle with which to clean up the session. Unlike
+    # blocking signals, this does not leave a blocked mask in the child.
+    pending = []
+    previous = {}
+    process = None
+    try:
         try:
-            return process.wait(timeout=command["timeout_seconds"])
-        except (subprocess.TimeoutExpired, KeyboardInterrupt):
+            for number in (signal.SIGTERM, signal.SIGINT):
+                previous[number] = signal.signal(number, lambda signum, frame: pending.append(signum))
+            process = subprocess.Popen(command["argv"], cwd=command["cwd"], env=command["env"],
+                                       stdout=log, stderr=subprocess.STDOUT, shell=False,
+                                       start_new_session=True)
+        finally:
+            for number, handler in previous.items():
+                signal.signal(number, handler)
+        if signal.SIGTERM in pending:
+            raise TerminationRequested("SIGTERM during launch")
+        if pending:
+            raise KeyboardInterrupt
+        return process.wait(timeout=command["timeout_seconds"])
+    except BaseException:
+        if process is not None:
+            # Do not let another catchable cancellation interrupt reaping.
+            cleanup_handlers = {}
             try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            process.wait()
-            raise
+                for number in (signal.SIGTERM, signal.SIGINT):
+                    cleanup_handlers[number] = signal.signal(number, signal.SIG_IGN)
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+            finally:
+                for number, handler in cleanup_handlers.items():
+                    signal.signal(number, handler)
+        raise
 
 
 def run_batch(manifest_path, ledger_path, invalidate=(), reason=None):
+    with termination_handler():
+        return _run_batch(manifest_path, ledger_path, invalidate, reason)
+
+
+def _run_batch(manifest_path, ledger_path, invalidate=(), reason=None):
     sources, checks = manifest(manifest_path)
     if len(set(invalidate)) != len(invalidate):
         raise ValidationError("Duplicate invalidation ID")
@@ -398,6 +450,9 @@ def main(argv=None):
     except (ValidationError, OSError, subprocess.TimeoutExpired) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
+    except TerminationRequested:
+        print("ERROR: SIGTERM; nonpassing receipts will be retried", file=sys.stderr)
+        return 128 + signal.SIGTERM
     except KeyboardInterrupt:
         print("ERROR: interrupted; running receipts will be retried", file=sys.stderr)
         return 130

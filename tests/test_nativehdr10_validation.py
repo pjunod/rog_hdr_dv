@@ -7,9 +7,11 @@ import io
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -281,6 +283,99 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(self.receipts()[-1]["status"], "running")
         self.assertEqual(self.run_batch(), 0)
         self.assertEqual(self.runs(), ["one"])
+
+    def test_sigterm_kills_check_and_descendant_before_retry(self):
+        ready = self.root / "ready.json"
+        child_code = "import time; time.sleep(60)"
+        code = (
+            "import json, os, subprocess, sys; from pathlib import Path\n"
+            f"ready = Path({str(ready)!r})\n"
+            "if ready.exists():\n"
+            "    print('retry after cancellation'); sys.exit(0)\n"
+            f"child = subprocess.Popen([sys.executable, '-c', {child_code!r}])\n"
+            "ready.write_text(json.dumps([os.getpid(), child.pid]))\n"
+            "child.wait()\n"
+        )
+        self.data["checks"] = [self.check("one", code)]
+        self.write_manifest()
+        pids = []
+        with (self.root / "runner.log").open("wb") as log:
+            runner = subprocess.Popen([sys.executable, str(SCRIPT), str(self.path),
+                                       "--ledger", str(self.ledger)], stdout=log,
+                                      stderr=subprocess.STDOUT)
+            try:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    if ready.exists():
+                        try:
+                            pids = json.loads(ready.read_text())
+                            break
+                        except ValueError:  # Wait for the complete readiness write.
+                            pass
+                    self.assertIsNone(runner.poll(), "runner exited before check readiness")
+                    time.sleep(0.01)
+                self.assertEqual(len(pids), 2, "check/descendant did not become ready")
+                runner.send_signal(signal.SIGTERM)
+                self.assertEqual(runner.wait(timeout=10), 128 + signal.SIGTERM)
+                for pid in pids:
+                    deadline = time.monotonic() + 5
+                    while self.process_running(pid) and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    self.assertFalse(self.process_running(pid), f"orphaned process {pid}")
+                self.assertNotEqual(self.receipts()[-1]["status"], "passed")
+                self.assertEqual(self.run_batch(), 0)
+                self.assertEqual(len(self.receipts()), 2)
+                self.assertEqual(self.receipts()[-1]["status"], "passed")
+            finally:
+                if runner.poll() is None:
+                    runner.kill()
+                    runner.wait()
+                for pid in pids:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
+    @staticmethod
+    def process_running(pid):
+        # Container init may retain adopted zombies: those cannot execute.
+        result = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)],
+                                capture_output=True, text=True, timeout=5)
+        state = result.stdout.strip()
+        return bool(state) and not state.startswith("Z")
+
+    def test_cancellation_during_launch_reaps_child_and_restores_handlers(self):
+        original = {number: signal.getsignal(number)
+                    for number in (signal.SIGTERM, signal.SIGINT)}
+        popen = subprocess.Popen
+        launched = []
+
+        def cancel_launch(*args, **kwargs):
+            process = popen(*args, **kwargs)
+            launched.append(process)
+            os.kill(os.getpid(), signal.SIGTERM)
+            return process
+
+        command = {"argv": [sys.executable, "-c", "import time; time.sleep(60)"],
+                   "cwd": str(self.source), "env": {}, "timeout_seconds": 10}
+        with (self.root / "launch.log").open("wb") as log:
+            with validation.termination_handler():
+                with mock.patch.object(validation.subprocess, "Popen", side_effect=cancel_launch):
+                    with self.assertRaises(validation.TerminationRequested):
+                        validation.execute(command, log)
+        self.assertEqual(len(launched), 1)
+        self.assertIsNotNone(launched[0].returncode)
+        for number, handler in original.items():
+            self.assertEqual(signal.getsignal(number), handler)
+
+    def test_imported_batch_restores_sigterm_handler_on_success_and_error(self):
+        handler = signal.getsignal(signal.SIGTERM)
+        self.assertEqual(self.run_batch(), 0)
+        self.assertEqual(signal.getsignal(signal.SIGTERM), handler)
+        self.data["checks"][0]["timeout_seconds"] = 0
+        with self.assertRaises(validation.ValidationError):
+            self.run_batch()
+        self.assertEqual(signal.getsignal(signal.SIGTERM), handler)
 
     def test_ledger_inside_source_must_not_overwrite_tracked_file(self):
         self.ledger = self.source / "affected.txt"

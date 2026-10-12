@@ -92,8 +92,14 @@ Each check requires:
   `LC_ALL=C`. No parent environment is inherited. Include required `HOME`,
   runtime-directory, renderer, library-path and test-setup values explicitly.
   Do not put credentials in this map: it is written verbatim to the receipt.
-- `timeout_seconds`: positive integer for that invocation. Timeout or interrupt
-  kills the child process group, not just a wrapper process.
+- `timeout_seconds`: positive integer for that invocation. Timeout, SIGINT or
+  SIGTERM kills the child process group and reaps the check, not just a wrapper
+  process.
+  Catchable cancellation during launch is deferred until its process handle
+  exists; imported batches restore the caller's signal handlers. Batches must
+  run on the main thread. SIGKILL, host loss and descendants that deliberately
+  escape the process group cannot be cleaned up by the runner; reconcile those
+  externally before retrying a nonpassing receipt.
 - Optional `paths`: mapping from a listed source ID to nonempty lists of
   literal tracked file/directory paths relative to that source. No globs,
   traversal, absolute names or missing paths. A missing mapping entry means
@@ -131,7 +137,7 @@ imported from the old handoff. An empty ledger really executes every explicit
 check; preserve it rather than starting a new one for another reviewer.
 
 On unchanged inputs, a successful check with its intact hash-verified log is
-skipped. A failed or interrupted check is retried once in that invocation;
+skipped. A failed or interrupted check is executed again by the next invocation;
 there is no in-process retry loop. Ordinary failures do not prevent other
 explicit affected checks from running. No test discovery, default full suite,
 reconstruction, installation or display action is added by the runner.
@@ -184,7 +190,8 @@ the ledger lock does not protect the checkouts from other tools.
 
 Exit codes: `0` means all manifest checks passed or reused valid successes;
 `1` means one or more executed checks failed; `2` means invalid input,
-receipt/source error or unavailable prerequisite; `130` means interrupted.
+receipt/source error or unavailable prerequisite; `130` means interrupted by
+SIGINT and `143` means terminated by SIGTERM after child cleanup.
 No exit code establishes display, optical, package or Dolby qualification.
 
 ## Integration and native execution
