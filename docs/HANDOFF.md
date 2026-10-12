@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Candidate being corrected | nativehdr10, `patches/mutter` 0050–0074 with reviewed corrections (see [status](STATUS.md#nativehdr10--adversarial-findings-being-corrected)) |
+| Candidate ready for final evidence verification | nativehdr10, `patches/mutter` 0050–0077, native `de09d575` / tree `058bbf97`, all71 unit receipts valid (see [status](STATUS.md#nativehdr10--reviewed-source-batch-and-validation)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -36,7 +36,8 @@ agent's workspace.
 
 ### nativehdr10 source candidate (2026-10-11)
 
-Both parts are now Mutter patches 0050–0061. The pins name candidate
+Initial implementation checkpoint: both parts are Mutter patches 0050–0061.
+The original pins named candidate
 `fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f`, tree
 `18ba4b5a752f4ee383541757b20116060f18daf9`, and patches 0001–0049 are
 unchanged. Every commit builds with warnings as errors, and the exported
@@ -58,7 +59,7 @@ receipts: 70 passed, one failed; all 73 execution logs hash-verified and all
 69 non-retried histories unchanged. See the
 [retry evidence](../evidence/nativehdr10-validation-attempt2.json).
 PR16 remains held unmerged.
-Corrections 0072–0074 are now integrated at native `980bb21`/tree `41605eb0`;
+Prior correction checkpoint: 0072–0074 were integrated at native `980bb21`/tree `41605eb0`;
 Fable approved them and exactly 17 genuinely invalidated checks. The required
 two-check gate passed all 20 color-management cases but monitor-dbus exited
 245 after reconnect, with no old fatal-colord warning printed. Dependent 15
@@ -85,25 +86,34 @@ in the offline Ubuntu cache, not the exact packaging imports.
    passes on the new tree: test-only binary identity and production-callback
    source unreachability are distinct grounds. For 0072–0074 Fable `t_6b592492`
    retains25native receipts by source-unreachability or virtual-monitor observable
-   equivalence, keeping actual trees. Sol owns Mac integration/evidence/status;
-   Opus exclusively diagnoses the new monitor-dbus exit245 with compilation/export
-   only (`t_ef832f3b`). Fable `t_c88207c7` reviews correction and recomputes scope.
-   Preserve colour-management's new41605eb0pass and colour-hdr's9111578epass unless
-   genuinely invalidated; the dependent15TEST checks still require valid receipts.
-   Same persistent ledger: `/work/hdr-nativehdr10-20261011/validation/receipts.json`,
-   SHA256 `480cbb50699512fce164b4ae23fe927de0fd51e77fc339856d893b383e0b9f13`.
-   Full export and review/hash inventories: ignored
-   `.peer-linux/deliverables/nativehdr10-validation-attempt3.tar.gz`
-   (SHA256 `bcf35417ae5c01dfea7dbcccea5ebc0a384acbef593d42b1db6597761dabc7b8`).
-   The exact17 manifest was split required2/dependent15 with identical objects,
-   sources, ledger/runner to enforce a required-pass gate without runner edits.
-   No further retry before focused diagnosis/review. Never reuse the executed
-   retry3 manifests to accidentally rerun successes; preserve their evidence.
-   Do not reconstruct, edit the frozen runner or start another full batch.
-   Final integrity runs after final evidence
-   and docs commit with receipt outside tracked source. Then
-   the repository pre-merge lane and one substantial PR that depends on
-   held PR16. After that, port to the Ubuntu series as 0062+ and package.
+   equivalence, keeping actual trees. Opus `t_ef832f3b` delivered compiled
+   0075–0077, Fable `t_c88207c7` approved the fixes and same17 retry set.
+   Current pins: native `de09d575e81799a1a75fe34a44d69f04caf2e727`, tree
+   `058bbf9758c65798d4d0010685e32e8e76da9d3d`; canonical full77 replay equals it.
+   All17 actual retries passed; color-management21/21cases, monitor-dbus invocation
+   and all15dependents. **All71 required unit receipts now valid**, with25native
+   retained under reviewed tiers and29unchanged runner histories. All92logs
+   verified,54histories unchanged. See
+   [final unit evidence](../evidence/nativehdr10-validation-attempt4.json).
+   Persistent ledger: `/work/hdr-nativehdr10-20261011/validation/receipts.json`,
+   SHA256 `b370ff84b5cd35802051d4ef1b222a6e2f6840acd08a2f019a615c75531bdc91`.
+   Full evidence/source/review/hash archive:
+   `.peer-linux/deliverables/nativehdr10-validation-attempt4.tar.gz`, SHA256
+   `3c263845d0617bb032c16cd16d2375baa618f56d98118666e6d63e4c48db9739`.
+   Final source bundle is inside `validation-attempt4/nativehdr10-final.bundle`,
+   SHA256 `8e3165df38c4fce2fab97e58f8f4e98de50bb4208b62e1dcc3f2b4fec9d5d996`;
+   it requires the unchanged `5f123bb` base already in the native source repo.
+   The wrapper postcheck failed after successful phases/export; schema-aware local
+   verification corrected it without reexecution. Do not rerun executed retry
+   manifests, reconstruct or edit the frozen runner/candidate. Final integrity
+   binds the final evidence/docs commit outside tracked source at
+   `.peer-linux/deliverables/final-integrity/receipts.json`.
+   Delivery child `t_2b0d5704` verifies without repeated units and prepares one
+   substantial PR depending on heldPR16; do not merge held dependency indirectly.
+   Optimization `t_38887c3f` and async lifetime assessment `t_3502f623` wait for
+   delivery, use separate ownership and must not change the frozen candidate.
+   Ubuntu port as0062+ and packaging remain later work with exact imports missing
+   from the offline cache; no physical/optical/Dolby acceptance is implied.
 2. **Open Dolby Vision track, stage 1** ([contract](OPEN_DV_DISPLAY_MANAGEMENT.md)):
    a headless libplacebo harness and ΔE_ITP comparison, then the baseline
    against the private reference renders on lab5. Today libplacebo uses only

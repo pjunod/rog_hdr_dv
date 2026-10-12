@@ -1,17 +1,16 @@
 # Night Light in HDR, and per-monitor target overrides (nativehdr10)
 
 **Status:** both parts implemented as Mutter patches 0050–0061, with the
-review and batch-failure corrections 0062–0074 appended (native candidate
-980bb21, tree 41605eb0). Every commit compiled with warnings as errors and the exported
-series replays to the built tree. Both adversarial and focused reviews are
-delivered; pre-freeze findings are addressed. The single affected validation
-batch returned 69 passes and two failures. The restricted retry passed colour
-channel bounds and the target-overrides D-Bus case, then failed in the later
-has-external-monitor case on colord lookup. Latest receipts are 70 passed,
-one failed. The next required-check gate passed all 20 color-management cases,
-including two new colord lifecycle regressions, but monitor-dbus exited 245 after
-reconnect. The dependent 15 invalidated checks did not run; current-candidate
-validity is 55 passing, one failed, 15 pending, not acceptance ·
+review and batch-failure corrections 0062–0077 appended (native candidate
+de09d575, tree 058bbf97). Every commit compiled with warnings as errors and the
+full 77-patch canonical series replays to the built tree. Both adversarial and
+focused reviews are delivered; findings are addressed. All **71 required unit
+receipts are now valid passes**: 17 approved retries passed, 25 native passes
+retain their actual executing trees under Fable's source/equivalence decision,
+and all 29 unchanged scoped runner methods retain their first-batch passes.
+All 92 logs are hash-verified; final repository integrity is recorded outside
+tracked source after the final evidence/docs commit. Final delivery verification,
+PR preparation, Ubuntu packaging and physical qualification are separate ·
 **Date:** 2026-10-12.
 
 Corrections 0069/0071 repair test precision and confirmation-fixture handling.
@@ -26,10 +25,23 @@ claim of upstream acceptance. See the
 lifecycle defects: withdraw a colord device when its manager drops it, not when
 the last asynchronous-task/view reference disappears; delete removed devices
 before creating same-ID replacements on connector moves. They are not HDR
-features or upstream acceptance. 0074's two focused regressions passed, but the
-remaining monitor-dbus failure still blocks acceptance. See the
+features or upstream acceptance. 0074's two focused regressions passed. See the
 [colord corrections](../evidence/nativehdr10-colord-corrections.json) and
 [required-gate results](../evidence/nativehdr10-validation-attempt3.json).
+
+0075 and 0076 correct pre-existing base async callbacks that cast borrowed
+user data before checking cancellation, exposed by 0072's drop-time cancellation.
+They finish/check cancellation before using the device/profile pointer; no
+extra lifetime reference, warning suppression or fixture change is added.
+The prior exit245 decodes as SIGSEGV; its faulting frame was inferred statically,
+not observed in a core. Fable approved these separate upstream-candidate fixes,
+not HDR features or upstream acceptance. 0077 adds unplug-during-setup coverage;
+the subsequent color-management invocation passed all21 cases, monitor-dbus
+passed, and all15 dependent checks passed. See the
+[cancellation corrections](../evidence/nativehdr10-cancellation-corrections.json)
+and [final scoped retry](../evidence/nativehdr10-validation-attempt4.json).
+Base manager-callback and store/generation teardown lifetime observations remain
+unproven follow-up assessments (`t_3502f623`), not changes to this candidate.
 
 Two compositor changes for general availability, specified together because
 both change how the colour device builds an output's rendering colour state.
@@ -356,8 +368,9 @@ Dispositions:
   decision about upstream submission or agent identity has been made.
 - **F12.** The transient `NightLightSupported` flip on hotplug (above).
 
-The integrated candidate is compiled, reviewed and replay-verified. Its first
-single affected batch has 69 passes and two failures (colour channel-bound
-near zero and D-Bus restored-peak wait); correction and focused retries are
-still required, so it is not accepted. Ubuntu packaging, deployment and
-optical measurement remain separate later stages.
+The integrated candidate is compiled, reviewed and replay-verified. The first
+single affected batch had 69 passes and two failures; all subsequently failed
+or genuinely invalidated checks now have valid passes after focused corrections
+and review, without repeating unaffected successes. Final repository integrity
+binds the evidence/docs commit in an external receipt. Ubuntu packaging,
+deployment, optical measurement and Dolby qualification remain separate stages.

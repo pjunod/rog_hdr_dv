@@ -63,16 +63,16 @@ generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides, and
-records their implementation as Mutter patches 0050–0074. That candidate is
-compiled and pinned; both adversarial and focused reviews are delivered and
-pre-freeze findings addressed. The single affected batch returned 69 passes
-and two failures; the restricted retry passed colour channel bounds and the
-target-override D-Bus case, but exposed a later colord warning. Latest receipts
-are 70 recorded passes, one failure, but 15 genuinely invalidated checks remain
-pending. The next required-check gate passed color-management (including the
-two colord lifecycle regressions), while monitor-dbus exited 245 after reconnect.
-For the current candidate: 55 valid passes, one failure, 15 pending; it is not
-accepted, packaged or deployed.
+records their implementation as Mutter patches 0050–0077, pinned at native
+`de09d575` / tree `058bbf97`. Both adversarial reviews and focused correction
+reviews are delivered, and every required unit check now has a valid passing
+receipt: **42 native invocations and 29 runner methods**. Only the 17 approved
+failed/genuinely invalidated checks were retried after the latest corrections;
+the other 54 histories retain their actual executing trees and reviewed
+retention grounds. All 92 execution logs are hash-verified. Repository integrity
+is a separate final gate, recorded outside tracked source after the final
+evidence/docs commit. Final evidence verification and PR preparation remain
+the delivery child's work; PR16 stays held. No packaging or deployment occurred.
 The earlier work-in-progress directories under `wip/` now only
 point to it.
 [nativehdr10 validation receipts](docs/NATIVEHDR10_VALIDATION.md) describes
@@ -87,6 +87,11 @@ successful checks or rewriting their executing source trees.
 The [next gated retry evidence](evidence/nativehdr10-validation-attempt3.json)
 accounts for all required checks, their actual executing trees and Fable's
 retention tiers without treating pending invalidated checks as accepted passes.
+The [final scoped retry evidence](evidence/nativehdr10-validation-attempt4.json)
+records all 17 new passes and all 71 valid unit receipts, with unchanged retained
+histories, exact fingerprints, log hashes and per-ID retention rationale.
+[Cancellation corrections](evidence/nativehdr10-cancellation-corrections.json)
+retain compiler/replay evidence for the base async defects exposed during validation.
 [Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
 agent: state, next tasks, environments and commands.
 

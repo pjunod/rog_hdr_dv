@@ -16,8 +16,12 @@ Latest receipts are 70 passed, one failed; see the
 [retry evidence](../evidence/nativehdr10-validation-attempt2.json).
 The next [required-check gate](../evidence/nativehdr10-validation-attempt3.json)
 passed color-management but monitor-dbus exited 245; 15 genuinely invalidated
-checks did not run. Raw 70 passing histories are not 70 valid current-candidate
-receipts: 55 valid passes, one failure, 15 pending. All 75 logs are preserved.
+checks did not run then. After focused correction/review, the
+[final scoped retry](../evidence/nativehdr10-validation-attempt4.json) passed
+all17 approved checks. All71 required unit receipts are valid, with 54 retained
+histories unchanged at their actual executing trees and all92 logs verified.
+Final repository integrity is recorded outside tracked source after the final
+evidence/docs commit; delivery evidence verification must reuse these passes.
 
 The existing [colour harness](../tools/test-mutter-colour.sh) selects tests and
 sets up their environment, but does not keep per-check retry receipts. Existing
@@ -219,6 +223,22 @@ sources, ledger and runner. The required gate failed, so the latter did not run
 and its older passes are marked pending-invalidated in public evidence, not
 claimed as current acceptance. No further retry before focused correction /
 scope review (`t_ef832f3b`, `t_c88207c7`).
+
+For corrections 0075–0077, Fable `t_c88207c7` approved the same17 objects/order
+on `058bbf97`: monitor-dbus and color-management required first, then15 dependent
+TEST-context checks. The color-management pass on `41605eb0` was genuinely
+invalidated by its new case and changed code. Retain25 native receipts under
+the same tiers, re-derived for cancel-before-cast: tierA has no colour manager;
+tierB has virtual monitors/no colord setup, with profile-conflict explicitly
+checked to complete its one directory profile creation non-cancelled before
+teardown. The library changed again (`3eb20c0c` → `1d8739de`); retention is
+reviewer-attested unreachability/observable equivalence, not library-byte identity.
+Both phases actually passed, with17 new attempts/invalidations and54 histories
+unchanged. No source tree or fingerprint was rewritten. All92 original/new logs
+are preserved. The external wrapper returned1 only after successful execution
+and export because the helper assumed a nonexistent top-level invalidations
+field; a local schema-aware verifier confirmed the history events, passes and
+hashes without reexecution. The frozen runner was never edited.
 
 ## Receipts, errors and retained evidence
 

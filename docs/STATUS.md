@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-11 (America/New_York) · **State:** hdr9 library and
+**Updated:** 2026-10-12 (America/New_York) · **State:** hdr9 library and
 `nativehdr8` compositor installed on 2026-10-11; the owner's HDR session runs
 on it and the owner accepted the picture. The tenth batch (`nativehdr9`,
 general display targets, and the upstream-facing Mutter port) is reviewed
@@ -13,7 +13,7 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## nativehdr10 — adversarial findings being corrected
+## nativehdr10 — reviewed source batch and validation
 
 The owned collaboration clone starts at the exact final handoff
 `7c78457581906a43377f8dbb0d8dc95b438f30d3`; PR 16 remains unmerged.
@@ -23,8 +23,8 @@ parts. The pinned upstream Mutter tree
 `72626245922181526fbcb990de3eb7f575efa56b` were reconstructed and compiled
 natively on x86_64 with warnings as errors in this task (164.61 seconds).
 
-**Done (source, compiled):** both parts are now Mutter patches 0050–0061
-in `patches/mutter`, pinned in `sources.json` as candidate
+**Initial source checkpoint (compiled):** both parts became Mutter patches 0050–0061
+in `patches/mutter`, originally pinned as candidate
 `fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f`, tree
 `18ba4b5a752f4ee383541757b20116060f18daf9`. Patches 0001–0049 are unchanged.
 
@@ -68,13 +68,13 @@ Night Light factors, a bounded observable-state restore wait, isolated
 user-override registration, real headless capture/readback coverage and
 SIGTERM child cleanup. Review completion is not candidate acceptance.
 
-**First batch:** the single affected batch executed 71 checks on native
+**First batch (historical result):** the single affected batch executed 71 checks on native
 `9570f9bb` / tree `ac02a18f`: **69 passed, 2 failed** in 134.99 seconds.
 All 29 individual Linux runner methods passed; 40 of 42 native checks passed,
 including the real capture case, isolated override case, gdctl, remaining
 monitor/backend and cursor cases. The failures are `mutter:color-hdr`
 (near-zero channel-bound assertion) and `mutter:monitor-dbus-tests`
-(restored-peak wait timeout). The candidate is **not accepted**.
+(restored-peak wait timeout). That first candidate was **not accepted**.
 The [first batch receipt](../evidence/nativehdr10-validation-attempt1.json)
 records every original attempt, command, source identity and log hash.
 All 71 original logs were retrieved and hash-verified and remain preserved.
@@ -117,7 +117,7 @@ reuse across whole-tree changes. Sol's transport postcheck assumed history lengt
 after both checks ran. A retrieval-only request preserved the actual ledger/logs,
 without reexecution or runner edits.
 
-**Current integration:** Opus delivered and Fable `t_6b592492` approved 0072–0074
+**Colord correction checkpoint:** Opus delivered and Fable `t_6b592492` approved 0072–0074
 at native `980bb21` / tree `41605eb0`, individually built with -Werror and replayed.
 0072 binds colord unregister to the manager's removal rather than the last reference;
 0073 removes old devices before creating replacements on connector moves. These
@@ -137,17 +137,39 @@ failure, 15 pending invalidated checks**, not acceptance. All 75 execution logs
 are hash-verified; 69 histories are unchanged. See the
 [gated retry evidence](../evidence/nativehdr10-validation-attempt3.json) and
 [colord correction receipt](../evidence/nativehdr10-colord-corrections.json).
-Opus `t_ef832f3b` exclusively owns native diagnosis/compile/export;
-Fable `t_c88207c7` reviews correction and recomputes retries. Sol owns Mac
-integration/evidence/status. Retain the new colour-management pass and prior
-colour-hdr pass unless a subsequent fix genuinely invalidates them.
+Opus `t_ef832f3b` delivered compiled corrections 0075–0077 at native
+`de09d575` / tree `058bbf97`; Fable `t_c88207c7` approved them. Source analysis
+identifies base async callbacks casting borrowed user data before cancellation
+checks, made reachable by 0072; no core frame was observed. The corrections
+check cancellation first and add an unplug-during-setup regression. Sol now
+owns released native source/build/retry-ledger and Mac integration/evidence/status.
+The same exact 17 checks required retry; color-management's `41605eb0` pass was
+genuinely invalidated. Retain 25 native and 29 runner histories at their actual
+executing trees under Fable's recorded source/equivalence decision. Canonical
+full 77-patch replay gives tree equality; prefix 0001–0074 is unchanged and
+three SHA256SUMS entries were deliberately appended for the reviewed corrections.
 
-**Remaining:** diagnose/fix and focused-review that failure; retry only failed or
-genuinely invalidated checks against the same persistent ledger. No second
-candidate-wide batch is planned. Final integrity
-is executed after all evidence/docs edits and their commit; its receipt
-stays outside tracked source to avoid receipt-in-tree circularity. The
-final-delivery child reuses receipts without rerunning successful tests.
+**Done (unit validation): all17 approved retries passed** on `058bbf97`, required
+pair then dependent fifteen, same persistent ledger/frozen runner. Monitor-dbus
+passed as a complete invocation; color-management passed21/21 cases including
+unplug-during-setup. Every one of the **71 required unit checks** has a valid
+pass:42 native invocations plus29 runner methods. All92 execution logs are
+hash-verified;54 retained histories remain unchanged. See the
+[final scoped retry evidence](../evidence/nativehdr10-validation-attempt4.json)
+and [cancellation correction receipt](../evidence/nativehdr10-cancellation-corrections.json).
+The wrapper returned1 only from an erroneous postcheck after both phases rc0 and
+export; schema-aware independent verification confirmed all histories/hashes,
+without test reexecution or frozen-runner edits. The final source bundle and
+full evidence archive are preserved under owned `.peer-linux/deliverables`.
+
+**Current handoff:** final repository integrity binds the final evidence/docs
+commit in an external receipt at `.peer-linux/deliverables/final-integrity`,
+avoiding receipt-in-tree circularity. Final-delivery `t_2b0d5704` verifies those
+receipts and prepares the substantial PR without repeating successful units.
+**Remaining:** no second candidate-wide batch. Separate optimization
+`t_38887c3f` and base async lifetime assessment `t_3502f623` wait for delivery
+and must not edit the frozen source/build. Publication and all later
+qualification stages remain separate.
 One substantial PR must declare its
 dependency on the held PR 16. Ubuntu port (0062+) and packaging, physical
 deployment, optical accuracy and Dolby Vision remain

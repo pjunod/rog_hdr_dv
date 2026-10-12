@@ -8,7 +8,7 @@ Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
 pre-merge-only review workflow. Future batches use that workflow.
 
-## nativehdr10 — review corrections in progress
+## nativehdr10 — findings resolved and unit receipts complete
 
 Astra and Fable independently reviewed repository `73918f3` and native
 Mutter `fa7eb2cf` / tree `18ba4b5a`. Reports are retained on the HDR board
@@ -26,7 +26,7 @@ acceptance. Fix/validation owner: `t_e5c490e6`.
 | F7: unrelated end-parse and mirror fixes bundled | End-parse behavior change withdrawn in 0065; mirror color-mode hunk retained with explicit split-before-upstream disposition. Authorship/history preserved. |
 | F8: disabled output retains configured override | Retain last-assignment declaration, consistent with existing colour-mode behavior; effective physical-target properties remain active-device-only. No new reset or alternate reporting policy. |
 | F9: offscreen reallocated each uniform step | Separate upstreamable optimization `t_38887c3f`; not part of this correctness batch. Preserve framebuffer when required format/dimensions unchanged, including reference-luminance path. |
-| F10: duplicate variant keys, gdctl readiness, installed fixture list | Installed fixture directory verified statically; gdctl passed first batch. Duplicate-key/override API case passed in restricted retry; entire monitor-dbus invocation still fails later, not accepted. |
+| F10: duplicate variant keys, gdctl readiness, installed fixture list | Installed fixture directory verified statically; gdctl passed first batch and approved lifecycle retry. Duplicate-key/override API and the complete monitor-dbus invocation now have a passing source-bound receipt. |
 | F11: agent copyright/upstream identity | Preserve authored copyright as provenance; upstream author/signoff mechanics remain an owner decision and no submission occurs. Do not invent owner attribution. |
 | F12: PQ hotplug capability transient | Accept documented false-to-true NightLightSupported notification during rebuild-before-assignment; notify-on-change bounds traffic. No forced support or unrelated lifecycle redesign. |
 
@@ -126,6 +126,42 @@ Stop before more execution. Opus `t_ef832f3b` exclusively owns native diagnosis 
 compile/export; Fable `t_c88207c7` gates focused correction/retry scope. Sol keeps
 Mac integration/evidence/status; colour-management's newpass and colour-hdr's
 priorpass are retained unless a new correction genuinely invalidates them.
+
+Final correction checkpoint: Opus delivered 0075–0077 at `de09d575` / tree
+`058bbf97`; Fable `t_c88207c7` approved the cause, minimal fixes and same17
+retry set. `ensure_device_profile_cb` and `on_cd_profile_created` used a
+borrowed pointer before checking cancellation in the base code. 0072 exposed
+the cancelled idle completion after the owner's last reference. 0075/0076
+check cancellation before casting, without extra references or suppression.
+Exit245 decodes as SIGSEGV, but the frame was inferred statically, not observed
+in a core. These are separate upstream-candidate base-defect fixes, not HDR
+features or upstream acceptance. 0077 adds unplug-during-setup coverage. Each
+commit built warm with -Werror; canonical full77 replay equals the built tree,
+and 0001–0074 remain byte-identical. See the
+[cancellation correction receipt](../evidence/nativehdr10-cancellation-corrections.json).
+
+Actual final scoped retry: **all17 passed**, required2 then dependent15.
+Color-management passed21/21 subcases including unplug-during-setup; the whole
+monitor-dbus invocation passed (source-bound command/exit0 retained; successful
+TAP stdout was overwritten by the next Meson invocation, so no TAP observation
+is claimed). All71 unit checks now have valid passes, all92 execution logs are
+hash-verified, and54 prior histories are unchanged. Retain25 native passes
+under Fable's re-derived tiers, including explicit profile-conflict analysis,
+and29 scoped runner passes at their actual executing trees/fingerprints. See
+[complete unit evidence](../evidence/nativehdr10-validation-attempt4.json).
+The wrapper postcheck assumed a nonexistent top-level invalidations field and
+returned1 after both rc0 phases and export; independent schema-aware local
+verification confirmed17 events/attempts/54retentions/92hashes without reexecution.
+No passing unit suite was rerun merely for another reviewer. Final repository
+integrity binds the evidence/docs commit in an external receipt; final delivery
+`t_2b0d5704` verifies evidence and prepares the substantial held-dependency PR.
+
+Deferred source observations: base manager connect/proxy callbacks cast borrowed
+user data before cancellation checks; store generation completion may outlive
+the store at teardown. Neither is changed or proven reachable here. Assessment
+`t_3502f623` and optimization `t_38887c3f` wait for final delivery and must not
+edit this frozen candidate. Packages, physical/optical/Dolby qualification and
+upstream acceptance remain separate; PR16 held, no devices/deployment.
 
 ## Initial repository review
 
