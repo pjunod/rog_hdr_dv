@@ -46,6 +46,19 @@ handler restoration and replay through the caller's handler; confirmation
 unhandled and is explicitly documented. R4 cancellation provenance is added.
 These are source/static corrections, not runtime passes.
 
+Freeze checkpoint: 0062–0068 are integrated at native `9570f9bb` / tree
+`ac02a18f`; [correction receipt](../evidence/nativehdr10-review-corrections.json)
+retains compiler/replay/export evidence. Astra-focused R1 is fixed by 0068
+(assert reads, initialize buffers, require opaque nonempty content).
+Fable confirmed R1/R2 and accepted R3/R4; R5 interrupted-mask cleanup and
+R6 TERM-first replay are folded into `e4f981d` before freeze, with regression
+coverage written. No further design review is required for those hygiene
+changes per Fable. F7 end_parse is withdrawn in 0065; the mirror hunk remains
+with an explicit split-before-upstream disposition. F10 installed fixture
+directory is verified; D-Bus duplicate-key and gdctl readiness await the batch.
+All actionable pre-freeze findings are addressed; runtime acceptance remains
+pending. Sol has exclusive native source/build and Mac integration ownership.
+
 ## Initial repository review
 
 | Finding | Evidence | Disposition |

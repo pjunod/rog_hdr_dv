@@ -67,27 +67,32 @@ Night Light factors, a bounded observable-state restore wait, isolated
 user-override registration, real headless capture/readback coverage and
 SIGTERM child cleanup. Review completion is not candidate acceptance.
 
-**Current:** Sol owns runner cleanup/regressions, evidence and validation;
-Opus delivered compiled/replay-verified corrections 0062–0067 at native
-`05288b05` / tree `42eb3a5a` (`t_800e0a15`); these still await canonical
-patch/pin integration. Focused Astra review (`t_40a0cc27`) approves the
-default-anchored production design, with capture-readback test hardening
-assigned exclusively to Opus (`t_6dd3c64c`). Sol corrected Fable's remaining
-runner handler windows in `cc82113`; focused pre-freeze confirmation
-`t_0641f434` is pending. Documentation precision is fixed in `4846eda`.
-No units have executed. Fable's
+**Current:** review corrections 0062–0068 are integrated and pinned at native
+`9570f9bb` / tree `ac02a18f`, with unchanged 0001–0061 prefix, individual
+warnings-as-errors builds and replay equality. See the
+[correction receipt](../evidence/nativehdr10-review-corrections.json).
+Focused Astra review approves the default-anchored production design;
+Opus completed the requested successful/nonempty capture readback sanity
+in 0068 and released native source/build ownership to Sol. Fable confirmed
+runner `cc82113`; Sol folded the scoped mask/replay hygiene into `e4f981d`
+before freezing it. Documentation precision is fixed in `4846eda`.
+Sol exclusively owns integration/native validation now. No units have
+executed at this freeze checkpoint. Fable's
 recorded decision anchors the diagonal factors at the default temperature's
 Planckian white, preserving exact off-state identity and continuous onset;
 absolute Planckian-white accuracy is no longer the acceptance claim.
 
-**Remaining:** finish the scoped capture hardening and runner confirmation,
-integrate the final patches/pins/hash/compiler/replay evidence, then freeze
-the candidate. Write the affected-check
-manifest from existing Meson test names and run it once on the native
-builder through `.peer-linux/run.py`, retrying only failures and checks the
-fixes invalidate. No unit test has run on this candidate. Golden gdctl
-fixtures are expectations, not execution evidence. After that come the
-repository pre-merge lane and one substantial PR that declares its
+**Remaining:** run the frozen affected manifest once on the native builder
+through `.peer-linux/run.py`: colour fast lane, all Wayland colour cases,
+the complete backend monitor suite, monitor-utils, cursor tests and
+one receipt per Python runner method. Declare full Mutter/library trees for
+native checks and only the runner/test files for Python methods. Resume the
+same ledger, retrying only failures and genuinely invalidated checks. Golden
+gdctl fixtures remain expectations until that batch passes. Final integrity
+is executed after all evidence/docs edits and their commit; its receipt
+stays outside tracked source to avoid receipt-in-tree circularity. The
+final-delivery child reuses receipts without rerunning successful tests.
+One substantial PR must declare its
 dependency on the held PR 16. Ubuntu port (0062+) and packaging, physical
 deployment, optical accuracy and Dolby Vision remain
 separate qualification stages. No laptop or display configuration change is

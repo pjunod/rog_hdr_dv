@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 03:50:16 +0000
+Subject: [PATCH] backends/monitor: Keep accepting truncated monitors.xml files
+
+The target override parser commit also finished parsing with
+g_markup_parse_context_end_parse(), which turned every truncated
+monitors.xml into a hard failure; before, the complete configurations it
+contained were loaded and the unfinished one dropped. That is a general
+behaviour change of configuration loading, unrelated to the overrides,
+and is not needed for their correctness: an override is only applied to
+its monitor configuration when its element closes, and a configuration
+is only stored when </configuration> closes, so an unfinished declaration
+is never accepted either way.
+
+Restore the previous behaviour, free override text left pending by a
+file that ends inside an override element, and drop the regression that
+asserted the hard failure. Hardening truncated-file handling, if wanted,
+belongs in its own change.
+---
+ src/backends/meta-monitor-config-store.c | 8 ++++++--
+ src/tests/monitor-store-unit-tests.c     | 8 --------
+ 2 files changed, 6 insertions(+), 10 deletions(-)
+
+diff --git a/src/backends/meta-monitor-config-store.c b/src/backends/meta-monitor-config-store.c
+index 606dbed..4dc1727 100644
+--- a/src/backends/meta-monitor-config-store.c
++++ b/src/backends/meta-monitor-config-store.c
+@@ -2284,8 +2284,7 @@ read_config_file (MetaMonitorConfigStore  *config_store,
+                                               G_MARKUP_TREAT_CDATA_AS_TEXT |
+                                               G_MARKUP_PREFIX_ERROR_POSITION,
+                                               &parser, NULL);
+-  if (!g_markup_parse_context_parse (parse_context, buffer, size, error) ||
+-      !g_markup_parse_context_end_parse (parse_context, error))
++  if (!g_markup_parse_context_parse (parse_context, buffer, size, error))
+     {
+       g_list_free_full (parser.current_logical_monitor_configs,
+                         (GDestroyNotify) meta_logical_monitor_config_free);
+@@ -2303,6 +2302,11 @@ read_config_file (MetaMonitorConfigStore  *config_store,
+       return FALSE;
+     }
+ 
++  /* A file that ends inside a target override element leaves its text
++   * pending; the override itself was never applied. */
++  if (parser.target_override_text)
++    g_string_free (parser.target_override_text, TRUE);
++
+   *out_configs = g_steal_pointer (&parser.pending_configs);
+   *should_update_file = parser.should_update_file;
+ 
+diff --git a/src/tests/monitor-store-unit-tests.c b/src/tests/monitor-store-unit-tests.c
+index 78f674e..7058a94 100644
+--- a/src/tests/monitor-store-unit-tests.c
++++ b/src/tests/monitor-store-unit-tests.c
+@@ -1375,14 +1375,6 @@ meta_test_monitor_store_target_override_invalid (void)
+       g_clear_error (&error);
+     }
+ 
+-  /* Unterminated XML must not silently accept an unfinished declaration. */
+-  g_assert_true (g_file_set_contents (input, parts[0], -1, &error));
+-  g_assert_no_error (error);
+-  g_assert_false (meta_monitor_config_store_set_custom (store, input, NULL,
+-                   META_MONITORS_CONFIG_FLAG_NONE, &error));
+-  g_assert_nonnull (error);
+-  g_clear_error (&error);
+-
+   g_assert_cmpint (g_remove (input), ==, 0);
+   g_assert_cmpint (g_rmdir (directory), ==, 0);
+ }

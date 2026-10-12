@@ -1,0 +1,108 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 04:13:11 +0000
+Subject: [PATCH] tests/color-management: Check that capture readbacks hold the
+ content
+
+The BT.2100 Night Light capture case compared pixels read back from the
+view framebuffer and the onscreen output without checking that either
+read succeeded, so a failed read left the compared pixels uninitialized,
+and captures that were blank in every state would have compared equal.
+
+Assert the result of both framebuffer reads, and that every pixel read
+back, in whichever encoding, holds the painted content: opaque, with the
+channel order of the painted color, which each encoding keeps.
+---
+ src/tests/wayland-color-management-test.c | 56 +++++++++++++++++------
+ 1 file changed, 41 insertions(+), 15 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 919ba56..dca9be4 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -2319,17 +2319,38 @@ typedef struct
+   uint8_t paint[4];
+ } CapturePixels;
+ 
++/*
++ * The content night_light_bt2100_capture() paints is an opaque orange with
++ * red above green above blue above zero. Each encoding a pixel of it is
++ * read back in keeps that: the blending state of a PQ output (sRGB primaries,
++ * a gamma transfer), the output's BT.2020 PQ (the BT.2020 conversion of this
++ * color keeps its channel order, and PQ is monotonic), and Night Light's
++ * warming of the latter (red kept, green and blue reduced, blue most). So a
++ * read of the painted content is opaque with red > green > blue > 0, in any
++ * of them, whereas an unpainted, cleared or failed read is not; this is
++ * what makes the comparisons between captures compare actual content.
++ */
++static void
++assert_capture_content (const uint8_t pixel[4])
++{
++  g_assert_cmpuint (pixel[3], ==, 255);
++  g_assert_cmpuint (pixel[0], >, pixel[1]);
++  g_assert_cmpuint (pixel[1], >, pixel[2]);
++  g_assert_cmpuint (pixel[2], >, 0);
++}
++
+ /*
+  * Paints a frame, then reads back, at the center of the output, a pixel
+  * of: the view framebuffer, which is the pre-output blending buffer that a
+  * single-output monitor stream reads in shared memory
+- * (meta_stream_source_monitor_record_to_buffer()); the view's onscreen
+- * framebuffer, which holds the output's encoding after the conversion of
+- * the blending state; and a stage paint to a buffer in @stream_color_state,
+- * the production path of every other capture to memory
+- * (clutter_stage_paint_to_buffer(), and through
++ * (meta_stream_source_monitor_record_to_buffer(), which itself is not
++ * called here); the view's onscreen framebuffer, which holds the output's
++ * encoding after the conversion of the blending state; and a stage paint
++ * to a buffer in @stream_color_state, the production path of every other
++ * capture to memory (clutter_stage_paint_to_buffer(), and through
+  * clutter_stage_paint_to_framebuffer_clipped() the monitor stream repaint,
+- * area and virtual streams).
++ * area and virtual streams). Every read must succeed and hold the painted
++ * content.
+  */
+ static void
+ read_capture_pixels (ClutterStage      *stage,
+@@ -2338,19 +2359,20 @@ read_capture_pixels (ClutterStage      *stage,
+                      CapturePixels     *pixels)
+ {
+   MtkRectangle rect = { .x = 312, .y = 232, .width = 16, .height = 16 };
+-  uint8_t buffer[16 * 16 * 4];
++  uint8_t buffer[16 * 16 * 4] = { 0 };
+   g_autoptr (GError) error = NULL;
+ 
++  memset (pixels, 0, sizeof (*pixels));
+   meta_wait_for_presented (test_context);
+ 
+-  cogl_framebuffer_read_pixels (clutter_stage_view_get_framebuffer (view),
+-                                320, 240, 1, 1,
+-                                COGL_PIXEL_FORMAT_RGBA_8888_PRE,
+-                                pixels->capture);
+-  cogl_framebuffer_read_pixels (clutter_stage_view_get_onscreen (view),
+-                                320, 240, 1, 1,
+-                                COGL_PIXEL_FORMAT_RGBA_8888_PRE,
+-                                pixels->output);
++  g_assert_true (cogl_framebuffer_read_pixels (clutter_stage_view_get_framebuffer (view),
++                                               320, 240, 1, 1,
++                                               COGL_PIXEL_FORMAT_RGBA_8888_PRE,
++                                               pixels->capture));
++  g_assert_true (cogl_framebuffer_read_pixels (clutter_stage_view_get_onscreen (view),
++                                               320, 240, 1, 1,
++                                               COGL_PIXEL_FORMAT_RGBA_8888_PRE,
++                                               pixels->output));
+   g_assert_true (clutter_stage_paint_to_buffer (stage, &rect, 1.0f,
+                                                 buffer, 16 * 4,
+                                                 COGL_PIXEL_FORMAT_RGBA_8888_PRE,
+@@ -2359,6 +2381,10 @@ read_capture_pixels (ClutterStage      *stage,
+                                                 &error));
+   g_assert_no_error (error);
+   memcpy (pixels->paint, buffer + (8 * 16 + 8) * 4, 4);
++
++  assert_capture_content (pixels->capture);
++  assert_capture_content (pixels->output);
++  assert_capture_content (pixels->paint);
+ }
+ 
+ /* Equal within one 8-bit code value. */

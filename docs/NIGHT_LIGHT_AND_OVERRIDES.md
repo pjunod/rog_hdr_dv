@@ -1,11 +1,11 @@
 # Night Light in HDR, and per-monitor target overrides (nativehdr10)
 
 **Status:** both parts implemented as Mutter patches 0050–0061, with the
-review corrections 0062–0067 appended (native candidate 05288b05, tree
-42eb3a5a). Every commit compiled with warnings as errors and the exported
-series replays to the built tree. Both adversarial reviews are delivered;
-the anchored Night Light correction awaits its focused review, and no unit
-test has run on this candidate ·
+review corrections 0062–0068 appended (native candidate 9570f9bb, tree
+ac02a18f). Every commit compiled with warnings as errors and the exported
+series replays to the built tree. Both adversarial and focused reviews are
+delivered; pre-freeze findings are addressed. The single affected validation
+batch is next; no unit test has run on this candidate yet ·
 **Date:** 2026-10-11.
 
 Two compositor changes for general availability, specified together because
@@ -300,7 +300,7 @@ Known compatibility limit: a client that does not know these properties
 The Settings UI is later work. Older compositors reject the new monitor XML
 children rather than ignoring them; see [rollback preparation](OPERATIONS.md#2-protect-the-working-installation).
 
-### Review corrections 0062–0067 and dispositions
+### Review corrections 0062–0068 and dispositions
 
 The corrections are appended after 0061 rather than amended into it, so the
 reviewed 0050–0061 stay byte-identical:
@@ -313,6 +313,7 @@ reviewed 0050–0061 stay byte-identical:
 | 0065 | F7 | Withdraw the unrelated truncated-file hard failure |
 | 0066 | F3 | User-override case in its own Meson invocation |
 | 0067 | F4 | Headless paint/readback capture regression |
+| 0068 | Astra-focused R1 | Assert successful reads and opaque, nonempty content on all three capture/output paths |
 
 Dispositions:
 
@@ -330,7 +331,6 @@ Dispositions:
   decision about upstream submission or agent identity has been made.
 - **F12.** The transient `NightLightSupported` flip on hotplug (above).
 
-The integrated candidate is compiled and replay-verified, not unit-qualified.
-It still needs the focused review of 0062, then one affected unit batch,
-before acceptance. Ubuntu packaging, deployment and optical measurement are
-separate later stages.
+The integrated candidate is compiled, reviewed and replay-verified, not yet
+unit-qualified. The single affected unit batch precedes acceptance. Ubuntu
+packaging, deployment and optical measurement are separate later stages.

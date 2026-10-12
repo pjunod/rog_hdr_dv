@@ -63,9 +63,9 @@ generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides, and
-records their implementation as Mutter patches 0050–0061. That candidate is
-compiled and pinned; both adversarial reviews delivered findings currently
-being corrected. It is not yet unit-validated, packaged or deployed.
+records their implementation as Mutter patches 0050–0068. That candidate is
+compiled and pinned; both adversarial and focused reviews are delivered and
+pre-freeze findings addressed. It is not yet unit-validated, packaged or deployed.
 The earlier work-in-progress directories under `wip/` now only
 point to it.
 [nativehdr10 validation receipts](docs/NATIVEHDR10_VALIDATION.md) describes

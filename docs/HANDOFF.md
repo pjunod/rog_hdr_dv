@@ -55,14 +55,15 @@ in the offline Ubuntu cache, not the exact packaging imports.
 1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Sol's
    [validation receipt runner](NATIVEHDR10_VALIDATION.md) is integrated.
    Astra and Fable delivered both reviews and focused reports. Opus delivered
-   corrections 0062–0067 at native `05288b05`/tree `42eb3a5a`, compiled/replayed
-   but not yet integrated into canonical patches/pins. Astra approves the
-   anchored production design; Opus exclusively owns capture test hardening
-   `t_6dd3c64c`. Sol owns Mac runner/docs/integration/validation; runner windows
-   fixed in `cc82113`, focused Fable confirmation `t_0641f434` pending.
-   No native commands by Sol until Opus hands ownership back. Complete these
-   gates, integrate final exports/pins/hash/evidence, then write the affected-check
-   manifest and run it once through the runner on the native builder. Then
+   corrections 0062–0068 at native `9570f9bb`/tree `ac02a18f`, now integrated
+   into canonical patches/pins with individual -Werror builds and replay.
+   Astra approves the anchored production design; 0068 hardens capture sanity.
+   Fable confirms runner `cc82113`; mask/replay hygiene is fixed in `e4f981d`.
+   Opus released native ownership; Sol now exclusively owns native validation
+   and Mac integration/docs. Execute the frozen affected manifest once using
+   per-invocation and per-Python-method receipts, resume the same ledger, retry
+   failures/invalidated checks only. Final integrity runs after final evidence
+   and docs commit with receipt outside tracked source. Then
    the repository pre-merge lane and one substantial PR that depends on
    held PR16. After that, port to the Ubuntu series as 0062+ and package.
 2. **Open Dolby Vision track, stage 1** ([contract](OPEN_DV_DISPLAY_MANAGEMENT.md)):
