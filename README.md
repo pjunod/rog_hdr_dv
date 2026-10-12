@@ -92,6 +92,9 @@ records all 17 new passes and all 71 valid unit receipts, with unchanged retaine
 histories, exact fingerprints, log hashes and per-ID retention rationale.
 [Cancellation corrections](evidence/nativehdr10-cancellation-corrections.json)
 retain compiler/replay evidence for the base async defects exposed during validation.
+The [delivery verification](evidence/nativehdr10-delivery-verification.json)
+records the read-only check of every final receipt and the decision to publish
+the candidate as a draft PR stacked on the held PR 16.
 [Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
 agent: state, next tasks, environments and commands.
 

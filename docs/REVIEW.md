@@ -156,6 +156,15 @@ No passing unit suite was rerun merely for another reviewer. Final repository
 integrity binds the evidence/docs commit in an external receipt; final delivery
 `t_2b0d5704` verifies evidence and prepares the substantial held-dependency PR.
 
+Delivery verification checkpoint (Fable `t_2b0d5704`): the final receipts were
+checked read-only against the retained archive: integrity receipt and log hash
+bound to `b7d6583`, `SHA256SUMS`, tracked patches equal to the canonical replay
+inputs, 71 latest and 92 ledger execution logs hash-verified, executing trees
+and qualification counts as recorded, clean publication scans. No unit was
+rerun and no second adversarial review was held; see the
+[delivery receipt](../evidence/nativehdr10-delivery-verification.json). The
+substantial PR is stacked on the held PR 16 and left unmerged.
+
 Deferred source observations: base manager connect/proxy callbacks cast borrowed
 user data before cancellation checks; store generation completion may outlive
 the store at teardown. Neither is changed or proven reachable here. Assessment

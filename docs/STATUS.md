@@ -162,17 +162,38 @@ export; schema-aware independent verification confirmed all histories/hashes,
 without test reexecution or frozen-runner edits. The final source bundle and
 full evidence archive are preserved under owned `.peer-linux/deliverables`.
 
-**Current handoff:** final repository integrity binds the final evidence/docs
-commit in an external receipt at `.peer-linux/deliverables/final-integrity`,
-avoiding receipt-in-tree circularity. Final-delivery `t_2b0d5704` verifies those
-receipts and prepares the substantial PR without repeating successful units.
+Final repository integrity binds the final evidence/docs commit `b7d6583` in
+an external receipt at `.peer-linux/deliverables/final-integrity`, avoiding
+receipt-in-tree circularity.
+
+**Done (delivery verification, Fable `t_2b0d5704`, 2026-10-12):** the final
+evidence was verified read-only; no unit check, build or probe ran. Clean
+`b7d6583` / tree `e70f190c` matches the integrity receipt and its recomputed
+log hash. `SHA256SUMS` verifies. The 28 tracked patches 0050–0077 equal the
+canonical replay inputs that gave tree `058bbf97`, and 0001–0049 and every
+other series are unchanged since the handoff head. All 71 latest execution
+logs and all 92 logs in the persistent ledger (`b370ff84…`) hash-verify from
+the retained archive; the 17 retries executed on `058bbf97`, 24 retained
+native receipts stay at `ac02a18f` and `color-hdr` at `9111578e`, as recorded.
+The saved required-phase TAP shows 21 `color-management` cases including
+unplug-during-setup; monitor-dbus keeps its source-bound exit 0 and Meson
+summary only. Gitleaks and the publication scan are clean over `main..HEAD`.
+See the [delivery receipt](../evidence/nativehdr10-delivery-verification.json).
+Repository integrity ran once more on the delivery commit.
+
+**Publication (stacked on the held PR 16):** public `main` (`eb41b16`) has
+not moved since PR 16 branched, so the candidate history contains PR 16's
+three commits. The substantial PR is therefore opened as a draft from
+`codex/team-hdr-nativehdr10-20261011` against `codex/open-dv-track`, PR 16's
+head. It cannot merge independently: merging it into `main` would land PR 16,
+and merging it into `codex/open-dv-track` would move PR 16's head. It stays
+reviewable and unmerged until the owner releases PR 16. The PR number is
+recorded in [handoff](HANDOFF.md) once opened.
+
 **Remaining:** no second candidate-wide batch. Separate optimization
-`t_38887c3f` and base async lifetime assessment `t_3502f623` wait for delivery
-and must not edit the frozen source/build. Publication and all later
-qualification stages remain separate.
-One substantial PR must declare its
-dependency on the held PR 16. Ubuntu port (0062+) and packaging, physical
-deployment, optical accuracy and Dolby Vision remain
+`t_38887c3f` and base async lifetime assessment `t_3502f623` are released by
+this delivery and must not edit the frozen source/build. Ubuntu port (0062+)
+and packaging, physical deployment, optical accuracy and Dolby Vision remain
 separate qualification stages. No laptop or display configuration change is
 authorized in this source batch.
 

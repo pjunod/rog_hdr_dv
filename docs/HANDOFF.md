@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Candidate ready for final evidence verification | nativehdr10, `patches/mutter` 0050–0077, native `de09d575` / tree `058bbf97`, all71 unit receipts valid (see [status](STATUS.md#nativehdr10--reviewed-source-batch-and-validation)) |
+| Delivered source candidate | nativehdr10, `patches/mutter` 0050–0077, native `de09d575` / tree `058bbf97`, all 71 unit receipts valid and verified read-only ([delivery receipt](../evidence/nativehdr10-delivery-verification.json)); published as a draft PR stacked on the held PR 16 (see [status](STATUS.md#nativehdr10--reviewed-source-batch-and-validation)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -108,10 +108,15 @@ in the offline Ubuntu cache, not the exact packaging imports.
    manifests, reconstruct or edit the frozen runner/candidate. Final integrity
    binds the final evidence/docs commit outside tracked source at
    `.peer-linux/deliverables/final-integrity/receipts.json`.
-   Delivery child `t_2b0d5704` verifies without repeated units and prepares one
-   substantial PR depending on heldPR16; do not merge held dependency indirectly.
-   Optimization `t_38887c3f` and async lifetime assessment `t_3502f623` wait for
-   delivery, use separate ownership and must not change the frozen candidate.
+   Delivery `t_2b0d5704` (Fable) verified every receipt read-only without
+   repeating units ([delivery receipt](../evidence/nativehdr10-delivery-verification.json))
+   and opened the substantial PR as a draft against `codex/open-dv-track`,
+   the head of the held PR 16, because `main` has not moved since PR 16
+   branched and the candidate history contains its three commits. The PR
+   cannot merge independently of PR 16 and stays unmerged until the owner
+   releases it; the PR number is recorded below once opened.
+   Optimization `t_38887c3f` and async lifetime assessment `t_3502f623` are
+   released by delivery, use separate ownership and must not change the frozen candidate.
    Ubuntu port as0062+ and packaging remain later work with exact imports missing
    from the offline cache; no physical/optical/Dolby acceptance is implied.
 2. **Open Dolby Vision track, stage 1** ([contract](OPEN_DV_DISPLAY_MANAGEMENT.md)):

@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "task": "t_2b0d5704",
+  "owner": "Fable (thinker), final delivery verification",
+  "date": "2026-10-12",
+  "stage": "Source-stage evidence verified read-only; one substantial implementation PR prepared, stacked on the held PR 16",
+  "verified_candidate": {
+    "repository_head": "b7d6583c6fd786b2c5ca191b0d15d8a0dafb649e",
+    "repository_tree": "e70f190c53c4ab1e07c47f58c890366c3c374561",
+    "working_tree": "clean (tracked); only ignored .peer-linux/, work/ and __pycache__ present",
+    "native_head": "de09d575e81799a1a75fe34a44d69f04caf2e727",
+    "native_tree": "058bbf9758c65798d4d0010685e32e8e76da9d3d",
+    "library_tree": "72626245922181526fbcb990de3eb7f575efa56b",
+    "mutter_patch_count": 77,
+    "base_commit": "d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7"
+  },
+  "checks_performed": [
+    {
+      "check": "external repository-integrity receipt binds the verified commit",
+      "result": ".peer-linux/deliverables/final-integrity/receipts.json sha256 bb9eddbf182fc4cfdf1a14a15eb168b2f19c415fca3002373df7344f77d5ecdd; head b7d6583/tree e70f190c, returncode 0; log sha256 8be8dfd07a296d353c3648b07343c07d5282abbfc77ac401fe7dea9b1e311226 recomputed and equal; log text 'PASS: 192 patches, 6 series, documentation links'"
+    },
+    {
+      "check": "SHA256SUMS verifies against the tracked tree",
+      "result": "shasum -a 256 -c SHA256SUMS: all 192 entries OK; the archive copy of SHA256SUMS is byte-identical to the tracked file"
+    },
+    {
+      "check": "tracked patches/mutter 0050-0077 equal the canonical replay inputs",
+      "result": "per-file sha256 of the 28 tracked patches equals validation-attempt4/canonical-replay/replay.json (base d82671c, 77 patches, TREE_EQUAL 058bbf97); diff -r of the archived canonical-patches directory against patches/mutter is empty"
+    },
+    {
+      "check": "prefix unchanged against the held handoff head",
+      "result": "git diff 7c78457..HEAD over patches/mutter 0001-0049 and every other series is empty"
+    },
+    {
+      "check": "pins",
+      "result": "sources.json mutter entry: candidate_commit de09d575, candidate_tree 058bbf97, patch_count 77; archived sources.json differs only in the candidate_status sentence (archive formed before the final docs commit), as the handoff recorded"
+    },
+    {
+      "check": "persistent unit ledger and execution logs",
+      "result": "validation-attempt4/receipts.json sha256 b370ff84b5cd35802051d4ef1b222a6e2f6840acd08a2f019a615c75531bdc91; 71 check IDs; attempt statuses 88 passed, 4 failed, 21 invalidated; 92 attempts carry a log and all 92 hash-verify from receipt-logs.tar.gz; evidence/nativehdr10-validation-attempt4.json names 71 latest logs and all 71 hash-verify; candidate validity passed for all 71; no nonzero returncode"
+    },
+    {
+      "check": "qualification and executing trees as claimed",
+      "result": "17 actual-execution on 058bbf97; 25 reviewer-retention (24 at ac02a18f, color-hdr at 9111578e) under FABLE_RETRY_DECISION_3.md sha256 a23d2b7e27028987c87ebbaf49371a0042bd967dfaabf50d2e489365dd39e312; 29 runner methods scoped-input-identity; runner sha256 7d927854a8da5a33ab323eb2c8b865c87b17fa3cd1af8cc68d8c92c2783a1f61 in every receipt"
+    },
+    {
+      "check": "retry provenance",
+      "result": "retry-provenance.json records both phase commands (required pair, then dependent 15) with returncode 0, the same ledger and runner hashes, and manifests retry3-required cf4e03dd… / retry3-dependent a265696d…"
+    },
+    {
+      "check": "gate logs and saved Meson output",
+      "result": "mutter-monitor-dbus-tests log tail: 'mutter:monitor-dbus-tests OK 2.90s, Ok: 1 Fail: 0'; mutter-color-management log tail: 'OK 1.43s, Ok: 1 Fail: 0'; saved required-phase TAP contains 21 ok lines under /color-management/ including unplug-during-setup; the monitor-dbus TAP stdout is not retained (overwritten by the following invocation), only its source-bound exit 0 and Meson summary"
+    },
+    {
+      "check": "post-execution identity",
+      "result": "post-execution-identity.json: head de09d575, tree 058bbf97, status clean, 'ninja: no work to do', libmutter-51 1d8739de…, mutter-color-management 2b369c87…, mutter-monitor-dbus-tests 2f01d452…, units_executed 0"
+    },
+    {
+      "check": "archives",
+      "result": "nativehdr10-final-handoff.tar.gz db2d835d07b19037cada777c3cbe8b1be75da782c57971ae54d3ae4bfe7c7cdf; nativehdr10-validation-attempt4.tar.gz 3c263845d0617bb032c16cd16d2375baa618f56d98118666e6d63e4c48db9739 (96 log entries); nativehdr10-collaboration-final.bundle 1b203a6182bbf36c55067c2222a263e45f4550e414f5b315b17499ac1668a04f verifies, contains b7d6583 and requires 7c78457"
+    },
+    {
+      "check": "publication scans",
+      "result": "gitleaks 8.x over refs/public/main..HEAD (25 commits): no leaks; gitleaks over the working directory: no leaks; tools/scan_publication.sh refs/public/main..HEAD: clean"
+    },
+    {
+      "check": "public repository state (read-only)",
+      "result": "main eb41b16d1be8c4c00b62d6e00e6986ac8b37b07a; codex/open-dv-track and refs/pull/16/head 7c78457581906a43377f8dbb0d8dc95b438f30d3; merge-base(main, 7c78457) = main, so PR 16 is exactly three commits over main and nothing on main is missing from the candidate; git merge-tree main HEAD reproduces e70f190c with no conflict; no PR exists yet from the team branch"
+    }
+  ],
+  "not_done": [
+    "No unit check, compiler job, reconstruction or behavioural probe was executed; retained receipts were not reinterpreted beyond their recorded grounds.",
+    "No second adversarial review; both reviews, their focused follow-ups and the resolution notes were read and found addressed in REVIEW.md.",
+    "No package build, installation, display change, device or Apple TV interaction, and no credential read; PR 16 was not merged or modified."
+  ],
+  "evidence_limits_carried_forward": [
+    "monitor-dbus TAP stdout of the passing invocation is not retained; the receipt keeps the source-bound command, exit 0 and Meson summary only.",
+    "The attempt-3 exit 245 faulting frame was inferred from source, not observed in a core.",
+    "PipeWire monitor-stream entry points are not executed by any check; capture coverage is stage paint-to-buffer and source-framebuffer readback plus source review.",
+    "Twenty-five native receipts are reviewer-attested retentions at their actual executing trees, not executions on 058bbf97.",
+    "No package, hardware, optical, Dolby Vision or upstream acceptance follows from these checks."
+  ],
+  "acceptance_decision": "Source stage accepted for publication as one reviewable PR: every required unit check has a valid passing receipt bound to its executing source, both adversarial reviews are resolved, the canonical series replays to the tested tree, and repository integrity passed on the verified commit. Package, physical and optical qualification remain separate stages.",
+  "publication_decision": {
+    "branch": "codex/team-hdr-nativehdr10-20261011",
+    "base": "codex/open-dv-track (head of the held PR 16, 7c78457)",
+    "why_not_main": "The candidate history starts at 7c78457. Public main has not moved since PR 16 branched, so a PR against main would contain and land PR 16's three held commits. Stacking on codex/open-dv-track shows only the 22 nativehdr10 commits and keeps PR 16 held.",
+    "merge_dependency": "The PR cannot merge independently of PR 16. Merging it into codex/open-dv-track would move PR 16's head; merging it into main would land PR 16. It is left open and reviewable until the owner releases PR 16, after which it can be rebased or merged in order.",
+    "mergeability_on_main": "Dry merge-tree shows no conflict with current main; this is informational only.",
+    "pull_request": "recorded in docs/STATUS.md and docs/HANDOFF.md after the PR is opened"
+  },
+  "verifier": {
+    "script": ".peer-linux/fable-delivery/verify_logs.py (owned, ignored) sha256 eae5f589e44158844dd6a98fcd2cf43739863a9032bb28f5eb52a7e0fc7940b0",
+    "output_sha256": "d18fe62ca34634ef6c72ce7276e7565af2dae1b30cc78945da4dc951cfd5c87e",
+    "method": "Python 3 with -I; hashes every log named by the public evidence and by every ledger attempt against the extracted receipt-logs archive; no network, no execution of checks"
+  },
+  "decisions_recorded": [
+    "Stack the PR on codex/open-dv-track rather than main, for the reason above; alternative of rebasing the 22 commits onto main was rejected because the series pins, docs and bundle require the 7c78457 handoff content and because it would present held work as new.",
+    "Open the PR as a draft so the merge button stays disabled while PR 16 is held; a draft is fully reviewable and the owner can mark it ready.",
+    "Run scripts/check_repository.py once on each delivery commit because documentation edits invalidate its link check; no other check is invalidated by documentation."
+  ],
+  "followups": {
+    "t_3502f623": "Base async callback lifetime assessment (Astra), released by this delivery; read-only, must not edit the frozen candidate",
+    "t_38887c3f": "Offscreen reallocation optimization (Opus), released by this delivery; separate checkout/build",
+    "runner_testlog_retention": "Created by this task: keep each check's Meson testlog beside its receipt so a passing TAP is never overwritten by the next invocation"
+  }
+}
