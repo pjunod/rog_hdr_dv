@@ -220,13 +220,13 @@ No exit code establishes display, optical, package or Dolby qualification.
    repository checks need a committed owned Git checkout in the container or
    a separate local manifest. Use the wrapper's documented regular-file export
    route for receipts/logs; do not bypass it with SSH or access credentials.
-5. Run the required Python runner regressions as a named check in the single
-   post-review batch. To retry an actual failed method, use
-   `PYTHONPATH=tests python3 -m unittest -v
+5. Give every required Python runner regression method its own stable check
+   ID and exact unittest target in the single post-review Linux batch:
+   `PYTHONPATH=tests python3 -B -m unittest -v
    test_nativehdr10_validation.ValidationTests.test_method` (one shell line,
-   substituting the real failed method). Narrowing an existing receipt command
-   requires a recorded invalidation; retain the original failed batch receipt
-   and account for every required method in the final acceptance evidence.
+   substituting the actual method). Scope these checks to the runner and test
+   files; retain one receipt per method and retry only nonpassing or genuinely
+   invalidated checks. No command-narrowing retry is needed.
 6. Retain ledger, manifest, logs and compiler/replay receipts in owned ignored
    evidence storage; sanitize any public summary separately. Reuse successful
    evidence for the second reviewer; do not execute the successful suites again.

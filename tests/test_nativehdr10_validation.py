@@ -361,6 +361,9 @@ class ValidationTests(unittest.TestCase):
         def cancel_launch(*args, **kwargs):
             process = popen(*args, **kwargs)
             launched.append(process)
+            # TERM must replay first even if Ctrl-C arrived first, so the
+            # coalescing flag protects the final receipt save.
+            os.kill(os.getpid(), signal.SIGINT)
             os.kill(os.getpid(), signal.SIGTERM)
             return process
 
@@ -384,6 +387,26 @@ class ValidationTests(unittest.TestCase):
         self.assertIsNotNone(launched[0].returncode)
         for number, handler in original.items():
             self.assertEqual(signal.getsignal(number), handler)
+
+    def test_interrupted_mask_install_restores_callers_mask(self):
+        sigmask = signal.pthread_sigmask
+        original = sigmask(signal.SIG_BLOCK, [])
+
+        def interrupt_after_block(how, numbers):
+            previous = sigmask(how, numbers)
+            if how == signal.SIG_BLOCK and numbers:
+                raise validation.TerminationRequested("interrupted mask install")
+            return previous
+
+        try:
+            with mock.patch.object(validation.signal, "pthread_sigmask",
+                                   side_effect=interrupt_after_block):
+                with self.assertRaises(validation.TerminationRequested):
+                    with validation.blocked((signal.SIGTERM, signal.SIGINT)):
+                        self.fail("interrupted block reached its body")
+            self.assertEqual(sigmask(signal.SIG_BLOCK, []), original)
+        finally:
+            sigmask(signal.SIG_SETMASK, original)
 
     def test_signal_during_handler_restoration_cannot_leak_other_handler(self):
         original = {number: signal.getsignal(number)

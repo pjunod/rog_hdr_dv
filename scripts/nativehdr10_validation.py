@@ -290,6 +290,18 @@ def output_location(path, sources):
                 raise ValidationError(f"Ledger output inside source must be Git-ignored: {path}")
 
 
+@contextmanager
+def blocked(numbers):
+    # Read first: pthread_sigmask may dispatch a raising Python handler after
+    # applying the block, before returning its old mask to the caller.
+    mask = signal.pthread_sigmask(signal.SIG_BLOCK, [])
+    try:
+        signal.pthread_sigmask(signal.SIG_BLOCK, numbers)
+        yield
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+
+
 def execute(command, log):
     # No handler may unwind launch, cleanup or partial handler restoration.
     # Block only while changing handlers (never across Popen), so the child
@@ -303,13 +315,10 @@ def execute(command, log):
         if signum not in pending:
             pending.append(signum)
 
-    mask = signal.pthread_sigmask(signal.SIG_BLOCK, numbers)
     try:
-        try:
+        with blocked(numbers):
             for number in numbers:
                 previous[number] = signal.signal(number, defer)
-        finally:
-            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
         try:
             process = subprocess.Popen(command["argv"], cwd=command["cwd"], env=command["env"],
                                        stdout=log, stderr=subprocess.STDOUT, shell=False,
@@ -331,15 +340,12 @@ def execute(command, log):
                     pass
                 process.wait()
     finally:
-        mask = signal.pthread_sigmask(signal.SIG_BLOCK, numbers)
-        try:
+        with blocked(numbers):
             for number, handler in previous.items():
                 signal.signal(number, handler)
-        finally:
-            signal.pthread_sigmask(signal.SIG_SETMASK, mask)
         # Replay through the caller-owned handler: termination_handler sets
         # its coalescing flag even for cancellation received during launch.
-        for number in pending:
+        for number in sorted(pending, key=numbers.index):
             signal.raise_signal(number)
         if pending:
             if signal.SIGTERM in pending:
