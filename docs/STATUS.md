@@ -68,14 +68,21 @@ user-override registration, real headless capture/readback coverage and
 SIGTERM child cleanup. Review completion is not candidate acceptance.
 
 **Current:** Sol owns runner cleanup/regressions, evidence and validation;
-Opus exclusively owns native corrections and the warm compiler tree
-(`t_800e0a15`). A focused Astra review (`t_40a0cc27`) gates the changed
-Night Light design before validation. No units have executed. Fable's
+Opus delivered compiled/replay-verified corrections 0062–0067 at native
+`05288b05` / tree `42eb3a5a` (`t_800e0a15`); these still await canonical
+patch/pin integration. Focused Astra review (`t_40a0cc27`) approves the
+default-anchored production design, with capture-readback test hardening
+assigned exclusively to Opus (`t_6dd3c64c`). Sol corrected Fable's remaining
+runner handler windows in `cc82113`; focused pre-freeze confirmation
+`t_0641f434` is pending. Documentation precision is fixed in `4846eda`.
+No units have executed. Fable's
 recorded decision anchors the diagonal factors at the default temperature's
 Planckian white, preserving exact off-state identity and continuous onset;
 absolute Planckian-white accuracy is no longer the acceptance claim.
 
-**Remaining:** fix the review findings. Then write the affected-check
+**Remaining:** finish the scoped capture hardening and runner confirmation,
+integrate the final patches/pins/hash/compiler/replay evidence, then freeze
+the candidate. Write the affected-check
 manifest from existing Meson test names and run it once on the native
 builder through `.peer-linux/run.py`, retrying only failures and checks the
 fixes invalidate. No unit test has run on this candidate. Golden gdctl

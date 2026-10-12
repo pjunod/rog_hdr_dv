@@ -54,11 +54,14 @@ in the offline Ubuntu cache, not the exact packaging imports.
 
 1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Sol's
    [validation receipt runner](NATIVEHDR10_VALIDATION.md) is integrated.
-   Astra and Fable delivered both reviews. Sol owns runner cleanup and
-   validation; Opus exclusively owns native fixes/builds (`t_800e0a15`).
-   Focused reviews `t_5625c404` (Fable, runner) and `t_40a0cc27` (Astra,
-   changed Night Light/capture design) gate unit execution. Fix the
-   findings, rebuilding each affected commit. Then write the affected-check
+   Astra and Fable delivered both reviews and focused reports. Opus delivered
+   corrections 0062–0067 at native `05288b05`/tree `42eb3a5a`, compiled/replayed
+   but not yet integrated into canonical patches/pins. Astra approves the
+   anchored production design; Opus exclusively owns capture test hardening
+   `t_6dd3c64c`. Sol owns Mac runner/docs/integration/validation; runner windows
+   fixed in `cc82113`, focused Fable confirmation `t_0641f434` pending.
+   No native commands by Sol until Opus hands ownership back. Complete these
+   gates, integrate final exports/pins/hash/evidence, then write the affected-check
    manifest and run it once through the runner on the native builder. Then
    the repository pre-merge lane and one substantial PR that depends on
    held PR16. After that, port to the Ubuntu series as 0062+ and package.

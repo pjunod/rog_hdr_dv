@@ -34,6 +34,18 @@ Both focused reviews and fixes precede one affected batch through the
 [receipt runner](NATIVEHDR10_VALIDATION.md). No units have run in this
 fixing stage. PR16 remains held unmerged; no physical or Apple TV activity.
 
+Focused review checkpoint: Astra approves Opus's 0062/0063 anchored design
+and finds F2/F3/F6/F7 satisfactory at native `05288b05`/tree `42eb3a5a`.
+It requests capture read-success and nonempty/opaque baseline assertions
+(`t_6dd3c64c`, Opus exclusive native ownership). Sol corrected the constant
+chromaticity-offset wording and explicitly retains both unexecuted PipeWire
+stream integration limits in `4846eda`. Fable's runner R1/R2 handler windows
+are corrected in `cc82113` with nonraising deferral through reap, atomic masked
+handler restoration and replay through the caller's handler; confirmation
+`t_0641f434` precedes freeze. R3 disposition: SIGHUP remains deliberately
+unhandled and is explicitly documented. R4 cancellation provenance is added.
+These are source/static corrections, not runtime passes.
+
 ## Initial repository review
 
 | Finding | Evidence | Disposition |
