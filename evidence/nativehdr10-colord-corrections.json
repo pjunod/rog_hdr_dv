@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "task": "t_e5c490e6",
+  "stage": "reviewed colord lifecycle corrections integrated; approved scoped validation pending",
+  "native_head": "980bb21f3adc84ade0edbeb2e85e4f798a228ae6",
+  "native_tree": "41605eb0894088936cfa633c4e048fedcfdb27a6",
+  "previous_native_head": "a8847717ea673fc6a34603aa5a99a9755e0b74ce",
+  "previous_native_tree": "9111578e2e03bda319277c8c7f48adabb6dec646",
+  "library_tree": "72626245922181526fbcb990de3eb7f575efa56b",
+  "corrections": {
+    "0072": "a32a10f: unregister colord device when manager drops it, idempotently; preserve rendering state for remaining refs; pre-existing upstream lifecycle defect",
+    "0073": "c4ddb21: drop removed devices before creating new ones to order DeleteDevice before same-ID CreateDevice on connector moves; pre-existing upstream lifecycle defect",
+    "0074": "980bb21: tests for unplug while referenced and connector move through real mocked-colord FindDeviceById"
+  },
+  "authorship": "Claude Agent <claude-agent@invalid>, exported bytes unchanged; no invented attribution/signoff/upstream acceptance",
+  "export_evidence": ".peer-linux/opus-colord/export",
+  "compiler_evidence": [".peer-linux/opus-colord/export/opus-colord-c1.log", ".peer-linux/opus-colord/export/opus-colord-c2.log", ".peer-linux/opus-colord/export/opus-colord-c3.log"],
+  "compiler_result": "Opus warm -Werror per commit: rc0, zero diagnostics, 25/7/2 steps. Sol independently verified clean native source and ninja -n no work; no redundant rebuild.",
+  "canonical_replay_evidence": ".peer-linux/results/d6bff688aa2846eeb56cac644ec8d2d8/exports/sol-colord-integration/replay.json",
+  "canonical_replay_result": "Full Mac canonical 0001-0074 replay onto d82671c gives TREE_EQUAL41605eb0; temporary detached worktree removed after equality",
+  "live_identity_evidence": ".peer-linux/results/8b26941947184033be79ca5e6d6670e5/output.txt",
+  "patch_integrity": "0001-0071 identical to8f6410d;0050-0071 byte equality with Opus export;SHA256SUMS deliberately appended exactly three hashes",
+  "review": "Fable t_6b592492 approved0072-0074 with no required fixes; decision sha256019f558252aabfefe941d30024d959e6330cd69aefaed6efd7a7d1e3daaf8f40",
+  "retry_policy": "Exactly17 genuinely invalidated IDs; retain25native+29runner histories unchanged at actual executing trees on reviewer-attested tierA/source-unreachability and tierB/virtual-monitor observable-equivalence grounds; no automatic whole-tree reuse. Frozen runner unchanged.",
+  "limits": ["Acceptance requires17passes then final external integrity receipt", "No upstream acceptance, packages, optical/Dolby qualification, device activity/push/merge/deployment;PR16 held"]
+}

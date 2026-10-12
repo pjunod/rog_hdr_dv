@@ -117,10 +117,16 @@ reuse across whole-tree changes. Sol's transport postcheck assumed history lengt
 after both checks ran. A retrieval-only request preserved the actual ledger/logs,
 without reexecution or runner edits.
 
-Sol owns Mac integration/evidence/validation. Opus `t_88ae3088` exclusively owns
-native source/build diagnosis, compilation and exports for the remaining colord
-warning, with no units. Fable `t_6b592492` reviews the correction and computes the
-next exact retry scope. No further retry has run; `color-hdr`'s new pass is retained.
+**Current integration:** Opus delivered and Fable `t_6b592492` approved 0072–0074
+at native `980bb21` / tree `41605eb0`, individually built with -Werror and replayed.
+0072 binds colord unregister to the manager's removal rather than the last reference;
+0073 removes old devices before creating replacements on connector moves. These
+are distinct fixes to pre-existing upstream lifecycle defects, not HDR features or
+upstream acceptance. 0074 adds unplug-with-reference and connector-move regressions.
+Sol now exclusively owns integration/native validation. The approved next retry
+is exactly 17 checks whose mocked-colord traffic changes; 25 native and 29 runner
+histories retain their actual executing trees under Fable's two-tier decision.
+No retry of this correction has run yet; `color-hdr`'s new pass is retained.
 
 **Remaining:** diagnose/fix and focused-review that failure; retry only failed or
 genuinely invalidated checks against the same persistent ledger. No second

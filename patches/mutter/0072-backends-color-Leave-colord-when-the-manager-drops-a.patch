@@ -1,0 +1,179 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 08:45:50 +0000
+Subject: [PATCH] backends/color: Leave colord when the manager drops a color
+ device
+
+A color device created its colord device when it was made and deleted it
+only in dispose, so it stood for its monitor in colord until its last
+reference was gone, rather than while the color manager had it. Other
+references outlive the manager's: the profile generation task, which runs
+with the color store's cancellable and keeps the device as its source
+object, and the stage views until they are rebuilt.
+
+When the monitor came back in the meantime, its new device, which has the
+same colord device ID, found the ID taken and looked the device up, and the
+old device's deletion, once its last reference went, removed the colord
+device the new one was using, or that lookup failed outright ("Failed to
+find existing colord device ... not found").
+
+Unregister a device from colord when the manager drops it: cancel its
+pending setup and delete its colord device then, as dispose did. Dispose
+still unregisters a device that was never dropped. The color state stays
+valid for the remaining references.
+---
+ src/backends/meta-color-device.c  | 63 ++++++++++++++++++++++---------
+ src/backends/meta-color-device.h  |  2 +
+ src/backends/meta-color-manager.c | 13 ++++++-
+ 3 files changed, 59 insertions(+), 19 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 3ae9dfe..67a1fd4 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -93,6 +93,7 @@ struct _MetaColorDevice
+ 
+   PendingState pending_state;
+   gboolean is_ready;
++  gboolean is_unregistered;
+   gboolean has_white_point;
+ 
+   float reference_luminance_factor;
+@@ -283,17 +284,33 @@ find_device_sync (CdClient    *cd_client,
+   return data.cd_device;
+ }
+ 
+-static void
+-meta_color_device_dispose (GObject *object)
++/*
++ * Withdraws the device from colord: stops its pending setup and deletes its
++ * colord device. The color device stands for its monitor in colord while the
++ * color manager has it, not until its last reference is gone: a profile
++ * generation still in progress, or a stage view yet to be rebuilt, may hold
++ * one. A colord device left behind would make the next device of the same
++ * monitor, which has the same colord ID, find its ID taken, and the colord
++ * device it then uses be deleted from under it. Only the colord side is
++ * released; the color state stays valid for the remaining references.
++ */
++void
++meta_color_device_unregister (MetaColorDevice *color_device)
+ {
+-  MetaColorDevice *color_device = META_COLOR_DEVICE (object);
+   MetaColorManager *color_manager = color_device->color_manager;
+-  CdClient *cd_client = meta_color_manager_get_cd_client (color_manager);
+   g_autoptr (CdDevice) cd_device = NULL;
+-  const char *cd_device_id;
++  const char *cd_device_id = color_device->cd_device_id;
++  CdClient *cd_client;
+ 
+-  meta_topic (META_DEBUG_COLOR,
+-              "Removing color device '%s'", color_device->cd_device_id);
++  /* Once unregistered, the device does not use its color manager again,
++   * which a remaining reference may outlive. */
++  if (color_device->is_unregistered)
++    return;
++
++  color_device->is_unregistered = TRUE;
++  cd_client = meta_color_manager_get_cd_client (color_manager);
++
++  meta_topic (META_DEBUG_COLOR, "Removing color device '%s'", cd_device_id);
+ 
+   if (color_device->assigned_profile_cancellable)
+     {
+@@ -302,21 +319,20 @@ meta_color_device_dispose (GObject *object)
+     }
+ 
+   g_cancellable_cancel (color_device->cancellable);
+-  g_clear_object (&color_device->cancellable);
+   g_clear_signal_handler (&color_device->device_profile_ready_handler_id,
+                           color_device->device_profile);
+   g_clear_signal_handler (&color_device->manager_ready_handler_id,
+                           color_manager);
+ 
+-
+-  g_clear_object (&color_device->assigned_profile);
+-  g_clear_object (&color_device->device_profile);
+-
+-  g_set_object (&cd_device, color_device->cd_device);
+-
+-  cd_device_id = color_device->cd_device_id;
+-  if (!cd_device && !color_device->is_ready &&
+-      cd_device_id && meta_color_manager_is_ready (color_manager))
++  cd_device = g_steal_pointer (&color_device->cd_device);
++  if (cd_device)
++    {
++      g_signal_handlers_disconnect_by_func (cd_device,
++                                            on_cd_device_changed,
++                                            color_device);
++    }
++  else if (!color_device->is_ready &&
++           cd_device_id && meta_color_manager_is_ready (color_manager))
+     {
+       g_autoptr (GError) error = NULL;
+ 
+@@ -333,9 +349,20 @@ meta_color_device_dispose (GObject *object)
+ 
+   if (cd_device)
+     cd_client_delete_device (cd_client, cd_device, NULL, NULL, NULL);
++}
++
++static void
++meta_color_device_dispose (GObject *object)
++{
++  MetaColorDevice *color_device = META_COLOR_DEVICE (object);
++
++  meta_color_device_unregister (color_device);
++
++  g_clear_object (&color_device->cancellable);
++  g_clear_object (&color_device->assigned_profile);
++  g_clear_object (&color_device->device_profile);
+ 
+   g_clear_pointer (&color_device->cd_device_id, g_free);
+-  g_clear_object (&color_device->cd_device);
+   g_clear_object (&color_device->monitor);
+   g_clear_object (&color_device->color_state);
+   g_clear_object (&color_device->rendering_color_state);
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 9049e53..e9c901b 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -141,6 +141,8 @@ MetaColorDevice * meta_color_device_new (MetaColorManager *color_manager,
+ void meta_color_device_update_monitor (MetaColorDevice *color_device,
+                                        MetaMonitor     *monitor);
+ 
++void meta_color_device_unregister (MetaColorDevice *color_device);
++
+ META_EXPORT_TEST
+ const char * meta_color_device_get_id (MetaColorDevice *color_device);
+ 
+diff --git a/src/backends/meta-color-manager.c b/src/backends/meta-color-manager.c
+index be0e2a0..430ebf9 100644
+--- a/src/backends/meta-color-manager.c
++++ b/src/backends/meta-color-manager.c
+@@ -180,6 +180,17 @@ on_target_volume_changed (MetaColorDevice  *color_device,
+                  0, color_device);
+ }
+ 
++/*
++ * A device the manager drops no longer stands for its monitor, whoever still
++ * holds a reference to it.
++ */
++static void
++remove_device (MetaColorDevice *color_device)
++{
++  meta_color_device_unregister (color_device);
++  g_object_unref (color_device);
++}
++
+ static void
+ update_devices (MetaColorManager *color_manager)
+ {
+@@ -193,7 +204,7 @@ update_devices (MetaColorManager *color_manager)
+   devices = g_hash_table_new_full (g_str_hash,
+                                    g_str_equal,
+                                    g_free,
+-                                   (GDestroyNotify) g_object_unref);
++                                   (GDestroyNotify) remove_device);
+ 
+   for (l = meta_monitor_manager_get_monitors (monitor_manager); l; l = l->next)
+     {
