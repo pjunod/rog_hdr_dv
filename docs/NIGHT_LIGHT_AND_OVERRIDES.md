@@ -58,9 +58,12 @@ Nothing excludes BT.2100. Upstream has the same behaviour.
   identity and the state equals today's, bit for bit. It is continuous
   across that point: 1 K either side, every factor is within 1e-3 of 1.
 - The shown white at a temperature is the output's own white moved by the
-  Planckian ratio, not the absolute Planckian chromaticity. It keeps the
-  output white's own offset from the 6500 K Planckian white (about
-  0.004 du'v' for D65, about 0.016 for a DCI white), as in SDR. The 6500 K
+  Planckian ratio, not the absolute Planckian chromaticity. The anchoring
+  preserves an RGB-relative reference relationship, not a constant distance
+  in chromaticity coordinates. Independent arithmetic examples for DCI-P3
+  give du'v' distances to the Planckian white of 0.01731 at 6500 K and
+  0.01579 at 4000 K (BT.2020: 0.00389 and 0.00384); these distances vary
+  with temperature. The 6500 K
   Planckian white is not D65, so anchoring at the encoding white instead
   would step green by about 4 % at every onset.
 - If the adaptation cannot be computed, the colour device warns and renders
@@ -79,8 +82,10 @@ gamma LUT or CTM is set for temperature; SDR is unchanged. Compositor
 tests: a surface on a BT.2100 output with Night Light active is converted,
 not scanned out, and returns to scanout when it is turned off; captures
 read back unchanged while the output's pixels warm. CPU and GLSL agree.
-(The earlier wording "the adapted D65 white lands on the Planckian white"
-was withdrawn: it cannot hold together with exact identity at 6500 K.)
+(Absolute Planckian matching at every non-default temperature arbitrarily
+near 6500 K conflicts with continuous exact identity at 6500 K; one isolated
+4000 K point alone does not. The chosen ratio contract replaces the earlier
+absolute-white acceptance, rather than making that broader impossibility claim.)
 
 ### Implementation (patches 0050–0054)
 
@@ -150,13 +155,16 @@ production boundaries: the view framebuffer (what the shared-memory stream
 reads), the view's onscreen (the output encoding) and
 `clutter_stage_paint_to_buffer` in the output's encoding (the stage paint
 behind the monitor stream repaint, area and virtual streams). With Night
-Light on, the output pixels warm while both captures stay within one
-8-bit code value; at the default temperature the output returns.
+Light on, the test requires the output pixels to warm while both captures
+stay within one 8-bit code value; at the default temperature the output must
+return. These are pending regression assertions, not runtime passes.
 
-Scope limit: the DMA-buffer monitor stream path (pre-paint scanout copy,
-pre-swap blit, repaint into the stream's blending framebuffer) needs
-PipeWire, which the headless fixture does not provide. It is not executed;
-it remains covered by source review and the colour-state predicates above.
+Scope limit: neither PipeWire monitor-stream entry point is invoked. The
+shared-memory coverage reads the source framebuffer directly; the stage
+screenshot/paint-to-buffer path is invoked. Shared-memory stream integration
+and the DMA-buffer stream path (pre-paint scanout copy, pre-swap blit, repaint
+into the stream's blending framebuffer) remain source-reviewed, not executed
+integration tests. The headless fixture does not provide PipeWire.
 Neither test involves a physical display or GPU scanout.
 
 ## 2. Per-monitor target overrides
