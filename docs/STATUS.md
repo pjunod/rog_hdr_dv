@@ -31,9 +31,11 @@ and is unmounted. No audio packages/settings/services changed and no sound
 was played or recorded. [Hardware](AUDIO_HARDWARE.md) and the
 [receipt](../evidence/audio-inventory-2026-10-12.json) record the evidence.
 
-Detailed [implementation contracts](AUDIO_IMPLEMENTATION.md) are ready for
-GPT-6.1 Sol build chats: offline speaker conversion, diagnostics/latency,
-and host-side Atmos. All are pending implementation qualification; live
+Three GPT-6.1 Sol build chats started on 2026-10-12 against the detailed
+[implementation contracts](AUDIO_IMPLEMENTATION.md): offline speaker
+conversion, diagnostics/latency, and host-side Atmos. Each has an isolated
+clone and a concrete code/build assignment. All are pending implementation
+qualification; live
 activation and M4 Air/M3 Max comparisons remain separate physical gates.
 Sonos work is deferred. The display status below is preserved.
 

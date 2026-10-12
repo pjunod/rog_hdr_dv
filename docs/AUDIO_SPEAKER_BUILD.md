@@ -85,8 +85,15 @@ is not a thermal/excursion protection implementation.
 
 Use a disposable Linux Python environment with pinned NumPy/SciPy and any
 upstream test dependencies. Record architecture and versions. Upstream's
-synthetic test command is `pytest -n 0 tests/`; corpus discovery must be
-explicitly disabled or isolated from OEM files for public testing. Run only
+synthetic-only baseline command is:
+
+```bash
+pytest -n 0 -m "not live_machine" --ignore=tests/corpus tests/
+```
+
+The upstream `live_machine` marker can remove isolation environment values,
+so excluding it and the corpus directory is mandatory for this synthetic run.
+Keep the container itself isolated from host audio and private data. Run only
 relevant upstream synthetic subsets in the fast lane after identifying them;
 record their actual names. Keep a private conversion receipt separate.
 

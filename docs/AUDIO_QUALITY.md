@@ -10,9 +10,11 @@ everyday media. Use the available M4 Air as the primary macOS reference and
 the M3 Max as secondary. The owner also has a Sonos Arc connected by eARC;
 the TV model and its passthrough capabilities still need inspection.
 
-Work through the milestones below. Read-only inventory is recorded in [audio hardware](AUDIO_HARDWARE.md); the
+Work through the milestones below. Read-only inventory is recorded in
+[audio hardware](AUDIO_HARDWARE.md); the
 detailed [implementation plan](AUDIO_IMPLEMENTATION.md) controls build order.
-Sonos Arc work is last, after internal audio and host Atmos. For live changes, coordinate playback, service restarts and profile activation. This
+Sonos Arc work is last, after internal audio and host Atmos. For live changes,
+coordinate playback, service restarts and profile activation. This
 plan does not install anything. Plurx-specific changes stay in Plurx.
 
 ## 1. Define macOS-level audio as measured outcomes
@@ -33,8 +35,8 @@ different physical limits, so compare both listening quality and measurements.
 | Research | Atmos on laptop/headphones | Object-aware decoding and appropriate renderer, with source-bound reference comparisons |
 
 **Evidence boundaries:** ASUS specifications describe intended hardware.
-Project READMEs describe candidate capabilities. Neither alone proves what this unit runs. The [audio inventory
-receipt](../evidence/audio-inventory-2026-10-12.json) now records actual
+Project READMEs describe candidate capabilities. Neither alone proves what
+this unit runs. The [audio inventory receipt](../evidence/audio-inventory-2026-10-12.json) now records actual
 read-only hardware/configuration findings. No listening, acoustic or Mac
 latency results have been obtained.
 

@@ -43,6 +43,9 @@ PipeWire and pipewire-pulse are `1.6.8-1ubuntu4`; WirePlumber is
 `1.2.15.2-1ubuntu2`, and the firmware metapackage is
 `20260915.git1522c78a.1ubuntu`.
 
+The `pactl` executable was unavailable; its card/sink/source probes did not
+run. Route evidence comes from `wpctl`, `pw-dump` and ALSA.
+
 No audio filters or playback streams were present in the captured graph.
 The graph settings were 48 kHz, default quantum 1024 frames, limits 32–2048,
 and no forced rate/quantum. The data-loop threads already had SCHED_RR

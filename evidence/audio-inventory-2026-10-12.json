@@ -25,7 +25,8 @@
     "wireplumber": "0.5.17-1ubuntu1",
     "alsa-ucm-conf": "1.2.16.1-1ubuntu1",
     "alsa-utils": "1.2.15.2-1ubuntu2",
-    "linux-firmware": "20260915.git1522c78a.1ubuntu"
+    "linux-firmware": "20260915.git1522c78a.1ubuntu",
+    "linux-firmware-misc": "20260915.git1522c78a-0ubuntu1"
   },
   "configuration": {
     "route": "HDA Intel PCH / ALC285 Analog / ACP analog stereo",
@@ -93,13 +94,120 @@
   },
   "private_evidence": {
     "raw_capture_sha256": "e238cdda2265448372de35786f5c296bf054ad30786dce5daa340dc7efe795a6",
-    "remote_directory": "~/.local/state/audio-quality/2026-10-12/"
+    "remote_directory": "~/.local/state/audio-quality/2026-10-12/",
+    "captures": [
+      {
+        "file": "inventory.json",
+        "sha256": "e238cdda2265448372de35786f5c296bf054ad30786dce5daa340dc7efe795a6",
+        "purpose": "Graph, ALSA mixer, scheduling, driver messages and per-probe outcomes"
+      },
+      {
+        "file": "initial.txt",
+        "sha256": "ed787bafa72a07974733ab7c2141eb5129a03082696d286829550201fa200989",
+        "purpose": "Codec identity and initial package inventory"
+      },
+      {
+        "file": "supplemental.json",
+        "sha256": "ad663178001082cf56466a01d942c75b11772d22ab684d720b5d52ab5f149fcd",
+        "purpose": "Rechecked package versions, amp-file equivalence and recovery unmounted state"
+      },
+      {
+        "file": "oem-manifest.json",
+        "sha256": "5d99b9a9445c7b5b6493bc5cd6ad7585e3a102fd1b6c5ad3eb46bd3ff57d8c98",
+        "purpose": "Selected file hashes, XML parse metadata and INF association"
+      },
+      {
+        "file": "extraction.log",
+        "sha256": "0205d6ed2f0c92d495c357f44aeaa851c7f714be2a61197216e8e0e61f143991",
+        "purpose": "7-Zip result and image reference-count warning"
+      }
+    ],
+    "acquisition": {
+      "packages": [
+        "dpkg-query",
+        "-W",
+        "pipewire",
+        "pipewire-pulse",
+        "wireplumber",
+        "alsa-ucm-conf",
+        "alsa-utils",
+        "linux-firmware",
+        "linux-firmware-misc"
+      ],
+      "firmware_comparison": "Read each named amp .bin; zstd -dc the corresponding .bin.zst; compare SHA-256 and bytes",
+      "python_version": "3.14.8",
+      "supplemental_captured_at": "2026-10-12T20:40:04.942101+00:00",
+      "recovery_unmounted": true
+    }
   },
   "limits": [
     "No playback, recording, service restart, profile activation or package installation",
     "No physical latency, acoustic accuracy, individual driver audibility or protection-behaviour measurement",
     "Kernel calibration-applied messages are not acoustic calibration evidence",
     "Recovery image reference-count warning retained; selected-file hashes identify extracted bytes, not signed authenticity",
-    "No Sonos work performed"
-  ]
+    "No Sonos work performed",
+    "pactl card/sink/source probes were unavailable; route evidence comes from wpctl, pw-dump and ALSA"
+  ],
+  "probe_outcomes": {
+    "playback": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "capture": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "status": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "cards": {
+      "status": "unavailable",
+      "detail": "command could not execute"
+    },
+    "sinks": {
+      "status": "unavailable",
+      "detail": "command could not execute"
+    },
+    "sources": {
+      "status": "unavailable",
+      "detail": "command could not execute"
+    },
+    "settings": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "graph": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "mixer": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "kernel": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "audio_log": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "modules": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "ucm": {
+      "status": "nonzero",
+      "returncode": 1
+    },
+    "recovery": {
+      "status": "ok",
+      "returncode": 0
+    },
+    "threads": {
+      "status": "ok",
+      "returncode": 0
+    }
+  }
 }
