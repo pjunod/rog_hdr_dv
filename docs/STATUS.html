@@ -12,11 +12,11 @@ th,td{text-align:left;vertical-align:top;padding:13px 14px;border-bottom:1px sol
 .callout{background:#192536;border-left:3px solid #8dcbff;padding:16px 20px;margin:24px 0}
 code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px){body{padding:24px 12px}th,td{padding:10px 7px}h1{font-size:2rem}}
 </style>
-<header><p class="muted">LINUX DISPLAY STACK · ASUS GU605MZ</p>
-<h1>HDR, Dolby Vision<br>and display quality</h1>
+<header><p class="muted">LINUX DISPLAY AND AUDIO · ASUS GU605MZ</p>
+<h1>Linux display<br>and audio quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 11, 2026 · hdr9 + nativehdr8 installed (owner accepted the picture); tenth batch (general display targets, nativehdr9; upstream-facing Mutter port) reviewed, fast-lane qualified and packaged, not installed</p></header>
+<p class="muted">Updated October 12, 2026 · hdr9 + nativehdr8 installed (owner accepted the picture); tenth batch (general display targets, nativehdr9; upstream-facing Mutter port) reviewed, fast-lane qualified and packaged, not installed</p></header>
 <div class="callout"><strong>Current physical result:</strong> the owner reported
 working HDR10 on the earlier patched stack (hdr6/nativehdr2) with Secure Boot
 enabled; hdr9 + nativehdr8 are installed; the HDR session runs on them and the
@@ -40,6 +40,7 @@ and measured calibration are not yet qualified.</div>
 <tr><td>Output characterization</td><td class="state pending">Contract defined</td><td>Deferred until an instrument measures how this unit renders PQ; firmware and factory-profile values are not used as a correction.</td></tr>
 <tr><td>Panel calibration</td><td class="state pending">Unqualified</td><td>Four factory profiles parsed privately. MHC2 transforms are identity; standard ICC characterisation differs by GPU route. Optical acceptance remains.</td></tr>
 <tr><td>Applications and Plurx</td><td class="state pending">Pending processor</td><td>Reusable platform path, then app integration and reference-corpus acceptance.</td></tr>
+<tr><td>Internal audio</td><td class="state active">Inspected; builds next</td><td>ALC285 and two CS35L56 amps; matching firmware and calibration reported. Exact ASUS DAX3 XML recovered privately. No live settings changed or acoustic/latency performance measured. GPT-6.1 Sol implementation contracts cover speaker tuning, diagnostics/latency and host Atmos; Sonos Arc/eARC is last. See <a href="AUDIO_IMPLEMENTATION.md">audio implementation</a>.</td></tr>
 </tbody></table>
 <p>A private offline reference experiment using official Dolby Professional Tools v5.6.4 completed. Proprietary processing details and outputs remain private. The generic synthetic PQ corpus passed all 11 new tests. Full playback integration, creative-trim qualification and optical measurement remain open.</p>
 <h2>Validated batches</h2>
@@ -52,8 +53,8 @@ description. Those fixes and three further premerge findings are resolved. All 4
 lane. Failed or invalidated checks are rerun individually. No automatic public
 CI job changes the laptop or runs proprietary components.</p>
 <h2>Decisions and limits</h2>
-<ul><li>Keep system display work in this repository; Plurx is an independent consumer.</li>
-<li>Implementation and review agents are Claude agents (Codex agents before the fifth batch); the independent review used Fable 5.1. The coordinator owns integration.</li>
+<ul><li>Keep system display and audio work in this repository; Plurx is an independent consumer.</li>
+<li>Display implementation/review uses the existing team; audio builds use owner-requested GPT-6.1 Sol chats. The coordinator owns integration.</li>
 <li>Do not replace full Dolby Vision with a DV-to-HDR10 result.</li>
 <li>Use root-cause evidence before output changes; no forced capability claims or watchdog workarounds.</li>
 <li>Keep OEM payloads, raw captures, credentials and signing material private. Publication scans run before pushes.</li></ul>

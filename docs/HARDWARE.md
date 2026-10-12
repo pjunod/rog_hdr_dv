@@ -79,3 +79,10 @@ even with an HDR panel. The machine tests the native SDR target path
 a stock 26.10 baseline. External HDR monitors on its NVIDIA outputs would
 test the CTA path. `nativehdr9` was installed on it on 2026-10-11
 ([receipt](../evidence/install-lab6-2026-10-11.json)).
+
+## Audio hardware and recovery findings
+
+The October 12 read-only [audio inventory](AUDIO_HARDWARE.md) records the
+ALC285 codec, two CS35L56 amplifiers, loaded model-specific tuning and exact
+OEM DAX3 speaker XML. These audio findings are separate from panel profiles
+and optical measurements.

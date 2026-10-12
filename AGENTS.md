@@ -1,12 +1,16 @@
 # Contributor workflow
 
 Read README.md, docs/STATUS.md and the relevant topical document first.
-This repository owns Linux HDR, Dolby Vision, colour management and panel
-tuning. Plurx application changes belong in its separate repository.
+This repository owns Linux HDR, Dolby Vision, colour management, panel tuning
+and audio quality, latency and Dolby Atmos. Plurx application changes belong
+in its separate repository.
 
 Keep source claims, inherited test receipts and new physical measurements
 distinct. A successful HDR decode or PQ surface is not full Dolby Vision.
 Do not claim calibrated accuracy without an optical measurement receipt.
+For audio, keep graph periods, physical latency, speaker tuning, object
+rendering and encoded passthrough distinct. No acoustic accuracy or speaker
+protection claim without scoped evidence. Sonos Atmos is the final audio lane.
 
 Preserve imported patch authorship, attribution and existing licence terms.
 Do not invent signoffs, reviews, certification or upstream acceptance. Keep
@@ -30,7 +34,10 @@ packages, signing keys and private recovery bundles out of version control.
 Read-only laptop inspection is distinct from display changes. Maintain
 recoverable stock packages and kernels. Do not replace a live compositor,
 alter boot selection or restart a session without a coordinated test window.
-No repository check may silently install or activate a display profile.
+No repository check may silently install or activate a display or audio
+profile. Read-only audio inspection must not play or record sound, change
+routing/mixer/metadata, or restart services. Build in isolated environments;
+coordinate activation and audible tests. Preserve stock amp protection.
 
 The repository is public. Scan the staged tree and reachable Git history for
 secrets before pushing; diagnostics and experimental output remain private

@@ -157,3 +157,14 @@ Before a live test, prepare compatible recovery packages, signing and NVIDIA
 module checks, and local recovery access using [operations](OPERATIONS.md).
 Do not infer future stock-library compatibility from a larger version number:
 the current stack consumes unpublished API additions.
+
+## 5. Build the audio lanes independently
+
+Use [audio implementation](AUDIO_IMPLEMENTATION.md) for the source pins,
+separate-clone ownership and three executable build contracts. Establish
+Linux dependency/compiler loops in disposable environments; no live sound
+hardware or session sockets enter offline tests. Public tests use synthetic
+inputs. Private OEM conversion, physical measurements and source compilation
+produce distinct receipts. Audio work does not modify display patch bytes or
+regenerate their hashes. Run the lane's focused checks after independent
+review, plus repository integrity and publication privacy scans.

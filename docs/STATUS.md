@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-11 (America/New_York) · **State:** hdr9 library and
+**Updated:** 2026-10-12 (America/New_York) · **State:** hdr9 library and
 `nativehdr8` compositor installed on 2026-10-11; the owner's HDR session runs
 on it and the owner accepted the picture. The tenth batch (`nativehdr9`,
 general display targets, and the upstream-facing Mutter port) is reviewed
@@ -12,6 +12,30 @@ The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENAN
 distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
+
+## Audio — read-only inspection and implementation batch
+
+The owner added internal speaker quality, lower latency and host Atmos to
+the platform scope, with Sonos Arc/eARC explicitly last. On 2026-10-12 the
+ROG was inspected read-only: Realtek ALC285 (`10431c63`), two CS35L56 SPI amps,
+model-specific DSP 3.11.16 and calibration-applied messages. Both speaker
+switches are on. The idle PipeWire graph is unfiltered stereo at 48 kHz with
+a 1024-frame default and realtime data-loop scheduling. This is not a physical
+latency or speaker-quality result. ACP is active; unsupported UCM does not
+by itself establish a routing defect.
+
+The recovery image contains the exact matching DAX3 speaker XML and INF.
+They were extracted privately, parsed and hashed; the image reader’s
+reference-count warning is retained. The recovery partition was read-only
+and is unmounted. No audio packages/settings/services changed and no sound
+was played or recorded. [Hardware](AUDIO_HARDWARE.md) and the
+[receipt](../evidence/audio-inventory-2026-10-12.json) record the evidence.
+
+Detailed [implementation contracts](AUDIO_IMPLEMENTATION.md) are ready for
+GPT-6.1 Sol build chats: offline speaker conversion, diagnostics/latency,
+and host-side Atmos. All are pending implementation qualification; live
+activation and M4 Air/M3 Max comparisons remain separate physical gates.
+Sonos work is deferred. The display status below is preserved.
 
 ## Installation — hdr9 and nativehdr8 (2026-10-11)
 
@@ -303,7 +327,10 @@ The staged acceptance criteria remain in
 
 Recorded for review; each can be revisited.
 
-- Since the fifth batch, agent commits use `Claude Agent <claude-agent@invalid>`
+- Audio implementation (requested 2026-10-12) uses GPT-6.1 Sol chats in
+  isolated clones. The coordinator owns design, review and integration; this
+  does not change the existing display team or its held work.
+- Since the fifth batch, display agent commits use `Claude Agent <claude-agent@invalid>`
   with a co-author trailer, and implementation and review agents are Claude
   agents. Earlier agent commits used `Codex <codex@invalid>`; recovered work
   keeps its original authorship.
