@@ -9,3 +9,10 @@ condition = "AND"
 paths = ['''^evidence/wine-file-fromapp-compile\.json$''']
 regexTarget = "secret"
 regexes = ['''^d965d646defe94b3dfba6d5b4406900ac6c81065428bf9d9303ad7a72ee8d1b8$''']
+
+[[allowlists]]
+description = "Public setupapi.dll build SHA-256 in two existing Wine receipts"
+condition = "AND"
+paths = ['''^evidence/(batch5-fast-lane|wine-displaymonitor-compile)\.json$''']
+regexTarget = "secret"
+regexes = ['''^2e5b15a52fac1c5fb4db615886ce38640bff17f6a89c7ffcf3d154ba3761c56a$''']

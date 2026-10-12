@@ -438,3 +438,39 @@ and `displayconfig` tests passed with the rebuilt modules
 ([receipt](../evidence/review-fixes-fast-lane.json)).
 `scripts/check_repository.py` passed before merge.
 
+
+## Audio implementation plan — independent review, 2026-10-12
+
+An independent GPT-6.1 Sol agent reviewed the audio contracts, actual private
+inventory, recovered-file metadata, integration changes and pinned converter
+source. It reported two P2 findings and no P0/P1 findings:
+
+1. Upstream's broad test command includes live-machine and OEM corpus tests.
+   The speaker build contract now excludes the `live_machine` marker and
+   `tests/corpus`, while retaining container isolation. Isolated runtime
+   validation and private conversion produce separate receipts.
+2. The first raw capture did not contain every supplemental package/firmware
+   finding. A fresh private supplemental capture records exact package
+   versions, decompressed amp-file equivalence and recovery unmounted state.
+   The public receipt hashes each supporting capture, records acquisition
+   commands and marks the unavailable `pactl` probes explicitly.
+
+Both corrections are incorporated. The review did not establish speaker
+quality, latency reduction, Atmos correctness or deployment acceptance.
+The pre-merge documentation/privacy fast-lane result is recorded with this
+batch; existing display validation is not rerun or inherited as audio evidence.
+
+The privacy scan also found two inherited `generic-api-key` matches on the
+same published `setupapi.dll` SHA-256 in existing Wine receipts. Both are
+artifact hashes, not credentials. The Gitleaks configuration now permits
+only that exact digest in those exact two files; default detectors remain
+active. No historical content was rewritten.
+
+Final documentation fast lane: `python3 scripts/check_repository.py` passed
+for 164 patches and six series; JSON parsing and `git diff --cached --check`
+passed. Gitleaks 8.30.1 scanned the candidate tree and all 94 then-reachable
+commits with the reviewed exact-hash exception and found no leaks. The
+independent reviewer rechecked both plan corrections and the narrow scanner
+exception with no remaining blockers. No C, kernel, patch bytes or runtime
+Python code changed in this documentation batch, so compiler/physical audio
+tests are pending the implementation lanes, not claimed here.

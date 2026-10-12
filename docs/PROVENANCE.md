@@ -75,3 +75,13 @@ OEM Dolby/ASUS files and inspection hashes are retained on the laptop under
 in [hardware](HARDWARE.md) and [the investigation](DOLBY_VISION_AND_QUALITY.md).
 No OEM DLL, profile payload, raw EDID, signing key, SSH credential or BitLocker
 material is included in this repository.
+
+## Audio evidence added on 2026-10-12
+
+The [audio inventory](../evidence/audio-inventory-2026-10-12.json) is a fresh
+read-only ROG capture, distinct from imported HDR tests. The exact-match OEM
+speaker XML and INF were selected from a read-only recovery image; hashes,
+parser outcome and the extractor's reference-count warning are retained.
+Raw diagnostics and OEM files remain private. Candidate audio source commits
+are listed in [implementation](AUDIO_IMPLEMENTATION.md); resolving a commit is
+not a compiler, codec, acoustic or physical-latency pass.
