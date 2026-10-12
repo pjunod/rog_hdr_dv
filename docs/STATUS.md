@@ -13,7 +13,7 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## nativehdr10 — source candidate awaiting adversarial review
+## nativehdr10 — adversarial findings being corrected
 
 The owned collaboration clone starts at the exact final handoff
 `7c78457581906a43377f8dbb0d8dc95b438f30d3`; PR 16 remains unmerged.
@@ -61,8 +61,19 @@ are invalidated with a reason. Its files were only syntax-compiled; the
 regressions have not run. The Mutter source and native build tree are
 unchanged by this integration, so no rebuild was needed.
 
-**Current:** Astra and Fable each review the same complete candidate:
-patches 0050–0061 and the validation runner in this repository.
+**Done (review):** Astra and Fable delivered independent reviews of
+`73918f3` / native `fa7eb2cf`. Changes are required: continuous default-anchored
+Night Light factors, a bounded observable-state restore wait, isolated
+user-override registration, real headless capture/readback coverage and
+SIGTERM child cleanup. Review completion is not candidate acceptance.
+
+**Current:** Sol owns runner cleanup/regressions, evidence and validation;
+Opus exclusively owns native corrections and the warm compiler tree
+(`t_800e0a15`). A focused Astra review (`t_40a0cc27`) gates the changed
+Night Light design before validation. No units have executed. Fable's
+recorded decision anchors the diagonal factors at the default temperature's
+Planckian white, preserving exact off-state identity and continuous onset;
+absolute Planckian-white accuracy is no longer the acceptance claim.
 
 **Remaining:** fix the review findings. Then write the affected-check
 manifest from existing Meson test names and run it once on the native

@@ -8,6 +8,34 @@ Companion to [status](STATUS.md) and [development](DEVELOPMENT.md). The initial
 review was explicitly requested before the owner established the subsequent
 pre-merge-only review workflow. Future batches use that workflow.
 
+## nativehdr10 — review corrections in progress
+
+Astra and Fable independently reviewed repository `73918f3` and native
+Mutter `fa7eb2cf` / tree `18ba4b5a`. Reports are retained on the HDR board
+(`t_70a00674`, `t_b2750819`); neither review was a unit pass or source
+acceptance. Fix/validation owner: `t_e5c490e6`.
+
+| Finding | Disposition and current evidence |
+|---|---|
+| F1 P1: discontinuous onset from absolute Planckian anchoring | Fable decided factors must be ratios to the default temperature's Planckian white. Opus implements; focused Astra review gates it. Exact off-state identity and channel bounds remain, absolute Planckian xy acceptance is replaced by relative white movement. |
+| F2 P1: restore wait never exits on retained idle ID | Opus replaces with bounded observable-state wait; no production idle-ID change solely for the test. |
+| F3 / A3: override case mutates shared fixture | Add to Meson separate cases and give its exact generated name one manifest receipt. |
+| F4 / A2: constructed capture state is not capture coverage | Opus adds real production paint/readback coverage; stream DMA-buffer and shared-memory paths must be named with actual exercised limitations. No source-demonstrated leak or speculative production fix. |
+| F5 / A1: SIGTERM can orphan check sessions | Sol correction `56c0329` installs/restores termination handling, defers cancellation over launch, kills check group and reaps check, preserves nonpassing receipt, returns 143. Real descendant regression plus launch/restoration regressions are written and syntax-compiled, not executed. Focused Fable review pending. |
+| F6: fallible adapted-state constructor lacks fallback | Opus adds warning/unadapted fallback before validation. |
+| F7: unrelated end-parse and mirror fixes bundled | Opus owns drop/split or explicit rationale; final disposition pending source handoff. Preserve already-delivered authorship/history rather than silently rewriting it. |
+| F8: disabled output retains configured override | Retain last-assignment declaration, consistent with existing colour-mode behavior; effective physical-target properties remain active-device-only. No new reset or alternate reporting policy. |
+| F9: offscreen reallocated each uniform step | Separate upstreamable optimization `t_38887c3f`; not part of this correctness batch. Preserve framebuffer when required format/dimensions unchanged, including reference-luminance path. |
+| F10: duplicate variant keys, gdctl readiness, installed fixture list | Verify fixture list statically; actual D-Bus/gdctl checks in the upcoming batch provide runtime evidence. No probe execution before freeze. |
+| F11: agent copyright/upstream identity | Preserve authored copyright as provenance; upstream author/signoff mechanics remain an owner decision and no submission occurs. Do not invent owner attribution. |
+| F12: PQ hotplug capability transient | Accept documented false-to-true NightLightSupported notification during rebuild-before-assignment; notify-on-change bounds traffic. No forced support or unrelated lifecycle redesign. |
+
+Both focused reviews and fixes precede one affected batch through the
+[receipt runner](NATIVEHDR10_VALIDATION.md). No units have run in this
+fixing stage. PR16 remains held unmerged; no physical or Apple TV activity.
+
+## Initial repository review
+
 | Finding | Evidence | Disposition |
 |---|---|---|
 | P2: reordered patches passed integrity checks | Reviewer reversed four dependent library patches in a disposable copy; checker still passed because it compared sets. | Explicit `patch_order` in the source manifest; checker and mutation regression in implementation. |

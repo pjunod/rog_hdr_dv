@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Unreviewed work | nativehdr10 candidate, `patches/mutter` 0050–0061 (see [status](STATUS.md#nativehdr10--source-candidate-awaiting-adversarial-review)) |
+| Candidate being corrected | nativehdr10, `patches/mutter` 0050–0061 plus pending review corrections (see [status](STATUS.md#nativehdr10--adversarial-findings-being-corrected)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -54,7 +54,10 @@ in the offline Ubuntu cache, not the exact packaging imports.
 
 1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Sol's
    [validation receipt runner](NATIVEHDR10_VALIDATION.md) is integrated.
-   Astra and Fable each review the same candidate adversarially. Fix the
+   Astra and Fable delivered both reviews. Sol owns runner cleanup and
+   validation; Opus exclusively owns native fixes/builds (`t_800e0a15`).
+   Focused reviews `t_5625c404` (Fable, runner) and `t_40a0cc27` (Astra,
+   changed Night Light/capture design) gate unit execution. Fix the
    findings, rebuilding each affected commit. Then write the affected-check
    manifest and run it once through the runner on the native builder. Then
    the repository pre-merge lane and one substantial PR that depends on
