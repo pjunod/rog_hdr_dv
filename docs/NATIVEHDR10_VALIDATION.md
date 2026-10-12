@@ -14,6 +14,10 @@ The first restricted retry passed colour channel bounds and the target-overrides
 D-Bus case, but failed the later has-external-monitor case on colord lookup.
 Latest receipts are 70 passed, one failed; see the
 [retry evidence](../evidence/nativehdr10-validation-attempt2.json).
+The next [required-check gate](../evidence/nativehdr10-validation-attempt3.json)
+passed color-management but monitor-dbus exited 245; 15 genuinely invalidated
+checks did not run. Raw 70 passing histories are not 70 valid current-candidate
+receipts: 55 valid passes, one failure, 15 pending. All 75 logs are preserved.
 
 The existing [colour harness](../tools/test-mutter-colour.sh) selects tests and
 sets up their environment, but does not keep per-check retry receipts. Existing
@@ -199,6 +203,22 @@ decision are retained with the retry archive; this is a reviewer attestation,
 not a new pass or runner-inferred dependency proof. Further production changes
 need a new invalidation computation. The failed retry stops execution pending
 focused diagnosis/review; no bounds widening or extra invalidation is authorized.
+
+For production corrections 0072–0074, Fable `t_6b592492` approved 17 checks
+whose mocked-colord traffic changes and retention of 25 native receipts plus
+29 scoped runner receipts. Tier A: native-hdr/monitor-utils never construct a
+colour manager, so the changed code cannot execute. Tier B: HEADLESS checks
+use only virtual monitors, where unregister has no colord call and the same
+observable effect in either version. This is reviewer-attested reachability /
+observable equivalence, not exact shared-library identity or runner inference.
+The decision and before/after binary inventories are in the attempt-3 archive;
+all retained receipts keep their actual executing trees. Because the frozen
+runner continues ordinary failures, the exact 17-check retry manifest was
+split into required-two and dependent-fifteen subsets with unchanged objects,
+sources, ledger and runner. The required gate failed, so the latter did not run
+and its older passes are marked pending-invalidated in public evidence, not
+claimed as current acceptance. No further retry before focused correction /
+scope review (`t_ef832f3b`, `t_c88207c7`).
 
 ## Receipts, errors and retained evidence
 

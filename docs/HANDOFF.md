@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Candidate being corrected | nativehdr10, `patches/mutter` 0050–0071 with reviewed corrections (see [status](STATUS.md#nativehdr10--adversarial-findings-being-corrected)) |
+| Candidate being corrected | nativehdr10, `patches/mutter` 0050–0074 with reviewed corrections (see [status](STATUS.md#nativehdr10--adversarial-findings-being-corrected)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -58,6 +58,14 @@ receipts: 70 passed, one failed; all 73 execution logs hash-verified and all
 69 non-retried histories unchanged. See the
 [retry evidence](../evidence/nativehdr10-validation-attempt2.json).
 PR16 remains held unmerged.
+Corrections 0072–0074 are now integrated at native `980bb21`/tree `41605eb0`;
+Fable approved them and exactly 17 genuinely invalidated checks. The required
+two-check gate passed all 20 color-management cases but monitor-dbus exited
+245 after reconnect, with no old fatal-colord warning printed. Dependent 15
+checks did not run. Raw ledger70pass/1fail is not acceptance: **55 valid passes,
+one failure, 15 pending-invalidated**. All75 execution logs are hash-verified;
+69 histories unchanged. See the
+[latest gated retry](../evidence/nativehdr10-validation-attempt3.json).
 No push, merge or display change is authorized. Ubuntu port/packaging and
 optical acceptance remain separate stages; only Mutter's orig tar is recorded
 in the offline Ubuntu cache, not the exact packaging imports.
@@ -75,15 +83,22 @@ in the offline Ubuntu cache, not the exact packaging imports.
    Fable `t_bedcc81f` approved only the two failed IDs for retry. Its retention
    decision preserves original native passes at `ac02a18f`, not fictional
    passes on the new tree: test-only binary identity and production-callback
-   source unreachability are distinct grounds. Sol owns validation/Mac integration;
-   Opus exclusively diagnoses the remaining colord warning with compilation/export
-   only (`t_88ae3088`). Fable reviews corrections and computes the next exact
-   retry scope (`t_6b592492`). Preserve colour-hdr's new pass as well as all other
-   successes; retry only failures/genuinely invalidated checks after those gates.
+   source unreachability are distinct grounds. For 0072–0074 Fable `t_6b592492`
+   retains25native receipts by source-unreachability or virtual-monitor observable
+   equivalence, keeping actual trees. Sol owns Mac integration/evidence/status;
+   Opus exclusively diagnoses the new monitor-dbus exit245 with compilation/export
+   only (`t_ef832f3b`). Fable `t_c88207c7` reviews correction and recomputes scope.
+   Preserve colour-management's new41605eb0pass and colour-hdr's9111578epass unless
+   genuinely invalidated; the dependent15TEST checks still require valid receipts.
    Same persistent ledger: `/work/hdr-nativehdr10-20261011/validation/receipts.json`,
-   SHA256 `a8b5d6a505c1605b6a5eb9862086997f6e5387788d1419d3c4297452b028d2a7`.
+   SHA256 `480cbb50699512fce164b4ae23fe927de0fd51e77fc339856d893b383e0b9f13`.
    Full export and review/hash inventories: ignored
-   `.peer-linux/deliverables/nativehdr10-validation-attempt2.tar.gz`.
+   `.peer-linux/deliverables/nativehdr10-validation-attempt3.tar.gz`
+   (SHA256 `bcf35417ae5c01dfea7dbcccea5ebc0a384acbef593d42b1db6597761dabc7b8`).
+   The exact17 manifest was split required2/dependent15 with identical objects,
+   sources, ledger/runner to enforce a required-pass gate without runner edits.
+   No further retry before focused diagnosis/review. Never reuse the executed
+   retry3 manifests to accidentally rerun successes; preserve their evidence.
    Do not reconstruct, edit the frozen runner or start another full batch.
    Final integrity runs after final evidence
    and docs commit with receipt outside tracked source. Then

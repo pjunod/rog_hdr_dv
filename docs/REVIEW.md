@@ -100,6 +100,33 @@ then Fable `t_6b592492` reviews correction and next exact retry scope. Colour-hd
 new success and all other successes are preserved. Final integrity remains
 after final evidence/docs commit, with receipt outside tracked source.
 
+Colord correction checkpoint: Opus `t_88ae3088` delivered 0072–0074 and Fable
+`t_6b592492` approved them with no required fixes at `980bb21`/tree `41605eb0`.
+0072 binds colord registration to manager ownership, not the last GObject ref;
+0073 deletes old devices before same-ID creation on connector moves. Both fix
+pre-existing upstream base defects, separately from HDR and without upstream
+acceptance claims. Every commit built -Werror and the canonical full Mac series
+replays to the built tree; see the
+[correction receipt](../evidence/nativehdr10-colord-corrections.json).
+Fable approved 17 retries and retains25native receipts at their actual trees:
+tierA code cannot execute, tierB virtual-monitor unregister has the same observable
+effect. This is reviewer attestation, not shared-library identity or automatic
+runner reuse. The required2/dependent15 phase manifests keep exactly the original
+check objects/sources/ledger/runner; the split enforces the pass gate because the
+frozen runner continues ordinary failures.
+
+Actual required gate: color-management passed all20cases including both new
+lifecycle regressions; monitor-dbus passed target-overrides then exited245 after
+reconnect, no old fatal-colord warning printed. Signal/cause remains undiagnosed
+in this receipt. The dependent15did not execute. All75logs hash-verified;
+69prior histories unchanged. Raw70passing histories are not current acceptance:
+**55 valid passes, one failure, 15 pending-invalidated**; see
+[gated retry evidence](../evidence/nativehdr10-validation-attempt3.json).
+Stop before more execution. Opus `t_ef832f3b` exclusively owns native diagnosis /
+compile/export; Fable `t_c88207c7` gates focused correction/retry scope. Sol keeps
+Mac integration/evidence/status; colour-management's newpass and colour-hdr's
+priorpass are retained unless a new correction genuinely invalidates them.
+
 ## Initial repository review
 
 | Finding | Evidence | Disposition |

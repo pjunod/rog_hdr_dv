@@ -63,12 +63,16 @@ generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides, and
-records their implementation as Mutter patches 0050–0071. That candidate is
+records their implementation as Mutter patches 0050–0074. That candidate is
 compiled and pinned; both adversarial and focused reviews are delivered and
 pre-freeze findings addressed. The single affected batch returned 69 passes
 and two failures; the restricted retry passed colour channel bounds and the
 target-override D-Bus case, but exposed a later colord warning. Latest receipts
-are 70 passed, one failed; it is not accepted, packaged or deployed.
+are 70 recorded passes, one failure, but 15 genuinely invalidated checks remain
+pending. The next required-check gate passed color-management (including the
+two colord lifecycle regressions), while monitor-dbus exited 245 after reconnect.
+For the current candidate: 55 valid passes, one failure, 15 pending; it is not
+accepted, packaged or deployed.
 The earlier work-in-progress directories under `wip/` now only
 point to it.
 [nativehdr10 validation receipts](docs/NATIVEHDR10_VALIDATION.md) describes
@@ -80,6 +84,9 @@ retains the 71 original attempts and two native failures.
 The [focused retry evidence](evidence/nativehdr10-validation-attempt2.json)
 preserves all original histories and the two new attempts without repeating
 successful checks or rewriting their executing source trees.
+The [next gated retry evidence](evidence/nativehdr10-validation-attempt3.json)
+accounts for all required checks, their actual executing trees and Fable's
+retention tiers without treating pending invalidated checks as accepted passes.
 [Handoff](docs/HANDOFF.md) is the continuation brief for a new session or
 agent: state, next tasks, environments and commands.
 

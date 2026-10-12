@@ -93,7 +93,7 @@ recorded decision anchors the diagonal factors at the default temperature's
 Planckian white, preserving exact off-state identity and continuous onset;
 absolute Planckian-white accuracy is no longer the acceptance claim.
 
-**Current:** reviewed corrections 0069–0071 are integrated and pinned at native
+**First retry candidate:** reviewed corrections 0069–0071 are integrated and pinned at native
 `a8847717` / tree `9111578e`, with individual -Werror builds and replay equality.
 0069 corrects the float32 near-zero test allowance; 0071 holds the test shell's
 synchronous confirmation so rejection actually runs. 0070 fixes the pre-existing
@@ -123,10 +123,24 @@ at native `980bb21` / tree `41605eb0`, individually built with -Werror and repla
 0073 removes old devices before creating replacements on connector moves. These
 are distinct fixes to pre-existing upstream lifecycle defects, not HDR features or
 upstream acceptance. 0074 adds unplug-with-reference and connector-move regressions.
-Sol now exclusively owns integration/native validation. The approved next retry
+Sol owned integration/native validation during this retry. The approved retry
 is exactly 17 checks whose mocked-colord traffic changes; 25 native and 29 runner
 histories retain their actual executing trees under Fable's two-tier decision.
-No retry of this correction has run yet; `color-hdr`'s new pass is retained.
+**Actual required gate:** on `41605eb0`, `monitor-dbus-tests` failed in 2.59 seconds
+with exit 245 after reconnect/HasExternalMonitor TRUE; the target-overrides case
+passed, and no earlier fatal-colord warning was printed. The signal/root cause
+is not established by this log. `color-management` passed all 20 cases, including
+the new unplug-with-reference and connector-move regressions. The remaining 15
+TEST-context checks did **not** run after the required gate failed. Raw ledger:
+70 recorded passes, one failure; current-candidate validity: **55 passes, one
+failure, 15 pending invalidated checks**, not acceptance. All 75 execution logs
+are hash-verified; 69 histories are unchanged. See the
+[gated retry evidence](../evidence/nativehdr10-validation-attempt3.json) and
+[colord correction receipt](../evidence/nativehdr10-colord-corrections.json).
+Opus `t_ef832f3b` exclusively owns native diagnosis/compile/export;
+Fable `t_c88207c7` reviews correction and recomputes retries. Sol owns Mac
+integration/evidence/status. Retain the new colour-management pass and prior
+colour-hdr pass unless a subsequent fix genuinely invalidates them.
 
 **Remaining:** diagnose/fix and focused-review that failure; retry only failed or
 genuinely invalidated checks against the same persistent ledger. No second

@@ -1,14 +1,17 @@
 # Night Light in HDR, and per-monitor target overrides (nativehdr10)
 
 **Status:** both parts implemented as Mutter patches 0050–0061, with the
-review and batch-failure corrections 0062–0071 appended (native candidate
-a8847717, tree 9111578e). Every commit compiled with warnings as errors and the exported
+review and batch-failure corrections 0062–0074 appended (native candidate
+980bb21, tree 41605eb0). Every commit compiled with warnings as errors and the exported
 series replays to the built tree. Both adversarial and focused reviews are
 delivered; pre-freeze findings are addressed. The single affected validation
 batch returned 69 passes and two failures. The restricted retry passed colour
 channel bounds and the target-overrides D-Bus case, then failed in the later
 has-external-monitor case on colord lookup. Latest receipts are 70 passed,
-one failed; candidate acceptance is incomplete ·
+one failed. The next required-check gate passed all 20 color-management cases,
+including two new colord lifecycle regressions, but monitor-dbus exited 245 after
+reconnect. The dependent 15 invalidated checks did not run; current-candidate
+validity is 55 passing, one failed, 15 pending, not acceptance ·
 **Date:** 2026-10-12.
 
 Corrections 0069/0071 repair test precision and confirmation-fixture handling.
@@ -18,6 +21,15 @@ a later attempt to remove a dead source ID. It is not an HDR feature or a
 claim of upstream acceptance. See the
 [correction receipt](../evidence/nativehdr10-failure-corrections.json) and
 [restricted retry evidence](../evidence/nativehdr10-validation-attempt2.json).
+
+0072 and 0073 are separate upstream-candidate fixes to pre-existing base
+lifecycle defects: withdraw a colord device when its manager drops it, not when
+the last asynchronous-task/view reference disappears; delete removed devices
+before creating same-ID replacements on connector moves. They are not HDR
+features or upstream acceptance. 0074's two focused regressions passed, but the
+remaining monitor-dbus failure still blocks acceptance. See the
+[colord corrections](../evidence/nativehdr10-colord-corrections.json) and
+[required-gate results](../evidence/nativehdr10-validation-attempt3.json).
 
 Two compositor changes for general availability, specified together because
 both change how the colour device builds an output's rendering colour state.
