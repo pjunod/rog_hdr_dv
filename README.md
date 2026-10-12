@@ -1,11 +1,10 @@
-# rog_hdr_dv — Linux display and audio quality
+# rog_hdr_dv — Linux HDR, Dolby Vision and display quality
 
-Linux display and audio work for the ASUS ROG Zephyrus G16 GU605MZ, with reusable
+Linux display-stack work for the ASUS ROG Zephyrus G16 GU605MZ, with reusable
 fixes for native DisplayID HDR detection and a programme for accurate colour,
-panel calibration, full Dolby Vision, speaker quality, latency and Dolby
-Atmos. macOS-like consistency and ease of use are the quality reference.
-Plurx is one consumer; this repository owns the operating-system work
-independently.
+panel calibration and full Dolby Vision. macOS-like consistency and ease of
+use are the quality reference. Plurx is one consumer; this repository owns
+the operating-system display work independently.
 
 **Current status:** the patched kernel (`nativehdr1`), the hdr9 library and the
 `nativehdr8` compositor are installed (the compositor and library since
@@ -18,10 +17,9 @@ hardware; a second laptop (`lab6`, Intel graphics, SDR panel) is the test
 machine for that. The earlier mpv
 DV-to-PQ sample does not qualify full Dolby Vision.
 
-**Audio:** the ROG codec/amplifiers and idle configuration were inspected
-read-only on 2026-10-12. Exact-match ASUS speaker tuning was recovered
-privately. Offline implementation is next; no audio settings changed and no
-physical audio performance is yet qualified. Sonos Arc Atmos comes last.
+**Audio moved:** speaker quality, latency and Dolby Atmos now live in the
+independent [rog_audio repository](https://github.com/pjunod/rog_audio),
+including its [progress ledger](https://github.com/pjunod/rog_audio/blob/main/docs/STATUS.md).
 
 Start with [status](docs/STATUS.md) for what is proven, then
 [hardware](docs/HARDWARE.md) for the exact panel and OEM findings.
@@ -64,14 +62,6 @@ deferred output-characterization contract.
 [Display target sources](docs/DISPLAY_TARGET_SOURCES.md) extends those targets
 beyond the ROG panel: DisplayID or CTA-861 luminance on any HDR output, and
 the base EDID gamut in the native SDR mode, for general availability.
-
-[Audio quality](docs/AUDIO_QUALITY.md) defines the speaker-first goals;
-[audio hardware](docs/AUDIO_HARDWARE.md) records the actual codec, amp and OEM
-findings. [Audio implementation](docs/AUDIO_IMPLEMENTATION.md) coordinates
-the build order and integration. The detailed contracts are
-[speaker tuning](docs/AUDIO_SPEAKER_BUILD.md),
-[diagnostics and latency](docs/AUDIO_LATENCY_BUILD.md), and
-[host Atmos](docs/AUDIO_ATMOS_BUILD.md).
 
 ## Work with the repository
 
@@ -116,8 +106,5 @@ any live compositor or kernel update.
 - [ ] Complete HDR/SDR, brightness, DPMS and suspend/resume qualification.
 - [ ] Establish a full Dolby Vision processor path for the internal panel.
 - [ ] Implement and measure general colour consistency and panel calibration.
-- [x] Inspect audio hardware/configuration and recover matching OEM tuning.
-- [ ] Build and qualify internal speaker tuning and measured audio latency.
-- [ ] Build host-side Atmos; test Sonos Arc/eARC after internal audio work.
 - [ ] Integrate and qualify multiple apps, including Plurx.
 - [ ] Package the complete solution and pursue upstream acceptance.

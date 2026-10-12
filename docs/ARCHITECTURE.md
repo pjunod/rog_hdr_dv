@@ -84,11 +84,7 @@ and consistent presentation are the goals.
 
 ## Audio ownership
 
-[Audio implementation](AUDIO_IMPLEMENTATION.md) extends this repository with
-speaker processing, diagnostics/latency and host-side Atmos. ALSA/CS35L56
-firmware owns the existing hardware path; an offline-generated speaker filter
-must not duplicate or replace amplifier protection. Application decoding and
-object rendering precede PCM processing. PipeWire transports the resulting
-PCM, and WirePlumber owns route policy. Speaker and headphone transforms have
-separate targets. Encoded HDMI passthrough bypasses PCM filters and is tested
-last on Sonos. Plurx application negotiation remains in the Plurx repository.
+Speaker processing, diagnostics, latency and host Atmos are owned by
+[rog_audio](https://github.com/pjunod/rog_audio). Audio implementation,
+source pins and physical acceptance are maintained there. This repository
+continues to own the display stack and panel qualification.

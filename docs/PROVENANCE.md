@@ -78,10 +78,10 @@ material is included in this repository.
 
 ## Audio evidence added on 2026-10-12
 
-The [audio inventory](../evidence/audio-inventory-2026-10-12.json) is a fresh
+The [audio inventory](https://github.com/pjunod/rog_audio/blob/main/evidence/audio-inventory-2026-10-12.json) is a fresh
 read-only ROG capture, distinct from imported HDR tests. The exact-match OEM
 speaker XML and INF were selected from a read-only recovery image; hashes,
 parser outcome and the extractor's reference-count warning are retained.
 Raw diagnostics and OEM files remain private. Candidate audio source commits
-are listed in [implementation](AUDIO_IMPLEMENTATION.md); resolving a commit is
+are listed in [implementation](https://github.com/pjunod/rog_audio/blob/main/docs/AUDIO_IMPLEMENTATION.md); resolving a commit is
 not a compiler, codec, acoustic or physical-latency pass.
