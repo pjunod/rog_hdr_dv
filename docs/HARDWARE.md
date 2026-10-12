@@ -82,7 +82,7 @@ test the CTA path. `nativehdr9` was installed on it on 2026-10-11
 
 ## Audio hardware and recovery findings
 
-The October 12 read-only [audio inventory](AUDIO_HARDWARE.md) records the
+The October 12 read-only [audio inventory](https://github.com/pjunod/rog_audio/blob/main/docs/AUDIO_HARDWARE.md) records the
 ALC285 codec, two CS35L56 amplifiers, loaded model-specific tuning and exact
 OEM DAX3 speaker XML. These audio findings are separate from panel profiles
 and optical measurements.

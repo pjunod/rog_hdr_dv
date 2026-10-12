@@ -110,20 +110,9 @@ GNOME Shell loads the new library. Retain an independent recovery route; SSH
 is the practical one, because a failing login screen keeps reclaiming the
 console. Do not terminate the desktop automatically.
 
-## 4. Inspect audio without changing the session
+## 4. Audio operations moved
 
-The read-only recipe is in [audio quality](AUDIO_QUALITY.md); the observed
-state and recovery assets are in [audio hardware](AUDIO_HARDWARE.md). `lab5`
-is a neutral documentation name, not an assumed SSH alias. Use private
-connection configuration and the actual desktop user's session environment.
-Do not start playback, record the microphone, change defaults/volume, force
-quantum, or restart audio services as part of inventory. Private captures may
-contain device serials, application names and user paths; publish only a
-reviewed allowlisted summary.
-
-Offline generation must write explicit private outputs and leave the running
-PipeWire/ALSA graph alone. Before activation, prepare stock configuration and
-routing restoration and a bounded owner-coordinated playback window. Preserve
-the installed amp firmware/protection. Recovered OEM speaker filters remain
-unqualified until measured. Sonos Arc/eARC testing is last, after internal
-speaker, latency and host Atmos work.
+Audio inspection, private OEM recovery, offline generation and coordinated
+playback procedures are maintained in
+[rog_audio operations](https://github.com/pjunod/rog_audio/blob/main/docs/OPERATIONS.md).
+Display installation and recovery procedures above remain unchanged.

@@ -13,31 +13,15 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## Audio — read-only inspection and implementation batch
+## Audio — moved to rog_audio on 2026-10-12
 
-The owner added internal speaker quality, lower latency and host Atmos to
-the platform scope, with Sonos Arc/eARC explicitly last. On 2026-10-12 the
-ROG was inspected read-only: Realtek ALC285 (`10431c63`), two CS35L56 SPI amps,
-model-specific DSP 3.11.16 and calibration-applied messages. Both speaker
-switches are on. The idle PipeWire graph is unfiltered stereo at 48 kHz with
-a 1024-frame default and realtime data-loop scheduling. This is not a physical
-latency or speaker-quality result. ACP is active; unsupported UCM does not
-by itself establish a routing defect.
-
-The recovery image contains the exact matching DAX3 speaker XML and INF.
-They were extracted privately, parsed and hashed; the image reader’s
-reference-count warning is retained. The recovery partition was read-only
-and is unmounted. No audio packages/settings/services changed and no sound
-was played or recorded. [Hardware](AUDIO_HARDWARE.md) and the
-[receipt](../evidence/audio-inventory-2026-10-12.json) record the evidence.
-
-Three GPT-6.1 Sol build chats started on 2026-10-12 against the detailed
-[implementation contracts](AUDIO_IMPLEMENTATION.md): offline speaker
-conversion, diagnostics/latency, and host-side Atmos. Each has an isolated
-clone and a concrete code/build assignment. All are pending implementation
-qualification; live
-activation and M4 Air/M3 Max comparisons remain separate physical gates.
-Sonos work is deferred. The display status below is preserved.
+At the owner's request, all active speaker, latency and Atmos implementation
+moved to [rog_audio](https://github.com/pjunod/rog_audio). Its
+[status ledger](https://github.com/pjunod/rog_audio/blob/main/docs/STATUS.md)
+tracks the GPT-6.1 Sol builds, review, validation and remaining measurements.
+The read-only hardware inventory and detailed build contracts moved with it.
+The original documentation review remains below in the review history.
+No live audio settings changed during the repository split.
 
 ## Installation — hdr9 and nativehdr8 (2026-10-11)
 
@@ -329,7 +313,7 @@ The staged acceptance criteria remain in
 
 Recorded for review; each can be revisited.
 
-- Audio implementation (requested 2026-10-12) uses GPT-6.1 Sol chats in
+- Audio implementation moved to rog_audio on 2026-10-12 and uses GPT-6.1 Sol chats in
   isolated clones. The coordinator owns design, review and integration; this
   does not change the existing display team or its held work.
 - Since the fifth batch, display agent commits use `Claude Agent <claude-agent@invalid>`
