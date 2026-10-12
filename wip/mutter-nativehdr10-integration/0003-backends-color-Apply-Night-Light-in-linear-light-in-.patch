@@ -1,0 +1,650 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sun, 11 Oct 2026 17:24:46 -0400
+Subject: [PATCH 03/11] backends/color: Apply Night Light in linear light in
+ BT.2100
+
+Night Light programs blackbody scales into the CRTC gamma LUT, or the
+CTM without one. That runs after composition, on encoded values. For a
+gamma encoding this is the long accepted approximation, but in BT.2100
+the values are PQ code values: scaling them removes far more light than
+the scale, unequally across the tonal range, and skews hue.
+
+With a PQ encoding, keep the gamma LUT and the CTM at identity, with no
+temperature and no calibration ramp of a profile, which is made for
+SDR. Instead, adapt the output's white to the Planckian white of the
+Night Light temperature in the rendering color state, in linear light
+before PQ encoding. It warms and very slightly dims, as in SDR, but
+never brightens. The Planckian chromaticity uses Krystek's rational
+approximation of the locus.
+
+The color device sets it on the rendering color state next to the
+target volume, so the renderer, direct scanout and the cursor plane
+read the same state. At the default temperature there is no adaptation
+and the rendering color state is exactly the one without Night Light.
+Each temperature step is a new value of the same adaptation. Screen
+casts and screenshots do not carry it, as they do not carry the gamma
+LUT in SDR. SDR modes keep the existing behavior.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
+---
+ src/backends/meta-color-device.c          | 128 +++++++++++----
+ src/backends/meta-color-profile.c         |  30 ++++
+ src/backends/meta-color-profile.h         |   5 +
+ src/tests/color-management-tests.c        | 184 ++++++++++++++++++++++
+ src/tests/meson.build                     |   4 +-
+ src/tests/wayland-color-management-test.c | 128 +++++++++++++++
+ 6 files changed, 451 insertions(+), 28 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index dabe55d..7be961d 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1456,19 +1456,74 @@ get_declared_target_primaries (MetaColorDevice  *color_device,
+                                                            NULL, NULL, NULL);
+ }
+ 
++/*
++ * Whether the output's encoding is PQ: in BT.2100, and with HDR forced. Its
++ * pixels are then PQ code values, which the gamma LUT and the CTM would scale
++ * without regard to the transfer function.
++ */
++static gboolean
++encodes_pq (MetaColorDevice *color_device)
++{
++  MetaBackend *backend =
++    meta_color_manager_get_backend (color_device->color_manager);
++  MetaDebugControl *debug_control =
++    meta_context_get_debug_control (meta_backend_get_context (backend));
++
++  return meta_monitor_get_color_mode (color_device->monitor) == META_COLOR_MODE_BT2100 ||
++         meta_debug_control_is_hdr_forced (debug_control);
++}
++
++static unsigned int
++get_temperature (MetaColorDevice *color_device)
++{
++  MetaColorManager *color_manager = color_device->color_manager;
++
++  if (color_device->is_calibrating)
++    return meta_color_manager_get_default_temperature (color_manager);
++  else
++    return meta_color_manager_get_temperature (color_manager);
++}
++
++/*
++ * The white point Night Light adapts the output to, if it does so in the
++ * rendering color state: in a PQ encoding, whose gamma LUT and CTM stay at
++ * identity (see update_white_point()), at any temperature but the default.
++ * At the default temperature there is no adaptation at all, so the
++ * rendering color state is exactly what it is without Night Light.
++ */
++static gboolean
++get_adapted_white (MetaColorDevice *color_device,
++                   float           *white_x,
++                   float           *white_y)
++{
++  unsigned int temperature = get_temperature (color_device);
++
++  if (!encodes_pq (color_device) ||
++      temperature == meta_color_manager_get_default_temperature (color_device->color_manager))
++    return FALSE;
++
++  meta_color_get_planckian_chromaticity (temperature, white_x, white_y);
++  return TRUE;
++}
++
+ /*
+  * The color state content is rendered for on this device: the output color
+  * state made a display target with the declared target as its target
+  * volume: the target luminance range when the peak is declared, and the
+- * target primaries when they are declared, by whichever source. This is the only place a
+- * display target is made. The blending state derived from it stays one, so
+- * color transforms map highlights toward the peak and compress gamut toward
+- * the primaries. Without either declaration, nothing is substituted: it is
+- * the output color state.
++ * target primaries when they are declared, by whichever source. In a PQ
++ * encoding with Night Light, the display target also adapts the output's
++ * white to the Night Light white, in linear light, on the way to the
++ * encoding. This is the only place a display target is made. The blending
++ * state derived from it stays one, so color transforms map highlights
++ * toward the peak, compress gamut toward the primaries and adapt the white.
++ * Without any of them, nothing is substituted: it is the output color
++ * state.
+  *
+  * The output color state itself stays the encoding only, so a change of
+  * target does not change it. The rendering color state is replaced only when
+- * it changes exactly, so that its users rebuild once per device update.
++ * it changes exactly, so that its users rebuild once per device update, and
++ * each Night Light temperature step changes only the value of the
++ * adaptation, not the shape of the conversion.
+  */
+ static UpdateResult
+ update_rendering_color_state (MetaColorDevice *color_device)
+@@ -1476,6 +1531,8 @@ update_rendering_color_state (MetaColorDevice *color_device)
+   const MetaColorTargetLuminance *target = &color_device->target_luminance;
+   g_autoptr (ClutterColorState) rendering_color_state = NULL;
+   ClutterColorTargetVolume target_volume = { 0 };
++  gboolean adapted = FALSE;
++  float white_x, white_y;
+ 
+   if (!color_device->color_state)
+     return 0;
+@@ -1498,9 +1555,19 @@ update_rendering_color_state (MetaColorDevice *color_device)
+                   color_device->target_primaries.tolerance,
+                   sizeof (target_volume.primaries_tolerance));
+         }
++
++      adapted = get_adapted_white (color_device, &white_x, &white_y);
+     }
+ 
+-  if (target_volume.has_luminance || target_volume.has_primaries)
++  if (adapted)
++    {
++      rendering_color_state =
++        clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
++                                                               &target_volume,
++                                                               white_x,
++                                                               white_y);
++    }
++  else if (target_volume.has_luminance || target_volume.has_primaries)
+     {
+       rendering_color_state =
+         clutter_color_state_params_new_display_target (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+@@ -2307,11 +2374,34 @@ update_white_point (MetaColorDevice *color_device)
+    * gamma ramp and the CTM fallback work without one. Devices that have no
+    * colord profile assigned must still get the temperature applied. */
+   color_profile = meta_color_device_get_assigned_profile (color_device);
++  temperature = get_temperature (color_device);
+ 
+-  if (color_device->is_calibrating)
+-    temperature = meta_color_manager_get_default_temperature (color_manager);
+-  else
+-    temperature = meta_color_manager_get_temperature (color_manager);
++  if (color_profile && meta_monitor_is_builtin (monitor))
++    {
++      const char *brightness_profile;
++
++      brightness_profile =
++        meta_color_profile_get_brightness_profile (color_profile);
++      if (brightness_profile)
++        {
++          meta_topic (META_DEBUG_COLOR,
++                      "Setting brightness to %s%% from brightness profile",
++                      brightness_profile);
++          meta_color_manager_set_brightness (color_manager,
++                                             atoi (brightness_profile));
++        }
++    }
++
++  /* Scaling PQ code values is neither a white point shift nor a uniform
++   * dimming, so a PQ encoding keeps the gamma LUT and the CTM at identity:
++   * no temperature, and no calibration ramp of a profile, which is made for
++   * SDR. Night Light adapts the white in linear light instead, in the
++   * rendering color state (see update_rendering_color_state()). */
++  if (encodes_pq (color_device))
++    {
++      color_profile = NULL;
++      temperature = meta_color_manager_get_default_temperature (color_manager);
++    }
+ 
+   /* Without a profile the ramp comes from the temperature alone, and at the
+    * default temperature it is a bit-exact identity. Programming that would
+@@ -2333,22 +2423,6 @@ update_white_point (MetaColorDevice *color_device)
+                             : "(none)",
+               temperature);
+ 
+-  if (color_profile && meta_monitor_is_builtin (monitor))
+-    {
+-      const char *brightness_profile;
+-
+-      brightness_profile =
+-        meta_color_profile_get_brightness_profile (color_profile);
+-      if (brightness_profile)
+-        {
+-          meta_topic (META_DEBUG_COLOR,
+-                      "Setting brightness to %s%% from brightness profile",
+-                      brightness_profile);
+-          meta_color_manager_set_brightness (color_manager,
+-                                             atoi (brightness_profile));
+-        }
+-    }
+-
+   lut_size = meta_monitor_get_gamma_lut_size (monitor);
+   if (lut_size > 0)
+     {
+diff --git a/src/backends/meta-color-profile.c b/src/backends/meta-color-profile.c
+index 0d94463..c0cafd3 100644
+--- a/src/backends/meta-color-profile.c
++++ b/src/backends/meta-color-profile.c
+@@ -517,6 +517,36 @@ meta_color_get_temperature_rgb_scales (unsigned int  temperature,
+   *out_blue = (float) blackbody_color.B;
+ }
+ 
++/*
++ * The CIE 1931 xy chromaticity of a Planckian (blackbody) radiator at
++ * @temperature, in Kelvin: the white point of Night Light in a PQ encoding,
++ * which is adapted to in linear light rather than scaled in the gamma ramp.
++ *
++ * This uses the rational approximation of the Planckian locus in CIE 1960
++ * UCS by Krystek, "An algorithm to calculate correlated colour temperature",
++ * Color Research & Application 10 (1), 1985, which is within 1e-4 of the
++ * locus in u and v, about 3e-4 in x and y, from 1000 K to 15000 K, the whole
++ * range of Night Light.
++ */
++void
++meta_color_get_planckian_chromaticity (unsigned int  temperature,
++                                       float        *x,
++                                       float        *y)
++{
++  double t = temperature;
++  double u, v, d;
++
++  u = (0.860117757 + 1.54118254e-4 * t + 1.28641212e-7 * t * t) /
++      (1.0 + 8.42420235e-4 * t + 7.08145163e-7 * t * t);
++  v = (0.317398726 + 4.22806245e-5 * t + 4.20481691e-8 * t * t) /
++      (1.0 - 2.89741816e-5 * t + 1.61456053e-7 * t * t);
++
++  /* CIE 1960 uv to CIE 1931 xy. */
++  d = 2.0 * u - 8.0 * v + 4.0;
++  *x = (float) (3.0 * u / d);
++  *y = (float) (2.0 * v / d);
++}
++
+ const MetaColorCalibration *
+ meta_color_profile_get_calibration (MetaColorProfile *color_profile)
+ {
+diff --git a/src/backends/meta-color-profile.h b/src/backends/meta-color-profile.h
+index cd68b2f..d2b9611 100644
+--- a/src/backends/meta-color-profile.h
++++ b/src/backends/meta-color-profile.h
+@@ -79,6 +79,11 @@ void meta_color_get_temperature_rgb_scales (unsigned int  temperature,
+                                             float        *out_green,
+                                             float        *out_blue);
+ 
++META_EXPORT_TEST
++void meta_color_get_planckian_chromaticity (unsigned int  temperature,
++                                            float        *x,
++                                            float        *y);
++
+ META_EXPORT_TEST
+ const MetaColorCalibration * meta_color_profile_get_calibration (MetaColorProfile *color_profile);
+ 
+diff --git a/src/tests/color-management-tests.c b/src/tests/color-management-tests.c
+index 7968302..cc7f4dc 100644
+--- a/src/tests/color-management-tests.c
++++ b/src/tests/color-management-tests.c
+@@ -27,6 +27,8 @@
+ #include "backends/meta-crtc.h"
+ #include "backends/meta-monitor-manager-private.h"
+ #include "backends/meta-monitor-private.h"
++#include "backends/meta-output.h"
++#include "clutter/clutter-color-state-params-private.h"
+ #include "meta-test/meta-context-test.h"
+ #include "tests/meta-crtc-test.h"
+ #include "tests/meta-monitor-test-utils.h"
+@@ -1754,6 +1756,184 @@ meta_test_color_management_night_light_ctm_fallback (void)
+                      expected_r, expected_g, expected_b);
+ }
+ 
++static void
++on_rendering_color_state_changed (MetaColorDevice *color_device,
++                                  gboolean        *run)
++{
++  *run = FALSE;
++}
++
++/* Like apply_night_light_temperature(), for a PQ encoding, where Night Light
++ * changes the rendering color state rather than the calibration. */
++static void
++apply_night_light_rendering_temperature (MetaColorDevice *color_device,
++                                         unsigned int     temperature,
++                                         gboolean         active)
++{
++  gboolean run = TRUE;
++  gboolean timed_out = FALSE;
++  gulong handler_id;
++  guint timeout_id;
++
++  handler_id = g_signal_connect (color_device, "rendering-color-state-changed",
++                                 G_CALLBACK (on_rendering_color_state_changed),
++                                 &run);
++  timeout_id = g_timeout_add_seconds (10, on_calibration_wait_timeout,
++                                      &timed_out);
++
++  set_night_light_temperature (temperature);
++  set_night_light_active (active);
++
++  while (run && !timed_out)
++    g_main_context_iteration (NULL, TRUE);
++
++  g_clear_handle_id (&timeout_id, g_source_remove);
++  g_signal_handler_disconnect (color_device, handler_id);
++
++  if (timed_out)
++    g_error ("Timed out waiting for %uK to be applied: the color device "
++             "emitted no rendering color state change", temperature);
++}
++
++static void
++set_output_color_mode (MetaOutput    *output,
++                       MetaColorMode  color_mode)
++{
++  g_autoptr (MetaCrtc) crtc = g_object_ref (meta_output_get_assigned_crtc (output));
++  MetaOutputAssignment assignment = {
++    .output = output,
++    .is_primary = meta_output_is_primary (output),
++    .color_mode = color_mode,
++  };
++
++  meta_output_assign_crtc (output, crtc, &assignment);
++}
++
++/*
++ * In BT.2100 the output carries PQ code values: Night Light programs
++ * neither the gamma LUT nor the CTM, and adapts the white in the rendering
++ * color state instead, to the Planckian white of the temperature. At the
++ * default temperature the rendering color state is exactly the one without
++ * Night Light.
++ */
++static void
++meta_test_color_management_night_light_bt2100 (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *monitor_manager =
++    meta_backend_get_monitor_manager (backend);
++  MetaMonitorManagerTest *monitor_manager_test =
++    META_MONITOR_MANAGER_TEST (monitor_manager);
++  MetaColorManager *color_manager =
++    meta_backend_get_color_manager (backend);
++  MonitorTestCaseSetup test_case_setup = base_monitor_setup;
++  MetaMonitorTestSetup *test_setup;
++  MetaMonitor *monitor;
++  MetaOutput *output;
++  MetaCrtcTest *crtc_test;
++  MetaColorDevice *color_device;
++  g_autoptr (ClutterColorState) initial = NULL;
++  ClutterColorState *rendering_color_state, *encoding;
++  unsigned int temperature = 3700;
++  float expected_x, expected_y, white_x, white_y;
++  size_t gamma_size;
++  uint16_t gamma_last;
++
++  test_case_setup.crtcs[0].enable_ctm = TRUE;
++  test_case_setup.outputs[0].edid_info = CALTECH_MONITOR_EDID;
++  test_case_setup.outputs[0].has_edid_info = TRUE;
++  test_case_setup.n_outputs = 1;
++  test_case_setup.n_crtcs = 1;
++
++  test_setup = meta_create_monitor_test_setup (backend, &test_case_setup,
++                                               MONITOR_TEST_FLAG_NO_STORED);
++  meta_monitor_manager_test_emulate_hotplug (monitor_manager_test, test_setup);
++
++  monitor = meta_monitor_manager_get_monitors (monitor_manager)->data;
++  color_device = meta_color_manager_get_color_device (color_manager, monitor);
++  g_assert_nonnull (color_device);
++
++  while (!meta_color_device_is_ready (color_device))
++    g_main_context_iteration (NULL, TRUE);
++
++  /* Start from daylight, whatever an earlier test left behind, through a
++   * temperature no other test uses, in the default mode. */
++  apply_night_light_temperature (color_device, 5100, TRUE);
++  apply_night_light_temperature (color_device, 6500, FALSE);
++
++  output = meta_monitor_get_main_output (monitor);
++  crtc_test = META_CRTC_TEST (meta_output_get_assigned_crtc (output));
++  set_output_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (color_device);
++  encoding = meta_color_device_get_color_state (color_device);
++  initial = g_object_ref (meta_color_device_get_rendering_color_state (color_device));
++  g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (initial),
++                                                                NULL, NULL));
++  gamma_size = crtc_test->gamma.size;
++  gamma_last = gamma_size ? crtc_test->gamma.red[gamma_size - 1] : 0;
++
++  apply_night_light_rendering_temperature (color_device, temperature, TRUE);
++
++  /* Neither the gamma LUT nor the CTM is touched. */
++  g_assert_cmpuint (crtc_test->gamma.size, ==, gamma_size);
++  if (gamma_size)
++    {
++      g_assert_cmpuint (crtc_test->gamma.red[gamma_size - 1], ==, gamma_last);
++      g_assert_cmpuint (crtc_test->gamma.green[gamma_size - 1], ==, gamma_last);
++      g_assert_cmpuint (crtc_test->gamma.blue[gamma_size - 1], ==, gamma_last);
++    }
++  g_assert_null (meta_crtc_test_peek_ctm (crtc_test));
++
++  /* The rendering color state adapts to the Planckian white instead. */
++  rendering_color_state = meta_color_device_get_rendering_color_state (color_device);
++  meta_color_get_planckian_chromaticity (temperature, &expected_x, &expected_y);
++  g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (rendering_color_state),
++                                                               &white_x, &white_y));
++  g_assert_cmpfloat (white_x, ==, expected_x);
++  g_assert_cmpfloat (white_y, ==, expected_y);
++  /* The output's encoding is not changed. */
++  g_assert_true (meta_color_device_get_color_state (color_device) == encoding);
++
++  /* Back to daylight: exactly the state without Night Light. */
++  apply_night_light_rendering_temperature (color_device, 6500, FALSE);
++
++  rendering_color_state = meta_color_device_get_rendering_color_state (color_device);
++  g_assert_true (clutter_color_state_identical (rendering_color_state, initial));
++  g_assert_null (meta_crtc_test_peek_ctm (crtc_test));
++
++  set_output_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (color_device);
++}
++
++/*
++ * The Planckian chromaticities Night Light adapts to: at 2856 K, CIE
++ * illuminant A, a Planckian radiator by definition, xy (0.44757, 0.40745),
++ * within the 1e-4 in CIE 1960 uv the approximation claims; and warmer, in x,
++ * at every lower temperature.
++ */
++static void
++meta_test_color_management_planckian_chromaticity (void)
++{
++  float x, y, previous_x = 1.0f;
++  double u, v, reference_u, reference_v;
++  unsigned int temperature;
++
++  meta_color_get_planckian_chromaticity (2856, &x, &y);
++  u = 4.0 * x / (-2.0 * x + 12.0 * y + 3.0);
++  v = 6.0 * y / (-2.0 * x + 12.0 * y + 3.0);
++  reference_u = 4.0 * 0.44757 / (-2.0 * 0.44757 + 12.0 * 0.40745 + 3.0);
++  reference_v = 6.0 * 0.40745 / (-2.0 * 0.44757 + 12.0 * 0.40745 + 3.0);
++  g_assert_cmpfloat_with_epsilon (u, reference_u, 1e-4);
++  g_assert_cmpfloat_with_epsilon (v, reference_v, 1e-4);
++
++  for (temperature = 1000; temperature <= 10000; temperature += 100)
++    {
++      meta_color_get_planckian_chromaticity (temperature, &x, &y);
++      g_assert_cmpfloat (x, <, previous_x);
++      previous_x = x;
++    }
++}
++
+ /*
+  * Nothing outside [0, 1] may reach the kernel, whatever the scales are, so
+  * check the boundaries of the conversion directly rather than only through a
+@@ -1898,6 +2078,10 @@ init_tests (void)
+                   meta_test_color_management_profile_efivar);
+   add_color_test ("/color-management/night-light/calibrated",
+                   meta_test_color_management_night_light_calibrated);
++  add_color_test ("/color-management/night-light/bt2100",
++                  meta_test_color_management_night_light_bt2100);
++  add_color_test ("/color-management/night-light/planckian-chromaticity",
++                  meta_test_color_management_planckian_chromaticity);
+   add_color_test ("/color-management/night-light/uncalibrated",
+                   meta_test_color_management_night_light_uncalibrated);
+   add_color_test ("/color-management/night-light/prefer-gamma-lut",
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 79e347e..bf0c3ff 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -953,7 +953,8 @@ wayland_test_cases = [
+     # output's EDID and colour mode, and the zero-descriptor case replaces
+     # the process's descriptor 0. The mapping cases give the fixture output a
+     # declared target peak or declared target primaries, and the published
+-    # case a declared target peak and reference luminance factors.
++    # case a declared target peak and reference luminance factors. The Night
++    # Light case changes the process wide Night Light temperature.
+     'separate_cases': [
+       '/wayland/target-luminance/v1',
+       '/wayland/target-luminance/v2',
+@@ -967,6 +968,7 @@ wayland_test_cases = [
+       '/wayland/published/reference-factor',
+       '/wayland/display-targets/cta',
+       '/wayland/display-targets/sdr-native',
++      '/wayland/night-light/bt2100-scanout',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index f43f9fa..bac2fc6 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1987,6 +1987,132 @@ display_targets_sdr_native (void)
+   meta_color_device_update (device);
+ }
+ 
++static void
++call_gsd_color_mock (const char *method,
++                     GVariant   *parameters)
++{
++  g_autoptr (GDBusProxy) proxy = NULL;
++  g_autoptr (GVariant) result = NULL;
++  g_autoptr (GError) error = NULL;
++
++  proxy = g_dbus_proxy_new_for_bus_sync (G_BUS_TYPE_SESSION,
++                                         G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START |
++                                         G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS,
++                                         NULL,
++                                         "org.gnome.SettingsDaemon.Color",
++                                         "/org/gnome/SettingsDaemon/Color",
++                                         "org.freedesktop.DBus.Mock",
++                                         NULL, &error);
++  g_assert_no_error (error);
++  result = g_dbus_proxy_call_sync (proxy, method, parameters,
++                                   G_DBUS_CALL_FLAGS_NO_AUTO_START, -1, NULL,
++                                   &error);
++  g_assert_no_error (error);
++}
++
++static void
++on_rendering_color_state_changed (MetaColorDevice *device,
++                                  gboolean        *changed)
++{
++  *changed = TRUE;
++}
++
++/* Sets the Night Light temperature through the mocked gsd-color, and waits
++ * for the device's rendering color state to follow. */
++static void
++set_night_light_temperature (MetaColorDevice *device,
++                             unsigned int     temperature)
++{
++  gboolean changed = FALSE;
++  gulong handler;
++
++  handler = g_signal_connect (device, "rendering-color-state-changed",
++                              G_CALLBACK (on_rendering_color_state_changed),
++                              &changed);
++  call_gsd_color_mock ("SetTemperature", g_variant_new ("(u)", temperature));
++  call_gsd_color_mock ("SetNightLightActive",
++                       g_variant_new ("(b)", temperature != 6500));
++  while (!changed)
++    g_main_context_iteration (NULL, TRUE);
++  g_signal_handler_disconnect (device, handler);
++}
++
++/*
++ * Night Light on a BT.2100 output adapts the output's white in the
++ * rendering color state: a surface in the output's own encoding, which
++ * would otherwise be scanned out, and the cursor plane, must be composited
++ * while it is active, and may be scanned out again once it is off, when the
++ * output's states are exactly those without Night Light.
++ */
++static void
++night_light_bt2100_scanout (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  ClutterContext *context = meta_backend_get_clutter_context (backend);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  ClutterStageView *view;
++  ClutterColorState *blending, *output_color_state;
++  g_autoptr (ClutterColorState) initial_blending = NULL;
++  g_autoptr (ClutterColorState) surface = NULL;
++  const ClutterLuminance *output_lum;
++
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++  view = CLUTTER_STAGE_VIEW (meta_renderer_get_view_for_crtc (renderer,
++                                                              meta_output_get_assigned_crtc (output)));
++  g_assert_nonnull (view);
++
++  output_color_state = clutter_stage_view_get_output_color_state (view);
++  output_lum =
++    clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (output_color_state));
++  /* A client surface in the output's own encoding. */
++  surface = clutter_color_state_params_new_full (context,
++                                                 CLUTTER_COLORSPACE_BT2020,
++                                                 CLUTTER_TRANSFER_FUNCTION_PQ,
++                                                 NULL, -1.0f,
++                                                 output_lum->min,
++                                                 output_lum->max,
++                                                 output_lum->ref,
++                                                 0.0f);
++  initial_blending = g_object_ref (clutter_stage_view_get_color_state (view));
++  g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (surface,
++                                                                            initial_blending,
++                                                                            output_color_state));
++
++  set_night_light_temperature (device, 3900);
++  g_assert_true (clutter_stage_view_get_output_color_state (view) == output_color_state);
++  blending = clutter_stage_view_get_color_state (view);
++  g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (blending),
++                                                               NULL, NULL));
++  g_assert_true (meta_compositor_view_native_color_state_prevents_scanout (surface,
++                                                                           blending,
++                                                                           output_color_state));
++  g_assert_true (clutter_color_transform_requires_composition (surface, blending));
++  /* The blending state's conversion to the output adapts the white. */
++  g_assert_true (clutter_color_transform_requires_mapping (blending,
++                                                           output_color_state));
++
++  /* A step during the transition is a new value of the same adaptation. */
++  set_night_light_temperature (device, 3880);
++  g_assert_true (meta_compositor_view_native_color_state_prevents_scanout (surface,
++                                                                           clutter_stage_view_get_color_state (view),
++                                                                           output_color_state));
++
++  set_night_light_temperature (device, 6500);
++  blending = clutter_stage_view_get_color_state (view);
++  g_assert_true (clutter_color_state_identical (blending, initial_blending));
++  g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (surface,
++                                                                            blending,
++                                                                            output_color_state));
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
+ static void
+ client_mode_case (gconstpointer data)
+ {
+@@ -2221,6 +2347,8 @@ init_tests (void)
+                    mapping_blending_target);
+   g_test_add_func ("/wayland/published/reference-factor",
+                    published_reference_factor);
++  g_test_add_func ("/wayland/night-light/bt2100-scanout",
++                   night_light_bt2100_scanout);
+   g_test_add_func ("/wayland/display-targets/cta",
+                    display_targets_cta);
+   g_test_add_func ("/wayland/display-targets/sdr-native",

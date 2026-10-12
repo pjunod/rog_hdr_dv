@@ -1,0 +1,211 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@invalid>
+Date: Sun, 11 Oct 2026 22:48:46 +0000
+Subject: [PATCH 06/11] backends/monitor: Carry per-monitor target override
+ declarations
+
+Keep target overrides separate from encoding and color-device policy. Propagate the applied configuration through each output assignment and expose one monitor getter. Explicit presence preserves zero black levels and zero initialization retains existing behavior.
+---
+ src/backends/meta-color-target-override.h   | 50 +++++++++++++++++++++
+ src/backends/meta-monitor-config-manager.c  |  1 +
+ src/backends/meta-monitor-config-manager.h  |  1 +
+ src/backends/meta-monitor-manager-private.h |  1 +
+ src/backends/meta-monitor-private.h         |  3 ++
+ src/backends/meta-monitor.c                 |  6 +++
+ src/backends/meta-output.c                  | 10 +++++
+ src/backends/meta-output.h                  |  3 ++
+ src/meson.build                             |  1 +
+ 9 files changed, 76 insertions(+)
+ create mode 100644 src/backends/meta-color-target-override.h
+
+diff --git a/src/backends/meta-color-target-override.h b/src/backends/meta-color-target-override.h
+new file mode 100644
+index 0000000..34c1df8
+--- /dev/null
++++ b/src/backends/meta-color-target-override.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2026 Codex
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of the
++ * License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, see <http://www.gnu.org/licenses/>.
++ */
++
++#pragma once
++
++#include <glib.h>
++
++typedef enum
++{
++  META_HDR_GAMUT_SOURCE_AUTO,
++  META_HDR_GAMUT_SOURCE_BASE_EDID,
++  META_HDR_GAMUT_SOURCE_NONE,
++} MetaHdrGamutSource;
++
++/* A monitor configuration's declaration, not a measurement or an encoding.
++ * Zero initialization means no luminance override and automatic gamut.
++ * Presence is explicit because zero is a valid declared black level. */
++typedef struct
++{
++  gboolean has_peak;
++  float peak;
++  gboolean has_min;
++  float min;
++  MetaHdrGamutSource gamut_source;
++} MetaColorTargetOverride;
++
++static inline gboolean
++meta_color_target_override_equal (const MetaColorTargetOverride *a,
++                                  const MetaColorTargetOverride *b)
++{
++  return a->has_peak == b->has_peak &&
++         (!a->has_peak || a->peak == b->peak) &&
++         a->has_min == b->has_min &&
++         (!a->has_min || a->min == b->min) &&
++         a->gamut_source == b->gamut_source;
++}
+diff --git a/src/backends/meta-monitor-config-manager.c b/src/backends/meta-monitor-config-manager.c
+index baad0a8..0472dd6 100644
+--- a/src/backends/meta-monitor-config-manager.c
++++ b/src/backends/meta-monitor-config-manager.c
+@@ -291,6 +291,7 @@ assign_monitor_crtc (MetaMonitor         *monitor,
+     .max_bpc = data->monitor_config->max_bpc,
+     .rgb_range = data->monitor_config->rgb_range,
+     .color_mode = data->monitor_config->color_mode,
++    .target_override = data->monitor_config->target_override,
+   };
+ 
+   g_ptr_array_add (data->crtc_assignments, crtc_assignment);
+diff --git a/src/backends/meta-monitor-config-manager.h b/src/backends/meta-monitor-config-manager.h
+index 73458f7..69992be 100644
+--- a/src/backends/meta-monitor-config-manager.h
++++ b/src/backends/meta-monitor-config-manager.h
+@@ -35,6 +35,7 @@ typedef struct _MetaMonitorConfig
+   unsigned int max_bpc;
+   MetaOutputRGBRange rgb_range;
+   MetaColorMode color_mode;
++  MetaColorTargetOverride target_override;
+ } MetaMonitorConfig;
+ 
+ typedef struct _MetaLogicalMonitorConfig
+diff --git a/src/backends/meta-monitor-manager-private.h b/src/backends/meta-monitor-manager-private.h
+index cfce38d..1d3dc58 100644
+--- a/src/backends/meta-monitor-manager-private.h
++++ b/src/backends/meta-monitor-manager-private.h
+@@ -108,6 +108,7 @@ struct _MetaOutputAssignment
+   unsigned int max_bpc;
+   unsigned int rgb_range;
+   MetaColorMode color_mode;
++  MetaColorTargetOverride target_override;
+ };
+ 
+ #define META_TYPE_MONITOR_MANAGER            (meta_monitor_manager_get_type ())
+diff --git a/src/backends/meta-monitor-private.h b/src/backends/meta-monitor-private.h
+index 0d183f8..89bcaac 100644
+--- a/src/backends/meta-monitor-private.h
++++ b/src/backends/meta-monitor-private.h
+@@ -311,6 +311,9 @@ void meta_monitor_set_ctm (MetaMonitor   *monitor,
+ 
+ MetaColorMode meta_monitor_get_color_mode (MetaMonitor *monitor);
+ 
++META_EXPORT_TEST
++const MetaColorTargetOverride * meta_monitor_get_target_override (MetaMonitor *monitor);
++
+ META_EXPORT_TEST
+ GList * meta_monitor_get_supported_color_modes (MetaMonitor *monitor);
+ 
+diff --git a/src/backends/meta-monitor.c b/src/backends/meta-monitor.c
+index 04a9110..84d06b3 100644
+--- a/src/backends/meta-monitor.c
++++ b/src/backends/meta-monitor.c
+@@ -2925,6 +2925,12 @@ meta_monitor_is_color_mode_supported (MetaMonitor   *monitor,
+   return !!g_list_find (priv->color_modes, GINT_TO_POINTER (color_mode));
+ }
+ 
++const MetaColorTargetOverride *
++meta_monitor_get_target_override (MetaMonitor *monitor)
++{
++  return meta_output_get_target_override (meta_monitor_get_main_output (monitor));
++}
++
+ MetaColorMode
+ meta_monitor_get_color_mode (MetaMonitor *monitor)
+ {
+diff --git a/src/backends/meta-output.c b/src/backends/meta-output.c
+index 777b7d6..34a78ea 100644
+--- a/src/backends/meta-output.c
++++ b/src/backends/meta-output.c
+@@ -62,6 +62,7 @@ typedef struct _MetaOutputPrivate
+   gboolean is_privacy_screen_enabled;
+ 
+   MetaColorMode color_mode;
++  MetaColorTargetOverride target_override;
+   MetaOutputRGBRange rgb_range;
+ } MetaOutputPrivate;
+ 
+@@ -262,6 +263,7 @@ meta_output_assign_crtc (MetaOutput                 *output,
+     priv->max_bpc = output_assignment->max_bpc;
+ 
+   priv->color_mode = output_assignment->color_mode;
++  priv->target_override = output_assignment->target_override;
+ }
+ 
+ void
+@@ -575,6 +577,14 @@ meta_output_get_color_metadata (MetaOutput            *output,
+     }
+ }
+ 
++const MetaColorTargetOverride *
++meta_output_get_target_override (MetaOutput *output)
++{
++  MetaOutputPrivate *priv = meta_output_get_instance_private (output);
++
++  return &priv->target_override;
++}
++
+ MetaColorMode
+ meta_output_get_color_mode (MetaOutput *output)
+ {
+diff --git a/src/backends/meta-output.h b/src/backends/meta-output.h
+index 3660b2b..ca7bf4c 100644
+--- a/src/backends/meta-output.h
++++ b/src/backends/meta-output.h
+@@ -24,6 +24,7 @@
+ #include "backends/meta-backend-types.h"
+ #include "backends/meta-backlight-private.h"
+ #include "backends/meta-connector.h"
++#include "backends/meta-color-target-override.h"
+ #include "backends/meta-gpu.h"
+ #include "core/util-private.h"
+ 
+@@ -254,6 +255,8 @@ void meta_output_get_color_metadata (MetaOutput            *output,
+ 
+ MetaColorMode meta_output_get_color_mode (MetaOutput *output);
+ 
++const MetaColorTargetOverride * meta_output_get_target_override (MetaOutput *output);
++
+ META_EXPORT_TEST
+ MetaOutputRGBRange meta_output_peek_rgb_range (MetaOutput *output);
+ 
+diff --git a/src/meson.build b/src/meson.build
+index 60970ce..c5ad94f 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -224,6 +224,7 @@ mutter_sources = [
+   'backends/meta-orientation-manager.c',
+   'backends/meta-output.c',
+   'backends/meta-output.h',
++  'backends/meta-color-target-override.h',
+   'backends/meta-pointer-constraint.c',
+   'backends/meta-pointer-constraint.h',
+   'backends/meta-remote-access-controller-private.h',
