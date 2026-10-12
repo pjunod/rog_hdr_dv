@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "task": "t_e5c490e6",
+  "stage": "reviewed batch-failure corrections integrated; first restricted retry incomplete",
+  "native_head": "a8847717ea673fc6a34603aa5a99a9755e0b74ce",
+  "native_tree": "9111578e2e03bda319277c8c7f48adabb6dec646",
+  "previous_native_head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+  "previous_native_tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5",
+  "library_tree": "72626245922181526fbcb990de3eb7f575efa56b",
+  "corrections": {
+    "0069": "test-only: scale absolute near-zero channel allowance to eight FLT_EPSILON of brightest input luminance; relative bounds unchanged",
+    "0070": "production upstream-candidate lifecycle fix: clear restore_config_id before running restore idle; prevents later removal of dead source ID, pre-existing at d82671c, distinct from HDR feature",
+    "0071": "test-only: hold test-shell synchronous confirmation while exercising real rejection/restore; assert pending confirmation and cleared restore ID"
+  },
+  "authorship": "Claude Agent <claude-agent@invalid>; exported patches copied byte-identically, no invented attribution or signoff",
+  "export_evidence": ".peer-linux/opus-failfix/export",
+  "compiler_evidence": [
+    ".peer-linux/opus-failfix/export/opus-failfix-0069.log",
+    ".peer-linux/opus-failfix/export/opus-failfix-0070.log",
+    ".peer-linux/opus-failfix/export/opus-failfix-0071.log"
+  ],
+  "compiler_result": "Opus warm -Werror builds passed with zero diagnostics; logs show two steps for 0069/0071 and seven completed compile/link/symbol/introspection steps for 0070; Sol independently verified clean native tree and ninja -n no work before retry",
+  "replay_evidence": ".peer-linux/opus-failfix/export/replay.txt",
+  "replay_result": "0050-0071 replay onto 5f123bb: TREE_EQUAL 9111578e2e03bda319277c8c7f48adabb6dec646; attribution preserved",
+  "live_identity_evidence": ".peer-linux/results/a1a9a2f70f244859be44cf2ac92eec58/output.txt",
+  "patch_integrity": "0050-0068 byte equality with Opus re-export; unchanged 0001-0068 canonical prefix; SHA256SUMS deliberately appended only three correction hashes",
+  "review": "Fable t_bedcc81f, FABLE_RETRY_DECISION.md D1-D5 approved 0069-0071 and exactly two retry IDs, no other invalidation",
+  "retry_evidence": "evidence/nativehdr10-validation-attempt2.json",
+  "retry_result": "color-hdr passed; monitor-dbus target-overrides case passed, then has-external-monitor failed on colord lookup. Latest required check receipts: 70 passed, 1 failed. Acceptance incomplete; no further retry.",
+  "next_tasks": ["t_88ae3088", "t_6b592492"],
+  "limits": [
+    "Retained passes keep their original executed trees; binary identity for test-only commits and reviewer-attested source reachability for production idle callback are separate grounds, not automatic runner reuse across full trees",
+    "No final repository-integrity receipt yet; run after final evidence/docs commit, outside tracked source",
+    "No upstream acceptance, packages, optical or Dolby qualification, device/display deployment or Apple TV interaction; PR16 held unmerged"
+  ]
+}
