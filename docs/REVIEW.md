@@ -465,3 +465,12 @@ same published `setupapi.dll` SHA-256 in existing Wine receipts. Both are
 artifact hashes, not credentials. The Gitleaks configuration now permits
 only that exact digest in those exact two files; default detectors remain
 active. No historical content was rewritten.
+
+Final documentation fast lane: `python3 scripts/check_repository.py` passed
+for 164 patches and six series; JSON parsing and `git diff --cached --check`
+passed. Gitleaks 8.30.1 scanned the candidate tree and all 94 then-reachable
+commits with the reviewed exact-hash exception and found no leaks. The
+independent reviewer rechecked both plan corrections and the narrow scanner
+exception with no remaining blockers. No C, kernel, patch bytes or runtime
+Python code changed in this documentation batch, so compiler/physical audio
+tests are pending the implementation lanes, not claimed here.
