@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Unreviewed work | `wip/mutter-nightlight/` (nativehdr10 part 1, see its README) |
+| Unreviewed work | nativehdr10 candidate, `patches/mutter` 0050–0061 (see [status](STATUS.md#nativehdr10--source-candidate-awaiting-adversarial-review)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -34,32 +34,30 @@ agent's workspace.
 
 ## Next tasks, in order
 
-### nativehdr10 source checkpoint (Sol stage, 2026-10-11)
+### nativehdr10 source candidate (2026-10-11)
 
-The [override configuration/API source stage](../wip/mutter-target-overrides/README.md)
-is compiled and exported in six authored patches, with native replay tree
-`ebe9aeb880eab66fcfc5cbf34a97d9eaf6cd30f5`. See the
-[stage receipt](../evidence/nativehdr10-sol-stage.json). The warm native source
-is at `9b2886d826a577c866c5cd26533a1109c9aba9c7` on
-`codex/sol-overrides`; do not reconstruct over it. Complete Night Light and
-target selection through the dependent Opus stage, then export the integrated
-candidate with the unchanged 49-patch prefix. The shared provenance converter
-is now `meta_color_target_provenance_to_string`; extend its one table.
+Both parts are now Mutter patches 0050–0061. The pins name candidate
+`fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f`, tree
+`18ba4b5a752f4ee383541757b20116060f18daf9`, and patches 0001–0049 are
+unchanged. Every commit builds with warnings as errors, and the exported
+series replays to the same tree; see the
+[candidate receipt](../evidence/nativehdr10-source-candidate.json). The warm
+native source is branch `codex/opus-nightlight` in the persistent peer work
+directory; do not reconstruct over it. A Git bundle of the range is in the
+ignored `.peer-linux/deliverables/opus-nightlight.bundle`.
 
-No units ran here. New D-Bus regressions intentionally depend on selector
-integration; golden gdctl show fixtures are source-derived expectations, not
-execution output. Both adversarial review lanes and their fixes precede the
-single affected validation batch. PR16 remains held unmerged, and the current
-pins still describe the qualified baseline. No push, merge or display change
-is authorized by this checkpoint. Ubuntu port/packaging and optical acceptance
-remain separate stages; only Mutter's orig tar is recorded in the offline
-Ubuntu cache, not the exact packaging imports.
+No unit test has run on the candidate. Golden gdctl show fixtures are
+source-derived expectations, not execution output. PR16 remains held unmerged.
+No push, merge or display change is authorized. Ubuntu port/packaging and
+optical acceptance remain separate stages; only Mutter's orig tar is recorded
+in the offline Ubuntu cache, not the exact packaging imports.
 
-1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Review and
-   complete part 1 from `wip/mutter-nightlight`, implement part 2 (overrides
-   with precedence measured > user > DisplayID > CTA > fallback), build each
-   commit, adversarial review, one fast lane, export with
-   `tools/export_series.py`, port to the Ubuntu series as 0062+, package.
+1. **nativehdr10** ([contract](NIGHT_LIGHT_AND_OVERRIDES.md)). Integrate Sol's
+   validation-ledger tooling (t_b51b86c0). Then Astra and Fable each review
+   the same candidate adversarially. Fix the findings, rebuilding each
+   affected commit, and run one affected unit batch. Then the repository
+   pre-merge lane and one substantial PR that depends on held PR16. After
+   that, port to the Ubuntu series as 0062+ and package.
 2. **Open Dolby Vision track, stage 1** ([contract](OPEN_DV_DISPLAY_MANAGEMENT.md)):
    a headless libplacebo harness and ΔE_ITP comparison, then the baseline
    against the private reference renders on lab5. Today libplacebo uses only

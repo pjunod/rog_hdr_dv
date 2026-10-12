@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-12T01:38:00Z",
+  "stage": "nativehdr10 integrated source candidate (Night Light in BT.2100 and per-monitor target overrides); compiled and replay-verified; awaiting both adversarial reviews; no unit tests run",
+  "task": "t_134bba61",
+  "previous_stage_receipt": "evidence/nativehdr10-sol-stage.json",
+  "architecture": "x86_64",
+  "transport": "owned .peer-linux/run.py only; unprivileged native x86_64 Ubuntu container; no emulation, network, display or device access",
+  "native_branch": "codex/opus-nightlight",
+  "native_base_commit": "5f123bb2c203c44c765d56628b47aad1fcfd9e86",
+  "native_base_tree": "3f238d2e9227dacd578f5a673c04ac10de5caac8",
+  "native_head": "fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f",
+  "native_tree": "18ba4b5a752f4ee383541757b20116060f18daf9",
+  "native_working_tree": "clean at export",
+  "series": "patches/mutter 0001-0049 byte-identical; 0050-0061 appended with tools/export_series.py --start 50",
+  "commits": [
+    {"patch": "0050", "commit": "3816ea4ffc1743cd91d2d2ae0d021875babae9c8", "tree": "14c13e25b22ba7e2be61da1c9eab7ca488c7d344", "author": "Claude Agent (original WIP, imported)", "subject": "clutter/color: Adapt a display's output to a white point", "sha256": "a0e38f0b3f90a87af6aa3d6c2f644a0cc37d35f7fd22cddbf54cae43d30d21d9"},
+    {"patch": "0051", "commit": "bedd3c8b4d028c4780b093a432dc13d339b23060", "tree": "4d768ea525f373d953a8fe582fba675046a20db3", "author": "Claude Agent (original WIP, imported)", "subject": "compositor: Composite content on outputs whose white is adapted", "sha256": "1f8ef57914a2f7581da102c5418b9f9a431c79b0f6c82526197383b9d82ae68c"},
+    {"patch": "0052", "commit": "710a40decf521b24940ef890ffabe414f95e6c91", "tree": "14ce390cdc57f5b9efac5826e31e625cf3dedb64", "author": "Claude Agent (original WIP, imported)", "subject": "backends/color: Apply Night Light in linear light in BT.2100", "sha256": "f4a556c52a0de1c5f2c7900ef66fffc6d66be06d6c6c2757dfa5f546f7037d08"},
+    {"patch": "0053", "commit": "d62bfbc7a59bf0ccf1b6a5ad125c3c7ff8887b39", "tree": "2a58193bd19993ceafe0b32b416ce8130cb37703", "author": "Claude Agent (Opus)", "subject": "clutter/color: Bound the white adaptation with diagonal output factors", "sha256": "532271e4917ce495220ad8e8a949aff29867efa408bc06c4ff639cbfd50d1664"},
+    {"patch": "0054", "commit": "71d22397217a5594abe0b0af0726e429911d577e", "tree": "b772ab6673d83dbf9b1e0ee8ffc25646f141d5b4", "author": "Claude Agent (Opus)", "subject": "tests: Cover Night Light mode transitions, captures and forced HDR", "sha256": "4c7e600f0f48c59da48ed694fd090bd64eb650525f9eea94e3e849e4c2d399f0"},
+    {"patch": "0055", "commit": "f460921df7a066c3b50c48885a91d92efea9c04f", "tree": "578c73f20ecefb754f65476c8366c5526e1732c9", "author": "Codex (Sol, rebased unchanged)", "subject": "backends/monitor: Carry per-monitor target override declarations", "sha256": "36e7c0c0b7eaaffc48aed612e787b31eef0a581fef9aabf6a0dc0b80147f0413"},
+    {"patch": "0056", "commit": "c8623ae1e9185bc29510f4d6bc04e680abb357c8", "tree": "cbbf215c26f9aa2a117ef24139950e33dcd5392e", "author": "Codex (Sol, rebased unchanged)", "subject": "backends/monitor: Persist and validate target overrides", "sha256": "a007034d047b9d0f8554586f88915858161bdadb7f0854e6446284596ddac636"},
+    {"patch": "0057", "commit": "933a98b76811d09ddecd11fcd3fe90aa3390cc78", "tree": "65607176f479fe39ef6a764e540ca4c17098a608", "author": "Codex (Sol, rebased unchanged)", "subject": "backends/monitor: Retain color settings when copying and synthesizing layouts", "sha256": "5111ae1ae4efaf9e7c0e8349dce0464be2b6bd0f1f5bca4fbd40d67ce8fffd7a"},
+    {"patch": "0058", "commit": "a71570de54c08d9906c093dee8f03a5feaca3fe8", "tree": "cae4e40495147da1d0f52014dcb4396ab9cf914d", "author": "Codex (Sol, rebased unchanged)", "subject": "backends/monitor: Expose configured and effective targets over DisplayConfig", "sha256": "cd28ab545f9eaf442fd76176ca650581257152e1d3a503381ae58a74016a03f2"},
+    {"patch": "0059", "commit": "51a61cce612781b41373084b06f635ec00c20aab", "tree": "62a9298ec9464a0d334027c390849a1914d49e7d", "author": "Codex (Sol, rebased unchanged)", "subject": "gdctl: Preserve per-monitor target declarations and support explicit clearing", "sha256": "b7bcdd194a8417e90b6c124a212dc151e1f6ce12b4d15cb24eb17ec23a7a4e4a"},
+    {"patch": "0060", "commit": "bd6b2ea042fb61ee534e8ee0304227c3c6b91feb", "tree": "5d90ca1a3e70ad8e488a4ad9c5356a15f3478274", "author": "Codex (Sol, rebased unchanged)", "subject": "backends/monitor: Report software PQ Night Light support on applied mode changes", "sha256": "4f6978ef5698222b486d9a9814c9abf2134997c6877a88fc8468b758f9768c34"},
+    {"patch": "0061", "commit": "fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f", "tree": "18ba4b5a752f4ee383541757b20116060f18daf9", "author": "Claude Agent (Opus)", "subject": "backends/color: Select per-monitor target overrides as user declarations", "sha256": "16c41ce324f8fda8c58f312489a103960cf391871ce3df8dcfdc56884a9dcbff"}
+  ],
+  "verification": {
+    "werror_compile_each_commit": "all twelve commits built individually in the warm native tree with bash /opt/peer-hdr/build.sh (-Dwerror=true) and 0 compiler diagnostics: 0050-0054 and 0060 in run 2; 0055-0059 at their rebased positions and 0061 in run 4. The first 0061 attempt failed to compile (two missed callers in src/wayland/meta-wayland-color-management.c); fixed before commit, rebuilt with 0 diagnostics.",
+    "import_identity": "0050-0052 applied to the pinned base reproduce tree 14ce390cdc57f5b9efac5826e31e625cf3dedb64; their content equals the PR16 WIP patches apart from subject numbering and index abbreviation; authorship Claude Agent <claude-agent@invalid> kept.",
+    "sol_rebase_identity": "0055-0060 content equals the stage export apart from subject wrapping and index abbreviation.",
+    "replay": "the exported 0050-0061 were git am'd onto 5f123bb in a fresh native worktree; replay tree 18ba4b5a752f4ee383541757b20116060f18daf9 equals the built head tree.",
+    "prefix_unchanged": "patches/mutter 0001-0049 and every other component unchanged; SHA256SUMS regenerated by export_series.py adds only the twelve new entries.",
+    "repository_integrity": "python3 scripts/check_repository.py run as a static integrity check after the export (PASS 176 patches, 6 series, documentation links); it is rerun as part of the pre-merge fast lane on the reviewed candidate.",
+    "unit_tests_run": 0,
+    "behavioral_probes_run": 0
+  },
+  "regressions_written_not_executed": [
+    "native-hdr: /native-hdr/target-luminance-override, /native-hdr/target-primaries-override (new); existing target cases updated for the override argument",
+    "wayland-color-management: /wayland/display-targets/user-override (new); Night Light transition, capture and forced-HDR assertions (0054)",
+    "color-management: diagonal factors, channel bound, endpoints, Planckian accuracy and non-D65 white (0053), LUT/CTM transitions (0054)",
+    "monitor/config/D-Bus/gdctl regressions from 0055-0060, including the D-Bus user-declared 400 cd/m2 at factor 2.1 case that needed 0061"
+  ],
+  "deliverables": {
+    "patches": "patches/mutter/0050-0061, series, sources.json mutter pins, SHA256SUMS",
+    "native_bundle": ".peer-linux/deliverables/opus-nightlight.bundle (ignored; 5f123bb..codex/opus-nightlight; sha256 61869f638dfec4462cc19be79b3827bd439039e73735583eeadc56bfa1a6c6f2)",
+    "superseded_wip": "wip/mutter-nightlight and wip/mutter-target-overrides keep supersession READMEs; their patch files were removed (in Git history at 7c78457 and 5bfde55); the run-2 checkpoint directory wip/mutter-nativehdr10-integration was removed (in history at 92b5fbd)"
+  },
+  "limits": [
+    "No unit test, behavioural probe or display run qualifies this candidate yet; both adversarial reviews and fixes precede one affected validation batch.",
+    "Validation-ledger tooling from Sol (t_aa4fe067, e0742e8) is integrated separately under t_b51b86c0.",
+    "Ubuntu port (0062+ in the Ubuntu series), packaging, deployment, optical measurement and Dolby Vision are separate later stages; nothing here was packaged or installed.",
+    "PR16 remains held unmerged; no push, merge or upstream submission."
+  ]
+}

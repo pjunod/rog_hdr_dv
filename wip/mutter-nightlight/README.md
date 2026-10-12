@@ -1,25 +1,24 @@
-# Unreviewed work in progress — Night Light in linear light (nativehdr10, part 1)
+# Superseded — Night Light in linear light (nativehdr10, part 1)
 
-These three patches are an implementation agent's partial start on part 1 of
-[Night Light and target overrides](../../docs/NIGHT_LIGHT_AND_OVERRIDES.md).
-The batch was interrupted before review, so they are kept here rather than
-in `patches/`. They are not pinned in `sources.json`, not reviewed, not
-packaged and not installed anywhere. The configuration/API portion of part 2
-is now compiled and exported separately in
-[the override stage](../mutter-target-overrides/README.md); its target selector
-and both source parts' final integration/qualification remain pending. These
-original Night Light patch bytes are still unchanged.
+The three original work-in-progress patches that were kept here are now
+patches 0050–0052 of [`patches/mutter`](../../patches/mutter/series). Their
+authorship and content are unchanged: only the `[PATCH n/3]` subject
+numbering and the abbreviated `index` lines that `git format-patch`
+regenerates differ. Applied in order to tree
+`3f238d2e9227dacd578f5a673c04ac10de5caac8`, they still reproduce tree
+`14ce390cdc57f5b9efac5826e31e625cf3dedb64`. The patch files were removed
+from this directory so that there is one copy. The original bytes remain
+in Git history (commit `7c78457`, the PR 16 handoff).
 
-- **Base:** the upstream-facing Mutter series in `patches/mutter` (candidate
-  tree `3f238d2e9227dacd578f5a673c04ac10de5caac8`); reconstruct it with
-  `tools/reconstruct.py mutter`, then `git am` these in order.
-- **Result tree:** `14ce390cdc57f5b9efac5826e31e625cf3dedb64`.
-- **Checked on 2026-10-11:** the head builds with warnings as errors
-  against the upstream libdisplay-info series, and
-  `tools/test-mutter-colour.sh` passes 24/24 (the 23 existing invocations
-  plus one new one). Individual commits were not built separately; there is
-  no adversarial review and no check against the contract's acceptance list.
+Inherited claim, not re-established here: the handoff recorded that the
+head built with warnings as errors and that `tools/test-mutter-colour.sh`
+passed 24/24 on 2026-10-11. In nativehdr10, each import was rebuilt
+individually with warnings as errors. No unit test has been run on the
+integrated candidate yet.
 
-Before this becomes part of a series: review it against the contract,
-complete part 2, build each commit, run the fast lane once after the review
-fixes, port to the Ubuntu series, and record the receipt.
+Patch 0053 replaces their Bradford white adaptation with bounded diagonal
+factors in the output's linear RGB. Patch 0054 adds the transition,
+capture and forced-HDR regressions. See
+[Night Light and target overrides](../../docs/NIGHT_LIGHT_AND_OVERRIDES.md) and
+[status](../../docs/STATUS.md#nativehdr10--source-candidate-awaiting-adversarial-review).
+The series is not reviewed, qualified, packaged or installed.

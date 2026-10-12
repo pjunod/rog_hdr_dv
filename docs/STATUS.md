@@ -13,45 +13,54 @@ distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
 
-## nativehdr10 — source implementation in progress
+## nativehdr10 — source candidate awaiting adversarial review
 
 The owned collaboration clone starts at the exact final handoff
 `7c78457581906a43377f8dbb0d8dc95b438f30d3`; PR 16 remains unmerged.
-Astra and Fable approved the design; Sol and Opus implement the two source
+Astra and Fable approved the design; Sol and Opus implemented the two source
 parts. The pinned upstream Mutter tree
 `3f238d2e9227dacd578f5a673c04ac10de5caac8` and library tree
 `72626245922181526fbcb990de3eb7f575efa56b` were reconstructed and compiled
 natively on x86_64 with warnings as errors in this task (164.61 seconds).
-This is baseline compilation evidence, not acceptance of the Night Light WIP.
 
-Sol's configuration/API stage is compiled and exported as six authored commits:
-XML persistence/validation, copy/history, applied-output transport, DisplayConfig,
-gdctl and bounded NightLightSupported reporting. The native head is
-`9b2886d826a577c866c5cd26533a1109c9aba9c7`, tree
-`ebe9aeb880eab66fcfc5cbf34a97d9eaf6cd30f5`; replay of the exported patches
-onto the exact baseline reproduced that tree. See the
-[stage handoff](../wip/mutter-target-overrides/README.md) and
-[compiler/export receipt](../evidence/nativehdr10-sol-stage.json).
-The preexisting 49-patch series and its pins/hashes remain unchanged.
+**Done (source, compiled):** both parts are now Mutter patches 0050–0061
+in `patches/mutter`, pinned in `sources.json` as candidate
+`fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f`, tree
+`18ba4b5a752f4ee383541757b20116060f18daf9`. Patches 0001–0049 are unchanged.
 
-Opus next owns the three original Night Light imports,
-their corrections, target-selection policy and complete source integration.
-The approved Night Light correction uses
-bounded diagonal factors in the output's linear RGB frame; the out-of-gamut
-1000 K white is projected to nonnegative RGB at parameter construction.
-Configuration copies now retain colour mode, RGB range and overrides;
-the manager capability check recognizes active BT.2100 without LUT/CTM,
-but its actual software rendering behavior awaits Opus's integration.
+- 0050–0052: the original Night Light work in progress, imported with
+  authorship and content unchanged (tree `14ce390c…` reproduced).
+- 0053: bounded diagonal factors in the output's linear RGB replace Bradford.
+  Negative factors are clamped at construction, so 1000 K is projected.
+- 0054: warm LUT/CTM SDR→BT.2100→SDR transitions, capture exclusion and
+  forced-HDR regressions. The capture inventory found no capture path that
+  applies the adaptation, so no fix was needed.
+- 0055–0060: Sol's configuration, persistence, copy/history, DisplayConfig,
+  gdctl and NightLightSupported commits, rebased unchanged after the
+  renderer.
+- 0061: target selection with `user-declared` provenance. The luminance
+  override comes before DisplayID and CTA, needs no EDID and is validated
+  against nominal white. The BT.2100 gamut source is auto, base-edid or none;
+  native SDR is unaffected.
 
-Regression tests are written and compiled during building; none have run in
-this task. D-Bus selector assertions intentionally require Opus's policy before
-validation; golden show fixtures are expectations, not execution evidence.
-The full source batch still needs completion, integrated export/pins,
-both adversarial reviews and fixes, then one affected validation batch.
-Ubuntu port/packaging,
-physical deployment, optical accuracy and Dolby Vision remain separate
-qualification stages. No laptop or display configuration changes are authorized
-in this source batch.
+Every commit was built individually with warnings as errors, with 0
+diagnostics. The exported series replays onto the base to the same tree.
+`check_repository.py` passes. See the
+[candidate receipt](../evidence/nativehdr10-source-candidate.json), the
+[earlier stage receipt](../evidence/nativehdr10-sol-stage.json) and the
+[contract and implementation notes](NIGHT_LIGHT_AND_OVERRIDES.md).
+
+**Current:** integration task `t_b51b86c0` brings in Sol's validation-ledger
+tooling. Then Astra and Fable each review the same exported candidate.
+
+**Remaining:** fix the review findings, then run one affected unit batch,
+retrying only failures and checks the fixes invalidate. No unit test has run
+on this candidate. Golden gdctl fixtures are expectations, not execution
+evidence. After that come the repository pre-merge lane and one substantial
+PR that declares its dependency on the held PR 16. Ubuntu port (0062+) and
+packaging, physical deployment, optical accuracy and Dolby Vision remain
+separate qualification stages. No laptop or display configuration change is
+authorized in this source batch.
 
 ## Installation — hdr9 and nativehdr8 (2026-10-11)
 

@@ -1,7 +1,9 @@
 # Night Light in HDR, and per-monitor target overrides (nativehdr10)
 
-**Status:** configuration/API source stage compiled and exported; complete
-source integration, adversarial review and unit validation pending ·
+**Status:** both parts implemented as Mutter patches 0050–0061; every
+commit compiled with warnings as errors and the exported series replays to
+the built tree. Adversarial review and unit validation are pending; no unit
+test has run on this candidate ·
 **Date:** 2026-10-11.
 
 Two compositor changes for general availability, specified together because
@@ -60,6 +62,51 @@ Compositor test: a surface on a BT.2100 output with Night Light active is
 converted, not scanned out, and returns to scanout when it is turned off.
 CPU and GLSL agree.
 
+### Implementation (patches 0050–0054)
+
+Patches 0050–0052 are the original work in progress, imported with their
+authorship and content unchanged. Patch 0053 replaces their Bradford
+adaptation with the diagonal method above. In the output's linear RGB the
+Planckian white has components (r, g, b). Negative components are set to
+0, and each is divided by the largest. The adjustment is
+to_bt2020 · diag(r, g, b) · from_bt2020 in the existing linear-BT.2020
+pipeline. For a BT.2100 output this is the diagonal itself. Its regressions
+cover:
+
+- 1000, 1700, 3990, 4000, 4700 and 10000 K, on BT.2020 and DCI-P3 outputs;
+- finite factors in [0, 1], and no output channel above its unadapted value;
+- the 4000 K white landing on the Planckian chromaticity;
+- a representable white on an output whose own white is not D65.
+
+At 1000 K the blue factor of a BT.2020 output is clamped, so that white is
+projected rather than exact. The default temperature bypass stays exact.
+
+Patch 0054 adds the mode-transition and capture regressions. Warm SDR
+temperatures in both the LUT and the CTM path are followed by BT.2100 and a
+return to SDR. The earlier stale-LUT hypothesis was not a defect: the
+existing white-point tracking already resets the LUT, and the regression now
+covers it. Forced HDR gets a white adaptation but no luminance or gamut
+target.
+
+**Capture inventory**, from the source at this tree. No change was needed.
+
+- Monitor stream stage paint derives its blending state from the stream's
+  own colour state, which never carries an adapted white.
+- The pre-paint scanout copy runs only when the stream state equals the
+  output state, and scanout is refused while adaptation is active.
+- The pre-swap blit copies the view's offscreen only when the stream state
+  equals the view's blending state. An adapted blending state never equals
+  a stream state, because the adapted white is part of equality, so the blit
+  falls back to stage paint.
+- Window, area and virtual streams, `clutter_stage_paint_to_buffer`/`_to_framebuffer`
+  and `meta_window_actor_paint_to_content` use the caller's or the actor's
+  colour state, never the device's rendering state.
+- The only adapted-to-unadapted transform is the stage view's offscreen
+  pipeline to the output colour state, which is the intended output path.
+
+The regressions assert that the stream blending state carries no adapted
+white.
+
 ## 2. Per-monitor target overrides
 
 **Why.** Display declarations are often wrong. Some monitors declare a CTA
@@ -104,7 +151,8 @@ and reads back the effective target and provenance.
 
 ### Configuration and API semantics
 
-The [unreviewed source stage](../wip/mutter-target-overrides/README.md) stores
+Patches 0055–0060 (configuration, transport, API, gdctl and support
+reporting) store
 `<targetpeakluminance>`, `<targetminluminance>` and `<hdrgamutsource>` under
 each `<monitor>`; unset fields are omitted. Zero is an explicit black level,
 not a reset sentinel. XML and D-Bus reject nonfinite values, wrong D-Bus types,
@@ -145,17 +193,36 @@ initialized colour state:
 | `target-primaries-source` | string: gamut provenance |
 
 The shared provenance names are `encoding-fallback`, `firmware-declared`,
-`cta-declared`, `edid-declared` and (after selector integration)
-`user-declared`. In BT.2100, a valid explicitly chosen base-EDID gamut is
-user-declared. An unusable base-EDID candidate falls through to DisplayID,
-then encoding fallback. `none` is a valid terminal request for encoding
-fallback, suppressing other gamut candidates. Native SDR is unaffected.
+`cta-declared`, `edid-declared` and `user-declared`.
+
+**Selection (patch 0061).** Luminance applies in BT.2100 only. The user's
+peak, with its optional minimum, is the first candidate, ahead of DisplayID
+and CTA. It is taken as a whole and validated like a declared source,
+against the nominal reference white, so the brightness factor never removes
+it. It needs no EDID. Without a minimum, black is the encoding's, never a
+display declaration's. An unusable override falls through to the next
+source. Gamut in BT.2100 follows this decision table:
+
+| `hdr-gamut-source` | Target primaries |
+|---|---|
+| `auto` | DisplayID native chromaticities, else encoding fallback |
+| `base-edid` | Base EDID characteristics as `user-declared` when usable; otherwise DisplayID, else fallback |
+| `none` | Encoding fallback, suppressing both declarations |
+
+Native SDR keeps its base-EDID encoding target with `edid-declared`
+provenance. The default SDR mode and forced HDR keep the fallback whatever
+the override. Regressions: `/native-hdr/target-luminance-override`,
+`/native-hdr/target-primaries-override`,
+`/wayland/display-targets/user-override` (published target, blending state,
+highlight mapping, factor 2.1, none, native SDR, forced HDR, clearing), and
+Sol's D-Bus case.
 
 Known compatibility limit: a client that does not know these properties
 (including today's Settings) drops overrides when it replaces the layout.
 The Settings UI is later work. Older compositors reject the new monitor XML
 children rather than ignoring them; see [rollback preparation](OPERATIONS.md#2-protect-the-working-installation).
 
-This stage is compiled and replay-verified, not unit-qualified. Its effective
-override assertions await Opus's target selector. Both source parts require
-the agreed adversarial reviews and one affected unit batch before acceptance.
+The integrated candidate is compiled and replay-verified, not unit-qualified.
+Both source parts still need the agreed adversarial reviews and fixes, then
+one affected unit batch, before acceptance. Ubuntu packaging, deployment and
+optical measurement are separate later stages.
