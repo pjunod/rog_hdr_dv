@@ -10,6 +10,10 @@ regression methods passed**. The first full affected batch returned 69 passes
 and two native failures, not candidate acceptance. See the
 [original receipts](../evidence/nativehdr10-validation-attempt1.json).
 Do not edit the frozen runner or repeat successful methods for another reviewer.
+The first restricted retry passed colour channel bounds and the target-overrides
+D-Bus case, but failed the later has-external-monitor case on colord lookup.
+Latest receipts are 70 passed, one failed; see the
+[retry evidence](../evidence/nativehdr10-validation-attempt2.json).
 
 The existing [colour harness](../tools/test-mutter-colour.sh) selects tests and
 sets up their environment, but does not keep per-check retry receipts. Existing
@@ -176,6 +180,25 @@ Do not shrink scopes, remove required checks, substitute no-op commands,
 rename IDs, hand-edit passes or delete the ledger to bypass evidence. The
 runner cannot prove semantic coverage or authenticate against a malicious
 local editor; reviewers own manifest completeness and receipt interpretation.
+
+A reviewer-approved retry manifest may restrict the check list to the exact IDs
+being retried against the same ledger, with their unchanged command objects and
+original source declarations. Retained receipts keep their recorded executing
+trees; final evidence must list every required ID, its executing tree and the
+reviewer's retention rationale. This does not grant automatic whole-tree reuse
+or permission to silently drop required checks.
+
+For corrections 0069–0071, Fable `t_bedcc81f` approved exactly `mutter-color-hdr`
+and `mutter-monitor-dbus-tests` for retry on `9111578e` using a two-check manifest
+and the existing ledger/runner. The 40 prior native passes remain executed on
+`ac02a18f`: 0069/0071 preserve their executables and loaded libraries exactly;
+0070 changes libmutter-51, so retention instead rests on source reachability.
+Its only changed idle callback runs on pending persistent D-Bus rejection,
+which no retained test/fixture invokes. The hash inventories and focused
+decision are retained with the retry archive; this is a reviewer attestation,
+not a new pass or runner-inferred dependency proof. Further production changes
+need a new invalidation computation. The failed retry stops execution pending
+focused diagnosis/review; no bounds widening or extra invalidation is authorized.
 
 ## Receipts, errors and retained evidence
 

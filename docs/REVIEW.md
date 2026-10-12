@@ -17,22 +17,22 @@ acceptance. Fix/validation owner: `t_e5c490e6`.
 
 | Finding | Disposition and current evidence |
 |---|---|
-| F1 P1: discontinuous onset from absolute Planckian anchoring | Fable decided factors must be ratios to the default temperature's Planckian white. Opus implements; focused Astra review gates it. Exact off-state identity and channel bounds remain, absolute Planckian xy acceptance is replaced by relative white movement. |
-| F2 P1: restore wait never exits on retained idle ID | Opus replaces with bounded observable-state wait; no production idle-ID change solely for the test. |
-| F3 / A3: override case mutates shared fixture | Add to Meson separate cases and give its exact generated name one manifest receipt. |
-| F4 / A2: constructed capture state is not capture coverage | Opus adds real production paint/readback coverage; stream DMA-buffer and shared-memory paths must be named with actual exercised limitations. No source-demonstrated leak or speculative production fix. |
-| F5 / A1: SIGTERM can orphan check sessions | Sol correction `56c0329` installs/restores termination handling, defers cancellation over launch, kills check group and reaps check, preserves nonpassing receipt, returns 143. Real descendant regression plus launch/restoration regressions are written and syntax-compiled, not executed. Focused Fable review pending. |
-| F6: fallible adapted-state constructor lacks fallback | Opus adds warning/unadapted fallback before validation. |
-| F7: unrelated end-parse and mirror fixes bundled | Opus owns drop/split or explicit rationale; final disposition pending source handoff. Preserve already-delivered authorship/history rather than silently rewriting it. |
+| F1 P1: discontinuous onset from absolute Planckian anchoring | Default-temperature Planckian ratios implemented in 0062 and approved by focused Astra review. Continuity/relative-white/channel-bound cases passed in the colour-hdr retry; absolute Planckian xy is not the acceptance claim. |
+| F2 P1: restore wait never exits on retained idle ID | 0064 bounds the observable-state wait. Retry diagnosis found synchronous test-shell acceptance (0071) and a pre-existing stale source-ID production lifecycle defect (0070), not a production change solely to serve a wait. Target-overrides case now passes. |
+| F3 / A3: override case mutates shared fixture | 0066 isolates it in Meson; its own invocation passed in the first batch. |
+| F4 / A2: constructed capture state is not capture coverage | 0067/0068 add real production paint/readback, read-success and opaque/nonempty assertions; invocation passed. Neither PipeWire stream entry point is invoked; DMA-buffer/shared-memory stream integration remains source-reviewed. No speculative leak fix. |
+| F5 / A1: SIGTERM can orphan check sessions | Runner corrected through `e4f981d`, focused Fable reviews delivered, bytes frozen before execution. All 29 individual runner methods passed, including real descendant cleanup, launch/restoration and interrupted-mask regressions. SIGHUP remains explicitly unhandled. |
+| F6: fallible adapted-state constructor lacks fallback | Warning/unadapted fallback added in 0063, focused review satisfactory. |
+| F7: unrelated end-parse and mirror fixes bundled | End-parse behavior change withdrawn in 0065; mirror color-mode hunk retained with explicit split-before-upstream disposition. Authorship/history preserved. |
 | F8: disabled output retains configured override | Retain last-assignment declaration, consistent with existing colour-mode behavior; effective physical-target properties remain active-device-only. No new reset or alternate reporting policy. |
 | F9: offscreen reallocated each uniform step | Separate upstreamable optimization `t_38887c3f`; not part of this correctness batch. Preserve framebuffer when required format/dimensions unchanged, including reference-luminance path. |
-| F10: duplicate variant keys, gdctl readiness, installed fixture list | Verify fixture list statically; actual D-Bus/gdctl checks in the upcoming batch provide runtime evidence. No probe execution before freeze. |
+| F10: duplicate variant keys, gdctl readiness, installed fixture list | Installed fixture directory verified statically; gdctl passed first batch. Duplicate-key/override API case passed in restricted retry; entire monitor-dbus invocation still fails later, not accepted. |
 | F11: agent copyright/upstream identity | Preserve authored copyright as provenance; upstream author/signoff mechanics remain an owner decision and no submission occurs. Do not invent owner attribution. |
 | F12: PQ hotplug capability transient | Accept documented false-to-true NightLightSupported notification during rebuild-before-assignment; notify-on-change bounds traffic. No forced support or unrelated lifecycle redesign. |
 
-Both focused reviews and fixes precede one affected batch through the
-[receipt runner](NATIVEHDR10_VALIDATION.md). No units have run in this
-fixing stage. PR16 remains held unmerged; no physical or Apple TV activity.
+Both focused reviews and fixes preceded one affected batch through the
+[receipt runner](NATIVEHDR10_VALIDATION.md). The original results and restricted
+retry are recorded below. PR16 remains held unmerged; no physical or Apple TV activity.
 
 Focused review checkpoint: Astra approves Opus's 0062/0063 anchored design
 and finds F2/F3/F6/F7 satisfactory at native `05288b05`/tree `42eb3a5a`.
@@ -68,9 +68,37 @@ receipt; D-Bus confirmation/restore still fails and its later coverage is not
 claimed. Colour channel-bound fails for a near-zero value0.000403328064 versus
 allowed0.0001. Opus `t_0b47678a` owns native diagnosis/correction/compile;
 Fable `t_bedcc81f` owns focused review and minimal-retry evidence decision.
-No retry has run and no passing suite is repeated. The
+No passing suite was repeated. The
 [original batch receipt](../evidence/nativehdr10-validation-attempt1.json)
 retains exact results and log hashes. Source acceptance remains incomplete.
+
+Restricted retry checkpoint: Fable `t_bedcc81f` approved Opus 0069–0071 and
+exactly the two failed IDs. 0069 gives the zero-channel float32 residue an
+eight-ulp scale-relative allowance (relative terms unchanged); 0071 blocks
+synchronous test-shell acceptance to exercise rejection. 0070 is a distinct
+upstream-candidate lifecycle fix, pre-existing at base `d82671c`: clear the
+restore source ID before executing the idle, preventing later removal of a
+dead ID. It makes no HDR-feature or upstream-acceptance claim. Native
+`a8847717`/tree `9111578e` builds and exported series replay identically; see
+[correction evidence](../evidence/nativehdr10-failure-corrections.json).
+
+Fable attests retention of the 40 first-batch native passes on their actual
+executing tree `ac02a18f`: exact retained executable/library bytes for the
+test-only commits, and source unreachability of 0070's changed persistent-reject
+idle callback. The library changed, so these are distinct grounds, not automatic
+runner reuse or rewritten full-tree passes. Both retried IDs retain the original
+failed attempt, an invalidation event and the new actual attempt. All 69 other
+histories remain unchanged; all 73 logs hash-verified.
+
+The restricted retry passed `color-hdr` and the target-overrides D-Bus subcase.
+`monitor-dbus-tests` then failed its later has-external-monitor subcase on a
+fatal existing-colord-device lookup after disabling the external monitor.
+Latest required receipts are **70 passed, one failed**, not acceptance; see
+[retry evidence](../evidence/nativehdr10-validation-attempt2.json). Execution
+stopped per Fable D5; Opus `t_88ae3088` owns scoped static diagnosis/compile/export,
+then Fable `t_6b592492` reviews correction and next exact retry scope. Colour-hdr's
+new success and all other successes are preserved. Final integrity remains
+after final evidence/docs commit, with receipt outside tracked source.
 
 ## Initial repository review
 

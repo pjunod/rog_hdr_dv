@@ -1,13 +1,23 @@
 # Night Light in HDR, and per-monitor target overrides (nativehdr10)
 
 **Status:** both parts implemented as Mutter patches 0050–0061, with the
-review corrections 0062–0068 appended (native candidate 9570f9bb, tree
-ac02a18f). Every commit compiled with warnings as errors and the exported
+review and batch-failure corrections 0062–0071 appended (native candidate
+a8847717, tree 9111578e). Every commit compiled with warnings as errors and the exported
 series replays to the built tree. Both adversarial and focused reviews are
 delivered; pre-freeze findings are addressed. The single affected validation
-batch returned 69 passes and two failures awaiting correction; candidate
-acceptance is incomplete ·
-**Date:** 2026-10-11.
+batch returned 69 passes and two failures. The restricted retry passed colour
+channel bounds and the target-overrides D-Bus case, then failed in the later
+has-external-monitor case on colord lookup. Latest receipts are 70 passed,
+one failed; candidate acceptance is incomplete ·
+**Date:** 2026-10-12.
+
+Corrections 0069/0071 repair test precision and confirmation-fixture handling.
+0070 is a distinct upstream-candidate lifecycle fix, pre-existing at base
+`d82671c`: clear `restore_config_id` before the restore idle runs, preventing
+a later attempt to remove a dead source ID. It is not an HDR feature or a
+claim of upstream acceptance. See the
+[correction receipt](../evidence/nativehdr10-failure-corrections.json) and
+[restricted retry evidence](../evidence/nativehdr10-validation-attempt2.json).
 
 Two compositor changes for general availability, specified together because
 both change how the colour device builds an output's rendering colour state.

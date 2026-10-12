@@ -58,8 +58,9 @@ per check, with an explicit environment. It keeps receipts tied to the
 source tree and its own bytes. Later runs skip receipts that still match and
 retry failures. Changed inputs stop the whole batch until the affected checks
 are invalidated with a reason. Its files were only syntax-compiled; the
-regressions have not run. The Mutter source and native build tree are
-unchanged by this integration, so no rebuild was needed.
+regressions had not run at integration. The later 29-method Linux batch passed
+every method (see below). The Mutter source and native build tree were
+unchanged by tooling integration, so no rebuild was needed for it.
 
 **Done (review):** Astra and Fable delivered independent reviews of
 `73918f3` / native `fa7eb2cf`. Changes are required: continuous default-anchored
@@ -67,7 +68,7 @@ Night Light factors, a bounded observable-state restore wait, isolated
 user-override registration, real headless capture/readback coverage and
 SIGTERM child cleanup. Review completion is not candidate acceptance.
 
-**Current:** the single affected batch executed 71 checks on native
+**First batch:** the single affected batch executed 71 checks on native
 `9570f9bb` / tree `ac02a18f`: **69 passed, 2 failed** in 134.99 seconds.
 All 29 individual Linux runner methods passed; 40 of 42 native checks passed,
 including the real capture case, isolated override case, gdctl, remaining
@@ -76,7 +77,7 @@ monitor/backend and cursor cases. The failures are `mutter:color-hdr`
 (restored-peak wait timeout). The candidate is **not accepted**.
 The [first batch receipt](../evidence/nativehdr10-validation-attempt1.json)
 records every original attempt, command, source identity and log hash.
-All 71 logs were retrieved and hash-verified; no retry has run.
+All 71 original logs were retrieved and hash-verified and remain preserved.
 
 Review corrections 0062–0068 are integrated and pinned at native
 `9570f9bb` / tree `ac02a18f`, with unchanged 0001–0061 prefix, individual
@@ -87,21 +88,43 @@ Opus completed the requested successful/nonempty capture readback sanity
 in 0068 and released native source/build ownership to Sol. Fable confirmed
 runner `cc82113`; Sol folded the scoped mask/replay hygiene into `e4f981d`
 before freezing it. Documentation precision is fixed in `4846eda`.
-Sol owns Mac integration/evidence/validation. Opus exclusively owns native
-source/build for the two scoped failure diagnoses (`t_0b47678a`), compilation
-and exports only; Fable reviews the correction and exact retry evidence
-policy (`t_bedcc81f`). Fable's
+Fable's
 recorded decision anchors the diagonal factors at the default temperature's
 Planckian white, preserving exact off-state identity and continuous onset;
 absolute Planckian-white accuracy is no longer the acceptance claim.
 
-**Remaining:** diagnose/fix, compile/export and focused-review the two failures,
-then retry only failed or genuinely invalidated checks against the same
-persistent ledger. Original native receipts declare whole Mutter/library
-trees; the thinker decision must reconcile test-only tree changes with exact
-unchanged dependency/binary evidence without shrinking scopes or needlessly
-rerunning 40 successes. Golden gdctl fixtures now have a passing execution
-receipt. No second candidate-wide unit batch is planned. Final integrity
+**Current:** reviewed corrections 0069–0071 are integrated and pinned at native
+`a8847717` / tree `9111578e`, with individual -Werror builds and replay equality.
+0069 corrects the float32 near-zero test allowance; 0071 holds the test shell's
+synchronous confirmation so rejection actually runs. 0070 fixes the pre-existing
+upstream restore-idle lifecycle bookkeeping, separately from the HDR feature;
+it has no upstream-acceptance claim. Prefix 0001–0068 is unchanged; hashes were
+deliberately appended. See the [correction receipt](../evidence/nativehdr10-failure-corrections.json).
+
+The approved two-check retry passed `mutter:color-hdr`; `monitor-dbus-tests`
+passed the new target-overrides case, then failed on a fatal existing-colord-device
+lookup in `/backends/monitor/has-external-monitor` after disabling the external
+monitor. Latest required receipts: **70 passed, 1 failed** (29 runner methods,
+41 native invocations passed). The candidate is **not accepted**.
+All 73 execution logs were hash-verified and all 69 non-retried histories remain
+unchanged; see the [retry receipt](../evidence/nativehdr10-validation-attempt2.json).
+Fable `t_bedcc81f` attests retention of the 40 original native passes: exact binary
+identity for 0069/0071, source unreachability for 0070's changed idle callback.
+Those passes stay at their actual executing tree `ac02a18f`, never rewritten
+as passes on `9111578e`. This is reviewer interpretation, not automatic runner
+reuse across whole-tree changes. Sol's transport postcheck assumed history length
+2 instead of original + invalidation + retry (3); its export assertion failed
+after both checks ran. A retrieval-only request preserved the actual ledger/logs,
+without reexecution or runner edits.
+
+Sol owns Mac integration/evidence/validation. Opus `t_88ae3088` exclusively owns
+native source/build diagnosis, compilation and exports for the remaining colord
+warning, with no units. Fable `t_6b592492` reviews the correction and computes the
+next exact retry scope. No further retry has run; `color-hdr`'s new pass is retained.
+
+**Remaining:** diagnose/fix and focused-review that failure; retry only failed or
+genuinely invalidated checks against the same persistent ledger. No second
+candidate-wide batch is planned. Final integrity
 is executed after all evidence/docs edits and their commit; its receipt
 stays outside tracked source to avoid receipt-in-tree circularity. The
 final-delivery child reuses receipts without rerunning successful tests.

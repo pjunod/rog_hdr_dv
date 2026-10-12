@@ -15,7 +15,7 @@ agent's workspace.
 | Rebuild any pinned tree | `tools/reconstruct.py COMPONENT WORKDIR` (all five series reproduce their pinned trees exactly) |
 | Build, test, package | `tools/` ([harness](DEVELOPMENT.md#build-test-and-packaging-harness-tools)) |
 | Built packages | Draft releases `packages/hdr9-nativehdr8` (installed on lab5) and `packages/hdr9-nativehdr9` (installed on lab6): one tar each plus `SHA256SUMS` |
-| Candidate being corrected | nativehdr10, `patches/mutter` 0050–0061 plus pending review corrections (see [status](STATUS.md#nativehdr10--adversarial-findings-being-corrected)) |
+| Candidate being corrected | nativehdr10, `patches/mutter` 0050–0071 with reviewed corrections (see [status](STATUS.md#nativehdr10--adversarial-findings-being-corrected)) |
 | Status page | `docs/STATUS.html` in the repository; the owner's claude.ai workboard artifact is updated only from a session that owns it |
 
 ## Machines (addresses and keys from the owner; never in the repository)
@@ -51,6 +51,12 @@ The first affected batch passed 69/71 checks on native `9570f9bb`/tree
 gdctl, capture, isolated override and remaining backend/cursor cases. Colour
 channel-bound and D-Bus restored-peak wait failed; acceptance is incomplete.
 See [all original attempts](../evidence/nativehdr10-validation-attempt1.json).
+The first restricted retry on native `a8847717`/tree `9111578e` passed
+`color-hdr` and the target-overrides D-Bus case, then failed the subsequent
+has-external-monitor case on a fatal existing-colord-device lookup. Latest
+receipts: 70 passed, one failed; all 73 execution logs hash-verified and all
+69 non-retried histories unchanged. See the
+[retry evidence](../evidence/nativehdr10-validation-attempt2.json).
 PR16 remains held unmerged.
 No push, merge or display change is authorized. Ubuntu port/packaging and
 optical acceptance remain separate stages; only Mutter's orig tar is recorded
@@ -63,10 +69,21 @@ in the offline Ubuntu cache, not the exact packaging imports.
    into canonical patches/pins with individual -Werror builds and replay.
    Astra approves the anchored production design; 0068 hardens capture sanity.
    Fable confirms runner `cc82113`; mask/replay hygiene is fixed in `e4f981d`.
-   Sol owns validation/Mac integration; Opus exclusively diagnoses the two
-   native failures with compilation/export only (`t_0b47678a`). Fable reviews
-   corrections and minimal retry policy (`t_bedcc81f`). Preserve all original
-   passes, retry only failures/genuinely invalidated checks after those gates.
+   Corrections 0069–0071 are now pinned at native `a8847717`/tree `9111578e`,
+   individually built and replayed. 0070 fixes upstream restore-idle bookkeeping,
+   separately from HDR; 0069/0071 repair precision and confirmation fixtures.
+   Fable `t_bedcc81f` approved only the two failed IDs for retry. Its retention
+   decision preserves original native passes at `ac02a18f`, not fictional
+   passes on the new tree: test-only binary identity and production-callback
+   source unreachability are distinct grounds. Sol owns validation/Mac integration;
+   Opus exclusively diagnoses the remaining colord warning with compilation/export
+   only (`t_88ae3088`). Fable reviews corrections and computes the next exact
+   retry scope (`t_6b592492`). Preserve colour-hdr's new pass as well as all other
+   successes; retry only failures/genuinely invalidated checks after those gates.
+   Same persistent ledger: `/work/hdr-nativehdr10-20261011/validation/receipts.json`,
+   SHA256 `a8b5d6a505c1605b6a5eb9862086997f6e5387788d1419d3c4297452b028d2a7`.
+   Full export and review/hash inventories: ignored
+   `.peer-linux/deliverables/nativehdr10-validation-attempt2.tar.gz`.
    Do not reconstruct, edit the frozen runner or start another full batch.
    Final integrity runs after final evidence
    and docs commit with receipt outside tracked source. Then
