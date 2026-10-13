@@ -31,7 +31,7 @@ def control(obj, metadata):
         values += [vol['min_nits'], vol['max_nits'], *vol['primaries']]
     values += [metadata['max_pq_y'] if metadata else 0,
                metadata['avg_pq_y'] if metadata else 0]
-    if metadata:
+    if s['system'] == 'dolbyvision' and metadata:
         values += metadata['nonlinear_offset']
         for matrix in ('nonlinear', 'linear'):
             values += [x for row in metadata[matrix] for x in row]
@@ -51,7 +51,7 @@ def baseline_semantics(obj, metadata):
     dovi = s['system'] == 'dolbyvision'
     native_l1 = [struct.unpack('<f', struct.pack('<f', metadata[k]))[0]
                  if metadata else 0 for k in ('max_pq_y', 'avg_pq_y')]
-    return {'pq_minima': {
+    result = {'pq_minima': {
                 'requested_source_nits': s['mastering']['min_nits'],
                 'requested_target_nits': obj['target']['min_nits'],
                 'effective_nominal_source_nits': 1e-6,
@@ -68,6 +68,13 @@ def baseline_semantics(obj, metadata):
                          'recognized': bool(native_l1[0] and native_l1[1]),
                          'fallback': 'mastering/color-space baseline when either L1 value is zero'},
             'l1_minimum': 'not implemented', 'trims': 'not implemented'}
+    if obj['schema'] == 2:
+        result['post_reshape'] = {
+            'translation': metadata['translation'], 'raw_l1': metadata['l1'],
+            'scope': 'direct normalized Dolby XML L1 translation into upstream slots; not proven photometric CIE-Y or RPU equivalence',
+            'unsupported_levels': ['L1 minimum', 'L2', 'L3', 'L8'],
+            'l9': 'source declaration verified; no dynamic L9 processing'}
+    return result
 
 
 def render(manifest, native, output, compile_receipt=None):
@@ -99,7 +106,7 @@ def render(manifest, native, output, compile_receipt=None):
         if execution_binding(native, stage / 'compile-receipt.json', env) != binding:
             raise ValueError('execution inputs changed during render')
         pixels(stage / 'output.f32', obj['frame']['width'], obj['frame']['height'])
-        receipt = {'schema': 1, 'role': 'candidate', 'alignment': alignment(obj),
+        receipt = {'schema': obj['schema'], 'role': 'candidate', 'alignment': alignment(obj, metadata),
                    'encoding': ENCODING,
                    'output': {'file': 'output.f32', 'sha256': sha(stage / 'output.f32')},
                    'provenance': {'implementation': 'source-bound libplacebo baseline',
@@ -129,9 +136,9 @@ def compare(candidate, reference):
     b, pb = result_manifest(reference, reference_raw)
     if a['role'] != 'candidate' or b['role'] != 'reference':
         raise ValueError('candidate and reference roles required')
-    if a['alignment'] != b['alignment']:
+    if a['schema'] != b['schema'] or a['alignment'] != b['alignment']:
         raise ValueError('source/metadata/target/frame alignment mismatch')
-    return {'schema': 1, 'metric': 'ITU-R BT.2124-0 Annex 1 deltaE_ITP',
+    return {'schema': a['schema'], 'metric': 'ITU-R BT.2124-0 Annex 1 deltaE_ITP',
             'alignment': a['alignment'], 'encoding': ENCODING,
             'candidate_sha256': a['output']['sha256'],
             'reference_sha256': b['output']['sha256'],

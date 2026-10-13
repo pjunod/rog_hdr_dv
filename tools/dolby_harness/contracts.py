@@ -195,9 +195,11 @@ def source_target(s, t):
 
 def input_manifest(path, snapshot=None):
     obj = parse_json(Path(path).read_bytes() if snapshot is None else snapshot)
-    keys(obj, 'schema frame source target metadata')
-    if type(obj['schema']) is not int or obj['schema'] != 1:
+    if not isinstance(obj, dict) or type(obj.get('schema')) is not int or obj['schema'] not in (1, 2):
         raise ValueError('unknown harness schema')
+    keys(obj, 'schema frame source target metadata' + (' stage' if obj['schema'] == 2 else ''))
+    if obj['schema'] == 2 and obj['stage'] != 'post-reshape':
+        raise ValueError('unknown display-management stage')
     f = obj['frame']
     keys(f, 'input width height index pts content_id')
     w, h = integer(f['width'], 1, 3840), integer(f['height'], 1, 2160)
@@ -214,7 +216,12 @@ def input_manifest(path, snapshot=None):
     t = obj['target']
     source_target(s, t)
     metadata = None
-    if s['system'] == 'dolbyvision':
+    if obj['schema'] == 2:
+        if s['system'] != 'rgb' or s['range'] != 'full':
+            raise ValueError('post-reshape requires explicit full-range RGB PQ')
+        from tools.dolby_harness.postreshape import metadata as postreshape_metadata
+        metadata = postreshape_metadata(Path(path).parent, obj['metadata'], obj)
+    elif s['system'] == 'dolbyvision':
         metadata = dovi_metadata(Path(path).parent, obj['metadata'], f)
         if metadata['bl_bit_depth'] != s['bit_depth']:
             raise ValueError('RPU base-layer bit depth/source normalization mismatch')
@@ -223,26 +230,60 @@ def input_manifest(path, snapshot=None):
     return obj, p, metadata
 
 
-def alignment(obj):
+def alignment(obj, metadata=None):
     f = obj['frame']
     # File paths are local transport, never comparison identities.
     m = obj['metadata']
-    return {'content_id': f['content_id'], 'source_sha256': f['input']['sha256'],
+    result = {'content_id': f['content_id'], 'source_sha256': f['input']['sha256'],
             'width': f['width'], 'height': f['height'], 'frame_index': f['index'],
             'pts': f['pts'], 'source': obj['source'], 'target': obj['target'],
-            'metadata_sha256': m['export']['sha256'] if m else None,
-            'rpu_sha256': m['rpu']['sha256'] if m else None}
+            'metadata_sha256': m['export']['sha256'] if m else None}
+    if obj['schema'] == 1:
+        result['rpu_sha256'] = m['rpu']['sha256'] if m else None
+    else:
+        if metadata is None:
+            raise ValueError('validated post-reshape metadata required for alignment')
+        for key in ('stage', 'analysis_sha256', 'source_manifest_sha256', 'parser',
+                    'xml_version', 'analysis_version', 'mapping', 'translation'):
+            result[key] = metadata[key]
+    return result
+
+
+def postreshape_alignment(a):
+    if a['stage'] != 'post-reshape' or a['source']['system'] != 'rgb' or a['source']['range'] != 'full':
+        raise ValueError('invalid post-reshape alignment stage/source')
+    for key in ('metadata_sha256', 'analysis_sha256', 'source_manifest_sha256'):
+        digest(a[key])
+    keys(a['parser'], 'name version sha256')
+    text(a['parser']['name'])
+    text(a['parser']['version'])
+    digest(a['parser']['sha256'])
+    if a['xml_version'] != '4.0.2' or type(a['analysis_version']) is not int or a['analysis_version'] != 4 or a['translation'] != 'dolby-xml-l1-direct-v1':
+        raise ValueError('unsupported analysis translation')
+    mapping = a['mapping']
+    keys(mapping, 'track_id shot_id shot_in shot_duration edit_offset edit_rate')
+    text(mapping['track_id'])
+    text(mapping['shot_id'])
+    start = integer(mapping['shot_in'])
+    duration = integer(mapping['shot_duration'], 1)
+    offset = integer(mapping['edit_offset'])
+    keys(mapping['edit_rate'], 'num den')
+    num = integer(mapping['edit_rate']['num'], 1)
+    den = integer(mapping['edit_rate']['den'], 1)
+    if offset >= duration or start + offset != a['frame_index'] or a['pts']['num'] * num != a['frame_index'] * den * a['pts']['den']:
+        raise ValueError('post-reshape shot/frame/PTS mismatch')
 
 
 def result_manifest(path, snapshot=None):
     obj = parse_json(Path(path).read_bytes() if snapshot is None else snapshot)
     keys(obj, 'schema role alignment encoding output provenance')
-    if type(obj['schema']) is not int or obj['schema'] != 1 or obj['role'] not in ('candidate', 'reference'):
+    if type(obj['schema']) is not int or obj['schema'] not in (1, 2) or obj['role'] not in ('candidate', 'reference'):
         raise ValueError('unknown result contract')
     if obj['encoding'] != ENCODING:
         raise ValueError('reference/candidate encoding mismatch')
     a = obj['alignment']
-    keys(a, 'content_id source_sha256 width height frame_index pts source target metadata_sha256 rpu_sha256')
+    keys(a, 'content_id source_sha256 width height frame_index pts source target metadata_sha256 ' +
+         ('rpu_sha256' if obj['schema'] == 1 else 'stage analysis_sha256 source_manifest_sha256 parser xml_version analysis_version mapping translation'))
     w, h = integer(a['width'], 1, 3840), integer(a['height'], 1, 2160)
     text(a['content_id'])
     digest(a['source_sha256'])
@@ -251,7 +292,9 @@ def result_manifest(path, snapshot=None):
     integer(a['pts']['num'], -2**53 + 1)
     integer(a['pts']['den'], 1)
     source_target(a['source'], a['target'])
-    if a['source']['system'] == 'dolbyvision':
+    if obj['schema'] == 2:
+        postreshape_alignment(a)
+    elif a['source']['system'] == 'dolbyvision':
         digest(a['metadata_sha256'])
         digest(a['rpu_sha256'])
     elif a['metadata_sha256'] is not None or a['rpu_sha256'] is not None:

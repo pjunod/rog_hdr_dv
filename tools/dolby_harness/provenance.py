@@ -21,7 +21,8 @@ COMPILE_INPUTS = ('tools/dolby_harness/headless_render.c',
 FRONTEND_INPUTS = ('tools/dolby_harness/harness.py',
                    'tools/dolby_harness/contracts.py',
                    'tools/dolby_harness/metric.py',
-                   'tools/dolby_harness/provenance.py')
+                   'tools/dolby_harness/provenance.py',
+                   'tools/dolby_harness/postreshape.py')
 
 
 def sha_bytes(data):
