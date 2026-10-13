@@ -1,6 +1,6 @@
 # Stage-1 headless display-management harness
 
-Status: **source reviewed; public qualification has one unresolved metric-vector failure**.
+Status: **fixture correction derived; independent correction review and failed-only retry pending**.
 The native API prerequisite compiled before C/build edits; the complete C
 consumer compiled/linked with warnings as errors, zero diagnostics. Python
 contracts/metric/CLI and all 27 regression methods were executed once after
@@ -11,9 +11,10 @@ bindings in the [correction receipt](../evidence/dolby-harness-corrections.json)
 All native rendering/range/depth/target/gamut/minimum/provenance/negative-input
 methods passed. `MetricTests.test_annex4_public_vector` failed: its rounded
 informative Annex-4 I value 0.3554 differs from computed 0.3557205250540528
-by more than its 0.0001 tolerance. Qualification is **not complete**; independently
-reconcile the normative arithmetic/example, review the correction, then retry
-only the failed or genuinely invalidated selection. Do not repeat the 26 passes.
+by more than its 0.0001 tolerance. Qualification is **not complete**. The independent
+high-precision derivation below supports a fixture-only correction, not a change
+to the production metric. Review that correction, then retry only the failed
+selection. Do not repeat the 26 passes or treat this source correction as a pass.
 The [actual first-batch receipt](../evidence/dolby-harness-qualification-attempt1.json)
 retains their executing identities; it does not relabel passes onto future trees.
 This is the first stage of [the open track](OPEN_DV_DISPLAY_MANAGEMENT.md),
@@ -213,6 +214,80 @@ rather than silently clamped or treated as PQ. This is a software image metric,
 not optical calibration or measured display accuracy. The open track's proposed
 mean≤1/p95≤3 threshold is a future private baseline decision, not a pass claimed
 by this stage. No reference statistics have been produced by this implementation.
+
+### Annex-4 input: normative numeric oracle correction
+
+BT.2124-0 recommends the Annex-1 calculation; Annex 4 is explicitly informative.
+The official [BT.2124-0 publication](https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.2124-0-201901-I!!PDF-E.pdf)
+(01/2019, editorial amendments February 2020) supplies the digital codes
+296/201/582 and divisor 1023 in Annex 4 section 1. Annex 2 conversion 3 defines
+the full-range PQ decode; Annex 1 section 2 steps 1–4 define RGB→LMS, PQ on LMS,
+I/CT/CP and T=CT/2. The fetched PDF SHA256 is
+`cad1e382516da511811c5205e5abe1b0b97999cf4722d4854a439389eff54470`;
+the copyrighted PDF stays private and is not vendored.
+
+The independent [rational/Decimal derivation](../evidence/dolby-harness-annex4-oracle.py)
+imports no harness, test or renderer implementation. Its
+[mathematical receipt](../evidence/dolby-harness-annex4-oracle.json) retains the
+exact rational constants/matrix coefficients and all intermediate values at
+80 and 120 decimal digits. Nonlinear powers use Decimal, not binary64; light
+is computed relative to 10000 cd/m² (which cancels through the PQ round trip),
+with absolute RGB/LMS values retained for inspection. The two precisions agree
+in ITP to better than 1e-70; this is numerical convergence, not an exact-real
+interval proof or a unit/render receipt.
+
+For the exact codes divided by 1023, the independently derived values rounded
+to 16 decimal places are:
+
+| Component | Normative calculation |
+| --- | ---: |
+| I | 0.3557205250540512 |
+| T | 0.1346466873449306 |
+| P | -0.1613950695752067 |
+
+Absolute linear RGB is approximately 8.75818211436527 / 2.29415607753754 /
+181.31806454725429 cd/m². The Annex-4 displayed normalized intermediates
+0.2893/0.1964/0.5689 instead explain its displayed linear values near
+8.753/2.291/181.3. However, applying Annex 1 to even that displayed linear RGB
+gives I≈0.35569814587136, not the example's I=0.3554. Thus the example's ITP
+triple is not the four-place rounding of the normative result for these codes;
+the derivation demonstrates an arithmetic inconsistency, not its historical
+cause or an official ITU erratum. No divisor substitution or tolerance
+weakening is justified. The normative result rounds to 0.3557/0.1346/-0.1614
+at four places, rather than 0.3554/0.1346/-0.1613.
+
+Only `MetricTests.test_annex4_public_vector` changes: it retains the original
+input and full-component assertion, uses the independent literals above and
+**tightens** absolute tolerance from 1e-4 to 1e-12. This permits binary64
+transcendental/accumulation rounding without treating the displayed example as
+a precise oracle. Production `metric.py`, all other front-end files, C, build
+recipe, dependencies and all other test methods/helpers/module initialization
+are unchanged. AST equivalence excluding this one method and SHA256 equivalence
+of all eight production inputs are recorded in the
+[static correction receipt](../evidence/dolby-harness-vector-correction.json).
+
+Pending independent Astra review `t_a844cca4` must decide retention and retry.
+The proposal retains the 26 actual passes and 25 actual passing subtests at
+their original executing `2ab8332` / tree `69c59f2`: the changed method is never
+called by those selections, and its local expected tuple has no module/global,
+shared fixture or production effect. Do not relabel them onto the new source
+tree. The successful compile remains applicable to unchanged C/build/dependency
+bytes; no compiler or renderer rerun is warranted for this correction.
+
+After review approval only, existing qualification `t_dcc3a830` should run from
+the exact corrected source in its isolated lane:
+
+```bash
+PYTHONPATH=tests python3 -B -m unittest test_dolby_harness.MetricTests.test_annex4_public_vector -v
+```
+
+This command imports the harness normally but invokes no native renderer.
+The proposed qualification platform remains native x86_64 Linux in the existing
+lane: Python execution there still requires the fixed `.peer-linux/run.py`
+wrapper and negotiated mailbox ownership, not a renderer rebuild or probe.
+No successful selection is invalidated by the fixture-only edit. Final
+qualification still needs this real passing retry and the reviewed retention
+receipt; neither is claimed by the builder.
 
 ## Source and public inputs
 

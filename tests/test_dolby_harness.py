@@ -43,9 +43,14 @@ class MetricTests(unittest.TestCase):
         self.assertAlmostEqual(compare_pixels([(0.5,) * 3], [(0.501,) * 3])['mean'], 0.72, places=9)
 
     def test_annex4_public_vector(self):
+        # Annex 4 supplies the codes; Annex 1 supplies the normative arithmetic.
+        # Its informative rounded ITP example is not a precise numeric oracle.
+        # Independently derived at 80/120 decimal digits (no metric imports):
+        # evidence/dolby-harness-annex4-oracle.py and its JSON receipt.
         itp = rgb_to_itp((296 / 1023, 201 / 1023, 582 / 1023))
-        for got, expected in zip(itp, (0.3554, 0.1346, -0.1613)):
-            self.assertAlmostEqual(got, expected, delta=0.0001)
+        expected = (0.3557205250540512, 0.1346466873449306, -0.1613950695752067)
+        for got, target in zip(itp, expected):
+            self.assertAlmostEqual(got, target, delta=1e-12)
 
     def test_itp_weighting(self):
         self.assertEqual(delta_itp((0, 0, 0), (0, 0.5, 0)), 360)
