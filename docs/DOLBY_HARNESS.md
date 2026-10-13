@@ -1,7 +1,8 @@
 # Stage-1 headless display-management harness
 
 Status: **schema-1 public software harness qualified; schema-2 post-reshape
-extension implemented, independent review and affected qualification pending**.
+extension corrected after adversarial findings, independent focused closure and
+affected qualification pending**.
 The native API prerequisite compiled before C/build edits; the complete C
 consumer compiled/linked with warnings as errors, zero diagnostics. Python
 contracts/metric/CLI and all 27 regression methods were executed once after
@@ -209,14 +210,25 @@ snapshots and must agree exactly. This bounded parser accepts XML namespace
 composition/output and track, contiguous nonoverlapping shots, and exactly one
 direct frame-local Level1/ImageCharacter for the selected frame. There is no
 shot-level inheritance, multi-track/playlist rebasing or arbitrary offset guess.
-Entities/DTD declarations and ambiguous/missing mapping or L1 are rejected.
+Only strict UTF8 XML is supported, with an optional UTF8 BOM and no conflicting
+encoding declaration. UTF16 (including LE/BE with or without BOM), invalid UTF8,
+and embedded NULs are refused before ElementTree parses the document. The decoded
+UTF8 declaration guard rejects entities/DTDs; no resolver or network fetch is
+used. Ambiguous/missing mapping or selected frame-local L1 is rejected.
 
 Mapping is `{track_id,shot_id,shot_in,shot_duration,edit_offset,edit_rate}` with
 the actual XML UniqueIDs. Frame index equals shot-in plus edit-offset, offset is
 inside positive duration, and PTS matches index × rate-den/rate-num using integer
-cross multiplication. XML source encoding, actual mastering display (not the
-ColorEncoding peak), and applicable shot L9 source primaries must equal the
-explicit source interpretation. L9 is verified declaration, not new processing.
+cross multiplication. XML ColorEncoding RGBW must match the fixed BT.2020/D65
+signal encoding (0.708/0.292, 0.170/0.797, 0.131/0.046, 0.3127/0.3290), independently
+of the mastering gamut. MasteringDisplay RGBW/minimum/peak must separately match
+`source.mastering` (not the ColorEncoding peak). This bounded declaration contract
+requires the selected shot's custom L9 source primaries to equal that mastering
+declaration; it does not require the mastering gamut to equal BT.2020. There is
+no implicit conversion or retagging. Any encountered frame-level L9 is explicitly
+unsupported and rejected, including one on an unselected frame or one numerically
+equal to the shot declaration. The authentic corpus contains only shot L9.
+L9 is checked declaration, not new processing or verified override semantics.
 
 L1 is `{min_pq,avg_pq,max_pq}`, finite and ordered in [0,1]. Translation is exactly
 `dolby-xml-l1-direct-v1`: XML average/maximum pass directly to upstream
@@ -266,6 +278,45 @@ It contains no proprietary positive fixture or invented RPU; altered copies are
 negative/arithmetic controls, never official references or native fidelity inputs.
 Set `TMPDIR` to the same durable directory for any inherited affected selections.
 No unit or new native candidate render ran during this implementation phase.
+
+### Adversarial correction checkpoint (2026-10-13)
+
+Astra's complete-candidate review required R1 (encoding/mastering conflation),
+R2 (parser-negative tests masked by stale export hashes) and R3 (UTF16 bypass of
+the ASCII declaration guard). The corrected parser has version `2`; translation
+remains `dolby-xml-l1-direct-v1`, with no change to native C or L1 arithmetic.
+The declaration-validation controls independently change encoding/mastering/L9
+and never become official fidelity inputs. XML structural negatives now call
+`parsed_export` directly and assert the intended diagnostic. Duplicate/missing
+selected L1 and missing selected Frame, unsupported frame L9, ASCII and UTF16
+declarations are covered by deferred source. Harmless UTF8 reserialization/BOM
+controls check unchanged semantics and consistently rebound envelope acceptance.
+Separate export/hash-tamper tests remain, while PTS/source-association and result
+mapping/encoding negatives assert their own guard instead of generic rejection.
+
+The original private corpus stays immutable. After verifying all 113 bound file
+hashes and the durable copy's metadata, six exports were regenerated from the
+unchanged authentic XML/sequence. Eighteen inputs and eighteen reference identities
+were rebound to the new parser/export hashes. Only those 42 manifests and the
+corpus index changed; the remaining 71 files, including original XML/TIFF/f32,
+commands, logs, tool execution and conversion evidence, are byte-identical.
+Export fields other than parser identity are unchanged; reference output and
+official provenance are unchanged. The private receipt contains the exact
+old/new per-file map. This is metadata rebinding, not an official-tool rerender,
+unit pass, native candidate render or numerical comparison. The
+[sanitized correction receipt](../evidence/dolby-postreshape-review-corrections.json)
+records the static scope without proprietary artifacts.
+
+Done: correction source, deferred controls and preserved-corpus rebinding.
+Current: independent focused review `t_5c5ab54b` of the whole correction batch.
+Remaining: authoritative qualification `t_37f20cb3`, then private numerical
+baseline `t_041c7d41`. Only after closure, run all 21 corrected post-reshape
+methods and the 11 named schema-1 selections approved by Astra. The other 16
+historical schema-1 receipts keep their actual executing identities and reviewed
+retention grounds; unchanged contracts/harness/metric/native/build/dependency
+bytes are not requalified just for another reviewer. The final repository
+integrity gate belongs to that qualification phase, outside unit totals.
+No consumer-RPU, full-CM4, photometric, calibrated or optical acceptance is claimed.
 
 ## Execution provenance
 
