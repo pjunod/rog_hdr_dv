@@ -1,6 +1,7 @@
 """Bounded official XML L1 translation; no RPU, statistics or trims generated."""
 import hashlib
 from pathlib import Path
+import re
 import xml.etree.ElementTree as ET
 
 from tools.dolby_harness.contracts import (bound_file, integer, keys, number,
@@ -9,7 +10,9 @@ from tools.dolby_harness.contracts import (bound_file, integer, keys, number,
 NAMESPACE = 'http://www.dolby.com/schemas/dvmd/4_0_2'
 TRANSLATION = 'dolby-xml-l1-direct-v1'
 PARSER_NAME = 'dolby-harness-cm4-frame-l1'
-PARSER_VERSION = '1'
+PARSER_VERSION = '2'
+# Signal encoding, independent of MasteringDisplay and shot L9 declarations.
+BT2020_RGBW = [0.708, 0.292, 0.170, 0.797, 0.131, 0.046, 0.3127, 0.3290]
 
 
 def parser_identity():
@@ -92,11 +95,21 @@ def xml_primaries(node):
 
 
 def selected_l1(raw, obj, sequence):
-    # ElementTree does not fetch external entities; reject declarations as well.
-    if b'<!DOCTYPE' in raw or b'<!ENTITY' in raw:
+    # Bounded UTF8-only interface: never let ElementTree autodetect UTF16 and
+    # bypass the declaration guard. An optional UTF8 BOM is harmless.
+    try:
+        document = raw.decode('utf-8-sig')
+    except UnicodeDecodeError as exc:
+        raise ValueError('official XML requires strict UTF8 encoding') from exc
+    declaration = re.match(r'^<\?xml\s+([^?]*)\?>', document)
+    encoding = re.search(r'\bencoding\s*=\s*([\x22\x27])(.*?)\1', declaration[1]) if declaration else None
+    if '\x00' in document or (encoding and encoding[2].lower() not in ('utf8', 'utf-8')):
+        raise ValueError('official XML requires strict UTF8 encoding')
+    # ElementTree does not fetch external entities; reject internal ones too.
+    if '<!DOCTYPE' in document or '<!ENTITY' in document:
         raise ValueError('XML declarations/entities unsupported')
     try:
-        root = ET.fromstring(raw)
+        root = ET.fromstring(document)
     except ET.ParseError as exc:
         raise ValueError('malformed official XML') from exc
     if root.tag != '{' + NAMESPACE + '}DolbyLabsMDF' or value(root, 'Version') != '4.0.2':
@@ -117,8 +130,8 @@ def selected_l1(raw, obj, sequence):
     encoding = one(track, 'ColorEncoding')
     if (value(encoding, 'Encoding'), value(encoding, 'ColorSpace'), value(encoding, 'SignalRange')) != ('pq', 'rgb', 'computer'):
         raise ValueError('XML/source encoding mismatch')
-    if xml_primaries(encoding) != obj['source']['mastering']['primaries']:
-        raise ValueError('XML/source primaries mismatch')
+    if obj['source']['primaries'] != 'bt2020' or xml_primaries(encoding) != BT2020_RGBW:
+        raise ValueError('XML/source BT2020 encoding primaries mismatch')
     global_node = one(track, 'PluginNode')
     if value(one(global_node, 'Level254'), 'CMVersion').split() != ['4', '1']:
         raise ValueError('unsupported CM4 analysis/compatibility version')
@@ -145,6 +158,10 @@ def selected_l1(raw, obj, sequence):
         frames = children(shot, 'Frame')
         offsets = set()
         for frame in frames:
+            frame_l9 = frame.findall('/'.join('{' + NAMESPACE + '}' + name
+                                            for name in ('PluginNode', 'DVDynamicData', 'Level9')))
+            if frame_l9:
+                raise ValueError('frame-level L9 override unsupported')
             offset = xml_integer(frame, 'EditOffset')
             if offset >= duration or offset in offsets:
                 raise ValueError('duplicate or out-of-shot XML frame')
