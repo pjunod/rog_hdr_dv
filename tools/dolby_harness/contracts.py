@@ -175,6 +175,9 @@ def pixels(path, width, height, expected_sha256=None):
 
 
 def source_target(s, t):
+    # Dolby range is an attestation of original base-layer codes, not a request
+    # for pre-expansion: upstream RPU matrices/offsets own effective levels.
+    # PQ minima remain requested declarations, not guaranteed mapper endpoints.
     keys(s, 'system transfer primaries range bit_depth layout orientation mastering')
     integer(s['bit_depth'], 8, 16)
     if s['bit_depth'] not in (8, 10, 12, 16):
@@ -190,8 +193,8 @@ def source_target(s, t):
     luminance(t)
 
 
-def input_manifest(path):
-    obj = load_json(path)
+def input_manifest(path, snapshot=None):
+    obj = parse_json(Path(path).read_bytes() if snapshot is None else snapshot)
     keys(obj, 'schema frame source target metadata')
     if type(obj['schema']) is not int or obj['schema'] != 1:
         raise ValueError('unknown harness schema')
@@ -231,8 +234,8 @@ def alignment(obj):
             'rpu_sha256': m['rpu']['sha256'] if m else None}
 
 
-def result_manifest(path):
-    obj = load_json(path)
+def result_manifest(path, snapshot=None):
+    obj = parse_json(Path(path).read_bytes() if snapshot is None else snapshot)
     keys(obj, 'schema role alignment encoding output provenance')
     if type(obj['schema']) is not int or obj['schema'] != 1 or obj['role'] not in ('candidate', 'reference'):
         raise ValueError('unknown result contract')

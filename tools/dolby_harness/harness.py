@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,8 @@ import tempfile
 from tools.dolby_harness.contracts import (ENCODING, alignment, input_manifest,
                                          pixels, result_manifest)
 from tools.dolby_harness.metric import compare_pixels
+from tools.dolby_harness.provenance import (execution_binding, implementation,
+                                           native_environment, sha_bytes)
 
 
 def sha(path):
@@ -43,8 +46,33 @@ def control(obj, metadata):
     return ' '.join(str(x) for x in values) + '\n'
 
 
-def render(manifest, native, output):
-    obj, source, metadata = input_manifest(manifest)
+def baseline_semantics(obj, metadata):
+    s = obj['source']
+    dovi = s['system'] == 'dolbyvision'
+    native_l1 = [struct.unpack('<f', struct.pack('<f', metadata[k]))[0]
+                 if metadata else 0 for k in ('max_pq_y', 'avg_pq_y')]
+    return {'pq_minima': {
+                'requested_source_nits': s['mastering']['min_nits'],
+                'requested_target_nits': obj['target']['min_nits'],
+                'effective_nominal_source_nits': 1e-6,
+                'effective_nominal_target_nits': 1e-6,
+                'policy': 'all PQ metadata minima ignored (PL_COLOR_HDR_BLACK)'},
+            'range': {'attested_base_layer_range': s['range'],
+                      'effective_normalization': 'RPU matrices and offsets; no pre-expansion'
+                      if dovi else 'explicit ' + s['range'],
+                      'samples': 'original codes divided by 2^bit_depth-1'},
+            'cie_y_l1': {'requested_max_pq_y': metadata['max_pq_y'] if metadata else None,
+                         'requested_avg_pq_y': metadata['avg_pq_y'] if metadata else None,
+                         'native_max_pq_y': native_l1[0],
+                         'native_avg_pq_y': native_l1[1],
+                         'recognized': bool(native_l1[0] and native_l1[1]),
+                         'fallback': 'mastering/color-space baseline when either L1 value is zero'},
+            'l1_minimum': 'not implemented', 'trims': 'not implemented'}
+
+
+def render(manifest, native, output, compile_receipt=None):
+    manifest_raw = Path(manifest).read_bytes()
+    obj, source, metadata = input_manifest(manifest, manifest_raw)
     output = Path(output).resolve()
     native = Path(native).resolve(strict=True)
     if output.exists():
@@ -57,22 +85,27 @@ def render(manifest, native, output):
         if sha(stage / 'source.f32') != obj['frame']['input']['sha256']:
             raise ValueError('source changed while staging')
         (stage / 'control.txt').write_text(control(obj, metadata))
-        env = os.environ.copy()
-        env['VK_DRIVER_FILES'] = '/usr/share/vulkan/icd.d/lvp_icd.json'
-        env['VK_ICD_FILENAMES'] = env['VK_DRIVER_FILES']
-        env['LP_NUM_THREADS'] = '2'
+        (stage / 'input-manifest.json').write_bytes(manifest_raw)
+        receipt_path = Path(compile_receipt) if compile_receipt else native.parent / 'compile-receipt.json'
+        (stage / 'compile-receipt.json').write_bytes(receipt_path.read_bytes())
+        env = native_environment(stage)
+        binding = execution_binding(native, stage / 'compile-receipt.json', env)
         with (stage / 'native.stdout').open('wb') as out, (stage / 'native.stderr').open('wb') as err:
             proc = subprocess.run([str(native), str(stage / 'control.txt'),
                                    str(stage / 'source.f32'), str(stage / 'output.f32')],
                                   env=env, stdout=out, stderr=err, timeout=180)
         if proc.returncode:
             raise ValueError('native renderer failed (exit ' + str(proc.returncode) + ')')
+        if execution_binding(native, stage / 'compile-receipt.json', env) != binding:
+            raise ValueError('execution inputs changed during render')
         pixels(stage / 'output.f32', obj['frame']['width'], obj['frame']['height'])
         receipt = {'schema': 1, 'role': 'candidate', 'alignment': alignment(obj),
                    'encoding': ENCODING,
                    'output': {'file': 'output.f32', 'sha256': sha(stage / 'output.f32')},
-                   'provenance': {'implementation': 'libplacebo-7.360.1-baseline',
-                                  'native_sha256': sha(native),
+                   'provenance': {'implementation': 'source-bound libplacebo baseline',
+                                  'execution': binding,
+                                  'input_manifest_sha256': sha_bytes(manifest_raw),
+                                  'baseline_semantics': baseline_semantics(obj, metadata),
                                   'control_sha256': sha(stage / 'control.txt'),
                                   'stdout_sha256': sha(stage / 'native.stdout'),
                                   'stderr_sha256': sha(stage / 'native.stderr'),
@@ -89,8 +122,11 @@ def render(manifest, native, output):
 
 
 def compare(candidate, reference):
-    a, pa = result_manifest(candidate)
-    b, pb = result_manifest(reference)
+    frontend = implementation()
+    candidate_raw = Path(candidate).read_bytes()
+    reference_raw = Path(reference).read_bytes()
+    a, pa = result_manifest(candidate, candidate_raw)
+    b, pb = result_manifest(reference, reference_raw)
     if a['role'] != 'candidate' or b['role'] != 'reference':
         raise ValueError('candidate and reference roles required')
     if a['alignment'] != b['alignment']:
@@ -99,6 +135,11 @@ def compare(candidate, reference):
             'alignment': a['alignment'], 'encoding': ENCODING,
             'candidate_sha256': a['output']['sha256'],
             'reference_sha256': b['output']['sha256'],
+            'provenance': {'candidate_manifest_sha256': sha_bytes(candidate_raw),
+                           'reference_manifest_sha256': sha_bytes(reference_raw),
+                           'candidate_renderer': a['provenance'],
+                           'reference_renderer': b['provenance'],
+                           'comparator': frontend},
             'statistics': compare_pixels(pa, pb),
             'scope': 'software pixels only; no certification or optical acceptance'}
 
@@ -109,6 +150,7 @@ def main():
     r = sub.add_parser('render')
     r.add_argument('manifest')
     r.add_argument('--native', required=True)
+    r.add_argument('--compile-receipt', help='defaults to compile-receipt.json beside native ELF')
     r.add_argument('--output', required=True)
     c = sub.add_parser('compare')
     c.add_argument('candidate')
@@ -117,7 +159,7 @@ def main():
     args = p.parse_args()
     try:
         if args.command == 'render':
-            print(render(args.manifest, args.native, args.output))
+            print(render(args.manifest, args.native, args.output, args.compile_receipt))
         else:
             report = compare(args.candidate, args.reference)
             # Exclusive create; preserve every existing private comparison.
