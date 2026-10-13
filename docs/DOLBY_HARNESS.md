@@ -1,8 +1,10 @@
 # Stage-1 headless display-management harness
 
-Status: implementation in progress; Python contracts/metric/CLI and regression
-source are written and syntax-compiled. Native API compiler prerequisite and
-renderer implementation are pending. No units or rendering probes have run.
+Status: **compiled implementation, adversarial review and units pending**.
+The native API prerequisite compiled before C/build edits; the complete C
+consumer compiled/linked with warnings as errors, zero diagnostics. Python
+contracts/metric/CLI and all 18 regression methods are syntax-compiled, not
+executed. No units or rendering probes have run.
 This is the first stage of [the open track](OPEN_DV_DISPLAY_MANAGEMENT.md),
 not a Dolby Vision processor, reference agreement or certification claim.
 Programme-wide status and README indexing belong to the integration lane.
@@ -54,6 +56,11 @@ The output encoding is always full-range PQ BT.2020 RGB-f32le, top-left origin.
 Target mastering-volume declarations are separate from the BT.2020 signal
 encoding. A target gamut is not relabelled as the encoding. All source/target
 values and frame/source/metadata hashes are carried into the candidate receipt.
+Input/output textures are ordered RGBA32F with only RGB exported. Internal
+shader arithmetic and any intermediate FBO selection retain pinned libplacebo
+defaults (which prefer 16-bit floating-point intermediates); this is not a claim
+of an entirely binary64 or 32-bit-only rendering pipeline. Any reported renderer
+fallback/error flag is a failure, not a successful degraded comparison.
 The harness supplies zero minima unchanged to libplacebo; upstream treats zero
 as unknown and may infer its nominal black. This upstream inference is recorded
 as a baseline limitation, not a measurement of zero black.
@@ -137,8 +144,10 @@ Inspected upstream tag v7.360.1 is commit
 <https://github.com/haasn/libplacebo>. Matching Ubuntu amd64 runtime/dev packages
 are 7.360.1-1, extracted into a private prefix, never installed. Their public
 archive origin is <https://archive.ubuntu.com/ubuntu/pool/universe/libp/libplacebo/>;
-exact observed SHA256/SHA512 and dependency/header receipts are to be delivered
-with compiler evidence. Archive bytes were compared to fresh official HTTPS
+exact observed SHA256/SHA512 are in
+[`dependencies.json`](../tools/dolby_harness/dependencies.json), and every actual
+header/runtime hash is in the [compiler receipt](../evidence/dolby-harness-compile.json).
+Archive bytes were compared to fresh official HTTPS
 retrieval; this does not claim a signed Release verification.
 
 Vulkan headers are v1.4.354 from KhronosGroup/Vulkan-Headers, matching the CPU
@@ -150,10 +159,69 @@ remain unchanged for original utility code.
 
 ## Build and deferred validation
 
-Native compiler commands, exact source hashes, ELF/runtime dependency bindings
-and review handoff are pending and will be appended before this implementation
-card completes. No units may run until the existing adversarial review card
-approves the completed candidate and any findings are fixed.
+Native API baseline request `724a9edda55240cca112d7ced905ba05` passed before
+production C/build edits. Completed candidate request
+`7a44f44372974c9f97aaa369544fc38a` passed natively on x86_64 (0.94 seconds for
+compile plus hash-bound receipt/export). Compiler is Ubuntu GCC 15.3.0; flags
+are `-std=c11 -O2 -fno-fast-math -Wall -Wextra -Werror`, linking the owned
+libplacebo prefix and libm. The exact argv and source bindings are in the
+receipt. All eight source files, all 49 pinned headers and the actual ELF
+were independently verified after export; upstream/Khronos headers match the
+inspected source bytes (generated config separately bound). ELF SHA256:
+`14f23387883cbf3baaa29405b5e8be7d4ca580ca76da55c7a9992d5e7f37d84e`.
+CPU ICD and loader/LLVM/Mesa dependency bytes are also bound. This is static
+compiler evidence, not a successful Vulkan render or a passing unit receipt.
+
+Public dependency acquisition/import is now complete, using the coordinator's
+hash-verified read-only stash. The earlier compact transport imported matching
+runtime/dev packages successfully; only the missing twelve video-header files
+needed a subsequent 13,044-byte archive. No credentials, network in the native
+builder, host package installation or inherited source/build modification.
+
+Reproduce compilation only in an owned native x86_64 Linux lane with the
+recorded headers and extracted package prefix:
+
+```bash
+python3 tools/dolby_harness/build.py --prefix "$LANE/prefix" \
+  --output "$LANE/build/new-candidate"
+```
+
+The build tool creates a new output directory and records actual source,
+header, binary, compiler and loader/CPU ICD hashes; it executes no units or
+GPU probe. Reuse the delivered binary/receipt if source is unchanged rather
+than rerunning a successful compile solely for a reviewer. Native commands in
+this collaboration must continue through the fixed `.peer-linux/run.py`
+transport and negotiated mailbox ownership.
+
+No units may run until existing review child `t_a5a08679` approves the complete
+candidate and any findings are fixed. Then qualification child `t_dcc3a830`
+owns one affected batch, not this implementation card:
+
+```bash
+export HDR_HARNESS_NATIVE="$LANE/build/candidate1/headless-render"
+python3 -B -m unittest discover -s tests -p test_dolby_harness.py -v
+```
+
+All 18 methods must receive a valid passing result, including actual CPU
+rendering, limited 10-bit RGB/YCbCr interpretation and 300/616/1000 target-peak
+mapping. A missing native binary is a failure, not a skip. Rerun only failed
+or genuinely invalidated checks. No existing compositor/corpus suite is
+requested again. No historical receipt claims that these new tests passed.
+
+After the same review gate, the CLI usage is:
+
+```bash
+python3 tools/dolby_harness/make_fixture.py "$PRIVATE/new-public-fixture"
+python3 -m tools.dolby_harness.harness render "$PRIVATE/new-public-fixture/frame.json" \
+  --native "$HDR_HARNESS_NATIVE" --output "$PRIVATE/new-render"
+python3 -m tools.dolby_harness.harness compare "$PRIVATE/new-render/candidate.json" \
+  "$PRIVATE/reference.json" --report "$PRIVATE/new-comparison.json"
+```
+
+Reports are exclusively created at the requested private path and numerical
+comparisons never print to stdout. Each report has its exact source/target/frame
+alignment and output hashes plus pixel mean/p95/max. Failed rendering retains
+private staging diagnostics and produces no finalized candidate receipt.
 
 The proposed affected batch is only `tests/test_dolby_harness.py`, using the
 compiled native binary through `HDR_HARNESS_NATIVE`. It covers public metric

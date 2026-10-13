@@ -109,3 +109,15 @@ The OEM processor experiment continues only to a go/no-go: one frame
 processed on the GPU with this panel's configuration engaged, compared with
 the same reference. A trace of the OEM pipeline on the laptop's Windows
 installation, run with the owner, informs both tracks.
+
+## Stage-1 implementation checkpoint (2026-10-13)
+
+The [headless harness](DOLBY_HARNESS.md) now has a compiled native x86_64
+libplacebo 7.360.1 consumer, exact source/range/bit-depth/frame/target and
+parsed-real-metadata contracts, and a BT.2124 Annex-1 metric. Compiler/header/ELF
+identities are in the [receipt](../evidence/dolby-harness-compile.json).
+All 18 new regression methods are written, not executed: adversarial review
+and the one affected batch are separate downstream cards. No real metadata
+or private reference comparison has run, no trims/new mapping are implemented,
+and no full Dolby, compositor pass-through or optical acceptance is claimed.
+Private reference absence does not block this stage-1 implementation handoff.
