@@ -1,13 +1,21 @@
 # Stage-1 headless display-management harness
 
-Status: **review corrections delivered; correction review and units pending**.
+Status: **source reviewed; public qualification has one unresolved metric-vector failure**.
 The native API prerequisite compiled before C/build edits; the complete C
 consumer compiled/linked with warnings as errors, zero diagnostics. Python
-contracts/metric/CLI and all 27 regression methods are syntax-compiled, not
-executed. Astra's original review required R1–R3; the corrections retain the
+contracts/metric/CLI and all 27 regression methods were executed once after
+Astra approved corrected `2ab8332` / tree `69c59f2`. The result was **26 passed,
+1 failed, no skips**; all 25 subtests passed. Astra's original review required R1–R3; the corrections retain the
 unchanged native consumer/build inputs and passing ELF, with new Python source
 bindings in the [correction receipt](../evidence/dolby-harness-corrections.json).
-No units or rendering probes have run; no correction-review approval is claimed.
+All native rendering/range/depth/target/gamut/minimum/provenance/negative-input
+methods passed. `MetricTests.test_annex4_public_vector` failed: its rounded
+informative Annex-4 I value 0.3554 differs from computed 0.3557205250540528
+by more than its 0.0001 tolerance. Qualification is **not complete**; independently
+reconcile the normative arithmetic/example, review the correction, then retry
+only the failed or genuinely invalidated selection. Do not repeat the 26 passes.
+The [actual first-batch receipt](../evidence/dolby-harness-qualification-attempt1.json)
+retains their executing identities; it does not relabel passes onto future trees.
 This is the first stage of [the open track](OPEN_DV_DISPLAY_MANAGEMENT.md),
 not a Dolby Vision processor, reference agreement or certification claim.
 Programme-wide status and README indexing belong to the integration lane.
@@ -262,9 +270,9 @@ than rerunning a successful compile solely for a reviewer. Native commands in
 this collaboration must continue through the fixed `.peer-linux/run.py`
 transport and negotiated mailbox ownership.
 
-No units may run until existing review child `t_a5a08679` approves the complete
-candidate and any findings are fixed. Then qualification child `t_dcc3a830`
-owns one affected batch, not this implementation card:
+Existing review `t_a5a08679` approved corrected `2ab8332` (Astra, not Fable).
+Qualification `t_dcc3a830` ran this one affected batch from a new isolated source
+directory, preserving the original ELF, compile receipt and prefix:
 
 ```bash
 export HDR_HARNESS_NATIVE="$LANE/build/candidate1/headless-render"
@@ -303,7 +311,7 @@ alignment, exact input-manifest and implementation/provenance bindings, output
 hashes and pixel mean/p95/max. Failed rendering retains
 private staging diagnostics and produces no finalized candidate receipt.
 
-The proposed affected batch is only `tests/test_dolby_harness.py`, using the
+The executed affected batch was only `tests/test_dolby_harness.py`, using the
 compiled native binary through `HDR_HARNESS_NATIVE`. It covers public metric
 vectors, transfer endpoints, chromatic weights, nearest-rank semantics,
 invalid inputs, explicit source interpretation, missing/mismatched metadata and
@@ -312,3 +320,22 @@ No real Dolby metadata fixture is present: the metadata-bearing path can compile
 and validate its interface but genuine corpus execution belongs to the separate
 private baseline milestone. No compositor, package, existing historical suite,
 physical or Apple TV check is requested by this harness batch.
+
+### First public qualification receipt (2026-10-13)
+
+Fresh preflight verified all nine executing source hashes, the preserved ELF and
+compile receipt, and all 34 actually resolved runtime bindings. The batch ran in
+22.257 seconds (unittest time). Evidence-only observation outside tracked source
+recorded every method/subtest and copied temporary fixtures, controls, native
+diagnostics and candidate manifests before normal cleanup. All 562 retained file
+hashes were verified after retrieval. No successful compiler or unit suite was
+rerun. The transport's 4 MiB export cap failed after execution; two bounded
+retrieval chunks recovered the complete 548,358-byte evidence archive without
+reexecution. SHA256:
+`2c4f9a3416c6f4989457efac0ea9064acd68bc3f068c9698a098c03393d8d9d7`.
+
+The archive and detailed logs remain in the private collaboration qualification
+lane. Only the sanitized public-synthetic receipt is committed. Programme-wide
+status remains integration-owned. Genuine Dolby metadata/private agreement,
+mapping/trims, preferred-description handoff and optical acceptance remain
+separate unmet milestones; passing public native renders do not qualify them.

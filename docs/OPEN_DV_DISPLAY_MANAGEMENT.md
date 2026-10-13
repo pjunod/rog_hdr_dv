@@ -121,9 +121,13 @@ The original Astra review required R1–R3 corrections; the
 requested/effective semantics (PQ ignores all minima, Dolby RPU owns range,
 zero L1 falls back), per-invocation source/ELF/runtime and comparison identities,
 and stronger public coverage. The passing native ELF is retained because C/build
-inputs are unchanged. All **27 actual regression methods** are written and
-syntax-compiled, not executed: independent correction review and the one affected
-batch are separate existing downstream cards. No approval is claimed. No real metadata
+inputs are unchanged. Astra independently approved corrected `2ab8332` / tree
+`69c59f2`; qualification ran all **27 actual regression methods once**: **26 passed,
+1 failed, no skips**, with 25 passing subtests. All native renderer cases passed;
+the informative Annex-4 metric-vector expectation requires independent arithmetic
+reconciliation, correction review and failed-only retry before stage-1 qualification
+is complete. See the [source-bound receipt](../evidence/dolby-harness-qualification-attempt1.json).
+No real metadata
 or private reference comparison has run, no trims/new mapping are implemented,
 and no full Dolby, compositor pass-through or optical acceptance is claimed.
 Private reference absence does not block this stage-1 implementation handoff.
