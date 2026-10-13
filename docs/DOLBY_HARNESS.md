@@ -1,10 +1,13 @@
 # Stage-1 headless display-management harness
 
-Status: **compiled implementation, adversarial review and units pending**.
+Status: **review corrections delivered; correction review and units pending**.
 The native API prerequisite compiled before C/build edits; the complete C
 consumer compiled/linked with warnings as errors, zero diagnostics. Python
-contracts/metric/CLI and all 18 regression methods are syntax-compiled, not
-executed. No units or rendering probes have run.
+contracts/metric/CLI and all 27 regression methods are syntax-compiled, not
+executed. Astra's original review required R1–R3; the corrections retain the
+unchanged native consumer/build inputs and passing ELF, with new Python source
+bindings in the [correction receipt](../evidence/dolby-harness-corrections.json).
+No units or rendering probes have run; no correction-review approval is claimed.
 This is the first stage of [the open track](OPEN_DV_DISPLAY_MANAGEMENT.md),
 not a Dolby Vision processor, reference agreement or certification claim.
 Programme-wide status and README indexing belong to the integration lane.
@@ -41,11 +44,17 @@ Unknown fields, duplicate JSON keys and nonfinite numbers are errors.
   Values are finite normalized digital samples in [0,1], with no automatic
   normalization or clipping. `source.bit_depth` is 8, 10, 12 or 16 and records
   the original normalization divisor `2^bit_depth-1`; it is passed to
-  libplacebo for exact limited-range and chroma-centre interpretation. Float
+  libplacebo for explicit non-Dolby range/chroma-centre interpretation. Float
   storage does not assert that samples were quantized at this nominal depth.
+  Dolby input must retain **original base-layer digital codes divided by that
+  divisor**, not samples with a prior limited-to-full expansion. The RPU matrices
+  and offsets already carry range normalization; doing it again is incorrect.
 - `source`: system `rgb`, `bt2020nc` or `dolbyvision`, PQ transfer, BT.2020
   primaries, explicit full/limited range, bit depth, layout, orientation,
-  and `mastering` (`min_nits`, `max_nits`, eight raw chromaticities).
+  and `mastering` (`min_nits`, `max_nits`, eight raw chromaticities). For Dolby,
+  `range` is a base-layer **attestation**, not an independent range-expansion
+  selector: upstream forces full sample normalization and lets the RPU own
+  levels. The receipt separately records requested/attested and effective policy.
 - `target`: descriptive id, minimum and maximum in cd/m², and eight raw
   chromaticities in order rx/ry/gx/gy/bx/by/wx/wy. Finite physical xy values,
   nondegenerate primary triangle and an interior white are required. No EDID
@@ -61,9 +70,32 @@ shader arithmetic and any intermediate FBO selection retain pinned libplacebo
 defaults (which prefer 16-bit floating-point intermediates); this is not a claim
 of an entirely binary64 or 32-bit-only rendering pipeline. Any reported renderer
 fallback/error flag is a failure, not a successful degraded comparison.
-The harness supplies zero minima unchanged to libplacebo; upstream treats zero
-as unknown and may infer its nominal black. This upstream inference is recorded
-as a baseline limitation, not a measurement of zero black.
+### Requested versus effective baseline semantics
+
+The harness preserves supplied source/target declarations in control and
+alignment. This does **not** mean every declaration is honored as a mapping
+endpoint by the unmodified baseline. Candidate `provenance.baseline_semantics`
+records the following pinned libplacebo behaviors:
+
+- `src/colorspace.c:812–814` replaces **all PQ metadata minima**, including
+  positive values such as 0.0004 cd/m², with `PL_COLOR_HDR_BLACK` (1e-6 cd/m²,
+  `src/include/libplacebo/colorspace.h:298`) for nominal luminance bounds.
+  Source/target requested minima are retained separately from that effective
+  nominal minimum. It is not a measured panel black, an applied black floor,
+  or a promise of black adaptation. No new black mapping is implemented.
+- `src/colorspace.c:177–180,1842–1848` makes Dolby range normalization RPU-owned;
+  the full/limited attestation does not apply a second range expansion. RGB and
+  BT.2020-NC still use the explicit range and bit-depth selector. Full-range NC
+  chroma uses the upstream MAX_INT=1 convention with midpoint `2^(b-1)/(2^b-1)`
+  and a positive half-range ending at 1; limited codes use scaled 16/219/224.
+- `src/colorspace.c:466–480,798–801` recognizes CIE-Y L1 maximum/average only
+  when **both** values are nonzero at native float32 precision. Either zero
+  falls back to mastering/color-space baseline metadata, not fabricated L1.
+  The receipt records requested values, native float32 values and recognition.
+
+These are source-verified semantics, not new executed rendering receipts.
+The deferred public positive-min case compares zero/positive declarations and
+rejects a fabricated 0.0004 black-floor claim. No synthetic RPU is needed.
 
 ### Private parsed metadata contract
 
@@ -91,8 +123,9 @@ as documented upstream. The export also carries `max_pq_y` and `avg_pq_y` in
 [0,1] from real level-1 analysis, not estimates from test frames. Pivots that
 collapse at float32 precision are refused. All arrays have exact shapes.
 
-The harness consumes only upstream-supported reshaping/matrices and level-1
-maximum/average. Level-1 minimum and level-2/8 trims remain in the original
+The harness consumes only upstream-supported reshaping/matrices and eligible
+level-1 maximum/average. If either L1 value is zero, CIE-Y L1 is unrecognized
+and mastering/color-space metadata supplies the baseline. Level-1 minimum and level-2/8 trims remain in the original
 private metadata but are not implemented here. Profile 7 FEL reconstruction,
 chroma subsampling reconstruction and decoder/extractor qualification are not
 part of this interface. For subsampled source, supply an explicitly converted
@@ -119,6 +152,42 @@ comparison validates exact byte counts, hashes, pixel domain and identities.
 Absence, wrong encoding, wrong hash or mismatch is an error, never an empty or
 zero-difference success. Private frames, RPU, parsed exports, reference manifests
 and numerical comparisons must stay outside version control.
+
+The comparison report binds the exact candidate/reference manifest **byte
+snapshots that were parsed**, not a later reread. It preserves both renderer
+provenance objects (including reference version/options), binds the comparator,
+contracts, metric and provenance implementation source hashes and Python
+interpreter identity, and also retains the output hashes and alignment.
+Reference provenance is still a caller attestation, not authenticated Dolby
+tool evidence. Public test reference images remain explicitly synthetic.
+
+## Execution provenance
+
+Every render requires the actual `compile-receipt.json` beside its native ELF
+(or the explicit `--compile-receipt` path). This is implementation identity,
+not a feature opt-in or new schema framework. The renderer snapshots that
+receipt privately and binds its exact bytes and complete compiler/header/source
+identities into the candidate. It verifies the current C consumer, build recipe
+and dependency manifest against the retained compile hashes and verifies ELF
+equality. Historical Python/test hashes inside the original compile receipt
+remain historical; current Python control/contracts/metric/provenance source
+and interpreter hashes are separately bound and source changes since import
+are rejected. A fresh interpreter must load the exported candidate.
+
+Before and after rendering, native and CPU-ICD `ldd` resolution plus actual
+file hashes must equal the compile receipt's runtime closure. The ICD JSON must
+name the expected CPU library. The dependency inspection and native child share
+the same clean, allowlisted environment: no inherited LD/VK/Mesa/layer or
+display-server settings, fixed CPU ICD, all Vulkan layers disabled, two CPU
+threads and private HOME/XDG cache/config/data directories. Nonempty system
+loader preloads are refused. Environment and actual verified runtime hashes
+are retained; a hard-coded version string is not the identity proof. The native
+device/version/options log is separately hash-bound.
+
+This detects changed inputs/resolution around the invocation in the controlled
+owned builder; it is not a signature/authentication scheme or protection against
+hostile concurrent mutation of the compiler/runtime. New verification code is
+written/syntax-compiled here, **not runtime-qualified** until the gated batch.
 
 ## Metric
 
@@ -188,7 +257,7 @@ python3 tools/dolby_harness/build.py --prefix "$LANE/prefix" \
 
 The build tool creates a new output directory and records actual source,
 header, binary, compiler and loader/CPU ICD hashes; it executes no units or
-GPU probe. Reuse the delivered binary/receipt if source is unchanged rather
+GPU probe. Reuse the delivered binary/receipt if native C/build inputs are unchanged rather
 than rerunning a successful compile solely for a reviewer. Native commands in
 this collaboration must continue through the fixed `.peer-linux/run.py`
 transport and negotiated mailbox ownership.
@@ -202,9 +271,19 @@ export HDR_HARNESS_NATIVE="$LANE/build/candidate1/headless-render"
 python3 -B -m unittest discover -s tests -p test_dolby_harness.py -v
 ```
 
-All 18 methods must receive a valid passing result, including actual CPU
-rendering, limited 10-bit RGB/YCbCr interpretation and 300/616/1000 target-peak
-mapping. A missing native binary is a failure, not a skip. Rerun only failed
+All **27 actual methods** must receive a valid passing result (12 are new or
+revised versus the original module; see the correction receipt). Coverage adds
+asymmetric in-gamut BT.2020-NC full/limited independent matrix/range oracles at
+8/10/12/16 bits; 300/616/1000 peak upper **and lower** bounds plus distinct target
+responses; synthetic BT.709 target gamut with chromatic in-gamut preservation,
+out-of-gamut response and unchanged PQ BT.2020 encoding; ignored positive PQ
+minimum behavior; direct malformed/trailing/truncated native controls and
+invalid pixel rejection with no output; table-driven source/target/metadata
+identity mismatches; exact parsed-manifest snapshots, front-end/ELF/source/runtime
+tampering and inherited-loader/ICD environment isolation. All are public,
+metadata-free fixtures; invalid non-Dolby metadata identities are rejection
+controls, not fabricated RPU data. A missing native binary/compile receipt is a
+failure, not a skip. Rerun only failed
 or genuinely invalidated checks. No existing compositor/corpus suite is
 requested again. No historical receipt claims that these new tests passed.
 
@@ -220,7 +299,8 @@ python3 -m tools.dolby_harness.harness compare "$PRIVATE/new-render/candidate.js
 
 Reports are exclusively created at the requested private path and numerical
 comparisons never print to stdout. Each report has its exact source/target/frame
-alignment and output hashes plus pixel mean/p95/max. Failed rendering retains
+alignment, exact input-manifest and implementation/provenance bindings, output
+hashes and pixel mean/p95/max. Failed rendering retains
 private staging diagnostics and produces no finalized candidate receipt.
 
 The proposed affected batch is only `tests/test_dolby_harness.py`, using the

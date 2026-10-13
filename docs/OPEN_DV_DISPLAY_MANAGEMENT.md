@@ -116,8 +116,14 @@ The [headless harness](DOLBY_HARNESS.md) now has a compiled native x86_64
 libplacebo 7.360.1 consumer, exact source/range/bit-depth/frame/target and
 parsed-real-metadata contracts, and a BT.2124 Annex-1 metric. Compiler/header/ELF
 identities are in the [receipt](../evidence/dolby-harness-compile.json).
-All 18 new regression methods are written, not executed: adversarial review
-and the one affected batch are separate downstream cards. No real metadata
+The original Astra review required R1–R3 corrections; the
+[correction receipt](../evidence/dolby-harness-corrections.json) records explicit
+requested/effective semantics (PQ ignores all minima, Dolby RPU owns range,
+zero L1 falls back), per-invocation source/ELF/runtime and comparison identities,
+and stronger public coverage. The passing native ELF is retained because C/build
+inputs are unchanged. All **27 actual regression methods** are written and
+syntax-compiled, not executed: independent correction review and the one affected
+batch are separate existing downstream cards. No approval is claimed. No real metadata
 or private reference comparison has run, no trims/new mapping are implemented,
 and no full Dolby, compositor pass-through or optical acceptance is claimed.
 Private reference absence does not block this stage-1 implementation handoff.
