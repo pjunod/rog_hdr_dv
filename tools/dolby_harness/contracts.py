@@ -42,7 +42,7 @@ def digest(x):
     return x
 
 
-def load_json(path):
+def parse_json(data):
     def unique(pairs):
         out = {}
         for k, v in pairs:
@@ -50,8 +50,12 @@ def load_json(path):
                 raise ValueError('duplicate JSON key')
             out[k] = v
         return out
-    return json.loads(Path(path).read_text(), object_pairs_hook=unique,
+    return json.loads(data, object_pairs_hook=unique,
                       parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
+
+
+def load_json(path):
+    return parse_json(Path(path).read_bytes())
 
 
 def bound_file(base, obj):
@@ -112,9 +116,10 @@ def dovi_metadata(base, obj, frame):
         raise ValueError('metadata frame alignment mismatch')
     export = bound_file(base, obj['export'])
     bound_file(base, obj['rpu'])
-    data = load_json(export)
-    if hashlib.sha256(export.read_bytes()).hexdigest() != obj['export']['sha256']:
+    raw = export.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != obj['export']['sha256']:
         raise ValueError('metadata changed while loading')
+    data = parse_json(raw)
     keys(data, 'schema profile residual_disabled bl_bit_depth nonlinear_offset nonlinear linear comp max_pq_y avg_pq_y')
     if type(data['schema']) is not int or data['schema'] != 1:
         raise ValueError('unknown parsed metadata schema')
@@ -157,8 +162,10 @@ def dovi_metadata(base, obj, frame):
     return data
 
 
-def pixels(path, width, height):
+def pixels(path, width, height, expected_sha256=None):
     data = Path(path).read_bytes()
+    if expected_sha256 is not None and hashlib.sha256(data).hexdigest() != expected_sha256:
+        raise ValueError('pixel bytes changed while loading')
     if len(data) != width * height * 12:
         raise ValueError('exact tightly packed RGB-f32le byte count required')
     out = list(struct.iter_unpack('<fff', data))
@@ -199,7 +206,7 @@ def input_manifest(path):
     integer(f['pts']['num'], -2**53 + 1)
     integer(f['pts']['den'], 1)
     p = bound_file(Path(path).parent, f['input'])
-    pixels(p, w, h)
+    pixels(p, w, h, f['input']['sha256'])
     s = obj['source']
     t = obj['target']
     source_target(s, t)
@@ -249,4 +256,4 @@ def result_manifest(path):
     if not isinstance(obj['provenance'], dict) or not obj['provenance']:
         raise ValueError('renderer/reference provenance required')
     p = bound_file(Path(path).parent, obj['output'])
-    return obj, pixels(p, w, h)
+    return obj, pixels(p, w, h, obj['output']['sha256'])
