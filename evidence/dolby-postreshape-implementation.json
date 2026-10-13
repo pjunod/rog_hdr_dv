@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "task": "t_772d238e",
+  "status": "IMPLEMENTED_AWAITING_INDEPENDENT_REVIEW_AND_AFFECTED_QUALIFICATION",
+  "parent_head": "72bfbb2b2f612fa70fc2a23fd89a2d4b7b7abc4d",
+  "implementation_head": "2fca0cfffb01053503a155c95aae66262a0bc22a",
+  "decisions": {
+    "thinker": "hdr-astra",
+    "task": "t_2c6e4dfb",
+    "comments": [
+      695,
+      697
+    ],
+    "translation": "dolby-xml-l1-direct-v1",
+    "scope": "normalized XML L1 field translation, not proven photometric CIE-Y, consumer reshape or full CM4"
+  },
+  "static": {
+    "request": "419e6e87f37e4f5689a840917f128166",
+    "architecture": "x86_64",
+    "source_files_verified": 11,
+    "protected_corpus_file_hashes_verified": 113,
+    "python_syntax_compilation": "PASS",
+    "retained_native_compiler_inputs_equivalent": true,
+    "elf_sha256": "14f23387883cbf3baaa29405b5e8be7d4ca580ca76da55c7a9992d5e7f37d84e",
+    "retained_compile_receipt_sha256": "5e1b6a51f5191a22fcb91f3463914906393343bc8061894fe31110b76ce986d6",
+    "runtime_closure_verified": true,
+    "new_native_compiles": 0
+  },
+  "public_source_bindings": {
+    "tests/test_dolby_postreshape.py": "7143eac30ac12ee7240d5f1628804674c772c30bb48b1cd1b1493eec91330e67",
+    "tests/test_dolby_harness.py": "b629624ed98e6cbc9c694f33d3778cb0cd4b7db0b0bb26185983572c8988397e",
+    "tools/dolby_harness/postreshape.py": "b80eacad82281adc835c592534a3c1a801f6d9f3ae71a4c6a96460cc813a868a",
+    "tools/dolby_harness/provenance.py": "f9bb6c96e7fa4c9918d82b225af86328a243b984e0af52dec3cc7b40b3758190",
+    "tools/dolby_harness/make_fixture.py": "b32b28f25142eee39e1bc1397d7f3a770ce054882c8b74c566ef26e55296868b",
+    "tools/dolby_harness/build.py": "41cc21f36d58d7e913351cd8706305d387e7efbee4eb464ed8a5bbc332effe29",
+    "tools/dolby_harness/dependencies.json": "520d52a44d1575a3f18b852bc106113117ecb8023a4d848768e782c3db8fa152",
+    "tools/dolby_harness/headless_render.c": "11cf72cdb78320b35908eb82516d1310a8196cfe907a4458eb781d687831baf8",
+    "tools/dolby_harness/harness.py": "04723220f91c5a48b74e5d0f35d11aa44d0aafe94319a5b8bfc383b3786a62fd",
+    "tools/dolby_harness/contracts.py": "ac9ebc0c6158e0301370812d757083f8d0aa3fefb0edaea12cd031815c6a462b",
+    "tools/dolby_harness/metric.py": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90"
+  },
+  "official_workflow_summary": {
+    "tools_version": "5.6.4",
+    "analysis": "CM4 longplay XML4.0.2, CPU-only",
+    "metadata_validation": "PASS, missing-L8 warning retained",
+    "synthetic_sources": 6,
+    "geometry": [
+      192,
+      108
+    ],
+    "edit_rate": {
+      "num": 24,
+      "den": 1
+    },
+    "official_references": 18,
+    "targets": [
+      "panel616/0.0004 with firmware primaries",
+      "documented custom BT2020/300/0",
+      "preset28 BT2020/600/0"
+    ],
+    "refused_coverage": "preset49 at1000 equals mastering peak; refused, no substitute",
+    "tool_generated_levels_retained": [
+      "L1",
+      "L2",
+      "L3",
+      "L9"
+    ],
+    "missing_levels": [
+      "L8"
+    ],
+    "storage": "private durable self-contained corpus and verified generation archive outside Git"
+  },
+  "deferred_new_methods": [
+    "PostreshapeTests.test_genuine_frame_local_l1_and_boundaries",
+    "PostreshapeTests.test_rgb_control_contains_l1_without_reshape",
+    "PostreshapeTests.test_required_schema_stage_source_and_metadata",
+    "PostreshapeTests.test_artifact_hash_and_missing_input",
+    "PostreshapeTests.test_export_cannot_override_raw_l1_parser_or_mapping",
+    "PostreshapeTests.test_exact_pts_and_sequence_association",
+    "PostreshapeTests.test_duplicate_frame_rejected",
+    "PostreshapeTests.test_missing_frame_l1_never_inherits_shot_l1",
+    "PostreshapeTests.test_overlap_and_offset_boundary_rejected",
+    "PostreshapeTests.test_namespace_multitrack_and_l9_rejected",
+    "PostreshapeTests.test_missing_malformed_and_zero_l1_controls",
+    "PostreshapeTests.test_genuine_metadata_native_execution_and_result_alignment",
+    "PostreshapeTests.test_result_schema_stage_encoding_and_mapping_mixing"
+  ],
+  "new_unit_executions": 0,
+  "new_native_candidate_renders": 0,
+  "numerical_baseline_executions": 0,
+  "historical_qualification": "27 valid original methods retain their executing identities; applicability after this extension must be adjudicated, not relabelled",
+  "limits": [
+    "Independent adversarial review and one affected batch remain",
+    "L1 minimum/L2/L3/L8 processing absent",
+    "No consumer Profile5/8 reshape agreement, Dolby fidelity/certification or physical acceptance",
+    "No proprietary binaries/XML/reference pixels/private result values committed",
+    "No devices/AppleTV/display/install/publication/merge; PR16 held"
+  ]
+}

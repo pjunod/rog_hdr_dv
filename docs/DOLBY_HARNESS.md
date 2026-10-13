@@ -1,6 +1,7 @@
 # Stage-1 headless display-management harness
 
-Status: **source reviewed; public software harness qualified**.
+Status: **schema-1 public software harness qualified; schema-2 post-reshape
+extension implemented, independent review and affected qualification pending**.
 The native API prerequisite compiled before C/build edits; the complete C
 consumer compiled/linked with warnings as errors, zero diagnostics. Python
 contracts/metric/CLI and all 27 regression methods were executed once after
@@ -40,7 +41,7 @@ Public fixtures contain no RPU, fake metadata, identity trims or Dolby tool
 outputs. No absent metadata silently falls back to RGB or HDR10 when the source
 system says `dolbyvision`. No private reference is required to build stage 1.
 
-### Frame manifest (schema 1)
+### Frame manifest (schema 1, unchanged consumer interface)
 
 See `tools/dolby_harness/contracts.py` for exact fields and rejection rules,
 and `tools/dolby_harness/make_fixture.py` for a complete metadata-free example.
@@ -171,6 +172,100 @@ contracts, metric and provenance implementation source hashes and Python
 interpreter identity, and also retains the output hashes and alignment.
 Reference provenance is still a caller attestation, not authenticated Dolby
 tool evidence. Public test reference images remain explicitly synthetic.
+
+### Official-analysis post-reshape interface (schema 2)
+
+This separate entry point consumes full-range PQ BT.2020 RGB **at the input to
+display management**, after any required reshaping. Synthetic RGB has no consumer
+decoder/RPU reshaping provenance, and is not relabelled as Profile 5 or 8. The
+schema-1 envelope, parsed metadata, result and alignment remain unchanged.
+
+Schema 2 input has exactly `schema stage frame source target metadata`, with
+integer schema 2 and stage `post-reshape`. Frame/source/target retain the existing
+shapes; source is explicitly `rgb`, `full`, `pq`, `bt2020`, `c3-f32le`, `top-left`.
+Mandatory metadata has exactly `origin analysis export source_manifest frame_index
+pts`, origin `dolby-tools`, and three hash-bound `{file,sha256}` artifacts.
+The original whole XML and analyzed sequence remain private authority; an
+independent L1 attestation without them is insufficient.
+
+The source manifest has exactly `schema source width height edit_rate frames
+provenance`. Schema is 2, source/geometry equal the frame declarations, edit rate
+is a positive `{num,den}` rational, and frames are an ordered contiguous
+zero-origin list of `{index,original,normalized}`. Both original analyzed TIFF and
+normalized frame use the bound-file shape; every file and every normalized pixel
+domain/byte count is checked. The selected normalized hash equals the harness
+frame hash. Nonempty private provenance records the actual source generator,
+official tool/version/command/runtime, original sequence/frame order and explicit
+RGB16→f32 conversion receipt. The implementation verifies bytes and declaration
+consistency, not the authenticity of an official-origin assertion. Independent
+review still inspects the real official execution receipts.
+
+Parsed export has exactly `schema stage analysis_sha256 source_manifest_sha256
+source_sha256 frame_index pts parser xml_version analysis_version mapping l1
+translation`. The parser identity is `{name,version,sha256}` for the actual
+`postreshape.py` bytes. Export is recomputed from the hash-checked XML/sequence
+snapshots and must agree exactly. This bounded parser accepts XML namespace
+`http://www.dolby.com/schemas/dvmd/4_0_2`, version `4.0.2`, CMVersion `4 1`, one
+composition/output and track, contiguous nonoverlapping shots, and exactly one
+direct frame-local Level1/ImageCharacter for the selected frame. There is no
+shot-level inheritance, multi-track/playlist rebasing or arbitrary offset guess.
+Entities/DTD declarations and ambiguous/missing mapping or L1 are rejected.
+
+Mapping is `{track_id,shot_id,shot_in,shot_duration,edit_offset,edit_rate}` with
+the actual XML UniqueIDs. Frame index equals shot-in plus edit-offset, offset is
+inside positive duration, and PTS matches index × rate-den/rate-num using integer
+cross multiplication. XML source encoding, actual mastering display (not the
+ColorEncoding peak), and applicable shot L9 source primaries must equal the
+explicit source interpretation. L9 is verified declaration, not new processing.
+
+L1 is `{min_pq,avg_pq,max_pq}`, finite and ordered in [0,1]. Translation is exactly
+`dolby-xml-l1-direct-v1`: XML average/maximum pass directly to upstream
+`avg_pq_y`/`max_pq_y` slots, with only the existing native float32 conversion.
+No RPU serialization, 12-bit quantization/clamping, second /4095 normalization,
+computed pixel statistics or L3 offsets are applied. Public
+[dovi_tool source](https://github.com/quietvoid/dovi_tool/blob/614c816b6446dcd1dbaf433403d499a6026fbb5a/dolby_vision/src/xml/parser.rs#L565-L589)
+establishes ImageCharacter order min/average/maximum; retained libplacebo
+`cee9b076` adapter `libav_internal.h:969–972` maps consumer L1 maximum/average
+/4095 into the same slots. This is a deliberately labelled normalized-field
+baseline translation, **not proven photometric CIE-Y**, bit-exact equivalence to
+a serialized consumer RPU, or full CM4. Official longplay analysis has temporal
+context; compatibility processing can adjust L1 with L3 compensation. Raw
+minimum and L2/L3/L8 remain unsupported and preserved in XML, never fabricated as
+neutral values. Genuine native-zero fallback remains explicit and cannot count
+as L1-active qualification.
+
+Schema 2 results retain existing top-level keys. Alignment retains
+content/source/geometry/frame/PTS/source/target/metadata hash and replaces the
+schema-1 RPU hash with `stage analysis_sha256 source_manifest_sha256 parser
+xml_version analysis_version mapping translation`. No RPU/profile/matrix/pivot
+placeholders exist. Cross-schema/stage, mapping, target, encoding or identity
+mismatch is rejected. Comparison report schema follows its matched inputs.
+Reference provenance includes the real official render command, target and
+original output/conversion hashes. Candidate provenance records raw/requested,
+native-float32 and recognized/fallback L1 semantics, with unsupported levels
+explicit. Agreement metrics belong to the subsequent private baseline, not this
+restoration implementation.
+
+The original native C/build/dependency files are byte-identical to their qualified
+compiler receipt; C already reads L1 for RGB and reshape data only for Dolby.
+This extension serializes reshape fields only for `dolbyvision`, so the original
+ELF/compiler/runtime can be reused. The new parser joins per-execution front-end
+source bindings. No successful compile or old suite is repeated for a reviewer.
+
+Implementation uses related commits in an isolated clone. Authentic new private
+references and parsed inputs for six original sources at panel616, BT.2020/300
+and BT.2020/600 are durably retained; 1000-nit same-master-peak refusal and missing
+L8 coverage are explicit. The [corpus restoration checkpoint](HDR_REFERENCE_CORPUS.md#restoration-checkpoint-2026-10-13)
+distinguishes this new evidence from the lost historical experiment.
+Independent complete-candidate review is scheduled, followed by one affected
+contract/parser/control/alignment batch and genuine metadata-bearing native
+execution. `tests/test_dolby_postreshape.py` requires `HDR_POSTRESHAPE_CORPUS`
+pointing to the protected self-contained corpus and `HDR_POSTRESHAPE_TMP` pointing
+to a durable task-owned directory, plus the retained `HDR_HARNESS_NATIVE`.
+It contains no proprietary positive fixture or invented RPU; altered copies are
+negative/arithmetic controls, never official references or native fidelity inputs.
+Set `TMPDIR` to the same durable directory for any inherited affected selections.
+No unit or new native candidate render ran during this implementation phase.
 
 ## Execution provenance
 

@@ -135,3 +135,30 @@ No real metadata
 or private reference comparison has run, no trims/new mapping are implemented,
 and no full Dolby, compositor pass-through or optical acceptance is claimed.
 Private reference absence does not block this stage-1 implementation handoff.
+
+## Official reference restoration and post-reshape entry (2026-10-13)
+
+The old official reference corpus was lost from temporary storage; its historical
+receipt is not a present artifact. A new bounded private CPU-only official-tool
+workflow has generated authentic CM4 analysis and six frames each for panel616,
+300-nit BT.2020 and 600-nit BT.2020. Tools and outputs remain private and durable;
+1000-nit same-master-peak refusal, temporal analysis context, generated L2/L3/L9
+and missing L8 are explicitly retained. No neutral metadata/trim/RPU substitute
+was authored. See [restoration](HDR_REFERENCE_CORPUS.md#restoration-checkpoint-2026-10-13).
+
+The [harness schema-2 entry](DOLBY_HARNESS.md#official-analysis-post-reshape-interface-schema-2)
+accepts genuine official XML plus a bound whole-sequence provenance manifest,
+recomputes exact selected frame/shot L1 and passes normalized maximum/average to
+the existing libplacebo slots as `dolby-xml-l1-direct-v1`. It does not perform or
+claim consumer Profile5/8 reshaping. This is not a claim of physical CIE-Y analysis
+or full CM4: L1 minimum/L2/L3/L8 are unimplemented. Their omission can contribute
+to differences against the full official renderer; later mapping must measure,
+not assume, agreement. Original schema-1 consumer contracts remain unchanged.
+
+The Python-only source extension and protected corpus are implemented, with
+unchanged C/ELF/compiler inputs reused. Complete-candidate independent review and
+one affected qualification batch are pending. Only after those gates does the
+original baseline resume actual numerical comparisons. Consumer real-content
+reshaping, later trims, preferred-description handoff, optical acceptance and
+the broader programme remain open; synthetic reference restoration replaces
+none of those milestones.

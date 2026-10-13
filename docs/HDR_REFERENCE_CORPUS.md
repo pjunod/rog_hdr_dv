@@ -87,3 +87,34 @@ processing details, outputs and numerical comparisons remain private. This
 establishes a reference workflow, not a real-time playback processor, creative
 trim qualification or measured panel accuracy. [Status](STATUS.md) records the
 current acceptance boundary.
+
+## Restoration checkpoint (2026-10-13)
+
+The historical experiment above is an inherited receipt, not an available
+corpus: its only known Mac temporary directory was lost. The explicitly
+authorized restoration uses a new private durable lane, not that old receipt.
+The unchanged reviewed generator produced six 192×108, 24/1-fps source TIFFs.
+Official Linux tools 5.6.4 ran unprivileged, CPU-only, in the existing offline
+native x86_64 builder, with no GPU, display, activation network or host install.
+CM Analyze generated genuine CM4 longplay metadata; Metafier validation passed.
+No RPU, coefficients or trims were supplied by hand.
+
+CM Offline produced six references each for the declared panel target
+(616 cd/m², 0.0004 black, firmware-declared primaries), a documented custom
+300 cd/m² BT.2020 target and preset 28 (600 cd/m² BT.2020). Preset 49 at
+1000 cd/m² was refused because it equals the mastering display's peak;
+that failure is retained and does not count as reference coverage. No bypass,
+identity substitute or rerun of successful targets was used. The original
+analysis also contains tool-generated L2/L3/L9, but no L8; the official
+validation's missing-L8 warning and rounded-aspect-ratio warning remain explicit.
+Output encoding was explicitly full-range PQ BT.2020 RGB, distinct from the
+custom physical target gamut.
+
+Original TIFFs, XML, command vectors, tool/analysis/source/frame hashes and logs
+are preserved privately in a verified durable archive and extracted directory,
+outside Git. Explicit unsigned RGB16-code normalization to RGB-f32le changes
+storage only, not gamut, PQ transfer, exposure, geometry or ICC processing.
+This is new authentic reference generation, not yet open-renderer agreement.
+The separately reviewed post-reshape interface and its affected qualification
+remain pending; numerical baseline, consumer-RPU reshaping, L8/creative trims
+and optical acceptance are not established by these official renders.
