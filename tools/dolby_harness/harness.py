@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Headless renderer front end and strict private-reference comparison CLI."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+from tools.dolby_harness.contracts import (ENCODING, alignment, input_manifest,
+                                         pixels, result_manifest)
+from tools.dolby_harness.metric import compare_pixels
+
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def control(obj, metadata):
+    f, s, t = obj['frame'], obj['source'], obj['target']
+    values = ['DVH1', f['width'], f['height'],
+              ('rgb', 'bt2020nc', 'dolbyvision').index(s['system']),
+              ('full', 'limited').index(s['range']), s['bit_depth']]
+    for vol in (s['mastering'], t):
+        values += [vol['min_nits'], vol['max_nits'], *vol['primaries']]
+    values += [metadata['max_pq_y'] if metadata else 0,
+               metadata['avg_pq_y'] if metadata else 0]
+    if metadata:
+        values += metadata['nonlinear_offset']
+        for matrix in ('nonlinear', 'linear'):
+            values += [x for row in metadata[matrix] for x in row]
+        for comp in metadata['comp']:
+            values += [len(comp['pivots']), *comp['pivots']]
+            for seg in comp['segments']:
+                if seg['method'] == 'polynomial':
+                    values += [0, *seg['coefficients']]
+                else:
+                    values += [1, seg['order'], seg['constant']]
+                    values += [x for row in seg['coefficients'] for x in row]
+    return ' '.join(str(x) for x in values) + '\n'
+
+
+def render(manifest, native, output):
+    obj, source, metadata = input_manifest(manifest)
+    output = Path(output).resolve()
+    native = Path(native).resolve(strict=True)
+    if output.exists():
+        raise ValueError('output directory already exists; never overwrite a receipt')
+    output.parent.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix='.harness-', dir=output.parent))
+    try:
+        # Snapshot verified inputs, not a second unchecked open by the renderer.
+        shutil.copyfile(source, stage / 'source.f32')
+        if sha(stage / 'source.f32') != obj['frame']['input']['sha256']:
+            raise ValueError('source changed while staging')
+        (stage / 'control.txt').write_text(control(obj, metadata))
+        env = os.environ.copy()
+        env['VK_DRIVER_FILES'] = '/usr/share/vulkan/icd.d/lvp_icd.json'
+        env['VK_ICD_FILENAMES'] = env['VK_DRIVER_FILES']
+        env['LP_NUM_THREADS'] = '2'
+        with (stage / 'native.stdout').open('wb') as out, (stage / 'native.stderr').open('wb') as err:
+            proc = subprocess.run([str(native), str(stage / 'control.txt'),
+                                   str(stage / 'source.f32'), str(stage / 'output.f32')],
+                                  env=env, stdout=out, stderr=err, timeout=180)
+        if proc.returncode:
+            raise ValueError('native renderer failed (exit ' + str(proc.returncode) + ')')
+        pixels(stage / 'output.f32', obj['frame']['width'], obj['frame']['height'])
+        receipt = {'schema': 1, 'role': 'candidate', 'alignment': alignment(obj),
+                   'encoding': ENCODING,
+                   'output': {'file': 'output.f32', 'sha256': sha(stage / 'output.f32')},
+                   'provenance': {'implementation': 'libplacebo-7.360.1-baseline',
+                                  'native_sha256': sha(native),
+                                  'control_sha256': sha(stage / 'control.txt'),
+                                  'stdout_sha256': sha(stage / 'native.stdout'),
+                                  'stderr_sha256': sha(stage / 'native.stderr'),
+                                  'device': (stage / 'native.stdout').read_text().strip(),
+                                  'peak_detection': False, 'dithering': False,
+                                  'scaling': False, 'trims': 'not implemented'}}
+        (stage / 'candidate.json').write_text(json.dumps(receipt, indent=2, allow_nan=False) + '\n')
+        (stage / 'source.f32').unlink()
+        os.rename(stage, output)
+        return output / 'candidate.json'
+    except Exception as exc:
+        # Retain actual failed compiler/runtime diagnostics privately, no fake output.
+        raise ValueError(str(exc) + '; retained diagnostics: ' + str(stage)) from exc
+
+
+def compare(candidate, reference):
+    a, pa = result_manifest(candidate)
+    b, pb = result_manifest(reference)
+    if a['role'] != 'candidate' or b['role'] != 'reference':
+        raise ValueError('candidate and reference roles required')
+    if a['alignment'] != b['alignment']:
+        raise ValueError('source/metadata/target/frame alignment mismatch')
+    return {'schema': 1, 'metric': 'ITU-R BT.2124-0 Annex 1 deltaE_ITP',
+            'alignment': a['alignment'], 'encoding': ENCODING,
+            'candidate_sha256': a['output']['sha256'],
+            'reference_sha256': b['output']['sha256'],
+            'statistics': compare_pixels(pa, pb),
+            'scope': 'software pixels only; no certification or optical acceptance'}
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__)
+    sub = p.add_subparsers(dest='command', required=True)
+    r = sub.add_parser('render')
+    r.add_argument('manifest')
+    r.add_argument('--native', required=True)
+    r.add_argument('--output', required=True)
+    c = sub.add_parser('compare')
+    c.add_argument('candidate')
+    c.add_argument('reference')
+    c.add_argument('--report', required=True, help='private report path; numerical comparisons never print')
+    args = p.parse_args()
+    try:
+        if args.command == 'render':
+            print(render(args.manifest, args.native, args.output))
+        else:
+            report = compare(args.candidate, args.reference)
+            # Exclusive create; preserve every existing private comparison.
+            with Path(args.report).open('x') as out:
+                out.write(json.dumps(report, indent=2, allow_nan=False) + '\n')
+            print('Comparison saved privately to requested report path')
+    except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
+        print('Harness error: ' + str(exc), file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
