@@ -115,9 +115,13 @@ def dovi_metadata(base, obj, frame):
     data = load_json(export)
     if hashlib.sha256(export.read_bytes()).hexdigest() != obj['export']['sha256']:
         raise ValueError('metadata changed while loading')
-    keys(data, 'schema nonlinear_offset nonlinear linear comp max_pq_y avg_pq_y')
+    keys(data, 'schema profile residual_disabled bl_bit_depth nonlinear_offset nonlinear linear comp max_pq_y avg_pq_y')
     if type(data['schema']) is not int or data['schema'] != 1:
         raise ValueError('unknown parsed metadata schema')
+    integer(data['profile'], 5, 8)
+    if data['profile'] not in (5, 8) or data['residual_disabled'] is not True:
+        raise ValueError('only Profile5/8 residual-disabled metadata is supported')
+    integer(data['bl_bit_depth'], 8, 16)
     floats(data['nonlinear_offset'], (3,))
     floats(data['nonlinear'], (3, 3))
     floats(data['linear'], (3, 3))
@@ -127,15 +131,15 @@ def dovi_metadata(base, obj, frame):
         raise ValueError('three reshape components required')
     for comp in data['comp']:
         keys(comp, 'pivots segments')
-        if not isinstance(comp['pivots'], list) or not 2 <= len(comp['pivots']) <= 9:
-            raise ValueError('2..9 pivots required')
+        if not isinstance(comp['pivots'], list) or len(comp['pivots']) not in (0, 2, 3, 4, 5, 6, 7, 8, 9):
+            raise ValueError('0 or 2..9 pivots required')
         pivots = floats(comp['pivots'], (len(comp['pivots']),), 0, 1)
         if any(a >= b for a, b in zip(pivots, pivots[1:])):
             raise ValueError('strictly increasing pivots required')
         native_pivots = [struct.unpack('<f', struct.pack('<f', x))[0] for x in pivots]
         if any(a >= b for a, b in zip(native_pivots, native_pivots[1:])):
             raise ValueError('pivots collapse at native float32 precision')
-        if not isinstance(comp['segments'], list) or len(comp['segments']) != len(pivots) - 1:
+        if not isinstance(comp['segments'], list) or len(comp['segments']) != max(len(pivots) - 1, 0):
             raise ValueError('reshape segment count mismatch')
         for seg in comp['segments']:
             if not isinstance(seg, dict):
@@ -202,6 +206,8 @@ def input_manifest(path):
     metadata = None
     if s['system'] == 'dolbyvision':
         metadata = dovi_metadata(Path(path).parent, obj['metadata'], f)
+        if metadata['bl_bit_depth'] != s['bit_depth']:
+            raise ValueError('RPU base-layer bit depth/source normalization mismatch')
     elif obj['metadata'] is not None:
         raise ValueError('metadata requires explicit dolbyvision interpretation')
     return obj, p, metadata

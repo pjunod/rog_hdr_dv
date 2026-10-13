@@ -69,8 +69,14 @@ as a baseline limitation, not a measurement of zero black.
 
 The exported schema-1 JSON fields map directly to `pl_dovi_metadata` in the
 7.360.1 public header: `nonlinear_offset` [3], row-major `nonlinear` and `linear`
-[3][3], and three `comp` objects. Each component has 2..9 strictly increasing
-normalized `pivots` and one fewer `segments`. Polynomial segments carry `method`
+[3][3], and three `comp` objects. The export also records actual RPU `profile`
+(5 or 8), `residual_disabled: true` and `bl_bit_depth` matching source bit depth;
+the baseline adapter only enables this path when residuals are disabled. Source
+mastering minima/maxima must be the actual header source_min/max_pq converted
+from /4095 PQ to cd/m², as the upstream adapter does. Each component has 2..9
+strictly increasing normalized `pivots` and one fewer `segments`, or zero pivots
+and zero segments if the real parser reports no reshaping for that channel.
+Polynomial segments carry `method`
 `polynomial` and three coefficients in x^0/x^1/x^2 order (unused coefficient
 zero supplied by the real parser). MMR segments carry `method` `mmr`, order
 1..3, constant, and [order][7] coefficients. Coefficients are already normalized
