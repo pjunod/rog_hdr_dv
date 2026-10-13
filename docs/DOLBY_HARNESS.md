@@ -1,6 +1,6 @@
 # Stage-1 headless display-management harness
 
-Status: **fixture correction derived; independent correction review and failed-only retry pending**.
+Status: **source reviewed; public software harness qualified**.
 The native API prerequisite compiled before C/build edits; the complete C
 consumer compiled/linked with warnings as errors, zero diagnostics. Python
 contracts/metric/CLI and all 27 regression methods were executed once after
@@ -9,12 +9,14 @@ Astra approved corrected `2ab8332` / tree `69c59f2`. The result was **26 passed,
 unchanged native consumer/build inputs and passing ELF, with new Python source
 bindings in the [correction receipt](../evidence/dolby-harness-corrections.json).
 All native rendering/range/depth/target/gamut/minimum/provenance/negative-input
-methods passed. `MetricTests.test_annex4_public_vector` failed: its rounded
-informative Annex-4 I value 0.3554 differs from computed 0.3557205250540528
-by more than its 0.0001 tolerance. Qualification is **not complete**. The independent
-high-precision derivation below supports a fixture-only correction, not a change
-to the production metric. Review that correction, then retry only the failed
-selection. Do not repeat the 26 passes or treat this source correction as a pass.
+methods passed. The sole initial failure was independently reconciled against
+normative BT.2124 arithmetic, corrected without changing production code and
+approved by Astra. The **one failed-only retry passed** on corrected `64e8949`
+/ tree `dc816dd`; all **27 required methods now have valid passing receipts**,
+with 25 retained passing subtests. The 26 successes were not repeated: their
+original execution identities remain explicit under reviewed source equivalence.
+The [final qualification receipt](../evidence/dolby-harness-qualified.json)
+binds the actual retry and every retained method. No renderer or compiler reran.
 The [actual first-batch receipt](../evidence/dolby-harness-qualification-attempt1.json)
 retains their executing identities; it does not relabel passes onto future trees.
 This is the first stage of [the open track](OPEN_DV_DISPLAY_MANAGEMENT.md),
@@ -102,8 +104,8 @@ records the following pinned libplacebo behaviors:
   falls back to mastering/color-space baseline metadata, not fabricated L1.
   The receipt records requested values, native float32 values and recognition.
 
-These are source-verified semantics, not new executed rendering receipts.
-The deferred public positive-min case compares zero/positive declarations and
+These are source-verified semantics with public metadata-free qualification.
+The passing public positive-min case compares zero/positive declarations and
 rejects a fabricated 0.0004 black-floor claim. No synthetic RPU is needed.
 
 ### Private parsed metadata contract
@@ -196,7 +198,8 @@ device/version/options log is separately hash-bound.
 This detects changed inputs/resolution around the invocation in the controlled
 owned builder; it is not a signature/authentication scheme or protection against
 hostile concurrent mutation of the compiler/runtime. New verification code is
-written/syntax-compiled here, **not runtime-qualified** until the gated batch.
+written/syntax-compiled before review, then **runtime-qualified** by the single
+approved public batch. Its retained receipts bind the original executing source.
 
 ## Metric
 
@@ -266,28 +269,31 @@ are unchanged. AST equivalence excluding this one method and SHA256 equivalence
 of all eight production inputs are recorded in the
 [static correction receipt](../evidence/dolby-harness-vector-correction.json).
 
-Pending independent Astra review `t_a844cca4` must decide retention and retry.
-The proposal retains the 26 actual passes and 25 actual passing subtests at
+Astra review `t_a844cca4` approved exact corrected `64e8949` / tree `dc816dd`
+and retention of the 26 actual passes and 25 actual passing subtests at
 their original executing `2ab8332` / tree `69c59f2`: the changed method is never
 called by those selections, and its local expected tuple has no module/global,
 shared fixture or production effect. Do not relabel them onto the new source
 tree. The successful compile remains applicable to unchanged C/build/dependency
 bytes; no compiler or renderer rerun is warranted for this correction.
 
-After review approval only, existing qualification `t_dcc3a830` should run from
-the exact corrected source in its isolated lane:
+After that approval and an explicit integration mailbox grant, qualification
+`t_dcc3a830` ran exactly this selection once from the corrected source in a new
+isolated native snapshot:
 
 ```bash
 PYTHONPATH=tests python3 -B -m unittest test_dolby_harness.MetricTests.test_annex4_public_vector -v
 ```
 
 This command imports the harness normally but invokes no native renderer.
-The proposed qualification platform remains native x86_64 Linux in the existing
+The qualification platform was native x86_64 Linux in the existing
 lane: Python execution there still requires the fixed `.peer-linux/run.py`
 wrapper and negotiated mailbox ownership, not a renderer rebuild or probe.
-No successful selection is invalidated by the fixture-only edit. Final
-qualification still needs this real passing retry and the reviewed retention
-receipt; neither is claimed by the builder.
+No successful selection was invalidated by the fixture-only edit. The actual
+retry returned exit 0, `Ran 1 test`, `OK`, with all nine source hashes equal
+before and after. Python 3.14.8 and its binary hash, the exact argv/environment,
+logs and exit are bound in the final receipt. Historical runtime bindings remain
+historical; no renderer/runtime probe or recompile occurred for this metric retry.
 
 ## Source and public inputs
 
@@ -309,7 +315,7 @@ Apache-2.0 notices in the private dependency stash. The implementation does not
 vendor or relicense libplacebo/Khronos source; [repository terms](../LICENSES.md)
 remain unchanged for original utility code.
 
-## Build and deferred validation
+## Build and qualified validation
 
 Native API baseline request `724a9edda55240cca112d7ced905ba05` passed before
 production C/build edits. Completed candidate request
@@ -414,3 +420,48 @@ lane. Only the sanitized public-synthetic receipt is committed. Programme-wide
 status remains integration-owned. Genuine Dolby metadata/private agreement,
 mapping/trims, preferred-description handoff and optical acceptance remain
 separate unmet milestones; passing public native renders do not qualify them.
+
+### Final public qualification and downstream handoff (2026-10-13)
+
+All 27 method requirements are satisfied: 26 actual method passes and 25 actual
+subtest passes retain executing HEAD
+`2ab8332c7f1638741620347729352f32b9c0c241`, tree
+`69c59f253a54240859ea166f4b7cd2a9b4fa4c5c`; one corrected metric method passed
+at HEAD `64e894901dfdf7670962c577599fafa936ed4802`, tree
+`dc816dd1084eaff9b77bb0bee3183323f286f3dc`. Astra independently verified
+unchanged production and whole-module AST equality outside that isolated,
+uncalled failed method. This is applicability of actual earlier passes, not
+execution of all tests on the corrected tree. The original failed assertion is
+preserved, not erased. The expected tuple comes from two independently arranged
+high-precision normative derivations; tolerance tightened to 1e-12.
+
+The failed-only retry used fresh Python 3.14.8 (Ubuntu GCC 15.3.0), interpreter
+SHA256 `6afce98b1e5ce89dc1c5dfca9672276a9486bc318855c7554cbe6da62d073e10`.
+Native request `76ed256ca45346e4926039b6cf653903` returned exit 0; selected-test
+process wall time was 0.09319043159484863 seconds. Stderr SHA256 is
+`376b881a738fc12dc4659571f6cc79b0445c2fb10b516e34b2e9cac5b5913849`;
+stdout is empty. The raw retry receipt SHA256 is
+`01cc37a45eddd32e7d9e8acbeb0fcf2a7adc982cdcb2feee5273c9c6e233f52c`.
+Static delivery verification compared all 563 first-batch archive regular files
+and all 562 receipt-bound hashes (555 event artifact files, plus seven retained
+execution/source/observer files). Original source, runtime, compiler and ELF
+evidence are preserved. One batch and one failed-only retry occurred in total.
+
+The private collaboration delivery contains the complete source bundle/archive,
+the reused native ELF/compile receipt and the already-generated public
+metadata-free fixture. Use the render/compare commands above from this corrected
+source, not the obsolete candidate1 Python directory. For the preserved native
+builder, `HDR_HARNESS_NATIVE` is
+`/work/hdr-nativehdr10-20261011/dolby-harness-t_8c7a6c12/build/candidate1/headless-render`;
+the matching prefix and runtime closure stay read-only. New native calls still
+require the fixed wrapper and explicit mailbox coordination. No extra smoke
+render is requested simply to repeat passing qualification.
+
+Baseline worker `t_041c7d41` must now locate the actual protected corpus and
+reference manifests, then supply matched decoded frames, real parsed metadata
+and original RPU hashes for genuine reference comparisons. The public software
+receipt is not private Dolby agreement. Mapping/trims worker `t_c2f72953` remains
+gated on that baseline: no fabricated metadata or guessed curve is authorized
+by this qualification. Programme status is integration-owned; PR16 stays held,
+and no publication, device/Apple TV, installation or physical acceptance occurs
+in this handoff.

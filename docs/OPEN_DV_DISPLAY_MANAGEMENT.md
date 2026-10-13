@@ -122,11 +122,15 @@ requested/effective semantics (PQ ignores all minima, Dolby RPU owns range,
 zero L1 falls back), per-invocation source/ELF/runtime and comparison identities,
 and stronger public coverage. The passing native ELF is retained because C/build
 inputs are unchanged. Astra independently approved corrected `2ab8332` / tree
-`69c59f2`; qualification ran all **27 actual regression methods once**: **26 passed,
-1 failed, no skips**, with 25 passing subtests. All native renderer cases passed;
-the informative Annex-4 metric-vector expectation requires independent arithmetic
-reconciliation, correction review and failed-only retry before stage-1 qualification
-is complete. See the [source-bound receipt](../evidence/dolby-harness-qualification-attempt1.json).
+`69c59f2`; qualification ran all **27 actual regression methods once**: initially
+**26 passed, 1 failed, no skips**, with 25 passing subtests. All native renderer
+cases passed. Independent normative arithmetic reconciliation and Astra review
+approved fixture-only correction `64e8949` / tree `dc816dd`; the sole failed metric
+selection then passed its one native Linux retry. **Stage-1 public software
+qualification is complete: all 27 method requirements have valid passing
+receipts**, retaining the original 26 execution identities rather than rerunning
+or relabelling them. See the [initial receipt](../evidence/dolby-harness-qualification-attempt1.json)
+and [final retained/retry ledger](../evidence/dolby-harness-qualified.json).
 No real metadata
 or private reference comparison has run, no trims/new mapping are implemented,
 and no full Dolby, compositor pass-through or optical acceptance is claimed.
