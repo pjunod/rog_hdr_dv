@@ -61,6 +61,8 @@ the base EDID gamut in the native SDR mode, for general availability.
 [Open RPU-aware display management](docs/OPEN_DV_DISPLAY_MANAGEMENT.md) is the
 generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
+[Headless stage-1 harness](docs/DOLBY_HARNESS.md) provides the compiled baseline
+consumer and BT.2124 comparison contract; adversarial review and units are pending.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides, and
 records their implementation as Mutter patches 0050–0077, pinned at native
