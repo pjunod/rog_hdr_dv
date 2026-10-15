@@ -1,11 +1,15 @@
 # Authored-master baseline adapter
 
-Status (2026-10-15): implemented and native consumer compiled. Independent review
-found a compile-input hash type error and unbounded result-output reads; both
-are corrected in source, with re-review and coordinator-routed validation pending.
-This is a bounded source/transport prerequisite, not recovery of full Dolby
-mapping or numerical acceptance. [Harness](DOLBY_HARNESS.md) schema1/2 and DVH1
-remain distinct. No library, player, compositor or metric equations change.
+Status (2026-10-15): the original frame0 adapter passed independent review and
+its 40 selected units; 31 historical passes were retained. Its actual full-raster
+comparison FAILED unchanged limits (mean10.742194879314294,
+p9510.745346596543353 versus mean≤1/p95≤3). A separate isolated follow-up now
+implements explicit nonzero-frame reference binding and has acquired exactly one
+ordinary authentic frame256/target27 reference. Source review and affected-only
+validation of that follow-up remain pending; no frame256 candidate/comparison or
+unit batch has run. This is not recovery of full Dolby mapping or numerical
+acceptance. [Harness](DOLBY_HARNESS.md) schema1/2 and DVH1 remain distinct.
+No library, player, compositor or metric equations change.
 
 ## Why a third interface
 
@@ -22,11 +26,16 @@ Producer publication binds P3D65/PQ/full; absent EXR transfer/chromaticity tags
 are not a licence to assume scene-linear. A mastering peak4000nit does not
 change PQ's10000nit signal scale.
 
-The only acquired source frame is almost uniform near black. Any later passing
-full-raster comparison is an alignment/black-region baseline only. It cannot
-establish representative trim, highlight or chroma coverage, held-out agreement,
-consumer CM selection, Windows/OEM equality, calibrated colour or optical
-acceptance. No more frames or vendor executions are authorized by this card.
+The original frame0 is almost uniform near black. Its comparison is a failed
+black-region baseline, not evidence to fit or tune equations. The follow-up chose
+frame256 a priori as the integer midpoint of the first 512-frame shot, before
+inspecting its pixels/reference. Its genuine source has spatial/chromatic
+variation (maximum PQ0.467529296875), not demonstrated highlight/full-content
+coverage. Neither case establishes held-out agreement, consumer CM selection,
+Windows/OEM equality, calibrated colour or optical acceptance. The one ordinary
+reference uses unchanged authentic source/metadata and unmodified tools; there
+is no metadata perturbation, synthetic vendor input, operator-identification
+sweep or new authorization for additional vendor calls.
 
 ## Schema3 contracts
 
@@ -64,11 +73,40 @@ The sparse source manifest has exactly `schema kind source width height
 edit_rate frames provenance`, schema3, kind `sparse-authored-master`, rational
 positive `edit_rate={num,den}` and at most64 actual acquired entries. Each frame
 has `index original normalized`, with unique nonnegative original indices and
-bound file envelopes. The acquired case has exactly entry0, not the XML duration
-and not a claimed complete sequence. Selected normalized bytes must equal the
+bound file envelopes. The original case has exactly entry0; the nonzero case has
+exactly entry256, never a renamed entry0. Neither is the XML duration or a claimed
+complete sequence. Selected normalized bytes must equal the
 input frame hash. Every supplied original EXR is independently decoded and
 compared sample-for-sample against its normalized bytes. Rate/timecode fields
-present in the original storage header are separately checked.
+present in the original storage header are retained as independent facts. Rate
+is checked against the sparse manifest/XML. Frame0 retains its established
+zero-timecode check. The nonzero original timecode bytes `1604000000000000`
+are preserved, not assigned an invented encoded-timecode interpretation.
+
+## Versioned ordinary-reference receipts
+
+`hdr.sparks-source-associated-reference.v1` retains its implicit original index0,
+PTS0/1 and rate60000/1001. It cannot be relabelled as a nonzero reference.
+`hdr.sparks-source-associated-reference.v2` adds required
+`frame_binding={index,pts:{num,den},rate:{num,den}}`: index and PTS numerator are
+nonnegative integers, rate numerator and both denominators positive integers.
+Exact JSON types/keys and exact index/PTS/rate equality with the validated sparse
+manifest, selected XML frame and original storage are required. For frame256 the
+binding is index256, PTS8008/1875, rate60000/1001.
+
+Both versions preserve original EXR/XML and byte-identical declaration rollback,
+source association, physical target, actual tool/runtime identities and bounded
+hash-checked log snapshots. The selected original must match `originals[0]` and
+the single exact `-f` argument. Actual source/output patterns must resolve to the
+bound native identities/output, not an output renamed to frame0. v2 also requires
+unique, exact normal Source/Destination/Src Info/Dst Info/Frames fields and the
+selected frame's metadata log. Changed, missing, duplicate or contradictory
+fields are rejected; decoder/container defaults do not supply signal authority.
+Original validation and target inspection are retained only on unchanged XML,
+tool and runtime identities, not rerun for the same bytes. Actual Src Info24fps,
+explicit60000/1001 override and Dst Info59.94fps remain a documented discrepancy,
+not a claim of retiming or an inferred named CM. AlgorithmVersions0,0 and
+`selected_cm_name=null` are unchanged; this is not CM2.9/rawRPU/L8 proof.
 
 Sparse provenance has exactly `publication acquisition conversions authority`:
 the first two are bound retained producer-association/acquisition receipts,
@@ -178,23 +216,35 @@ normal validation/target/render log snapshots. It does not infer CM selection
 from a pipeline timing label or a decoder's container defaults.
 
 After independent review/fixes, coordinator recovery alone routes the one affected
-unit batch and the one original frame0 candidate comparison. The private task
-handoff supplies the exact input, prefix/ELF, proposed test IDs and per-ID retention
+unit batch and one original frame256 candidate comparison. The completed frame0
+render, successful units and failed comparison are not repeated. The private task
+handoff supplies exact input, prefix/ELF, proposed test IDs and per-ID retention
 rationale; it is not a passing receipt. Set `TMPDIR` to durable task-owned storage,
 `PYTHONPATH=tests`, `HDR_HARNESS_NATIVE` to the new ELF, `HDR_AUTHORED_INPUT` to the
 real bound input, and existing schema2 corpus variables for the selected retained
 interface checks. Missing genuine fixtures are failures, not synthetic replacements.
-The revised proposal has40 selected methods (23 authored) and31 retained unchanged
-historical methods, with their actual executing identities and review262 retention
-rationale. Five new deferred regressions cover exact/short/oversize bounded reads,
+The original revised proposal's40 selected methods (23 authored) actually passed
+in execution273, alongside31 retained histories. The nonzero follow-up proposes
+only14 affected methods: eight invalidated historical authored methods and six
+new receipt methods, with63 other histories retained at their real executing
+identities. The private per-ID applicability manifest is the reviewable proposal,
+not a fresh passing receipt. Parser-file identity changes invalidate bound
+exports/results: regenerate current private exports and later candidate/reference
+results, never rewrite their historical parser/ELF/test receipts. The old
+exact/short/oversize bounded-read regressions cover
 output hash/domain checks and authentic candidate/reference result acceptance,
 compile/frontend/control/log tamper rejection and output-hash rejection. The
 small public storage controls contain no Dolby metadata or claimed render output.
+The six new definitions cover v1 compatibility, strict v2 frame/PTS/rate and
+malformed/duplicate rejection, actual nonzero reference acceptance and negative
+source/argv/log/output bindings using local rejection-only mutations. No mutated
+fixture is passed to an official tool. New positive reference tests require both
+the genuine v2 input and a regenerated v1 export (`HDR_AUTHORED_V1_INPUT`).
 
 Use `normalize_reference(manifest, immutable_reference_exr, new_private_directory)`
 only after the review gate. It reads and normalizes the already acquired reference,
-never invokes a vendor tool. Recovery's revised pending recipe normalizes that
-reference and renders the original candidate ONCE before the ONE unit process,
+never invokes a vendor tool. Recovery's next pending recipe normalizes the newly
+acquired reference and renders the original256 candidate ONCE before ONE unit process,
 so the genuine result tests can consume those actual artifacts without another
 render. Set `HDR_AUTHORED_CANDIDATE` and `HDR_AUTHORED_REFERENCE` to those result
 manifests. Then compare with the existing CLI; no metrics run inside the new tests.

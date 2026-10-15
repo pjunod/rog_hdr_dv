@@ -65,6 +65,9 @@ validated against Dolby's reference renderer.
 consumer and BT.2124 comparison contract; adversarial review and units are pending.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) separates sparse
 P3D65/PQ HALF/XML2.0.5 transport from unresolved trim processing and acceptance.
+Its isolated follow-up binds ordinary nonzero-frame references explicitly while
+preserving v1 frame0 receipts; the actual frame0 numerical failure remains and
+frame256 source review/affected validation are still pending, not Dolby parity.
 [Night Light and target overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) specifies
 Night Light in linear light for HDR and per-monitor target overrides, and
 records their implementation as Mutter patches 0050–0077, pinned at native

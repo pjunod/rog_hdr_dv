@@ -17,6 +17,28 @@ Source qualification is separate from package delivery and physical measurement.
 
 ### Isolated authored-master adapter (2026-10-15)
 
+Follow-up checkpoint: the reviewed frame0 recipe completed with40/40 selected
+units and31 retained histories, but numerical acceptance FAILED
+(mean10.742194879314294/p9510.745346596543353 versus unchanged1/3 limits).
+No equation or threshold was changed to fit that near-black frame. A separate
+owned branch now implements strict v2 nonzero-frame receipt binding while
+retaining v1; one ordinary authentic frame256/target27 reference was acquired
+with unchanged original metadata/declaration repair and exact256 output/log
+identity. Original/storage bytes were imported without re-download or decoding.
+All native compile inputs/ELF/runtime are unchanged; no rebuild was needed.
+Current: complete source/reference candidate ready for independent review;
+Python syntax and hash/AST applicability inspection passed, six new regressions
+remain unexecuted. Per-ID71-history applicability proposes14 affected methods
+and63 retained histories, not fresh unit passes.
+Remaining: source approval, then coordinator-routed one affected unit batch and
+one frame256 candidate/full-raster comparison. No new units/candidate/comparison
+have run, no namedCM/rawSOP/L8 or full-mapping/optical claim. The frame has real
+variation, not demonstrated highlight/full-content coverage. The earlier adapter
+notes below are historical implementation-phase evidence, not the current gate.
+
+Historical frame0 implementation checkpoint (superseded by the above execution
+and follow-up state):
+
 Done: verified the frozen source base and retained native compiler/header/runtime
 identities without rebuilding libraries; implemented schema3/DVH2 full-raster
 P3D65/PQ HALF, strict XML2.0.5/sparse association and storage-only decoder;
