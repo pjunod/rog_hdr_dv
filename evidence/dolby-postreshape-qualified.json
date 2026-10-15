@@ -1,0 +1,417 @@
+{
+  "schema": 1,
+  "task": "t_37f20cb3",
+  "status": "qualified-schema2-postreshape-software-and-baseline-input-handoff-only",
+  "reviewer": "hdr-astra",
+  "complete_review_task": "t_411cfab8",
+  "focused_closure_task": "t_5c5ab54b",
+  "focused_closure_report_sha256": "f3bc137219492b65f59445566d2c1545a973054c67f24a3d41e464ce65c67b54",
+  "focused_closure_verification_sha256": "3c7dcdddbaa43230800215c0eba9fea58f941a01538048822f2a43e7f76956d0",
+  "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+  "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+  "source_hashes": {
+    "tests/test_dolby_harness.py": "b629624ed98e6cbc9c694f33d3778cb0cd4b7db0b0bb26185983572c8988397e",
+    "tests/test_dolby_postreshape.py": "a17bbcd26e0e9494f5a9a1879b452138b10a77a968bb9078a5ce4d4ccd81b7fd",
+    "tools/dolby_harness/build.py": "41cc21f36d58d7e913351cd8706305d387e7efbee4eb464ed8a5bbc332effe29",
+    "tools/dolby_harness/contracts.py": "ac9ebc0c6158e0301370812d757083f8d0aa3fefb0edaea12cd031815c6a462b",
+    "tools/dolby_harness/dependencies.json": "520d52a44d1575a3f18b852bc106113117ecb8023a4d848768e782c3db8fa152",
+    "tools/dolby_harness/harness.py": "04723220f91c5a48b74e5d0f35d11aa44d0aafe94319a5b8bfc383b3786a62fd",
+    "tools/dolby_harness/headless_render.c": "11cf72cdb78320b35908eb82516d1310a8196cfe907a4458eb781d687831baf8",
+    "tools/dolby_harness/make_fixture.py": "b32b28f25142eee39e1bc1397d7f3a770ce054882c8b74c566ef26e55296868b",
+    "tools/dolby_harness/metric.py": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90",
+    "tools/dolby_harness/postreshape.py": "a6b4d99cdbf14e69cc57f0736a713d47d9efb5147027df5b05f99cadf1add95d",
+    "tools/dolby_harness/provenance.py": "f9bb6c96e7fa4c9918d82b225af86328a243b984e0af52dec3cc7b40b3758190"
+  },
+  "required_methods": 48,
+  "new_actual_method_passes": 32,
+  "new_postreshape_methods": 21,
+  "new_affected_schema1_methods": 11,
+  "retained_historical_methods": 16,
+  "new_subtest_passes": 43,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "retries": 0,
+  "new_unit_batches": 1,
+  "new_unit_command": [
+    "/usr/bin/python3",
+    "-B",
+    "-m",
+    "unittest",
+    "-v",
+    "test_dolby_postreshape.PostreshapeTests.test_genuine_frame_local_l1_and_boundaries",
+    "test_dolby_postreshape.PostreshapeTests.test_rgb_control_contains_l1_without_reshape",
+    "test_dolby_postreshape.PostreshapeTests.test_required_schema_stage_source_and_metadata",
+    "test_dolby_postreshape.PostreshapeTests.test_artifact_hash_and_missing_input",
+    "test_dolby_postreshape.PostreshapeTests.test_export_cannot_override_raw_l1_parser_or_mapping",
+    "test_dolby_postreshape.PostreshapeTests.test_exact_pts_and_sequence_association",
+    "test_dolby_postreshape.PostreshapeTests.test_duplicate_frame_rejected",
+    "test_dolby_postreshape.PostreshapeTests.test_missing_frame_l1_never_inherits_shot_l1",
+    "test_dolby_postreshape.PostreshapeTests.test_duplicate_selected_l1_rejected",
+    "test_dolby_postreshape.PostreshapeTests.test_missing_selected_frame_rejected",
+    "test_dolby_postreshape.PostreshapeTests.test_overlap_and_offset_boundary_rejected",
+    "test_dolby_postreshape.PostreshapeTests.test_namespace_multitrack_and_l9_rejected",
+    "test_dolby_postreshape.PostreshapeTests.test_frame_l9_override_rejected",
+    "test_dolby_postreshape.PostreshapeTests.test_harmless_utf8_reserialization",
+    "test_dolby_postreshape.PostreshapeTests.test_non_bt2020_encoding_rejected_with_matching_mastering_l9",
+    "test_dolby_postreshape.PostreshapeTests.test_bt2020_encoding_independent_of_mastering_l9",
+    "test_dolby_postreshape.PostreshapeTests.test_dtd_and_entities_rejected_before_parse",
+    "test_dolby_postreshape.PostreshapeTests.test_non_utf8_xml_rejected_without_declarations",
+    "test_dolby_postreshape.PostreshapeTests.test_missing_malformed_and_zero_l1_controls",
+    "test_dolby_postreshape.PostreshapeTests.test_genuine_metadata_native_execution_and_result_alignment",
+    "test_dolby_postreshape.PostreshapeTests.test_result_schema_stage_encoding_and_mapping_mixing",
+    "test_dolby_harness.ContractTests.test_valid_public_fixture",
+    "test_dolby_harness.ContractTests.test_source_interpretation",
+    "test_dolby_harness.ContractTests.test_unknown_duplicate_and_boolean",
+    "test_dolby_harness.ContractTests.test_no_fabricated_metadata",
+    "test_dolby_harness.ContractTests.test_reference_absent_misaligned_and_encoding",
+    "test_dolby_harness.ContractTests.test_identical_reference_statistics",
+    "test_dolby_harness.ContractTests.test_reference_identity_mismatch_table",
+    "test_dolby_harness.ContractTests.test_comparison_snapshot_and_implementation_provenance",
+    "test_dolby_harness.ContractTests.test_environment_and_frontend_tamper",
+    "test_dolby_harness.ContractTests.test_requested_effective_semantics_annotation",
+    "test_dolby_harness.ContractTests.test_native_provenance_rejects_elf_source_and_runtime_tamper"
+  ],
+  "native_request": "cb9941fc5e0b430f9348442254e3b84d",
+  "method_receipts": {
+    "test_dolby_postreshape.PostreshapeTests.test_genuine_frame_local_l1_and_boundaries": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_rgb_control_contains_l1_without_reshape": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_required_schema_stage_source_and_metadata": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_artifact_hash_and_missing_input": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_export_cannot_override_raw_l1_parser_or_mapping": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_exact_pts_and_sequence_association": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_duplicate_frame_rejected": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_missing_frame_l1_never_inherits_shot_l1": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_duplicate_selected_l1_rejected": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_missing_selected_frame_rejected": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_overlap_and_offset_boundary_rejected": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_namespace_multitrack_and_l9_rejected": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_frame_l9_override_rejected": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_harmless_utf8_reserialization": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_non_bt2020_encoding_rejected_with_matching_mastering_l9": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_bt2020_encoding_independent_of_mastering_l9": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_dtd_and_entities_rejected_before_parse": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_non_utf8_xml_rejected_without_declarations": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_missing_malformed_and_zero_l1_controls": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_genuine_metadata_native_execution_and_result_alignment": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_postreshape.PostreshapeTests.test_result_schema_stage_encoding_and_mapping_mixing": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_valid_public_fixture": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_source_interpretation": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_unknown_duplicate_and_boolean": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_no_fabricated_metadata": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_reference_absent_misaligned_and_encoding": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_identical_reference_statistics": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_reference_identity_mismatch_table": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_comparison_snapshot_and_implementation_provenance": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_environment_and_frontend_tamper": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_requested_effective_semantics_annotation": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_native_provenance_rejects_elf_source_and_runtime_tamper": {
+      "status": "pass",
+      "executing_head": "cbbf531725e09ca8c8351667d459109a95a1b33a",
+      "executing_tree": "84d8098872f208650434df6db12b137bc4736c79",
+      "receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b"
+    },
+    "test_dolby_harness.ContractTests.test_exact_byte_count_and_nonfinite": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_missing_and_wrong_hash": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_chromatic_bt2020nc_full_limited_depths": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_cpu_render_alignment_and_repeatability": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_limited_10bit_rgb": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_narrow_gamut_preserves_encoding": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_positive_min_is_ignored_baseline": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_rejects_controls_and_pixels_without_output": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_native_target_peak_mapping": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.ContractTests.test_target_validation": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.MetricTests.test_achromatic_and_known_delta": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.MetricTests.test_invalid_metric_inputs": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.MetricTests.test_itp_weighting": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.MetricTests.test_pq_endpoints_and_roundtrip": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.MetricTests.test_summary_nearest_rank": {
+      "status": "pass",
+      "executing_head": "2ab8332c7f1638741620347729352f32b9c0c241",
+      "executing_tree": "69c59f253a54240859ea166f4b7cd2a9b4fa4c5c",
+      "receipt": "dolby-harness-qualification-attempt1.json",
+      "applicability": "Astra approved unchanged production and whole-module AST equality outside isolated failed method"
+    },
+    "test_dolby_harness.MetricTests.test_annex4_public_vector": {
+      "status": "pass",
+      "executing_head": "64e894901dfdf7670962c577599fafa936ed4802",
+      "executing_tree": "dc816dd1084eaff9b77bb0bee3183323f286f3dc",
+      "receipt": "failed-only-retry",
+      "applicability": "actual native x86_64 Linux fresh-interpreter execution"
+    }
+  },
+  "retention_grounds": "Astra verified source byte and AST equivalence for the16 retained historical methods; original executing heads/trees stay original, not relabelled as new executions",
+  "native": {
+    "architecture": "x86_64",
+    "elf_sha256": "14f23387883cbf3baaa29405b5e8be7d4ca580ca76da55c7a9992d5e7f37d84e",
+    "compile_receipt_sha256": "5e1b6a51f5191a22fcb91f3463914906393343bc8061894fe31110b76ce986d6",
+    "resolved_runtime_bindings_verified_before_and_after": 34,
+    "new_compiles": 0,
+    "genuine_schema2_positive": "passed: both native float32 L1 fields positive, exact official reference alignment and encoding; deliberately rejected before official metric",
+    "no_new_consumer_rpu_positives": true
+  },
+  "private_artifact_verification": {
+    "corpus_bound_files_verified": 113,
+    "input_reference_pairs_verified": 18,
+    "parsed_exports": 6,
+    "original_official_outputs_preserved": true,
+    "receipt_files_verified": 92,
+    "event_delta_files_verified": 83,
+    "inherited_corpus_file_bindings_verified": 2383,
+    "raw_qualification_receipt_sha256": "f461bb9024043445bbca8ab014ee36caf54a424240f050888650165d4bc5979b",
+    "private_evidence_archive_sha256": "05aff2af4014e9b500a3bf890c4da47939eb9851311ce1d2ae580f15552fafb1",
+    "artifacts_public": false
+  },
+  "environment": "Durable task-owned HOME/XDG_CONFIG_HOME/XDG_DATA_HOME/XDG_CACHE_HOME/TMPDIR/HDR_POSTRESHAPE_TMP; exact argv/cwd/environment/source/per-method receipts retained privately",
+  "official_tool_executions": 0,
+  "official_numerical_comparisons": 0,
+  "baseline_task": "t_041c7d41",
+  "baseline_route": "Use schema2 post-reshape plus genuine official XML/source_manifest/exports for this synthetic workflow; consumerRPU acceptance is separately outstanding",
+  "limits": [
+    "dolby-xml-l1-direct-v1 is normalized-field baseline translation, not proven photometric CIE-Y or consumerRPU equivalence",
+    "Raw L1 minimum/L2/L3/L8/frameL9 processing, full CM4, new mapping/trims, real-content reshaping, preferred-description handoff, optical/calibrated acceptance remain open",
+    "1000-nit same-master-peak refused; no bypass or fabricated metadata",
+    "No numerical agreement or certification claim",
+    "No devices/AppleTV/display/session/install/boot/credentials/publication/merge; PR16 remains held"
+  ],
+  "final_repository_integrity": "After final evidence/docs commit, recorded externally to avoid receipt-in-tree circularity"
+}
