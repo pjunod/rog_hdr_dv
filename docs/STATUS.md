@@ -23,8 +23,13 @@ comparisons FAILED the unchanged1/3 mean/p95 bar. Observation307 was independent
 reviewed308 and its nine new methods passed once310 on OLD307 source. Original
 final-linear bound exceedance remains a failure, not proof of a compiler defect.
 New [absolute-PQ SOP alternative](OPEN_ABSOLUTE_PQ_SOP.md) is written in isolated
-ABI364, preserving normalized arithmetic and old histories. Current: compile new
-whole batch, one authorized development render/comparison, independent review.
+ABI364, preserving normalized arithmetic and old histories. Done: native full/noDV
+whole-batch and matched consumer -Werror compilation, export replay, and ONE
+authorized development render/comparison. The new result FAILED unchanged limits:
+mean9.611271870503995/p9516.368383078915453 across8,847,360 pixels. No tuning.
+Current: independent whole-batch source/evidence review. Remaining: recovery-owned
+approved affected batch (3 new+5 invalidated Python methods and native dovi_dm),
+then semantic disposition. Six303 and77 baseline histories retain actual identities.
 New/invalidated units are deferred until after review. Full mapping is incomplete;
 this unqualified source is excluded from parallel merged Ubuntu packaging.
 

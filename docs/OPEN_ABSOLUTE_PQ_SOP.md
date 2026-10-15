@@ -1,7 +1,8 @@
 # OPEN absolute-PQ SOP alternative
 
-Status: implementation written; native whole-batch compilation and one development
-comparison pending. New/invalidated units are deferred until independent review.
+Status: implementation and native whole-batch compilation delivered. The single
+authorized development comparison FAILED unchanged mean/p95 limits. Independent
+whole-batch source/evidence review is next; new/invalidated units remain deferred.
 This isolated candidate is NOT merged, packaged, qualified, released or installed.
 It is excluded from the parallel merged-runtime Ubuntu packaging lane.
 
@@ -62,6 +63,38 @@ Actual nonzero chroma/detail remain unapplied with exact source strings;
 selected_cm_name is null. Public embodiment implementation and even a passing
 single development comparison would not establish full CM applicability,
 held-out/content/temporal/rawRPU/L8/Windows/OEM/optical acceptance.
+
+### Actual development result and compiler closure
+
+On committed source `98e0ce9` / tree `976781cc`, library `e9869a0` / tree
+`1d2f1187`, native full Vulkan/shaderc/DOVI and noDV builds each compiled125
+warnings-as-errors commands,14 deferred executables and60 C/C++ header units.
+The paired ABI364 consumer binds36 copied/generated headers,97 compiler
+dependencies and35 runtime closure entries, including the exact private library
+and CPU Vulkan ICD. Compilation is not unit/SPIR-V/pixel qualification.
+
+The first compiler receipt failed closed because upstream computes API version
+by dictionary key count: adding364 above362 yielded363. A reserved363 bookkeeping
+entry fixes that cause without importing any observer code. Initial output/logs
+remain retained; corrected ABI364 source was rebuilt and export replay matched.
+The appended patch SHA256SUMS was deliberately regenerated for this source fix.
+
+Exactly one new authentic frame256 variant3 render and one unchanged BT.2124
+comparison ran. Across all8,847,360 pixels: mean9.611271870503995,
+p9516.368383078915453, max26.04627366711356. Limits mean<=1/p95<=3 FAILED.
+Render19.64s; comparison103.16s; maximum comparator RSS3,627,640KiB, no swap.
+This is pre-review development evidence, not a passing acceptance or final
+qualification receipt. No fitting or model/threshold change followed this result.
+Original source/reference/control records and all prior303/289 failures remain.
+
+The affected proposal is3 new Python methods plus5 genuinely invalidated methods
+and the indivisible native `dovi_dm.c` scalar/GPU/cache executable. Six unchanged
+303 method histories and77 baseline histories retain their original identities;
+none is relabelled as a new-source pass. Recovery commissions that batch only
+after the independent whole-batch source/evidence review and any fixes.
+The [source/development receipt](../evidence/open-absolute-pq-source-phase.json)
+contains source/compiler identities, actual numerical failure and private archive
+hash. Large pixels and full compiler/runtime/log receipts remain private.
 
 Current source export: `wip/libplacebo-dm/absolute-pq/SOURCE.json` and appended
 patch against the exact existing library candidate. The old source pin/export
