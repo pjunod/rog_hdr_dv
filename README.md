@@ -63,6 +63,10 @@ generally available Dolby Vision track: player-side mapping from the RPU,
 validated against Dolby's reference renderer.
 [Headless stage-1 harness](docs/DOLBY_HARNESS.md) provides the compiled baseline
 consumer and BT.2124 comparison contract; adversarial review and units are pending.
+[OPEN XML205 diagnostic](docs/OPEN_XML205_CANDIDATE.md) adds isolated analytic
+PQ-Hermite L1 and explicitly hypothetical target-PQ SOP, with separate ABI362,
+DVH3 and source-bound receipts. It is in implementation/compiler preparation,
+not reviewed or unit/accuracy-qualified, and does not change the stock baseline.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) separates sparse
 P3D65/PQ HALF/XML2.0.5 transport from unresolved trim processing and acceptance.
 Its isolated follow-up binds ordinary nonzero-frame references explicitly while

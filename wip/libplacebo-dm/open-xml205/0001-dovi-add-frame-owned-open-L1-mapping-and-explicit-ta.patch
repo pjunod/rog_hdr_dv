@@ -1,0 +1,766 @@
+From 4a3889981f59200d65ac61b0c1e80d4dd7719d6c Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@example.invalid>
+Date: Tue, 13 Oct 2026 13:10:15 -0400
+Subject: [PATCH 1/3] dovi: add frame-owned open L1 mapping and explicit target
+ snapshots
+
+---
+ meson.build                                 |   1 +
+ src/dovi_dm.c                               | 114 ++++++++++++++
+ src/include/libplacebo/dovi_dm.h            |  88 +++++++++++
+ src/include/libplacebo/renderer.h           |   5 +
+ src/include/libplacebo/shaders/colorspace.h |   4 +
+ src/include/libplacebo/tone_mapping.h       |   2 +
+ src/include/libplacebo/utils/dovi_dm.h      | 162 ++++++++++++++++++++
+ src/meson.build                             |   4 +
+ src/renderer.c                              |   2 +
+ src/shaders/colorspace.c                    |  82 ++++++++--
+ src/tests/dovi_dm.c                         |  48 ++++++
+ src/tone_mapping.c                          |   4 +-
+ 12 files changed, 500 insertions(+), 16 deletions(-)
+ create mode 100644 src/dovi_dm.c
+ create mode 100644 src/include/libplacebo/dovi_dm.h
+ create mode 100644 src/include/libplacebo/utils/dovi_dm.h
+ create mode 100644 src/tests/dovi_dm.c
+
+diff --git a/meson.build b/meson.build
+index 7ba2219..71509ff 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '361': 'experimental frame-owned open Dolby DM and explicit average presence',
+       '360': 'add pl_d3d11_swapchain_params.{alpha,color}_bits',
+       '359': 'add pl_vulkan_swapchain_params.{alpha,color}_bits',
+       '358': 'add PL_COLOR_SYSTEM_YCGCO_{RE,RO}',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+new file mode 100644
+index 0000000..8c5b0d7
+--- /dev/null
++++ b/src/dovi_dm.c
+@@ -0,0 +1,114 @@
++/*
++ * This file is part of libplacebo.
++ * Copyright (c) 2026 HDR contributors
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ */
++#include <math.h>
++#include "common.h"
++#include <libplacebo/dovi_dm.h>
++
++static bool pq_valid(float v)
++{
++    return isfinite(v) && v >= 0.0f && v <= 1.0f;
++}
++
++enum pl_dovi_dm_status pl_dovi_dm_prepare(
++    const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
++    struct pl_tone_map_params *tone)
++{
++    if (!dm || !dm->version)
++        return PL_DOVI_DM_ABSENT;
++    if (dm->version != 1 ||
++        (dm->origin != PL_DOVI_DM_RPU && dm->origin != PL_DOVI_DM_OFFICIAL_XML) ||
++        dm->num_blocks < 0 || dm->num_blocks > PL_DOVI_DM_MAX_BLOCKS)
++        return PL_DOVI_DM_INVALID;
++    if (!dm->has_l1)
++        return PL_DOVI_DM_MISSING_L1;
++    if (!target || !tone || !pq_valid(dm->min_pq) || !pq_valid(dm->avg_pq) ||
++        !pq_valid(dm->max_pq) || dm->min_pq > dm->avg_pq ||
++        dm->avg_pq > dm->max_pq || !isfinite(target->min_luma) ||
++        !isfinite(target->max_luma) || target->min_luma < 0.0f ||
++        target->min_luma >= target->max_luma || target->max_luma > 10000.0f ||
++        !pl_primaries_valid(&target->prim))
++        return PL_DOVI_DM_INVALID;
++    if (dm->curve != PL_DOVI_DM_ST2094_10 && dm->curve != PL_DOVI_DM_SPLINE)
++        return PL_DOVI_DM_INVALID;
++
++    // Work on a copy so rejected optional data cannot poison the generic mapper.
++    struct pl_tone_map_params t = *tone;
++    t.function = dm->curve == PL_DOVI_DM_SPLINE ? &pl_tone_map_spline :
++                                                &pl_tone_map_st2094_10;
++    t.param = 0.0f; // use existing constants, not backwards-compat tuning knobs
++    pl_tone_map_params_infer(&t); // sanitize constants, then override inference
++    t.input_scaling = t.output_scaling = PL_HDR_PQ;
++    t.input_min = dm->min_pq;
++    t.input_avg = dm->avg_pq;
++    t.input_avg_present = true;
++    t.input_max = dm->max_pq;
++    t.output_min = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->min_luma);
++    t.output_max = fminf(dm->max_pq,
++        pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma));
++    // A source below the target black still maps to target black, not an
++    // inverted output interval. No inverse peak expansion is allowed.
++    t.output_max = fmaxf(t.output_min, t.output_max);
++    *tone = t;
++    return dm->min_pq == dm->max_pq ? PL_DOVI_DM_FLAT : PL_DOVI_DM_L1;
++}
++
++bool pl_dovi_dm_generate(float *out, const struct pl_tone_map_params *tone)
++{
++    if (!out || !tone || tone->lut_size < 2 ||
++        tone->input_scaling != PL_HDR_PQ || tone->output_scaling != PL_HDR_PQ ||
++        !pq_valid(tone->input_min) || !pq_valid(tone->input_avg) ||
++        !pq_valid(tone->input_max) || !pq_valid(tone->output_min) ||
++        !pq_valid(tone->output_max) || tone->input_min > tone->input_avg ||
++        tone->input_avg > tone->input_max || tone->output_min > tone->output_max ||
++        (tone->function != &pl_tone_map_spline &&
++         tone->function != &pl_tone_map_st2094_10))
++        return false;
++
++    if (tone->input_min == tone->input_max || tone->output_min == tone->output_max) {
++        float value = fminf(fmaxf(tone->input_max, tone->output_min), tone->output_max);
++        for (size_t i = 0; i < tone->lut_size; i++)
++            out[i] = value;
++        return true;
++    }
++
++    struct pl_tone_map_params fixed = *tone;
++    enum pl_hdr_scaling scaling = tone->function->scaling;
++    fixed.input_scaling = fixed.output_scaling = scaling;
++    fixed.input_min = pl_hdr_rescale(PL_HDR_PQ, scaling, tone->input_min);
++    fixed.input_avg = pl_hdr_rescale(PL_HDR_PQ, scaling, tone->input_avg);
++    fixed.input_max = pl_hdr_rescale(PL_HDR_PQ, scaling, tone->input_max);
++    fixed.output_min = pl_hdr_rescale(PL_HDR_PQ, scaling, tone->output_min);
++    fixed.output_max = pl_hdr_rescale(PL_HDR_PQ, scaling, tone->output_max);
++    for (size_t i = 0; i < tone->lut_size; i++) {
++        float w = (float) i / (tone->lut_size - 1);
++        float x = tone->input_min + w * (tone->input_max - tone->input_min);
++        out[i] = pl_hdr_rescale(PL_HDR_PQ, scaling, x);
++    }
++    // Do not call the generic generator: it re-infers a 100-nit source floor.
++    // Here both original curve and knee execute in their real declared units.
++    fixed.function->map(out, &fixed);
++    for (size_t i = 0; i < tone->lut_size; i++) {
++        if (!isfinite(out[i]))
++            return false;
++        float v = fminf(fmaxf(out[i], fixed.output_min), fixed.output_max);
++        out[i] = pl_hdr_rescale(scaling, PL_HDR_PQ, v);
++        if (!isfinite(out[i]) || (i && out[i] + 1e-6f < out[i-1]))
++            return false;
++    }
++    return true;
++}
++
++const char *pl_dovi_dm_status_name(enum pl_dovi_dm_status status)
++{
++    switch (status) {
++    case PL_DOVI_DM_ABSENT: return "absent";
++    case PL_DOVI_DM_MISSING_L1: return "missing-l1:ordinary-mapper";
++    case PL_DOVI_DM_INVALID: return "invalid:ordinary-mapper";
++    case PL_DOVI_DM_L1: return "open-l1:trims-not-applied";
++    case PL_DOVI_DM_FLAT: return "open-l1-flat:trims-not-applied";
++    }
++    return "unknown";
++}
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+new file mode 100644
+index 0000000..80acf7a
+--- /dev/null
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -0,0 +1,88 @@
++/*
++ * This file is part of libplacebo.
++ * Copyright (c) 2026 HDR contributors
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ */
++#ifndef LIBPLACEBO_DOVI_DM_H_
++#define LIBPLACEBO_DOVI_DM_H_
++
++#include <libplacebo/colorspace.h>
++#include <libplacebo/tone_mapping.h>
++
++PL_API_BEGIN
++
++// Experimental open display management, NOT Dolby's proprietary CM algorithm.
++// All values originate from matching real RPU or official post-reshape metadata.
++// The payload is copied by value with the frame; no borrowed AVFrame pointers.
++// Version zero means no DM and preserves the ordinary mapper byte for byte.
++enum pl_dovi_dm_origin {
++    PL_DOVI_DM_NONE,
++    PL_DOVI_DM_RPU,
++    PL_DOVI_DM_OFFICIAL_XML,
++};
++
++enum pl_dovi_dm_curve {
++    PL_DOVI_DM_ST2094_10, // existing rational curve/knee, with real NITS scaling
++    PL_DOVI_DM_SPLINE,   // diagnostic B: existing spline with explicit DM bounds
++};
++
++#define PL_DOVI_DM_MAX_BLOCKS 32
++struct pl_dovi_dm_block {
++    uint8_t level;
++    // Original decoded bitfields (not SOP coefficients). Format-specific
++    // adapters retain all repeated L2/L8/L10 records; never average raw codes.
++    uint16_t data[24];
++    // Exact FFmpeg-decoded chromaticity rationals for L9/L10 (x/y RGBW).
++    int32_t primaries[8][2];
++    // FFmpeg does not expose original optional L8 payload lengths. Unknown
++    // presence is not identity; retain the original RPU bytes in private audit.
++    bool optional_presence_known;
++};
++
++struct pl_dovi_dm_metadata {
++    uint32_t version; // 1, or 0 for absent
++    enum pl_dovi_dm_origin origin;
++    uint64_t stream_id, frame_id; // caller's stable content/sequence identity
++    bool has_l1; // min/average zero are present, not missing-value sentinels
++    float min_pq, avg_pq, max_pq; // normalized genuine L1, separate from CIE Y
++    struct pl_hdr_metadata source; // declarations, NOT signal encoding
++    uint8_t cm_version[2];
++    enum pl_dovi_dm_curve curve;
++    int num_blocks;
++    struct pl_dovi_dm_block blocks[PL_DOVI_DM_MAX_BLOCKS];
++};
++
++enum pl_dovi_dm_status {
++    PL_DOVI_DM_ABSENT,
++    PL_DOVI_DM_MISSING_L1,
++    PL_DOVI_DM_INVALID,
++    PL_DOVI_DM_L1,
++    PL_DOVI_DM_FLAT,
++};
++
++// Immutable preferred-volume snapshot captured for one output buffer. The
++// protocol object/tag is consumer-owned; this identity is NOT proof that the
++// compositor accepted the tag. An old-generation buffer must retain this
++// snapshot when newer feedback arrives. Zero black remains an explicit value.
++struct pl_dovi_dm_target {
++    uint32_t version; // 1, never infer absent fields from output encoding
++    uint64_t generation, description_id;
++    struct pl_hdr_metadata volume;
++};
++
++// Prepares explicit PQ bounds AFTER ordinary nominal-luma inference. Never
++// infer a 100-nit floor or source-average fallback for DM. Target is a complete
++// current physical-volume snapshot; output encoding remains separately owned
++// by the consumer. Unsupported trim blocks remain retained, NOT applied.
++PL_API enum pl_dovi_dm_status pl_dovi_dm_prepare(
++    const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
++    struct pl_tone_map_params *tone);
++
++// Uses original function->map and existing constants in its declared scaling,
++// returning false for a nonfinite/nonmonotone curve. No fitted coefficients,
++// substitute curve or invented metadata. Flat intervals are constant/clamped.
++PL_API bool pl_dovi_dm_generate(float *out, const struct pl_tone_map_params *tone);
++PL_API const char *pl_dovi_dm_status_name(enum pl_dovi_dm_status status);
++
++PL_API_END
++#endif
+diff --git a/src/include/libplacebo/renderer.h b/src/include/libplacebo/renderer.h
+index 18c0c5e..403481b 100644
+--- a/src/include/libplacebo/renderer.h
++++ b/src/include/libplacebo/renderer.h
+@@ -644,6 +644,11 @@ struct pl_frame {
+ 
+     // Ignored by libplacebo. May be useful for users.
+     void *user_data;
++    // Owned by value. Copy with the queued frame; clear on absent/bad metadata,
++    // seek or new stream. Source declarations never replace signal encoding.
++    struct pl_dovi_dm_metadata dovi_dm;
++    // Render-target snapshot captured before generic colorspace inference.
++    struct pl_dovi_dm_target dovi_target;
+ };
+ 
+ // Helper function to infer the chroma location offset for each plane in a
+diff --git a/src/include/libplacebo/shaders/colorspace.h b/src/include/libplacebo/shaders/colorspace.h
+index 7a1df4a..2da8324 100644
+--- a/src/include/libplacebo/shaders/colorspace.h
++++ b/src/include/libplacebo/shaders/colorspace.h
+@@ -22,6 +22,7 @@
+ // value (PL_SHADER_SIG_COLOR).
+ 
+ #include <libplacebo/colorspace.h>
++#include <libplacebo/dovi_dm.h>
+ #include <libplacebo/gamut_mapping.h>
+ #include <libplacebo/tone_mapping.h>
+ #include <libplacebo/shaders.h>
+@@ -353,6 +354,9 @@ struct pl_color_map_args {
+     // `pl_shader_extract_features`. Optional. No effect if
+     // `params->contrast_recovery` is disabled.
+     pl_tex feature_map;
++    // Optional frame-owned display-management payload, valid for this call.
++    const struct pl_dovi_dm_metadata *dovi_dm;
++    const struct pl_dovi_dm_target *dovi_target;
+ };
+ 
+ #define pl_color_map_args(...) (&(struct pl_color_map_args) { __VA_ARGS__ })
+diff --git a/src/include/libplacebo/tone_mapping.h b/src/include/libplacebo/tone_mapping.h
+index b5e8aa4..c584284 100644
+--- a/src/include/libplacebo/tone_mapping.h
++++ b/src/include/libplacebo/tone_mapping.h
+@@ -150,6 +150,8 @@ struct pl_tone_map_params {
+     float input_min;
+     float input_max;
+     float input_avg; // or 0 if unknown
++    // A genuine zero average is distinguishable from legacy absence.
++    bool input_avg_present;
+ 
+     // The desired characteristics of the output, in `output_scaling` units.
+     float output_min;
+diff --git a/src/include/libplacebo/utils/dovi_dm.h b/src/include/libplacebo/utils/dovi_dm.h
+new file mode 100644
+index 0000000..ed146e3
+--- /dev/null
++++ b/src/include/libplacebo/utils/dovi_dm.h
+@@ -0,0 +1,162 @@
++/*
++ * This file is part of libplacebo.
++ * Copyright (c) 2026 HDR contributors
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ */
++#ifndef LIBPLACEBO_UTILS_DOVI_DM_H_
++#define LIBPLACEBO_UTILS_DOVI_DM_H_
++
++#include <string.h>
++#include <stdalign.h>
++#include <libplacebo/dovi_dm.h>
++#include <libavutil/dovi_meta.h>
++
++// Match FFmpeg headers to the rebuilt client. This copies a single complete
++// frame's decoded metadata; no pointer into AVFrame survives. Original RPU and
++// official XML bytes remain caller-owned private audit artifacts. This is NOT
++// raw-RPU-to-ST2094 SOP normalization and does not enable any trim operator.
++static inline bool pl_dovi_dm_from_av(struct pl_dovi_dm_metadata *out,
++    const AVDOVIMetadata *metadata, size_t size, uint64_t stream_id, uint64_t frame_id)
++{
++    if (!out)
++        return false;
++    memset(out, 0, sizeof(*out)); // also clear old data on absent/invalid input
++    if (!metadata)
++        return true;
++    if (size < sizeof(*metadata) || metadata->num_ext_blocks < 0 ||
++        metadata->num_ext_blocks > PL_DOVI_DM_MAX_BLOCKS ||
++        metadata->header_offset < sizeof(*metadata) ||
++        metadata->header_offset > size ||
++        metadata->header_offset % alignof(AVDOVIRpuDataHeader) ||
++        sizeof(AVDOVIRpuDataHeader) > size - metadata->header_offset ||
++        metadata->color_offset < sizeof(*metadata) || metadata->color_offset > size ||
++        metadata->color_offset % alignof(AVDOVIColorMetadata) ||
++        sizeof(AVDOVIColorMetadata) > size - metadata->color_offset ||
++        (metadata->num_ext_blocks &&
++         (metadata->ext_block_offset < sizeof(*metadata) ||
++          metadata->ext_block_offset > size ||
++          metadata->ext_block_size < sizeof(AVDOVIDmData) ||
++          metadata->ext_block_offset % alignof(AVDOVIDmData) ||
++          metadata->ext_block_size % alignof(AVDOVIDmData) ||
++          (size - metadata->ext_block_offset) / metadata->ext_block_size <
++          (size_t) metadata->num_ext_blocks)))
++        return false;
++
++    const AVDOVIRpuDataHeader *header = av_dovi_get_header(metadata);
++    const AVDOVIColorMetadata *color = av_dovi_get_color(metadata);
++    // Profile7 FEL is an explicit non-goal. Preserve ordinary handling rather
++    // than pretending this independent display-management stage rebuilds FEL.
++    if (!header->disable_residual_flag || color->source_min_pq > 4095 ||
++        color->source_max_pq > 4095 || color->source_min_pq > color->source_max_pq)
++        return false;
++    struct pl_dovi_dm_metadata dm = {
++        .version = 1, .origin = PL_DOVI_DM_RPU,
++        .stream_id = stream_id, .frame_id = frame_id,
++        .source = {
++            .min_luma = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, color->source_min_pq / 4095.0f),
++            .max_luma = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, color->source_max_pq / 4095.0f),
++        },
++        .num_blocks = metadata->num_ext_blocks,
++    };
++    for (int i = 0; i < metadata->num_ext_blocks; i++) {
++        const AVDOVIDmData *ext = av_dovi_get_ext(metadata, i);
++        struct pl_dovi_dm_block *b = &dm.blocks[i];
++        b->level = ext->level;
++        b->optional_presence_known = ext->level != 8;
++        switch (ext->level) {
++        case 1:
++            if (dm.has_l1 || ext->l1.min_pq > 4095 || ext->l1.max_pq > 4095 ||
++                ext->l1.avg_pq > 4095 || ext->l1.min_pq > ext->l1.avg_pq ||
++                ext->l1.avg_pq > ext->l1.max_pq)
++                return false;
++            b->data[0] = ext->l1.min_pq;
++            b->data[1] = ext->l1.avg_pq;
++            b->data[2] = ext->l1.max_pq;
++            dm.has_l1 = true;
++            dm.min_pq = ext->l1.min_pq / 4095.0f;
++            dm.avg_pq = ext->l1.avg_pq / 4095.0f;
++            dm.max_pq = ext->l1.max_pq / 4095.0f;
++            break;
++        case 2:
++            b->data[0] = ext->l2.target_max_pq;
++            b->data[1] = ext->l2.trim_slope;
++            b->data[2] = ext->l2.trim_offset;
++            b->data[3] = ext->l2.trim_power;
++            b->data[4] = ext->l2.trim_chroma_weight;
++            b->data[5] = ext->l2.trim_saturation_gain;
++            b->data[6] = (uint16_t) ext->l2.ms_weight; // signed code preserved
++            break;
++        case 3:
++            b->data[0] = ext->l3.min_pq_offset;
++            b->data[1] = ext->l3.avg_pq_offset;
++            b->data[2] = ext->l3.max_pq_offset;
++            break;
++        case 4:
++            b->data[0] = ext->l4.anchor_pq;
++            b->data[1] = ext->l4.anchor_power;
++            break;
++        case 5:
++            b->data[0] = ext->l5.left_offset;
++            b->data[1] = ext->l5.right_offset;
++            b->data[2] = ext->l5.top_offset;
++            b->data[3] = ext->l5.bottom_offset;
++            break;
++        case 6:
++            b->data[0] = ext->l6.max_luminance;
++            b->data[1] = ext->l6.min_luminance;
++            b->data[2] = ext->l6.max_cll;
++            b->data[3] = ext->l6.max_fall;
++            break;
++        case 8:
++            b->data[0] = ext->l8.target_display_index;
++            b->data[1] = ext->l8.trim_slope;
++            b->data[2] = ext->l8.trim_offset;
++            b->data[3] = ext->l8.trim_power;
++            b->data[4] = ext->l8.trim_chroma_weight;
++            b->data[5] = ext->l8.trim_saturation_gain;
++            b->data[6] = ext->l8.ms_weight;
++            b->data[7] = ext->l8.target_mid_contrast;
++            b->data[8] = ext->l8.clip_trim;
++            for (int k = 0; k < 6; k++) {
++                b->data[9+k] = ext->l8.saturation_vector_field[k];
++                b->data[15+k] = ext->l8.hue_vector_field[k];
++            }
++            break;
++        case 9:
++        case 10: {
++            const AVColorPrimariesDesc *p;
++            if (ext->level == 9) {
++                b->data[0] = ext->l9.source_primary_index;
++                p = &ext->l9.source_display_primaries;
++            } else {
++                b->data[0] = ext->l10.target_display_index;
++                b->data[1] = ext->l10.target_max_pq;
++                b->data[2] = ext->l10.target_min_pq;
++                b->data[3] = ext->l10.target_primary_index;
++                p = &ext->l10.target_display_primaries;
++            }
++            const AVRational v[8] = {p->prim.r.x, p->prim.r.y, p->prim.g.x,
++                p->prim.g.y, p->prim.b.x, p->prim.b.y, p->wp.x, p->wp.y};
++            for (int k = 0; k < 8; k++) {
++                b->primaries[k][0] = v[k].num;
++                b->primaries[k][1] = v[k].den;
++            }
++            break;
++        }
++        case 254:
++            b->data[0] = ext->l254.dm_mode;
++            b->data[1] = ext->l254.dm_version_index;
++            // These are not the XML CMVersion pair; do not relabel them.
++            break;
++        default:
++            // Unrecognized data is not supported/applied. The actual complete
++            // FFmpeg side-data/RPU must remain in private audit, not this copy.
++            b->optional_presence_known = false;
++            break;
++        }
++    }
++    *out = dm;
++    return true;
++}
++
++#endif
+diff --git a/src/meson.build b/src/meson.build
+index ea5d9b4..1e9cf6b 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -59,6 +59,7 @@ headers = [
+   'd3d11.h',
+   'dispatch.h',
+   'dither.h',
++  'dovi_dm.h',
+   'dummy.h',
+   'filters.h',
+   'gamut_mapping.h',
+@@ -81,6 +82,7 @@ headers = [
+   'utils/dav1d.h',
+   'utils/dav1d_internal.h',
+   'utils/dolbyvision.h',
++  'utils/dovi_dm.h',
+   'utils/frame_queue.h',
+   'utils/libav.h',
+   'utils/libav_internal.h',
+@@ -94,6 +96,7 @@ sources = [
+   'common.c',
+   'convert.cc',
+   'dither.c',
++  'dovi_dm.c',
+   'dispatch.c',
+   'dummy.c',
+   'filters.c',
+@@ -134,6 +137,7 @@ tests = [
+   'colorspace.c',
+   'common.c',
+   'dither.c',
++  'dovi_dm.c',
+   'dummy.c',
+   'lut.c',
+   'filters.c',
+diff --git a/src/renderer.c b/src/renderer.c
+index 576528b..396fbad 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -2259,6 +2259,8 @@ static void pass_convert_colors(struct pass_state *pass)
+             .prelinearized = prelinearized,
+             .state         = &rr->tone_map_state,
+             .feature_map   = feature_map,
++            .dovi_dm       = &image->dovi_dm,
++            .dovi_target   = &target->dovi_target,
+         ));
+ 
+         if (target->icc)
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 475af5a..43cf3a0 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1569,10 +1569,18 @@ static void visualize_gamut_map(pl_shader sh, pl_rect2df rc,
+          lut);
+ }
+ 
++struct tone_lut_data {
++    const struct pl_tone_map_params *tone;
++    const float *dm_lut;
++};
++
+ static void fill_tone_lut(void *data, const struct sh_lut_params *params)
+ {
+-    const struct pl_tone_map_params *lut_params = params->priv;
+-    pl_tone_map_generate(data, lut_params);
++    const struct tone_lut_data *input = params->priv;
++    if (input->dm_lut)
++        memcpy(data, input->dm_lut, input->tone->lut_size * sizeof(float));
++    else
++        pl_tone_map_generate(data, input->tone);
+ }
+ 
+ static void fill_gamut_lut(void *data, const struct sh_lut_params *params)
+@@ -1615,7 +1623,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+     }
+ 
+     pl_color_space_infer_map(&src, &dst);
+-    if (pl_color_space_equal(&src, &dst)) {
++    const bool dm_present = args->dovi_dm && args->dovi_dm->version;
++    if (!dm_present && pl_color_space_equal(&src, &dst)) {
+         if (args->prelinearized)
+             pl_shader_delinearize(sh, &dst);
+         return;
+@@ -1654,13 +1663,24 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+ 
+     pl_tone_map_params_infer(&tone);
+ 
++    const struct pl_hdr_metadata *dm_volume = args->dovi_target &&
++        args->dovi_target->version == 1 ? &args->dovi_target->volume : NULL;
++    enum pl_dovi_dm_status dm_status = pl_dovi_dm_prepare(args->dovi_dm, dm_volume, &tone);
++    bool dm_active = dm_status == PL_DOVI_DM_L1 || dm_status == PL_DOVI_DM_FLAT;
++    if (dm_present && !dm_active)
++        PL_WARN(sh, "Open DM fallback: %s", pl_dovi_dm_status_name(dm_status));
++    if (dm_active && !args->state) {
++        SH_FAIL(sh, "Open DM requires a LUT state; refusing a different mapper");
++        return;
++    }
++
+     // Round sufficiently similar values
+-    if (fabs(tone.input_max - tone.output_max) < 1e-6)
++    if (!dm_active && fabs(tone.input_max - tone.output_max) < 1e-6)
+         tone.output_max = tone.input_max;
+-    if (fabs(tone.input_min - tone.output_min) < 1e-6)
++    if (!dm_active && fabs(tone.input_min - tone.output_min) < 1e-6)
+         tone.output_min = tone.input_min;
+ 
+-    if (!params->inverse_tone_mapping) {
++    if (!dm_active && !params->inverse_tone_mapping) {
+         // Never exceed the source unless requested, but still allow
+         // black point adaptation
+         tone.output_max = PL_MIN(tone.output_max, tone.input_max);
+@@ -1693,6 +1713,12 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         .out_min    = &gamut.min_luma,
+         .out_max    = &gamut.max_luma,
+     ));
++    if (dm_active) {
++        // PQ nominal inference discards black; the DM physical target does not.
++        gamut.output_gamut = dm_volume->prim;
++        gamut.min_luma = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->min_luma);
++        gamut.max_luma = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->max_luma);
++    }
+ 
+     // Clip the gamut mapping output to the input gamut if disabled
+     if (!params->gamut_expansion && gamut.function->bidirectional) {
+@@ -1731,7 +1757,7 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         pl_unreachable();
+     }
+ 
+-    bool can_fast = !params->force_tone_mapping_lut;
++    bool can_fast = !dm_active && !params->force_tone_mapping_lut;
+     if (!args->state) {
+         // No state object provided, forcibly disable advanced methods
+         can_fast = true;
+@@ -1747,7 +1773,7 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         can_fast = true;
+     }
+ 
+-    bool need_tone_map = !pl_tone_map_params_noop(&tone);
++    bool need_tone_map = dm_active || !pl_tone_map_params_noop(&tone);
+     bool need_gamut_map = !pl_gamut_map_params_noop(&gamut);
+ 
+     if (!args->prelinearized)
+@@ -1810,7 +1836,13 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                      pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, tone.input_max),
+                      pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, tone.output_max));
+ 
+-        if (fun == &pl_tone_map_clip && can_fast) {
++        if (dm_active && (tone.input_min == tone.input_max ||
++                          tone.output_min == tone.output_max)) {
++            // Resolve zero/flat intervals before any LUT normalization division.
++            float value = fminf(fmaxf(tone.input_max, tone.output_min), tone.output_max);
++            GLSL("#define tone_map(x) ("$") \n", SH_FLOAT(value));
++
++        } else if (fun == &pl_tone_map_clip && can_fast) {
+ 
+             GLSL("#define tone_map(x) clamp((x), "$", "$") \n",
+                  SH_FLOAT(tone.input_min),
+@@ -1840,6 +1872,17 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         } else {
+ 
+             pl_assert(obj);
++            float *dm_lut = NULL;
++            if (dm_active) {
++                dm_lut = pl_alloc(NULL, tone.lut_size * sizeof(float));
++                if (!dm_lut || !pl_dovi_dm_generate(dm_lut, &tone)) {
++                    pl_free(dm_lut);
++                    SH_FAIL(sh, "Open DM generated an invalid curve; no output produced");
++                    return;
++                }
++                sh_describe(sh, "open DM level1 (trims not applied)");
++            }
++            struct tone_lut_data input = { .tone = &tone, .dm_lut = dm_lut };
+             ident_t lut = sh_lut(sh, sh_lut_params(
+                 .object     = &obj->tone.lut,
+                 .var_type   = PL_VAR_FLOAT,
+@@ -1848,10 +1891,11 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                 .width      = tone.lut_size,
+                 .comps      = 1,
+                 .update     = !pl_tone_map_params_equal(&tone, &obj->tone.params),
+-                .dynamic    = tone.input_avg > 0, // dynamic metadata
++                .dynamic    = dm_active || tone.input_avg > 0, // zero can be present
+                 .fill       = fill_tone_lut,
+-                .priv       = &tone,
++                .priv       = &input,
+             ));
++            pl_free(dm_lut);
+             obj->tone.params = tone;
+             if (!lut) {
+                 SH_FAIL(sh, "Failed generating tone-mapping LUT!");
+@@ -1866,7 +1910,7 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         }
+ 
+         bool need_recovery = tone.input_max >= tone.output_max;
+-        if (need_recovery && params->contrast_recovery && args->feature_map) {
++        if (!dm_active && need_recovery && params->contrast_recovery && args->feature_map) {
+             ident_t pos, pt;
+             ident_t lowres = sh_bind(sh, args->feature_map, PL_TEX_ADDRESS_CLAMP,
+                                      PL_TEX_SAMPLE_LINEAR, "feature_map",
+@@ -1916,9 +1960,17 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         // Avoid raising saturation excessively when raising brightness, and
+         // also desaturate when reducing brightness greatly to account for the
+         // reduction in gamut volume.
+-        GLSL("vec2 hull = vec2(i_orig, ipt.x);                  \n"
+-             "hull = ((hull - 6.0) * hull + 9.0) * hull;        \n"
+-             "ipt.yz *= min(i_orig / ipt.x, hull.y / hull.x);   \n");
++        if (dm_active) {
++            // Explicit zero black must not introduce 0/0 in chroma compensation.
++            GLSL("vec2 hull = vec2(i_orig, ipt.x); \n"
++                 "hull = ((hull - 6.0) * hull + 9.0) * hull; \n"
++                 "ipt.yz *= min(i_orig / max(ipt.x, 1e-6), \n"
++                 "              hull.y / max(hull.x, 1e-6)); \n");
++        } else {
++            GLSL("vec2 hull = vec2(i_orig, ipt.x);                  \n"
++                 "hull = ((hull - 6.0) * hull + 9.0) * hull;        \n"
++                 "ipt.yz *= min(i_orig / ipt.x, hull.y / hull.x);   \n");
++        }
+     }
+ 
+     if (need_gamut_map) {
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+new file mode 100644
+index 0000000..566a058
+--- /dev/null
++++ b/src/tests/dovi_dm.c
+@@ -0,0 +1,48 @@
++/* Numerical boundary regressions, NOT authored RPU/trim/reference fixtures.
++ * Execute only in the one post-review batch. LGPL-2.1-or-later.
++ */
++#include <assert.h>
++#include <math.h>
++#include <string.h>
++#include <libplacebo/dovi_dm.h>
++
++int main(void)
++{
++    struct pl_tone_map_params tone = {
++        .function = &pl_tone_map_st2094_10,
++        .constants = { PL_TONE_MAP_CONSTANTS },
++        .input_scaling = PL_HDR_PQ, .output_scaling = PL_HDR_PQ,
++        .lut_size = 256, .input_min = 0.0f, .input_avg = 0.0f,
++        .input_avg_present = true, .input_max = 1.0f,
++        .output_min = 0.0f, .output_max = 0.75f,
++    };
++    float lut[256];
++    assert(pl_dovi_dm_generate(lut, &tone));
++    for (int i = 0; i < 256; i++) {
++        assert(isfinite(lut[i]));
++        assert(lut[i] >= tone.output_min && lut[i] <= tone.output_max);
++        assert(i == 0 || lut[i] + 1e-6f >= lut[i-1]);
++    }
++    // The DM generator, unlike generic inference, must never impose 100 nits.
++    tone.input_max = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, 1.0f);
++    tone.input_avg = tone.input_max / 2.0f;
++    tone.output_max = tone.input_max;
++    assert(pl_dovi_dm_generate(lut, &tone));
++    assert(lut[255] <= tone.input_max);
++    tone.input_min = tone.input_avg = tone.input_max = 0.0f;
++    tone.output_min = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, 0.0004f);
++    tone.output_max = tone.output_min;
++    assert(pl_dovi_dm_generate(lut, &tone));
++    for (int i = 0; i < 256; i++)
++        assert(lut[i] == tone.output_min);
++    // Absence leaves ordinary mapper parameters completely untouched.
++    struct pl_tone_map_params saved = tone;
++    const struct pl_dovi_dm_metadata absent = {0};
++    assert(pl_dovi_dm_prepare(&absent, NULL, &tone) == PL_DOVI_DM_ABSENT);
++    assert(memcmp(&saved, &tone, sizeof(tone)) == 0);
++    assert(pl_dovi_dm_prepare(NULL, NULL, &tone) == PL_DOVI_DM_ABSENT);
++    assert(!pl_dovi_dm_generate(NULL, &tone));
++    tone.input_avg = NAN;
++    assert(!pl_dovi_dm_generate(lut, &tone));
++    return 0;
++}
+diff --git a/src/tone_mapping.c b/src/tone_mapping.c
+index 5b4f9db..8df58da 100644
+--- a/src/tone_mapping.c
++++ b/src/tone_mapping.c
+@@ -56,6 +56,7 @@ bool pl_tone_map_params_equal(const struct pl_tone_map_params *a,
+            a->input_min == b->input_min &&
+            a->input_max == b->input_max &&
+            a->input_avg == b->input_avg &&
++           a->input_avg_present == b->input_avg_present &&
+            a->output_min == b->output_min &&
+            a->output_max == b->output_max &&
+            constants_equal(&a->constants, &b->constants) &&
+@@ -243,7 +244,8 @@ static void st2094_pick_knee(float *out_src_knee, float *out_dst_knee,
+     const float dst_knee_max = PL_MIX(dst_min, dst_max, max_knee);
+ 
+     // Choose source knee based on source scene brightness
+-    float src_knee = PL_DEF(src_avg, PL_MIX(src_min, src_max, def_knee));
++    float src_knee = params->input_avg_present ? src_avg :
++                    PL_DEF(src_avg, PL_MIX(src_min, src_max, def_knee));
+     src_knee = fclampf(src_knee, src_knee_min, src_knee_max);
+ 
+     // Choose target adaptation point based on linearly re-scaling source knee

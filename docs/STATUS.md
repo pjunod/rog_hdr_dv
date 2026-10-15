@@ -15,6 +15,23 @@ Source qualification is separate from package delivery and physical measurement.
 
 ## nativehdr10 — reviewed source batch and validation
 
+### Isolated OPEN XML205 diagnostic (2026-10-15)
+
+Done (source only): additive DVH3 consumer/frontend/provenance, exact original
+decimal SOP derivation, analytic public improved PQ-Hermite core/shader and typed
+target-PQ SOP after existing L1 compensation/before final gamut once; explicit
+private ABI362 and value-keyed frame/target cache. Original adapter/stock source
+remain byte-identical. Retained full compiler361 prerequisites are reused.
+Current: source self-audit, deferred regression definitions and native compile
+preparation in separate owned trees. No unit/render/metric execution or approval.
+Remaining: native warnings-as-errors compile/headers/loader closure, source-bound
+exports, independent review/fixes, then recovery-owned one affected batch and
+fixed-variant comparisons against retained genuine original reference.
+Primary public Hermite is distinct from named nits-rational ablation. Nonzero
+chroma/detail, rawSOP/CM/L8/temporal rules and full content/OEM/optical acceptance
+remain open; hypotheses/unapplied fields are machine-readable result fields.
+See [OPEN candidate contract](OPEN_XML205_CANDIDATE.md). PR16 held; no deployment.
+
 ### Isolated authored-master adapter (2026-10-15)
 
 Follow-up checkpoint: the reviewed frame0 recipe completed with40/40 selected
