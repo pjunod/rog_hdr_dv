@@ -1,7 +1,8 @@
 # HDR foundations, public tooling and experimental launcher
 
 Status: final source preparation for [draft PR20](https://github.com/pjunod/rog_hdr_dv/pull/20),
-2026-10-15; ready for independent whole-candidate review. This is not
+2026-10-15; whole-candidate review completed with three support-helper findings,
+now corrected and awaiting focused independent re-review. This is not
 full Dolby equivalence, a package release, a new installation, or final review
 approval. The integration task is `t_67396754`; independent review is
 `t_c00009d9`, followed by final qualification `t_f06aa8f3`.
@@ -93,7 +94,18 @@ heads/trees, not at this integration head. In particular:
   are retained. The genuine stock P5 trial is not a corrected-launcher trial;
   P8 runtime remains unproved and P7 FEL remains excluded.
 
-No unit execution is authorized in this preparation phase. New integrity,
+The initial source preparation executed no units. The correction lane adds
+`tests/test_legacy_helpers.py`: actual helper control flow in temporary Git
+repositories with stub build/runtime commands, never the privileged Wine outer
+installer. Commit builds reject existing paths, check every prerequisite and
+Meson source/build association, and remove only their own worktree. Publication
+scanning distinguishes no matches from read errors; generated Wine commands
+preserve initialization/test/timeout results across owned-process cleanup.
+Use `HDR_HELPER_TEST_ROOT` for an explicit durable scratch root; the default is
+ignored `work/helper-tests`. Focused independent re-review precedes the single
+new helper batch. No unchanged component suite is invalidated by these fixes.
+
+New integrity,
 canonical replay, source comparison, syntax/static inspection, compiler and
 publication-scan receipts are not unit passes. The reviewer decides the minimum
 new/invalidated final batch after all findings are fixed. No full-suite repeat

@@ -42,16 +42,43 @@ mkdir -p /home/tester/t
 cp "$mods/windows.devices.display_test.exe" "$mods/user32_test.exe" /home/tester/t/
 chown -R tester /home/tester
 cat > /home/tester/go.sh <<'IN'
+#!/bin/sh
+set -u
 # WINEDLLOVERRIDES keeps wineboot from waiting on Mono/Gecko installers.
 export WINEDLLOVERRIDES="mscoree,mshtml=" WINEPREFIX=$HOME/pfx WINEDEBUG=-all WINEARCH=win64 PATH=/opt/wine-stable/bin:$PATH
+xpid=
+cleanup() {
+    rc=$?
+    trap - EXIT HUP INT TERM
+    wineserver -k || printf 'Wine cleanup failed\n' >&2
+    if [ -n "$xpid" ]; then
+        kill "$xpid" 2>/dev/null || :
+        wait "$xpid" 2>/dev/null || :
+    fi
+    exit "$rc"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 Xvfb :91 -screen 0 1920x1080x24 >/dev/null 2>&1 & xpid=$!
 export DISPLAY=:91
-sleep 1
-timeout 300 wineboot --init >/dev/null 2>&1; echo "wineboot exit=$?"
-cd $HOME/t
-timeout 300 wine windows.devices.display_test.exe displaymonitor > dm.log 2>&1; echo "displaymonitor exit=$?"; tail -1 dm.log
-timeout 300 wine user32_test.exe displayconfig > dc.log 2>&1; echo "displayconfig exit=$?"; tail -1 dc.log
-wineserver -k; kill $xpid
+sleep 1 || exit $?
+cd "$HOME/t" || exit $?
+init=0
+timeout 300 wineboot --init > wineboot.log 2>&1 || init=$?
+echo "wineboot exit=$init"
+[ "$init" -eq 0 ] || exit "$init"
+status=0
+dm=0
+timeout 300 wine windows.devices.display_test.exe displaymonitor > dm.log 2>&1 || dm=$?
+echo "displaymonitor exit=$dm"; tail -1 dm.log
+[ "$dm" -eq 0 ] || status=$dm
+dc=0
+timeout 300 wine user32_test.exe displayconfig > dc.log 2>&1 || dc=$?
+echo "displayconfig exit=$dc"; tail -1 dc.log
+if [ "$status" -eq 0 ]; then status=$dc; fi
+exit "$status"
 IN
 chmod +x /home/tester/go.sh
 su tester -c /home/tester/go.sh
