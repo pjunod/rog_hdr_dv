@@ -15,6 +15,22 @@ Source qualification is separate from package delivery and physical measurement.
 
 ## nativehdr10 — reviewed source batch and validation
 
+### Isolated authored-master adapter (2026-10-15)
+
+Done: verified the frozen source base and retained native compiler/header/runtime
+identities without rebuilding libraries; implemented schema3/DVH2 full-raster
+P3D65/PQ HALF, strict XML2.0.5/sparse association and storage-only decoder;
+compiled the native consumer with warnings as errors and zero diagnostics;
+prepared the actual original private source manifests on both durable hosts.
+Current: complete-candidate adversarial review/fixes. Remaining: coordinator-routed
+one affected unit batch and one original frame0 comparison. No units, candidate
+render, metric or vendor execution has run in this implementation phase.
+The acquired frame is nearly uniform near-black: even a later passing comparison
+cannot establish representative trims/highlights/chroma or full Dolby agreement.
+PR16 remains held; no publication, installation or physical/display action.
+See the [bounded adapter contract](AUTHORED_MASTER_BASELINE.md) and
+[source/compiler-only receipt](../evidence/authored-master-adapter.json).
+
 The owned collaboration clone starts at the exact final handoff
 `7c78457581906a43377f8dbb0d8dc95b438f30d3`; PR 16 remains unmerged.
 Astra and Fable approved the design; Sol and Opus implemented the two source

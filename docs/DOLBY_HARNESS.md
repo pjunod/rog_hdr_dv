@@ -1,5 +1,20 @@
 # Stage-1 headless display-management harness
 
+## Separate authored-master baseline extension (2026-10-15)
+
+[Schema3 authored-master baseline](AUTHORED_MASTER_BASELINE.md) is implemented
+and the incremental native consumer compiled with warnings as errors, without
+rebuilding the frozen baseline libraries. It accepts explicit P3D65/PQ HALF
+storage and actual XML2.0.5 through DVH2; schema1/2 and DVH1 remain distinct.
+Original/repaired XML, exact two-insertion rollback, sparse actual acquired
+frames, L1 baseline slots and verbatim unapplied L2 records are bound. Review
+and one coordinator-routed affected unit/comparison batch remain pending;
+implementation executed zero units, candidate renders, metrics or vendor calls.
+The acquired frame0 is nearly uniform near-black and cannot qualify representative
+trims/highlights/chroma, a named consumer CM or full Dolby agreement.
+The original schema1/2 qualification history below is retained, not a new pass
+on this extension's source. See the [source/compiler-only receipt](../evidence/authored-master-adapter.json).
+
 Status: **schema-1 public software harness qualified; schema-2 post-reshape
 extension corrected after adversarial findings, independent focused closure and
 affected qualification pending**.
