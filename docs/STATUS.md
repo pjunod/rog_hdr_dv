@@ -22,8 +22,14 @@ identities without rebuilding libraries; implemented schema3/DVH2 full-raster
 P3D65/PQ HALF, strict XML2.0.5/sparse association and storage-only decoder;
 compiled the native consumer with warnings as errors and zero diagnostics;
 prepared the actual original private source manifests on both durable hosts.
-Current: complete-candidate adversarial review/fixes. Remaining: coordinator-routed
-one affected unit batch and one original frame0 comparison. No units, candidate
+Independent review262 found a Path/bytes compile-hash defect and unbounded
+result reads; corrected both, using single bounded candidate/reference output
+snapshots and the same input snapshot for domain checks. Five new deferred
+regressions extend the proposal to40 selections/31 retained histories; unchanged
+C/build/library inputs reuse the successful ELF without recompiling.
+Current: complete-candidate corrective re-review. Remaining: coordinator-routed
+one original frame0 render, one affected unit batch consuming those actual
+candidate/reference artifacts, then one comparison. No units, candidate
 render, metric or vendor execution has run in this implementation phase.
 The acquired frame is nearly uniform near-black: even a later passing comparison
 cannot establish representative trims/highlights/chroma or full Dolby agreement.

@@ -1,7 +1,8 @@
 # Authored-master baseline adapter
 
-Status (2026-10-15): implemented and native consumer compiled; complete-candidate
-adversarial review and the subsequent coordinator-routed validation are pending.
+Status (2026-10-15): implemented and native consumer compiled. Independent review
+found a compile-input hash type error and unbounded result-output reads; both
+are corrected in source, with re-review and coordinator-routed validation pending.
 This is a bounded source/transport prerequisite, not recovery of full Dolby
 mapping or numerical acceptance. [Harness](DOLBY_HARNESS.md) schema1/2 and DVH1
 remain distinct. No library, player, compositor or metric equations change.
@@ -164,6 +165,12 @@ Schema3 alignment carries all common source/frame/target/export identities plus
 the export's declaration/parser/version/mapping/translation identities (not L1
 or records, which are bound by export hash). There is no invented analysisVersion4.
 Result validation rebinds alignment to the actual input/metadata snapshots.
+Compile-input identities hash actual file bytes, not Path objects. For both
+candidate and reference, after provenance checks it reads output only once,
+with a width×height×12+1 byte cap, checks exact size and SHA256, then verifies
+reference storage and decodes finite normalized samples from that same snapshot.
+There is no unbounded legacy output reopen. The schema3 input's domain check
+also consumes its bounded hashed snapshot; schema1/2 helpers remain unchanged.
 Candidate compiler/ELF/runtime/frontend/control/log hashes and explicit baseline
 semantics are retained. Reference provenance separately binds actual immutable
 reference EXR, storage/sample hash, decoder, vendor argv/runtime identities and
@@ -177,11 +184,21 @@ rationale; it is not a passing receipt. Set `TMPDIR` to durable task-owned stora
 `PYTHONPATH=tests`, `HDR_HARNESS_NATIVE` to the new ELF, `HDR_AUTHORED_INPUT` to the
 real bound input, and existing schema2 corpus variables for the selected retained
 interface checks. Missing genuine fixtures are failures, not synthetic replacements.
+The revised proposal has40 selected methods (23 authored) and31 retained unchanged
+historical methods, with their actual executing identities and review262 retention
+rationale. Five new deferred regressions cover exact/short/oversize bounded reads,
+output hash/domain checks and authentic candidate/reference result acceptance,
+compile/frontend/control/log tamper rejection and output-hash rejection. The
+small public storage controls contain no Dolby metadata or claimed render output.
 
 Use `normalize_reference(manifest, immutable_reference_exr, new_private_directory)`
 only after the review gate. It reads and normalizes the already acquired reference,
-never invokes a vendor tool. Then use the existing harness render/compare CLI
-with the reviewed schema3 input and reference result. No copying of alignment
+never invokes a vendor tool. Recovery's revised pending recipe normalizes that
+reference and renders the original candidate ONCE before the ONE unit process,
+so the genuine result tests can consume those actual artifacts without another
+render. Set `HDR_AUTHORED_CANDIDATE` and `HDR_AUTHORED_REFERENCE` to those result
+manifests. Then compare with the existing CLI; no metrics run inside the new tests.
+This ordering proposal is not authorization to execute before review. No copying of alignment
 without checking the actual source/target/frame/encoding is permitted. All raw
 XML/EXR/conversions/numerical results stay private, outside Git.
 
