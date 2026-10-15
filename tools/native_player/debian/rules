@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	python3 -c 'import ast; ast.parse(open("player.py").read())'
+
+override_dh_auto_test:
+	# Qualification is a single separately reviewed affected batch, not build-time.
+
+override_dh_auto_install:
+	install -D -m755 player.py debian/hermes-hdr-experimental-player/usr/bin/hermes-hdr-player
+	install -D -m644 player.desktop debian/hermes-hdr-experimental-player/usr/share/applications/hermes-hdr-player.desktop
+	install -D -m644 USAGE.txt debian/hermes-hdr-experimental-player/usr/share/doc/hermes-hdr-experimental-player/USAGE.txt
+	install -D -m644 inputs.json debian/hermes-hdr-experimental-player/usr/share/doc/hermes-hdr-experimental-player/inputs.json

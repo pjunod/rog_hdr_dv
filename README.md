@@ -71,6 +71,8 @@ the base EDID gamut in the native SDR mode, for general availability.
 [Asynchronous lifetime](docs/COLOUR_ASYNC_LIFETIME.md) and
 [offscreen reuse](docs/OFFSCREEN_REUSE.md) document the reviewed follow-ups.
 [Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) and
+[merged Ubuntu source-package release](docs/MERGED_UBUNTU_PACKAGES.md) record
+historical artifacts separately from the current package construction/qualification;
 [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) distinguish source
 pins from the actual historical package construction identities.
 [The headless harness](docs/DOLBY_HARNESS.md) documents public contracts and the

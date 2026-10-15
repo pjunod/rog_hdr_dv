@@ -1,0 +1,17 @@
+Source: hermes-hdr-experimental-player
+Section: video
+Priority: optional
+Maintainer: HDR Engineering Agent <hdr-agent@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 14), python3:any
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+Homepage: https://github.com/pjunod/rog_hdr_dv
+
+Package: hermes-hdr-experimental-player
+Architecture: all
+Depends: ${misc:Depends}, python3 (>= 3.11), mpv (>= 0.41.0), libplacebo360 (>= 7.360.1), libavcodec62 (>= 7:8.1.2), libavutil60 (>= 7:8.1.2)
+Description: Experimental native RPU-aware player launcher
+ Uses existing Ubuntu mpv gpu-next, FFmpeg Dolby metadata and libplacebo
+ reshaping. Follows the Wayland preferred target and stores private,
+ advisory renderer evidence. No certified or full-fidelity Dolby claim.
+ No compositor, audio configuration, display profile or session changes.

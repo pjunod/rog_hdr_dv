@@ -15,6 +15,13 @@ Source qualification is separate from package delivery and physical measurement.
 
 ## HDR foundations — main-targeting candidate
 
+Merged-package lane `t_b2f97e54` now owns [normal Ubuntu source/binary packaging](MERGED_UBUNTU_PACKAGES.md)
+in a new isolated clone from actual main2735b97f. Done: source/receipt inventory;
+current: normal launcher source recipe, versioned compositor/library applicability
+and actual isolated-install environment. Remaining: construction, independent
+review/fixes, one affected package batch, install/rollback evidence, kit and PR.
+Not yet a fresh release or live installation. Unqualified Dolby work is excluded.
+
 Done: selected nativehdr10 upstream90/Ubuntu105 source, unchanged library pins,
 the qualified public schema1/schema2 headless harness and experimental2 launcher.
 Imported source/test bytes and retained evidence are compared against qualified
