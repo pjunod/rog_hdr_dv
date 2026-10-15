@@ -1,7 +1,8 @@
 # Status — what is working and what remains
 
 **Updated:** 2026-10-15 (America/New_York) · **State:** main-targeting HDR
-foundations/tooling/experimental-launcher source integration in progress.
+foundations/tooling/experimental-launcher source preparation complete;
+independent review pending.
 Previously qualified component source and exact historical receipts are selected
 without importing held PR16/17 history. Complete-candidate independent review
 and final acceptance remain pending. Full Dolby Vision and measured image-quality
@@ -21,10 +22,12 @@ donors, not described as new executions. Component receipts retain their actual
 heads/trees; no unit suite runs in this preparation phase.
 See [scope/provenance/applicability](QUALIFIED_HDR_FOUNDATIONS.md).
 
-Current: canonical replay, fresh source-bound native compiler evidence, static
-integrity/publication checks and a draft PR against main. Inherited support-tool
-prerequisites are explicit new review scope, not implicitly qualified by use on
-an older branch. Main's audio ownership and security policy are preserved.
+Done: canonical library10/upstream90/Ubuntu105 replay and all selected native
+compiler stages, including both full Mutter builds. The [compiler receipt](../evidence/qualified-main-compiler.json)
+binds 302 unchanged inputs, zero unit execution and recovered original Ubuntu
+success. Current: independent whole-candidate review of [draft PR20](https://github.com/pjunod/rog_hdr_dv/pull/20).
+Inherited support-tool prerequisites are explicit new review scope, not
+implicitly qualified by use on an older branch. Main's audio ownership and security policy are preserved.
 PR16 is held; PR17 is unchanged and not the qualified delivery.
 
 Remaining: independent whole-candidate review `t_c00009d9`, corrections and

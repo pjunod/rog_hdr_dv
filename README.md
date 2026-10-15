@@ -11,8 +11,8 @@ experimental launcher](docs/QUALIFIED_HDR_FOUNDATIONS.md), prepared directly
 on `main` without merging held PR16 history. It combines nativehdr10 Night
 Light/monitor targets, asynchronous lifetime and offscreen fixes, the Ubuntu
 port/package recipes, a public headless reference harness, and a bounded
-launcher for the existing stock player. Component qualification is retained
-at its actual historical identities; complete-candidate independent review
+launcher for the existing stock player. All selected native compiler stages passed with 302 unchanged bound inputs.
+Component qualification is retained at its actual historical identities; complete-candidate independent review
 and final integration acceptance are separate, not assumed passed. Full Dolby
 mapping/trims, reference agreement, optical calibration and broader hardware
 acceptance remain unfinished. No new deployment is part of this batch.

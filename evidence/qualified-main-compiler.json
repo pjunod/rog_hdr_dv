@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "task": "t_67396754",
+  "status": "All selected native compiler stages passed; final source preparation only, independent review and final qualification remain",
+  "verified_utc": "2026-10-15T18:12:07.029391+00:00",
+  "architecture": "x86_64",
+  "source_snapshot_head": "7de43ad2c1901a33e341deb88f432287e468aa36",
+  "source_archive_sha256": "81e9cf6b375bfa7d0d5028b47564e91d205d92fbb1f89af1e2b019816f27f8e3",
+  "compiler_input_binding": {
+    "files": 302,
+    "canonical_sorted_json_sha256": "e982cbd638e3c1ba6ad36b45ff4391406a3d9106ebb915d331c67d3068d1d68c",
+    "comparison": "Every native imported input equals its original hash and the final integration source; final delivery verifies this again after documentation/evidence commits."
+  },
+  "reconstructed_source_trees": {
+    "libdisplay-info": "72626245922181526fbcb990de3eb7f575efa56b",
+    "mutter": "c113c0ca9ac046c43f85992aa81ffb0b57633b36",
+    "ubuntu-mutter": "08740f943fb2ddda60411fa4d72bb4ccc4238e5f"
+  },
+  "original_execution_requests": {
+    "library_and_harness_python": "63b802815ef94dc3a8b2b1cc3b8e56ca",
+    "mutter": "2bb18700f0ca4d0d8fde10e2a799961e",
+    "ubuntu_mutter": "3b7d668947a848abaa73aead2d35dcf2"
+  },
+  "stages": {
+    "library": {
+      "stage": "library",
+      "units_run": 0,
+      "architecture": "x86_64",
+      "uid": 2000,
+      "commands": [
+        {
+          "argv": [
+            "meson",
+            "setup",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/library",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/libdisplay-info",
+            "-Dwerror=true",
+            "--prefix=${HDR_WORK}/qualified-main-integration-t_67396754/build/library-prefix",
+            "--libdir=lib/x86_64-linux-gnu",
+            "--wrap-mode=nofallback"
+          ],
+          "exit": 0,
+          "seconds": 0.6881552950944752,
+          "log_sha256": "dd8a33ae0728692e55eb7e76185fd445585cb03374e32416dfdf0fe4c4d76eb2"
+        },
+        {
+          "argv": [
+            "ninja",
+            "-C",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/library",
+            "-j2",
+            "install"
+          ],
+          "exit": 0,
+          "seconds": 1.121315968921408,
+          "log_sha256": "87d7de049eed389d9e793b6764e8925403fe552d6accf19d9ca3058c4d096e50"
+        }
+      ],
+      "status": "PASS; compiler only, zero unit or rendering execution",
+      "native_receipt_sha256": "b74e4ef996b90768adfa4cf386851251d30889727fb3674774de9d7016c93b1b"
+    },
+    "harness-python": {
+      "stage": "harness-python",
+      "units_run": 0,
+      "architecture": "x86_64",
+      "uid": 2000,
+      "commands": [
+        {
+          "argv": [
+            "python3",
+            "-B",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/input/tools/dolby_harness/build.py",
+            "--prefix",
+            "${HDR_WORK}/dolby-harness-t_8c7a6c12/prefix",
+            "--output",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/headless"
+          ],
+          "exit": 0,
+          "seconds": 0.964646837906912,
+          "log_sha256": "e3d1b4694ec37f569c39d6202b0133cd98776f6ecf4d4e71637b8c9e37bba504"
+        }
+      ],
+      "syntax_files": 28,
+      "status": "PASS; compiler only, zero unit or rendering execution",
+      "native_receipt_sha256": "9b65d853f6aebd0d26d17b65d42e95362268badf33b115b3a08495487d3a1254"
+    },
+    "mutter": {
+      "stage": "mutter",
+      "units_run": 0,
+      "architecture": "x86_64",
+      "uid": 2000,
+      "commands": [
+        {
+          "argv": [
+            "meson",
+            "setup",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/mutter",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/mutter",
+            "-Dremote_desktop=true",
+            "-Dwerror=true",
+            "--wrap-mode=nofallback"
+          ],
+          "exit": 0,
+          "seconds": 6.922095014015213,
+          "log_sha256": "53f1508eb0a9885ea4a45c3dbc44a108b13313470d79b679511b3f25a788b0a4"
+        },
+        {
+          "argv": [
+            "ninja",
+            "-C",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/mutter",
+            "-j2"
+          ],
+          "exit": 0,
+          "seconds": 287.15097573189996,
+          "log_sha256": "f5c3a7398c61aa130048458faf84b8ed5c72fed5516661eb8840ab3cad2e6665"
+        }
+      ],
+      "source_tree": "c113c0ca9ac046c43f85992aa81ffb0b57633b36",
+      "source_unchanged": true,
+      "status": "PASS; compiler only, zero unit or rendering execution",
+      "native_receipt_sha256": "142825cfb9620f65c61d22ea7a6810479536e84d064a5f72dc3acca542bef8f7"
+    },
+    "ubuntu-mutter": {
+      "stage": "ubuntu-mutter",
+      "units_run": 0,
+      "architecture": "x86_64",
+      "uid": 2000,
+      "commands": [
+        {
+          "argv": [
+            "meson",
+            "setup",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/ubuntu-mutter",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/ubuntu-mutter",
+            "-Dremote_desktop=true",
+            "-Dwerror=true",
+            "--wrap-mode=nofallback"
+          ],
+          "exit": 0,
+          "seconds": 7.033292304025963,
+          "log_sha256": "c68e626b041567b9079ca00858bc0bfac195c141dc89f51e6a8f2e49e5f1d8d2"
+        },
+        {
+          "argv": [
+            "ninja",
+            "-C",
+            "${HDR_WORK}/qualified-main-integration-t_67396754/build/ubuntu-mutter",
+            "-j2"
+          ],
+          "exit": 0,
+          "seconds": 294.86458041588776,
+          "log_sha256": "6f0560d51fee65eac3ded836e0dbcf1f4e2126cc35eac66fdefd40598a7a1172"
+        }
+      ],
+      "source_tree": "08740f943fb2ddda60411fa4d72bb4ccc4238e5f",
+      "source_unchanged": true,
+      "status": "PASS; compiler only, zero unit or rendering execution",
+      "native_receipt_sha256": "852c9b79c6f7101a5f80d2b2ec4c06e7e42aedb69267dcf8e2c5c3ce236a9196"
+    }
+  },
+  "units_run": 0,
+  "renderings_run": 0,
+  "artifact_inventory": {
+    "built_executables_and_shared_libraries": 480,
+    "private_inventory_sha256": "83d138ae8b65ac768bb6b081e838cb2a66b785f3c6806931a0107f2f8b742b3f",
+    "private_compiler_archive_sha256": "c9eb2ac8d4d3174111ba33c0349f002f08c6643a3af3593d0f0b7a5956038d75",
+    "headless_binary_sha256_recorded_by_compiler": "877e39f93c7d3e5fe6fbba1752040ba75d20eb5876d1f3edd887e09392e1bca7"
+  },
+  "recovery_disposition": [
+    "Stale checkpoint omitted the completed Ubuntu build. Original execution and exact native receipt/log hashes recovered; readback is not a new compilation.",
+    "A continuation attempt stopped before compilation because its helper unconditionally copied an already populated GVDB directory. Existing dependency hashes matched; no source correction or successful-stage rerun was needed.",
+    "An evidence-export attempt stopped on the aggregate export size limit. Only this lane archive was moved to durable storage, transferred in three verified bounded parts, then its transfer part removed.",
+    "The only generated source-tree cleanup was an empty untracked Meson wrap lock; reconstructed source trees remained unchanged."
+  ],
+  "limits": [
+    "Compiler evidence is not unit execution, package provenance, deployment, review approval or optical acceptance.",
+    "Historical unit passes retain their original component identities and remain subject to independent applicability review.",
+    "HDR_WORK denotes an explicitly selected durable owned native workspace; private host paths and raw compiler logs remain outside public source."
+  ]
+}
