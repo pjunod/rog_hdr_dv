@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Engineering <hdr-engineering@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 21:44:58 +0000
+Subject: [PATCH] color/store: sequence cancellable lookup before transferring
+ callback ownership
+
+---
+ src/backends/meta-color-store.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/backends/meta-color-store.c b/src/backends/meta-color-store.c
+index 3b4e108..56e9065 100644
+--- a/src/backends/meta-color-store.c
++++ b/src/backends/meta-color-store.c
+@@ -347,6 +347,7 @@ query_file_info_cb (GObject      *source_object,
+   g_autoptr (GFileInfo) info = NULL;
+   g_autoptr (GError) error = NULL;
+   g_autoptr (MetaColorStore) color_store = user_data;
++  GCancellable *cancellable;
+ 
+   info = g_file_query_info_finish (file, res, &error);
+   if (!info)
+@@ -370,7 +371,8 @@ query_file_info_cb (GObject      *source_object,
+   if (should_ignore_store_file (file))
+     return;
+ 
+-  g_file_load_contents_async (file, color_store->cancellable,
++  cancellable = color_store->cancellable;
++  g_file_load_contents_async (file, cancellable,
+                               on_store_file_read,
+                               g_steal_pointer (&color_store));
+ }

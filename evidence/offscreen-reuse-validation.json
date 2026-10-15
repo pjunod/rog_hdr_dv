@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "task": "t_38887c3f",
+  "scope": "Independently reviewed and affected-test-qualified isolated offscreen reuse source follow-up",
+  "implementation_mac_commit": "2b4e5fb24ac4800cdb97983556ca6eb2a4ac10dc",
+  "native_commit": "2cc87e0aafc6113184d05586f1a3ea66504ba1dc",
+  "native_tree": "ca9aff7ba61bd1d6097d86f0b308dcdc1029255d",
+  "review": {
+    "task": "t_ef4eb06c",
+    "reviewer": "hdr-astra",
+    "verdict": "approved-for-affected-validation",
+    "blocking_findings": [],
+    "source_edits_since_review": false
+  },
+  "execution": {
+    "request": "0591bc75602e47c7b66b60f867f0753d",
+    "architecture": "x86_64",
+    "renderer": "llvmpipe",
+    "affected_invocations": 8,
+    "passed": 8,
+    "failed": 0,
+    "retries": 0,
+    "seconds": 15.214407376945019,
+    "native_clean_before_after": true,
+    "command": [
+      "meson",
+      "test",
+      "-C",
+      "/work/hdr-nativehdr10-20261011/build-sol-offscreen",
+      "--setup",
+      "mutter:default",
+      "--no-rebuild",
+      "--num-processes",
+      "1",
+      "--timeout-multiplier",
+      "2",
+      "--print-errorlogs",
+      "mutter:stage-views",
+      "mutter:color-state-transform",
+      "mutter:wayland-color-management",
+      "mutter:wayland-color-management-wayland-night-light-bt2100-scanout",
+      "mutter:wayland-color-management-wayland-night-light-bt2100-capture",
+      "mutter:wayland-color-management-wayland-mapping-blending-target",
+      "mutter:wayland-color-management-wayland-mapping-target-gamut",
+      "mutter:wayland-color-management-wayland-published-reference-factor"
+    ],
+    "environment": {
+      "LIBGL_ALWAYS_SOFTWARE": "1",
+      "GALLIUM_DRIVER": "llvmpipe",
+      "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+    },
+    "unset_environment": [
+      "DISPLAY",
+      "WAYLAND_DISPLAY",
+      "DBUS_SESSION_BUS_ADDRESS",
+      "DBUS_SYSTEM_BUS_ADDRESS",
+      "XDG_RUNTIME_DIR"
+    ]
+  },
+  "observed_allocation_evidence": {
+    "night_light_painted_steps": 26,
+    "night_light_offscreen_replacements": 0,
+    "reference_luminance_steps": 10,
+    "reference_luminance_offscreen_replacements": 0,
+    "method": "Framebuffer pointer equality after each paint, protected by a strong reference to the original framebuffer; not an allocator counter",
+    "messages": [
+      "# Reference-luminance ramp: 10 steps, 0 offscreen replacements",
+      "# Night Light ramp: 26 painted steps, 0 offscreen replacements"
+    ]
+  },
+  "checks": [
+    {
+      "name": "clutter+clutter/conform - mutter:color-state-transform",
+      "result": "OK",
+      "duration": 2.323643445968628,
+      "returncode": 0,
+      "log": "check-clutter+clutter_conform_-_mutter_color-state-transform.txt",
+      "log_sha256": "fc4e0c8e499a98c6ec38c0173fe890ddeb88249c2efe443199869121bdee48d3",
+      "observed_ramp_messages": []
+    },
+    {
+      "name": "core+mutter/compositor - mutter:stage-views",
+      "result": "OK",
+      "duration": 3.587043523788452,
+      "returncode": 0,
+      "log": "check-core+mutter_compositor_-_mutter_stage-views.txt",
+      "log_sha256": "ed9bd6c57196334d6ce2d574c10370d481ffd801742ed70f956d5dd5297efad0",
+      "observed_ramp_messages": [
+        "# Reference-luminance ramp: 10 steps, 0 offscreen replacements"
+      ]
+    },
+    {
+      "name": "core+mutter/wayland - mutter:wayland-color-management",
+      "result": "OK",
+      "duration": 1.7983226776123047,
+      "returncode": 0,
+      "log": "check-core+mutter_wayland_-_mutter_wayland-color-management.txt",
+      "log_sha256": "7404bdd22819fc930e416c83446c12328a4eb2f6df1bb664eed1c47173f2102b",
+      "observed_ramp_messages": []
+    },
+    {
+      "name": "core+mutter/wayland - mutter:wayland-color-management-wayland-mapping-blending-target",
+      "result": "OK",
+      "duration": 1.1603326797485352,
+      "returncode": 0,
+      "log": "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-mapping-blending-target.txt",
+      "log_sha256": "301a37ad2b90996fad3b8e388feb19fcb3dcf982323bcd6543566be6a5dcca30",
+      "observed_ramp_messages": []
+    },
+    {
+      "name": "core+mutter/wayland - mutter:wayland-color-management-wayland-mapping-target-gamut",
+      "result": "OK",
+      "duration": 1.163856029510498,
+      "returncode": 0,
+      "log": "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-mapping-target-gamut.txt",
+      "log_sha256": "37467267edd934e02e10b000486b811b0205f8ca7f25b0b562e135e54b39a77a",
+      "observed_ramp_messages": []
+    },
+    {
+      "name": "core+mutter/wayland - mutter:wayland-color-management-wayland-published-reference-factor",
+      "result": "OK",
+      "duration": 1.3940961360931396,
+      "returncode": 0,
+      "log": "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-published-reference-factor.txt",
+      "log_sha256": "89cb20970f4e727f11e50b78e1af34b32180821eee847a4ba9f34aaef04894b1",
+      "observed_ramp_messages": []
+    },
+    {
+      "name": "core+mutter/wayland - mutter:wayland-color-management-wayland-night-light-bt2100-scanout",
+      "result": "OK",
+      "duration": 1.1904971599578857,
+      "returncode": 0,
+      "log": "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-night-light-bt2100-scanout.txt",
+      "log_sha256": "85469e190f6bbe990c62c4f036256808c69644f7ad83729c8d82978bc87bae30",
+      "observed_ramp_messages": []
+    },
+    {
+      "name": "core+mutter/wayland - mutter:wayland-color-management-wayland-night-light-bt2100-capture",
+      "result": "OK",
+      "duration": 2.2552592754364014,
+      "returncode": 0,
+      "log": "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-night-light-bt2100-capture.txt",
+      "log_sha256": "f12ce588e90beefd6280e048b7225579a24efc6a99c54e2939bd68823a4ff777",
+      "observed_ramp_messages": [
+        "# Night Light ramp: 26 painted steps, 0 offscreen replacements"
+      ]
+    }
+  ],
+  "patch_sha256": {
+    "0078-clutter-stage-view-Reuse-compatible-offscreen-buffer.patch": "de3c533e34a1c141f4a308d8ba623d39454edef112848d8d69eb083820c9357c",
+    "0079-tests-Exercise-offscreen-reuse-across-colour-state-r.patch": "88ce00cf470003d0d40101be576335b1ce900d18b2321103c9af263f5bba5d72"
+  },
+  "binary_sha256": {
+    "/work/hdr-nativehdr10-20261011/build-sol-offscreen/src/tests/clutter/conform/color-state-transform": "7f793bb064076e5e8bbbbc45c0952cabbc4dbbe5eeed2ae57de23a97d282ce07",
+    "/work/hdr-nativehdr10-20261011/build-sol-offscreen/src/tests/mutter-stage-views": "229996a6d1ad080b7adba290a7d0de0e2e3fc319f77b0c80a8ade440778f7fa6",
+    "/work/hdr-nativehdr10-20261011/build-sol-offscreen/src/tests/mutter-wayland-color-management": "8a7f545ac8cfe6418664e71d7473aa02d3df61ee58ced6a4a7e426ec0014502d",
+    "src/libmutter-51.so": "49fdc4ffe34a557002c49d4d7adb2bb48d68672372cc1649fc222e58641641ef",
+    "clutter/clutter/libmutter-clutter-51.so": "420cb8e13bef3f3ba500fe575d8ed08067b8738524cf640f19371fb82d10b825",
+    "cogl/cogl/libmutter-cogl-51.so": "92ede2813036d69431a9f7e34bbdc17d4598762488ce9779a99d2db6ae90cfd0"
+  },
+  "verification": {
+    "exported_logs_hash_verified": 13,
+    "execution_receipt_sha256": "2437436f8975c18095127daf2abd9c3673f4f1f95a7b670a48889b3d8e1bf4ac",
+    "log_archive_sha256": "920d27c668ef41d811a95a1dbd171449060df400cf60fdf01241fac2714ddf6d",
+    "all_check_stdout_tap_retained": true,
+    "log_sha256": {
+      "check-clutter+clutter_conform_-_mutter_color-state-transform.txt": "fc4e0c8e499a98c6ec38c0173fe890ddeb88249c2efe443199869121bdee48d3",
+      "check-core+mutter_compositor_-_mutter_stage-views.txt": "ed9bd6c57196334d6ce2d574c10370d481ffd801742ed70f956d5dd5297efad0",
+      "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-mapping-blending-target.txt": "301a37ad2b90996fad3b8e388feb19fcb3dcf982323bcd6543566be6a5dcca30",
+      "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-mapping-target-gamut.txt": "37467267edd934e02e10b000486b811b0205f8ca7f25b0b562e135e54b39a77a",
+      "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-night-light-bt2100-capture.txt": "f12ce588e90beefd6280e048b7225579a24efc6a99c54e2939bd68823a4ff777",
+      "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-night-light-bt2100-scanout.txt": "85469e190f6bbe990c62c4f036256808c69644f7ad83729c8d82978bc87bae30",
+      "check-core+mutter_wayland_-_mutter_wayland-color-management-wayland-published-reference-factor.txt": "89cb20970f4e727f11e50b78e1af34b32180821eee847a4ba9f34aaef04894b1",
+      "check-core+mutter_wayland_-_mutter_wayland-color-management.txt": "7404bdd22819fc930e416c83446c12328a4eb2f6df1bb664eed1c47173f2102b",
+      "execution.txt": "b12c5cd119784c504a067f03da3eea9c6184395a4717c5650fac7130b72ce604",
+      "test-inventory.json": "fa3d0ae8c4e7ce36b0abef8bcd8c3779c21d8d9ab17d22066116a4e955c01a14",
+      "testlog-mutter_default.json": "b58b09918163bc59abe1cb62a495fa2d54e1df24183dcded8e626b95b91bf703",
+      "testlog-mutter_default.junit.xml": "c20aafb5602a5186d829441b3fffff3d5d246e9327e73f97105db148c33ff741",
+      "testlog-mutter_default.txt": "2f1b2d62e9e7e6741dd9131e80ba1416913ec168946c6bbd85022e2453512d43"
+    }
+  },
+  "limits": [
+    "Strong framebuffer references prove zero replacements in these two fixtures; no instrumented baseline A/B or all-driver allocation-count claim.",
+    "Reference-luminance ramp validates allocation identity, not per-step pixels.",
+    "Night Light reads/content-checks every intermediate paint; conversion assertions cover warm endpoint and default return, not quantitative per-temperature accuracy.",
+    "No forced fallback-format, dynamic dimension-mismatch or rotated-view reuse fixture.",
+    "No GPU timing, VRAM, energy, physical picture, optical, package or Dolby qualification.",
+    "Frozen nativehdr10 source/build/receipts are unchanged; successful units not rerun.",
+    "Local-only isolated delivery; no publication/merge/devices/AppleTV/credentials. PR16 held unmerged.",
+    "Separate lifecycle follow-up has overlapping patch numbers on its own branch; coordinated integration must serialize and renumber, not blindly concatenate."
+  ],
+  "transport_note": "Initial Mac inline Python launcher was approval-blocked before any native request/execution; normal owned script-file launcher used the authorized run.py transport. No duplicate unit execution.",
+  "remaining": [
+    "Coordinated combined integration/PR publication decision with held dependency; do not alter frozen draft delivery",
+    "Driver fallback/rotation/dimension and physical/performance qualification are outside this source scope"
+  ]
+}

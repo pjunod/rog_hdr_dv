@@ -1,0 +1,309 @@
+{
+  "schema": 1,
+  "stage": "compile-only; independent review and units pending",
+  "native_head": "65b5c00a35f675a84658c52c4cd80cf89b1c4947",
+  "native_tree": "648f28ce4e22e014098a803bc453841abb9eaad9",
+  "base_head": "de09d575e81799a1a75fe34a44d69f04caf2e727",
+  "base_tree": "058bbf9758c65798d4d0010685e32e8e76da9d3d",
+  "commits": [
+    "769c2a375e51f79facb66efe36c2120d0a181bf4 backends/color: Shut down store work before manager resources disappear",
+    "da1929e6a884ede5c394f000ce3bf7d5455c3828 tests/color: Add a guarded real callback delivery barrier",
+    "ef2f85ae14ad4ed68060e79515a6638ef4d9422b tests/color: Exercise shutdown at actual asynchronous delivery boundaries",
+    "65b5c00a35f675a84658c52c4cd80cf89b1c4947 tests/color: Transfer context ownership exactly once during teardown"
+  ],
+  "files": {
+    "config.h.meson": {
+      "blob": "87b4bc5ed40cf73f0236add6704190b8a43ee4d1",
+      "sha256": "c4135c8588fb7ced3dc149216af88967295367379979272257d844906b440770"
+    },
+    "meson.build": {
+      "blob": "56e3230b07b53d706071bc4a66cb2b88d70a390c",
+      "sha256": "3f37485701b6b7c0fd9b846651eb92cefa86597177d84ef47a1046d56ddbc76b"
+    },
+    "src/backends/meta-color-device.c": {
+      "blob": "cf2f11251491b7955fbeebee7e0e6bf64709bc48",
+      "sha256": "07b059c38b85ae97cb7166646ee274a54dbd0cc949041d2c706e56c6f4ceaa75"
+    },
+    "src/backends/meta-color-lifecycle-test-private.h": {
+      "blob": "5ab7372130f0fb524997cfe6d90e6edbd8311fc1",
+      "sha256": "1794a8b9c07935b3d4b3af79cf207c9199a28032bc82544765cea24f558ad418"
+    },
+    "src/backends/meta-color-manager.c": {
+      "blob": "bbd34eadd930b8fe471e956be8bb40195f1ea90e",
+      "sha256": "07da33bb70d3d1402d6a11464d97c753004aeca04b1e7b52ec90c0347fff30f6"
+    },
+    "src/backends/meta-color-profile.c": {
+      "blob": "02d93d4a137a94756a01b3ff754735e3ec4d8741",
+      "sha256": "77de99db9f593b034031e691b66cb2ccac39145244baaca47a9d4acb3f02ffc2"
+    },
+    "src/backends/meta-color-store.c": {
+      "blob": "3b4e108bc26f62ed5492606875dcbd7c9d326651",
+      "sha256": "c754c8febfb280f1a0f667360c84d70bb611cf5c1c2cc06d0eb1c1a90e93144b"
+    },
+    "src/backends/meta-color-store.h": {
+      "blob": "5d927653096552b0071dce878c44c63bba395e9f",
+      "sha256": "9b16e4a37671d97d4ac64078a17aabbb807faa32a499a44a9b61939e03107588"
+    },
+    "src/tests/color-lifecycle-tests.c": {
+      "blob": "b26f2fdc19e450e3166c673b52bb61db084a4ec1",
+      "sha256": "5be9a673c7668ae8d01c5b2d2849cfd1a21a1a4b1c8a1b3a938f92a2fee043cd"
+    },
+    "src/tests/meson.build": {
+      "blob": "467c586a4fdec307a80eaeff4ef19bb10c7cc01e",
+      "sha256": "c6d667a389769b1e4a2ad443511599aba2a9ee642b322684eee114b355ce5e2d"
+    }
+  },
+  "configs": {
+    "enabled": {
+      "sha256": "ba07388c76741dcb9d1ae7739e4b6971b3369ecc10418e7e33f442661a80e975",
+      "guard_defined": true,
+      "hook_symbols_present": true
+    },
+    "disabled": {
+      "sha256": "8c6fbc4ffcdd1d319f33345940af9846ec9b1e9c1fdde688fed50f6fcf5f061c",
+      "guard_defined": false,
+      "hook_symbols_present": false
+    }
+  },
+  "binaries_sha256": {
+    "enabled-store-object": "14fa2dc5ba3f195ae8ccbddb2769efe2bad272580ec888d99efa996584d31fa7",
+    "libmutter": "fc701461866ef3ca8111ae207bda1831c57acfde5699931cfd7cf0a9a2c40a33",
+    "lifecycle-executable": "f25d4035d1e930b5fb0bdd6428eed931ce210b94ec75268dba1f49a0f64bd5ef",
+    "disabled-store-object": "1eedfc18480ba4fa9ee641ea53d46d9d27a3d24b0688ac90f0ac6ec305561a8b"
+  },
+  "unit_tests_executed": 0,
+  "behavior_probes_executed": 0,
+  "task": "t_e76fe6ee",
+  "review_child": "t_a26a1173",
+  "validation_child": "t_8eee5d9f",
+  "review_status": "R1 corrected; same-card adversarial rereview pending; runtime validation NOT authorized",
+  "finding_disposition": {
+    "R1": "Accepted; transfer sole owned MetaContext using g_steal_pointer into consuming meta_context_destroy; remove second clear; manager weak-finalization assertion/callback/cycle-release checks unchanged",
+    "fixture_audit": "Single destroy callsite at269; conditional finish_fixture checks pointer at278; global ownership originates at913 and final main clear at942 sees NULL after transfer; no extra ref/retention or production change",
+    "native_hdr_control": "Earlier builder proposal incorrect; pure g_test parser/policy without MetaContext, excluded by reviewer"
+  },
+  "superseded_candidate": {
+    "head": "ef2f85ae14ad4ed68060e79515a6638ef4d9422b",
+    "tree": "2f6324d764063b057ba1ae57b69571abacfb82f2",
+    "historical_receipt": "colour-async-lifetime.json",
+    "status": "Rejected for R1; preserved, not runtime acceptance"
+  },
+  "native_requests": [
+    {
+      "request": "54b972abc1534fc092b0bfef1e9d74b7",
+      "purpose": "Initial clean candidate/context-consume/target discovery",
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.18,
+      "architecture": "x86_64",
+      "error": null,
+      "log_sha256": "10f58eb710e4e0f61e2fa5ce3c667cb4ab0d8cf2b48c4e81f4b00747954d6664",
+      "log_artifact": "native-logs/54b972abc1534fc092b0bfef1e9d74b7.txt",
+      "native_log_returned": true
+    },
+    {
+      "request": "dcc096edbe2d404193d6e6dc77bd90aa",
+      "purpose": "Correction request failed in transport; no execution state returned",
+      "ok": false,
+      "exit_code": null,
+      "seconds": null,
+      "architecture": null,
+      "error": "Worker exited 255: Error: Failed to retrieve PID of executing child process\n",
+      "log_sha256": "9f782baabf17a80d6ee765a7b8f2d82a9f4424688a689c24b80f9a05c58282af",
+      "log_artifact": "native-logs/dcc096edbe2d404193d6e6dc77bd90aa.txt",
+      "native_log_returned": false
+    },
+    {
+      "request": "d6e9a305362e47f0aeb421c1782f61e8",
+      "purpose": "Read-only recovery failed in transport; no native state returned",
+      "ok": false,
+      "exit_code": null,
+      "seconds": null,
+      "architecture": null,
+      "error": "Worker exited 255: Error: Failed to retrieve PID of executing child process\n",
+      "log_sha256": "9f782baabf17a80d6ee765a7b8f2d82a9f4424688a689c24b80f9a05c58282af",
+      "log_artifact": "native-logs/d6e9a305362e47f0aeb421c1782f61e8.txt",
+      "native_log_returned": false
+    },
+    {
+      "request": "9a51bf79136c47d29b6eb18931316b4b",
+      "purpose": "Coordinator repaired transport then verified clean old candidate and no R1 artifacts",
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.07,
+      "architecture": "x86_64",
+      "error": null,
+      "log_sha256": "53a32e2eff9d8818f9c5bd6a31c01569dd1339ff8ae019c5d7c7924654485a97",
+      "log_artifact": "native-logs/9a51bf79136c47d29b6eb18931316b4b.txt",
+      "native_log_returned": true
+    },
+    {
+      "request": "14e9a8ef83324dc7918b9f5ec39b3948",
+      "purpose": "Generated request SyntaxError before any native edit; raw-string launcher corrected",
+      "ok": false,
+      "exit_code": 1,
+      "seconds": 0.13,
+      "architecture": "x86_64",
+      "error": null,
+      "log_sha256": "22779a537cfb0eeda4940b5acb2d3deb4fc1a4cabfeb8a60a2ee32eed289e868",
+      "log_artifact": "native-logs/14e9a8ef83324dc7918b9f5ec39b3948.txt",
+      "native_log_returned": true
+    },
+    {
+      "request": "294f1af00e0545a3aac9046f6121d834",
+      "purpose": "Corrective lifecycle executable compile/link, authored commit, canonical export and full81 replay",
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 2.89,
+      "architecture": "x86_64",
+      "error": null,
+      "log_sha256": "aaa1ce0cb651256ba0ffe8716a002b69907e2ffa363541f655213babc6abda96",
+      "log_artifact": "native-logs/294f1af00e0545a3aac9046f6121d834.txt",
+      "native_log_returned": true
+    },
+    {
+      "request": "ca693468f5ed46568cb28c1dcb7bf75f",
+      "purpose": "Read-only corrected source/binary/registration/Werror readback; replay cleanup verified",
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.17,
+      "architecture": "x86_64",
+      "error": null,
+      "log_sha256": "837c1f054a192f6c947c749f7252bd03a5fa2f10d7dcdced19e2405e3a9aab25",
+      "log_artifact": "native-logs/ca693468f5ed46568cb28c1dcb7bf75f.txt",
+      "native_log_returned": true
+    }
+  ],
+  "canonical_replay": {
+    "scope": "full81 canonical replay; no unit execution",
+    "candidate_head": "65b5c00a35f675a84658c52c4cd80cf89b1c4947",
+    "candidate_tree": "648f28ce4e22e014098a803bc453841abb9eaad9",
+    "replay_head": "a2a391c400006d525c4e909cbb461095dbde73b7",
+    "replay_tree": "648f28ce4e22e014098a803bc453841abb9eaad9",
+    "tree_equal": true,
+    "patches": {
+      "0001-backends-native-Support-native-DisplayID-RGB-BT.2020.patch": "d584a8b0a8bee5ec91438a439e4c3632eca9ef3eda0ef6c2329014139cb383cb",
+      "0002-backends-color-Separate-the-native-target-luminance-.patch": "f77652dc2e4c2084c30223763b854da33dfc22d59fd1b944f302ef26d4266e8c",
+      "0003-tests-native-hdr-Cover-native-target-policy-and-immu.patch": "2bc23a00a4f55d58b905a2ab4abb2af5fbc253f59ab175cfa3caf7cab1398bb5",
+      "0004-backends-color-Refresh-preferred-targets-after-outpu.patch": "13028cd64bd69b373022f2826f4a029b41102fa7c1e7308dab4a43e899dff098",
+      "0005-tests-color-management-Account-for-global-forced-HDR.patch": "cb14f98416ff4602f34a096428816612b7169df9c122539dbba63badbee6b4bc",
+      "0006-wayland-color-management-Dispose-target-records-befo.patch": "5a1c7cd3e2ab6e18baff5edd2b07c28ccac6e0c98068a490093e01db733fb455",
+      "0007-tests-native-hdr-Keep-the-fixture-mode-in-the-forced.patch": "d466982356e2e036eb54a0ba2d81dc79ac13fb22c8a6bcc07aa20f4de112a0af",
+      "0008-backends-color-Publish-target-primaries-apart-from-t.patch": "7254433476becd51092c15048bfb41c0c7c234a19b70f63a5c82314367c3c143",
+      "0009-tests-native-hdr-Cover-native-target-primaries-and-t.patch": "e7fbb48529391541c0a6ba828c3d73221070ef16d6facd8ff40f6d56a43a6617",
+      "0010-tests-Run-target-volume-cases-in-separate-test-invoc.patch": "f828510ceb79688c7a4fa56830caa11c1259fc89759ee683f3b10933230738b9",
+      "0011-clutter-color-Add-a-fallible-definition-of-the-linea.patch": "457f65542272147f35f3b804338c73f5bcf5a7c07151b0eead8c6f9d35fc792f",
+      "0012-backends-color-Publish-target-primaries-with-one-con.patch": "a0ccde5291d60edf83dbbbdde5f51062d1299f9d852fe3f6dd7cd5ff9a135c82",
+      "0013-wayland-color-management-Accept-signed-custom-primar.patch": "8fbfece4329dc0030ff7a3f00bc95c373b133310359d934930b0e8df746211d0",
+      "0014-wayland-color-management-Fix-ICC-file-range-and-desc.patch": "8854697d8800ff3b0201745613b7643e7b2c2f66265d2c81162304b3cc52880d",
+      "0015-core-util-Read-at-the-absolute-offset-and-reject-sho.patch": "ea41de70a5dc0f54925a29a5be32d6d2da0842f3a232cbb8c9857ce4540bec3c",
+      "0016-wayland-color-management-Post-the-creator-s-own-unsu.patch": "b7a574fe57b1d22ddae748287df41fd266100a5fef428bbe85eee2aa12cfce94",
+      "0017-backends-color-Validate-EDID-primaries-before-using-.patch": "a42f5c9c0fd06a79be9c350059b0274cdf44106dddecfc298380efc733c4c162",
+      "0018-tests-color-management-Cover-signed-custom-primaries.patch": "bdfbbd16a18e311776be951e990f1120a71cbc1a581ec745f1488f9fea8070a2",
+      "0019-tests-color-management-Cover-ICC-file-ranges-descrip.patch": "35be19e2b13f643d1f50f98620e13fbdfa43bb17aa4f5df1037dd9b1bc3d4914",
+      "0020-tests-color-management-Cover-the-creator-params-unsu.patch": "96c481ee46425750da0146a67411b01f1bfa60c14fc2e9304170bf0a32cdd947",
+      "0021-tests-color-management-Expect-the-disconnect-warning.patch": "14f81cea25f84cb2912be363ac30d50b0a207184665dc8fc90c0f4ec092d6883",
+      "0022-clutter-color-Add-the-HLG-transfer-function.patch": "23e7135dd0d912f02c3abade895f6127258a4dbd37bd381425d7228adb978380",
+      "0023-wayland-color-management-Accept-and-advertise-HLG.patch": "99f6467d492e4733efee6378a56f54dc7d66fa86e75d6cfbaf77db0859867a01",
+      "0024-tests-color-management-Cover-HLG-decoding-encoding-a.patch": "ab94ecd3b4eb34b6a169cd813ecfcd0ef373639d886066d954e4ffe27e8a3134",
+      "0025-clutter-color-Give-parametric-color-states-a-target-.patch": "307e9d61a7ce516723133dde8ef46e1fec9952dc1d7bc57430d0b754476cb3da",
+      "0026-wayland-color-management-Accept-mastering-metadata-a.patch": "830704dd9ded04cf500002a6bdca0657d71642e7b84ff1b88967c657c946ca99",
+      "0027-tests-color-management-Cover-mastering-metadata-and-.patch": "f9a4129e4ac923c257054fe22a872a9bdd05d6329bd9e306fb7571b524e07196",
+      "0028-clutter-color-Map-highlights-toward-a-declared-targe.patch": "7f47188ef627b250410fd6c98582c19d583c65a020f0e16763224f7a8dce295f",
+      "0029-backends-color-Blend-for-the-output-s-declared-targe.patch": "68ad6106fa81e501a82b819cc5014f63f3186dd3e3cb483597c5d19e3016c78b",
+      "0030-native-Composite-surfaces-and-cursors-whose-highligh.patch": "36e9406c968151ad43bd4f0dae704c0a6f879ec0331afc619a7a4e5d5d23ec8f",
+      "0031-tests-color-management-Cover-highlight-mapping-and-s.patch": "0e08e166d5a49cd0278649f0ef42f5c3f2e57dd0a8f2fd24308ee2923d5af715",
+      "0032-clutter-color-Compress-gamut-toward-a-declared-displ.patch": "ffe38a045f3b2ac40d76bc5e1eb9f5413edd639e9ae2edc3536c4b5699152744",
+      "0033-native-Composite-surfaces-and-cursors-whose-gamut-is.patch": "0f93259ca6035df471eae00abd0632755b4e61f1d6840699c366dd1a2d5b3dca",
+      "0034-backends-color-Render-for-the-output-s-declared-targ.patch": "d195b4051a545a8d0b7a259d88461de62465d2c7034da3727bdad6a240df03f5",
+      "0035-tests-color-management-Cover-gamut-compression-and-s.patch": "3515c15a9e8e680f896a364ddb398f376f167621eef284afd2f91c8924d84eec",
+      "0036-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch": "241ba62404cf3cc381dea2dde320054032bcd08f0bcf97fcfe16a5d52f720904",
+      "0037-clutter-color-Use-the-BT.2100-Table-5-HLG-system-gam.patch": "4c762af839a1f7e743d0c8b3d96a450465da8ec5dca8035655cfa868d3a27989",
+      "0038-clutter-color-Make-display-targets-only-through-an-e.patch": "0493e2dcdeb07bd94b2ddc9eaa610101dddc213285d869fb216e3c469d51a7ee",
+      "0039-clutter-color-Decide-mapping-once-per-source-and-tar.patch": "cc4a027754f626708c4b2a611485e0629ab3fdf8bd2f355eefcec55af7d646c1",
+      "0040-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch": "684e090b92cb7f06bcd0a68f4e4ad50f6f3778b297a8b099edf6a1287cc66508",
+      "0041-wayland-color-management-Correct-comments-on-masteri.patch": "9ba1a3f9201f8613bfc6cf65312d7c0186a37e0cc2b65c263e7de56817558ed4",
+      "0042-wayland-color-management-Publish-descriptions-on-exa.patch": "0bd24f20cdc265ed692cbb92cf96154cd8b7a3e446cf302807b5dca7cf376bf2",
+      "0043-clutter-color-Evaluate-gamut-compression-without-cla.patch": "15829e8c293de99fcd707609be72fb0e31ca862673f0710a4c5831afb4c4bf04",
+      "0044-backends-color-Treat-every-declared-target-source-as.patch": "ea9fe5ad9a671868c5d1b44913b0a7f7f12ceabca2dd8f80fadbf76124e435cb",
+      "0045-backends-color-Take-the-target-peak-from-CTA-HDR-sta.patch": "58f15d930b77f77c0676929a946c88c3e3b60765c1cb1447a7924ab44e8675da",
+      "0046-clutter-color-Judge-gamut-containment-in-the-frame-o.patch": "27af5f7f5031867fad8fa75e84d80d967a713664cae4969025ee2c31ced54a90",
+      "0047-backends-color-Take-native-SDR-target-primaries-from.patch": "27bc28e26cea83373ed60664a4e040dd84e770478513480f910cf01f9927949c",
+      "0048-tests-native-hdr-Cover-CTA-and-base-EDID-target-sour.patch": "185416ebbcf3a2db08b8b386ed1015517be01385adaba7e8ad580b9185648ef5",
+      "0049-tests-color-management-Cover-CTA-and-base-EDID-displ.patch": "f8410b9c1028b5af3691cbe18179262d7c7a76e8598a90414e8df1743dc1070f",
+      "0050-clutter-color-Adapt-a-display-s-output-to-a-white-po.patch": "a0e38f0b3f90a87af6aa3d6c2f644a0cc37d35f7fd22cddbf54cae43d30d21d9",
+      "0051-compositor-Composite-content-on-outputs-whose-white-.patch": "1f8ef57914a2f7581da102c5418b9f9a431c79b0f6c82526197383b9d82ae68c",
+      "0052-backends-color-Apply-Night-Light-in-linear-light-in-.patch": "f4a556c52a0de1c5f2c7900ef66fffc6d66be06d6c6c2757dfa5f546f7037d08",
+      "0053-clutter-color-Bound-the-white-adaptation-with-diagon.patch": "532271e4917ce495220ad8e8a949aff29867efa408bc06c4ff639cbfd50d1664",
+      "0054-tests-Cover-Night-Light-mode-transitions-captures-an.patch": "4c7e600f0f48c59da48ed694fd090bd64eb650525f9eea94e3e849e4c2d399f0",
+      "0055-backends-monitor-Carry-per-monitor-target-override-d.patch": "36e7c0c0b7eaaffc48aed612e787b31eef0a581fef9aabf6a0dc0b80147f0413",
+      "0056-backends-monitor-Persist-and-validate-target-overrid.patch": "a007034d047b9d0f8554586f88915858161bdadb7f0854e6446284596ddac636",
+      "0057-backends-monitor-Retain-color-settings-when-copying-.patch": "5111ae1ae4efaf9e7c0e8349dce0464be2b6bd0f1f5bca4fbd40d67ce8fffd7a",
+      "0058-backends-monitor-Expose-configured-and-effective-tar.patch": "cd28ab545f9eaf442fd76176ca650581257152e1d3a503381ae58a74016a03f2",
+      "0059-gdctl-Preserve-per-monitor-target-declarations-and-s.patch": "b7bcdd194a8417e90b6c124a212dc151e1f6ce12b4d15cb24eb17ec23a7a4e4a",
+      "0060-backends-monitor-Report-software-PQ-Night-Light-supp.patch": "4f6978ef5698222b486d9a9814c9abf2134997c6877a88fc8468b758f9768c34",
+      "0061-backends-color-Select-per-monitor-target-overrides-a.patch": "16c41ce324f8fda8c58f312489a103960cf391871ce3df8dcfdc56884a9dcbff",
+      "0062-clutter-color-Anchor-the-Night-Light-adaptation-at-t.patch": "26799d78258b51ec1f751ac0c21c84b0069541f647c185ad164c7b50be974216",
+      "0063-backends-color-Render-without-Night-Light-when-its-w.patch": "1db066df99c8742d34dc691dc3c839d6f2d79ca246a20902c8150b9f67c74046",
+      "0064-tests-monitor-dbus-Wait-for-the-restored-target-over.patch": "f05da67e7ab8de2b1255f447eb3e81d7704b1711790146a93581211e68980f4d",
+      "0065-backends-monitor-Keep-accepting-truncated-monitors.x.patch": "7084aac4fbced1f9da1180b44366a1443fa4e9a0c6b5c84857311e39d6c1030f",
+      "0066-tests-Run-the-display-target-user-override-case-on-i.patch": "b5b202c5ca1215e646e8a9e880ddfeda30e8801198bcbe4eecc4e4a05aeafc75",
+      "0067-tests-color-management-Read-back-captures-across-BT..patch": "143f1c299c23688f6b82ab9d1bf2a65f71bc31b5aef7a96f2d6173166521df18",
+      "0068-tests-color-management-Check-that-capture-readbacks-.patch": "8007ea6991347a46ca08e5be883eaa461924ac2867c39dce9b27d7ae44a5a12c",
+      "0069-tests-color-hdr-Bound-the-channel-residue-of-single-.patch": "5e2e234f96323de92b64b9c921d8605560c2612805c80693620b4daa1a412ff4",
+      "0070-backends-monitor-manager-Forget-the-restore-handle-o.patch": "2fbbe32c0d29d6286bd52505b3618aaab77dac3ea9fefbe363517df64523a7f2",
+      "0071-tests-monitor-dbus-Hold-the-confirmation-before-reje.patch": "60f83722d60dddf5181c4d90cc73c53bda5ce9a758c6994fdfa9fa813f6167d0",
+      "0072-backends-color-Leave-colord-when-the-manager-drops-a.patch": "8cc071afe9aeaaa3147560f23e595f09a1a404380f91311d5806d21fd181ae34",
+      "0073-backends-color-Drop-removed-color-devices-before-cre.patch": "055990a5af4f7eff12af2e6553001273efd8941dd300d4cec3d901dff001c340",
+      "0074-tests-color-management-Check-colord-devices-across-u.patch": "d7cd4f1d5a5cd013f4b4ac9c298c1653db0be105213ecc5ef3bf14a526967d49",
+      "0075-backends-color-device-Leave-a-cancelled-device-profi.patch": "bd6d424839c2b9d855f6e9618c81e4250a36797f6dc1de8bc1b962f09b72529d",
+      "0076-backends-color-profile-Leave-a-cancelled-colord-prof.patch": "b300fee139cd6767d6ad9990d507949af406e9276a599ddab5afa15d78dd8386",
+      "0077-tests-color-management-Unplug-a-monitor-while-its-pr.patch": "49830f651c81896f07e8875cffd78411f320abf6e8b7e4dbf9401cae39486092",
+      "0078-backends-color-Shut-down-store-work-before-manager-r.patch": "afd6d2632aa0e8171940c1c91e52e506646dfc37ee45f6f31614e4193ed09612",
+      "0079-tests-color-Add-a-guarded-real-callback-delivery-bar.patch": "d856d976bae1c88fc86c19d8a040fe882d78d57cd172d33b92577e400b658099",
+      "0080-tests-color-Exercise-shutdown-at-actual-asynchronous.patch": "95c96c36fc8a212dc7bfc933e348f69466de50eb376f8336b3bbb6db15e1d28c",
+      "0081-tests-color-Transfer-context-ownership-exactly-once-.patch": "6b7d9d9daa46b8d107671483865c1645a6fc3aa8edd137f69f80081786f6b86b"
+    },
+    "frozen_native_head_unchanged": true,
+    "frozen_native_status_clean": true
+  },
+  "patch_prefix_0001_0080_byte_identical": true,
+  "sha256sums_change": "Deliberately append only0081 corrective patch entry; all195 previous entries unchanged",
+  "corrective_native_files": [
+    "src/tests/color-lifecycle-tests.c"
+  ],
+  "production_binary_identities_unchanged": true,
+  "production_source_files_unchanged": true,
+  "production_compile_reused": "Existing successful whole-enabled build and guard-disabled affected production objects preserved; only lifecycle object/executable recompiled/linked",
+  "registration_sha256": "65fbd1c97a10f995beda04457204a774ff68a66c38cd557a606a5573f0a7afa1",
+  "rereview_manifest_sha256": "f23aa189d932010dc200073a88676262ac3ad6e71f4cd4c0e8f4bf163d63b9fd",
+  "planned_invocations": 24,
+  "deferred_test_paths": [
+    "/color-lifecycle/startup/queued-success",
+    "/color-lifecycle/startup/cancelled",
+    "/color-lifecycle/generation/directory-query",
+    "/color-lifecycle/generation/directory-create",
+    "/color-lifecycle/generation/write-result",
+    "/color-lifecycle/generation/profile-result",
+    "/color-lifecycle/generation/efi-success",
+    "/color-lifecycle/generation/efi-fallback",
+    "/color-lifecycle/shared/caller-cancel",
+    "/color-lifecycle/finish/queued-device",
+    "/color-lifecycle/assigned/connect",
+    "/color-lifecycle/assigned/read",
+    "/color-lifecycle/finish/queued-assigned",
+    "/color-lifecycle/directory/query",
+    "/color-lifecycle/directory/read",
+    "/color-lifecycle/local-ready/shutdown",
+    "/color-lifecycle/local-ready/finalize",
+    "/color-lifecycle/profile/create-after-finalize",
+    "/color-lifecycle/profile/retained-owner",
+    "/color-lifecycle/profile/retained-assigned"
+  ],
+  "prior_compiler_and_transport_failures_preserved": true,
+  "constraints": [
+    "frozen nativehdr10 receipts/source/build unchanged",
+    "offscreen optimization not integrated",
+    "PR16 held; no push/merge/deployment/devices/Apple TV/credentials/owner repository access"
+  ]
+}

@@ -1,0 +1,368 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Sol Agent <sol-agent@invalid>
+Date: Mon, 12 Oct 2026 19:32:23 +0000
+Subject: [PATCH] tests/color: Add a guarded real callback delivery barrier
+
+---
+ meson.build                                   |  1 +
+ src/backends/meta-color-device.c              | 21 ++++++++
+ .../meta-color-lifecycle-test-private.h       | 42 +++++++++++++++
+ src/backends/meta-color-manager.c             | 16 ++++++
+ src/backends/meta-color-profile.c             | 11 ++++
+ src/backends/meta-color-store.c               | 54 ++++++++++++++++++-
+ src/backends/meta-color-store.h               |  5 ++
+ 7 files changed, 149 insertions(+), 1 deletion(-)
+ create mode 100644 src/backends/meta-color-lifecycle-test-private.h
+
+diff --git a/meson.build b/meson.build
+index 47b7527..9da2693 100644
+--- a/meson.build
++++ b/meson.build
+@@ -610,6 +610,7 @@ cdata.set('HAVE_XKBCOMMON_KANA_COMPOSE_LEDS',
+ cdata.set('HAVE_EIS_EVENT_REF',
+   libeis_dep.version().version_compare('>= 1.5.0'))
+ cdata.set('HAVE_ASAN_TESTS', have_asan_tests)
++cdata.set('HAVE_COLOR_LIFECYCLE_TESTS', have_mutter_tests)
+ 
+ if have_xwayland
+   xkb_base = xkeyboard_config_dep.get_variable('xkb_base')
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 725e6a6..cf2f112 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -27,6 +27,7 @@
+ 
+ #include "backends/meta-backend-private.h"
+ #include "backends/meta-color-device.h"
++#include "backends/meta-color-lifecycle-test-private.h"
+ #include "backends/meta-color-manager-private.h"
+ #include "backends/meta-color-profile.h"
+ #include "backends/meta-color-store.h"
+@@ -1848,6 +1849,11 @@ on_profile_written (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("device:on_profile_written",
++                                          source_object, res, user_data,
++                                          on_profile_written))
++    return;
++
+   GFile *file = G_FILE (source_object);
+   g_autoptr (GTask) task = G_TASK (user_data);
+   GenerateProfileData *data = g_task_get_task_data (task);
+@@ -1917,6 +1923,11 @@ on_directories_created (GObject      *source_object,
+                         GAsyncResult *res,
+                         gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("device:on_directories_created",
++                                          source_object, res, user_data,
++                                          on_directories_created))
++    return;
++
+   GFile *directory = G_FILE (source_object);
+   GTask *thread_task = G_TASK (res);
+   g_autoptr (GTask) task = G_TASK (user_data);
+@@ -1966,6 +1977,11 @@ on_directory_queried (GObject      *source_object,
+                       GAsyncResult *res,
+                       gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("device:on_directory_queried",
++                                          source_object, res, user_data,
++                                          on_directory_queried))
++    return;
++
+   GFile *directory = G_FILE (source_object);
+   g_autoptr (GTask) task = G_TASK (user_data);
+   g_autoptr (GFileInfo) file_info = NULL;
+@@ -2278,6 +2294,11 @@ on_efi_panel_color_info_loaded (GObject      *source_object,
+                                 GAsyncResult *res,
+                                 gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("device:on_efi_panel_color_info_loaded",
++                                          source_object, res, user_data,
++                                          on_efi_panel_color_info_loaded))
++    return;
++
+   GFile *file = G_FILE (source_object);
+   g_autoptr (GTask) task = G_TASK (user_data);
+   MetaColorDevice *color_device =
+diff --git a/src/backends/meta-color-lifecycle-test-private.h b/src/backends/meta-color-lifecycle-test-private.h
+new file mode 100644
+index 0000000..5ab7372
+--- /dev/null
++++ b/src/backends/meta-color-lifecycle-test-private.h
+@@ -0,0 +1,42 @@
++/*
++ * Copyright (C) 2026 Sol Agent
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ */
++
++#pragma once
++
++#include "config.h"
++
++#include <gio/gio.h>
++
++#include "core/util-private.h"
++
++#ifdef HAVE_COLOR_LIFECYCLE_TESTS
++/* Owning main context only. TRUE parks this delivery before ownership adoption.
++ * The test must replay the exact callback once with hooks detached. Only the
++ * source/result may be referenced by the queue; callback_data keeps its original
++ * borrowed/transferred ownership. No production queue or lifetime is added. */
++typedef gboolean (* MetaColorLifecycleTestHook) (const char          *point,
++                                                GObject             *source_object,
++                                                GAsyncResult        *result,
++                                                gpointer             callback_data,
++                                                GAsyncReadyCallback  callback,
++                                                gpointer             hook_data);
++
++META_EXPORT_TEST
++void meta_color_lifecycle_test_set_hook (MetaColorLifecycleTestHook hook,
++                                         gpointer                   hook_data);
++
++META_EXPORT_TEST
++gboolean meta_color_lifecycle_test_intercept (const char          *point,
++                                               GObject             *source_object,
++                                               GAsyncResult        *result,
++                                               gpointer             callback_data,
++                                               GAsyncReadyCallback  callback);
++#else
++#define meta_color_lifecycle_test_intercept(...) FALSE
++#endif
+diff --git a/src/backends/meta-color-manager.c b/src/backends/meta-color-manager.c
+index 2a75662..bbd34ea 100644
+--- a/src/backends/meta-color-manager.c
++++ b/src/backends/meta-color-manager.c
+@@ -50,6 +50,7 @@
+ #include "backends/meta-backend-types.h"
+ #include "backends/meta-color-calibration-session.h"
+ #include "backends/meta-color-device.h"
++#include "backends/meta-color-lifecycle-test-private.h"
+ #include "backends/meta-color-store.h"
+ #include "backends/meta-dbus-session-manager.h"
+ #include "backends/meta-monitor-manager-private.h"
+@@ -318,6 +319,11 @@ cd_client_connect_cb (GObject      *source_object,
+                       GAsyncResult *res,
+                       gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("manager:cd_client_connect_cb",
++                                          source_object, res, user_data,
++                                          cd_client_connect_cb))
++    return;
++
+   CdClient *client = CD_CLIENT (source_object);
+   MetaColorManager *color_manager;
+   MetaColorManagerPrivate *priv;
+@@ -382,6 +388,11 @@ on_gsd_color_ready (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("manager:on_gsd_color_ready",
++                                          source_object, res, user_data,
++                                          on_gsd_color_ready))
++    return;
++
+   MetaColorManager *color_manager;
+   MetaColorManagerPrivate *priv;
+   MetaDBusSettingsDaemonColor *gsd_color;
+@@ -417,6 +428,11 @@ on_gsd_power_screen_ready (GObject      *source_object,
+                            GAsyncResult *res,
+                            gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("manager:on_gsd_power_screen_ready",
++                                          source_object, res, user_data,
++                                          on_gsd_power_screen_ready))
++    return;
++
+   MetaColorManager *color_manager;
+   MetaColorManagerPrivate *priv;
+   MetaDBusSettingsDaemonPowerScreen *gsd_power_screen;
+diff --git a/src/backends/meta-color-profile.c b/src/backends/meta-color-profile.c
+index 8cc4a20..02d93d4 100644
+--- a/src/backends/meta-color-profile.c
++++ b/src/backends/meta-color-profile.c
+@@ -26,6 +26,7 @@
+ #include <gio/gio.h>
+ 
+ #include "backends/meta-color-manager-private.h"
++#include "backends/meta-color-lifecycle-test-private.h"
+ #include "mtk/mtk.h"
+ 
+ enum
+@@ -180,6 +181,11 @@ on_cd_profile_connected (GObject      *source_object,
+                          GAsyncResult *res,
+                          gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("profile:on_cd_profile_connected",
++                                          source_object, res, user_data,
++                                          on_cd_profile_connected))
++    return;
++
+   CdProfile *cd_profile = CD_PROFILE (source_object);
+   MetaColorProfile *color_profile = user_data;
+   g_autoptr (GError) error = NULL;
+@@ -213,6 +219,11 @@ on_cd_profile_created (GObject      *source_object,
+                        GAsyncResult *res,
+                        gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("profile:on_cd_profile_created",
++                                          source_object, res, user_data,
++                                          on_cd_profile_created))
++    return;
++
+   CdClient *cd_client = CD_CLIENT (source_object);
+   MetaColorProfile *color_profile;
+   g_autoptr (GError) error = NULL;
+diff --git a/src/backends/meta-color-store.c b/src/backends/meta-color-store.c
+index b8ad0b3..3b4e108 100644
+--- a/src/backends/meta-color-store.c
++++ b/src/backends/meta-color-store.c
+@@ -26,6 +26,7 @@
+ #include <stdint.h>
+ 
+ #include "backends/meta-color-device.h"
++#include "backends/meta-color-lifecycle-test-private.h"
+ #include "backends/meta-color-profile.h"
+ #include "backends/meta-monitor-private.h"
+ 
+@@ -54,6 +55,31 @@ typedef struct
+ G_DEFINE_TYPE (MetaColorStore, meta_color_store,
+                G_TYPE_OBJECT)
+ 
++#ifdef HAVE_COLOR_LIFECYCLE_TESTS
++static MetaColorLifecycleTestHook lifecycle_test_hook;
++static gpointer lifecycle_test_hook_data;
++
++void
++meta_color_lifecycle_test_set_hook (MetaColorLifecycleTestHook hook,
++                                   gpointer                   hook_data)
++{
++  lifecycle_test_hook = hook;
++  lifecycle_test_hook_data = hook_data;
++}
++
++gboolean
++meta_color_lifecycle_test_intercept (const char          *point,
++                                    GObject             *source_object,
++                                    GAsyncResult        *result,
++                                    gpointer             callback_data,
++                                    GAsyncReadyCallback  callback)
++{
++  return lifecycle_test_hook &&
++    lifecycle_test_hook (point, source_object, result, callback_data, callback,
++                         lifecycle_test_hook_data);
++}
++#endif
++
+ void
+ meta_color_store_shutdown (MetaColorStore *color_store)
+ {
+@@ -275,6 +301,11 @@ on_store_file_read (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("store:on_store_file_read",
++                                          source_object, res, user_data,
++                                          on_store_file_read))
++    return;
++
+   GFile *file = G_FILE (source_object);
+   g_autoptr (MetaColorStore) color_store = user_data;
+   g_autoptr (GError) error = NULL;
+@@ -307,6 +338,11 @@ query_file_info_cb (GObject      *source_object,
+                     GAsyncResult *res,
+                     gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("store:query_file_info_cb",
++                                          source_object, res, user_data,
++                                          query_file_info_cb))
++    return;
++
+   GFile *file = G_FILE (source_object);
+   g_autoptr (GFileInfo) info = NULL;
+   g_autoptr (GError) error = NULL;
+@@ -504,6 +540,11 @@ on_profile_generated (GObject      *source_object,
+                       GAsyncResult *res,
+                       gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("store:on_profile_generated",
++                                          source_object, res, user_data,
++                                          on_profile_generated))
++    return;
++
+   MetaColorDevice *color_device = META_COLOR_DEVICE (source_object);
+   g_autoptr (GTask) task = G_TASK (user_data);
+   EnsureDeviceProfileData *data = g_task_get_task_data (task);
+@@ -665,7 +706,8 @@ meta_color_store_ensure_device_profile_finish (MetaColorStore  *color_store,
+   g_hash_table_insert (color_store->profiles,
+                        g_strdup (meta_color_profile_get_id (color_profile)),
+                        g_object_ref (color_profile));
+-  return g_steal_pointer (&color_profile);
++  /* The successful device-profile result is borrowed from the tables. */
++  return color_profile;
+ }
+ 
+ typedef struct
+@@ -686,6 +728,11 @@ on_cd_profile_contents_loaded (GObject      *source_object,
+                                GAsyncResult *res,
+                                gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("store:on_cd_profile_contents_loaded",
++                                          source_object, res, user_data,
++                                          on_cd_profile_contents_loaded))
++    return;
++
+   GFile *file = G_FILE (source_object);
+   g_autoptr (GTask) task = G_TASK (user_data);
+   EnsureColordProfileData *data = g_task_get_task_data (task);
+@@ -763,6 +810,11 @@ on_cd_profile_connected (GObject      *source_object,
+                          GAsyncResult *res,
+                          gpointer      user_data)
+ {
++  if (meta_color_lifecycle_test_intercept ("store:on_cd_profile_connected",
++                                          source_object, res, user_data,
++                                          on_cd_profile_connected))
++    return;
++
+   CdProfile *cd_profile = CD_PROFILE (source_object);
+   g_autoptr (GTask) task = G_TASK (user_data);
+   EnsureColordProfileData *data = g_task_get_task_data (task);
+diff --git a/src/backends/meta-color-store.h b/src/backends/meta-color-store.h
+index ebabcd6..5d92765 100644
+--- a/src/backends/meta-color-store.h
++++ b/src/backends/meta-color-store.h
+@@ -31,24 +31,29 @@ G_DECLARE_FINAL_TYPE (MetaColorStore, meta_color_store,
+ 
+ MetaColorStore * meta_color_store_new (MetaColorManager *color_manager);
+ 
++META_EXPORT_TEST
+ void meta_color_store_shutdown (MetaColorStore *color_store);
+ 
++META_EXPORT_TEST
+ gboolean meta_color_store_ensure_device_profile (MetaColorStore      *color_store,
+                                                  MetaColorDevice     *color_device,
+                                                  GCancellable        *cancellable,
+                                                  GAsyncReadyCallback  callback,
+                                                  gpointer             user_data);
+ 
++META_EXPORT_TEST
+ MetaColorProfile * meta_color_store_ensure_device_profile_finish (MetaColorStore  *color_store,
+                                                                   GAsyncResult    *res,
+                                                                   GError         **error);
+ 
++META_EXPORT_TEST
+ void meta_color_store_ensure_colord_profile (MetaColorStore      *color_store,
+                                              CdProfile           *cd_profile,
+                                              GCancellable        *cancellable,
+                                              GAsyncReadyCallback  callback,
+                                              gpointer             user_data);
+ 
++META_EXPORT_TEST
+ MetaColorProfile * meta_color_store_ensure_colord_profile_finish (MetaColorStore  *color_store,
+                                                                   GAsyncResult    *res,
+                                                                   GError         **error);

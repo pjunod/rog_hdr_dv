@@ -1,0 +1,419 @@
+{
+  "schema": 1,
+  "task": "t_71bdbe27",
+  "request": "a19ed8009b8f4cd7ad629f9bb9d967ef",
+  "status": "Exact Ubuntu candidate tree compiled; complete packaging/qualification unfinished",
+  "units_executed": 0,
+  "receipt": {
+    "task": "t_71bdbe27",
+    "head": "7480ecd50527a1584feb53ff18a2d88c34df233d",
+    "tree": "1193050b6082cec1331021252521ad1a1afe8c33",
+    "units": 0,
+    "architecture": "x86_64",
+    "Werror": true,
+    "canonical_replay102_tree_equal": true,
+    "added_exported_symbols": [
+      "meta_color_chromaticity_from_fixed",
+      "meta_color_get_planckian_chromaticity",
+      "meta_color_lifecycle_test_intercept",
+      "meta_color_lifecycle_test_set_hook",
+      "meta_color_store_ensure_colord_profile",
+      "meta_color_store_ensure_colord_profile_finish",
+      "meta_color_store_ensure_device_profile",
+      "meta_color_store_ensure_device_profile_finish",
+      "meta_color_store_shutdown",
+      "meta_color_target_provenance_to_string",
+      "meta_monitor_get_target_override",
+      "meta_monitor_manager_confirm_configuration",
+      "meta_verify_target_override"
+    ],
+    "removed_symbols": [],
+    "packages": [
+      {
+        "file": "libdisplay-info-bin_0.3.0-1ubuntu1~hdr9_amd64.deb",
+        "bytes": 35750,
+        "sha256": "6bcdf691d4a208deed5e0d2551dd2ae476c842a4129bbc86b5c4c55c0e68c846",
+        "control": "Package: libdisplay-info-bin\nVersion: 0.3.0-1ubuntu1~hdr9\nArchitecture: amd64\nDepends: libc6 (>= 2.43), libdisplay-info3 (>= 0.3.0)"
+      },
+      {
+        "file": "libdisplay-info-dev_0.3.0-1ubuntu1~hdr9_amd64.deb",
+        "bytes": 34436,
+        "sha256": "957d13c1315c00d172a5ed98d4b6f4fa40ce3f1918fc4a2b74bd65ab363f224b",
+        "control": "Package: libdisplay-info-dev\nVersion: 0.3.0-1ubuntu1~hdr9\nArchitecture: amd64\nDepends: libdisplay-info3 (= 0.3.0-1ubuntu1~hdr9)"
+      },
+      {
+        "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb",
+        "bytes": 95310,
+        "sha256": "080a4add280ebb94ed7d0da5a0b46fe259fd84b7f35a44d27a128dea24664949",
+        "control": "Package: libdisplay-info3\nVersion: 0.3.0-1ubuntu1~hdr9\nArchitecture: amd64\nDepends: libc6 (>= 2.27)\nProvides: libdisplay-info3-native-hdr-api (= 2)"
+      }
+    ],
+    "commands": [
+      {
+        "argv": [
+          "nm",
+          "-D",
+          "--defined-only",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/build-ubuntu-baseline/src/libmutter-51.so.0.0.0"
+        ],
+        "seconds": 0.003872642992064357,
+        "exit_code": 0,
+        "log": "ubuntu-port-00.txt",
+        "sha256": "e797702c32fa733cf3519aee042a7b2f58c94630a6fc1f22b67f3ae676380442"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "fetch",
+          "--update-shallow",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/upstream",
+          "codex/full-integration-t_71bdbe27"
+        ],
+        "seconds": 0.5807423330843449,
+        "exit_code": 0,
+        "log": "ubuntu-port-01.txt",
+        "sha256": "cebd9a4aa0f2362a29a4218d7e772503bb956f219ceab6a5a0e943c80ac55412"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "cherry-pick",
+          "5f123bb2c203c44c765d56628b47aad1fcfd9e86..d5c29655fc1be42267e25e13885a152199400465"
+        ],
+        "seconds": 0.4368830370949581,
+        "exit_code": 0,
+        "log": "ubuntu-port-02.txt",
+        "sha256": "a9bf4c93b86ba714e5ce057092ef86ada96550dafdf4b1caa4ea4580ce5eae72"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "apply",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu-packaging-metadata.patch"
+        ],
+        "seconds": 0.0023879760410636663,
+        "exit_code": 0,
+        "log": "ubuntu-port-03.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "add",
+          "debian/changelog",
+          "debian/rules"
+        ],
+        "seconds": 0.015106720966286957,
+        "exit_code": 0,
+        "log": "ubuntu-port-04.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "commit",
+          "-m",
+          "debian: prepare nativehdr10 candidate with warnings as errors"
+        ],
+        "seconds": 0.018731924006715417,
+        "exit_code": 0,
+        "log": "ubuntu-port-05.txt",
+        "sha256": "892346fd61a76efa87827bb359595aaab8650c1a826cb9a40393da30b0b192e5"
+      },
+      {
+        "argv": [
+          "ninja",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/build-ubuntu-baseline",
+          "-j2"
+        ],
+        "seconds": 274.46518336597364,
+        "exit_code": 0,
+        "log": "ubuntu-port-06.txt",
+        "sha256": "b9ecd4372d24587dfca317a7d98cdf075a9ab395e41b6934beca14182a1fa6f4"
+      },
+      {
+        "argv": [
+          "nm",
+          "-D",
+          "--defined-only",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/build-ubuntu-baseline/src/libmutter-51.so.0.0.0"
+        ],
+        "seconds": 0.00421349098905921,
+        "exit_code": 0,
+        "log": "ubuntu-port-07.txt",
+        "sha256": "b0ad35f2c0d423c10f760e277262a5853360013f4189a5f1dccf2643dd4f5308"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "format-patch",
+          "--zero-commit",
+          "--no-signature",
+          "--no-numbered",
+          "--start-number=62",
+          "-o",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu",
+          "5085c01b7e26818f9c9b3603091ca18b01d7d7c3..HEAD"
+        ],
+        "seconds": 0.08756717597134411,
+        "exit_code": 0,
+        "log": "ubuntu-port-08.txt",
+        "sha256": "634384a26978c0cbe8ac37b687b42eba886b3c7be88b90383518c9850632ac1e"
+      },
+      {
+        "argv": [
+          "git",
+          "clone",
+          "--no-hardlinks",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-ubuntu"
+        ],
+        "seconds": 0.6712487780023366,
+        "exit_code": 0,
+        "log": "ubuntu-port-09.txt",
+        "sha256": "3c6cb6fc96062177df2b4852d171e7bb315140d02b7221705e4ee26230ca89cb"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-ubuntu",
+          "checkout",
+          "--detach",
+          "3d32d81054448f1d32126647a92ade89c084f288"
+        ],
+        "seconds": 0.17957889405079186,
+        "exit_code": 0,
+        "log": "ubuntu-port-10.txt",
+        "sha256": "227f89247172fb03a897fb4e152da719fc2a7602b9304bdf8d9a2ee21098a167"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-ubuntu",
+          "config",
+          "user.name",
+          "HDR Engineering Agent"
+        ],
+        "seconds": 0.0014076810330152512,
+        "exit_code": 0,
+        "log": "ubuntu-port-11.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-ubuntu",
+          "config",
+          "user.email",
+          "hdr-agent@invalid"
+        ],
+        "seconds": 0.0012708569411188364,
+        "exit_code": 0,
+        "log": "ubuntu-port-12.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "argv": [
+          "git",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-ubuntu",
+          "am",
+          "--quiet",
+          "--keep-cr",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0002-backends-native-scope-native-capability-veto-to-exte.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0003-style-align-native-HDR-helper-regressions.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0004-packaging-prepare-private-native-DisplayID-HDR-candi.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0005-debian-refine-private-symbol-introduction-minima.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0006-color-separate-native-target-luminance-from-encoding.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0007-test-cover-native-target-and-immutable-feedback.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0008-style-align-native-target-feedback.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0009-color-refresh-targets-after-topology-and-validate-wire-range.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0010-test-distinguish-global-HDR-from-native-target-updates.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0011-color-dispose-target-records-before-output-teardown.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0012-test-isolate-fixed-route-forced-HDR-policy.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0013-color-publish-native-target-primaries-independently-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0014-test-cover-native-target-primaries-and-their-Wayland.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0015-test-run-target-volume-cases-in-separate-test-invoca.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0016-clutter-color-Add-a-fallible-definition-of-the-linea.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0017-color-Publish-encoding-and-fallback-target-primaries.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0018-wayland-color-management-Accept-signed-custom-primar.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0019-wayland-color-management-Fix-ICC-file-range-and-desc.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0020-core-util-Read-at-the-absolute-offset-and-reject-sho.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0021-wayland-color-management-Post-the-creator-s-own-unsu.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0022-color-device-Validate-EDID-primaries-before-using-th.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0023-tests-color-management-Cover-signed-custom-primaries.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0024-tests-color-management-Cover-ICC-file-ranges-descrip.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0025-tests-color-management-Cover-the-creator-params-unsu.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0026-debian-Add-nativehdr5-changelog-entry.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0027-tests-color-management-Expect-the-disconnect-warning.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0028-clutter-color-Add-the-HLG-transfer-function.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0029-wayland-color-management-Accept-and-advertise-HLG.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0030-tests-color-management-Cover-HLG-decoding-encoding-a.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0031-clutter-color-Give-parametric-color-states-a-target-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0032-wayland-color-management-Accept-mastering-metadata-a.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0033-tests-color-management-Cover-mastering-metadata-and-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0034-clutter-color-Map-highlights-toward-a-declared-targe.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0035-backends-color-Blend-for-the-output-s-declared-targe.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0036-native-Composite-surfaces-and-cursors-whose-highligh.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0037-tests-color-management-Cover-highlight-mapping-and-s.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0038-debian-Add-nativehdr6-changelog-entry.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0039-clutter-color-Compress-gamut-toward-a-declared-displ.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0040-native-Composite-surfaces-and-cursors-whose-gamut-is.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0041-backends-color-Render-for-the-output-s-declared-targ.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0042-tests-color-management-Cover-gamut-compression-and-s.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0043-debian-Add-nativehdr7-changelog-entry.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0044-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0045-clutter-color-Use-the-BT.2100-Table-5-HLG-system-gam.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0046-clutter-color-Make-display-targets-only-through-an-e.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0047-clutter-color-Decide-mapping-once-per-source-and-tar.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0048-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0049-wayland-color-management-Correct-comments-on-masteri.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0050-wayland-color-management-Publish-descriptions-on-exa.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0051-clutter-color-Evaluate-gamut-compression-without-cla.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0052-debian-Add-nativehdr8-changelog-entry-and-native-HDR.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0053-tests-native-hdr-Indent-the-target-primaries-policy-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0054-backends-edid-Set-the-unusable-chromaticity-status-w.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0055-backends-color-Treat-every-declared-target-source-as.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0056-backends-color-Take-the-target-peak-from-CTA-HDR-sta.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0057-clutter-color-Judge-gamut-containment-in-the-frame-o.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0058-backends-color-Take-native-SDR-target-primaries-from.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0059-tests-native-hdr-Cover-CTA-and-base-EDID-target-sour.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0060-tests-color-management-Cover-CTA-and-base-EDID-displ.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0061-debian-Add-nativehdr9-changelog-entry.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0062-clutter-color-Adapt-a-display-s-output-to-a-white-po.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0063-compositor-Composite-content-on-outputs-whose-white-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0064-backends-color-Apply-Night-Light-in-linear-light-in-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0065-clutter-color-Bound-the-white-adaptation-with-diagon.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0066-tests-Cover-Night-Light-mode-transitions-captures-an.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0067-backends-monitor-Carry-per-monitor-target-override-d.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0068-backends-monitor-Persist-and-validate-target-overrid.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0069-backends-monitor-Retain-color-settings-when-copying-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0070-backends-monitor-Expose-configured-and-effective-tar.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0071-gdctl-Preserve-per-monitor-target-declarations-and-s.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0072-backends-monitor-Report-software-PQ-Night-Light-supp.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0073-backends-color-Select-per-monitor-target-overrides-a.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0074-clutter-color-Anchor-the-Night-Light-adaptation-at-t.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0075-backends-color-Render-without-Night-Light-when-its-w.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0076-tests-monitor-dbus-Wait-for-the-restored-target-over.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0077-backends-monitor-Keep-accepting-truncated-monitors.x.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0078-tests-Run-the-display-target-user-override-case-on-i.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0079-tests-color-management-Read-back-captures-across-BT..patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0080-tests-color-management-Check-that-capture-readbacks-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0081-tests-color-hdr-Bound-the-channel-residue-of-single-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0082-backends-monitor-manager-Forget-the-restore-handle-o.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0083-tests-monitor-dbus-Hold-the-confirmation-before-reje.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0084-backends-color-Leave-colord-when-the-manager-drops-a.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0085-backends-color-Drop-removed-color-devices-before-cre.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0086-tests-color-management-Check-colord-devices-across-u.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0087-backends-color-device-Leave-a-cancelled-device-profi.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0088-backends-color-profile-Leave-a-cancelled-colord-prof.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0089-tests-color-management-Unplug-a-monitor-while-its-pr.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0090-backends-color-Shut-down-store-work-before-manager-r.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0091-tests-color-Add-a-guarded-real-callback-delivery-bar.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0092-tests-color-Exercise-shutdown-at-actual-asynchronous.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0093-tests-color-Transfer-context-ownership-exactly-once-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0094-color-store-sequence-cancellable-lookup-before-trans.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0095-color-store-return-ineligible-requests-before-creati.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0096-backend-destroy-the-owned-Clutter-event-source-befor.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0097-native-seat-detach-incoming-signal-targets-before-di.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0098-tests-assert-native-seat-keymap-disconnection-at-can.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0099-tests-isolate-ineligible-caller-fixture-from-shared-.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0100-clutter-stage-view-Reuse-compatible-offscreen-buffer.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0101-tests-Exercise-offscreen-reuse-across-colour-state-r.patch",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical-ubuntu/0102-debian-prepare-nativehdr10-candidate-with-warnings-a.patch"
+        ],
+        "seconds": 0.47309721598867327,
+        "exit_code": 0,
+        "log": "ubuntu-port-13.txt",
+        "sha256": "0efa37a8709930bbfbc06a2191703b0c7242d8c4a733dfb994e72f12a54dfe04"
+      },
+      {
+        "argv": [
+          "dpkg-deb",
+          "-f",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/libdisplay-info-bin_0.3.0-1ubuntu1~hdr9_amd64.deb",
+          "Package",
+          "Version",
+          "Architecture",
+          "Depends",
+          "Provides"
+        ],
+        "seconds": 0.005913041066378355,
+        "exit_code": 0,
+        "log": "ubuntu-port-14.txt",
+        "sha256": "daaa46fec7674575092fb64cd0a2ffb4e256932a1d155123bb40ed9ac5562d93"
+      },
+      {
+        "argv": [
+          "dpkg-deb",
+          "-f",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/libdisplay-info-dev_0.3.0-1ubuntu1~hdr9_amd64.deb",
+          "Package",
+          "Version",
+          "Architecture",
+          "Depends",
+          "Provides"
+        ],
+        "seconds": 0.005958380992524326,
+        "exit_code": 0,
+        "log": "ubuntu-port-15.txt",
+        "sha256": "3581d6c715ed3a6dcbada0a97dc2f55481bfa034bc27d2374bbb7755f4c12fb7"
+      },
+      {
+        "argv": [
+          "dpkg-deb",
+          "-f",
+          "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb",
+          "Package",
+          "Version",
+          "Architecture",
+          "Depends",
+          "Provides"
+        ],
+        "seconds": 0.005999090964905918,
+        "exit_code": 0,
+        "log": "ubuntu-port-16.txt",
+        "sha256": "a345ff9a86f6de3f16bf4c4f4f00d34f6d46d7b179af1559e013fa49b275d347"
+      }
+    ]
+  },
+  "source_identity": "Native compiler tree equals Mac1193050b; full102 native replay tree equal",
+  "canonical_patch_comparison": {
+    "equal": 101,
+    "metadata_envelope_differences": [
+      {
+        "name": "0102-debian-prepare-nativehdr10-candidate-with-warnings-a.patch",
+        "native_sha256": "d550b49124140586e395d6dc6bbabd093a31165627ab64c95f22ec3947f018cd",
+        "mac_sha256": "d87a565d98058183ec5cf765102599a0bd62fc78b8a5bb2114bd3f887364d5a7"
+      }
+    ],
+    "explanation": "0102 native metadata commit has its real native author timestamp; packaging source bytes/tree equal. Must replay exact final canonical bytes before delivery; do not claim102 byte matches."
+  },
+  "operational_repairs": [
+    "03cd056e preflight stopped on retained untracked .pc metadata;04f48131 read-only confirmed exact baseline tree and only.pc",
+    "008a36cb fetch failed traversing absent pinned-base parent; declared actual d82671c shallow boundary in owned upstream clone only, preserving source/HEAD. No inherited clone mutation or compiler/unit repeated."
+  ],
+  "next": [
+    "Complete all-DSO symbol minima",
+    "Actual amd64 compositor/i386 packages and install/rollback kit",
+    "Exact final canonical replay",
+    "Whole batch review then one affected qualification batch"
+  ]
+}

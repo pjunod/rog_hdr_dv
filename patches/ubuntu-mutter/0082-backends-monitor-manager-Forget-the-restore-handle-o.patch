@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 06:53:59 +0000
+Subject: [PATCH] backends/monitor-manager: Forget the restore handle once the
+ restore runs
+
+Rejecting a persistent configuration schedules restore_previous_config()
+once, at idle, and keeps its source ID in restore_config_id, but nothing
+cleared the ID when the source ran. The next applied configuration, or
+disposing of the manager, then removed a source that no longer existed,
+which is a critical warning.
+
+Clear the ID in the idle callback before restoring.
+---
+ src/backends/meta-monitor-manager.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/src/backends/meta-monitor-manager.c b/src/backends/meta-monitor-manager.c
+index 502c9cd..f0085f5 100644
+--- a/src/backends/meta-monitor-manager.c
++++ b/src/backends/meta-monitor-manager.c
+@@ -2105,6 +2105,17 @@ meta_monitor_manager_get_display_configuration_timeout (MetaMonitorManager *mana
+   return DEFAULT_DISPLAY_CONFIGURATION_TIMEOUT;
+ }
+ 
++static void
++restore_previous_config_idle (gpointer user_data)
++{
++  MetaMonitorManager *manager = user_data;
++
++  /* The source is gone once this returns; a stale handle would later be
++   * removed again. */
++  manager->restore_config_id = 0;
++  restore_previous_config (manager);
++}
++
+ static void
+ save_config_timeout (gpointer user_data)
+ {
+@@ -3285,7 +3296,7 @@ meta_monitor_manager_confirm_configuration (MetaMonitorManager *manager,
+   else
+     {
+       manager->restore_config_id =
+-        mtk_idle_add_once ((GSourceOnceFunc) restore_previous_config, manager);
++        mtk_idle_add_once (restore_previous_config_idle, manager);
+       mtk_source_set_name_by_id (manager->restore_config_id,
+                                  "[mutter] restore_previous_config");
+     }

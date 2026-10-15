@@ -1,0 +1,722 @@
+{
+  "schema": 1,
+  "task": "t_71bdbe27",
+  "status": "Ubuntu port constructed; candidate compile/package/review still pending",
+  "units_executed": 0,
+  "combined_native": {
+    "request": "e9cb890e6cc746fb97876bf33e0db1d6",
+    "receipt": {
+      "task": "t_71bdbe27",
+      "units": 0,
+      "upstream_head": "d5c29655fc1be42267e25e13885a152199400465",
+      "upstream_tree": "c5e17dc113ed8808fe425c6c6c7ca0708e1d0b4f",
+      "replay_tree_equal": true,
+      "patch_count": 89,
+      "ubuntu_baseline_tree": "a1a83849955917b1866b38c31b5873fcea7fac6c",
+      "lib_tree": "96d65c11ed0f408792c41cd42c2866255b1089d0",
+      "commands": [
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/upstream",
+            "fetch",
+            "/work/hdr-nativehdr10-20261011/wt-sol-offscreen",
+            "2cc87e0aafc6113184d05586f1a3ea66504ba1dc"
+          ],
+          "log": "integration-stage-00.txt",
+          "sha256": "4cdbf2522fdf604d712e03e0df1d299f63e8d44e4328ce579f4b837434015933",
+          "exit_code": 0,
+          "seconds": 0.009184614988043904
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/upstream",
+            "cherry-pick",
+            "12aa332567274fd3912a11736fe958bf4540ebe0",
+            "2cc87e0aafc6113184d05586f1a3ea66504ba1dc"
+          ],
+          "log": "integration-stage-01.txt",
+          "sha256": "089c0f2b63bc27770276d4eeb76d61a519c6453dbafc6881f75c49192a24665a",
+          "exit_code": 0,
+          "seconds": 0.016249361098743975
+        },
+        {
+          "command": [
+            "ninja",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/build-upstream",
+            "-j2",
+            "src/tests/mutter-color-lifecycle",
+            "src/tests/mutter-color-management",
+            "src/tests/mutter-color-management-profile-conflict",
+            "src/tests/mutter-monitor-dbus-tests",
+            "src/tests/mutter-wayland-color-management",
+            "src/tests/mutter-stage-views"
+          ],
+          "log": "integration-stage-02.txt",
+          "sha256": "cb2a71982356cf29f3be7c79ae1f0dec6bff4f89fd71ab8c8cc477159842d0ce",
+          "exit_code": 0,
+          "seconds": 1.260729247936979
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/upstream",
+            "format-patch",
+            "--zero-commit",
+            "--no-signature",
+            "--no-numbered",
+            "--start-number=78",
+            "-o",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical",
+            "de09d575e81799a1a75fe34a44d69f04caf2e727..HEAD"
+          ],
+          "log": "integration-stage-03.txt",
+          "sha256": "82e3aca6d72a599b7fa838f55dba52570a81f79ebcba3d4ef68657c9ca1f9708",
+          "exit_code": 0,
+          "seconds": 0.024619868956506252
+        },
+        {
+          "command": [
+            "git",
+            "clone",
+            "--no-hardlinks",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/upstream",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-upstream"
+          ],
+          "log": "integration-stage-04.txt",
+          "sha256": "940f239819f7044c43f608aa5d982a746ba0eb57aa65f763ad60d0dd4b512bb8",
+          "exit_code": 0,
+          "seconds": 0.26106150506529957
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-upstream",
+            "checkout",
+            "--detach",
+            "d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7"
+          ],
+          "log": "integration-stage-05.txt",
+          "sha256": "5749ecb55f2148c7cd152528038bcab046af27bf5d66765c71c84ea8b0770871",
+          "exit_code": 0,
+          "seconds": 0.1653539310209453
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-upstream",
+            "config",
+            "user.name",
+            "HDR Engineering Agent"
+          ],
+          "log": "integration-stage-06.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.0013785079354420304
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-upstream",
+            "config",
+            "user.email",
+            "hdr-agent@invalid"
+          ],
+          "log": "integration-stage-07.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.001203909981995821
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/replay-upstream",
+            "am",
+            "--quiet",
+            "--keep-cr",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0001-backends-native-Support-native-DisplayID-RGB-BT.2020.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0002-backends-color-Separate-the-native-target-luminance-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0003-tests-native-hdr-Cover-native-target-policy-and-immu.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0004-backends-color-Refresh-preferred-targets-after-outpu.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0005-tests-color-management-Account-for-global-forced-HDR.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0006-wayland-color-management-Dispose-target-records-befo.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0007-tests-native-hdr-Keep-the-fixture-mode-in-the-forced.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0008-backends-color-Publish-target-primaries-apart-from-t.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0009-tests-native-hdr-Cover-native-target-primaries-and-t.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0010-tests-Run-target-volume-cases-in-separate-test-invoc.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0011-clutter-color-Add-a-fallible-definition-of-the-linea.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0012-backends-color-Publish-target-primaries-with-one-con.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0013-wayland-color-management-Accept-signed-custom-primar.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0014-wayland-color-management-Fix-ICC-file-range-and-desc.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0015-core-util-Read-at-the-absolute-offset-and-reject-sho.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0016-wayland-color-management-Post-the-creator-s-own-unsu.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0017-backends-color-Validate-EDID-primaries-before-using-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0018-tests-color-management-Cover-signed-custom-primaries.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0019-tests-color-management-Cover-ICC-file-ranges-descrip.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0020-tests-color-management-Cover-the-creator-params-unsu.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0021-tests-color-management-Expect-the-disconnect-warning.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0022-clutter-color-Add-the-HLG-transfer-function.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0023-wayland-color-management-Accept-and-advertise-HLG.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0024-tests-color-management-Cover-HLG-decoding-encoding-a.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0025-clutter-color-Give-parametric-color-states-a-target-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0026-wayland-color-management-Accept-mastering-metadata-a.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0027-tests-color-management-Cover-mastering-metadata-and-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0028-clutter-color-Map-highlights-toward-a-declared-targe.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0029-backends-color-Blend-for-the-output-s-declared-targe.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0030-native-Composite-surfaces-and-cursors-whose-highligh.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0031-tests-color-management-Cover-highlight-mapping-and-s.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0032-clutter-color-Compress-gamut-toward-a-declared-displ.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0033-native-Composite-surfaces-and-cursors-whose-gamut-is.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0034-backends-color-Render-for-the-output-s-declared-targ.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0035-tests-color-management-Cover-gamut-compression-and-s.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0036-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0037-clutter-color-Use-the-BT.2100-Table-5-HLG-system-gam.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0038-clutter-color-Make-display-targets-only-through-an-e.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0039-clutter-color-Decide-mapping-once-per-source-and-tar.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0040-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0041-wayland-color-management-Correct-comments-on-masteri.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0042-wayland-color-management-Publish-descriptions-on-exa.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0043-clutter-color-Evaluate-gamut-compression-without-cla.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0044-backends-color-Treat-every-declared-target-source-as.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0045-backends-color-Take-the-target-peak-from-CTA-HDR-sta.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0046-clutter-color-Judge-gamut-containment-in-the-frame-o.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0047-backends-color-Take-native-SDR-target-primaries-from.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0048-tests-native-hdr-Cover-CTA-and-base-EDID-target-sour.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0049-tests-color-management-Cover-CTA-and-base-EDID-displ.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0050-clutter-color-Adapt-a-display-s-output-to-a-white-po.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0051-compositor-Composite-content-on-outputs-whose-white-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0052-backends-color-Apply-Night-Light-in-linear-light-in-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0053-clutter-color-Bound-the-white-adaptation-with-diagon.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0054-tests-Cover-Night-Light-mode-transitions-captures-an.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0055-backends-monitor-Carry-per-monitor-target-override-d.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0056-backends-monitor-Persist-and-validate-target-overrid.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0057-backends-monitor-Retain-color-settings-when-copying-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0058-backends-monitor-Expose-configured-and-effective-tar.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0059-gdctl-Preserve-per-monitor-target-declarations-and-s.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0060-backends-monitor-Report-software-PQ-Night-Light-supp.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0061-backends-color-Select-per-monitor-target-overrides-a.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0062-clutter-color-Anchor-the-Night-Light-adaptation-at-t.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0063-backends-color-Render-without-Night-Light-when-its-w.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0064-tests-monitor-dbus-Wait-for-the-restored-target-over.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0065-backends-monitor-Keep-accepting-truncated-monitors.x.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0066-tests-Run-the-display-target-user-override-case-on-i.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0067-tests-color-management-Read-back-captures-across-BT..patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0068-tests-color-management-Check-that-capture-readbacks-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0069-tests-color-hdr-Bound-the-channel-residue-of-single-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0070-backends-monitor-manager-Forget-the-restore-handle-o.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0071-tests-monitor-dbus-Hold-the-confirmation-before-reje.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0072-backends-color-Leave-colord-when-the-manager-drops-a.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0073-backends-color-Drop-removed-color-devices-before-cre.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0074-tests-color-management-Check-colord-devices-across-u.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0075-backends-color-device-Leave-a-cancelled-device-profi.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0076-backends-color-profile-Leave-a-cancelled-colord-prof.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0077-tests-color-management-Unplug-a-monitor-while-its-pr.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0078-backends-color-Shut-down-store-work-before-manager-r.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0079-tests-color-Add-a-guarded-real-callback-delivery-bar.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0080-tests-color-Exercise-shutdown-at-actual-asynchronous.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0081-tests-color-Transfer-context-ownership-exactly-once-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0082-color-store-sequence-cancellable-lookup-before-trans.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0083-color-store-return-ineligible-requests-before-creati.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0084-backend-destroy-the-owned-Clutter-event-source-befor.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0085-native-seat-detach-incoming-signal-targets-before-di.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0086-tests-assert-native-seat-keymap-disconnection-at-can.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0087-tests-isolate-ineligible-caller-fixture-from-shared-.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0088-clutter-stage-view-Reuse-compatible-offscreen-buffer.patch",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/canonical/0089-tests-Exercise-offscreen-reuse-across-colour-state-r.patch"
+          ],
+          "log": "integration-stage-08.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.5755711280507967
+        },
+        {
+          "command": [
+            "python3",
+            "/var/lib/peer-hdr/e9cb890e6cc746fb97876bf33e0db1d6-olz1svr3/tools/reconstruct.py",
+            "ubuntu-libdisplay-info",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu"
+          ],
+          "log": "integration-stage-09.txt",
+          "sha256": "c99ac14b4eb9e6399417354b91657df254f24bee5d47875d04833fb77df32f28",
+          "exit_code": 0,
+          "seconds": 0.48360794002655894
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-libdisplay-info",
+            "switch",
+            "-c",
+            "codex/full-integration-ubuntu"
+          ],
+          "log": "integration-stage-10.txt",
+          "sha256": "068f4a04d429756cbc38438ef0cfea9408b3dff651bcce9bca490945452661eb",
+          "exit_code": 0,
+          "seconds": 0.0023121279664337635
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-libdisplay-info",
+            "config",
+            "user.name",
+            "HDR Engineering Agent"
+          ],
+          "log": "integration-stage-11.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.001211396069265902
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-libdisplay-info",
+            "config",
+            "user.email",
+            "hdr-agent@invalid"
+          ],
+          "log": "integration-stage-12.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.0012102030450478196
+        },
+        {
+          "command": [
+            "python3",
+            "/var/lib/peer-hdr/e9cb890e6cc746fb97876bf33e0db1d6-olz1svr3/tools/reconstruct.py",
+            "ubuntu-mutter",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu"
+          ],
+          "log": "integration-stage-13.txt",
+          "sha256": "874ff96495c7bcd4e076aa00079ab28f606927f83bcd89bfb83420c14f8e6727",
+          "exit_code": 0,
+          "seconds": 3.0249784109182656
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+            "switch",
+            "-c",
+            "codex/full-integration-ubuntu"
+          ],
+          "log": "integration-stage-14.txt",
+          "sha256": "068f4a04d429756cbc38438ef0cfea9408b3dff651bcce9bca490945452661eb",
+          "exit_code": 0,
+          "seconds": 0.00232916499953717
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+            "config",
+            "user.name",
+            "HDR Engineering Agent"
+          ],
+          "log": "integration-stage-15.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.0012462199665606022
+        },
+        {
+          "command": [
+            "git",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+            "config",
+            "user.email",
+            "hdr-agent@invalid"
+          ],
+          "log": "integration-stage-16.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.001179893035441637
+        },
+        {
+          "command": [
+            "dpkg-buildpackage",
+            "-b",
+            "-us",
+            "-uc"
+          ],
+          "log": "integration-stage-17.txt",
+          "sha256": "5236fac1d40a793bd6f5e3d2d4972cb109b8a2bea640c52bb402c147ec38be19",
+          "exit_code": 0,
+          "seconds": 10.116468638996594
+        },
+        {
+          "command": [
+            "dpkg-deb",
+            "-x",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/libdisplay-info-dev_0.3.0-1ubuntu1~hdr9_amd64.deb",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/prefix-ubuntu"
+          ],
+          "log": "integration-stage-18.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.00333674403373152
+        },
+        {
+          "command": [
+            "dpkg-deb",
+            "-x",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/prefix-ubuntu"
+          ],
+          "log": "integration-stage-19.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "exit_code": 0,
+          "seconds": 0.003065873053856194
+        },
+        {
+          "command": [
+            "meson",
+            "setup",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/build-ubuntu-baseline",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/ubuntu/ubuntu-mutter",
+            "-Dremote_desktop=true",
+            "-Dwerror=true",
+            "--wrap-mode=nofallback"
+          ],
+          "log": "integration-stage-20.txt",
+          "sha256": "4971c9747f2235bbf648c90bc0d858efe3e357d4450f6e4e7b2a3c3db8193ded",
+          "exit_code": 0,
+          "seconds": 6.641170509974472
+        },
+        {
+          "command": [
+            "ninja",
+            "-C",
+            "/work/hdr-nativehdr10-20261011/full-integration-t_71bdbe27/build-ubuntu-baseline",
+            "-j2",
+            "src/libmutter-51.so.0.0.0"
+          ],
+          "log": "integration-stage-21.txt",
+          "sha256": "ae45c110fed6d9e71b7c35c9df0328a659c8fc414614c4800fc52ee7c6fb48e4",
+          "exit_code": 0,
+          "seconds": 91.44097707804758
+        }
+      ]
+    },
+    "canonical_all89_hashes_match_mac": true,
+    "all_command_log_hashes_verified": true
+  },
+  "ubuntu_port": {
+    "base_candidate_tree": "a1a83849955917b1866b38c31b5873fcea7fac6c",
+    "source_head": "a8c66983bd06ee5a41975637dd5033505ee271d6",
+    "source_tree": "1193050b6082cec1331021252521ad1a1afe8c33",
+    "source_only_tree": "20b4dbb33c84926bf1d9a1edcc40e5a88d5ee4cb",
+    "patch_count": 102,
+    "prefix_0001_0061_preserved": true,
+    "manual_conflict_resolutions": 0,
+    "port_map": [
+      {
+        "upstream_commit": "3816ea4ffc1743cd91d2d2ae0d021875babae9c8",
+        "ubuntu_commit": "225b4afd04be8a17f819268d8db9a9c465f3c80b",
+        "upstream_patch": 50,
+        "ubuntu_patch": 62,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "bedd3c8b4d028c4780b093a432dc13d339b23060",
+        "ubuntu_commit": "9dc40e28c70ba8aa7cdeab2219973e734155688c",
+        "upstream_patch": 51,
+        "ubuntu_patch": 63,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "710a40decf521b24940ef890ffabe414f95e6c91",
+        "ubuntu_commit": "9455ca807e05eec8b972ce2eedb9aab73d4ceff3",
+        "upstream_patch": 52,
+        "ubuntu_patch": 64,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "d62bfbc7a59bf0ccf1b6a5ad125c3c7ff8887b39",
+        "ubuntu_commit": "77fce7004e10c1017090a235d371442425edc398",
+        "upstream_patch": 53,
+        "ubuntu_patch": 65,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "71d22397217a5594abe0b0af0726e429911d577e",
+        "ubuntu_commit": "4244a4a6f8f7c3607ab3dc3962df2eb681720cf0",
+        "upstream_patch": 54,
+        "ubuntu_patch": 66,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "f460921df7a066c3b50c48885a91d92efea9c04f",
+        "ubuntu_commit": "3a64d887ec34db6e6db1fbde93c9f98ed77fe0f8",
+        "upstream_patch": 55,
+        "ubuntu_patch": 67,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "c8623ae1e9185bc29510f4d6bc04e680abb357c8",
+        "ubuntu_commit": "dc7525e6ca28895d7b0a4dc37e108d246a53636f",
+        "upstream_patch": 56,
+        "ubuntu_patch": 68,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "933a98b76811d09ddecd11fcd3fe90aa3390cc78",
+        "ubuntu_commit": "e2b0c6bec76f40d27db00177b6cb9b3c1e6f64a3",
+        "upstream_patch": 57,
+        "ubuntu_patch": 69,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "a71570de54c08d9906c093dee8f03a5feaca3fe8",
+        "ubuntu_commit": "7bd01bef980dcdc0b22ff1157d7e10b192d3cd58",
+        "upstream_patch": 58,
+        "ubuntu_patch": 70,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "51a61cce612781b41373084b06f635ec00c20aab",
+        "ubuntu_commit": "f33ef8cc3eee32f4834b53aab2ec95a55b46999f",
+        "upstream_patch": 59,
+        "ubuntu_patch": 71,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "bd6b2ea042fb61ee534e8ee0304227c3c6b91feb",
+        "ubuntu_commit": "682d483f2d06120e8d60030d9598ebb58f336aeb",
+        "upstream_patch": 60,
+        "ubuntu_patch": 72,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "fa7eb2cf55dd39464ef04042e3f085a5d6c18e5f",
+        "ubuntu_commit": "d7aa2e93efd86197e411cd43ef4063dd1f69d83f",
+        "upstream_patch": 61,
+        "ubuntu_patch": 73,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "e1ebcca5e2fa85f748fc1845570e8a34ddd0462f",
+        "ubuntu_commit": "58315b3ead01997ac38b1d4f9670922fd19301b0",
+        "upstream_patch": 62,
+        "ubuntu_patch": 74,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "7b68d4b72e1c5ee45452bb0d2a395ccda40bc2c0",
+        "ubuntu_commit": "b018a29d703dd73200bc7fd3d4964d1adb5cdd13",
+        "upstream_patch": 63,
+        "ubuntu_patch": 75,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "bd014ffb7dafcaf6123f65c99786874232b825a2",
+        "ubuntu_commit": "3c42481e815f6b095ab8ebccd2b17d5d96dcab6b",
+        "upstream_patch": 64,
+        "ubuntu_patch": 76,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "8ef8847e886c224b8e0544569b3bb3bef6559d45",
+        "ubuntu_commit": "efc5f21103d627c7914f706f5c4604336f464831",
+        "upstream_patch": 65,
+        "ubuntu_patch": 77,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "e66f9881c54cbb1fbf8a2cc55632e2df42874d03",
+        "ubuntu_commit": "b08d3ec0debb0fba2c357f9b6879c088467cffe2",
+        "upstream_patch": 66,
+        "ubuntu_patch": 78,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "05288b05561a6a9ebec598456c3c76478596d79c",
+        "ubuntu_commit": "a4f1eecf58b162f6bcb4ff37c182a99db7825051",
+        "upstream_patch": 67,
+        "ubuntu_patch": 79,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+        "ubuntu_commit": "a5b6c6d69b48a314155da4d26cb2f8dd08c6c7c0",
+        "upstream_patch": 68,
+        "ubuntu_patch": 80,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "11da74493948686ad75c76a7ace3b1f7972aaead",
+        "ubuntu_commit": "2d14e1cb9dc4765317b3b68594abc5600aff0c7b",
+        "upstream_patch": 69,
+        "ubuntu_patch": 81,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "7aedf25fac1560cc634be41e340bce03b7797f93",
+        "ubuntu_commit": "fb7848b8fdcbc3318e2a89e9d9e3d1cd8817a571",
+        "upstream_patch": 70,
+        "ubuntu_patch": 82,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "a8847717ea673fc6a34603aa5a99a9755e0b74ce",
+        "ubuntu_commit": "cb8f25a259affbc7f9d06e8dfd300ef124c83836",
+        "upstream_patch": 71,
+        "ubuntu_patch": 83,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "a32a10f8d1a9f0f28cffe0575db36e5fdf14ddd0",
+        "ubuntu_commit": "737a94cea52d6f1060016ed0d5e02f73eb545378",
+        "upstream_patch": 72,
+        "ubuntu_patch": 84,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "c4ddb21f9648348f7cbcef6325dc89cb449912a6",
+        "ubuntu_commit": "3828ef1f41f13ccb9dc45734e5e56eb38460c66f",
+        "upstream_patch": 73,
+        "ubuntu_patch": 85,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "980bb21f3adc84ade0edbeb2e85e4f798a228ae6",
+        "ubuntu_commit": "c37834de0715b56caed23334f860e44e0aac7237",
+        "upstream_patch": 74,
+        "ubuntu_patch": 86,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "9a00acf9b29b4a98d6a481a91b52742d9fcd0bb0",
+        "ubuntu_commit": "7b9a50d8fd954ac41a5d6c6e677dd4f8382757d7",
+        "upstream_patch": 75,
+        "ubuntu_patch": 87,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "36a95b6aca2872f10c9b01eefd057f5347cbe1a7",
+        "ubuntu_commit": "1a37c043515d880153a131840ea10c3042e7a0b8",
+        "upstream_patch": 76,
+        "ubuntu_patch": 88,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "de09d575e81799a1a75fe34a44d69f04caf2e727",
+        "ubuntu_commit": "0719eda73f028d71a8828b8b297ba566e2d5ebc0",
+        "upstream_patch": 77,
+        "ubuntu_patch": 89,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "769c2a375e51f79facb66efe36c2120d0a181bf4",
+        "ubuntu_commit": "9c6c0c386538e587512f1cd84c64a682fa441c1a",
+        "upstream_patch": 78,
+        "ubuntu_patch": 90,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "da1929e6a884ede5c394f000ce3bf7d5455c3828",
+        "ubuntu_commit": "ede786f05da814cff10751d835e5188b9fa266b8",
+        "upstream_patch": 79,
+        "ubuntu_patch": 91,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "ef2f85ae14ad4ed68060e79515a6638ef4d9422b",
+        "ubuntu_commit": "2c8799bd04f1029d78b261dc2c7425fae8f576c3",
+        "upstream_patch": 80,
+        "ubuntu_patch": 92,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "65b5c00a35f675a84658c52c4cd80cf89b1c4947",
+        "ubuntu_commit": "a8f8b25821f4c9eca98bedd0c3d895aa40d065ea",
+        "upstream_patch": 81,
+        "ubuntu_patch": 93,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "6bcd1c0d9d3eb25d03338871985db4402eefde3b",
+        "ubuntu_commit": "8770ee0ffe16cc5b8fd28d3967db60e4e6dd3b19",
+        "upstream_patch": 82,
+        "ubuntu_patch": 94,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "733d6b8bb986b138bd95126dde86c0023b3eb663",
+        "ubuntu_commit": "ff5b8604baff6e6bf5a32fb15dc51bea24abc7ec",
+        "upstream_patch": 83,
+        "ubuntu_patch": 95,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "b230080510eaab034b6c85cec73432951edcdd9f",
+        "ubuntu_commit": "ba0cf74d887b29bc0fd8c80916760e62833f3bab",
+        "upstream_patch": 84,
+        "ubuntu_patch": 96,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "21426ab8853927d5c70b506c3782ab063189a98a",
+        "ubuntu_commit": "69b003a7c9264853ca69a94243c73e9911fba75d",
+        "upstream_patch": 85,
+        "ubuntu_patch": 97,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+        "ubuntu_commit": "f935ab93d683a88fdb07b4a2f05b2cfe2846d50b",
+        "upstream_patch": 86,
+        "ubuntu_patch": 98,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "e2d7cfbad8d3a44dd1a9a9d89a124444e44e9bb9",
+        "ubuntu_commit": "e0c6af42dc2c8f16b4e04f5ccfc3795c17e0db41",
+        "upstream_patch": 87,
+        "ubuntu_patch": 99,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "db433384f0705cde4eb53ac711e7958af3ce92c3",
+        "ubuntu_commit": "11718ec102b37b4c147dede35e2433a5a6bfe869",
+        "upstream_patch": 88,
+        "ubuntu_patch": 100,
+        "authorship_date_message_preserved": true
+      },
+      {
+        "upstream_commit": "4b8110667f4d92cbc2c4d7fa8b72b5d97a9648ac",
+        "ubuntu_commit": "18f5c2f32c75094597cf56fa92b26ae0dc9ebde7",
+        "upstream_patch": 89,
+        "ubuntu_patch": 101,
+        "authorship_date_message_preserved": true
+      }
+    ],
+    "packaging_metadata_commit": "a8c66983bd06ee5a41975637dd5033505ee271d6"
+  },
+  "build_dependencies": {
+    "libdisplay_info_nocheck_audit": "PASS",
+    "mutter_nocheck_audit": "dpkg-checkbuilddeps: error: unmet build dependencies: libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr8~)",
+    "exception": "matching hdr9 dev/runtime packages built/extracted privately; no installed dpkg status altered"
+  },
+  "remaining": [
+    "Ubuntu candidate-Werror compiler and complete canonical102 replay",
+    "New exported symbols packaging minima",
+    "Actual amd64 compositor .deb and matching i386 hdr9 package",
+    "No-private-rpath/dependency/file/symbol/install+rollback kit audit",
+    "Whole batch adversarial review then reviewed affected batch"
+  ]
+}

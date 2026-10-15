@@ -1,0 +1,179 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Sol <hdr-sol@example.invalid>
+Date: Mon, 12 Oct 2026 18:54:23 +0000
+Subject: [PATCH] tests: Exercise offscreen reuse across colour-state ramps
+
+Keep strong framebuffer references across 26 painted Night Light steps and a 10-step source/output reference-luminance ramp. Cover incompatible format transitions, coalesced intermediate states and removal of the conversion. Read back actual output/capture pixels to retain the pipeline refresh contract.
+---
+ src/tests/stage-view-tests.c              | 99 +++++++++++++++++++++++
+ src/tests/wayland-color-management-test.c | 20 ++++-
+ 2 files changed, 116 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/stage-view-tests.c b/src/tests/stage-view-tests.c
+index c734f82..7677b17 100644
+--- a/src/tests/stage-view-tests.c
++++ b/src/tests/stage-view-tests.c
+@@ -1642,6 +1642,103 @@ meta_test_stage_views_offscreen_effect_resource_scale (void)
+   meta_monitor_manager_test_emulate_hotplug (monitor_manager_test, test_setup);
+ }
+ 
++static void
++meta_test_stage_view_offscreen_reuse (void)
++{
++  ClutterActor *stage = meta_backend_get_stage (test_backend);
++  ClutterContext *context = clutter_actor_get_context (stage);
++  ClutterStageView *view =
++    clutter_stage_peek_stage_views (CLUTTER_STAGE (stage))->data;
++  g_autoptr (ClutterColorState) saved_color =
++    g_object_ref (clutter_stage_view_get_color_state (view));
++  g_autoptr (ClutterColorState) saved_output =
++    g_object_ref (clutter_stage_view_get_output_color_state (view));
++  g_autoptr (ClutterColorState) srgb = NULL;
++  g_autoptr (ClutterColorState) wide_srgb = NULL;
++  g_autoptr (ClutterColorState) linear = NULL;
++  g_autoptr (CoglFramebuffer) low_buffer = NULL;
++  g_autoptr (CoglFramebuffer) high_buffer = NULL;
++  int i;
++
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  wide_srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                              CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  linear = clutter_color_state_params_new_full (context,
++                                                CLUTTER_COLORSPACE_BT2020,
++                                                CLUTTER_TRANSFER_FUNCTION_LINEAR,
++                                                NULL, -1.0f,
++                                                0.0f, 10000.0f, 203.0f, 0.0f);
++
++  clutter_stage_view_set_color_state (view, srgb);
++  clutter_stage_view_set_output_color_state (view, wide_srgb);
++  meta_wait_for_paint (CLUTTER_STAGE (stage));
++  low_buffer = g_object_ref (clutter_stage_view_get_framebuffer (view));
++  g_assert_true (COGL_IS_OFFSCREEN (low_buffer));
++  g_assert_true (low_buffer != clutter_stage_view_get_onscreen (view));
++  g_assert_cmpint (cogl_framebuffer_get_internal_format (low_buffer), ==,
++                   cogl_framebuffer_get_internal_format (clutter_stage_view_get_onscreen (view)));
++
++  /* Coalesced incompatible/intermediate states need no allocation. */
++  clutter_stage_view_set_color_state (view, linear);
++  clutter_stage_view_set_color_state (view, srgb);
++  meta_wait_for_paint (CLUTTER_STAGE (stage));
++  g_assert_true (clutter_stage_view_get_framebuffer (view) == low_buffer);
++
++  clutter_stage_view_set_color_state (view, linear);
++  meta_wait_for_paint (CLUTTER_STAGE (stage));
++  high_buffer = g_object_ref (clutter_stage_view_get_framebuffer (view));
++  g_assert_true (high_buffer != low_buffer);
++  g_assert_cmpint (cogl_framebuffer_get_internal_format (high_buffer), !=,
++                   cogl_framebuffer_get_internal_format (low_buffer));
++
++  /* Source and output reference-luminance changes refresh the pipeline,
++   * retaining the fp16 buffer. Strong refs exclude allocator address reuse.
++   */
++  for (i = 0; i < 10; i++)
++    {
++      g_autoptr (ClutterColorState) changed_color = NULL;
++      g_autoptr (ClutterColorState) changed_output = NULL;
++
++      changed_color = clutter_color_state_params_new_full (context,
++                                                           CLUTTER_COLORSPACE_BT2020,
++                                                           CLUTTER_TRANSFER_FUNCTION_LINEAR,
++                                                           NULL, -1.0f,
++                                                           0.0f, 10000.0f,
++                                                           203.0f + i, 0.0f);
++      changed_output = clutter_color_state_params_new_full (context,
++                                                            CLUTTER_COLORSPACE_BT2020,
++                                                            CLUTTER_TRANSFER_FUNCTION_GAMMA22,
++                                                            NULL, -1.0f,
++                                                            0.0f, 100.0f,
++                                                            80.0f + i, 0.0f);
++      clutter_stage_view_set_color_state (view, changed_color);
++      clutter_stage_view_set_output_color_state (view, changed_output);
++      meta_wait_for_paint (CLUTTER_STAGE (stage));
++      g_assert_true (clutter_stage_view_get_framebuffer (view) == high_buffer);
++    }
++  g_test_message ("Reference-luminance ramp: 10 steps, 0 offscreen replacements");
++
++  clutter_stage_view_set_color_state (view, srgb);
++  clutter_stage_view_set_output_color_state (view, wide_srgb);
++  meta_wait_for_paint (CLUTTER_STAGE (stage));
++  g_assert_true (clutter_stage_view_get_framebuffer (view) != high_buffer);
++  g_assert_cmpint (cogl_framebuffer_get_internal_format (clutter_stage_view_get_framebuffer (view)), ==,
++                   cogl_framebuffer_get_internal_format (low_buffer));
++
++  /* Remove the conversion before its ensure idle runs. */
++  clutter_stage_view_set_color_state (view, linear);
++  clutter_stage_view_set_color_state (view, srgb);
++  clutter_stage_view_set_output_color_state (view, srgb);
++  meta_wait_for_paint (CLUTTER_STAGE (stage));
++  g_assert_true (clutter_stage_view_get_framebuffer (view) ==
++                 clutter_stage_view_get_onscreen (view));
++
++  clutter_stage_view_set_color_state (view, saved_color);
++  clutter_stage_view_set_output_color_state (view, saved_output);
++  meta_wait_for_paint (CLUTTER_STAGE (stage));
++}
++
+ static void
+ on_before_tests (MetaContext *context)
+ {
+@@ -1655,6 +1752,8 @@ init_tests (void)
+ 
+   g_test_add_func ("/stage-view/stage-views-exist",
+                    meta_test_stage_views_exist);
++  g_test_add_func ("/stage-views/offscreen-color-state-reuse",
++                   meta_test_stage_view_offscreen_reuse);
+   g_test_add_func ("/stage-views/actor-stage-views",
+                    meta_test_actor_stage_views);
+   g_test_add_func ("/stage-views/actor-stage-views-relayout",
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index dca9be4..f8e8ae5 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -2424,6 +2424,8 @@ night_light_bt2100_capture (void)
+   ClutterActor *actor;
+   CoglColor color;
+   CapturePixels day, night, back;
++  g_autoptr (CoglFramebuffer) offscreen = NULL;
++  int temperature;
+ 
+   set_test_color_mode (output, META_COLOR_MODE_BT2100);
+   meta_color_device_update (device);
+@@ -2439,15 +2441,26 @@ night_light_bt2100_capture (void)
+   clutter_actor_add_child (stage, actor);
+ 
+   read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &day);
++  offscreen = g_object_ref (clutter_stage_view_get_framebuffer (view));
++  g_assert_true (offscreen != clutter_stage_view_get_onscreen (view));
+   g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
+                                                                 NULL, NULL));
+ 
+-  set_night_light_temperature (device, 3900);
++  /* Hold the buffer alive so allocator address reuse cannot fake identity.
++   * Paint/read back every step, rather than coalescing the entire ramp.
++   */
++  for (temperature = 6400; temperature >= 3900; temperature -= 100)
++    {
++      set_night_light_temperature (device, temperature);
++      read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &night);
++      g_assert_true (clutter_stage_view_get_framebuffer (view) == offscreen);
++      assert_pixels_close (night.capture, day.capture);
++      assert_pixels_close (night.paint, day.paint);
++    }
++  g_test_message ("Night Light ramp: 26 painted steps, 0 offscreen replacements");
+   g_assert_true (clutter_stage_view_get_output_color_state (view) == output_color_state);
+   g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
+                                                                NULL, NULL));
+-  read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &night);
+-
+   /* The output conversion changed. */
+   g_assert_cmpint (ABS ((int) night.output[0] - (int) day.output[0]), <=, 1);
+   g_assert_cmpint (night.output[1], <=, day.output[1]);
+@@ -2460,6 +2473,7 @@ night_light_bt2100_capture (void)
+   g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
+                                                                 NULL, NULL));
+   read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &back);
++  g_assert_true (clutter_stage_view_get_framebuffer (view) == offscreen);
+   assert_pixels_close (back.output, day.output);
+   assert_pixels_close (back.capture, day.capture);
+   assert_pixels_close (back.paint, day.paint);

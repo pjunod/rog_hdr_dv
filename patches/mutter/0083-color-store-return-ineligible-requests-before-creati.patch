@@ -1,0 +1,158 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Engineering <hdr-engineering@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 21:45:00 +0000
+Subject: [PATCH] color/store: return ineligible requests before creating
+ callback-bearing tasks
+
+---
+ src/backends/meta-color-store.c   | 26 +++++++++++--------
+ src/tests/color-lifecycle-tests.c | 42 +++++++++++++++++++++++++++++--
+ 2 files changed, 55 insertions(+), 13 deletions(-)
+
+diff --git a/src/backends/meta-color-store.c b/src/backends/meta-color-store.c
+index 56e9065..f4e4041 100644
+--- a/src/backends/meta-color-store.c
++++ b/src/backends/meta-color-store.c
+@@ -596,7 +596,7 @@ meta_color_store_ensure_device_profile (MetaColorStore      *color_store,
+                                         gpointer             user_data)
+ {
+   MetaMonitor *monitor;
+-  const char *device_id, *edid_checksum_md5;
++  const char *device_id, *edid_checksum_md5 = NULL;
+   g_autoptr (GTask) task = NULL;
+   g_autofree char *file_name = NULL;
+   g_autofree char *file_path = NULL;
+@@ -604,24 +604,28 @@ meta_color_store_ensure_device_profile (MetaColorStore      *color_store,
+   MetaColorProfile *color_profile;
+   GPtrArray *waiting_tasks;
+ 
++  /* Ineligible active requests return FALSE without scheduling a callback.
++   * Cancellation takes precedence and must not access the borrowed device. */
++  if (!g_cancellable_is_cancelled (color_store->cancellable) &&
++      !g_cancellable_is_cancelled (cancellable))
++    {
++      monitor = meta_color_device_get_monitor (color_device);
++      edid_checksum_md5 = meta_monitor_get_edid_checksum_md5 (monitor);
++
++      /* Only create a fallback sRGB profile for non-EDID monitors if the
++       * display supports gamma LUT adjustment (e.g. for Night Light). */
++      if (!edid_checksum_md5 && !meta_monitor_supports_gamma_lut (monitor))
++        return FALSE;
++    }
++
+   task = g_task_new (G_OBJECT (color_store), cancellable, callback, user_data);
+   g_task_set_source_tag (task, meta_color_store_ensure_device_profile);
+   if (return_error_if_cancelled (color_store, task))
+     return TRUE;
+ 
+-  monitor = meta_color_device_get_monitor (color_device);
+   device_id = meta_color_device_get_id (color_device);
+ 
+   /* Use EDID if available, fall back to device ID hash */
+-  edid_checksum_md5 = meta_monitor_get_edid_checksum_md5 (monitor);
+-  if (!edid_checksum_md5)
+-    {
+-      /* Only create a fallback sRGB profile for non-EDID monitors if the
+-       * display supports gamma LUT adjustment (e.g. for Night Light). */
+-      if (!meta_monitor_supports_gamma_lut (monitor))
+-        return FALSE;
+-    }
+-
+   if (edid_checksum_md5)
+     {
+       file_name = g_strdup_printf ("edid-%s.icc", edid_checksum_md5);
+diff --git a/src/tests/color-lifecycle-tests.c b/src/tests/color-lifecycle-tests.c
+index b26f2fd..f4701ab 100644
+--- a/src/tests/color-lifecycle-tests.c
++++ b/src/tests/color-lifecycle-tests.c
+@@ -289,14 +289,15 @@ finish_fixture (Fixture *fixture)
+ }
+ 
+ static MetaColorDevice *
+-add_monitor (MetaColorManager *manager)
++add_monitor_with_setup (MetaColorManager     *manager,
++                        MonitorTestCaseSetup *monitor_test_setup)
+ {
+   MetaBackend *backend = meta_context_get_backend (test_context);
+   MetaMonitorManager *monitor_manager = meta_backend_get_monitor_manager (backend);
+   MetaMonitorTestSetup *setup;
+   MetaMonitor *monitor;
+ 
+-  setup = meta_create_monitor_test_setup (backend, &monitor_setup,
++  setup = meta_create_monitor_test_setup (backend, monitor_test_setup,
+                                           MONITOR_TEST_FLAG_NO_STORED);
+   meta_monitor_manager_test_emulate_hotplug (
+     META_MONITOR_MANAGER_TEST (monitor_manager), setup);
+@@ -304,6 +305,12 @@ add_monitor (MetaColorManager *manager)
+   return g_object_ref (meta_color_manager_get_color_device (manager, monitor));
+ }
+ 
++static MetaColorDevice *
++add_monitor (MetaColorManager *manager)
++{
++  return add_monitor_with_setup (manager, &monitor_setup);
++}
++
+ static void
+ finish_result (MetaColorStore *store,
+                Result         *result,
+@@ -496,11 +503,15 @@ static void
+ test_shared_caller_cancel (void)
+ {
+   Fixture fixture = { .hold_point = "device:on_profile_written" };
++  MonitorTestCaseSetup ineligible_setup = monitor_setup;
+   MetaColorManager *manager;
++  g_autoptr (MetaColorDevice) ineligible_device = NULL;
+   g_autoptr (MetaColorDevice) device = NULL;
+   MetaColorStore *store;
+   g_autoptr (GCancellable) cancelled = g_cancellable_new ();
++  g_autoptr (GCancellable) already_cancelled = g_cancellable_new ();
+   Result first = {}, second = {};
++  Result ineligible = {}, cancelled_before_request = {};
+   gboolean device_gone = FALSE;
+ 
+   if (!run_in_fresh_process ())
+@@ -508,6 +519,29 @@ test_shared_caller_cancel (void)
+ 
+   manager = setup_fixture (&fixture, TRUE);
+   store = meta_color_manager_get_color_store (manager);
++
++  /* An active monitor without EDID or gamma support is synchronously
++   * ineligible: FALSE promises that no completion callback is scheduled. */
++  ineligible_setup.outputs[0].has_edid_info = FALSE;
++  ineligible_setup.crtcs[0].disable_gamma_lut = TRUE;
++  ineligible_device = add_monitor_with_setup (manager, &ineligible_setup);
++  g_assert_null (meta_monitor_get_edid_checksum_md5 (
++    meta_color_device_get_monitor (ineligible_device)));
++  g_assert_false (meta_monitor_supports_gamma_lut (
++    meta_color_device_get_monitor (ineligible_device)));
++  g_assert_false (meta_color_store_ensure_device_profile (
++    store, ineligible_device, NULL, on_result, &ineligible));
++  g_assert_cmpuint (ineligible.calls, ==, 0);
++  g_assert_false (meta_color_store_has_pending_profiles (store));
++
++  /* Already-cancelled callers instead get one tagged CANCELLED completion,
++   * without dereferencing even a NULL device, while the store is active. */
++  g_cancellable_cancel (already_cancelled);
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, NULL, already_cancelled, on_result, &cancelled_before_request));
++  assert_cancelled (&cancelled_before_request);
++  clear_result (&cancelled_before_request);
++
+   device = add_monitor (manager);
+   watch (device, &device_gone);
+   wait_for_delivery (&fixture);
+@@ -531,9 +565,13 @@ test_shared_caller_cancel (void)
+   clear_result (&first);
+   clear_result (&second);
+   destroy_manager (&fixture);
++  g_clear_object (&ineligible_device);
+   g_clear_object (&device);
+   wait_for_release (&device_gone);
+   finish_fixture (&fixture);
++  /* The real surviving generation and teardown above dispatched callbacks;
++   * no delay or extra loop iteration is used to stand in for this contract. */
++  g_assert_cmpuint (ineligible.calls, ==, 0);
+ }
+ 
+ static void

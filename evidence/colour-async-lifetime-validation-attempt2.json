@@ -1,0 +1,895 @@
+{
+  "schema": 2,
+  "task": "t_8eee5d9f",
+  "status": "STOPPED_ON_SHARED_CALLER_CANCEL_TIMEOUT_NOT_SOURCE_READY",
+  "review": {
+    "task": "t_79ec36bd",
+    "actual_reviewer": "hdr-astra via automatic quota route from Fable; independent of builder Sol, prior design role disclosed; not Fable/independent-model approval",
+    "manifest_sha256": "8f56f4ad4a76434c9a60e418d98d05ced291eb88543aff14b3424adcfa212fc7",
+    "runtime_binding_sha256": "5bad196b7fa89dc3a37fa5c4716cd5b819746e053eeebb7606fab37a2fdbffb6",
+    "verdict": "source-review-approved; runtime acceptance remained outstanding"
+  },
+  "resumption": {
+    "coordinator": "codex-coordinator",
+    "recovery": "t_3664fbd1",
+    "activation": "original card supported unblock and hdr-sol claim run72 verified before execution"
+  },
+  "native_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+  "native_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+  "mac_pre_execution_head": "eb949060c7bbfb5d64a469a1f3b34420d7847da9",
+  "mac_pre_execution_tree": "fbd1dacf330bde1cbca82195d0475092fba03264",
+  "source_changed_since_review": false,
+  "native_x86_64": true,
+  "affected_invocations_executed": 9,
+  "passed": 8,
+  "failed": 1,
+  "not_run": 15,
+  "authorized_invocations": 24,
+  "repeat_count": 0,
+  "approved_scope": {
+    "failed": 18,
+    "individually_invalidated_pass": 6
+  },
+  "seconds": 44.11081922100857,
+  "pre_post_identity_equal": true,
+  "per_check_log_hashes_verified": 36,
+  "historical_attempt1": {
+    "passed": 6,
+    "failed": 18,
+    "invocations": 24,
+    "log_hashes_verified": 96,
+    "unchanged": true,
+    "receipt_sha256": "d0dc1782ca2a8f9478ef6e8ec04f9d696c004bec24b74525e887809c7cb1aaea",
+    "logs_archive_sha256": "55e867eb23aadc8a9dfba233d15f1624aa61bf9db6e9d729eb425e677ee37a0f"
+  },
+  "runtime_environment": {
+    "G_ENABLE_DIAGNOSTIC": "1",
+    "G_DEBUG": "fatal-warnings",
+    "LIBGL_ALWAYS_SOFTWARE": "1",
+    "GALLIUM_DRIVER": "llvmpipe",
+    "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+  },
+  "environment_limit": "Original builder G_ENABLE_DIAGNOSTIC=1 deviation preserved and expressly selected by recovery/review; fatal warnings remain enabled, no suppression/instrumentation.",
+  "checks": [
+    {
+      "id": 1,
+      "target": "mutter:color-lifecycle-color-lifecycle-startup-queued-success",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "PASS",
+      "review_disposition": "invalidated-pass",
+      "review_reason": "test_startup(TRUE), color-lifecycle-tests.c:411-425, destroys the setup context after all three successful real callbacks are parked; changed backend GSource destruction and native-seat handler detachment execute before replay. Old passing delivery/release proof does not cover new teardown behavior.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-startup-queued-success"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/startup/queued-success"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/startup/queued-success"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.5050159350503236,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/startup/queued-success",
+          "tap": "ok 1 /color-lifecycle/startup/queued-success"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/01/testlog-mutter_default.junit.xml": "01b4a82b5285efca849a5099f79ed4bf924126fd533d4baadc0b03d59d6e1929",
+        "logs/01/testlog-mutter_default.json": "3b44360fdf2193776a43b783b387e7d5de7714b5ad04bb8e883a401243263cb0",
+        "logs/01/command-output.txt": "aeac9dabf19f77e408d55db28d928c42fb9a4cb7f80212dbadba9c1059b71d77",
+        "logs/01/testlog-mutter_default.txt": "cc409ede40a45451e8da8e679f6259cd3a25c990d635e7c02cbd9cf4a982db88"
+      }
+    },
+    {
+      "id": 2,
+      "target": "mutter:color-lifecycle-color-lifecycle-startup-cancelled",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-startup-cancelled"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/startup/cancelled"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/startup/cancelled"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.5088195609860122,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/startup/cancelled",
+          "tap": "ok 1 /color-lifecycle/startup/cancelled"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/02/testlog-mutter_default.junit.xml": "4ca26f16ef5f75a6c5422fbe0a765d0b43c3bbecfa9335e38ae2433e92ca0397",
+        "logs/02/testlog-mutter_default.json": "0ac1ac3cb6a8f4d2c52b119ca5b80f54c916c54773a0eaefb7f5c851b59b5800",
+        "logs/02/command-output.txt": "4ebeed86e895c92bb560a1bc6b7b8130c1480e6ff0cc1da5d432d824f10cde48",
+        "logs/02/testlog-mutter_default.txt": "716781434bc50026a229a65434dddc8b76199d4b0184ca868f708aae26ca0997"
+      }
+    },
+    {
+      "id": 3,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-directory-query",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-generation-directory-query"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/generation/directory-query"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/directory-query"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.5102613359922543,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/generation/directory-query",
+          "tap": "ok 1 /color-lifecycle/generation/directory-query"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/03/testlog-mutter_default.junit.xml": "b718aff9cf7d3d5f3c64fba56834f4914852eeeb5716e377f14c45943a596b27",
+        "logs/03/testlog-mutter_default.json": "3029a5e4e0eb82e4ffccf513e139ed953abf09f4521903755f8ec55955ffa67b",
+        "logs/03/command-output.txt": "bab678843ae76c80dab8878d790d235759c7d732a034546a5a8ab9eba997b739",
+        "logs/03/testlog-mutter_default.txt": "f86608b96e5e4d3e6015bfa675468a41a7cbb238372978367f6f1334fc93aea4"
+      }
+    },
+    {
+      "id": 4,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-directory-create",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-generation-directory-create"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/generation/directory-create"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/directory-create"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.8327008580090478,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/generation/directory-create",
+          "tap": "ok 1 /color-lifecycle/generation/directory-create"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/04/testlog-mutter_default.junit.xml": "578dee04eff2c2c6e051d9b0fb24d2755ef3601c5702c6544354ddb2e45877bb",
+        "logs/04/testlog-mutter_default.json": "65a82ff03a257f0cb273ae7e42faf3d27481ac1fd85d9a16d0d3a77407845f8d",
+        "logs/04/command-output.txt": "12939a84c427c3b746eedbc014185619ccbb099fad3f294bda30954214c5628d",
+        "logs/04/testlog-mutter_default.txt": "66cf91d3ae742f9d82f5e5c3b27ed1ab3362cf9193858a3ee3c45dabcb5f33a6"
+      }
+    },
+    {
+      "id": 5,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-write-result",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-generation-write-result"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/generation/write-result"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/write-result"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.7228541829390451,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/generation/write-result",
+          "tap": "ok 1 /color-lifecycle/generation/write-result"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/05/testlog-mutter_default.junit.xml": "22899017dfaef7ffe6c37e70567b8007ebe190f5623665febadfb089ff392342",
+        "logs/05/testlog-mutter_default.json": "293bf805b7cfb3a9e05de3c621f7ec4990fd6d7203b4fe8d3af6413b63d63918",
+        "logs/05/command-output.txt": "e2ed018af6b4a847573e77cb5594ea9c134b20a936603f49545f3b55d9e3d3c0",
+        "logs/05/testlog-mutter_default.txt": "d12ab4b1badc87d5bed5d69a99968fad0f9aca35a54b3a0b18c5d24353c1cb46"
+      }
+    },
+    {
+      "id": 6,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-profile-result",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-generation-profile-result"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/generation/profile-result"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/profile-result"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.5251406440511346,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/generation/profile-result",
+          "tap": "ok 1 /color-lifecycle/generation/profile-result"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/06/testlog-mutter_default.junit.xml": "054b8afc322f6b4fde687dcf2e686646aa4600280e1a7a24b74ce9b8ce62e851",
+        "logs/06/testlog-mutter_default.json": "0572d01044bdf858f32824a6c980b2a95961de8857871b06806e2cdda246a489",
+        "logs/06/command-output.txt": "2b3eac7a72c59350ff8a08790310d539c493422554065f32f0105447f5a3a583",
+        "logs/06/testlog-mutter_default.txt": "0cc5ca522cf501f95e91e5a0c0cb59971a240ca895f55affc7c7a5d8a1ab01b0"
+      }
+    },
+    {
+      "id": 7,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-efi-success",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-generation-efi-success"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/generation/efi-success"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/efi-success"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.5892885379726067,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/generation/efi-success",
+          "tap": "ok 1 /color-lifecycle/generation/efi-success"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/07/testlog-mutter_default.junit.xml": "596141fb9cef941dfd855589ef7e7e140e2fad0fafc44df310f865fcca07b738",
+        "logs/07/testlog-mutter_default.json": "8e4916c7c36a4db8ed77f2b1e7d7d608d959ec51704ef508e5c62630d2062058",
+        "logs/07/command-output.txt": "2a2eed8dd234c6e397b630ed9eee53321af7f2842663b12df61b3a36c5b49c58",
+        "logs/07/testlog-mutter_default.txt": "6971d8adb2da90334aa675f21c50962b761e0df8acc43ba39103c9281a6f596b"
+      }
+    },
+    {
+      "id": 8,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-efi-fallback",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-generation-efi-fallback"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/generation/efi-fallback"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/efi-fallback"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 1.55136636889074,
+      "exit_code": 0,
+      "result": "PASS",
+      "reasons": [],
+      "executed_tap": [
+        {
+          "path": "/color-lifecycle/generation/efi-fallback",
+          "tap": "ok 1 /color-lifecycle/generation/efi-fallback"
+        }
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/08/testlog-mutter_default.junit.xml": "532e44189bf5b63269592b2e2cce9c963a154f4998709d17b5450e95be4932d2",
+        "logs/08/testlog-mutter_default.json": "7dbf50b01baf42f501834ba05725a5927a0c1d826f3dac9832d57cc7b8cc9c2b",
+        "logs/08/command-output.txt": "22fcdb5ffd96ccfc1376eda02ed18b657fcb82eeabbd64297f7d63e06f9e7883",
+        "logs/08/testlog-mutter_default.txt": "a4209679604dadc0e82d297c0617eb4b1ac6dad6a49c80974bad2eab19b6e045"
+      }
+    },
+    {
+      "id": 9,
+      "target": "mutter:color-lifecycle-color-lifecycle-shared-caller-cancel",
+      "attempt": 2,
+      "head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "command": [
+        "meson",
+        "test",
+        "-C",
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+        "--no-rebuild",
+        "--setup",
+        "mutter:default",
+        "--print-errorlogs",
+        "--num-processes",
+        "1",
+        "mutter:color-lifecycle-color-lifecycle-shared-caller-cancel"
+      ],
+      "emitted_command": [
+        "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle",
+        "-p",
+        "/color-lifecycle/shared/caller-cancel"
+      ],
+      "emitted_environment": {
+        "G_TEST_SRCDIR": "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "G_TEST_BUILDDIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests",
+        "XDG_CONFIG_HOME": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/.config",
+        "MUTTER_TEST_PLUGIN_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins/libdefault.so",
+        "MUTTER_REF_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/ref-tests",
+        "MUTTER_GDCTL_TEST_RESULT_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-logs/tests/gdctl",
+        "GSETTINGS_SCHEMA_DIR": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/data",
+        "MUTTER_DEBUG_A11Y_MANAGER_WITHOUT_ACCESS_CONTROL": "1",
+        "LD_PRELOAD": "libumockdev-preload.so.0",
+        "LD_LIBRARY_PATH": "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/compositor/plugins:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/cogl/cogl:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/mtk/mtk:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests:/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/clutter/clutter"
+      },
+      "runtime_environment": {
+        "G_ENABLE_DIAGNOSTIC": "1",
+        "G_DEBUG": "fatal-warnings",
+        "LIBGL_ALWAYS_SOFTWARE": "1",
+        "GALLIUM_DRIVER": "llvmpipe",
+        "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+      },
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/shared/caller-cancel"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "seconds": 31.358950722962618,
+      "exit_code": 1,
+      "result": "FAIL",
+      "reasons": [
+        "Nonpassing Meson result",
+        "Insufficient non-skipped TAP cases",
+        "Non-skipped TAP path set differs from reviewed exact selection",
+        "Meson exit 1"
+      ],
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/09/testlog-mutter_default.junit.xml": "670063e787a8475cd1981af2f7ca63ebca731d87134b843e1b9b12d5b22b6b23",
+        "logs/09/testlog-mutter_default.json": "76ee32bae58968ee6dc00824a1cf2e473a4af6360870b804bebfd51a2d2cd11b",
+        "logs/09/command-output.txt": "caf52f2c0d31befd2ec536e1d8782ee2068d591f251326650139564bdd5e40c6",
+        "logs/09/testlog-mutter_default.txt": "4c3a0798922681c96e198a9fa6df8769eaac7f0c70607bf160e98ae4b3e8bc7a"
+      }
+    }
+  ],
+  "not_executed_checks": [
+    {
+      "id": 10,
+      "target": "mutter:color-lifecycle-color-lifecycle-finish-queued-device",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 11,
+      "target": "mutter:color-lifecycle-color-lifecycle-assigned-connect",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 12,
+      "target": "mutter:color-lifecycle-color-lifecycle-assigned-read",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 13,
+      "target": "mutter:color-lifecycle-color-lifecycle-finish-queued-assigned",
+      "historical_result": "PASS",
+      "review_disposition": "invalidated-pass",
+      "review_reason": "test_assigned_profile(NULL), color-lifecycle-tests.c:723-745, retains a successful ensure result then calls destroy_manager before finish; changed backend source/seat cleanup precedes cancellation finish and subsequent release dispatch. Old pass cannot qualify that changed disposal.",
+      "new_result": null
+    },
+    {
+      "id": 14,
+      "target": "mutter:color-lifecycle-color-lifecycle-directory-query",
+      "historical_result": "PASS",
+      "review_disposition": "invalidated-pass",
+      "review_reason": "test_directory_request(query), color-lifecycle-tests.c:767-795, parks the real directory query then destroys context, drops fixture store and replays after teardown; changed backend/seat disposal changes the very lifetime boundary. The new read-transfer statement is not reached in this cancelled path, so transfer repair alone is NOT an invalidation reason.",
+      "new_result": null
+    },
+    {
+      "id": 15,
+      "target": "mutter:color-lifecycle-color-lifecycle-directory-read",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 16,
+      "target": "mutter:color-lifecycle-color-lifecycle-local-ready-shutdown",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 17,
+      "target": "mutter:color-lifecycle-color-lifecycle-local-ready-finalize",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 18,
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-create-after-finalize",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 19,
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-retained-owner",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 20,
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-retained-assigned",
+      "historical_result": "PASS",
+      "review_disposition": "invalidated-pass",
+      "review_reason": "test_retained_profile(FALSE), color-lifecycle-tests.c:900-955, obtains an assigned profile, destroys context while retaining it, and checks profile/ICC/client releases; changed backend source destruction and seat detach are on its context disposal path, independently of unchanged assigned-profile code.",
+      "new_result": null
+    },
+    {
+      "id": 21,
+      "target": "mutter:color-management",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 22,
+      "target": "mutter:color-management-profile-conflict",
+      "historical_result": "PASS",
+      "review_disposition": "invalidated-pass",
+      "review_reason": "color-management-profile-conflict-test.c main uses an autoptr HEADLESS MetaContext and returns from meta_context_test_run_tests; autoptr cleanup reaches meta_context_dispose:813 -> meta_backend_destroy -> changed backend disposal/source and native-seat destruction. Source verified via native request95f126e9656e4fa69503f5f29ef42600. New cleanup is a real executed code change, not relink-only.",
+      "new_result": null
+    },
+    {
+      "id": 23,
+      "target": "mutter:monitor-dbus-tests",
+      "historical_result": "FAIL",
+      "review_disposition": "failed-retry-required",
+      "review_reason": "Original failed invocation remains outstanding. No inference of an individual causal frame beyond diagnosed IDs2,3,11,15-18; repair must be qualified on exact repaired candidate.",
+      "new_result": null
+    },
+    {
+      "id": 24,
+      "target": "mutter:wayland-color-management",
+      "historical_result": "PASS",
+      "review_disposition": "invalidated-pass",
+      "review_reason": "wayland-color-management-test.c:2721-2747 main uses autoptr HEADLESS MetaContext, executes primary cases and returns through context cleanup -> meta_backend_destroy -> changed source/seat disposal. Existing primary exclusions do not avoid this shared teardown. No need to invoke virtual-monitor eligibility as an assumed runtime path.",
+      "new_result": null
+    }
+  ],
+  "failure": {
+    "id": 9,
+    "path": "/color-lifecycle/shared/caller-cancel",
+    "observed": "Fresh child exceeded g_test_trap_subprocess 30-second failure bound; parent failed at color-lifecycle-tests.c:134, Meson child exit250/parent invocation exit1; no non-skipped TAP. Child stderr only startup/surfaceless renderer messages.",
+    "exact_wait_location": "Unknown; no stack or progress markers captured. Recovery thinker must establish it before bounded repair.",
+    "static_lead": "Fixture first installs ineligible monitor then eligible monitor using the same base setup. Manager update_devices reuses colour device by vendor/product/serial/connector identity. Device profile initialization is initiated in setup_created_cd_device, while monitor update does not necessarily re-run it. Potential unreachable on_profile_written barrier at tests.c:568; not a captured/proven timeout cause.",
+    "diagnostics_executed_on_this_card": 0
+  },
+  "export_failure_recovery": {
+    "observed_error": "exports exceed 4 MiB after execution",
+    "recovery_request": "ff474da2aa2b4eafba922a05892ec9c9",
+    "action": "Recovered existing attempt2 receipt and logs only; six hash-verified previously returned own repair mailbox files preserved outside mailbox, no deletion or test rerun. Frozen/offscreen files and ledgers untouched.",
+    "remaining_export_bytes": 3706932
+  },
+  "private_artifact_hashes": {
+    "logs.tar.gz": "c37263e9b7e34cf001d451a8564b16f11cb348394b68aced78426d8ede9350fc",
+    "approved-execution-manifest.json": "4cae0efa41ae3b16e63c29b053fda637adce398e1e155c8f07fe76c67422ff93",
+    "failed-testlog-mutter_default.txt": "4c3a0798922681c96e198a9fa6df8769eaac7f0c70607bf160e98ae4b3e8bc7a",
+    "failed-testlog-mutter_default.json": "76ee32bae58968ee6dc00824a1cf2e473a4af6360870b804bebfd51a2d2cd11b",
+    "post-execution-identity.json": "c4fb5402cfefc80b69be678dfd8bd0de3ade645e5015ffcf10f413744f78d913",
+    "pre-execution-identity.json": "c4fb5402cfefc80b69be678dfd8bd0de3ade645e5015ffcf10f413744f78d913",
+    "failed-command-output.txt": "caf52f2c0d31befd2ec536e1d8782ee2068d591f251326650139564bdd5e40c6",
+    "receipt.json": "464404065870f3759acaf92f4fffaa8ba36405142a1d32d4f0ee0c15d4567075",
+    "failed-testlog-mutter_default.junit.xml": "670063e787a8475cd1981af2f7ca63ebca731d87134b843e1b9b12d5b22b6b23"
+  },
+  "prior_source_receipts": "Compiler and full86 canonical replay/tree equality reused from colour-async-lifetime-repair-complete.json and independent review; no successful compilation/replay repeated.",
+  "remaining": "Automatic recovery thinker must diagnose exact ID9 wait/cause, decide bounded file ownership/repair and per-ID retained-pass/scoped-resumption manifest. Compile/export/review any source correction before ID9 retry and IDs10-24 first execution; no repeat of IDs1-8 absent actual reviewed invalidation.",
+  "limits": [
+    "No source-readiness or full runtime qualification",
+    "No general native-input leak-freedom; inherited keymap-ref/queued-data audit separate",
+    "No packaging/physical/optical/Dolby claims",
+    "No publication/push/merge or cross-lane integration",
+    "PR16 held; frozen delivery preserved; no devices/Apple TV"
+  ]
+}

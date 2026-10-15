@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "task": "t_38887c3f",
+  "scope": "Historical implementation checkpoint: compilation/replay only; later review and behavioral qualification in offscreen-reuse-validation.json",
+  "base_commit": "de09d575e81799a1a75fe34a44d69f04caf2e727",
+  "base_tree": "058bbf9758c65798d4d0010685e32e8e76da9d3d",
+  "native_commit": "2cc87e0aafc6113184d05586f1a3ea66504ba1dc",
+  "native_tree": "ca9aff7ba61bd1d6097d86f0b308dcdc1029255d",
+  "commits": ["12aa332567274fd3912a11736fe958bf4540ebe0", "2cc87e0aafc6113184d05586f1a3ea66504ba1dc"],
+  "patches": {
+    "0078-clutter-stage-view-Reuse-compatible-offscreen-buffer.patch": "de3c533e34a1c141f4a308d8ba623d39454edef112848d8d69eb083820c9357c",
+    "0079-tests-Exercise-offscreen-reuse-across-colour-state-r.patch": "88ce00cf470003d0d40101be576335b1ce900d18b2321103c9af263f5bba5d72"
+  },
+  "compiler": {
+    "architecture": "native x86_64",
+    "warnings_as_errors": true,
+    "baseline": {"request": "61856e8d64be417faea11da32cd1924f", "seconds": 162.99, "exit_code": 0, "log_sha256": "696f998972e3572f371245dd81d4a90f7df4d50e96da5220225c54a12210ab0b"},
+    "production": {"request": "a339b5b448c84ad2999be657620b346f", "seconds": 4.48, "exit_code": 0, "log_sha256": "23f9acda9727d40db3b70a6147148410e3c6af683e3ca033511781ab2abb5db1"},
+    "regressions": {"request": "7e1cbb8fd85644e69ff6809422fc4bc6", "seconds": 0.82, "exit_code": 0, "log_sha256": "bea44e87e6dafed0797056aa162f748eed665e77a451e69c637b2c9fbf07d9a1"}
+  },
+  "replay": {"request": "c927b113420e4a4889b36867166252fd", "base_commit": "d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7", "patch_count": 79, "tree_equal": true, "log_sha256": "3ca24ce6db7a518218f9c969a674eed5901f6c6e6a897191b189c775ec4294e2"},
+  "ownership": {"native_worktree": "wt-sol-offscreen", "native_build": "build-sol-offscreen", "branch": "codex/sol-offscreen-t_38887c3f", "frozen_source_and_build_unchanged": true, "prefix_0001_0077_unchanged": true},
+  "review_task": "t_ef4eb06c",
+  "review_state": "pending",
+  "unit_execution": "deferred until adversarial review and findings addressed",
+  "observed_allocation_saving": null,
+  "later_validation_receipt": "offscreen-reuse-validation.json",
+  "limits": ["No physical devices, Apple TV, display deployment, packages or credentials", "No timing, VRAM, energy or optical claim", "No forced fallback-format or dynamic dimension-mismatch fixture", "Frozen nativehdr10 unit receipts not relabeled as follow-up evidence", "Local-only delivery; PR16 held unmerged"],
+  "failures_preserved": ["Initial isolated Meson setup attempted offline gvdb fetch; recovered with cached unchanged subproject", "Oversized full-file transport payloads rejected before native execution; changed to compressed unified diff transport", "Test compile rejected nonexistent transfer-function SRGB enum; corrected to neighboring GAMMA22 and build passed"]
+}

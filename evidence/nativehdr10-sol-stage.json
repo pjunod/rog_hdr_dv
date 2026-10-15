@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-11T23:33:06.524098+00:00",
+  "stage": "Sol configuration/transport/API/CLI implementation only; not complete nativehdr10 acceptance",
+  "task": "t_6b7145f8",
+  "dependent_integration_task": "t_134bba61",
+  "architecture": "x86_64",
+  "transport": "owned .peer-linux/run.py only; unprivileged native x86_64; no display deployment",
+  "native_branch": "codex/sol-overrides",
+  "native_base_commit": "5f123bb2c203c44c765d56628b47aad1fcfd9e86",
+  "native_base_tree": "3f238d2e9227dacd578f5a673c04ac10de5caac8",
+  "native_head": "9b2886d826a577c866c5cd26533a1109c9aba9c7",
+  "native_tree": "ebe9aeb880eab66fcfc5cbf34a97d9eaf6cd30f5",
+  "native_working_tree": "clean at final export and replay",
+  "interrupted_archive_preserved": {
+    "path": ".peer-linux/preserved/sol-transfer.tar.gz",
+    "sha256": "8524dc99f284f55769e1ad1bd40c7f249a936c5ce5b10a3c8364a9974950aeb2",
+    "source_member_equality": "monitor-storage-tests.c matches the delivered source exactly (0e9a59e04805222bef1fbcf5fcad8818c4bb60079d312ec95c2e752abcd33b12)",
+    "cleanup": "Redundant new transfer archives removed; interrupted original archive moved intact to ignored preserved evidence. Native export bundle/diff/source archive and logs retained."
+  },
+  "commits": [
+    {
+      "commit": "52e5f97afebeb9096247d5e36ed72fa02cb64da2",
+      "tree": "22036a9d7cf21f29783ec13267f2ef034e149b41",
+      "author_and_subject": "Codex <codex@invalid> backends/monitor: Carry per-monitor target override declarations"
+    },
+    {
+      "commit": "fe06a44ef7913296e9b2081f9c0b7478b5d423f8",
+      "tree": "23b00a0c989bb4ac6224ca6797a893d06e4a42f9",
+      "author_and_subject": "Codex <codex@invalid> backends/monitor: Persist and validate target overrides"
+    },
+    {
+      "commit": "eba0eccabdc7236d9e0748fc030efabbe54d5fd6",
+      "tree": "ae9d2646bf89a0b6de3ab219938c66f5f56b6df3",
+      "author_and_subject": "Codex <codex@invalid> backends/monitor: Retain color settings when copying and synthesizing layouts"
+    },
+    {
+      "commit": "711a97af12b4c91f1894a53fd36d015f38dcc506",
+      "tree": "f0e40d998aa3c90401fab37719a8b18a61c42730",
+      "author_and_subject": "Codex <codex@invalid> backends/monitor: Expose configured and effective targets over DisplayConfig"
+    },
+    {
+      "commit": "498c17812c753333bec316122b7c0af4109cbbac",
+      "tree": "a9cd7c39c4e35b32e55d3467dd0605ce0f58bd68",
+      "author_and_subject": "Codex <codex@invalid> gdctl: Preserve per-monitor target declarations and support explicit clearing"
+    },
+    {
+      "commit": "9b2886d826a577c866c5cd26533a1109c9aba9c7",
+      "tree": "ebe9aeb880eab66fcfc5cbf34a97d9eaf6cd30f5",
+      "author_and_subject": "Codex <codex@invalid> backends/monitor: Report software PQ Night Light support on applied mode changes"
+    }
+  ],
+  "patches": [
+    {
+      "file": "wip/mutter-target-overrides/0001-backends-monitor-Carry-per-monitor-target-override-d.patch",
+      "sha256": "735a14ca94da42e85fb922346a8a8e13f7b9bee7065b18283513be73174b9c29"
+    },
+    {
+      "file": "wip/mutter-target-overrides/0002-backends-monitor-Persist-and-validate-target-overrid.patch",
+      "sha256": "7f7a7bbf4274a6ae65c652cd3ada1b97aa3954f2f413529fa32f23e87fe31205"
+    },
+    {
+      "file": "wip/mutter-target-overrides/0003-backends-monitor-Retain-color-settings-when-copying-.patch",
+      "sha256": "52b9e652df9fd77ebdd6cbe70644d1f905f74d8bb855da5214d8d28f8fe161a3"
+    },
+    {
+      "file": "wip/mutter-target-overrides/0004-backends-monitor-Expose-configured-and-effective-tar.patch",
+      "sha256": "dfb674eb7129c6baa76e2e257223e43592728c1cf4f9d6003e3422940dab2214"
+    },
+    {
+      "file": "wip/mutter-target-overrides/0005-gdctl-Preserve-per-monitor-target-declarations-and-s.patch",
+      "sha256": "459850dc5b4f25928247ee17fb17679996d94c49730aaecfc0ee26bf249e121e"
+    },
+    {
+      "file": "wip/mutter-target-overrides/0006-backends-monitor-Report-software-PQ-Night-Light-supp.patch",
+      "sha256": "29a5a30af48883d64c07a805b06bdbd82eb3308bcd99309779603a3d88239745"
+    }
+  ],
+  "unchanged_baseline": {
+    "patch_count": 49,
+    "all_patch_bytes_equal_to_handoff": true,
+    "series_sources_json_root_sha256sums_unchanged": true,
+    "original_nightlight_patch_bytes_unchanged": true
+  },
+  "compile": {
+    "command": "PKG_CONFIG_PATH=$PEER_WORK/prefix/lib/x86_64-linux-gnu/pkgconfig LDFLAGS=-Wl,-rpath,$PEER_WORK/prefix/lib/x86_64-linux-gnu ninja -C $PEER_WORK/build-mutter -j4",
+    "werror": true,
+    "werror_verified_by": ".peer-linux/results/75796019cd804943bf0c2ae5c7a7b923/output.txt",
+    "python_syntax_command": "python3 -m py_compile tools/gdctl",
+    "python_syntax_request": "29298de76d0a4ebdb1f97e7ecabf9b68",
+    "logs": [
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-store-build.txt",
+        "sha256": "e5933a0cba0178c98a70a2833b897ac7b15b433a03c5b8d9a733367c04d0b6e6",
+        "scope": "recovered XML/store commit",
+        "inherited_pre_migration": true
+      },
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-copy-final-build.txt",
+        "sha256": "771c70e3245a39c65aaea9d138665a8e2b302aa1b0e74690a455f8c78ed8be02",
+        "scope": "recovered copy/history commit and preceding source",
+        "inherited_pre_migration": true
+      },
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-api-build-complete.txt",
+        "sha256": "489d429f304bdbc3cae0adb0fc5b035dc0ece212a934b3afeab81c2bae969b4a",
+        "scope": "new API and deferred D-Bus regressions",
+        "inherited_pre_migration": false
+      },
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-cli-build.txt",
+        "sha256": "2bfa80155c395fc0e6d814635875a86fb9fba26098ca9c97e76ac7be405c2df7",
+        "scope": "new gdctl regression binary; Python syntax separately compiled",
+        "inherited_pre_migration": false
+      },
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-support-build.txt",
+        "sha256": "49a87474dbfbea6973771ec05064a62b6eadf0ce1dc8ddbd7b0d6bb4384ef884",
+        "scope": "new manager support refresh and final deferred D-Bus regression",
+        "inherited_pre_migration": false
+      }
+    ],
+    "fixed_failures": [
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-api-build.txt",
+        "sha256": "d6f737cc124584b9078d266d87e9726d470ea5f3695a7a1a7812274dc411ed85",
+        "cause_and_fix": "implicit double-to-float conversion; fixed with explicit cast"
+      },
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-api-build-final.txt",
+        "sha256": "93d8a9f08f48a31f67e92e3098ab07729407470c2f8fb02d68390395cb505f82",
+        "cause_and_fix": "missing config-manager header in new test; added"
+      },
+      {
+        "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-api-build-passed.txt",
+        "sha256": "ed170844244cd263cc944f01e10b75865d7cc4790615590ccba9ed56bb43a9b6",
+        "cause_and_fix": "existing fixed-to-float helper hidden from regression binary; exported for tests"
+      }
+    ],
+    "commit_identity_failure": "069db56426fb4c239a1163c313583cc1: compilation completed; git commit failed with missing native identity. Per-repository neutral identity configured; commit retried without rerunning compilation."
+  },
+  "replay": {
+    "request": "75796019cd804943bf0c2ae5c7a7b923",
+    "result": "exact source tree equality",
+    "scope": "six Mac-exported patches onto pinned native baseline; no compile or units rerun",
+    "tree": "ebe9aeb880eab66fcfc5cbf34a97d9eaf6cd30f5",
+    "temporary_worktree_removed": true
+  },
+  "preserved_artifacts": [
+    {
+      "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-overrides.bundle",
+      "sha256": "c4440035d95fc390b901f12c260a812ca546d5cba7d739f3de204e92fdebd714"
+    },
+    {
+      "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-overrides.diff",
+      "sha256": "aa20192b44a0903185f3fd61dde881d185b38185273119dce7a38f78476932df"
+    },
+    {
+      "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-overrides-source.tar.gz",
+      "sha256": "ac1eb72148f5729727c110215a4c4b4dddc9a2d42a5ae69b5b3cee6e75cc08d7"
+    },
+    {
+      "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-overrides-commits.txt",
+      "sha256": "d8b0706b65663d90b8230e37dacfcd41ceccff6221e880e1643ace6276f19a30"
+    },
+    {
+      "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/sol-overrides-files.txt",
+      "sha256": "e6b839231aa4f0810a0122ec56cca01c9d1fa73894d75958e7538352f27189ff"
+    }
+  ],
+  "unit_tests_run": 0,
+  "behavioral_probes_run": 0,
+  "deferred_coverage": [
+    "monitor-store target-override roundtrip and malformed XML",
+    "monitor-storage deep copy, per-monitor history and override-only reapply/VERIFY",
+    "monitor-dbus strict types/enums/nonfinite/ranges/duplicates, VERIFY, persistent rejection/restore",
+    "monitor-dbus configured/effective target and provenance; 400 cd/m\u00b2 override at 2.1 reference factor",
+    "monitor-dbus no-LUT/no-CTM NightLightSupported PQ/SDR transitions and inactive effective-target omission",
+    "monitor-gdctl two-monitor preservation/clearing/VERIFY/invalid ranges and updated golden show fixtures",
+    "existing affected hotplug/orientation/restore and colour coverage in full candidate batch"
+  ],
+  "fixture_warning": "Golden fixtures are source-derived expectations, not execution receipts. D-Bus user-target assertions require Opus selector integration.",
+  "hotspots": [
+    "src/backends/meta-color-device.[ch]: only shared provenance converter interface and test visibility changed; selector/rendering ownership passes to Opus"
+  ],
+  "decisions": [
+    "Direct D-Bus omissions replace/reset; gdctl read-modify-write preserves configured overrides plus color mode/RGB range.",
+    "Existing pinned source has no MetaMonitorConfig equality/assignment-change short circuit; native apply always carries assignments. No unused equality API added.",
+    "Expose one existing provenance table, not duplicate source-name mappings.",
+    "Final integrated series/pins/hashes and both source reviews precede one affected unit batch; repository pre-merge lane deferred."
+  ],
+  "remaining": [
+    "Opus Night Light imports/corrections/capture inventory and target selector, including USER_DECLARED and no-EDID override handling",
+    "Integrated source series/export/replay/pins/hashes, both adversarial reviews and fixes, then one affected validation batch",
+    "Coordinator-managed substantial implementation PR; no publication in this stage; PR16 held unmerged",
+    "Ubuntu port/package qualification and optical/display/Dolby acceptance are separate"
+  ],
+  "ubuntu_cache_inventory": {
+    "scope": "retained pre-migration inventory; not a fresh packaging audit",
+    "path": ".peer-linux/results/970a52ee272441ed89f21a2fc24c9022/exports/ubuntu-cache-inventory.json",
+    "available_recorded": [
+      "mutter_51.0.orig.tar.xz"
+    ],
+    "missing_recorded_inputs": [
+      "mutter_51.0-1ubuntu3.dsc",
+      "mutter_51.0-1ubuntu3.debian.tar.xz",
+      "exact Ubuntu libdisplay-info source package artifacts from sources.json"
+    ]
+  },
+  "limitations": [
+    "Compilation and source equality only, no software acceptance from unexecuted units.",
+    "No packages, live laptop access, display changes, measurement, optical calibration or Dolby qualification.",
+    "No push, merge or upstream submission. PR16 remains held unmerged."
+  ]
+}

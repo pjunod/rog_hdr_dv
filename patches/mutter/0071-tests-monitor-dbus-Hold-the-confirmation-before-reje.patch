@@ -1,0 +1,81 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 06:54:40 +0000
+Subject: [PATCH] tests/monitor-dbus: Hold the confirmation before rejecting a
+ target override
+
+The persistent target override case rejected its configuration with
+meta_monitor_manager_confirm_configuration(), but the test shell has no
+confirmation dialog: the plugin manager accepts a persistent configuration
+while it is applied, from the confirm-display-change emission, so the
+configuration was already saved and the rejection returned early with
+nothing to restore. The wait for the restored peak then timed out.
+
+Block the plugin manager's handler around the persistent proposal, as a
+user who has not yet answered would, check that a confirmation is pending,
+reject it, wait for the restored peak, and check that no restore handle is
+left behind.
+---
+ src/tests/monitor-dbus-tests.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/monitor-dbus-tests.c b/src/tests/monitor-dbus-tests.c
+index aad65bb..a560f42 100644
+--- a/src/tests/monitor-dbus-tests.c
++++ b/src/tests/monitor-dbus-tests.c
+@@ -340,8 +340,7 @@ on_target_wait_timeout (gpointer user_data)
+ /*
+  * Waits, at most 10 s, until the monitor's configured target peak is @peak:
+  * an observable result of the restore that rejecting a persistent
+- * configuration schedules, rather than the manager's private idle handle,
+- * which is not cleared when the restore runs.
++ * configuration schedules, rather than the manager's private idle handle.
+  */
+ static void
+ wait_for_target_override_peak (MetaMonitor *monitor,
+@@ -410,6 +409,7 @@ meta_test_monitor_target_dbus (void)
+   g_autoptr (GError) error = NULL;
+   double peak, minimum;
+   const char *source;
++  unsigned int confirm_signal_id;
+   size_t i;
+ 
+   meta_emulate_hotplug (meta_create_monitor_test_setup (backend, &setup,
+@@ -471,7 +471,17 @@ meta_test_monitor_target_dbus (void)
+       g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, 400);
+     }
+ 
+-  /* Persistent proposals use the ordinary rejection/restore lifecycle. */
++  /* Persistent proposals use the ordinary rejection/restore lifecycle. The
++   * test shell, like any plugin without a confirmation dialog, accepts a
++   * persistent configuration while it is being applied, which would leave
++   * nothing to reject: hold its confirmation, as a user would. */
++  confirm_signal_id = g_signal_lookup ("confirm-display-change",
++                                       G_OBJECT_TYPE (manager));
++  g_assert_cmpuint (g_signal_handlers_block_matched (manager,
++                                                     G_SIGNAL_MATCH_ID,
++                                                     confirm_signal_id, 0,
++                                                     NULL, NULL, NULL),
++                    ==, 1);
+   g_clear_pointer (&valid, g_variant_unref);
+   valid = g_variant_parse (G_VARIANT_TYPE_VARDICT,
+     "{'color-mode': <uint32 1>, 'target-peak-luminance': <double 600>}",
+@@ -482,8 +492,18 @@ meta_test_monitor_target_dbus (void)
+   g_assert_no_error (error);
+   g_clear_pointer (&reply, g_variant_unref);
+   g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, 600);
++  g_assert_cmpuint (manager->persistent_timeout_id, !=, 0);
+   meta_monitor_manager_confirm_configuration (manager, FALSE);
++  g_assert_cmpuint (manager->persistent_timeout_id, ==, 0);
+   wait_for_target_override_peak (monitor, 400);
++  /* The restore has run: no stale handle is left for the next
++   * configuration to remove. */
++  g_assert_cmpuint (manager->restore_config_id, ==, 0);
++  g_assert_cmpuint (g_signal_handlers_unblock_matched (manager,
++                                                       G_SIGNAL_MATCH_ID,
++                                                       confirm_signal_id, 0,
++                                                       NULL, NULL, NULL),
++                    ==, 1);
+ 
+   /* Omission replaces the declaration, rather than silently retaining it. */
+   g_clear_pointer (&valid, g_variant_unref);

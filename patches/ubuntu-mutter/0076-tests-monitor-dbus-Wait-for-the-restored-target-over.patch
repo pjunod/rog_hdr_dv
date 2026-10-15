@@ -1,0 +1,81 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 03:49:47 +0000
+Subject: [PATCH] tests/monitor-dbus: Wait for the restored target override,
+ bounded
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The target override D-Bus regression waited for the restore of a
+rejected persistent configuration with
+
+  while (manager->restore_config_id)
+    g_main_context_iteration (NULL, TRUE);
+
+but restore_previous_config() never clears restore_config_id once its
+idle has run, so the loop could never end and the test would hang until
+the Meson timeout.
+
+Wait instead for the observable result, the monitor's configured target
+peak returning to the previous 400 cd/m², with a 10 s bound that fails
+the test rather than hanging. Production code is unchanged.
+---
+ src/tests/monitor-dbus-tests.c | 37 +++++++++++++++++++++++++++++++---
+ 1 file changed, 34 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/monitor-dbus-tests.c b/src/tests/monitor-dbus-tests.c
+index e4677ff..aad65bb 100644
+--- a/src/tests/monitor-dbus-tests.c
++++ b/src/tests/monitor-dbus-tests.c
+@@ -329,6 +329,39 @@ assert_effective_target (GVariant        *properties,
+     }
+ }
+ 
++static void
++on_target_wait_timeout (gpointer user_data)
++{
++  gboolean *timed_out = user_data;
++
++  *timed_out = TRUE;
++}
++
++/*
++ * Waits, at most 10 s, until the monitor's configured target peak is @peak:
++ * an observable result of the restore that rejecting a persistent
++ * configuration schedules, rather than the manager's private idle handle,
++ * which is not cleared when the restore runs.
++ */
++static void
++wait_for_target_override_peak (MetaMonitor *monitor,
++                               float        peak)
++{
++  gboolean timed_out = FALSE;
++  unsigned int timeout_id;
++
++  timeout_id = g_timeout_add_seconds_once (10, on_target_wait_timeout,
++                                           &timed_out);
++  while (meta_monitor_get_target_override (monitor)->peak != peak &&
++         !timed_out)
++    g_main_context_iteration (NULL, TRUE);
++
++  if (!timed_out)
++    g_source_remove (timeout_id);
++  g_assert_false (timed_out);
++  g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, peak);
++}
++
+ static void
+ meta_test_monitor_target_dbus (void)
+ {
+@@ -450,9 +483,7 @@ meta_test_monitor_target_dbus (void)
+   g_clear_pointer (&reply, g_variant_unref);
+   g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, 600);
+   meta_monitor_manager_confirm_configuration (manager, FALSE);
+-  while (manager->restore_config_id)
+-    g_main_context_iteration (NULL, TRUE);
+-  g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, 400);
++  wait_for_target_override_peak (monitor, 400);
+ 
+   /* Omission replaces the declaration, rather than silently retaining it. */
+   g_clear_pointer (&valid, g_variant_unref);

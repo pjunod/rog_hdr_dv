@@ -1,0 +1,341 @@
+{
+  "schema": 1,
+  "stage": "PARTIAL compile-only; native seat/keymap repair unresolved, no readiness or review requested",
+  "task": "t_1da8e97b",
+  "recovery_task": "t_3664fbd1",
+  "original_validation": "t_8eee5d9f remains blocked; original6PASS18FAIL unchanged",
+  "native_head": "b230080510eaab034b6c85cec73432951edcdd9f",
+  "native_tree": "c5e7c673464477638e2ec9f62432baa71dd87914",
+  "mac_base": "7aa3ede3a867e177013b950766f3ab9d439bfe66",
+  "original_native_head": "65b5c00a35f675a84658c52c4cd80cf89b1c4947",
+  "original_native_tree": "648f28ce4e22e014098a803bc453841abb9eaad9",
+  "native_commits": [
+    "b230080510eaab034b6c85cec73432951edcdd9f c5e7c673464477638e2ec9f62432baa71dd87914 backend: destroy the owned Clutter event source before releasing its context",
+    "733d6b8bb986b138bd95126dde86c0023b3eb663 b08dd31f4808462df9ebc42a01782caba4e6a490 color/store: return ineligible requests before creating callback-bearing tasks",
+    "6bcd1c0d9d3eb25d03338871985db4402eefde3b e171906b336faf9a1f6a318d18b023388c393c1c color/store: sequence cancellable lookup before transferring callback ownership"
+  ],
+  "affected_compile": {
+    "head": "b230080510eaab034b6c85cec73432951edcdd9f",
+    "tree": "c5e7c673464477638e2ec9f62432baa71dd87914",
+    "command": [
+      "ninja",
+      "-C",
+      "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b",
+      "-j2",
+      "src/tests/mutter-color-lifecycle"
+    ],
+    "seconds": 92.8873505849624,
+    "exit_code": 0,
+    "sha256": {
+      "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/backends/meta-color-store.c": "fe8b3b6b9fc03305e003d72cd72ea9d0085c07b106d46ce06ec939ccf7f71f29",
+      "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/tests/color-lifecycle-tests.c": "2abcaa9f70750c35898dd1805a3e7d38b9e603ec700d7c440e5d8a85876b5791",
+      "/work/hdr-nativehdr10-20261011/wt-sol-lifetime-repair-t_1da8e97b/src/backends/meta-backend.c": "cec1481318461722594e5825ed1ab7b1d8443102d78db462c0578208441f7177",
+      "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/config.h": "ba07388c76741dcb9d1ae7739e4b6971b3369ecc10418e7e33f442661a80e975",
+      "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/libmutter-51.so.0.0.0": "cc064e4d8831e6bcb9a040a6d3da662612f83efce205639dffce1a6a88c168b0",
+      "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/src/tests/mutter-color-lifecycle": "61a228dd06846293abb76c059ed06685cb2740a2a669062a9fa3760b29099b1a",
+      "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-info/intro-buildoptions.json": "0f133aa561ed86da91c1a9c413bd08d2b0c26fd4cd610c6af11f3b02f4a9fc73",
+      "/work/hdr-nativehdr10-20261011/build-sol-lifetime-repair-t_1da8e97b/meson-info/intro-tests.json": "50dbb295f6b99812d16175cc31b958aa3bdab41593450040d430185f23da14df"
+    },
+    "unit_executions": 0,
+    "status": "PARTIAL compile-only, startup seat/keymap still unfixed"
+  },
+  "guard_disabled_objects": [
+    "src/libmutter-51.so.0.0.0.p/backends_meta-color-store.c.o",
+    "src/libmutter-51.so.0.0.0.p/backends_meta-backend.c.o"
+  ],
+  "guard_disabled_symbols_absent": true,
+  "replay_equal": true,
+  "replay_tree": "c5e7c673464477638e2ec9f62432baa71dd87914",
+  "replay_provenance": "0578091ebe3340c18713039cb653de47 verified equality and removed replay BEFORE postcheck line44 failed; no successful build/replay rerun",
+  "patch_count": 84,
+  "appended_patches": {
+    "0082-color-store-sequence-cancellable-lookup-before-trans.patch": "1076e5a4d772b2f71addaa9e77c4b96681b4ac76a3243a1e58457fc9b06c6d08",
+    "0083-color-store-return-ineligible-requests-before-creati.patch": "d26c4eac9b787ee2d75dc6a9b37f8cb15baaa01e599d7dd0ea0c9d1a057ae23d",
+    "0084-backend-destroy-the-owned-Clutter-event-source-befor.patch": "0f975926c300ffc2c13307a8b27f7c743a7ab88defdb5ac35343fecc5d17d07b"
+  },
+  "unchanged_prefix": {
+    "0001-backends-native-Support-native-DisplayID-RGB-BT.2020.patch": "d584a8b0a8bee5ec91438a439e4c3632eca9ef3eda0ef6c2329014139cb383cb",
+    "0002-backends-color-Separate-the-native-target-luminance-.patch": "f77652dc2e4c2084c30223763b854da33dfc22d59fd1b944f302ef26d4266e8c",
+    "0003-tests-native-hdr-Cover-native-target-policy-and-immu.patch": "2bc23a00a4f55d58b905a2ab4abb2af5fbc253f59ab175cfa3caf7cab1398bb5",
+    "0004-backends-color-Refresh-preferred-targets-after-outpu.patch": "13028cd64bd69b373022f2826f4a029b41102fa7c1e7308dab4a43e899dff098",
+    "0005-tests-color-management-Account-for-global-forced-HDR.patch": "cb14f98416ff4602f34a096428816612b7169df9c122539dbba63badbee6b4bc",
+    "0006-wayland-color-management-Dispose-target-records-befo.patch": "5a1c7cd3e2ab6e18baff5edd2b07c28ccac6e0c98068a490093e01db733fb455",
+    "0007-tests-native-hdr-Keep-the-fixture-mode-in-the-forced.patch": "d466982356e2e036eb54a0ba2d81dc79ac13fb22c8a6bcc07aa20f4de112a0af",
+    "0008-backends-color-Publish-target-primaries-apart-from-t.patch": "7254433476becd51092c15048bfb41c0c7c234a19b70f63a5c82314367c3c143",
+    "0009-tests-native-hdr-Cover-native-target-primaries-and-t.patch": "e7fbb48529391541c0a6ba828c3d73221070ef16d6facd8ff40f6d56a43a6617",
+    "0010-tests-Run-target-volume-cases-in-separate-test-invoc.patch": "f828510ceb79688c7a4fa56830caa11c1259fc89759ee683f3b10933230738b9",
+    "0011-clutter-color-Add-a-fallible-definition-of-the-linea.patch": "457f65542272147f35f3b804338c73f5bcf5a7c07151b0eead8c6f9d35fc792f",
+    "0012-backends-color-Publish-target-primaries-with-one-con.patch": "a0ccde5291d60edf83dbbbdde5f51062d1299f9d852fe3f6dd7cd5ff9a135c82",
+    "0013-wayland-color-management-Accept-signed-custom-primar.patch": "8fbfece4329dc0030ff7a3f00bc95c373b133310359d934930b0e8df746211d0",
+    "0014-wayland-color-management-Fix-ICC-file-range-and-desc.patch": "8854697d8800ff3b0201745613b7643e7b2c2f66265d2c81162304b3cc52880d",
+    "0015-core-util-Read-at-the-absolute-offset-and-reject-sho.patch": "ea41de70a5dc0f54925a29a5be32d6d2da0842f3a232cbb8c9857ce4540bec3c",
+    "0016-wayland-color-management-Post-the-creator-s-own-unsu.patch": "b7a574fe57b1d22ddae748287df41fd266100a5fef428bbe85eee2aa12cfce94",
+    "0017-backends-color-Validate-EDID-primaries-before-using-.patch": "a42f5c9c0fd06a79be9c350059b0274cdf44106dddecfc298380efc733c4c162",
+    "0018-tests-color-management-Cover-signed-custom-primaries.patch": "bdfbbd16a18e311776be951e990f1120a71cbc1a581ec745f1488f9fea8070a2",
+    "0019-tests-color-management-Cover-ICC-file-ranges-descrip.patch": "35be19e2b13f643d1f50f98620e13fbdfa43bb17aa4f5df1037dd9b1bc3d4914",
+    "0020-tests-color-management-Cover-the-creator-params-unsu.patch": "96c481ee46425750da0146a67411b01f1bfa60c14fc2e9304170bf0a32cdd947",
+    "0021-tests-color-management-Expect-the-disconnect-warning.patch": "14f81cea25f84cb2912be363ac30d50b0a207184665dc8fc90c0f4ec092d6883",
+    "0022-clutter-color-Add-the-HLG-transfer-function.patch": "23e7135dd0d912f02c3abade895f6127258a4dbd37bd381425d7228adb978380",
+    "0023-wayland-color-management-Accept-and-advertise-HLG.patch": "99f6467d492e4733efee6378a56f54dc7d66fa86e75d6cfbaf77db0859867a01",
+    "0024-tests-color-management-Cover-HLG-decoding-encoding-a.patch": "ab94ecd3b4eb34b6a169cd813ecfcd0ef373639d886066d954e4ffe27e8a3134",
+    "0025-clutter-color-Give-parametric-color-states-a-target-.patch": "307e9d61a7ce516723133dde8ef46e1fec9952dc1d7bc57430d0b754476cb3da",
+    "0026-wayland-color-management-Accept-mastering-metadata-a.patch": "830704dd9ded04cf500002a6bdca0657d71642e7b84ff1b88967c657c946ca99",
+    "0027-tests-color-management-Cover-mastering-metadata-and-.patch": "f9a4129e4ac923c257054fe22a872a9bdd05d6329bd9e306fb7571b524e07196",
+    "0028-clutter-color-Map-highlights-toward-a-declared-targe.patch": "7f47188ef627b250410fd6c98582c19d583c65a020f0e16763224f7a8dce295f",
+    "0029-backends-color-Blend-for-the-output-s-declared-targe.patch": "68ad6106fa81e501a82b819cc5014f63f3186dd3e3cb483597c5d19e3016c78b",
+    "0030-native-Composite-surfaces-and-cursors-whose-highligh.patch": "36e9406c968151ad43bd4f0dae704c0a6f879ec0331afc619a7a4e5d5d23ec8f",
+    "0031-tests-color-management-Cover-highlight-mapping-and-s.patch": "0e08e166d5a49cd0278649f0ef42f5c3f2e57dd0a8f2fd24308ee2923d5af715",
+    "0032-clutter-color-Compress-gamut-toward-a-declared-displ.patch": "ffe38a045f3b2ac40d76bc5e1eb9f5413edd639e9ae2edc3536c4b5699152744",
+    "0033-native-Composite-surfaces-and-cursors-whose-gamut-is.patch": "0f93259ca6035df471eae00abd0632755b4e61f1d6840699c366dd1a2d5b3dca",
+    "0034-backends-color-Render-for-the-output-s-declared-targ.patch": "d195b4051a545a8d0b7a259d88461de62465d2c7034da3727bdad6a240df03f5",
+    "0035-tests-color-management-Cover-gamut-compression-and-s.patch": "3515c15a9e8e680f896a364ddb398f376f167621eef284afd2f91c8924d84eec",
+    "0036-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch": "241ba62404cf3cc381dea2dde320054032bcd08f0bcf97fcfe16a5d52f720904",
+    "0037-clutter-color-Use-the-BT.2100-Table-5-HLG-system-gam.patch": "4c762af839a1f7e743d0c8b3d96a450465da8ec5dca8035655cfa868d3a27989",
+    "0038-clutter-color-Make-display-targets-only-through-an-e.patch": "0493e2dcdeb07bd94b2ddc9eaa610101dddc213285d869fb216e3c469d51a7ee",
+    "0039-clutter-color-Decide-mapping-once-per-source-and-tar.patch": "cc4a027754f626708c4b2a611485e0629ab3fdf8bd2f355eefcec55af7d646c1",
+    "0040-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch": "684e090b92cb7f06bcd0a68f4e4ad50f6f3778b297a8b099edf6a1287cc66508",
+    "0041-wayland-color-management-Correct-comments-on-masteri.patch": "9ba1a3f9201f8613bfc6cf65312d7c0186a37e0cc2b65c263e7de56817558ed4",
+    "0042-wayland-color-management-Publish-descriptions-on-exa.patch": "0bd24f20cdc265ed692cbb92cf96154cd8b7a3e446cf302807b5dca7cf376bf2",
+    "0043-clutter-color-Evaluate-gamut-compression-without-cla.patch": "15829e8c293de99fcd707609be72fb0e31ca862673f0710a4c5831afb4c4bf04",
+    "0044-backends-color-Treat-every-declared-target-source-as.patch": "ea9fe5ad9a671868c5d1b44913b0a7f7f12ceabca2dd8f80fadbf76124e435cb",
+    "0045-backends-color-Take-the-target-peak-from-CTA-HDR-sta.patch": "58f15d930b77f77c0676929a946c88c3e3b60765c1cb1447a7924ab44e8675da",
+    "0046-clutter-color-Judge-gamut-containment-in-the-frame-o.patch": "27af5f7f5031867fad8fa75e84d80d967a713664cae4969025ee2c31ced54a90",
+    "0047-backends-color-Take-native-SDR-target-primaries-from.patch": "27bc28e26cea83373ed60664a4e040dd84e770478513480f910cf01f9927949c",
+    "0048-tests-native-hdr-Cover-CTA-and-base-EDID-target-sour.patch": "185416ebbcf3a2db08b8b386ed1015517be01385adaba7e8ad580b9185648ef5",
+    "0049-tests-color-management-Cover-CTA-and-base-EDID-displ.patch": "f8410b9c1028b5af3691cbe18179262d7c7a76e8598a90414e8df1743dc1070f",
+    "0050-clutter-color-Adapt-a-display-s-output-to-a-white-po.patch": "a0e38f0b3f90a87af6aa3d6c2f644a0cc37d35f7fd22cddbf54cae43d30d21d9",
+    "0051-compositor-Composite-content-on-outputs-whose-white-.patch": "1f8ef57914a2f7581da102c5418b9f9a431c79b0f6c82526197383b9d82ae68c",
+    "0052-backends-color-Apply-Night-Light-in-linear-light-in-.patch": "f4a556c52a0de1c5f2c7900ef66fffc6d66be06d6c6c2757dfa5f546f7037d08",
+    "0053-clutter-color-Bound-the-white-adaptation-with-diagon.patch": "532271e4917ce495220ad8e8a949aff29867efa408bc06c4ff639cbfd50d1664",
+    "0054-tests-Cover-Night-Light-mode-transitions-captures-an.patch": "4c7e600f0f48c59da48ed694fd090bd64eb650525f9eea94e3e849e4c2d399f0",
+    "0055-backends-monitor-Carry-per-monitor-target-override-d.patch": "36e7c0c0b7eaaffc48aed612e787b31eef0a581fef9aabf6a0dc0b80147f0413",
+    "0056-backends-monitor-Persist-and-validate-target-overrid.patch": "a007034d047b9d0f8554586f88915858161bdadb7f0854e6446284596ddac636",
+    "0057-backends-monitor-Retain-color-settings-when-copying-.patch": "5111ae1ae4efaf9e7c0e8349dce0464be2b6bd0f1f5bca4fbd40d67ce8fffd7a",
+    "0058-backends-monitor-Expose-configured-and-effective-tar.patch": "cd28ab545f9eaf442fd76176ca650581257152e1d3a503381ae58a74016a03f2",
+    "0059-gdctl-Preserve-per-monitor-target-declarations-and-s.patch": "b7bcdd194a8417e90b6c124a212dc151e1f6ce12b4d15cb24eb17ec23a7a4e4a",
+    "0060-backends-monitor-Report-software-PQ-Night-Light-supp.patch": "4f6978ef5698222b486d9a9814c9abf2134997c6877a88fc8468b758f9768c34",
+    "0061-backends-color-Select-per-monitor-target-overrides-a.patch": "16c41ce324f8fda8c58f312489a103960cf391871ce3df8dcfdc56884a9dcbff",
+    "0062-clutter-color-Anchor-the-Night-Light-adaptation-at-t.patch": "26799d78258b51ec1f751ac0c21c84b0069541f647c185ad164c7b50be974216",
+    "0063-backends-color-Render-without-Night-Light-when-its-w.patch": "1db066df99c8742d34dc691dc3c839d6f2d79ca246a20902c8150b9f67c74046",
+    "0064-tests-monitor-dbus-Wait-for-the-restored-target-over.patch": "f05da67e7ab8de2b1255f447eb3e81d7704b1711790146a93581211e68980f4d",
+    "0065-backends-monitor-Keep-accepting-truncated-monitors.x.patch": "7084aac4fbced1f9da1180b44366a1443fa4e9a0c6b5c84857311e39d6c1030f",
+    "0066-tests-Run-the-display-target-user-override-case-on-i.patch": "b5b202c5ca1215e646e8a9e880ddfeda30e8801198bcbe4eecc4e4a05aeafc75",
+    "0067-tests-color-management-Read-back-captures-across-BT..patch": "143f1c299c23688f6b82ab9d1bf2a65f71bc31b5aef7a96f2d6173166521df18",
+    "0068-tests-color-management-Check-that-capture-readbacks-.patch": "8007ea6991347a46ca08e5be883eaa461924ac2867c39dce9b27d7ae44a5a12c",
+    "0069-tests-color-hdr-Bound-the-channel-residue-of-single-.patch": "5e2e234f96323de92b64b9c921d8605560c2612805c80693620b4daa1a412ff4",
+    "0070-backends-monitor-manager-Forget-the-restore-handle-o.patch": "2fbbe32c0d29d6286bd52505b3618aaab77dac3ea9fefbe363517df64523a7f2",
+    "0071-tests-monitor-dbus-Hold-the-confirmation-before-reje.patch": "60f83722d60dddf5181c4d90cc73c53bda5ce9a758c6994fdfa9fa813f6167d0",
+    "0072-backends-color-Leave-colord-when-the-manager-drops-a.patch": "8cc071afe9aeaaa3147560f23e595f09a1a404380f91311d5806d21fd181ae34",
+    "0073-backends-color-Drop-removed-color-devices-before-cre.patch": "055990a5af4f7eff12af2e6553001273efd8941dd300d4cec3d901dff001c340",
+    "0074-tests-color-management-Check-colord-devices-across-u.patch": "d7cd4f1d5a5cd013f4b4ac9c298c1653db0be105213ecc5ef3bf14a526967d49",
+    "0075-backends-color-device-Leave-a-cancelled-device-profi.patch": "bd6d424839c2b9d855f6e9618c81e4250a36797f6dc1de8bc1b962f09b72529d",
+    "0076-backends-color-profile-Leave-a-cancelled-colord-prof.patch": "b300fee139cd6767d6ad9990d507949af406e9276a599ddab5afa15d78dd8386",
+    "0077-tests-color-management-Unplug-a-monitor-while-its-pr.patch": "49830f651c81896f07e8875cffd78411f320abf6e8b7e4dbf9401cae39486092",
+    "0078-backends-color-Shut-down-store-work-before-manager-r.patch": "afd6d2632aa0e8171940c1c91e52e506646dfc37ee45f6f31614e4193ed09612",
+    "0079-tests-color-Add-a-guarded-real-callback-delivery-bar.patch": "d856d976bae1c88fc86c19d8a040fe882d78d57cd172d33b92577e400b658099",
+    "0080-tests-color-Exercise-shutdown-at-actual-asynchronous.patch": "95c96c36fc8a212dc7bfc933e348f69466de50eb376f8336b3bbb6db15e1d28c",
+    "0081-tests-color-Transfer-context-ownership-exactly-once-.patch": "6b7d9d9daa46b8d107671483865c1645a6fc3aa8edd137f69f80081786f6b86b"
+  },
+  "sums_deliberately_appended": 3,
+  "original20registrations_equal": true,
+  "compiled_diagnostic_invocations": 3,
+  "diagnostic_ids": [
+    2,
+    3,
+    11
+  ],
+  "diagnostic_exit_codes": [
+    250,
+    250,
+    250
+  ],
+  "diagnostic_log_hashes_verified": 24,
+  "delivery_file_hashes_verified": 25,
+  "unit_acceptance_invocations": 0,
+  "requests": {
+    "native_inventory-wrapper": "73ab6e17019349c2a55ad9fe42476ae9",
+    "final_native-wrapper": "a941b09bffbe489a930ca6f8b8c6a3f4",
+    "glib_routes-wrapper": "820cc1e9e9ec4799870f69a7eb1c79eb",
+    "apply-part2-wrapper": "37fcb725fb8844629ac8511568c29615",
+    "apply-part3-wrapper": "e4de667f2c63496db652f6dd5338a1f9",
+    "export_compact-wrapper": "0578091ebe3340c18713039cb653de47",
+    "setup_native-wrapper": "f555e991828c48f9ad56216fd1823f2c",
+    "run_capture-wrapper": "a3108ea7d6cf4a6aa963af0a0509e12c",
+    "apply-part1-wrapper": "b0abccb4aab54e7bbc58e1eb46f18340",
+    "build_capture-wrapper": "25c15b13241a4a7dac57e459f2858e8a",
+    "compile_candidate-wrapper": "413023e6d5834bb4b6cdf75dacec006c",
+    "repackage_export-wrapper": "36826b560a7e40dabbe92448c6dff186"
+  },
+  "failures": {
+    "native_inventory-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.43,
+      "error": null,
+      "request_id": "73ab6e17019349c2a55ad9fe42476ae9",
+      "sha256": "1e693f9b29547e7dd78fa256551d2623de6ed0409081aacad5abae54a1b4e2a7"
+    },
+    "apply_compile-wrapper.json": {
+      "ok": false,
+      "error": "no JSON result: oversized request rejected before execution, wrapper timed out",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "final_native-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.28,
+      "error": null,
+      "request_id": "a941b09bffbe489a930ca6f8b8c6a3f4",
+      "sha256": "a4ee6074aade199177d1efe43d23e3c80bcd7958907f77d5c830b809288c26f5"
+    },
+    "glib_routes-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.14,
+      "error": null,
+      "request_id": "820cc1e9e9ec4799870f69a7eb1c79eb",
+      "sha256": "9b43ee5f28332d97d385677d694dbe7e622514ad42456ceb385241b905c80585"
+    },
+    "apply-part2-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.13,
+      "error": null,
+      "request_id": "37fcb725fb8844629ac8511568c29615",
+      "sha256": "f2ef892229a0e86323263c048e807b23c09fe71bd3af205ecaec9dca134996c0"
+    },
+    "apply-part3-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.17,
+      "error": null,
+      "request_id": "e4de667f2c63496db652f6dd5338a1f9",
+      "sha256": "e420a128be2e8951cf88228dea03d6f28f27642baae666b6d2458e015805ebf2"
+    },
+    "export_compact-wrapper.json": {
+      "ok": false,
+      "exit_code": 1,
+      "seconds": 8.95,
+      "error": null,
+      "request_id": "0578091ebe3340c18713039cb653de47",
+      "sha256": "755be13cb866f43ad0c6fe1e76aa62d07ab3d4fb7fdc350bd81b1c17b240ab50"
+    },
+    "setup_native-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 7.35,
+      "error": null,
+      "request_id": "f555e991828c48f9ad56216fd1823f2c",
+      "sha256": "00f6ed99f55180d67d91673da2cb9be0ddcbf16c09305e15e8b86b0b774c38cc"
+    },
+    "run_capture-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 4.89,
+      "error": null,
+      "request_id": "a3108ea7d6cf4a6aa963af0a0509e12c",
+      "sha256": "9e33be776da75e65f6d1e46aa4d39c8805dac1a0dac4af1a176f7baefdeed6a7"
+    },
+    "apply-part1-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.28,
+      "error": null,
+      "request_id": "b0abccb4aab54e7bbc58e1eb46f18340",
+      "sha256": "cbf851bb16a6bf0d1748ea7510a72d55b94dc3468e592be24a6542485d141c6f"
+    },
+    "apply_store-wrapper.json": {
+      "ok": false,
+      "exit_code": null,
+      "seconds": null,
+      "error": "Invalid Linux request",
+      "request_id": null,
+      "sha256": "c8e42d97f50fc5cd9fe99cd58690a5e2bbf2a7e7a820dd9c278b5e911227144c"
+    },
+    "build_capture-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 1.03,
+      "error": null,
+      "request_id": "25c15b13241a4a7dac57e459f2858e8a",
+      "sha256": "80f1e7863f6c7116230bbd0cf7814a901693a99e80fdfc914d2ba6bc9591df24"
+    },
+    "compile_candidate-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 93.03,
+      "error": null,
+      "request_id": "413023e6d5834bb4b6cdf75dacec006c",
+      "sha256": "b6cb8d4b2ae25915dcb861b4cdf696bb126a0bdc3edbb18f01fa1708456da4c9"
+    },
+    "recover_export-wrapper.json": {
+      "ok": false,
+      "exit_code": null,
+      "seconds": null,
+      "error": "Worker exited 1: Traceback (most recent call last):\n  File \"/usr/local/lib/peer-hdr-runner.py\", line 57, in <module>\n    if total>4*1024*1024: raise ValueError('exports exceed 4 MiB')\n                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nValueError: exports exceed 4 MiB\n",
+      "request_id": null,
+      "sha256": "c6bd1a93dafe0c5ea91c70003ef649819a89f8459cae95e37ac1f28b3b6e4ee2"
+    },
+    "apply_backend-wrapper.json": {
+      "ok": false,
+      "exit_code": null,
+      "seconds": null,
+      "error": "Invalid Linux request",
+      "request_id": null,
+      "sha256": "c8e42d97f50fc5cd9fe99cd58690a5e2bbf2a7e7a820dd9c278b5e911227144c"
+    },
+    "repackage_export-wrapper.json": {
+      "ok": true,
+      "exit_code": 0,
+      "seconds": 0.13,
+      "error": null,
+      "request_id": "36826b560a7e40dabbe92448c6dff186",
+      "sha256": "12d1c1be6a295f2e0e3ae5821860c2dd19ea11c2edf0c05b3d05afd6b804c2e2"
+    }
+  },
+  "child_findings": [
+    {
+      "ids": [
+        3,
+        11
+      ],
+      "source": "meta-backend.c1143 clutter_source_prepare -> clutter_events_pending -> _clutter_context_get_default",
+      "attribution": "causal child after confirmed weak manager finalization, not parent trap"
+    },
+    {
+      "ids": [
+        2
+      ],
+      "source": "meta-keymap-native.c240 update_keymap_in_main -> meta-seat-native.c216 on_keymap_changed -> g_signal_emit on destroyed seat",
+      "disposition": "outside scope, handed to Astra; not repaired"
+    }
+  ],
+  "binary_config_original_unchanged": true,
+  "retained_pass_path_impacts": {
+    "1": "startup queued success consumes no query transfer; common changed backend dispose executes in destroy_manager",
+    "13": "queued assigned finish distinct ensure/read; common changed backend dispose executes in destroy_manager",
+    "14": "query request callback returns at cancelled check before transfer; common changed backend dispose executes in destroy_manager",
+    "20": "assigned retained profile no generation/query transfer; common changed backend dispose executes in destroy_manager",
+    "22": "HEADLESS context setup then autoptr finalization runs meta_context_dispose813 -> meta_backend_destroy; modified source retain/destroy path executes; copied profile is initial-directory enumeration, not query transfer",
+    "24": "HEADLESS context, virtual monitor, meta_context_test_run_tests and autoptr finalization run changed backend lifetime; active ineligible virtual monitor ensure path may exercise changed eligibility before task creation"
+  },
+  "pass_disposition": "All6original receipts preserved. Each reaches changed backend lifetime code; final validity/scoped manifest belongs to Astra on complete combined diff, no automatic retention/invalidation on relink. No pass executed here.",
+  "constraints": [
+    "No production diagnostic helper",
+    "No original/frozen/offscreen writes",
+    "No publication/push/merge/device/AppleTV/AirPlay/CEC/deployment/credentials/ARM/owner-code activity",
+    "PR16held"
+  ],
+  "artifacts_sha256": {
+    "repair-compile-identity.json": "ef6b876b3f9188e79f139bad31dfbd9b8242cc0147899d431c35a6cc057bc4ec",
+    "repair-glib-routes.txt": "3e66421479a0f2f0a57ff5c3fd55f0cdb5318bf6cc8511015c5d299c38b43a40",
+    "repair-setup.txt": "335e4aac060cb807887bb636ec01010ec85021ed825ce455931a90daf99daeec",
+    "repair-delivery.tar.gz": "f10272910f0928b6dd153419cd14419d719116af6409305a71e85189e3ae91aa",
+    "repair-diagnostic-results.tar.gz": "9f64b785a7014826ee1d3fc8bbd15f6d84ea985c52a55b5cb570eab0ed8dc02e",
+    "repair-compile.txt": "e2cc8df470d30b8ac3092f152cfcacef434d9fc2d9b53a44120b0fd75b651a40",
+    "repair-diagnostic-build.tar.gz": "4a8516efbcf600b245f692f655581961e5bce7feb453d77d2ac3de23581134d8",
+    "repair-seat-context.tar.gz": "b9bdbd903cafc382e87de14284025eaad53f8350c31da51a28ea47bc464a8f3f",
+    "repair-context.tar.gz": "a53946f863f0a0be3cbd8912a769afc56186bd97960a9b8f832f385f4f89ff77",
+    "repair-final-context.tar.gz": "899065b24b9894f2c8a5ac0acedd47d64c078a18910930678e346ee8c9c0d676"
+  }
+}
