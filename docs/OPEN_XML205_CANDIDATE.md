@@ -1,9 +1,11 @@
 # OPEN XML205 PQ-Hermite/SOP diagnostic
 
-Status: implementation in progress; native compilation and independent source
+Status: source batch compiled natively with warnings as errors; independent source
 review pending. No units, candidate renders or accuracy comparisons have run in
 this source phase. This is not full Dolby mapping, consumer-CM identification,
 certification, legal clearance, Windows/OEM equality or optical acceptance.
+The [source/compiler receipt](../evidence/open-xml205-source-phase.json) records
+actual compiler identities and counts, not behavioral/accuracy passes.
 
 ## Frozen public embodiment and limits
 
@@ -133,7 +135,10 @@ input/frontend/control/log/ELF/header/committed library source/runtime/CPU-ICD
 identities. The compile source set includes the candidate's committed SOURCE.json,
 not hardcoded baseline COMPILE_INPUTS. Actual loader selection and clean CPU ICD
 environment are checked before and after rendering; actual used source/generated
-headers and the full source manifest are rehashed. Old receipts are not relabelled.
+headers (including compiler-generated transitive dependency lists) and the full
+source manifest are rehashed. Precomparison spec/parameter/public-curve decision
+hashes are explicit, distinct from any current relocated export hash. Old
+receipts are not relabelled.
 
 Comparison independently revalidates candidate and genuine schema3 reference
 against their actual input manifest, then exact same-source/frame/metadata/target/

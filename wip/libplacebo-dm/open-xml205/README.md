@@ -15,8 +15,10 @@ and shaderc dependencies are retained from the verified prior compiler tree,
 read-only, not re-downloaded or reconstructed over a live build.
 
 The exported series has been replayed in an isolated clone to the same tree.
-Native full/no-DV/header/test/consumer compilation and independent review are
-pending. Regression definitions are written but unexecuted. Recovery owns later
+Native full Vulkan/shaderc/DOVI and separate no-DV warnings-as-errors builds passed,
+including14 deferred test executables and60 C/C++ header translation units each.
+Matched ABI362 DVH3 consumer/header/loader/CPUICD compilation passed. Independent
+review is pending. Regression definitions are written but unexecuted. Recovery owns later
 one affected-unit batch/fixed-variant comparisons. See
 [the explicit contract](../../../docs/OPEN_XML205_CANDIDATE.md) for equations,
 engineering degenerate policies, domain/applicability hypotheses and unapplied

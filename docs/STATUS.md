@@ -22,15 +22,20 @@ decimal SOP derivation, analytic public improved PQ-Hermite core/shader and type
 target-PQ SOP after existing L1 compensation/before final gamut once; explicit
 private ABI362 and value-keyed frame/target cache. Original adapter/stock source
 remain byte-identical. Retained full compiler361 prerequisites are reused.
-Current: source self-audit, deferred regression definitions and native compile
-preparation in separate owned trees. No unit/render/metric execution or approval.
-Remaining: native warnings-as-errors compile/headers/loader closure, source-bound
-exports, independent review/fixes, then recovery-owned one affected batch and
+Native compiler: full Vulkan/shaderc/DOVI and separate no-DV builds passed with
+warnings as errors, each14 deferred executables/60 C/C++ header translation units;
+separate matched DVH3 ABI362 consumer/header/loader/CPUICD closure passed.
+Current: source self-audit, source-bound evidence/exports and independent review
+handoff. No unit/render/metric execution or approval. Compilation of generated
+shader C is not SPIR-V/runtime shader or pixel acceptance.
+Remaining: independent review/fixes, then recovery-owned one affected batch and
 fixed-variant comparisons against retained genuine original reference.
 Primary public Hermite is distinct from named nits-rational ablation. Nonzero
 chroma/detail, rawSOP/CM/L8/temporal rules and full content/OEM/optical acceptance
 remain open; hypotheses/unapplied fields are machine-readable result fields.
 See [OPEN candidate contract](OPEN_XML205_CANDIDATE.md). PR16 held; no deployment.
+The [source/compiler receipt](../evidence/open-xml205-source-phase.json) records
+actual build/loader identities, source replay and explicit unexecuted boundaries.
 
 ### Isolated authored-master adapter (2026-10-15)
 

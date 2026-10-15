@@ -22,6 +22,13 @@ from tools.dolby_harness.metric import compare_pixels
 SCHEMA = 'hdr.open-dm-result.v1'
 ALGORITHM = 'open-xml205-hermite-pq-sop-v1'
 VARIANTS = ('l1-rational', 'l1-hermite', 'l1-hermite-sop')
+FROZEN_DECISIONS = {
+    'spec_sha256': '3179434d7e0a88dfd50ec61f7df2a7db9b7fac04e062d2c2ad49a05160046183',
+    'parameter_decision_sha256': '0d418f1915ba26faf713ce6eae23e16aa67eacd025ba5cc5122729700c6d99e1',
+    'historical_decision_export_sha256': 'e3fa8aaa9d69eae6b483eb0b53a3ec9df4500f2fd4739441b5bcdd8649d4c6fc',
+    'public_curve_contract_sha256': 'b4874602eb675d0f9be379c23ea7cd41c2c2aee8544c90eeea45be9c27ffce4c',
+    'limit': 'Precomparison policy/derivation identities, not the current relocated export or a reference observation',
+}
 HYPOTHESES = [
     'Public US10600166B2 Table1/Eq7 with improved0080-0082, not identified consumer CM',
     'XML Lift/Gain/Gamma serializer algebra and Eq1 delta-to-factor are OPEN applicability hypotheses',
@@ -68,6 +75,7 @@ def algorithm(obj, meta, variant):
               'collapsed-tail' if l1['min_pq'] == l1['avg_pq'] else
               'collapsed-head' if l1['avg_pq'] == l1['max_pq'] else 'regular')
     return {'id': ALGORITHM, 'variant': variant,
+            'frozen_decisions': FROZEN_DECISIONS,
             'domain': 'normalized-PQ; existing HPE-LMS/PQ/IPT I placement',
             'l1_curve_domain': 'nits rational' if variant == 'l1-rational' else 'normalized-PQ analytic Hermite',
             'l1': l1, 'l1_presence': True, 'degenerate_branch': branch,
@@ -178,7 +186,8 @@ def validate_result(path, raw=None):
 
 def compare(candidate, reference):
     from tools.dolby_harness.open_dm_provenance import implementation
-    a, pa = validate_result(candidate)
+    candidate_raw = read_bounded(candidate, 4 * 1024 * 1024)
+    a, pa = validate_result(candidate, candidate_raw)
     reference_raw = read_bounded(reference, 4 * 1024 * 1024)
     b, pb = result_manifest(reference, reference_raw)
     if b['schema'] != 3 or b['role'] != 'reference' or not am.strict_equal(a['source_alignment'], b['alignment']):
@@ -189,7 +198,7 @@ def compare(candidate, reference):
     return {'schema': 'hdr.open-dm-comparison.v1', 'algorithm': a['algorithm'],
             'source_alignment': a['source_alignment'], 'encoding': ENCODING,
             'candidate_sha256': a['output']['sha256'], 'reference_sha256': b['output']['sha256'],
-            'candidate_manifest_sha256': sha(read_bounded(candidate, 4 * 1024 * 1024)),
+            'candidate_manifest_sha256': sha(candidate_raw),
             'reference_manifest_sha256': sha(reference_raw), 'comparator': implementation(),
             'metric': 'ITU-R BT.2124-0 Annex 1 deltaE_ITP', 'statistics': compare_pixels(pa, pb),
             'scope': 'OPEN fixed diagnostic; not full Dolby/OEM/optical acceptance'}
