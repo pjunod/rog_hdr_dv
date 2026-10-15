@@ -8,6 +8,7 @@ import argparse
 import json
 from pathlib import Path
 import platform
+import shlex
 import shutil
 import subprocess
 
@@ -40,6 +41,7 @@ def main():
     native = output / 'open-dm-render'
     library = (build / 'src/libplacebo.so.362').resolve(strict=True)
     cmd = [str(compiler), '-std=c11', '-O2', '-fno-fast-math', '-Wall', '-Wextra', '-Werror',
+           '-MD', '-MF', str(output / 'compile.d'),
            '-I' + str(build / 'src/include'), '-I' + str(source / 'src/include'),
            str(p.ROOT / 'tools/dolby_harness/open_dm_render.c'),
            '-L' + str(build / 'src'), '-Wl,-rpath,' + str(build / 'src'),
@@ -50,6 +52,11 @@ def main():
     if proc.returncode:
         raise ValueError('OPEN compiler failed; retained ' + str(output))
     verify()
+    dependency_text = (output / 'compile.d').read_text().replace('\\\n', ' ')
+    dependencies = shlex.split(dependency_text.split(':', 1)[1])
+    actual_dependencies = {str(Path(path).resolve(strict=True)): p.sha(path) for path in dependencies}
+    if str((p.ROOT / 'tools/dolby_harness/open_dm_render.c').resolve()) not in actual_dependencies:
+        raise ValueError('compiler dependency closure omitted actual consumer source')
     headers = [*sorted((source / 'src/include').rglob('*.h')),
                *sorted((build / 'src/include').rglob('*.h'))]
     # One root retains both generated and source headers without path ambiguity.
@@ -78,6 +85,7 @@ def main():
                'library_sources': manifest['sources'], 'source_manifest_sha256': p.base.sha_bytes(manifest_raw),
                'header_root': str(header_root), 'headers': hashes,
                'actual_headers': {str(path): p.sha(path) for path in headers},
+               'compiler_dependencies': actual_dependencies,
                'sources': {rel: p.sha(p.ROOT / rel) for rel in p.COMPILE_INPUTS},
                'runtime': runtime, 'compile_stdout_sha256': p.sha(output / 'compile.stdout'),
                'compile_stderr_sha256': p.sha(output / 'compile.stderr'), 'units_run': 0, 'renders_run': 0}

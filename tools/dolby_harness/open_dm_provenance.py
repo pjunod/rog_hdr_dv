@@ -37,7 +37,7 @@ def validate_compile(receipt, live=False):
     for p in COMPILE_INPUTS:
         if receipt['sources'][p] != sha(ROOT / p):
             raise ValueError('OPEN compile input changed: ' + p)
-    for key in ('headers', 'actual_headers', 'library_sources', 'runtime'):
+    for key in ('headers', 'actual_headers', 'compiler_dependencies', 'library_sources', 'runtime'):
         if not receipt[key]:
             raise ValueError('OPEN compile closure missing: ' + key)
     identity = receipt['library_identity']
@@ -54,6 +54,9 @@ def validate_compile(receipt, live=False):
     if any(k not in receipt['library_sources'] for k in required):
         raise ValueError('OPEN library source set incomplete')
     if live:
+        for path, digest in receipt['compiler_dependencies'].items():
+            if sha(path) != digest:
+                raise ValueError('OPEN actual compiler dependency changed: ' + path)
         for path, digest in receipt['actual_headers'].items():
             if sha(path) != digest:
                 raise ValueError('OPEN actual compile header changed: ' + path)
