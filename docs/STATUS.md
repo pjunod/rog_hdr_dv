@@ -25,8 +25,12 @@ remain byte-identical. Retained full compiler361 prerequisites are reused.
 Native compiler: full Vulkan/shaderc/DOVI and separate no-DV builds passed with
 warnings as errors, each14 deferred executables/60 C/C++ header translation units;
 separate matched DVH3 ABI362 consumer/header/loader/CPUICD closure passed.
-Current: source self-audit, source-bound evidence/exports and independent review
-handoff. No unit/render/metric execution or approval. Compilation of generated
+Current: round1 review identified mixed-precision decimal L1 ordering and incomplete
+no-SOP unapplied-field reporting. Source fixes and11 deferred Python method definitions are written;
+affected consumer recompilation passed natively with -Werror and matched ABI362
+source/header/library/loader closure. Corrected-source re-review is next. Valid
+unchanged library/full/noDV compiler receipts are retained, not repeated.
+No unit/render/metric execution or approval. Compilation of generated
 shader C is not SPIR-V/runtime shader or pixel acceptance.
 Remaining: independent review/fixes, then recovery-owned one affected batch and
 fixed-variant comparisons against retained genuine original reference.

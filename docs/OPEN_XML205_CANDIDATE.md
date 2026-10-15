@@ -1,7 +1,8 @@
 # OPEN XML205 PQ-Hermite/SOP diagnostic
 
 Status: source batch compiled natively with warnings as errors; independent source
-review pending. No units, candidate renders or accuracy comparisons have run in
+re-review pending after round1 parser/reporting corrections. No units, candidate
+renders or accuracy comparisons have run in
 this source phase. This is not full Dolby mapping, consumer-CM identification,
 certification, legal clearance, Windows/OEM equality or optical acceptance.
 The [source/compiler receipt](../evidence/open-xml205-source-phase.json) records
@@ -99,6 +100,10 @@ L1 is identity. Genuine target27 derives S=507/500,O=-7/500,P=2000/2001 from the
 original decimals, chosen before reference comparison.
 
 Every result retains all source records and names unapplied fields explicitly.
+The no-SOP variants list all nine original trim indexes/decimal strings as
+unapplied; only `l1-hermite-sop` removes indexes3/4/5 from that list. Derived
+authored factors remain distinct from the identity factors actually transported
+by the two no-SOP ablations.
 Target27's nonzero chroma(-0.002) and detail(-0.75) remain UNAPPLIED; saturation0
 is retained, not claimed as support. L3/L8, midcontrast, temporal/CM selection,
 raw-RPU SOP, clipping/vector operations and target interpolation are unsupported.
@@ -121,6 +126,9 @@ L1min,L1avg,L1max, variant0/1/2, actual S,O,P. Non-SOP variants require identity
 factors in transport but do not claim authored identity. Controls derive only
 after unchanged strict schema3 source, target, frame, original storage and metadata
 verification. Finite/range/geometry validation precedes Vulkan and any output.
+L1 ordering is checked on all three parsed doubles before narrowing to frame
+floats, with no epsilon. Equal non-binary-exact decimals remain legal flat or
+collapsed anchors; descending doubles reject even if binary32 rounds them equal.
 
     python3 -m tools.dolby_harness.open_dm_build --library-source OWN_SOURCE \
       --library-build OWN_BUILD --source-manifest SOURCE.json --output NEW_BUILD
@@ -154,7 +162,11 @@ Recovery owns one affected batch and one fixed comparison per variant against
 retained genuine reference. Python positive source/result fixtures require actual
 authentic256; C/scalar mathematical fixtures are explicitly synthetic algorithm/
 cache regressions, not authored Dolby inputs or reference agreement evidence.
-No official tool receives mutated test controls. Missing genuine fixtures fail,
-never become skips or fabricated positives. Source approval is bounded partial
+No official tool receives mutated test controls.
+Mathematical parser controls use absent pixel input to stop before Vulkan, and
+cover equal decimal flat/collapsed triples and strictly descending/nonfinite/
+out-of-range coordinates. They are not authored metadata or rendered evidence.
+Missing genuine fixtures fail, never become skips or fabricated positives.
+Source approval is bounded partial
 source qualification, not full mapper acceptance. Existing whole-mapper review,
 Windows/OEM, content/profile/CM coverage and optical gates remain open.

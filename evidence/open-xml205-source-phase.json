@@ -1,6 +1,6 @@
 {
   "schema": "hdr.open-xml205-source-phase.v1",
-  "status": "compiled-awaiting-independent-review",
+  "status": "review-fixes-compiled-awaiting-independent-re-review",
   "algorithm": "open-xml205-hermite-pq-sop-v1",
   "variants": [
     "l1-rational",
@@ -31,8 +31,8 @@
   },
   "consumer": {
     "abi": 362,
-    "binary_sha256": "b835271dba1e3aede32df79419f562c14230a0e89b53a580b70e736917c7df3f",
-    "compile_receipt_sha256": "ea62a090f420c2f787853b2ca212f5d1fc3c9fb6c6fd46d945cb0d73f96fa369",
+    "binary_sha256": "633cccdf57dab530e38ba360d1b5498e87ff1dfd833329a1475a36653d518690",
+    "compile_receipt_sha256": "86b1c7ad57e6c95672085085b693339a63d03140a9bc50426126b797a183d7a0",
     "libplacebo_headers": 36,
     "compiler_dependency_files": 97,
     "runtime_files": 35,
@@ -44,7 +44,7 @@
   "proof_archive_sha256": "6fd4629322cc18dc00d03fbb64eba5c01901b9e71f17678afe5ded52a0953521",
   "library_archive_sha256": "01f80d519dc3833225aa6a69a4162523f604a65effc9527aa52c69d0874091a4",
   "source_series_replay_tree": "e275c6b55e5e7988d4b9ead95b5e0c6e7de62ff9",
-  "new_python_methods": 9,
+  "new_python_methods": 11,
   "units_run": 0,
   "renders_run": 0,
   "comparisons_run": 0,
@@ -54,7 +54,20 @@
     "full": "89775c573ec9478091e2923b41dd4906",
     "no_dv": "53639931b56447cc89c61b73dd55fc16",
     "consumer_initial": "6928d8c74ce34dddb44d4bf0ef369484",
-    "consumer_transitive_dependency_binding": "eb9a02daa73c47a291a34efcaa2a8335"
+    "consumer_transitive_dependency_binding": "eb9a02daa73c47a291a34efcaa2a8335",
+    "consumer_review_fixes": "609fc971a56945bbbdd460df91e8019c"
+  },
+  "review_fixes": {
+    "review": "Astra round1 source review296; source approval withheld pending re-review",
+    "source_commit": "346cac07a3c5f628b03e072ad78eb135cb4754bd",
+    "R1": "Validate L1 as ordered finite parsed doubles before narrowing; no epsilon. Deferred equal decimal flat/collapsed and descending/invalid parser controls are mathematical only, with no pixel input.",
+    "R2": "No-SOP variants explicitly list all nine unapplied original trim indexes/decimal strings; SOP variant lists six. All variants asserted using unchanged authentic record.",
+    "library_and_baseline": "Unchanged; valid full/noDV/header/test-executable compiles retained without rebuild",
+    "prior_consumer_binary_sha256": "b835271dba1e3aede32df79419f562c14230a0e89b53a580b70e736917c7df3f",
+    "prior_compile_receipt_sha256": "ea62a090f420c2f787853b2ca212f5d1fc3c9fb6c6fd46d945cb0d73f96fa369",
+    "proof_archive298_sha256": "1aa17327d594554922c166f9647214162b08bffb431f276efb92e62e348d29e9",
+    "units_run": 0,
+    "renders_run": 0
   },
   "preserved_auxiliary_failures": [
     "readback inventory included deliberately omitted Python bytecode cache; repaired by validating exact pinned source archives",
