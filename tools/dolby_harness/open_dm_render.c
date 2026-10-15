@@ -41,7 +41,7 @@ static bool read_int(FILE *f, int min, int max, int *out)
     return true;
 }
 
-static bool read_float(FILE *f, float min, float max, float *out)
+static bool read_double(FILE *f, double min, double max, double *out)
 {
     char buf[64], *end;
     if (!token(f, buf))
@@ -50,8 +50,32 @@ static bool read_float(FILE *f, float min, float max, float *out)
     double n = strtod(buf, &end);
     if (errno || end == buf || *end || !isfinite(n) || n < min || n > max)
         return false;
+    *out = n;
+    return true;
+}
+
+static bool read_float(FILE *f, float min, float max, float *out)
+{
+    double n;
+    if (!read_double(f, min, max, &n))
+        return false;
     *out = (float) n;
     return isfinite(*out);
+}
+
+static bool read_l1(FILE *f, struct pl_dovi_dm_metadata *dm)
+{
+    double min, avg, max;
+    // Check original parsed coordinates together before binary32 narrowing.
+    // Equal decimal anchors must reach the explicit flat/collapsed policies;
+    // genuinely descending coordinates reject even if they round to equal floats.
+    if (!read_double(f, 0, 1, &min) || !read_double(f, min, 1, &avg) ||
+        !read_double(f, avg, 1, &max))
+        return false;
+    dm->min_pq = (float) min;
+    dm->avg_pq = (float) avg;
+    dm->max_pq = (float) max;
+    return true;
 }
 
 static bool read_volume(FILE *f, struct pl_hdr_metadata *hdr)
@@ -146,9 +170,7 @@ int main(int argc, char **argv)
         read_int(control, 1, 4096, &width) && read_int(control, 1, 2160, &height) &&
         read_int(control, 1, 1, &primaries) &&
         read_volume(control, &src.color.hdr) && read_volume(control, &dst.color.hdr) &&
-        read_float(control, 0, 1, &dm->min_pq) &&
-        read_float(control, dm->min_pq, 1, &dm->avg_pq) &&
-        read_float(control, dm->avg_pq, 1, &dm->max_pq) &&
+        read_l1(control, dm) &&
         read_int(control, 0, 2, &variant) &&
         read_float(control, 0.5f, 1.5f, &factors.slope) &&
         read_float(control, -0.5f, 0.5f, &factors.offset) &&

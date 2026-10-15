@@ -70,6 +70,7 @@ def algorithm(obj, meta, variant):
         raise ValueError('conflicting frame/shot Trim')
     derived = factors(trims[0])
     applied = derived['float'] if variant == 'l1-hermite-sop' else {'S': 1.0, 'O': 0.0, 'P': 1.0}
+    unapplied = [0, 1, 2, 6, 7, 8] if variant == 'l1-hermite-sop' else list(range(9))
     l1 = meta['l1']
     branch = ('flat-source' if l1['min_pq'] == l1['max_pq'] else
               'collapsed-tail' if l1['min_pq'] == l1['avg_pq'] else
@@ -88,8 +89,8 @@ def algorithm(obj, meta, variant):
             'applied_stages': ['explicit presence-aware L1', 'existing L1 chroma compensation once'] +
                               (['OPEN target-normalized PQ SOP'] if variant == 'l1-hermite-sop' else []) +
                               ['existing final physical gamut mapping once'],
-            'unapplied_trim_indexes': [0, 1, 2, 6, 7, 8],
-            'unapplied_trim_values': {str(i): trims[0].split(',')[i] for i in (0, 1, 2, 6, 7, 8)},
+            'unapplied_trim_indexes': unapplied,
+            'unapplied_trim_values': {str(i): trims[0].split(',')[i] for i in unapplied},
             'unapplied_stages': ['chroma', 'saturation', 'detail', 'L3', 'L8', 'midcontrast',
                                  'CM selection', 'temporal rules', 'target interpolation', 'raw-RPU SOP'],
             'hypotheses': HYPOTHESES, 'full_mapping_complete': False}

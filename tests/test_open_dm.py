@@ -39,6 +39,41 @@ class OpenAlgebraTests(unittest.TestCase):
         self.assertEqual(f['exact']['P'], '2/3')
 
 
+class OpenProtocolMathTests(unittest.TestCase):
+    # Synthetic mathematical protocol controls only; never source/authored/vendor
+    # metadata. Missing pixels stop execution before any Vulkan/renderer call.
+    def check_l1(self, anchors, accepted):
+        native = Path(os.environ['HDR_OPEN_NATIVE'])
+        volume = ['0', '1000', *map(str, am.P3)]
+        values = ['DVH3', '1', '1', '1', *volume, *volume, *anchors, '1', '1', '0', '1']
+        with tempfile.TemporaryDirectory(prefix='open-l1-math-') as tmp:
+            root = Path(tmp)
+            (root / 'control').write_text(' '.join(values) + '\n')
+            proc = subprocess.run([str(native), str(root / 'control'), str(root / 'absent-input'),
+                                   str(root / 'absent-output')], capture_output=True,
+                                  env=prov.native_environment(root), timeout=30)
+            self.assertEqual(proc.returncode, 1 if accepted else 2)
+            self.assertIn(b'No successful OPEN' if accepted else b'Invalid DVH3', proc.stderr)
+            self.assertNotIn(b'Explicit OPEN metadata rejected', proc.stderr)
+            self.assertEqual(proc.stdout, b'')
+            self.assertFalse((root / 'absent-output').exists())
+
+    def test_equal_decimal_flat_and_collapsed_l1_acceptance(self):
+        for anchors in (('0.1', '0.1', '0.8'), ('0.1', '0.1', '0.1'),
+                        ('0', '0.1', '0.1')):
+            with self.subTest(anchors=anchors):
+                self.check_l1(anchors, accepted=True)
+
+    def test_descending_and_invalid_l1_rejection(self):
+        for anchors in (('0.100000001', '0.1', '0.8'),
+                        ('0', '0.100000001', '0.1'), ('0.1', '0', '0.8'),
+                        ('0', '0.8', '0.1'), ('nan', '0.1', '0.8'),
+                        ('0', 'inf', '1'), ('0', '0.1', '1.000000001'),
+                        ('-0.000000001', '0.1', '1')):
+            with self.subTest(anchors=anchors):
+                self.check_l1(anchors, accepted=False)
+
+
 class OpenAuthenticTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -59,6 +94,19 @@ class OpenAuthenticTests(unittest.TestCase):
         self.assertFalse(a['full_mapping_complete'])
         self.assertEqual(a['source_records'], self.meta['records'])
         self.assertEqual(a['l1'], {'min_pq': 0.0, 'avg_pq': 0.290273, 'max_pq': 0.879591})
+        saved = copy.deepcopy(self.meta)
+        for variant in dm.VARIANTS:
+            with self.subTest(variant=variant):
+                a = dm.algorithm(self.obj, self.meta, variant)
+                indexes = [0, 1, 2, 6, 7, 8] if variant == 'l1-hermite-sop' else list(range(9))
+                self.assertEqual(a['unapplied_trim_indexes'], indexes)
+                self.assertEqual(a['unapplied_trim_values'],
+                                 {str(i): a['original_trim'].split(',')[i] for i in indexes})
+                self.assertEqual(a['derived_factors']['exact'],
+                                 {'S': '507/500', 'O': '-7/500', 'P': '2000/2001'})
+                self.assertEqual(a['applied_factors'], a['derived_factors']['float']
+                                 if variant == 'l1-hermite-sop' else {'S': 1.0, 'O': 0.0, 'P': 1.0})
+        self.assertEqual(self.meta, saved)
 
     def test_fixed_variant_control_geometry_domain(self):
         saved = copy.deepcopy(self.meta)
