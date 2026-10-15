@@ -255,7 +255,7 @@ class GenuineAuthoredTests(unittest.TestCase):
         self.assertEqual(l1, self.meta['l1'])
         self.assertEqual(records, self.meta['records'])
         self.assertEqual(mapping['shot_in'] + mapping['edit_offset'], self.obj['frame']['index'])
-        self.assertEqual([f['index'] for f in self.sequence['frames']], [0])
+        self.assertEqual([f['index'] for f in self.sequence['frames']], [self.obj['frame']['index']])
         self.assertGreater(mapping['shot_duration'], len(self.sequence['frames']))
         self.assertEqual(mapping['edit_rate'], {'num': 60000, 'den': 1001})
 
@@ -309,11 +309,14 @@ class GenuineAuthoredTests(unittest.TestCase):
                 self.selected(root=root)
 
     def test_selected_l1_missing_conflicting_and_target_source_rejections(self):
+        def selected_frame(t):
+            return next(f for s in t.findall('Shot') for f in s.findall('Frame')
+                        if int(s.findtext('Record/In')) + int(f.findtext('EditOffset')) == self.obj['frame']['index'])
         for mutate, error in (
-                (lambda t: t.find('Shot/Frame/PluginNode').clear(), 'explicit selected frame-local'),
-                (lambda t: setattr(t.find('Shot/Frame/PluginNode/DolbyEDR/ImageCharacter'), 'text', '0,0.1,0.2'), 'conflicting selected'),
+                (lambda t: selected_frame(t).find('PluginNode').clear(), 'explicit selected frame-local'),
+                (lambda t: setattr(selected_frame(t).find('PluginNode/DolbyEDR/ImageCharacter'), 'text', '0,0.1,0.2'), 'conflicting selected'),
                 (lambda t: setattr(t.find('Shot/Source/ParentID'), 'text', 'absent-parent'), 'ParentID missing'),
-                (lambda t: setattr(t.find('Shot/Frame/EditOffset'), 'text', '512'), 'duplicate/out-of-shot')):
+                (lambda t: setattr(selected_frame(t).find('EditOffset'), 'text', '512'), 'duplicate/out-of-shot')):
             root = master.document(self.actual)
             mutate(master.track(root)[1])
             with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
@@ -381,6 +384,138 @@ class GenuineAuthoredTests(unittest.TestCase):
         bad['target']['max_nits'] = 601
         with self.assertRaisesRegex(ValueError, 'only acquired'):
             master.reference_provenance(self.base, self.obj['metadata']['declaration_repair'], bad, self.meta, reference)
+
+
+class FrameReceiptTests(unittest.TestCase):
+    """Local time-identity controls only; never sent to an official tool."""
+    def test_v1_implicit_frame0_and_v2_exact_nonzero_time_identity(self):
+        rate = {'num': 60000, 'den': 1001}
+        zero = {'index': 0, 'pts': {'num': 0, 'den': 1}}
+        master.reference_frame({'schema': master.REFERENCE_V1}, zero, rate)
+        frame = {'index': 256, 'pts': {'num': 8008, 'den': 1875}}
+        binding = {**frame, 'rate': rate}
+        self.assertEqual(master.reference_frame({'schema': master.REFERENCE_V2, 'frame_binding': binding}, frame, rate), binding)
+        with self.assertRaisesRegex(ValueError, 'frame/PTS/rate'):
+            master.reference_frame({'schema': master.REFERENCE_V1}, frame, rate)
+        with self.assertRaisesRegex(ValueError, 'implicit frame0'):
+            master.reference_frame({'schema': master.REFERENCE_V1, 'frame_binding': binding}, zero, rate)
+
+    def test_v2_missing_duplicate_malformed_and_mismatched_time_identity(self):
+        frame = {'index': 256, 'pts': {'num': 8008, 'den': 1875}}
+        rate = {'num': 60000, 'den': 1001}
+        receipt = {'schema': master.REFERENCE_V2, 'frame_binding': {**frame, 'rate': rate}}
+        cases = [lambda r: r.pop('frame_binding'),
+                 lambda r: r['frame_binding'].update(extra=0),
+                 lambda r: r['frame_binding'].update(index=True),
+                 lambda r: r['frame_binding'].update(index=0),
+                 lambda r: r['frame_binding'].update(pts={'num': 0, 'den': 1}),
+                 lambda r: r['frame_binding'].update(pts={'num': 8008.0, 'den': 1875}),
+                 lambda r: r['frame_binding'].update(rate={'num': 24, 'den': 1}),
+                 lambda r: r['frame_binding'].update(rate={'num': 60000, 'den': 0})]
+        for mutate in cases:
+            bad = copy.deepcopy(receipt)
+            mutate(bad)
+            with self.subTest(receipt=bad), self.assertRaises(ValueError):
+                master.reference_frame(bad, frame, rate)
+        with self.assertRaises(ValueError):
+            master.parse_json(b'{"schema":"hdr.sparks-source-associated-reference.v2","frame_binding":{},"frame_binding":{}}')
+
+
+class GenuineNonzeroReceiptTests(unittest.TestCase):
+    """Reuse authentic setup without inheriting/discovering duplicate tests."""
+    @classmethod
+    def setUpClass(cls):
+        source = os.environ.get('HDR_AUTHORED_INPUT')
+        if not source:
+            raise AssertionError('real private HDR_AUTHORED_INPUT required; no fake/skip replacement')
+        cls.path = Path(source)
+        cls.obj, _, cls.meta = input_manifest(cls.path)
+        cls.base = cls.path.parent
+        e = cls.obj['metadata']
+        cls.actual = master.snapshot(cls.base, e['analysis'])[1]
+        cls.original = master.snapshot(cls.base, e['original_analysis'])[1]
+        cls.repair = master.snapshot(cls.base, e['declaration_repair'])[1]
+        cls.sequence_path, cls.sequence_raw = master.snapshot(cls.base, e['source_manifest'])
+        cls.sequence = json.loads(cls.sequence_raw)
+
+    def receipt_check(self, receipt, directory):
+        raw = json.dumps(receipt).encode()
+        path = Path(directory) / 'rejection-only-receipt.json'
+        path.write_bytes(raw)
+        meta = {**self.meta, 'declaration_repair_sha256': sha(raw)}
+        reference = {'file': receipt['Mac_reference']['path'], 'sha256': receipt['Mac_reference']['sha256']}
+        return master.reference_provenance(self.base, {'file': str(path), 'sha256': sha(raw)}, self.obj, meta, reference)
+
+    def test_actual_v2_nonzero_and_unchanged_v1_reference(self):
+        self.assertEqual(self.obj['frame']['index'], 256)
+        self.assertEqual(json.loads(self.repair)['schema'], master.REFERENCE_V2)
+        source = os.environ.get('HDR_AUTHORED_V1_INPUT')
+        self.assertIsNotNone(source, 'refreshed v1 export required, never alter historical receipt')
+        assert source is not None
+        path = Path(source)
+        obj, _, meta = input_manifest(path)
+        binding = obj['metadata']['declaration_repair']
+        receipt = json.loads(master.snapshot(path.parent, binding)[1])
+        self.assertEqual(receipt['schema'], master.REFERENCE_V1)
+        reference = {'file': receipt['Mac_reference']['path'], 'sha256': receipt['Mac_reference']['sha256']}
+        vendor = master.reference_provenance(path.parent, binding, obj, meta, reference)
+        self.assertIn('frame0 near-black', vendor['content_limit'])
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertIn('frame256 only', self.receipt_check(json.loads(self.repair), directory)['content_limit'])
+
+    def test_v2_original_source_argv_output_and_duplicate_identity_rejections(self):
+        cases = [
+            (lambda r: r['originals'][0].update(sha256='0' * 64), 'native source/tool'),
+            (lambda r: r['render']['argv'].__setitem__(-1, '0'), 'argv/frame/rate'),
+            (lambda r: r['render']['argv'].__setitem__(-4, '/absent/source_#####.exr'), 'native source/tool'),
+            (lambda r: r['render']['argv'].__setitem__(-3, '/absent/output_#####.exr'), 'output path/hash'),
+            (lambda r: r['render']['argv'].__setitem__(-3, '/absent/output_00000.exr'), 'frame pattern'),
+            (lambda r: r['native_reference'].update(sha256='0' * 64), 'output path/hash'),
+            (lambda r: r['final_native_readback']['identities'].append(copy.deepcopy(r['final_native_readback']['identities'][0])), 'duplicate reference native'),
+            (lambda r: r['requests'].append(copy.deepcopy(next(x for x in r['requests'] if x.get('request_id') == r['render_request']))), 'command/log entry')]
+        with tempfile.TemporaryDirectory() as directory:
+            for mutate, error in cases:
+                receipt = json.loads(self.repair)
+                mutate(receipt)
+                with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                    self.receipt_check(receipt, directory)
+
+    def test_v2_render_log_frame_and_output_mismatches(self):
+        receipt = json.loads(self.repair)
+        entry = next(x for x in receipt['requests'] if x.get('request_id') == receipt['render_request'])['full_output']
+        original = master.retained(self.base, entry)[1]
+        # Rejection-only local log controls, never an invented passing execution.
+        replacements = ((b'256-256', b'0-0'),
+                        (receipt['Mac_reference']['sha256'].encode(), b'0' * 64),
+                        (receipt['render']['argv'][-4].encode(), b'/wrong/source_#####.exr'),
+                        (receipt['render']['argv'][-3].encode(), b'/wrong/output_#####.exr'),
+                        (b"Src Info: '4096", b"Src Info: ''4096"))
+        changed_logs = []
+        for before, after in replacements:
+            self.assertIn(before, original)
+            changed_logs.append(original.replace(before, after))
+        changed_logs.append(original + b'\ncm_offline: Frames: 256-256\n')
+        for changed in changed_logs:
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / 'rejection-only-render.log'
+                path.write_bytes(changed)
+                bad = copy.deepcopy(receipt)
+                target = next(x for x in bad['requests'] if x.get('request_id') == bad['render_request'])['full_output']
+                target.update(path=str(path), sha256=sha(changed))
+                with self.assertRaisesRegex(ValueError, 'normal log evidence'):
+                    self.receipt_check(bad, directory)
+
+    def test_v2_export_original_source_binding_cannot_be_rebased(self):
+        receipt = json.loads(self.repair)
+        receipt['originals'][0]['sha256'] = '0' * 64
+        raw = json.dumps(receipt).encode()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'rejection-only-receipt.json'
+            path.write_bytes(raw)
+            sequence = copy.deepcopy(self.sequence)
+            sequence['provenance']['acquisition'] = {'file': str(path), 'sha256': sha(raw)}
+            with self.assertRaisesRegex(ValueError, 'original frame/repair source identity'):
+                master.parsed_export(self.actual, self.original, raw, self.sequence_path, json.dumps(sequence).encode(), self.obj)
 
 
 class GenuineResultTests(unittest.TestCase):

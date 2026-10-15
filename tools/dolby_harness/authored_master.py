@@ -24,6 +24,8 @@ IDENTITIES = ('stage analysis_sha256 original_analysis_sha256 declaration_repair
 EXPORT_KEYS = ('schema ' + IDENTITIES + ' source_sha256 frame_index pts l1 records')
 MAPPING_KEYS = ('output_id track_id shot_id frame_id source_parent_id source_in '
                 'shot_in shot_duration edit_offset edit_rate')
+REFERENCE_V1 = 'hdr.sparks-source-associated-reference.v1'
+REFERENCE_V2 = 'hdr.sparks-source-associated-reference.v2'
 
 
 def validation(function):
@@ -192,7 +194,7 @@ def repaired(original_raw, analysis_raw, receipt_raw):
     receipt = parse_json(receipt_raw)
     original = document(original_raw)
     actual = document(analysis_raw)
-    if receipt.get('schema') != 'hdr.sparks-source-associated-reference.v1':
+    if receipt.get('schema') not in (REFERENCE_V1, REFERENCE_V2):
         raise ValueError('verified source-associated repair receipt required')
     if (receipt['originals'][1]['sha256'] != sha(original_raw) or
             receipt['new_derivative']['sha256'] != sha(analysis_raw)):
@@ -429,6 +431,32 @@ def selected_metadata(root, obj, sequence):
 
 
 @validation
+def reference_frame(receipt, frame, edit_rate):
+    """Bind receipt time identity without interpreting producer timecode bits."""
+    if receipt.get('schema') == REFERENCE_V1:
+        binding = {'index': 0, 'pts': {'num': 0, 'den': 1},
+                   'rate': {'num': 60000, 'den': 1001}}
+        if 'frame_binding' in receipt:
+            raise ValueError('v1 reference has implicit frame0 binding only')
+    elif receipt.get('schema') == REFERENCE_V2:
+        binding = receipt['frame_binding']
+        keys(binding, 'index pts rate')
+        integer(binding['index'])
+        for name in ('pts', 'rate'):
+            keys(binding[name], 'num den')
+            integer(binding[name]['num'], 1 if name == 'rate' else 0)
+            integer(binding[name]['den'], 1)
+    else:
+        raise ValueError('verified source-associated reference receipt required')
+    expected = {'index': frame['index'], 'pts': frame['pts'], 'rate': edit_rate}
+    if (not strict_equal(binding, expected) or
+            binding['pts']['num'] * binding['rate']['num'] !=
+            binding['index'] * binding['rate']['den'] * binding['pts']['den']):
+        raise ValueError('reference frame/PTS/rate binding mismatch')
+    return binding
+
+
+@validation
 def parsed_export(analysis_raw, original_raw, repair_raw, source_path, source_raw, obj):
     source_target(obj['source'], obj['target'])
     root, receipt = repaired(original_raw, analysis_raw, repair_raw)
@@ -442,6 +470,7 @@ def parsed_export(analysis_raw, original_raw, repair_raw, source_path, source_ra
             association['algorithm_versions'] != '0,0'):
         raise ValueError('source-associated declaration provenance mismatch')
     sequence, selected = source_manifest(source_path, source_raw, obj)
+    reference_frame(receipt, obj['frame'], sequence['edit_rate'])
     if (sequence['provenance']['publication']['sha256'] != association['provenance']['sha256'] or
             sequence['provenance']['acquisition']['sha256'] != sha(repair_raw)):
         raise ValueError('sparse source/repair provenance binding mismatch')
@@ -504,11 +533,11 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
     """Inspect retained real execution/log snapshots, never invoke a vendor tool.
 
     Hashes bind retained provenance; they are not an authentication/signature.
-    This deliberately accepts only the acquired one-frame baseline receipt.
+    v1 retains implicit frame0; v2 explicitly binds the acquired sparse frame.
     """
     _, raw = snapshot(base, repair_binding)
     r = parse_json(raw)
-    if sha(raw) != metadata['declaration_repair_sha256'] or r['schema'] != 'hdr.sparks-source-associated-reference.v1':
+    if sha(raw) != metadata['declaration_repair_sha256'] or r['schema'] not in (REFERENCE_V1, REFERENCE_V2):
         raise ValueError('reference declaration receipt mismatch')
     if not (r['render']['exit'] == 0 and type(r['render']['exit']) is int and
             r['validation']['exit'] == 0 and type(r['validation']['exit']) is int and
@@ -518,10 +547,12 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
             strict_equal(r['validation']['declared_and_vendor_validated_algorithm_versions'], [0, 0])):
         raise ValueError('normal acquired reference execution evidence required')
     f, target = obj['frame'], obj['target']
-    if ((f['width'], f['height'], f['index'], f['pts']) != (4096, 2160, 0, {'num': 0, 'den': 1}) or
+    binding = reference_frame(r, f, metadata['mapping']['edit_rate'])
+    index = binding['index']
+    if ((f['width'], f['height']) != (4096, 2160) or
             target != {'id': '27', 'min_nits': 0, 'max_nits': 600, 'primaries': P3} or
             obj['source']['mastering'] != {'min_nits': 0.005, 'max_nits': 4000, 'primaries': P3}):
-        raise ValueError('reference only acquired original full frame0 target27')
+        raise ValueError('reference only acquired original full frame target27')
     if (r['new_derivative']['sha256'] != metadata['analysis_sha256'] or
             r['originals'][1]['sha256'] != metadata['original_analysis_sha256'] or
             r['Mac_reference']['sha256'] != reference_binding['sha256'] or
@@ -533,12 +564,23 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
                 r['validation']['command']['argv'][-1], '--source-format',
                 'half rgb full pq p3d65', '--output-format', 'half rgb full pq bt2020',
                 '-r', '60000/1001', '--targ', '27', '--echo-metadata',
-                a[-4], a[-3], '-f', '0']
+                a[-4], a[-3], '-f', str(index)]
     if a != expected or metadata['mapping']['edit_rate'] != {'num': 60000, 'den': 1001}:
         raise ValueError('reference argv/frame/rate/encoding mismatch')
     native_identities = r['final_native_readback']['identities']
     identities = {item['path']: item['sha256'] for item in native_identities}
-    original_native = a[-4].replace('#####', '00000')
+    if len(identities) != len(native_identities):
+        raise ValueError('duplicate reference native identity')
+    for pattern in (a[-4], a[-3]):
+        if pattern.count('#####') != 1 or '#####' not in Path(pattern).name or not pattern.endswith('.exr'):
+            raise ValueError('reference input/output frame pattern mismatch')
+    original_native = a[-4].replace('#####', f'{index:05d}')
+    output_native = a[-3].replace('#####', f'{index:05d}')
+    native_reference = r['native_reference']
+    if (native_reference['path'] != output_native or
+            native_reference['sha256'] != reference_binding['sha256'] or
+            not strict_equal(native_reference, r['final_native_readback']['reference'])):
+        raise ValueError('reference native output path/hash mismatch')
     if (identities.get(original_native) != r['originals'][0]['sha256'] or
             identities.get(a[6]) != metadata['analysis_sha256'] or
             a[0] not in identities or r['validation']['command']['argv'][0] not in identities):
@@ -557,9 +599,21 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
         elif request_id == r['target_info_request']:
             required = ['(ID 27)', 'pq(0,600) rgb computer p3d65']
         else:
-            required = ['Src Info:', '4096x2160x3 f16 planar 444 le tight 0-0 24fps top_left pq rgb computer p3d65',
-                        'Dst Info:', '4096x2160x3 f16 planar 444 le tight 0-0 59.94fps top_left pq rgb computer bt2020',
-                        'Frames: 0-0', 'completed 1 frames', reference_binding['sha256']]
+            required = ['Src Info:', f'4096x2160x3 f16 planar 444 le tight {index}-{index} 24fps top_left pq rgb computer p3d65',
+                        'Dst Info:', f'4096x2160x3 f16 planar 444 le tight {index}-{index} 59.94fps top_left pq rgb computer bt2020',
+                        f'Frames: {index}-{index}', 'completed 1 frames', reference_binding['sha256']]
+            if r['schema'] == REFERENCE_V2:
+                # Bind actual normal log fields, not just an argv echoed by the
+                # recorder. Reject duplicate/contradictory fields as ambiguous.
+                fields = {'Source': a[-4], 'Destination': a[-3],
+                          'Src Info': required[1], 'Dst Info': required[3],
+                          'Frames': f'{index}-{index}'}
+                for name, expected_value in fields.items():
+                    values = re.findall(r'cm_offline:\s+' + re.escape(name) + r':\s*([^\r\n]*)', contents)
+                    expected_field = expected_value if name == 'Frames' else "'" + expected_value + "'"
+                    if [x.strip() for x in values] != [expected_field]:
+                        raise ValueError('reference actual normal log evidence mismatch')
+                required.append(f'frame {index} metadata:')
         if not all(x in contents for x in required):
             raise ValueError('reference actual normal log evidence mismatch')
     return {'receipt': repair_binding, 'receipt_sha256': sha(raw), 'vendor_argv': a,
@@ -567,7 +621,9 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
             'selected_cm_name': None, 'metadata_application': 'authored L1/L2 by actual vendor reference',
             'label': r['label'], 'scope_limits': r['source_scope_limit'],
             'warnings_and_rate_limits': r['warnings_and_rate_limits'],
-            'content_limit': 'original frame0 near-black only; not representative trim/highlight/chroma coverage'}
+            'content_limit': ('original frame0 near-black only; not representative trim/highlight/chroma coverage'
+                              if index == 0 else
+                              f'original frame{index} only; no full-content/highlight or mapping acceptance claim')}
 
 
 @validation
