@@ -40,7 +40,8 @@ def prepare(root):
     root.mkdir(parents=True)
     # Fully independent writable payload, no hardlinks to the compiler's /usr.
     shutil.copytree('/usr', root / 'usr', symlinks=True)
-    shutil.copytree('/var/lib/dpkg', root / 'var/lib/dpkg', symlinks=True)
+    shutil.copytree('/var/lib/dpkg', root / 'var/lib/dpkg', symlinks=True,
+                    ignore=shutil.ignore_patterns('lock', 'lock-frontend'))
     for directory in ['dev', 'proc', 'run', 'root', 'scratch', 'kit',
                       'etc/apt/sources.list.d', 'var/lib/apt/lists/partial',
                       'var/cache/apt/archives/partial', 'var/log/apt']:
@@ -58,6 +59,8 @@ def prepare(root):
     (root / 'etc/passwd').write_text('root:x:0:0:root:/root:/bin/bash\n_apt:x:100:65534:APT:/nonexistent:/usr/sbin/nologin\n')
     (root / 'etc/group').write_text('root:x:0:\nnogroup:x:65534:\n')
     policy = root / 'usr/sbin/policy-rc.d'
+    if policy.is_symlink():
+        policy.unlink()
     policy.write_text('#!/bin/sh\nexit 101\n')
     policy.chmod(0o755)
     # Reuse public package indexes only; exclude root-owned partial/lock entries.

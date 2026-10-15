@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import tarfile
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -120,6 +121,31 @@ class NativeArtifactTests(unittest.TestCase):
                     self.assertEqual(member.uid, 0)
                     self.assertEqual(member.gid, 0)
                     self.assertEqual(member.mode & 0o6000, 0)
+
+    def test_elf_sonames_architectures_and_runtime_paths(self):
+        scratch = self.artifacts / 'validation-scratch'
+        scratch.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=scratch) as temporary:
+            target = Path(temporary) / 'payload.elf'
+            for deb in sorted(self.mutter.glob('*.deb')) + sorted(self.library.glob('*.deb')):
+                arch = self.control(deb, 'Architecture')
+                for name, (member, data) in self.payload(deb).items():
+                    if not member.isfile() or not data or not data.startswith(b'\x7fELF'):
+                        continue
+                    with self.subTest(package=deb.name, file=name):
+                        target.write_bytes(data)
+                        header = subprocess.check_output(['readelf', '-h', str(target)], text=True)
+                        self.assertIn('ELF32' if arch == 'i386' else 'ELF64', header)
+                        dynamic = subprocess.check_output(['readelf', '-d', str(target)], text=True)
+                        for line in dynamic.splitlines():
+                            if '(RPATH)' in line or '(RUNPATH)' in line:
+                                self.assertNotIn('/work/', line)
+                                self.assertNotIn('/home/', line)
+                                self.assertNotIn('/usr/local', line)
+                        if name.endswith('/libmutter-51.so.0.0.0'):
+                            self.assertIn('Library soname: [libmutter-51.so.0]', dynamic)
+                        if name.endswith('/libdisplay-info.so.3.0.0'):
+                            self.assertIn('Library soname: [libdisplay-info.so.3]', dynamic)
 
     def test_launcher_exact_payload_and_declared_stock_dependencies(self):
         deb, = self.launcher.glob('*.deb')
