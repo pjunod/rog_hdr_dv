@@ -16,7 +16,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>Linux display<br>quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 15, 2026 · main-targeting HDR foundations/tooling/experimental-launcher source candidate; whole-candidate review found three helper defects, corrections awaiting focused re-review and final acceptance</p></header>
+<p class="muted">Updated October 15, 2026 · HDR foundations/tooling/experimental-launcher source independently reviewed and qualified; three helper findings closed, 29/29 affected methods passed; full Dolby and physical acceptance remain open</p></header>
 <div class="callout"><strong>Historical physical result (2026-10-11):</strong> the owner reported
 working HDR10 on the earlier patched stack (hdr6/nativehdr2) with Secure Boot
 enabled; hdr9 + nativehdr8 were installed; the HDR session ran on them and the
@@ -24,7 +24,7 @@ owner accepted the picture. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
 <h2>Workboard</h2>
 <table><thead><tr><th>Work</th><th>State</th><th>Evidence or next step</th></tr></thead><tbody>
-<tr><td>HDR foundations main candidate</td><td class="state active">Helper corrections in re-review</td><td><a href="QUALIFIED_HDR_FOUNDATIONS.md">Selected qualified nativehdr10 upstream90/Ubuntu105, public harness and experimental2 launcher</a>; no held PR16 ancestry. Source comparison, canonical replay and all four source-bound compiler stages complete; 302 unchanged inputs and zero unit execution in preparation. <a href="../evidence/qualified-main-compiler.json">Compiler evidence</a> retained. Whole-candidate review of <a href="https://github.com/pjunod/rog_hdr_dv/pull/20">draft PR20</a> required commit-build ownership/prerequisite, publication-scan error handling and Wine exit-status corrections. Corrections and hermetic regressions await focused re-review, then one helper batch and final integrity/security qualification t_f06aa8f3; no new deployment.</td></tr>
+<tr><td>HDR foundations main source</td><td class="state done">Reviewed and qualified</td><td><a href="QUALIFIED_HDR_FOUNDATIONS.md">Selected qualified nativehdr10 upstream90/Ubuntu105, public harness and experimental2 launcher</a>; no held PR16 ancestry. Source comparison, canonical replay and all four source-bound compiler stages complete; 302 unchanged inputs and zero unit execution in preparation. <a href="../evidence/qualified-main-compiler.json">Compiler evidence</a> retained. Whole-candidate review required commit-build ownership/prerequisite, publication-scan error handling and Wine exit-status corrections. Independent re-review closed all three; one hermetic helper batch passed 29/29, with unchanged component suites retained, not repeated. <a href="../evidence/qualified-main-final.json">Qualification evidence</a>; <a href="https://github.com/pjunod/rog_hdr_dv/pull/20">PR20</a> records final publication/merge disposition. No new deployment.</td></tr>
 <tr><td>Full Dolby and physical acceptance</td><td class="state pending">Incomplete</td><td>Creative trims, official-reference agreement, exact target/no-double-mapping, broader KMS scanout/size-warning causes, Windows and optical checks remain in the <a href="FULL_HDR_HANDOFF.md">programme ledger</a>. Experimental playback is not full fidelity or calibration.</td></tr>
 <tr><td>Existing HDR stack</td><td class="state done">Implemented</td><td>28 imported patches; library, compositor and kernel baseline recorded. Transition/resume acceptance remains.</td></tr>
 <tr><td>Public repository and provenance</td><td class="state active">Validated</td><td>Ordered series, public source URLs/hashes and pre-merge workflow. Adversarial findings resolved; 45 tests and integrity checks passed.</td></tr>
@@ -46,7 +46,7 @@ and measured calibration are not yet qualified.</div>
 </tbody></table>
 <p>A private offline reference experiment using official Dolby Professional Tools v5.6.4 completed. Proprietary processing details and outputs remain private. The generic synthetic PQ corpus passed all 11 new tests. Full playback integration, creative-trim qualification and optical measurement remain open.</p>
 <h2>Historical validated batches and observations</h2>
-<p>The dated rows below the current candidate are retained history, not a fresh device inventory. Component passes keep their original executing source identities; no successful suite is repeated solely for this integration or another reviewer. PR16 remains held and PR17 unchanged.</p>
+<p>The dated rows below the qualified source are retained history, not a fresh device inventory. Component passes keep their original executing source identities; no successful suite is repeated solely for this integration or another reviewer. PR16 remains held/closed/unmerged; PR17 is superseded source history, not the qualified delivery.</p>
 <p>The initial adversarial review found three issues: patch-order validation,
 incomplete public source-reconstruction inputs, and an incorrect base/candidate
 description. Those fixes and three further premerge findings are resolved. All 45 tests passed in one run; the source-bound probe compiled with warnings as errors.</p>

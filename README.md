@@ -12,8 +12,10 @@ on `main` without merging held PR16 history. It combines nativehdr10 Night
 Light/monitor targets, asynchronous lifetime and offscreen fixes, the Ubuntu
 port/package recipes, a public headless reference harness, and a bounded
 launcher for the existing stock player. All selected native compiler stages passed with 302 unchanged bound inputs.
-Component qualification is retained at its actual historical identities; complete-candidate independent review
-and final integration acceptance are separate, not assumed passed. Full Dolby
+Independent whole-candidate review and focused re-review closed three helper defects;
+the one affected helper batch passed all 29 methods. [Qualification evidence](evidence/qualified-main-final.json)
+retains exact reviewed/tested identities and unchanged component passes, not new
+component executions. [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20) records final publication/merge disposition. Full Dolby
 mapping/trims, reference agreement, optical calibration and broader hardware
 acceptance remain unfinished. No new deployment is part of this batch.
 

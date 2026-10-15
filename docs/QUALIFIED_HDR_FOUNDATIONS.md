@@ -1,11 +1,13 @@
 # HDR foundations, public tooling and experimental launcher
 
-Status: final source preparation for [draft PR20](https://github.com/pjunod/rog_hdr_dv/pull/20),
-2026-10-15; whole-candidate review completed with three support-helper findings,
-now corrected and awaiting focused independent re-review. This is not
-full Dolby equivalence, a package release, a new installation, or final review
-approval. The integration task is `t_67396754`; independent review is
-`t_c00009d9`, followed by final qualification `t_f06aa8f3`.
+Status: independently reviewed and qualified source for [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20),
+2026-10-15. Whole-candidate review `t_c00009d9` found three support-helper defects;
+focused independent re-review `t_d1b8661c` approved their correction at `2bf1912`.
+The one affected helper batch passed all 29 methods; retained component/compiler
+passes remain at their actual source identities. This is not full Dolby
+equivalence, a package release or a new installation. Integration task
+`t_67396754` and qualification `t_f06aa8f3` retain detailed private evidence;
+the PR records actual final publication/merge disposition.
 
 ## Deliberately selected source, not held history
 
@@ -102,8 +104,13 @@ Meson source/build association, and remove only their own worktree. Publication
 scanning distinguishes no matches from read errors; generated Wine commands
 preserve initialization/test/timeout results across owned-process cleanup.
 Use `HDR_HELPER_TEST_ROOT` for an explicit durable scratch root; the default is
-ignored `work/helper-tests`. Focused independent re-review precedes the single
-new helper batch. No unchanged component suite is invalidated by these fixes.
+ignored `work/helper-tests`. Focused independent re-review approved the correction
+before the single new helper batch: 29/29 passed, no failures/errors/skips.
+[The sanitized qualification receipt](../evidence/qualified-main-final.json)
+binds exact review/test identities, hashes and executed method IDs. No unchanged
+component suite is invalidated by these fixes. Later evidence/status-only changes
+are checked statically under the reviewer's explicit unchanged-input rule;
+final integrity/publication checks remain required, without another unit batch.
 
 New integrity,
 canonical replay, source comparison, syntax/static inspection, compiler and
@@ -148,8 +155,9 @@ in the integration task's durable handoff, never the public archive.
 Main-only source applies only to mobile builds intended for installation on
 physical devices and those installations; it does not restrict non-mobile HDR
 compiler work. This clarification grants no new device/deployment permission.
-PR16 stays held; PR17 stays unchanged until the coordinator decides disposition
-following safe replacement landing. This preparation does not merge either PR.
+PR16 stays held and closed/unmerged. PR17 may be closed as superseded only after
+verified replacement landing; its branch and historical evidence remain preserved.
+Neither held history is merged by this source selection.
 
 Full mapping/trims/reference agreement, exact preferred-target identity and
 no-double-mapping, broader KMS scanout and size-accounting warnings, Windows and

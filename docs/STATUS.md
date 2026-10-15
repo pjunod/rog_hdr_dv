@@ -1,12 +1,12 @@
 # Status — what is working and what remains
 
 **Updated:** 2026-10-15 (America/New_York) · **State:** main-targeting HDR
-foundations/tooling/experimental-launcher source preparation complete;
-whole-candidate review found three support-helper defects; corrections ready for focused re-review.
+foundations/tooling/experimental-launcher source independently reviewed and qualified;
+three support-helper defects corrected and re-reviewed, all 29 affected methods passed.
 Previously qualified component source and exact historical receipts are selected
-without importing held PR16/17 history. Complete-candidate independent review
-and final acceptance are not yet approved. Full Dolby Vision and measured image-quality
-acceptance remain open; this preparation authorizes no deployment.
+without importing held PR16/17 history. [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20)
+records final publication/merge disposition. Full Dolby Vision and measured image-quality
+acceptance remain open; source qualification authorizes no deployment.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
 distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
@@ -25,18 +25,22 @@ See [scope/provenance/applicability](QUALIFIED_HDR_FOUNDATIONS.md).
 Done: canonical library10/upstream90/Ubuntu105 replay and all selected native
 compiler stages, including both full Mutter builds. The [compiler receipt](../evidence/qualified-main-compiler.json)
 binds 302 unchanged inputs, zero unit execution and recovered original Ubuntu
-success. Whole-candidate review of [draft PR20](https://github.com/pjunod/rog_hdr_dv/pull/20)
+success. Whole-candidate review of [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20)
 completed with changes required: unsafe commit-build prerequisites/ownership,
 fail-open publication scanning, and masked Wine initialization/test exits.
-Corrections and hermetic helper regressions are prepared; no new units executed yet.
+All three findings closed in independent focused re-review at `2bf1912`;
+the one hermetic helper batch passed 29/29, with no failures/errors/skips.
+The [qualification receipt](../evidence/qualified-main-final.json) binds the actual
+review, source hashes, executed IDs and logs. Component suites were not repeated.
 Inherited support-tool prerequisites are explicit new review scope, not
 implicitly qualified by use on an older branch. Main's audio ownership and security policy are preserved.
-PR16 is held; PR17 is unchanged and not the qualified delivery.
+PR16 remains closed/unmerged and held; PR17 is superseded source history, not the qualified delivery.
 
-Current: focused independent re-review of R1–R3 corrections, then the single
-hermetic helper batch and final integrity/security qualification `t_f06aa8f3`
-before any merge. Whole-candidate review `t_c00009d9` is not merge approval. Do not repeat
-successful component units without actual invalidation. The broader programme
+Qualification lane `t_f06aa8f3` retains final source-integrity/publication and
+actual merge readbacks. Whole-candidate review `t_c00009d9` required changes;
+focused re-review `t_d1b8661c` approved their correction. Evidence/status-only
+closeout does not change executable/test/patch/dependency/build/scanner/CI inputs.
+Do not repeat successful component units without actual invalidation. The broader programme
 still owns KMS scanout/size-warning causes, transitions/resume, exact target
 handoff/no-double-mapping, Dolby minimum/creative trims/reference agreement,
 Windows comparison, optical measurement and upstream disposition. A bounded
