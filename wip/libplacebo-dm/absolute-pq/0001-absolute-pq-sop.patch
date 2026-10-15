@@ -1,8 +1,8 @@
 From db14e9b3ac4df8bfdadd34fda856875b6f636be6 Mon Sep 17 00:00:00 2001
 From: HDR contributors <hdr-contributors@users.noreply.github.com>
 Date: Thu, 15 Oct 2026 17:47:49 -0400
-Subject: [PATCH] dovi_dm: add explicit absolute-PQ SOP embodiment and domain
- regressions
+Subject: [PATCH 1/2] dovi_dm: add explicit absolute-PQ SOP embodiment and
+ domain regressions
 
 ---
  meson.build                      |  1 +
@@ -226,6 +226,32 @@ index 33c8481..ca51388 100644
  #ifdef PL_HAVE_VULKAN
      shader_cache_tests();
  #endif
+-- 
+2.54.0 (Apple Git-157)
+
+
+From e9869a0d7519140c457cf1bb04eb68d3bf264dfd Mon Sep 17 00:00:00 2001
+From: HDR contributors <hdr-contributors@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 18:57:55 -0400
+Subject: [PATCH 2/2] build: reserve separate observer ABI slot before
+ absolute-PQ ABI364
+
+---
+ meson.build | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/meson.build b/meson.build
+index 85d16a0..c364c9c 100644
+--- a/meson.build
++++ b/meson.build
+@@ -13,6 +13,7 @@ project('libplacebo', ['c', 'cpp'],
+     # API version
+     {
+       '364': 'private OPEN absolute-PQ SOP domain, separate from observer ABI363',
++      '363': 'reserved for separate private observer candidate; no observer code here',
+       '362': 'private OPEN analytic PQ-Hermite and typed target-PQ SOP candidate',
+       '361': 'experimental frame-owned open Dolby DM and explicit average presence',
+       '360': 'add pl_d3d11_swapchain_params.{alpha,color}_bits',
 -- 
 2.54.0 (Apple Git-157)
 
