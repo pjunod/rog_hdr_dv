@@ -4,6 +4,29 @@ Read [architecture](ARCHITECTURE.md) for ownership and [provenance](PROVENANCE.m
 for imported source identities. The repository stores patch series, not full
 vendored Linux/Mutter trees or installable binaries.
 
+## Current source batch and durable workspace policy
+
+The [main-targeting HDR foundations candidate](QUALIFIED_HDR_FOUNDATIONS.md)
+selects qualified component bytes and preserves their actual historical receipts.
+Its inherited support tools are explicit independent-review scope, not implicit
+approval of every helper. No unit execution occurs during preparation; review
+and corrections precede the minimum affected final batch. Retain valid passing
+receipts instead of repeating suites on every repository commit.
+
+All source/build/input/scratch directories must be task-owned and durable, for
+example an explicit `HDR_WORK` under the agent's collaboration workspace or
+`/work/<owned-task>` in the native builder. Set HOME/XDG/TMPDIR to that owned
+root before compiler/testing work. Do not use system temporary directories,
+owner repositories, another worker's tree or a frozen qualification build.
+Native commands use the existing fixed native x86_64 wrapper, unprivileged;
+never emulation, private-key access, host installs or warm-tree reconstruction.
+The legacy root-oriented test helper is not the wrapper's execution recipe.
+
+Owner clarification: only mobile app builds intended for physical-device
+installation, and those installations, require source already merged into main.
+Non-mobile HDR pre-merge builds remain authorized under the existing workflow.
+No additional device/deployment permission or review/test waiver follows.
+
 ## 1. Verify the repository
 
 ```bash
@@ -41,7 +64,8 @@ snapshot and require the same hashes. Never substitute another version.
 On a Linux build host with `dpkg-dev`, fetch the three recorded artifacts into
 one empty directory, verify every hash, and run `dpkg-source -x` on the `.dsc`.
 Keep its normally applied quilt patches. Initialise Git in the extracted tree
-and stage source with `git add -f -- . ':(exclude).pc'`; `.pc/` is generated
+and stage source with `git add -- . ':(exclude).pc'`, preserving the source's
+ignore rules (including vendored gvdb/build products); `.pc/` is generated
 quilt bookkeeping, not part of the recorded imported tree. Check `git write-tree`
 against the component's `base_tree` before creating a baseline commit or
 applying any exported patch. Stop on a mismatch and report the differing
@@ -107,7 +131,7 @@ The kernel parser suite is selected by `drm_displayid_luminance`:
 
 ```bash
 python3 tools/testing/kunit/kunit.py run \
-  --arch x86_64 --jobs 2 --build_dir /tmp/rog-hdr-kunit \
+  --arch x86_64 --jobs 2 --build_dir "$HDR_WORK/rog-hdr-kunit" \
   --kunitconfig drivers/gpu/drm/tests --timeout 120 \
   drm_displayid_luminance  # Run inside the reconstructed kernel source.
 ```
@@ -163,3 +187,28 @@ the current stack consumes unpublished API additions.
 Use [rog_audio development](https://github.com/pjunod/rog_audio/blob/main/docs/DEVELOPMENT.md)
 for the audio build environments, review and validation workflow. Do not add
 audio tools or their dependency manifests to the display patch series.
+
+## Build, test and packaging harness tools
+
+`tools/reconstruct.py COMPONENT WORKDIR` binds the public pinned base, ordered
+series and exact final tree. Use only a fresh owned directory; do not reconstruct
+over work. For offline native replay use public cached base objects in a new
+task-owned repository and require the same tree equality. Do not substitute a
+newer Ubuntu import or imply signature authentication beyond recorded evidence.
+
+`tools/build-upstream.sh LIB_SOURCE MUTTER_SOURCE BUILD_ROOT ORIG_ARCHIVE`
+stages the library into its own prefix and compiles with warnings as errors.
+`tools/package-ubuntu-offline.py` constructs an unprivileged, source-tree-bound
+Ubuntu package set using the exact supplied library packages, with no APT or
+host installation and no units. [Ubuntu delivery](NATIVEHDR10_UBUNTU_DELIVERY.md)
+records actual historical construction versions, API dependency, GTK floor and
+both library architectures; never relabel all packages as rebuilt on Ubuntu105.
+
+`tools/export_series.py` preserves upstream authorship when exporting ordered
+mail patches; regenerate SHA256SUMS deliberately only when patch bytes change.
+`scripts/nativehdr10_validation.py` retains per-invocation logs and validity.
+`tools/dolby_harness/build.py` binds the headless consumer, exact headers and
+CPU Vulkan closure; [the harness contract](DOLBY_HARNESS.md) scopes its evidence.
+`tools/native_player/build.py` packages the [experimental launcher](../tools/native_player/README.md)
+without rebuilding stock mpv/FFmpeg/libplacebo, installing or playing media.
+None of these commands should be inferred as permission for a device action.

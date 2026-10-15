@@ -1,17 +1,47 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-12 (America/New_York) · **State:** hdr9 library and
-`nativehdr8` compositor installed on 2026-10-11; the owner's HDR session runs
-on it and the owner accepted the picture. The tenth batch (`nativehdr9`,
-general display targets, and the upstream-facing Mutter port) is reviewed
-and packaged. It is installed on the second test machine `lab6`, where
-native SDR mode publishes the panel's EDID gamut as its target. Full Dolby
-Vision and measured image-quality acceptance remain open.
+**Updated:** 2026-10-15 (America/New_York) · **State:** main-targeting HDR
+foundations/tooling/experimental-launcher source integration in progress.
+Previously qualified component source and exact historical receipts are selected
+without importing held PR16/17 history. Complete-candidate independent review
+and final acceptance remain pending. Full Dolby Vision and measured image-quality
+acceptance remain open; this preparation authorizes no deployment.
 
 The [visual status page](STATUS.html) shows the workboard. [Provenance](PROVENANCE.md)
 distinguishes inherited evidence from new work, [development](DEVELOPMENT.md)
 defines validation, and [review](REVIEW.md) records findings and their resolution.
 Source qualification is separate from package delivery and physical measurement.
+
+## HDR foundations — main-targeting candidate
+
+Done: selected nativehdr10 upstream90/Ubuntu105 source, unchanged library pins,
+the qualified public schema1/schema2 headless harness and experimental2 launcher.
+Imported source/test bytes and retained evidence are compared against qualified
+donors, not described as new executions. Component receipts retain their actual
+heads/trees; no unit suite runs in this preparation phase.
+See [scope/provenance/applicability](QUALIFIED_HDR_FOUNDATIONS.md).
+
+Current: canonical replay, fresh source-bound native compiler evidence, static
+integrity/publication checks and a draft PR against main. Inherited support-tool
+prerequisites are explicit new review scope, not implicitly qualified by use on
+an older branch. Main's audio ownership and security policy are preserved.
+PR16 is held; PR17 is unchanged and not the qualified delivery.
+
+Remaining: independent whole-candidate review `t_c00009d9`, corrections and
+reviewer-scoped final validation `t_f06aa8f3` before any merge. Do not repeat
+successful component units without actual invalidation. The broader programme
+still owns KMS scanout/size-warning causes, transitions/resume, exact target
+handoff/no-double-mapping, Dolby minimum/creative trims/reference agreement,
+Windows comparison, optical measurement and upstream disposition. A bounded
+historical laptop trial is not clean-log or full hardware acceptance.
+
+Owner clarification: main-only builds/installs apply only to mobile builds
+intended for installation on physical devices, and those installations.
+Non-mobile HDR pre-merge compiler work follows the existing authorized workflow;
+all device restrictions, independent-review gates and PR16 hold remain.
+
+The installation sections below are dated historical evidence, not a fresh
+inventory or permission to install their artifacts.
 
 ## Audio — moved to rog_audio on 2026-10-12
 

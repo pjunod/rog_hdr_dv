@@ -11,7 +11,7 @@ Use Python 3 and a new output directory outside the source repository. Its
 parent must already exist. For example:
 
 ```bash
-python3 scripts/generate_hdr_corpus.py /tmp/hdr-reference-corpus \
+python3 scripts/generate_hdr_corpus.py "$HDR_WORK/hdr-reference-corpus" \
   --width 192 --height 108 --fps 24
 ```
 
@@ -87,3 +87,20 @@ processing details, outputs and numerical comparisons remain private. This
 establishes a reference workflow, not a real-time playback processor, creative
 trim qualification or measured panel accuracy. [Status](STATUS.md) records the
 current acceptance boundary.
+
+## Restoration checkpoint 2026-10-13
+
+The [public harness](DOLBY_HARNESS.md) now carries a separately qualified schema2
+post-reshape entry point. Genuine private official XML, source sequence and
+18 exact target/frame reference pairs were rebound and inspected; the corrected
+parser's one 32-method affected batch and 16 retained historical method receipts
+are recorded in [qualification](../evidence/dolby-postreshape-qualified.json).
+Original tools, XML, TIFF/f32/reference pixels, execution logs and locator maps
+remain private. No private input is required for public source reconstruction.
+
+This restores baseline-ready inputs and bounded software contracts, not
+consumer-RPU extraction qualification, representative creative-trim/reference
+agreement, new display-management equations or optical accuracy. The original
+generator and its eleven passing tests are unchanged and were not rerun for
+this integration. [Main candidate scope](QUALIFIED_HDR_FOUNDATIONS.md) retains
+exact historical identities rather than relabelling them as current execution.
