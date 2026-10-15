@@ -10,7 +10,10 @@ approval. The integration task is `t_67396754`; independent review is
 Base main is `9c1fea526c2ea954bd9730e5ffbb4d370cbd13ad`. No merge or
 cherry-pick of PR16/17 is used. Donor references are private local inspection
 refs only and must not be pushed. Existing main audio separation, attribution,
-licences and narrow secret-scan configuration are retained. Upstream patch
+licences and narrow secret-scan rules are retained. One additional exact-path,
+exact-value allowance identifies a recomputed public regression AST digest in
+the applicability receipt, not a credential; no detector or general hash class
+is disabled. Upstream patch
 mail authors, dates and bytes remain unchanged.
 
 | Selected component | Actual qualified repository donor | Contract and retained evidence |
