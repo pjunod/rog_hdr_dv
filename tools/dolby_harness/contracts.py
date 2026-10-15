@@ -216,13 +216,15 @@ def input_manifest(path, snapshot=None):
     integer(f['pts']['den'], 1)
     if obj['schema'] == 3:
         from tools.dolby_harness.authored_master import snapshot as master_snapshot
+        from tools.dolby_harness.authored_master import pixel_samples
         p, frame_raw = master_snapshot(Path(path).parent, f['input'], w * h * 12)
         if len(frame_raw) != w * h * 12:
             raise ValueError('exact tightly packed RGB-f32le byte count required')
+        pixel_samples(frame_raw)
         del frame_raw
     else:
         p = bound_file(Path(path).parent, f['input'])
-    pixels(p, w, h, f['input']['sha256'])
+        pixels(p, w, h, f['input']['sha256'])
     s = obj['source']
     t = obj['target']
     if obj['schema'] == 3:
@@ -337,7 +339,7 @@ def result_manifest(path, snapshot=None):
     if not isinstance(obj['provenance'], dict) or not obj['provenance']:
         raise ValueError('renderer/reference provenance required')
     if obj['schema'] == 3:
-        from tools.dolby_harness.authored_master import validate_result
-        validate_result(Path(path).parent, obj)
+        from tools.dolby_harness.authored_master import pixel_samples, validate_result
+        return obj, pixel_samples(validate_result(Path(path).parent, obj))
     p = bound_file(Path(path).parent, obj['output'])
     return obj, pixels(p, w, h, obj['output']['sha256'])

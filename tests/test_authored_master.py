@@ -6,6 +6,7 @@ Run once only after complete adapter review/fixes. Native tests reject controls
 before Vulkan; the one genuine candidate render belongs to recovery validation.
 """
 import copy
+import io
 import json
 import math
 import os
@@ -24,7 +25,7 @@ from tools.dolby_harness import authored_master as master
 from tools.dolby_harness.contracts import ENCODING, alignment, input_manifest, result_manifest
 from tools.dolby_harness.harness import baseline_semantics, control
 from tools.dolby_harness.master_pixels import decode, geometry, header, normalize, sha, verify
-from tools.dolby_harness.provenance import FRONTEND_INPUTS, ROOT, implementation
+from tools.dolby_harness.provenance import COMPILE_INPUTS, FRONTEND_INPUTS, ROOT, implementation
 
 
 def exr(width, height, samples, compression=0):
@@ -68,6 +69,38 @@ def public_transport():
 
 
 class StorageTransportTests(unittest.TestCase):
+    def test_output_snapshot_exact_short_oversize_and_bounded_read(self):
+        # Metadata-free RGB storage controls only, never a Dolby result fixture.
+        raw = struct.pack('<3f', 0.125, 0.25, 0.5)
+        for data, error in ((raw, None), (raw[:-1], 'exact tightly packed'),
+                            (raw + b'\0' * 32, 'resource bound')):
+            reads = []
+            class Stream(io.BytesIO):
+                def read(self, size: int | None = -1):
+                    reads.append(size)
+                    return super().read(size)
+            with patch.object(Path, 'open', return_value=Stream(data)):
+                binding = {'file': 'public-storage-only', 'sha256': sha(data)}
+                if error is None:
+                    self.assertEqual(master.output_snapshot('.', binding, 1, 1), raw)
+                else:
+                    with self.assertRaisesRegex(ValueError, error):
+                        master.output_snapshot('.', binding, 1, 1)
+            self.assertEqual(reads, [13])
+
+    def test_output_snapshot_hash_and_sample_domain(self):
+        raw = struct.pack('<3f', 0.125, 0.25, 0.5)
+        with patch.object(Path, 'open', return_value=io.BytesIO(raw)):
+            with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+                master.output_snapshot('.', {'file': 'public-storage-only', 'sha256': '0' * 64}, 1, 1)
+        self.assertEqual(master.pixel_samples(raw), [(0.125, 0.25, 0.5)])
+        for x in (math.nan, math.inf, -0.01, 1.01):
+            bad = struct.pack('<3f', x, 0, 0)
+            with patch.object(Path, 'open', return_value=io.BytesIO(bad)):
+                snapshot = master.output_snapshot('.', {'file': 'public-storage-only', 'sha256': sha(bad)}, 1, 1)
+            with self.assertRaisesRegex(ValueError, 'finite normalized samples'):
+                master.pixel_samples(snapshot)
+
     def test_half_exact_channels_rows_no_integer_or_gamma_transform(self):
         samples = [(0, 0.5, 1), (0.25, 0.0625, 0.75), (2**-24, 0.03125, 0.125), (1, 0.0, 0.5)]
         raw = exr(2, 2, samples)
@@ -348,6 +381,90 @@ class GenuineAuthoredTests(unittest.TestCase):
         bad['target']['max_nits'] = 601
         with self.assertRaisesRegex(ValueError, 'only acquired'):
             master.reference_provenance(self.base, self.obj['metadata']['declaration_repair'], bad, self.meta, reference)
+
+
+class GenuineResultTests(unittest.TestCase):
+    """Consume the ONE later real render/normalization; never render in tests."""
+    @classmethod
+    def setUpClass(cls):
+        cls.paths = {}
+        for role, variable in (('candidate', 'HDR_AUTHORED_CANDIDATE'),
+                               ('reference', 'HDR_AUTHORED_REFERENCE')):
+            source = os.environ.get(variable)
+            if not source:
+                raise AssertionError(variable + ' real reviewed result required; no fake/skip replacement')
+            cls.paths[role] = Path(source)
+
+    def test_genuine_results_positive_single_bounded_snapshot(self):
+        original_open, original_read_bytes = Path.open, Path.read_bytes
+        for role, path in self.paths.items():
+            obj = json.loads(path.read_bytes())
+            self.assertEqual((obj['schema'], obj['role']), (3, role))
+            output = path.parent / obj['output']['file']
+            expected = obj['alignment']['width'] * obj['alignment']['height'] * 12
+            reads, opens = [], []
+            class Stream:
+                def __enter__(self):
+                    self.stream = original_open(output, 'rb')
+                    return self
+                def __exit__(self, *args):
+                    self.stream.close()
+                def read(self, size=-1):
+                    reads.append(size)
+                    return self.stream.read(size)
+            def opened(p, *args, **kwargs):
+                if p == output:
+                    opens.append(p)
+                    return Stream()
+                return original_open(p, *args, **kwargs)
+            def read_bytes(p):
+                if p == output:
+                    raise AssertionError('schema3 output must never use unbounded read_bytes')
+                return original_read_bytes(p)
+            with self.subTest(role=role), patch.object(Path, 'open', opened), patch.object(Path, 'read_bytes', read_bytes):
+                accepted, samples = result_manifest(path)
+                self.assertEqual(accepted, obj)
+                self.assertEqual(len(samples), expected // 12)
+                self.assertEqual(opens, [output])
+                self.assertEqual(reads, [expected + 1])
+                del samples
+
+    def test_genuine_candidate_compile_frontend_control_log_tamper(self):
+        path = self.paths['candidate']
+        original = json.loads(path.read_bytes())
+        for key, error in (('native_sha256', 'compiler/runtime binding'),
+                           ('frontend', 'implementation changed')):
+            bad = copy.deepcopy(original)
+            execution = bad['provenance']['execution']
+            if key == 'frontend':
+                execution[key]['sources'][FRONTEND_INPUTS[0]] = '0' * 64
+            else:
+                execution[key] = '0' * 64
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, error):
+                result_manifest(path, json.dumps(bad).encode())
+        for key in ('control_sha256', 'stdout_sha256', 'stderr_sha256'):
+            bad = copy.deepcopy(original)
+            bad['provenance'][key] = '0' * 64
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+                result_manifest(path, json.dumps(bad).encode())
+        original_read_bytes = Path.read_bytes
+        for source in COMPILE_INPUTS:
+            def changed(p):
+                return original_read_bytes(p) + (b'\n' if p == ROOT / source else b'')
+            with self.subTest(source=source), patch.object(Path, 'read_bytes', changed):
+                with self.assertRaisesRegex(ValueError, 'implementation changed'):
+                    result_manifest(path)
+
+    def test_genuine_results_wrong_output_hash_after_provenance(self):
+        for role, path in self.paths.items():
+            bad = json.loads(path.read_bytes())
+            bad['output']['sha256'] = '0' * 64
+            if role == 'reference':
+                # Rejection-only result mutation; authentic XML/vendor provenance
+                # stays intact. Reach the shared output guard, not earlier equality.
+                bad['provenance']['storage_conversion']['normalized']['sha256'] = '0' * 64
+            with self.subTest(role=role), self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+                result_manifest(path, json.dumps(bad).encode())
 
 
 if __name__ == '__main__':

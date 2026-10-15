@@ -4,6 +4,7 @@ Only normalized L1 max/average enter existing baseline slots. Decimal records
 are retained unapplied. No named consumer CM, RPU or photometric claim is inferred.
 """
 import json
+import math
 from functools import wraps
 from pathlib import Path
 import re
@@ -48,6 +49,22 @@ def snapshot(base, binding, maximum=4 * 1024 * 1024):
     if sha(raw) != binding['sha256']:
         raise ValueError('authored artifact SHA256 mismatch')
     return path, raw
+
+
+def output_snapshot(base, binding, width, height):
+    """Hash and size-check one bounded RGB-f32le snapshot, never reopen it."""
+    expected = geometry(width, height) * 12
+    _, raw = snapshot(base, binding, expected)
+    if len(raw) != expected:
+        raise ValueError('exact tightly packed RGB-f32le byte count required')
+    return raw
+
+
+def pixel_samples(raw):
+    out = list(struct.iter_unpack('<fff', raw))
+    if not all(math.isfinite(x) and 0 <= x <= 1 for p in out for x in p):
+        raise ValueError('finite normalized samples required (no implicit clipping)')
+    return out
 
 
 def retained(base, entry):
@@ -590,7 +607,7 @@ def normalize_reference(manifest, reference_exr, output):
 
 @validation
 def validate_result(base, result):
-    """Rebind alignment to actual input snapshots before accepting schema3 output."""
+    """Rebind provenance and return the single bounded, hash-checked output."""
     from tools.dolby_harness.contracts import alignment, input_manifest
     provenance = result['provenance']
     manifest, raw = snapshot(base, provenance['input_manifest'])
@@ -603,14 +620,6 @@ def validate_result(base, result):
         validate_decoder(conversion['decoder'])
         if not strict_equal(vendor, provenance['vendor']) or conversion['normalized']['sha256'] != result['output']['sha256']:
             raise ValueError('authored reference provenance mismatch')
-        _, original = snapshot(base, conversion['original'], 256 * 1024 * 1024)
-        _, normalized = snapshot(base, result['output'], geometry(obj['frame']['width'], obj['frame']['height']) * 12)
-        actual_header = verify(original, normalized, obj['frame']['width'], obj['frame']['height'])
-        if (conversion.get('operation') != 'HALF-exact-binary32-storage-only' or
-                conversion.get('entry_point') != 'tools.dolby_harness.master_pixels.normalize' or
-                conversion.get('transforms') != [] or conversion.get('header') != actual_header or
-                (conversion.get('width'), conversion.get('height')) != (obj['frame']['width'], obj['frame']['height'])):
-            raise ValueError('reference storage conversion declaration mismatch')
     else:
         from tools.dolby_harness.harness import baseline_semantics, control
         from tools.dolby_harness.provenance import COMPILE_INPUTS, implementation
@@ -621,10 +630,21 @@ def validate_result(base, result):
         if not strict_equal(compiled, execution['compile_receipt']) or compiled['binary_sha256'] != execution['native_sha256'] or compiled['runtime'] != execution['runtime']:
             raise ValueError('authored candidate compiler/runtime binding mismatch')
         current = implementation()['sources']
-        if execution['frontend']['sources'] != current or any(compiled['sources'][k] != sha(Path(__file__).resolve().parents[2] / k) for k in COMPILE_INPUTS):
+        if execution['frontend']['sources'] != current or any(compiled['sources'][k] != sha((Path(__file__).resolve().parents[2] / k).read_bytes()) for k in COMPILE_INPUTS):
             raise ValueError('authored candidate implementation changed')
         _, native_control = snapshot(base, {'file': 'control.txt', 'sha256': provenance['control_sha256']})
         for name in ('stdout', 'stderr'):
             snapshot(base, {'file': 'native.' + name, 'sha256': provenance[name + '_sha256']})
         if native_control != control(obj, meta).encode('utf8') or provenance['protocol'] != 'DVH2' or not strict_equal(provenance['baseline_semantics'], baseline_semantics(obj, meta)):
             raise ValueError('authored candidate control/semantics mismatch')
+    normalized = output_snapshot(base, result['output'], obj['frame']['width'], obj['frame']['height'])
+    if result['role'] == 'reference':
+        conversion = provenance['storage_conversion']
+        _, original = snapshot(base, conversion['original'], 256 * 1024 * 1024)
+        actual_header = verify(original, normalized, obj['frame']['width'], obj['frame']['height'])
+        if (conversion.get('operation') != 'HALF-exact-binary32-storage-only' or
+                conversion.get('entry_point') != 'tools.dolby_harness.master_pixels.normalize' or
+                conversion.get('transforms') != [] or conversion.get('header') != actual_header or
+                (conversion.get('width'), conversion.get('height')) != (obj['frame']['width'], obj['frame']['height'])):
+            raise ValueError('reference storage conversion declaration mismatch')
+    return normalized
