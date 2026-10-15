@@ -17,6 +17,19 @@ Source qualification is separate from package delivery and physical measurement.
 
 ### Isolated OPEN XML205 diagnostic (2026-10-15)
 
+Current follow-up: the corrected original source was independently approved301;
+its once-only affected batch303 passed but all three authentic frame256 numerical
+comparisons FAILED the unchanged1/3 mean/p95 bar. Observation307 was independently
+reviewed308 and its nine new methods passed once310 on OLD307 source. Original
+final-linear bound exceedance remains a failure, not proof of a compiler defect.
+New [absolute-PQ SOP alternative](OPEN_ABSOLUTE_PQ_SOP.md) is written in isolated
+ABI364, preserving normalized arithmetic and old histories. Current: compile new
+whole batch, one authorized development render/comparison, independent review.
+New/invalidated units are deferred until after review. Full mapping is incomplete;
+this unqualified source is excluded from parallel merged Ubuntu packaging.
+
+Historical original source-phase checkpoint (not the current review gate):
+
 Done (source only): additive DVH3 consumer/frontend/provenance, exact original
 decimal SOP derivation, analytic public improved PQ-Hermite core/shader and typed
 target-PQ SOP after existing L1 compensation/before final gamut once; explicit

@@ -1,6 +1,11 @@
 # OPEN XML205 PQ-Hermite/SOP diagnostic
 
-Status: source batch compiled natively with warnings as errors; independent source
+Current: original source approved301 and affected batch303 passed; all three
+fixed numerical comparisons failed unchanged thresholds. Original receipts keep
+their executing identities. See [absolute-PQ follow-up](OPEN_ABSOLUTE_PQ_SOP.md)
+for the isolated ABI364 source candidate and its current gates.
+
+Historical source-phase status: source batch compiled natively with warnings as errors; independent source
 re-review pending after round1 parser/reporting corrections. No units, candidate
 renders or accuracy comparisons have run in
 this source phase. This is not full Dolby mapping, consumer-CM identification,

@@ -98,14 +98,14 @@ class OpenAuthenticTests(unittest.TestCase):
         for variant in dm.VARIANTS:
             with self.subTest(variant=variant):
                 a = dm.algorithm(self.obj, self.meta, variant)
-                indexes = [0, 1, 2, 6, 7, 8] if variant == 'l1-hermite-sop' else list(range(9))
+                indexes = [0, 1, 2, 6, 7, 8] if variant in dm.SOP_VARIANTS else list(range(9))
                 self.assertEqual(a['unapplied_trim_indexes'], indexes)
                 self.assertEqual(a['unapplied_trim_values'],
                                  {str(i): a['original_trim'].split(',')[i] for i in indexes})
                 self.assertEqual(a['derived_factors']['exact'],
                                  {'S': '507/500', 'O': '-7/500', 'P': '2000/2001'})
                 self.assertEqual(a['applied_factors'], a['derived_factors']['float']
-                                 if variant == 'l1-hermite-sop' else {'S': 1.0, 'O': 0.0, 'P': 1.0})
+                                 if variant in dm.SOP_VARIANTS else {'S': 1.0, 'O': 0.0, 'P': 1.0})
         self.assertEqual(self.meta, saved)
 
     def test_fixed_variant_control_geometry_domain(self):
@@ -147,7 +147,7 @@ class OpenAuthenticTests(unittest.TestCase):
         tokens = dm.control(self.obj, self.meta, 'l1-hermite-sop').split()
         wrong = [tokens + ['trailing'], tokens[:-1], ['DVH2'] + tokens[1:]]
         for index, value in ((1, '4097'), (3, '0'), (24, 'nan'), (25, '-1'),
-                             (26, '0'), (27, '3'), (28, '2'), (30, '0')):
+                             (26, '0'), (27, '4'), (28, '2'), (30, '0')):
             t = tokens[:]
             t[index] = value
             wrong.append(t)
@@ -164,7 +164,7 @@ class OpenAuthenticTests(unittest.TestCase):
 
     def test_actual_compile_source_header_library_abi_closure(self):
         prov.validate_compile(self.compile, live=True)
-        self.assertEqual(self.compile['abi'], 362)
+        self.assertEqual(self.compile['abi'], 364)
         self.assertEqual(self.compile['binary_sha256'], prov.sha(self.native))
         for edit in ('abi', 'sources', 'library_sources', 'headers'):
             c = copy.deepcopy(self.compile)
@@ -182,20 +182,21 @@ class OpenAuthenticTests(unittest.TestCase):
 class OpenActualResultTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Recovery supplies exact paths to its three fixed once-rendered outputs.
+        # Only the new once-rendered variant belongs to this source. The three
+        # original303 results retain OLD frontend/ABI362 executing identities.
         cls.paths = parse_json(read_bounded(os.environ['HDR_OPEN_RESULTS'], 4 * 1024 * 1024))
-        if set(cls.paths) != set(dm.VARIANTS):
-            raise AssertionError('all fixed variants required; no fabricated results')
+        if set(cls.paths) != {dm.ABSOLUTE_VARIANT}:
+            raise AssertionError('new absolute-PQ result required; no old-result relabelling')
 
     def test_genuine_source_bound_results_and_rejection_only_tampering(self):
-        for variant in dm.VARIANTS:
+        for variant in self.paths:
             path = Path(self.paths[variant])
             r, pixels = dm.validate_result(path)
             self.assertEqual(r['algorithm']['variant'], variant)
             self.assertEqual(len(pixels), 4096 * 2160)
             del pixels
             self.assertEqual(r['source_alignment']['frame_index'], 256)
-            self.assertEqual(r['algorithm']['applied_factors']['S'], 1.014 if variant.endswith('-sop') else 1.0)
+            self.assertEqual(r['algorithm']['applied_factors']['S'], 1.014)
             for field in ('algorithm', 'encoding', 'source_alignment', 'provenance'):
                 changed = copy.deepcopy(r)
                 if field == 'algorithm':

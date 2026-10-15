@@ -1,0 +1,231 @@
+From db14e9b3ac4df8bfdadd34fda856875b6f636be6 Mon Sep 17 00:00:00 2001
+From: HDR contributors <hdr-contributors@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 17:47:49 -0400
+Subject: [PATCH] dovi_dm: add explicit absolute-PQ SOP embodiment and domain
+ regressions
+
+---
+ meson.build                      |  1 +
+ src/dovi_dm.c                    |  7 +++-
+ src/include/libplacebo/dovi_dm.h |  6 ++-
+ src/shaders/colorspace.c         | 29 +++++++++-----
+ src/tests/dovi_dm.c              | 65 +++++++++++++++++++++++++++++++-
+ 5 files changed, 95 insertions(+), 13 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index cf7a0b2..85d16a0 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '364': 'private OPEN absolute-PQ SOP domain, separate from observer ABI363',
+       '362': 'private OPEN analytic PQ-Hermite and typed target-PQ SOP candidate',
+       '361': 'experimental frame-owned open Dolby DM and explicit average presence',
+       '360': 'add pl_d3d11_swapchain_params.{alpha,color}_bits',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index 264a28a..aff30c0 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -241,7 +241,8 @@ float pl_dovi_dm_hermite_eval(const struct pl_dovi_dm_hermite *c, float x)
+ bool pl_dovi_dm_sop_valid(const struct pl_dovi_dm_sop *s)
+ {
+     return s && (!s->version || (s->version == 1 &&
+-        s->domain == PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ &&
++        (s->domain == PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ ||
++         s->domain == PL_DOVI_DM_SOP_ABSOLUTE_PQ) &&
+         isfinite(s->slope) && s->slope >= 0.5f && s->slope <= 1.5f &&
+         isfinite(s->offset) && s->offset >= -0.5f && s->offset <= 0.5f &&
+         isfinite(s->power) && s->power >= 0.5f && s->power <= 1.5f));
+@@ -255,6 +256,10 @@ float pl_dovi_dm_sop_eval(const struct pl_dovi_dm_sop *s,
+         return NAN;
+     if (!s->version || (s->slope == 1 && s->offset == 0 && s->power == 1))
+         return y; // exact identity preserves L1 bytes, even outside bounds
++    if (s->domain == PL_DOVI_DM_SOP_ABSOLUTE_PQ) {
++        float u = fminf(fmaxf(s->slope * y + s->offset, 0), 1);
++        return physical_clamp(powf(u, s->power), b);
++    }
+     float z = (y - b.min) / (b.max - b.min);
+     z = fminf(fmaxf(s->slope * z + s->offset, 0), 1);
+     return b.min + (b.max - b.min) * powf(z, s->power);
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+index f529094..c9e380b 100644
+--- a/src/include/libplacebo/dovi_dm.h
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -41,10 +41,11 @@ struct pl_dovi_dm_block {
+ };
+ 
+ // Actual factors, NOT stored XML/raw-RPU codes or deltas. Only the explicitly
+-// named OPEN normalized-PQ embodiment is supported. Version zero is absent.
++// named OPEN PQ embodiments are supported. Version zero is absent.
+ enum pl_dovi_dm_sop_domain {
+     PL_DOVI_DM_SOP_UNSPECIFIED,
+     PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ,
++    PL_DOVI_DM_SOP_ABSOLUTE_PQ, // Eq5 without optional Eq6/7 target normalization
+ };
+ struct pl_dovi_dm_sop {
+     uint32_t version; // 1
+@@ -124,6 +125,9 @@ PL_API bool pl_dovi_dm_hermite_prepare(struct pl_dovi_dm_pq_anchors source,
+     struct pl_dovi_dm_pq_bounds target, struct pl_dovi_dm_hermite *out);
+ PL_API float pl_dovi_dm_hermite_eval(const struct pl_dovi_dm_hermite *curve, float x);
+ PL_API bool pl_dovi_dm_sop_valid(const struct pl_dovi_dm_sop *sop);
++// Absolute-PQ: clamp(pow(clamp(S*y+O,0,1),P),target.min,target.max).
++// Both clamps are OPEN finite/output-volume policies, not normative claims.
++// Validate factors/domain/target before the exact identity bypass.
+ PL_API float pl_dovi_dm_sop_eval(const struct pl_dovi_dm_sop *sop,
+     struct pl_dovi_dm_pq_bounds target, float y);
+ 
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index a891173..4dc39de 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -2038,16 +2038,27 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+     }
+ 
+     if (sop_active) {
+-        // OPEN Eq5/6/7 target-normalized PQ embodiment. Apply only after L1's
+-        // existing compensation, so SOP does not affect that compensation.
++        // Apply the explicitly validated domain after L1 compensation once,
++        // before gamut. Domain changes shader source; values are uniforms.
+         float a = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->min_luma);
+-        float b = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->max_luma) - a;
+-        sh_describe(sh, "OPEN target-PQ SOP (chroma/detail unapplied)");
+-        GLSL("float open_z = (ipt.x - "$") / "$"; \n"
+-             "open_z = clamp("$" * open_z + "$", 0.0, 1.0); \n"
+-             "ipt.x = "$" + "$" * pow(open_z, "$"); \n",
+-             SH_FLOAT(a), SH_FLOAT(b), SH_FLOAT(sop->slope), SH_FLOAT(sop->offset),
+-             SH_FLOAT(a), SH_FLOAT(b), SH_FLOAT(sop->power));
++        if (sop->domain == PL_DOVI_DM_SOP_ABSOLUTE_PQ) {
++            float b = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->max_luma);
++            sh_describe(sh, "OPEN absolute-PQ SOP (chroma/detail unapplied)");
++            // Eq5 without Eq6/7. Clamps are explicit OPEN safety policies.
++            GLSL("float open_u = clamp("$" * ipt.x + "$", 0.0, 1.0); \n"
++                 "ipt.x = clamp(pow(open_u, "$"), "$", "$"); \n",
++                 SH_FLOAT(sop->slope), SH_FLOAT(sop->offset), SH_FLOAT(sop->power),
++                 SH_FLOAT(a), SH_FLOAT(b));
++        } else {
++            // Existing Eq5/6/7 arithmetic remains unchanged.
++            float b = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->max_luma) - a;
++            sh_describe(sh, "OPEN target-PQ SOP (chroma/detail unapplied)");
++            GLSL("float open_z = (ipt.x - "$") / "$"; \n"
++                 "open_z = clamp("$" * open_z + "$", 0.0, 1.0); \n"
++                 "ipt.x = "$" + "$" * pow(open_z, "$"); \n",
++                 SH_FLOAT(a), SH_FLOAT(b), SH_FLOAT(sop->slope), SH_FLOAT(sop->offset),
++                 SH_FLOAT(a), SH_FLOAT(b), SH_FLOAT(sop->power));
++        }
+     }
+ 
+     if (need_gamut_map) {
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index 33c8481..ca51388 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -85,6 +85,39 @@ static void sop_tests(void)
+     assert(!pl_dovi_dm_sop_valid(&s));
+ }
+ 
++static void absolute_sop_tests(void)
++{
++    struct pl_dovi_dm_sop s = {.version=1, .domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,
++        .slope=1.1f, .offset=-0.1f, .power=0.8f};
++    struct pl_dovi_dm_pq_bounds b = {0.2f, 0.7f};
++    for (int i=0; i<=100; i++) {
++        float y = i / 100.0f;
++        float u = fminf(fmaxf(s.slope * y + s.offset, 0), 1);
++        float expected = fminf(fmaxf(powf(u, s.power), b.min), b.max);
++        assert(pl_dovi_dm_sop_eval(&s,b,y) == expected);
++    }
++    float absolute = pl_dovi_dm_sop_eval(&s,b,0.45f);
++    s.domain = PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ;
++    assert(fabsf(absolute - pl_dovi_dm_sop_eval(&s,b,0.45f)) > 0.01f);
++    s.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
++    assert(pl_dovi_dm_sop_eval(&s,b,-1) == b.min);
++    assert(pl_dovi_dm_sop_eval(&s,b,2) == b.max);
++    b.min = 0;
++    assert(pl_dovi_dm_sop_eval(&s,b,0) == 0);
++    s.slope = s.power = 1; s.offset = 0;
++    assert(pl_dovi_dm_sop_eval(&s,b,0.456f) == 0.456f);
++    assert(pl_dovi_dm_sop_eval(&s,b,-1) == -1); // exact historical bypass
++    struct pl_dovi_dm_pq_bounds bad = {b.max,b.max};
++    assert(isnan(pl_dovi_dm_sop_eval(&s,bad,0.4f))); // validate before identity
++    assert(isnan(pl_dovi_dm_sop_eval(&s,b,NAN)));
++    s.domain = (enum pl_dovi_dm_sop_domain) 99;
++    assert(!pl_dovi_dm_sop_valid(&s) && isnan(pl_dovi_dm_sop_eval(&s,b,0.4f)));
++    s.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
++    s.slope = INFINITY; assert(!pl_dovi_dm_sop_valid(&s));
++    s.slope = 1; s.power = 0; assert(!pl_dovi_dm_sop_valid(&s));
++    s.power = 1; s.offset = 0.6f; assert(!pl_dovi_dm_sop_valid(&s));
++}
++
+ #ifdef PL_HAVE_VULKAN
+ static void readback(pl_gpu gpu, pl_tex tex, float out[16])
+ {
+@@ -139,18 +172,25 @@ static void shader_cache_tests(void)
+     assert(pl_render_image(rr,&src,&dst,&params));
+     readback(gpu,dst_tex,identity);
+     assert(memcmp(plain,identity,sizeof(plain)) == 0); // exact SOP bypass
++    src.dovi_dm.open_sop.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
++    assert(pl_render_image(rr,&src,&dst,&params));
++    readback(gpu,dst_tex,identity);
++    assert(memcmp(plain,identity,sizeof(plain)) == 0);
++    src.dovi_dm.open_sop.domain = PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ;
+     const struct pl_frame *frames[] = {&src};
+     uint64_t signatures[] = {123};
+     float timestamps[] = {0};
+     struct pl_frame_mix mix = {.num_frames=1,.frames=frames,.signatures=signatures,
+         .timestamps=timestamps,.vsync_duration=1.0f/24};
+     assert(pl_render_image_mix(rr,&mix,&dst,&params)); // populate one cache key
+-    for (int change = 0; change < 5; change++) {
++    float previous[16];
++    for (int change = 0; change < 6; change++) {
+         if (change == 0) src.dovi_dm.open_sop.offset = -0.05f; // L1 identity still SOP
+         if (change == 1) src.dovi_dm.avg_pq = 0.25f;
+         if (change == 2) { dst.dovi_target.volume.max_luma=600; dst.dovi_target.generation++; }
+         if (change == 3) { dst.dovi_target.volume.min_luma=0.1f; dst.dovi_target.description_id++; }
+-        if (change == 4) src.dovi_dm.version = 0; // missing next frame resets
++        if (change == 4) src.dovi_dm.open_sop.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
++        if (change == 5) src.dovi_dm.version = 0; // missing next frame resets
+         assert(pl_render_image_mix(rr,&mix,&dst,&params));
+         readback(gpu,dst_tex,altered);
+         pl_renderer other = pl_renderer_create(NULL,gpu);
+@@ -158,8 +198,28 @@ static void shader_cache_tests(void)
+         readback(gpu,dst_tex,fresh);
+         for (int i=0; i<16; i++) assert(fabsf(altered[i]-fresh[i]) < 1e-5f);
+         if (change == 0) assert(memcmp(plain,altered,sizeof(plain)) != 0);
++        if (change == 4) assert(memcmp(previous,altered,sizeof(previous)) != 0);
++        memcpy(previous,altered,sizeof(previous));
+         pl_renderer_destroy(&other);
+     }
++    // Scalar/shader equivalence on neutral algorithm-only vectors with a
++    // nonunit target span and nonzero target black. No official-reference use.
++    src.dovi_dm.version = 2;
++    src.dovi_dm.open_sop = (struct pl_dovi_dm_sop) {.version=1,
++        .domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,.slope=1.1f,.offset=-0.1f,.power=0.8f};
++    assert(pl_render_image(rr,&src,&dst,&params));
++    readback(gpu,dst_tex,altered);
++    struct pl_dovi_dm_pq_bounds bounds = {
++        pl_hdr_rescale(PL_HDR_NITS,PL_HDR_PQ,dst.dovi_target.volume.min_luma),
++        pl_hdr_rescale(PL_HDR_NITS,PL_HDR_PQ,dst.dovi_target.volume.max_luma)};
++    struct pl_dovi_dm_hermite curve;
++    assert(pl_dovi_dm_hermite_prepare((struct pl_dovi_dm_pq_anchors) {
++        src.dovi_dm.min_pq,src.dovi_dm.avg_pq,src.dovi_dm.max_pq},bounds,&curve));
++    for (int i=0; i<4; i++) {
++        float expected = pl_dovi_dm_sop_eval(&src.dovi_dm.open_sop,bounds,
++            pl_dovi_dm_hermite_eval(&curve,input[4*i]));
++        for (int c=0; c<3; c++) assert(fabsf(altered[4*i+c]-expected) < 5e-5f);
++    }
+     assert(pl_renderer_get_errors(rr).errors == PL_RENDER_ERR_NONE);
+     pl_renderer_destroy(&rr);
+     pl_tex_destroy(gpu,&src_tex); pl_tex_destroy(gpu,&dst_tex);
+@@ -171,6 +231,7 @@ int main(void)
+ {
+     hermite_tests();
+     sop_tests();
++    absolute_sop_tests();
+ #ifdef PL_HAVE_VULKAN
+     shader_cache_tests();
+ #endif
+-- 
+2.54.0 (Apple Git-157)
+

@@ -18,7 +18,7 @@
 #endif
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
                "IEEE754 binary32 required");
-_Static_assert(PL_MAJOR_VER == 7 && PL_API_VER == 362, "Private matched ABI362 required");
+_Static_assert(PL_MAJOR_VER == 7 && PL_API_VER == 364, "Private matched ABI364 required");
 #if !defined(PL_HAVE_VULKAN) || !defined(PL_HAVE_DOVI)
 #error "Private full Vulkan/DOVI build required"
 #endif
@@ -171,7 +171,7 @@ int main(int argc, char **argv)
         read_int(control, 1, 1, &primaries) &&
         read_volume(control, &src.color.hdr) && read_volume(control, &dst.color.hdr) &&
         read_l1(control, dm) &&
-        read_int(control, 0, 2, &variant) &&
+        read_int(control, 0, 3, &variant) &&
         read_float(control, 0.5f, 1.5f, &factors.slope) &&
         read_float(control, -0.5f, 0.5f, &factors.offset) &&
         read_float(control, 0.5f, 1.5f, &factors.power);
@@ -179,7 +179,7 @@ int main(int argc, char **argv)
         valid = false;
     if (control && fclose(control))
         valid = false;
-    if (variant != 2 && (factors.slope != 1 || factors.offset != 0 || factors.power != 1))
+    if (variant < 2 && (factors.slope != 1 || factors.offset != 0 || factors.power != 1))
         valid = false;
     if (!valid) {
         fprintf(stderr, "Invalid DVH3 control protocol\n");
@@ -190,7 +190,9 @@ int main(int argc, char **argv)
     dm->has_l1 = true;
     dm->source = src.color.hdr;
     dm->curve = variant == 0 ? PL_DOVI_DM_ST2094_10 : PL_DOVI_DM_OPEN_HERMITE_PQ;
-    if (variant == 2)
+    if (variant == 3)
+        factors.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
+    if (variant == 2 || variant == 3)
         dm->open_sop = factors;
     // Frame owns both complete values for this output's entire lifetime.
     dst.dovi_target = (struct pl_dovi_dm_target) {

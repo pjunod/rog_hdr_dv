@@ -21,13 +21,21 @@ from tools.dolby_harness.metric import compare_pixels
 
 SCHEMA = 'hdr.open-dm-result.v1'
 ALGORITHM = 'open-xml205-hermite-pq-sop-v1'
-VARIANTS = ('l1-rational', 'l1-hermite', 'l1-hermite-sop')
+ABSOLUTE_VARIANT = 'l1-hermite-sop-absolute-pq'
+ABSOLUTE_ALGORITHM = 'open-xml205-hermite-absolute-pq-sop-v1'
+VARIANTS = ('l1-rational', 'l1-hermite', 'l1-hermite-sop', ABSOLUTE_VARIANT)
+SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT)
 FROZEN_DECISIONS = {
     'spec_sha256': '3179434d7e0a88dfd50ec61f7df2a7db9b7fac04e062d2c2ad49a05160046183',
     'parameter_decision_sha256': '0d418f1915ba26faf713ce6eae23e16aa67eacd025ba5cc5122729700c6d99e1',
     'historical_decision_export_sha256': 'e3fa8aaa9d69eae6b483eb0b53a3ec9df4500f2fd4739441b5bcdd8649d4c6fc',
     'public_curve_contract_sha256': 'b4874602eb675d0f9be379c23ea7cd41c2c2aee8544c90eeea45be9c27ffce4c',
     'limit': 'Precomparison policy/derivation identities, not the current relocated export or a reference observation',
+}
+ABSOLUTE_DECISIONS = {
+    **FROZEN_DECISIONS,
+    'absolute_domain_spec_sha256': '41fa7c8d6c5ea830f64c9a9ec23aeb47fad9761c0988a04d51eb68a16d572484',
+    'embodiment': 'US12573352B2 Eq5 without optional Eq6/7; not consumer CM selection',
 }
 HYPOTHESES = [
     'Public US10600166B2 Table1/Eq7 with improved0080-0082, not identified consumer CM',
@@ -69,15 +77,17 @@ def algorithm(obj, meta, variant):
     if len(set(trims)) != 1:
         raise ValueError('conflicting frame/shot Trim')
     derived = factors(trims[0])
-    applied = derived['float'] if variant == 'l1-hermite-sop' else {'S': 1.0, 'O': 0.0, 'P': 1.0}
-    unapplied = [0, 1, 2, 6, 7, 8] if variant == 'l1-hermite-sop' else list(range(9))
+    absolute = variant == ABSOLUTE_VARIANT
+    applied = derived['float'] if variant in SOP_VARIANTS else {'S': 1.0, 'O': 0.0, 'P': 1.0}
+    unapplied = [0, 1, 2, 6, 7, 8] if variant in SOP_VARIANTS else list(range(9))
     l1 = meta['l1']
     branch = ('flat-source' if l1['min_pq'] == l1['max_pq'] else
               'collapsed-tail' if l1['min_pq'] == l1['avg_pq'] else
               'collapsed-head' if l1['avg_pq'] == l1['max_pq'] else 'regular')
-    return {'id': ALGORITHM, 'variant': variant,
-            'frozen_decisions': FROZEN_DECISIONS,
-            'domain': 'normalized-PQ; existing HPE-LMS/PQ/IPT I placement',
+    result = {'id': ABSOLUTE_ALGORITHM if absolute else ALGORITHM, 'variant': variant,
+            'frozen_decisions': ABSOLUTE_DECISIONS if absolute else FROZEN_DECISIONS,
+            'domain': ('absolute normalized-PQ; no target normalization; existing HPE-LMS/PQ/IPT I placement'
+                       if absolute else 'normalized-PQ; existing HPE-LMS/PQ/IPT I placement'),
             'l1_curve_domain': 'nits rational' if variant == 'l1-rational' else 'normalized-PQ analytic Hermite',
             'l1': l1, 'l1_presence': True, 'degenerate_branch': branch,
             'target': obj['target'], 'target_generation': 1, 'target_description_id': 27,
@@ -87,13 +97,19 @@ def algorithm(obj, meta, variant):
             'curve_defaults': {'preservation_tail': 0.5, 'preservation_head': 0.5,
                                'cutoff': 0.5, 'contrast': 1, 'tail_power': 2, 'head_power': 4},
             'applied_stages': ['explicit presence-aware L1', 'existing L1 chroma compensation once'] +
-                              (['OPEN target-normalized PQ SOP'] if variant == 'l1-hermite-sop' else []) +
+                              (['OPEN absolute-PQ SOP'] if absolute else
+                               ['OPEN target-normalized PQ SOP'] if variant == 'l1-hermite-sop' else []) +
                               ['existing final physical gamut mapping once'],
             'unapplied_trim_indexes': unapplied,
             'unapplied_trim_values': {str(i): trims[0].split(',')[i] for i in unapplied},
             'unapplied_stages': ['chroma', 'saturation', 'detail', 'L3', 'L8', 'midcontrast',
                                  'CM selection', 'temporal rules', 'target interpolation', 'raw-RPU SOP'],
             'hypotheses': HYPOTHESES, 'full_mapping_complete': False}
+    if absolute:
+        result['sop_domain'] = 'PL_DOVI_DM_SOP_ABSOLUTE_PQ'
+        result['sop_equation'] = 'u=clamp(S*y+O,0,1); output=clamp(pow(u,P),PQ(target.black),PQ(target.peak))'
+        result['sop_clamp_policy'] = 'OPEN finite/nonnegative input and physical output-volume clamps; not normative'
+    return result
 
 
 def control(obj, meta, variant):

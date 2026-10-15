@@ -1,4 +1,4 @@
-"""Source-bound OPEN ABI362 compiler/execution closure, separate from baseline."""
+"""Source-bound OPEN ABI364 compiler/execution closure, separate from baseline."""
 from pathlib import Path
 import platform
 import sys
@@ -13,7 +13,7 @@ SCHEMA = 'hdr.open-dm-compile.v1'
 COMPILE_INPUTS = ('tools/dolby_harness/open_dm_render.c',
                   'tools/dolby_harness/open_dm_build.py',
                   'tools/dolby_harness/open_dm_provenance.py',
-                  'wip/libplacebo-dm/open-xml205/SOURCE.json')
+                  'wip/libplacebo-dm/absolute-pq/SOURCE.json')
 FRONTEND_INPUTS = (*base.FRONTEND_INPUTS, 'tools/dolby_harness/open_dm.py',
                    'tools/dolby_harness/open_dm_provenance.py')
 sha = base.sha
@@ -30,10 +30,10 @@ def implementation():
 
 
 def validate_compile(receipt, live=False):
-    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 362 or
+    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 364 or
             receipt.get('architecture') != 'x86_64' or
             receipt.get('status') != 'compiled-not-executed'):
-        raise ValueError('OPEN ABI362 compile receipt required')
+        raise ValueError('OPEN ABI364 compile receipt required')
     for p in COMPILE_INPUTS:
         if receipt['sources'][p] != sha(ROOT / p):
             raise ValueError('OPEN compile input changed: ' + p)
@@ -41,7 +41,7 @@ def validate_compile(receipt, live=False):
         if not receipt[key]:
             raise ValueError('OPEN compile closure missing: ' + key)
     identity = receipt['library_identity']
-    pinned = parse_json(read_bounded(ROOT / 'wip/libplacebo-dm/open-xml205/SOURCE.json', 4 * 1024 * 1024))
+    pinned = parse_json(read_bounded(ROOT / 'wip/libplacebo-dm/absolute-pq/SOURCE.json', 4 * 1024 * 1024))
     if not am.strict_equal(identity, pinned['identity']) or not am.strict_equal(receipt['library_sources'], pinned['sources']):
         raise ValueError('OPEN library differs from committed candidate source pin')
     for key in ('head', 'tree'):

@@ -66,7 +66,11 @@ consumer and BT.2124 comparison contract; adversarial review and units are pendi
 [OPEN XML205 diagnostic](docs/OPEN_XML205_CANDIDATE.md) adds isolated analytic
 PQ-Hermite L1 and explicitly hypothetical target-PQ SOP, with separate ABI362,
 DVH3 and source-bound receipts. Its native warnings-as-errors source batch compiled;
-it is not reviewed or unit/accuracy-qualified and does not change the stock baseline.
+its later reviewed/qualified three-variant303 experiment failed accuracy and does
+not change the stock baseline. [Absolute-PQ SOP alternative](docs/OPEN_ABSOLUTE_PQ_SOP.md)
+adds one previously documented public embodiment in isolated ABI364/DVH3 variant3.
+Implementation is written; native compilation/development evidence and independent
+review remain pending. New units are deferred. It is not merged/packaged/released/installed.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) separates sparse
 P3D65/PQ HALF/XML2.0.5 transport from unresolved trim processing and acceptance.
 Its isolated follow-up binds ordinary nonzero-frame references explicitly while
