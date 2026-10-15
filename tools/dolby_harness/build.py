@@ -58,6 +58,7 @@ def main():
     source_paths = [*sorted((root / 'tools/dolby_harness').glob('*.py')),
                     consumer, root / 'tools/dolby_harness/dependencies.json',
                     root / 'tests/test_dolby_harness.py']
+    source_paths.append(root / 'tests/test_authored_master.py')
     runtime = inspect_elf(build / 'headless-render')
     icd = Path('/usr/share/vulkan/icd.d/lvp_icd.json')
     icd_data = json.loads(icd.read_text())

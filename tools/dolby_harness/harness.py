@@ -24,6 +24,12 @@ def sha(path):
 
 def control(obj, metadata):
     f, s, t = obj['frame'], obj['source'], obj['target']
+    if obj['schema'] == 3:
+        values = ['DVH2', f['width'], f['height'], 1]
+        for vol in (s['mastering'], t):
+            values += [vol['min_nits'], vol['max_nits'], *vol['primaries']]
+        values += [metadata['max_pq_y'], metadata['avg_pq_y']]
+        return ' '.join(str(x) for x in values) + '\n'
     values = ['DVH1', f['width'], f['height'],
               ('rgb', 'bt2020nc', 'dolbyvision').index(s['system']),
               ('full', 'limited').index(s['range']), s['bit_depth']]
@@ -74,6 +80,20 @@ def baseline_semantics(obj, metadata):
             'scope': 'direct normalized Dolby XML L1 translation into upstream slots; not proven photometric CIE-Y or RPU equivalence',
             'unsupported_levels': ['L1 minimum', 'L2', 'L3', 'L8'],
             'l9': 'source declaration verified; no dynamic L9 processing'}
+    if obj['schema'] == 3:
+        result['range'] = {'requested_storage': s['sample_format'],
+                           'effective_normalization': 'unity RGB full float; native bit fields zero',
+                           'samples': 'exact HALF expansion; no integer divisor'}
+        result['baseline_l1_slots'] = result.pop('cie_y_l1')
+        result['authored_master'] = {
+            'protocol': 'DVH2', 'source': 'P3D65/PQ/full',
+            'output_encoding': 'BT2020/PQ/full', 'physical_target': obj['target'],
+            'translation': metadata['translation'], 'raw_l1': metadata['l1'],
+            'selected_cm_name': None, 'algorithm_versions': metadata['algorithm_versions'],
+            'scope': 'direct normalized L1 max/average baseline slots only; not proven CIE-Y or RPU semantics',
+            'unsupported_levels': ['L1 minimum', 'L2', 'L3', 'L8'],
+            'l2_records': 'preserved verbatim/unapplied in bound metadata export',
+            'content_limit': 'original acquired frame0 nearly uniform near-black; no representative highlight/chroma/trim coverage'}
     return result
 
 
@@ -114,11 +134,15 @@ def render(manifest, native, output, compile_receipt=None):
                                   'input_manifest_sha256': sha_bytes(manifest_raw),
                                   'baseline_semantics': baseline_semantics(obj, metadata),
                                   'control_sha256': sha(stage / 'control.txt'),
+                                  'protocol': 'DVH2' if obj['schema'] == 3 else 'DVH1',
                                   'stdout_sha256': sha(stage / 'native.stdout'),
                                   'stderr_sha256': sha(stage / 'native.stderr'),
                                   'device': (stage / 'native.stdout').read_text().strip(),
                                   'peak_detection': False, 'dithering': False,
                                   'scaling': False, 'trims': 'not implemented'}}
+        if obj['schema'] == 3:
+            receipt['provenance']['input_manifest'] = {'file': str(Path(manifest).resolve()),
+                                                       'sha256': sha_bytes(manifest_raw)}
         (stage / 'candidate.json').write_text(json.dumps(receipt, indent=2, allow_nan=False) + '\n')
         (stage / 'source.f32').unlink()
         os.rename(stage, output)

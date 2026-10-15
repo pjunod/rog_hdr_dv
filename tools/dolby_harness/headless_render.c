@@ -197,11 +197,21 @@ int main(int argc, char **argv)
     struct pl_dovi_metadata dovi = {0};
     FILE *control = fopen(argv[1], "r");
     char magic[64];
-    bool valid = control && token(control, magic) && !strcmp(magic, "DVH1") &&
-        read_int(control, 1, 3840, &width) && read_int(control, 1, 2160, &height) &&
-        read_int(control, 0, 2, &system) && read_int(control, 0, 1, &range) &&
-        read_int(control, 8, 16, &depth) &&
-        (depth == 8 || depth == 10 || depth == 12 || depth == 16) &&
+    bool valid = control && token(control, magic);
+    bool authored = valid && !strcmp(magic, "DVH2");
+    valid = valid && (authored || !strcmp(magic, "DVH1")) &&
+        read_int(control, 1, authored ? 4096 : 3840, &width) &&
+        read_int(control, 1, 2160, &height);
+    if (valid && authored) {
+        int primaries_code;
+        valid = read_int(control, 1, 1, &primaries_code);
+        /* RGB/full, zero bit fields: direct IEEE754 float samples, not uint16. */
+    } else if (valid) {
+        valid = read_int(control, 0, 2, &system) && read_int(control, 0, 1, &range) &&
+            read_int(control, 8, 16, &depth) &&
+            (depth == 8 || depth == 10 || depth == 12 || depth == 16);
+    }
+    valid = valid &&
         read_volume(control, &src.color.hdr) && read_volume(control, &dst.color.hdr) &&
         read_float(control, 0, 1, &src.color.hdr.max_pq_y) &&
         read_float(control, 0, src.color.hdr.max_pq_y, &src.color.hdr.avg_pq_y);
@@ -229,10 +239,15 @@ int main(int argc, char **argv)
         .sys = PL_COLOR_SYSTEM_RGB, .levels = PL_COLOR_LEVELS_FULL,
         .alpha = PL_ALPHA_NONE,
     };
-    src.color.primaries = dst.color.primaries = PL_COLOR_PRIM_BT_2020;
+    src.color.primaries = authored ? PL_COLOR_PRIM_DISPLAY_P3 : PL_COLOR_PRIM_BT_2020;
+    dst.color.primaries = PL_COLOR_PRIM_BT_2020;
     src.color.transfer = dst.color.transfer = PL_COLOR_TRC_PQ;
     src.crop = dst.crop = (pl_rect2df) {0, 0, width, height};
     size_t count = (size_t) width * (size_t) height;
+    if (count > SIZE_MAX / (4 * sizeof(float))) {
+        fprintf(stderr, "Frame allocation overflow\n");
+        return 2;
+    }
     float *input = calloc(count * 4, sizeof(float));
     float *output = calloc(count * 4, sizeof(float));
     int result = 1;
