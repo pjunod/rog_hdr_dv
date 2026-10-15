@@ -41,7 +41,7 @@ def prepare(root):
     # Fully independent writable payload, no hardlinks to the compiler's /usr.
     shutil.copytree('/usr', root / 'usr', symlinks=True)
     shutil.copytree('/var/lib/dpkg', root / 'var/lib/dpkg', symlinks=True,
-                    ignore=shutil.ignore_patterns('lock', 'lock-frontend'))
+                    ignore=shutil.ignore_patterns('lock', 'lock-frontend', 'Lock'))
     for directory in ['dev', 'proc', 'run', 'root', 'scratch', 'kit',
                       'etc/apt/sources.list.d', 'var/lib/apt/lists/partial',
                       'var/cache/apt/archives/partial', 'var/log/apt']:
