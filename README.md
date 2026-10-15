@@ -11,7 +11,9 @@ experimental launcher](docs/QUALIFIED_HDR_FOUNDATIONS.md), prepared directly
 on `main` without merging held PR16 history. It combines nativehdr10 Night
 Light/monitor targets, asynchronous lifetime and offscreen fixes, the Ubuntu
 port/package recipes, a public headless reference harness, and a bounded
-launcher for the existing stock player. All selected native compiler stages passed with 302 unchanged bound inputs.
+launcher for the existing stock player. All selected native compiler stages passed;
+consumed compiler inputs remain unchanged. Of 302 original transferred files,
+299 are byte-identical and three transported-only shell helpers were corrected below.
 Independent whole-candidate review and focused re-review closed three helper defects;
 the one affected helper batch passed all 29 methods. [Qualification evidence](evidence/qualified-main-final.json)
 retains exact reviewed/tested identities and unchanged component passes, not new

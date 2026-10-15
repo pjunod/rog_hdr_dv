@@ -74,7 +74,15 @@
   "retained_component_evidence": {
     "compiler": "evidence/qualified-main-compiler.json",
     "applicability": "evidence/qualified-main-applicability.json",
-    "unchanged_native_compiler_inputs": 302,
+    "original_transferred_archive_entries": 302,
+    "unchanged_transferred_archive_entries": 299,
+    "changed_transported_only_helpers": [
+      "tools/check-each-commit.sh",
+      "tools/scan_publication.sh",
+      "tools/wine-runtime-test.sh"
+    ],
+    "actual_consumed_compiler_inputs_unchanged": true,
+    "binding_reassessment": "Original archive included support shell helpers, not only consumed compiler inputs. Direct replay applies manifest patches; direct compiler driver invokes meson/ninja, harness build.py and Python syntax compilation, not these three shell helpers. Their reviewed corrections and separate 29-method batch do not invalidate component compilation. Original compiler receipt remains historical at preparation source.",
     "component_compiler_or_unit_repeats": 0,
     "qualification_identity_policy": "Retained passes keep their original executing heads/trees; they are not new executions on the integration candidate."
   },

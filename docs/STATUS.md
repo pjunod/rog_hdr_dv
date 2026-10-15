@@ -24,8 +24,10 @@ See [scope/provenance/applicability](QUALIFIED_HDR_FOUNDATIONS.md).
 
 Done: canonical library10/upstream90/Ubuntu105 replay and all selected native
 compiler stages, including both full Mutter builds. The [compiler receipt](../evidence/qualified-main-compiler.json)
-binds 302 unchanged inputs, zero unit execution and recovered original Ubuntu
-success. Whole-candidate review of [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20)
+binds the original 302-file source transfer, zero unit execution and recovered
+original Ubuntu success. Final static binding finds 299 identical transferred
+files plus three corrected shell helpers not invoked by the direct replay/compiler
+drivers; actual consumed compiler inputs remain unchanged. Whole-candidate review of [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20)
 completed with changes required: unsafe commit-build prerequisites/ownership,
 fail-open publication scanning, and masked Wine initialization/test exits.
 All three findings closed in independent focused re-review at `2bf1912`;

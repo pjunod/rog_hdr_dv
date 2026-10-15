@@ -120,9 +120,13 @@ is justified solely by a new repository commit or reviewer.
 
 The [source-bound compiler receipt](../evidence/qualified-main-compiler.json)
 records passing native x86_64 library, headless C and both full Mutter builds,
-plus syntax compilation of 28 Python files. All 302 imported compiler inputs
-match the final candidate; canonical library10, upstream90 and Ubuntu105 replay
-matches the declared trees. The upstream build took 294.22 seconds and Ubuntu
+plus syntax compilation of 28 Python files. Its original 302 transferred files
+matched preparation head `57e1228f`. After helper corrections, 299 still match;
+the only differences are the three reviewed shell helpers, transported but not
+invoked by the direct replay/compiler drivers. All consumed patch/source,
+dependency/build and Python inputs remain unchanged, so compiler evidence is
+retained without rerunning it. Canonical library10, upstream90 and Ubuntu105
+replay matches the declared trees. The upstream build took 294.22 seconds and Ubuntu
 302.04 seconds including setup. Ubuntu's original success was recovered from
 the retained execution receipt; a later readback is not another build. A stale
 checkpoint prompted one continuation that stopped before compilation on an
