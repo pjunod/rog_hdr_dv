@@ -6,16 +6,20 @@ panel calibration and full Dolby Vision. macOS-like consistency and ease of
 use are the quality reference. Plurx is one consumer; this repository owns
 the operating-system display work independently.
 
-**Current status:** the patched kernel (`nativehdr1`), the hdr9 library and the
-`nativehdr8` compositor are installed (the compositor and library since
-2026-10-11), and Secure Boot is enabled. The owner reported working HDR10 on
-the earlier stack; on the new compositor the HDR session runs in BT.2100 mode
-and the owner accepted the picture. Full Dolby Vision, measured calibration
-and remaining transition/resume acceptance are unfinished. The next batch
-(`nativehdr9`) widens the colour targets to ordinary HDR and wide-gamut
-hardware; a second laptop (`lab6`, Intel graphics, SDR panel) is the test
-machine for that. The earlier mpv
-DV-to-PQ sample does not qualify full Dolby Vision.
+**Current source batch (2026-10-15):** [HDR foundations, tooling and an
+experimental launcher](docs/QUALIFIED_HDR_FOUNDATIONS.md), prepared directly
+on `main` without merging held PR16 history. It combines nativehdr10 Night
+Light/monitor targets, asynchronous lifetime and offscreen fixes, the Ubuntu
+port/package recipes, a public headless reference harness, and a bounded
+launcher for the existing stock player. All selected native compiler stages passed;
+consumed compiler inputs remain unchanged. Of 302 original transferred files,
+299 are byte-identical and three transported-only shell helpers were corrected below.
+Independent whole-candidate review and focused re-review closed three helper defects;
+the one affected helper batch passed all 29 methods. [Qualification evidence](evidence/qualified-main-final.json)
+retains exact reviewed/tested identities and unchanged component passes, not new
+component executions. [PR20](https://github.com/pjunod/rog_hdr_dv/pull/20) records final publication/merge disposition. Full Dolby
+mapping/trims, reference agreement, optical calibration and broader hardware
+acceptance remain unfinished. No new deployment is part of this batch.
 
 **Audio moved:** speaker quality, latency and Dolby Atmos now live in the
 independent [rog_audio repository](https://github.com/pjunod/rog_audio),
@@ -62,6 +66,22 @@ deferred output-characterization contract.
 [Display target sources](docs/DISPLAY_TARGET_SOURCES.md) extends those targets
 beyond the ROG panel: DisplayID or CTA-861 luminance on any HDR output, and
 the base EDID gamut in the native SDR mode, for general availability.
+[Night Light and overrides](docs/NIGHT_LIGHT_AND_OVERRIDES.md) defines nativehdr10;
+[validation receipts](docs/NATIVEHDR10_VALIDATION.md) describes its scoped runner.
+[Asynchronous lifetime](docs/COLOUR_ASYNC_LIFETIME.md) and
+[offscreen reuse](docs/OFFSCREEN_REUSE.md) document the reviewed follow-ups.
+[Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) and
+[GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) distinguish source
+pins from the actual historical package construction identities.
+[The headless harness](docs/DOLBY_HARNESS.md) documents public contracts and the
+private reference boundary. [The open display-management contract](docs/OPEN_DV_DISPLAY_MANAGEMENT.md)
+describes the unfinished full-fidelity target, not a claim for the launcher.
+[Launcher source/usage](tools/native_player/README.md) and
+[qualification](tools/native_player/QUALIFICATION.md) describe the experimental milestone.
+[Continuation](docs/HANDOFF.md) and the [programme ledger](docs/FULL_HDR_HANDOFF.md)
+keep the done/current/remaining boundaries visible.
+[Integration provenance and applicability](docs/QUALIFIED_HDR_FOUNDATIONS.md)
+defines the independently reviewable main-targeting batch.
 
 ## Work with the repository
 

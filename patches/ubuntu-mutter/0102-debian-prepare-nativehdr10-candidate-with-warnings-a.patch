@@ -1,0 +1,46 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Engineering Agent <hdr-agent@invalid>
+Date: Tue, 13 Oct 2026 01:51:41 -0400
+Subject: [PATCH] debian: prepare nativehdr10 candidate with warnings as errors
+
+---
+ debian/changelog | 14 ++++++++++++++
+ debian/rules     |  3 ++-
+ 2 files changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/debian/changelog b/debian/changelog
+index cf1520e..9938c27 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,17 @@
++mutter (51.0-1ubuntu3+nativehdr10) UNRELEASED; urgency=medium
++
++  * Apply Night Light in linear light on BT.2100 outputs while retaining SDR
++    LUT/CTM behaviour, exact default identity and capture exclusion.
++  * Carry per-monitor target luminance/gamut declarations through configuration,
++    persistence, DisplayConfig and gdctl with truthful effective provenance.
++  * Integrate the separately reviewed async colour teardown fixes and compatible
++    offscreen buffer reuse, preserving imported authorship and test coverage.
++  * Build the candidate with warnings as errors. Tests remain a separate reviewed
++    affected qualification batch; this source entry is not runtime acceptance.
++  * No display install, optical accuracy, full Dolby Vision or certification claim.
++
++ -- HDR Engineering Agent <hdr-agent@invalid>  Tue, 13 Oct 2026 05:50:51 +0000
++
+ mutter (51.0-1ubuntu3+nativehdr9) UNRELEASED; urgency=medium
+ 
+   * Select display targets on every output that declares one, not only on
+diff --git a/debian/rules b/debian/rules
+index e1b2f1e..0454ed4 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -20,7 +20,8 @@ export MUTTER_SONAME
+ 	dh $@
+ 
+ CONFFLAGS = \
+-	-Dremote_desktop=true
++	-Dremote_desktop=true \
++	-Dwerror=true
+ 
+ # Update the cogl_trace architectures in the symbols file to match this list:
+ ifeq (,$(filter amd64 arm64 armhf loong64 ppc64el riscv64 s390x,$(DEB_HOST_ARCH)))

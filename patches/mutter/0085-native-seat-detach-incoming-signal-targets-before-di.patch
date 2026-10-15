@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Engineering <hdr-engineering@users.noreply.github.com>
+Date: Mon, 12 Oct 2026 22:04:37 +0000
+Subject: [PATCH] native-seat: detach incoming signal targets before disposal
+
+---
+ src/backends/native/meta-seat-native.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/backends/native/meta-seat-native.c b/src/backends/native/meta-seat-native.c
+index 6c2441f..71db8d1 100644
+--- a/src/backends/native/meta-seat-native.c
++++ b/src/backends/native/meta-seat-native.c
+@@ -317,6 +317,18 @@ meta_seat_native_dispose (GObject *object)
+ {
+   MetaSeatNative *seat = META_SEAT_NATIVE (object);
+ 
++  /* Queued impl/keymap notifications can outlive the seat. Detach their
++   * targets before releasing any seat state. impl also guards repeat dispose
++   * from revisiting the borrowed backend after the first cleanup. */
++  if (seat->impl)
++    {
++      if (seat->keymap)
++        g_signal_handlers_disconnect_by_data (seat->keymap, seat);
++      g_signal_handlers_disconnect_by_data (seat->impl, seat);
++      if (seat->backend)
++        g_signal_handlers_disconnect_by_data (seat->backend, seat);
++    }
++
+   g_clear_pointer (&seat->keymap_description,
+                    meta_keymap_description_unref);
+   g_clear_pointer (&seat->xkb_keymap, xkb_keymap_unref);

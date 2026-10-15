@@ -1,0 +1,2652 @@
+{
+  "schema": 1,
+  "task": "t_71bdbe27",
+  "status": "Real amd64 package construction and exact104 canonical replay passed; i386, dependency simulation, complete kit, review and qualification pending",
+  "units_executed": 0,
+  "installed": false,
+  "candidate_tree": "2e8ee2e27d9f4965bd4035b1a95bc8caf5ee0b16",
+  "candidate_commit_mac": "2180a60d0ff2cf30ac9c847b54e36569d7c69134",
+  "package_build": {
+    "schema": 1,
+    "source_tree": "2e8ee2e27d9f4965bd4035b1a95bc8caf5ee0b16",
+    "source_tar_sha256": "5cbff3ee76da5228d6f1d77821f6929ed0a6748d79fbe12ad1ab156525d6ff97",
+    "architecture": "x86_64",
+    "units_executed": 0,
+    "installed": false,
+    "command": [
+      "dpkg-buildpackage",
+      "-b",
+      "-us",
+      "-uc",
+      "-d"
+    ],
+    "seconds": 520.7090164350811,
+    "exit_code": 0,
+    "build_log_sha256": "efc41586d468202df3bb7c07e2fce462da87f59063a56804d975a96dff5db59e",
+    "dependency_exception": {
+      "package": "libdisplay-info-dev",
+      "minimum": "0.3.0-1ubuntu1~hdr8~",
+      "staged_version": "0.3.0-1ubuntu1~hdr9",
+      "installed_status_changed": false
+    },
+    "shlibs_local": "libdisplay-info 3 libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr9)\n",
+    "library_inputs": [
+      {
+        "file": "libdisplay-info-dev_0.3.0-1ubuntu1~hdr9_amd64.deb",
+        "sha256": "957d13c1315c00d172a5ed98d4b6f4fa40ce3f1918fc4a2b74bd65ab363f224b"
+      },
+      {
+        "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb",
+        "sha256": "080a4add280ebb94ed7d0da5a0b46fe259fd84b7f35a44d27a128dea24664949"
+      }
+    ],
+    "packages": [
+      {
+        "file": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 168410,
+        "sha256": "8cb85f875ea60b925756837b6d0b3f45a02040903559055e680f16265265d406",
+        "control": "Package: gir1.2-mutter-51\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 568\nDepends: libmutter-51-0 (= 51.0-1ubuntu3+nativehdr10), gir1.2-atk-1.0, gir1.2-gdesktopenums-3.0 (>= 51~rc), gir1.2-gio-2.0, gir1.2-gl-1.0, gir1.2-gobject-2.0, gir1.2-graphene-1.0, gir1.2-pango-1.0, gir1.2-xfixes-4.0, gir1.2-xlib-2.0\nBreaks: gnome-shell (<< 51.0~)\nSection: introspection\nPriority: optional\nMulti-Arch: same\nHomepage: https://mutter.gnome.org/\nDescription: GObject introspection data for Mutter\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the GObject introspection data which may be\n used to generate dynamic bindings.\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "libmutter-51-0_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 1589916,
+        "sha256": "0018ff3eb50180d7f0978c42a88c59d928e0a48f2fa7763123daddd4c0b976dc",
+        "control": "Package: libmutter-51-0\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 4738\nDepends: adwaita-icon-theme, gsettings-desktop-schemas (>= 51~alpha), libdisplay-info3-native-hdr-api (>= 2), mutter-common (>= 50~beta), mutter-common-bin (>= 49.0), libatk1.0-0t64 (>= 2.2.0), libc6 (>= 2.43), libcairo2 (>= 1.6.0), libcanberra0 (>= 0.2), libcolord2 (>= 1.4.5), libdisplay-info3 (>= 0.3.0-1ubuntu1~hdr9), libdrm2 (>= 2.4.119), libegl1, libeis1 (>= 1.5.0), libfribidi0 (>= 0.19.2), libgbm1 (>= 21.3.0~rc1), libgl1, libgles2, libglib2.0-0t64 (>= 2.83.0), libgnome-desktop-4-2t64 (>= 3.17.92), libgraphene-1.0-0 (>= 1.10.0), libgudev-1.0-0 (>= 238), libharfbuzz0b (>= 0.6.0), libinput10 (>= 1.31.0), libjson-glib-1.0-0 (>= 1.5.2), liblcms2-2 (>= 2.6), libpango-1.0-0 (>= 1.45.5), libpangocairo-1.0-0 (>= 1.18.0), libpipewire-0.3-0t64 (>= 1.6.1), libpixman-1-0 (>= 0.18.0), libsoup-3.0-0 (>= 3.0.3), libstartup-notification0 (>= 0.11), libsystemd0 (>= 226), libudev1 (>= 238), libwacom9 (>= 2.0.0), libwayland-server0 (>= 1.26), libx11-6 (>= 2:1.7.0), libx11-xcb1, libxau6 (>= 1:1.0.11), libxcb-res0 (>= 1.10), libxcb1, libxcomposite1 (>= 1:0.4.6), libxcursor1 (>> 1.1.2), libxext6, libxfixes3 (>= 1:6.0.0), libxi6 (>= 2:1.2.99.4), libxinerama1 (>= 2:1.1.4), libxkbcommon0 (>= 1.0.0), libxkbregistry0 (>= 1.0.0), libxrandr2 (>= 2:1.2.99.3)\nBreaks: gnome-kiosk (<< 51.0~), gnome-shell (<< 51.0~), xwayland (<< 2:23.1.0)\nSection: libs\nPriority: optional\nMulti-Arch: same\nHomepage: https://mutter.gnome.org/\nDescription: window manager library from the Mutter window manager\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the window manager shared library, used by mutter\n itself, and gnome-shell.\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "libmutter-51-dev_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 463294,
+        "sha256": "3bb7b6b6ccdcdf3459f53badc51d7ff176d47e7fe03f8fc761a42e320fb3253e",
+        "control": "Package: libmutter-51-dev\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 5851\nDepends: gir1.2-mutter-51 (= 51.0-1ubuntu3+nativehdr10), gnome-settings-daemon-dev, gobject-introspection, gsettings-desktop-schemas-dev (>= 51~alpha), libatk1.0-dev, libcairo2-dev, libcanberra-dev, libcolord-dev, libdisplay-info-dev (>= 0.3.0-1ubuntu1~hdr8~), libdrm-dev (>= 2.4.118), libeis-dev (>= 1.3.901), libegl1-mesa-dev, libgbm-dev (>= 21.3), libgles-dev, libglib2.0-dev (>= 2.76), libgnome-desktop-4-dev, libgraphene-1.0-dev, libinput-dev (>= 1.31.0), libjson-glib-dev, liblcms2-dev, libmutter-51-0 (= 51.0-1ubuntu3+nativehdr10), libpango1.0-dev, libsoup-3.0-dev, libpipewire-0.3-dev (>= 1.6.0), libsysprof-capture-4-dev (>= 3.40.1), libstartup-notification0-dev, libsystemd-dev, libwayland-dev (>= 1.26), libx11-dev, libx11-xcb-dev, libxcb-res0-dev, libxcomposite-dev, libxcursor-dev, libxdamage-dev, libxext-dev, libxfixes-dev, libxi-dev, libxinerama-dev, libxkbcommon-dev, libxrandr-dev, libc6 (>= 2.34)\nSection: libdevel\nPriority: optional\nMulti-Arch: same\nHomepage: https://mutter.gnome.org/\nDescription: Development files for the Mutter window manager\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the development files.\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "libmutter-test-51_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 80500,
+        "sha256": "8112f692b9d30ee19e786ddd53577ec3702ab9d1340113195b5df474278d97fb",
+        "control": "Package: libmutter-test-51\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 210\nDepends: libmutter-51-0 (= 51.0-1ubuntu3+nativehdr10), mutter (= 51.0-1ubuntu3+nativehdr10), gir1.2-gdesktopenums-3.0 (>= 51~rc), gir1.2-gobject-2.0, gir1.2-mutter-51 (= 51.0-1ubuntu3+nativehdr10), gir1.2-xfixes-4.0, gir1.2-xlib-2.0, libc6 (>= 2.38), libcairo2 (>= 1.14.0), libevdev2 (>= 0.9.1), libglib2.0-0t64 (>= 2.80.0), libgudev-1.0-0 (>= 238), libumockdev0 (>= 0.8), libwayland-client0 (>= 1.26), libxcb1, libxext6\nProvides: gir1.2-metatest-51\nSection: libs\nPriority: optional\nHomepage: https://mutter.gnome.org/\nDescription: Test helper library for GNOME's window manager library\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n This package contains a private library used by the automated tests for\n mutter and gnome-shell. It should not be used by non-GNOME packages.\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "mutter-51-tests_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 3091472,
+        "sha256": "da93362e0e5d75b64feafba11c5557113e10c5ceb3799d0d7f85e84a547d27cb",
+        "control": "Package: mutter-51-tests\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 23322\nDepends: at-spi2-core, gir1.2-glib-2.0, dbus-daemon, dmz-cursor-theme, libglib2.0-bin, libmutter-51-0 (= 51.0-1ubuntu3+nativehdr10), libmutter-test-51 (= 51.0-1ubuntu3+nativehdr10), mutter (= 51.0-1ubuntu3+nativehdr10), pipewire (>= 1.6.0), python3, python3-gi, python3-dbus, python3-dbusmock, umockdev, wireplumber, xauth, xwayland (>= 2:23.1.0), zenity, libc6 (>= 2.38), libcairo2 (>= 1.12.0), libcolord2 (>= 1.4.5), libei1 (>= 1.3.901), libevdev2 (>= 0.9.1), libgbm1 (>= 21.3.0~rc1), libglib2.0-0t64 (>= 2.80.0), libgraphene-1.0-0 (>= 1.5.4), libgtk-3-0t64 (>= 3.23.0), libpipewire-0.3-0t64 (>= 1.6.1), libwayland-client0 (>= 1.26), libwayland-cursor0 (>= 1.26), libwayland-server0 (>= 1.26), libx11-6, libxext6, libxkbcommon0 (>= 0.5.0), libxrandr2 (>= 2:1.2.99.3)\nSection: x11\nPriority: optional\nHomepage: https://mutter.gnome.org/\nDescription: Tests for GNOME's window manager library\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains test programs, designed to be run as part of a\n regression testsuite.\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "mutter-common-bin_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 61984,
+        "sha256": "c0b977fe3685dfc32b01778c82b18f93313a61051fd2400fe2ec834605d26197",
+        "control": "Package: mutter-common-bin\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 172\nDepends: gir1.2-glib-2.0, python3-gi, python3:any, libc6 (>= 2.38), libglib2.0-0t64 (>= 2.80.0), libgtk-4-1 (>= 4.22.0), libx11-6, libxfixes3 (>= 1:6.0.0), libxi6 (>= 2:1.2.99.4)\nSuggests: python3-argcomplete\nBreaks: libmutter-17-0 (<< 50~), mutter (<< 48.1~)\nReplaces: mutter (<< 48.1~)\nSection: misc\nPriority: optional\nMulti-Arch: foreign\nHomepage: https://mutter.gnome.org/\nDescription: shared programs for the Mutter window manager\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the program files which are used for the libraries\n and others.\nCommands: gdctl\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "mutter-common_51.0-1ubuntu3+nativehdr10_all.deb",
+        "bytes": 564810,
+        "sha256": "3b59bad6f285e8b1f34d08537ce5c7407fa4aaa14a4e499d5180b3569703aa45",
+        "control": "Package: mutter-common\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: all\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 3919\nDepends: python3:any, dconf-gsettings-backend | gsettings-backend\nBreaks: libmutter-10-0 (<< 49~), libmutter-11-0 (<< 49~), libmutter-12-0 (<< 49~), libmutter-13-0 (<< 49~), libmutter-14-0 (<< 49~), libmutter-15-0 (<< 49~), libmutter-16-0 (<< 49~), libmutter-17-0 (<< 50~), magpie-common (<< 0.9.3-0ubuntu8~)\nReplaces: magpie-common (<< 0.9.3-0ubuntu8~)\nSection: misc\nPriority: optional\nMulti-Arch: foreign\nHomepage: https://mutter.gnome.org/\nDescription: shared files for the Mutter window manager\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the shared files.\nCommands: gnome-service-client\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "mutter-dev-bin_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 111334,
+        "sha256": "eebb8568648191e969f32d56772e6f8b0d4c0584128e0fd32489639ca0195510",
+        "control": "Package: mutter-dev-bin\nSource: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 321\nDepends: libadwaita-1-0 (>= 1.5~beta), libc6 (>= 2.38), libcairo2 (>= 1.10.0), libei1 (>= 1.3.901), libglib2.0-0t64 (>= 2.80.0), libgtk-4-1 (>= 4.22.0), libpipewire-0.3-0t64 (>= 1.6.1), libxkbcommon0 (>= 0.5.0)\nSection: devel\nPriority: optional\nMulti-Arch: foreign\nHomepage: https://mutter.gnome.org/\nDescription: Development programs for the Mutter window manager\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the Mutter Development Kit.\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      },
+      {
+        "file": "mutter_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "bytes": 164390,
+        "sha256": "4ab989ffddd0cf33a900400f7d023af60829fde80e37ba542f179706bb1f0a8a",
+        "control": "Package: mutter\nVersion: 51.0-1ubuntu3+nativehdr10\nArchitecture: amd64\nMaintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>\nInstalled-Size: 226\nDepends: adwaita-icon-theme, gnome-settings-daemon-common, gsettings-desktop-schemas (>= 51~rc), mutter-common (>= 49.0), libc6 (>= 2.34), libglib2.0-0t64 (>= 2.76.0), libmutter-51-0 (>= 49.0)\nSuggests: gnome-control-center, xdg-user-dirs\nBreaks: mutter-common (<< 48~beta)\nReplaces: mutter-common (<< 48~beta)\nProvides: x-window-manager\nSection: x11\nPriority: optional\nHomepage: https://mutter.gnome.org/\nDescription: Example window manager using GNOME's window manager library\n Mutter is a Wayland display server and X11 window manager and\n compositor library. It contains functionality related to, among other\n things, window management, window compositing, focus tracking, workspace\n management, keybindings and monitor configuration.\n .\n Internally it uses a fork of Cogl, a hardware acceleration abstraction\n library used to simplify usage of OpenGL pipelines, as well as a fork\n of Clutter, a scene graph and user interface toolkit.\n .\n This package contains the mutter executable. It can be used as a\n standalone window manager, but is primarily intended for debugging.\nCommands: mutter\nOriginal-Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>"
+      }
+    ]
+  },
+  "static_elf_audit": {
+    "schema": 1,
+    "source_tree": "2e8ee2e27d9f4965bd4035b1a95bc8caf5ee0b16",
+    "package_receipt_sha256": "70597f41a9d555f38b00a02c9d4b4ff9506914c012de8a74e56d723aebd107ff",
+    "packages": [
+      {
+        "package": "gir1.2-mutter-51_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "8cb85f875ea60b925756837b6d0b3f45a02040903559055e680f16265265d406",
+        "bytes": 168410,
+        "elfs": []
+      },
+      {
+        "package": "libmutter-51-0_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "0018ff3eb50180d7f0978c42a88c59d928e0a48f2fa7763123daddd4c0b976dc",
+        "bytes": 1589916,
+        "elfs": [
+          {
+            "file": "usr/lib/x86_64-linux-gnu/libmutter-51.so.0.0.0",
+            "sha256": "80e6b232f8c67b98df7548ade3404252711c3b1e3f98ce3f12634d96b006aa32",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-cogl-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgraphene-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libEGL.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgmodule-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpixman-1.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxkbcommon.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [liblcms2.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcairo.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXfixes.so.3]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXi.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcolord.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libjson-glib-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libsoup-3.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxkbregistry.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libeis.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libdisplay-info.so.3]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libdrm.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgnome-desktop-4.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcanberra.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgudev-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libudev.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libstartup-notification-1.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwacom.so.9]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpipewire-0.3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXrandr.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXinerama.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXext.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXcomposite.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXcursor.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11-xcb.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxcb.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxcb-res.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXau.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libsystemd.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libinput.so.10]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/lib/x86_64-linux-gnu/mutter-51/libmutter-clutter-51.so.0.0.0",
+            "sha256": "ffc9071d3d069866f891e865b8e9f7168a5a1e10183bd92218b86d523de61e4c",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-cogl-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libatk-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [liblcms2.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcairo.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libfribidi.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpangocairo-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpango-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libharfbuzz.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgraphene-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libGLESv2.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/lib/x86_64-linux-gnu/mutter-51/libmutter-cogl-51.so.0.0.0",
+            "sha256": "91125f5ec9e24e5f81c6bcd3d2da9848f8e9833295255c12665f5a264c315f86",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgraphene-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libEGL.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libGL.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgmodule-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/lib/x86_64-linux-gnu/mutter-51/libmutter-mtk-51.so.0.0.0",
+            "sha256": "256f0234e96171f38b53cf70d7b1c16ede62de496480044b6737bf3de1dceb34",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgraphene-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpixman-1.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      },
+      {
+        "package": "libmutter-51-dev_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "3bb7b6b6ccdcdf3459f53badc51d7ff176d47e7fe03f8fc761a42e320fb3253e",
+        "bytes": 463294,
+        "elfs": [
+          {
+            "file": "usr/lib/x86_64-linux-gnu/mutter-51/libasan-preloader.so",
+            "sha256": "8e712ec6640fed606ba6883036d7d7b5cb92a218e5f655722e5019f2f3fe8139",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      },
+      {
+        "package": "libmutter-test-51_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "8112f692b9d30ee19e786ddd53577ec3702ab9d1340113195b5df474278d97fb",
+        "bytes": 80500,
+        "elfs": [
+          {
+            "file": "usr/lib/x86_64-linux-gnu/libmutter-test-51.so",
+            "sha256": "41d0bc3635ec9e8bb0ffcde552863f15bf2004dd4b2292ac29cfed51e7eedf13",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-cogl-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcairo.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgudev-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXext.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxcb.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libumockdev.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libevdev.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      },
+      {
+        "package": "mutter-51-tests_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "da93362e0e5d75b64feafba11c5557113e10c5ceb3799d0d7f85e84a547d27cb",
+        "bytes": 3091472,
+        "elfs": [
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/monitor-backlight-client",
+            "sha256": "33e62650c0d31ec292fcd9b6a3e094877e8441df453eeb20c37c63425c5cd2e9",
+            "runtime_paths": [],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-bezier",
+            "sha256": "ac9e1e09104f20c0a1b53990d3ca71e8068370d0bb989253180a1c4744d4f5ec",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-color-lifecycle",
+            "sha256": "bcc0d5849edd460cb159cc326f852e50a2f8292c385b3d40ae4ebe5d0fad9a57",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcolord.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-color-management",
+            "sha256": "cf7dd2555a9b1e04eeba9158fc6b4956a1cad19a5de7d5cdcbf750c9c5f93316",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcolord.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-color-management-profile-conflict",
+            "sha256": "ef00fb87d6fcd0c41b675abc7acc5c055a1e2ebe29ef01bd3e3d84551590c96b",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-cursor-overlay-tests",
+            "sha256": "e347451085c50e04c3d2ef09f942015f99668085c71d88fb20dca3c535afae2e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-cursor-tests",
+            "sha256": "24b33f1d289344cd07fcc093a49ab96be4d559a24dff6731795ea192d5be2d1e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-cogl-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-cursor-tests-screen-cast-client",
+            "sha256": "19bb713dcfcacfa0f479b2454da877fe87143446213c5c1eeab66fd1d4232568",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libei.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpipewire-0.3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcairo.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-debug-control",
+            "sha256": "3c7d15ae589c957b7ae6034639dc6bf8230f35a60b86d59ed5bf36ea4fd38883",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-dnd-tests",
+            "sha256": "42b64a16233d7c96540e91d276eca60b0b965c7f5cd25042211e5611cbed1671",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-edid",
+            "sha256": "86c00916d1a2aeb566d046b790dfef99ea130664c22ebbe9a122dcdb2a757752",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-external-constraint",
+            "sha256": "8f25388c5cc6815bf4b52fe7ea37862b7f5cd2f36485ee44ac14155869603681",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-input-capture",
+            "sha256": "e1408c3e416e8cff37cc957e73441780657511b75d661a80de1723ad3dd19d00",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-input-capture-test-client",
+            "sha256": "1aad61ecdf5d913e06bed3368195030fa0fa3baf047cf4e231102b8723d0412e",
+            "runtime_paths": [],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libei.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-keybindings",
+            "sha256": "e04f9b1ee6c4ae2f2d70c4bebbcd1717c7e08d42b1a8dc4169c0931af6b6c4d2",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-keyboard-map-tests",
+            "sha256": "d430be3aa04985bb23ed0696d57dfb4470d8dd10dafffe5a0f059d26e08be417",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxkbcommon.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-kms-utils",
+            "sha256": "dc417757e2ae1083741139e009b88f25588b830afe7248acec85cf23f08d8098",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-abstraction-tests",
+            "sha256": "00e05b52a0b430d2494c9279aa9d7eb9f4d1208e9e6e49060cf431b33e7dcd33",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-backlight",
+            "sha256": "116ff98f8c059297c37b4632bdc50515376a2b3b649574c17428f6e0eaa5d06c",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-color-tests",
+            "sha256": "9ecf4e525bdf4687c2c43bd95479bf7be7728df77ff6570f2c971239eafda71f",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-config-migration-tests",
+            "sha256": "d516ed5ab5fecd9b44a2081bef8c38bbaf1451c7b67be88eef9298912ce1108d",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-config-policy-tests",
+            "sha256": "d6e4821fc208cf2874a0d9409bde0c8bb924ba8d701778a79a78ea64f05e3e0e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-config-tests",
+            "sha256": "ac103c9d440ab6adfecc08ecf886a8bf4e1760d1b66c4bc4c0b91d2de539fde3",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-custom-config-tests",
+            "sha256": "0916eff82b05e6c9e881b1ba73726b2df9cf5c2bd2d6a2088165a224b21b9728",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-dbus-tests",
+            "sha256": "4277eee9b662bff0977d534517f5a04bf508ce3e6b4dbd426b2b0597238fcc39",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-gdctl",
+            "sha256": "55193ac9ef9cae8d8e4d64f9c96948b09f7736b46d565d8065453b8844f7c754",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-orientation-phone-tests",
+            "sha256": "ebf9045dd5a21d5a2cfb678c91eadc14b64d6ec2ca197077ac21a31a52da6705",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-orientation-tests",
+            "sha256": "ed77c213950c902290b00663656aab9aabb8b61d7cb035edf18b9b714e90d3f2",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-scale-tests",
+            "sha256": "92029480b6fa22abe5987750d4096300502a99d8ca5c245dd89019a3105ab198",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-storage-tests",
+            "sha256": "99bf6c980c16d539f0f274ecc47896f8bb31851f8d50024570e2fce6f498c6e1",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-monitor-utils",
+            "sha256": "ff24b07e2198ec37f76f2f6ac0511917aa9d4111f41a286c78a89ccadb1db8a4",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-mtk-anonymous-file",
+            "sha256": "10ca3e3f09be1c51a7a7548120f44be571f2d8b4733936b0a85c32e34f552167",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-mtk-dispose-bin",
+            "sha256": "26ac14439c3c51cfee72d9b6ecd767882eb4fb03a754e12e82e5d8df2f7d4400",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-mtk-rectangle",
+            "sha256": "bd860e99c0d9ca464bab90326212f4c4845f27bfcc9ed8eb29b7df1b9d6a814e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-mtk-region",
+            "sha256": "72ca6eb4532d9aca8ca4f4eed90318efae8a25e15ef68b48401704925038ea94",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-mtk-time-utils",
+            "sha256": "f6363ef5e78794938a18df6caba4c1a2c83e4b76198dfa30d11af5a51f84481b",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-native-hdr",
+            "sha256": "e9411bf3c1c34320fe7f5727471e057907c11871f8c615b8442f9cb70b77650f",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-native-screen-cast",
+            "sha256": "04ce0803b8c5dfd7eaed229ea94df7528f12a0321c2611bf4bde673da341852b",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-native-virtual-monitor",
+            "sha256": "ffd05cea6864c9006a0279d85d46a2993d98e824acf2c797cc3ba6e40486b3a9",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-persistent-virtual-monitor",
+            "sha256": "0122b5b0febe26224c5f656dcd143f25ecb589b96cf9fdcea515b8a3ffe75490",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-pointer-constraints",
+            "sha256": "9324c96086e558d5613682f9033fb037d672a57cdccfc04f30d17057f9bc0e18",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-ref-test-sanity",
+            "sha256": "753fc2aa1676c36eac46cf387d442adf95bbadfdbbb2a854fbfb7831b750c2a0",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-remote-desktop-tests",
+            "sha256": "f10893373c077c072fb11220108b57e57457523b9356470278e8071e07e3b9b3",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-remote-desktop-tests-client",
+            "sha256": "639951c32ff528bf411f6511a0c89888e583e0531100ecafc36f04df1917aafd",
+            "runtime_paths": [],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libei.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpipewire-0.3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-screen-cast-client",
+            "sha256": "635fc179d215d53ab374485e3b4321c79dfdb60f0efc069b387e773e4f2861f8",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libei.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpipewire-0.3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-screen-cast-client-driver",
+            "sha256": "2e3bd0d84bc5993cddba1d1cce5f5eb40df77ca27305956fde132a88047471f8",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpipewire-0.3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-service-channel",
+            "sha256": "a4ea283b7520ca27d796dd448b4c83aea70e8b00819bd032fed7de9fc549f6e4",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-stage",
+            "sha256": "fe34d54ccf44dbe8078fdc9967300559fe9d23b504248516e1ddca5bca3429b8",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-stage-views",
+            "sha256": "8d290e8cd3d8edbe40b64c25c35c96159ed60aa6039c272c7ae24a5f4871af80",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-cogl-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-surface-scale-tests",
+            "sha256": "413fb23d4fa5ea747e2e704213cabc199beac1e9767a0fd6505d83e11529fad4",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-test-client",
+            "sha256": "6242b667ddbddfa9de3a1bccc09b35d4de9943d1f7c6b8d91f980af7ca9b01fe",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgtk-3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgdk-3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcairo.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXext.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXrandr.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-test-runner",
+            "sha256": "95981532f5058174471b4e19394f713ab6962d55cba9af28acf26b151e4c1372",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgraphene-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libevdev.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-thread",
+            "sha256": "3a1ec786694023c4a40879c2205919793e666efdd2d1d15c9a0755b0a84bc426",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-tiling-hotplug-test",
+            "sha256": "21e39374492b35ce02828a1d7ddf3c45141273920ae4eda200bd1695858b4b7e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-unit",
+            "sha256": "712ac1db57796673500d8c2b6556880e02e0832ae92d8c4cb6c962c4853c933d",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-viewport-tests",
+            "sha256": "8ce09aafc56b45f4b24f4a533172fe2c227f6d9bb0ffdc505ba6681d6fde987f",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-buffer",
+            "sha256": "fd0afd12582b087110002f58a4ec4cc647bbe4a841be878798f8448ebad69cc9",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-client-tests",
+            "sha256": "63bf453a821e906fc40d077474a78d9f105944467b56e5715150a87c149337c9",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-color-management",
+            "sha256": "de72be0fdbe10ecb6a5ca36e446a42942504966f19cb7e27c70f9b9ca1472ebf",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-cogl-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgraphene-1.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-color-representation",
+            "sha256": "754ddc4b7130f1c07113ec62bd1abef44f3ee50e1c6b8313e44efffc4a2eb1f3",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-cursor",
+            "sha256": "ea90ded1ad8e3a0ce3896e7f4b3d6d8700326aa3192a061dc1683a32a0c53800",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-drm-lease",
+            "sha256": "2f85f2e9286cafb22ec2a2eb5af24da6c6d623e85b75c072154484db7e214dd4",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-fractional-scale",
+            "sha256": "53c2e96ff54c10a3607ab8028e90a0f0df388c370a341f6ae70320cb8e777877",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-fullscreen",
+            "sha256": "cba15d5509d1459d85895df625903c27ba9ef63fab13b30c28062674c031c93a",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-global-filter",
+            "sha256": "a8952d9fd02b0d2c7c7cfa25ddb40a6fd0392276cb068f5469d0ba4de20dad90",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-idle-inhibit",
+            "sha256": "121021eed81e1fb68fc5857e4005ee6c1ce34ea82cdba72cfe73fac23b33e031",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-keyboard",
+            "sha256": "9b9d3edba9caa230fa6854b98e6c9059fcb54784927e648482ac91bf35955161",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-stable-rounding",
+            "sha256": "96315e4cffe1c80d70e60013c15416707be84855f4ead79b0fb3c00eb61bab98",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-subsurface",
+            "sha256": "e730ffdd393601d16c257e8430b629c9b41c39204d8d65c985f8112b1a6eedac",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-x11-interop",
+            "sha256": "63714bc0aa2194a02c6dfe5113d134c347a7ec1d96adf98e353e21f00fdda310",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-xdg-activation",
+            "sha256": "47dc0cc8c0d84d5870fe412c077c755a5a4fe2162b33089ece860b79070c30dd",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-xdg-foreign",
+            "sha256": "6be3ef465b75b9fd6f6da95fb35fd7825e7b7435f78abb63b996b7c08e21b654",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-xdg-session-management",
+            "sha256": "c15fc55454684c06fff6d7dc5a47e07109c12e5cc84cf468a5d5bff9c48301d8",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-xdg-shell",
+            "sha256": "ca004d41cf93245a2e09f0986d4b127df3e04d8ea7b8a7e387d8ebd8a82f472b",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-xdg-toplevel-suspended",
+            "sha256": "41178eac00cf25d98093c102a574c4a0e14abb22ad6dfe10019dff497548b0ee",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-wayland-xdg-toplevel-tag",
+            "sha256": "28bb768552f8287364f41e03acb46a42082512de4acfcf68987f578e9640fec3",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-window-config",
+            "sha256": "874845c0ed36f612dd0f8742a58fd6a86ef85be2bab1449f43aa9438335b5a76",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-window-created",
+            "sha256": "db94ac6b3cdd91f35cacb99aa10a620a985478581ab4f14a4ef4b447357ea6d6",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-window-mapped-inhibit",
+            "sha256": "6817faeaf6e89efd9438bb765bff93262b37c447f5ff5c08c71103ca7fd5db05",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-server.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-x11-tests",
+            "sha256": "a7f821067c737cc4cfe8102e8267a617da4b6dc6adaa931638868a6ec71c68f6",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/mutter-xwayland",
+            "sha256": "71b55369a8603f14af1732f3d8a2805a12364de034f20717bbfc0365a3b400bf",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-test-51.so]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/buffer-less-viewport-client",
+            "sha256": "0616472bf18172c06759a5d5f7e9c06135b5df88f0732f2115ae3fb42234a94c",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/buffer-transform",
+            "sha256": "540d5d399059575c56bba3de1780cec42ec570358fece8181dc3ea2a0eec907d",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/color-management",
+            "sha256": "30178657e60961822b9baebf41ba719a042c713f5b960f93c31b55a720e4d367",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/color-representation",
+            "sha256": "740c8f6d1025aa8ddf921aeb660fa3a936c6198a827e5ce8918d551c416abf24",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/cursor-shape",
+            "sha256": "6d2d3aac5ccaddcd568f91da957f5368caa9fb6a116a5bfb401465bfc8abc284",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/cursor-tests-client",
+            "sha256": "0dfd6123603d2931a9dad9c3afbbc5a47d9d79c1b20b03dbb51d1b462690e41c",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-cursor.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/delayed-cursor",
+            "sha256": "af677f973e76f01f733a6e1c9dea78d084fa100f2eae6a6422e91fc3a76bbfe2",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/dma-buf-scanout",
+            "sha256": "ab33b74ca700a74476efbcfcb9f0e0c30388d4744afb869ad8dcd1a5689f6d56",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/dnd-order",
+            "sha256": "02aa88234af5f14ad97f2e3c5ba64beea32182e77496699f59fd8c11e617c979",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/dnd-reuse-icon",
+            "sha256": "2d667fd58736af92e6c41b3c5212b28eec82612d8438b53bcaf62edc53ddc46a",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/drm-lease",
+            "sha256": "f7aeee4e2fe5d123f8e5e8685871c1c8630e0a968eecb82d2e9816a5488a99ab",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/fixed-size-client",
+            "sha256": "e86aee158fc2d3a02eb5d5d1594ebfba5edb4246b7cb7f4358ae4b122976c573",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/fractional-scale",
+            "sha256": "dfc2a7bdd1222d0b8e3377ce2001fa16e6c0a80971a31b4ed2b10f91606411f2",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/fullscreen",
+            "sha256": "8475b347746117749ed6410b665a829f865b559a4c141ca3829449d49d42c4d0",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/idle-inhibit",
+            "sha256": "82c98fb69b997bcdcb745c429ef6c563797db75d3066c624026dc8b93e3c2e71",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/invalid-geometry",
+            "sha256": "d6ee8060f757a8b451de44d595bf55b50e14fb9bfaa3f7cd49e48eb88c972278",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/invalid-size-limits-on-map-client",
+            "sha256": "4919268518c3c8a2fa8dc977ea80a8b1585a0b76fd8ce1b4f152d3c579876096",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/invalid-subsurfaces",
+            "sha256": "a5fa81d914e470c7faad41d25873c29f5f1cdb6824a5f185b345eaae8ed39c4f",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/invalid-xdg-shell-actions",
+            "sha256": "0f7ea699051310a8c863451b0a1e9362ef212d5d309e390650905f016b1376ee",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/keyboard",
+            "sha256": "54295025f9defe476cdeb2ccdf21670636d2fcbf265cda3efe36e9d90e34ebc7",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/kms-cursor-hotplug-helper",
+            "sha256": "3786bda7e0e50d103e933124e3611c9fe3a8dd03ecf7311765cd9b2b72c33d8a",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-cursor.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/repeated-preferred-scale",
+            "sha256": "247004d62e41333a3d81b62f17627ebeea7dbc8f0fc431a0cbddeda5cc7c6d3a",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/resize-state",
+            "sha256": "a3211361ef64bb13daea866b5d4509ea9d7a85dd7678f318154ea6c660cef5b3",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/service-client",
+            "sha256": "e4e1f1aa2d5330c05795d08e1a369dbae40b7715790eb87e604dec3e611ddf18",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/shm-destroy-before-release",
+            "sha256": "c5133e5e431eace421fc088dfd664b274e01b1823b36e1398e48b86bba4befc4",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/single-pixel-buffer",
+            "sha256": "e26ab18e484e68fc62974b94b2eac2adec5384ed5a562fc49f6fe73d08157c66",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/stable-rounding",
+            "sha256": "ac5ed5951fded3e3002ded737e9e63ea222247dea79a8764386aedc37d49d5e6",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/subsurface-corner-cases",
+            "sha256": "63a5dfb0c6518b372c3590663159a85b219b4cf8b6f694574599211edec5c025",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/subsurface-parent-unmapped",
+            "sha256": "cf85fd7e991719f718e26ba86382e750d2b473313fcade91c9b5076e78a7f8aa",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/subsurface-remap-toplevel",
+            "sha256": "6594855952314e2126f18e7b19f37696f86d95211e5a4e333252cff98ccadfae",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/subsurface-reparenting",
+            "sha256": "b905231e5969b5040d6c727c173f8406251f1630d81b05598d00a7a8681d5fce",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/surface-scale-client",
+            "sha256": "5c1d062212729eee809e6cc152f39a234c8ee640c8492c00f1445b4912e58765",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-cursor.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/toplevel-reuse-surface",
+            "sha256": "d72d79eee861c3c5767f049022ce19dceece55b3e28677cc85ee96642fe29f71",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/toplevel-show-states",
+            "sha256": "199238b0541902e6fb2333d3674a95b142e1bf9ae33dd40166d650f51c24fd83",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/touch-dnd-same-surface",
+            "sha256": "d35eaffcc30cb03d99c438cad72d42b10974c230734f665458182c1ec69293e0",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-activation-before-mapped",
+            "sha256": "5c2059f7f4ec46073f9d25a15f5e65660e775c9a7784a42a2c52f9e0d8e78cd2",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-activation-no-serial",
+            "sha256": "5c37269b420bbdbf23dafb152fccbba5b9a07168d22a6fe1449fa4e8d6b367b5",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-activation-serial",
+            "sha256": "d25abf65fc40cf2f9f19220414b9679eff706375103eb62100b3825371a9e2e5",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-apply-limits",
+            "sha256": "b7eaefab50b5c03ebcb0adddad4e143ac07337b09098dfe581d8afc5f8e1cfc6",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-foreign",
+            "sha256": "79e8e85e19b0f517cf393397d2d16d80a2931c7fea728187fcbe2d5338793438",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-foreign-parent-of-destroyed",
+            "sha256": "e44beed3e4ef926d2870049ad8bd66c5bb3557fe2e3212d0afa8efb8acbd078d",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-session-management",
+            "sha256": "5162a75ad6f7b5a60b0a53f19fab178870dfd0c3ec00a4f8883486ab28dec789",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-session-management-replace",
+            "sha256": "f88a13ef4a7990073988f778e5a704ced05e4568d83e05c2274191810ab4d86c",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-session-management-restore",
+            "sha256": "4c097f61a41a6c38a8ec458b6a59c374ab2b59c2217b804a0dacff73d397f55e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-toplevel-bounds",
+            "sha256": "439d6d3db0c08842a2a0086c457deac5596c8801a7ef8a5ed9b93768f42a364b",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-toplevel-suspended",
+            "sha256": "1888e8c76aecb1f257f2774370ee2455626def8573c4494ac2e92c384b72ffba",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/xdg-toplevel-tag",
+            "sha256": "55e4f021a6ec8a5e36c7794569bf9d904059c26e28de52b8162abd04e276d981",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/wayland-test-clients/ycbcr",
+            "sha256": "af6f658d49f36415c62da3eb2b33c59df2d7386ba5ec1182e3ccfd60b665dd0e",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libwayland-client.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgbm.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/x11-compositor-checker",
+            "sha256": "c536784a5346737d855e8d4c115035c36c18cd197702f0d72a0aeb81d9ac1667",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/x11-test-clients/user-position",
+            "sha256": "e5078f3072ba2f8104cb5b3bfe5bcacc21892cd959aac85fa8734efee7af6f77",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/installed-tests/mutter-51/x11-test-clients/xwayland-allow-commits-test",
+            "sha256": "15052bc030c5ae255b85fad4f51c1537ba345317214fba4aca53347e6fe5f3b8",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      },
+      {
+        "package": "mutter-common-bin_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "c0b977fe3685dfc32b01778c82b18f93313a61051fd2400fe2ec834605d26197",
+        "bytes": 61984,
+        "elfs": [
+          {
+            "file": "usr/libexec/mutter-backlight-helper",
+            "sha256": "85576b3e054576f10f809d1974063ac46a385dcccc275f9055269eb11ef98c17",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/libexec/mutter-x11-frames",
+            "sha256": "65a7b54901ee01dcc9a199c5f76c82b443dc3c452842539526e6b2cf73de44ff",
+            "runtime_paths": [],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgmodule-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgtk-4.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libX11.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXfixes.so.3]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libXi.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      },
+      {
+        "package": "mutter-common_51.0-1ubuntu3+nativehdr10_all.deb",
+        "sha256": "3b59bad6f285e8b1f34d08537ce5c7407fa4aaa14a4e499d5180b3569703aa45",
+        "bytes": 564810,
+        "elfs": []
+      },
+      {
+        "package": "mutter-dev-bin_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "eebb8568648191e969f32d56772e6f8b0d4c0584128e0fd32489639ca0195510",
+        "bytes": 111334,
+        "elfs": [
+          {
+            "file": "usr/libexec/mutter-devkit",
+            "sha256": "254e11bbbe251263b32d1cfae26440ff5eccf627641f504bea427c63060ac0df",
+            "runtime_paths": [],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgtk-4.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libcairo.so.2]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libadwaita-1.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libpipewire-0.3.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libei.so.1]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libxkbcommon.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      },
+      {
+        "package": "mutter_51.0-1ubuntu3+nativehdr10_amd64.deb",
+        "sha256": "4ab989ffddd0cf33a900400f7d023af60829fde80e37ba542f179706bb1f0a8a",
+        "bytes": 164390,
+        "elfs": [
+          {
+            "file": "usr/bin/mutter",
+            "sha256": "68f1870325e12ef9a5c7f16cda0bd6b3b7939d3823869f61f933e6afaf974ded",
+            "runtime_paths": [],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          },
+          {
+            "file": "usr/lib/x86_64-linux-gnu/mutter-51/plugins/libdefault.so",
+            "sha256": "7c26f5215eb8208ce7c89b0e4af4f64a917b61c5afd3bce0c65a60efaf8eec96",
+            "runtime_paths": [
+              " 0x000000000000000f (RPATH)              Library rpath: [/usr/lib/x86_64-linux-gnu/mutter-51]"
+            ],
+            "needed": [
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-clutter-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libmutter-mtk-51.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libglib-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgobject-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libgio-2.0.so.0]",
+              "0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]"
+            ]
+          }
+        ]
+      }
+    ],
+    "units_executed": 0,
+    "installed": false,
+    "rpath_policy": "No owned build/prefix paths in delivered ELF dynamic runtime paths"
+  },
+  "canonical_replay": {
+    "schema": 1,
+    "canonical_count": 104,
+    "canonical_sha256": {
+      "0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch": "61393d369891ee1dda45c2bfdbc3311b941f6999eb355cace96066362109e9fd",
+      "0002-backends-native-scope-native-capability-veto-to-exte.patch": "08135326e533ab0f06d62d1dda01376c9b11d414aa08c6b27f1f0975573edbf6",
+      "0003-style-align-native-HDR-helper-regressions.patch": "1f428f471e5622c6e3169fe7b7cdee6507ef32c24bec88da1f8025dec11ea4d7",
+      "0004-packaging-prepare-private-native-DisplayID-HDR-candi.patch": "18e4579cbb426f91ebc28a2a83e24860dd5ed11fda95f36c2b68deb17f4b8af0",
+      "0005-debian-refine-private-symbol-introduction-minima.patch": "dd8a0d23c0469d2d55e6ec51aceba0d5af11b98ff20fb7fe10543984f420c4c8",
+      "0006-color-separate-native-target-luminance-from-encoding.patch": "e6863baa2a956b9a29305d90f79c73e64123cb19dae8c4d62bfc4f51073ea5f3",
+      "0007-test-cover-native-target-and-immutable-feedback.patch": "663bdb83a08f1e9996b637518feda50a4ab95705d6098ec6822a874f0c5d2ff5",
+      "0008-style-align-native-target-feedback.patch": "cd219c9ef0511d2c488bd99fa4206d62e2d06bd8d0223516dbcd5c04ac21fde1",
+      "0009-color-refresh-targets-after-topology-and-validate-wire-range.patch": "baf6ad7ce741343aff8ba97bb0750803634e46bd7433bbf40dd23db39721b95d",
+      "0010-test-distinguish-global-HDR-from-native-target-updates.patch": "5962e88a87bf9243d7d20f8c363dfd77b6bfba2863c0f198b3265f3082d67041",
+      "0011-color-dispose-target-records-before-output-teardown.patch": "2c397b76b58959de84196f27c4fd45a29e9e918f96e9ecef5c3cc99b7dc05784",
+      "0012-test-isolate-fixed-route-forced-HDR-policy.patch": "2aa862a837196db1df0b7a2b43ea634d121f1f597d0396d6263c82085464fecf",
+      "0013-color-publish-native-target-primaries-independently-.patch": "c3475bc87c273db8a36238ec6952ece703356c53e924ace1f801c752574595ce",
+      "0014-test-cover-native-target-primaries-and-their-Wayland.patch": "d95820f2061f24a9ade36d4b9873f8fae815d64ba4d62cf65c0e3b777fbc3515",
+      "0015-test-run-target-volume-cases-in-separate-test-invoca.patch": "96c24862687ae2c2ea8793432aed6b293f5f4b4c2282bd28eaaeed9626306647",
+      "0016-clutter-color-Add-a-fallible-definition-of-the-linea.patch": "dd0a414c088aea2aa05e1e7b7c01301e78d92e97abb1557033245a3adcbdecbf",
+      "0017-color-Publish-encoding-and-fallback-target-primaries.patch": "1eb3039f8a34d6b26240f9dc629f1374e3a79e34d3585ecd2127734242d95498",
+      "0018-wayland-color-management-Accept-signed-custom-primar.patch": "775524b226f34661a262cce85b01810354e48ac5dbea6b2fe5391d93d9e7f7f2",
+      "0019-wayland-color-management-Fix-ICC-file-range-and-desc.patch": "e2181088c8f47bfb1f38f745bfc0fd7433c7df6a78361c05940c55b3fe3c538d",
+      "0020-core-util-Read-at-the-absolute-offset-and-reject-sho.patch": "783d69271e3f021fb3f69a818ee815f4385117b561e868b6de610d02e881b529",
+      "0021-wayland-color-management-Post-the-creator-s-own-unsu.patch": "f4c232c3ecf7d28e7915426341d72a781932fc3b2f6abaa021711d51b6b29966",
+      "0022-color-device-Validate-EDID-primaries-before-using-th.patch": "6ce341bebe2631ca0ff974457008c3deb02524ada74af1e662875023e651d97c",
+      "0023-tests-color-management-Cover-signed-custom-primaries.patch": "c71b90398bd220b030145ac820d8e17154b6d99f639ee849d0e7a44ffc1f0a2d",
+      "0024-tests-color-management-Cover-ICC-file-ranges-descrip.patch": "fd0aa9cc483d775bb62cf27d7362c29e6b09a56ad4fecabe1b44086b6d194be8",
+      "0025-tests-color-management-Cover-the-creator-params-unsu.patch": "75551c1c87671bfc9ef04e7a47088ad58bcd60c9b88a5b70c8648ce23ba40c2e",
+      "0026-debian-Add-nativehdr5-changelog-entry.patch": "58b54e76d211df97e2e272800e5b9cf573c6e873c7bde0df63a7c27076650511",
+      "0027-tests-color-management-Expect-the-disconnect-warning.patch": "c8b24f7dc3c652136602d87e2579077407063adbfecc677c0cea7e2b5d40b622",
+      "0028-clutter-color-Add-the-HLG-transfer-function.patch": "115927e6ac44e54dee0d0f70b9fe2dc3faf0b7b21c90911a43586e0a3fdbd67a",
+      "0029-wayland-color-management-Accept-and-advertise-HLG.patch": "b24dd8c284dac1e2b288fe90ceb3efd798c5d56d8615db8ccd93b5f0c05d9307",
+      "0030-tests-color-management-Cover-HLG-decoding-encoding-a.patch": "31c6ee5ff581125f6dcf82cc238a2ffff4329c3c714d73d4fed0512598f21c08",
+      "0031-clutter-color-Give-parametric-color-states-a-target-.patch": "718f5767045594d2dbb31b6d6ed95d7bf7e39876ab64af8643c052018a123a7d",
+      "0032-wayland-color-management-Accept-mastering-metadata-a.patch": "b60166bcbbc2f703fdc039cfcdf4a2817adec3d0fd241af8d261c15a236863a5",
+      "0033-tests-color-management-Cover-mastering-metadata-and-.patch": "eb277997f528d1a912017f6c6c23c73e1a054f5f8111c83af6a03e63c5defa14",
+      "0034-clutter-color-Map-highlights-toward-a-declared-targe.patch": "e7d6aee3d2a334934a2a24128b50d8afa773868226841af69c8bf28e4d94d10d",
+      "0035-backends-color-Blend-for-the-output-s-declared-targe.patch": "824ced0b4aa103b1b7acb301760116f9a7c7d5c7a058f45b19d388d932d8a47a",
+      "0036-native-Composite-surfaces-and-cursors-whose-highligh.patch": "6d69f2edff842dc2cabf3e9309d13c2be0a30b379b2ca11b0c63cb4443d2cec6",
+      "0037-tests-color-management-Cover-highlight-mapping-and-s.patch": "2d1d7635e018d5ceb8f7c5c5e1f02cfa544b19569bde4e1cb50c9ad02159de28",
+      "0038-debian-Add-nativehdr6-changelog-entry.patch": "e861cdef59491c6cf132c001628f102f6e7ba887154e68e68518f9c961bed220",
+      "0039-clutter-color-Compress-gamut-toward-a-declared-displ.patch": "1d16335018e888c83810cc6166c647beddcd3dcccb005cf64610ebafd4d7ee40",
+      "0040-native-Composite-surfaces-and-cursors-whose-gamut-is.patch": "9d6f0f97ae1e4f4730dbc755af9c0f903452c9a3cc848d2106bd72c9be8f22c8",
+      "0041-backends-color-Render-for-the-output-s-declared-targ.patch": "9b91984c57f30215c06c613b1d6652719c14fbfaff7c2239675e9e66118e18f6",
+      "0042-tests-color-management-Cover-gamut-compression-and-s.patch": "48d77873ae48e923cb5404e0bef69ba8b9251ff1e2fb6408e74b821fb9160fb2",
+      "0043-debian-Add-nativehdr7-changelog-entry.patch": "4e1fdd1067594b68f6cd0517703cc02b045f816121e4018c98b06f1ee31058f9",
+      "0044-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch": "3c52c5295fbf6c2607d17dc919d998a6961e0b3f34925b8f68db79c435819927",
+      "0045-clutter-color-Use-the-BT.2100-Table-5-HLG-system-gam.patch": "90ccfaee84dedd37788586b3ec605941ed303649d47a90cba7c3e4b840a1f6bf",
+      "0046-clutter-color-Make-display-targets-only-through-an-e.patch": "d034764653e690969140eb1c2926f810fdb2d3b718775852a65b5661f02f1032",
+      "0047-clutter-color-Decide-mapping-once-per-source-and-tar.patch": "b99ad6af4e720c46c8e5e16591b1c8144f1775f7a3c1baa66378fc12a46fa27c",
+      "0048-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch": "e24a826e038c283bd1c4bc5176b87b2054340052ac138c81fff883534c35c9a0",
+      "0049-wayland-color-management-Correct-comments-on-masteri.patch": "5da1097e45c91f22c78e5d7144eaa20521894facb22ef5d5db8edb82d6df355a",
+      "0050-wayland-color-management-Publish-descriptions-on-exa.patch": "5ce67b7660dbd001ce7607d386129ce01dab6ede8d5bc98e1b62ee7e1b05109b",
+      "0051-clutter-color-Evaluate-gamut-compression-without-cla.patch": "1505e8dd147fd61c8bd871c4b76c18a3dd0722fda5e8deb322dcac570649baf4",
+      "0052-debian-Add-nativehdr8-changelog-entry-and-native-HDR.patch": "ee3227175c41a3c286b834898393a253cb7846864abc8b7820445c142040569a",
+      "0053-tests-native-hdr-Indent-the-target-primaries-policy-.patch": "462d11be1629f4b3e126b884c6c2a0da053b8bac99a625d8b7eaa212008ff7db",
+      "0054-backends-edid-Set-the-unusable-chromaticity-status-w.patch": "894f237f347f3f6fdf0b7053c3010f5c69909f4e305b2bd26dc0e1d283a0959f",
+      "0055-backends-color-Treat-every-declared-target-source-as.patch": "38a24b097e1b3da67b7864c25bdd32c6a282cc1bed274e07d8a9647f08952482",
+      "0056-backends-color-Take-the-target-peak-from-CTA-HDR-sta.patch": "99cec922365bbaaa3737af070592d96d221a27b0ac9bc4e376f9a3acc0a9d767",
+      "0057-clutter-color-Judge-gamut-containment-in-the-frame-o.patch": "46ed77df1ac08a7ce070c5d5e63635eec9a8f2ac9fa0e34bc676fb22f81c1d3e",
+      "0058-backends-color-Take-native-SDR-target-primaries-from.patch": "80b4c1724852111cb96a8b13cbda9807ba46700fd14b836fac96e9abcda893d9",
+      "0059-tests-native-hdr-Cover-CTA-and-base-EDID-target-sour.patch": "0e6d1e07aace17c6f7790ee1e2e6382cf16d3e2f1c18e0732cb9c0bcb91212db",
+      "0060-tests-color-management-Cover-CTA-and-base-EDID-displ.patch": "029ae73ad4a838ae35ddf69711bc010bf0ee770b54700d2a8a3062221cb6af59",
+      "0061-debian-Add-nativehdr9-changelog-entry.patch": "8bd6e3c726e74285c705801e2a8179b2e7377bbec72bad0482200f7e43e83414",
+      "0062-clutter-color-Adapt-a-display-s-output-to-a-white-po.patch": "a0e38f0b3f90a87af6aa3d6c2f644a0cc37d35f7fd22cddbf54cae43d30d21d9",
+      "0063-compositor-Composite-content-on-outputs-whose-white-.patch": "43529cc1459e24ff3a1c1b8f1e39132d3701dd3f4b46a4d8f8626bfafefc4850",
+      "0064-backends-color-Apply-Night-Light-in-linear-light-in-.patch": "7f0c7edf53a7573be9335f09144dac69a889692de90167086e38d0c22865ba35",
+      "0065-clutter-color-Bound-the-white-adaptation-with-diagon.patch": "532271e4917ce495220ad8e8a949aff29867efa408bc06c4ff639cbfd50d1664",
+      "0066-tests-Cover-Night-Light-mode-transitions-captures-an.patch": "4c7e600f0f48c59da48ed694fd090bd64eb650525f9eea94e3e849e4c2d399f0",
+      "0067-backends-monitor-Carry-per-monitor-target-override-d.patch": "5c240475ecfa6fbddd419e22b4670ea6e5ca3b92cd272c364296ab73f988ccd7",
+      "0068-backends-monitor-Persist-and-validate-target-overrid.patch": "a007034d047b9d0f8554586f88915858161bdadb7f0854e6446284596ddac636",
+      "0069-backends-monitor-Retain-color-settings-when-copying-.patch": "5111ae1ae4efaf9e7c0e8349dce0464be2b6bd0f1f5bca4fbd40d67ce8fffd7a",
+      "0070-backends-monitor-Expose-configured-and-effective-tar.patch": "50b1709c4e275c77de7bf15fa33305559ad9bdc8938db57f8046abc55b5fa7e0",
+      "0071-gdctl-Preserve-per-monitor-target-declarations-and-s.patch": "b7bcdd194a8417e90b6c124a212dc151e1f6ce12b4d15cb24eb17ec23a7a4e4a",
+      "0072-backends-monitor-Report-software-PQ-Night-Light-supp.patch": "0138ce55687556c3b146846572f9dbaf65e38ba8a815792257e7e8ba614f52dd",
+      "0073-backends-color-Select-per-monitor-target-overrides-a.patch": "16c41ce324f8fda8c58f312489a103960cf391871ce3df8dcfdc56884a9dcbff",
+      "0074-clutter-color-Anchor-the-Night-Light-adaptation-at-t.patch": "26799d78258b51ec1f751ac0c21c84b0069541f647c185ad164c7b50be974216",
+      "0075-backends-color-Render-without-Night-Light-when-its-w.patch": "1db066df99c8742d34dc691dc3c839d6f2d79ca246a20902c8150b9f67c74046",
+      "0076-tests-monitor-dbus-Wait-for-the-restored-target-over.patch": "f05da67e7ab8de2b1255f447eb3e81d7704b1711790146a93581211e68980f4d",
+      "0077-backends-monitor-Keep-accepting-truncated-monitors.x.patch": "7084aac4fbced1f9da1180b44366a1443fa4e9a0c6b5c84857311e39d6c1030f",
+      "0078-tests-Run-the-display-target-user-override-case-on-i.patch": "439e735d67fdd07e029b3e968589dc08c3a32487c89da57b5ee8bd105c149fba",
+      "0079-tests-color-management-Read-back-captures-across-BT..patch": "5b86351afea21b4f1cc1729ae97e16f3203c74ae943873ad177420c530aa0cb3",
+      "0080-tests-color-management-Check-that-capture-readbacks-.patch": "8007ea6991347a46ca08e5be883eaa461924ac2867c39dce9b27d7ae44a5a12c",
+      "0081-tests-color-hdr-Bound-the-channel-residue-of-single-.patch": "5e2e234f96323de92b64b9c921d8605560c2612805c80693620b4daa1a412ff4",
+      "0082-backends-monitor-manager-Forget-the-restore-handle-o.patch": "130101115af5b6ed5a395e2f893efdfbb3653fb4db2578f33422661240c9dcf5",
+      "0083-tests-monitor-dbus-Hold-the-confirmation-before-reje.patch": "60f83722d60dddf5181c4d90cc73c53bda5ce9a758c6994fdfa9fa813f6167d0",
+      "0084-backends-color-Leave-colord-when-the-manager-drops-a.patch": "8cc071afe9aeaaa3147560f23e595f09a1a404380f91311d5806d21fd181ae34",
+      "0085-backends-color-Drop-removed-color-devices-before-cre.patch": "055990a5af4f7eff12af2e6553001273efd8941dd300d4cec3d901dff001c340",
+      "0086-tests-color-management-Check-colord-devices-across-u.patch": "d7cd4f1d5a5cd013f4b4ac9c298c1653db0be105213ecc5ef3bf14a526967d49",
+      "0087-backends-color-device-Leave-a-cancelled-device-profi.patch": "bd6d424839c2b9d855f6e9618c81e4250a36797f6dc1de8bc1b962f09b72529d",
+      "0088-backends-color-profile-Leave-a-cancelled-colord-prof.patch": "b300fee139cd6767d6ad9990d507949af406e9276a599ddab5afa15d78dd8386",
+      "0089-tests-color-management-Unplug-a-monitor-while-its-pr.patch": "49830f651c81896f07e8875cffd78411f320abf6e8b7e4dbf9401cae39486092",
+      "0090-backends-color-Shut-down-store-work-before-manager-r.patch": "afd6d2632aa0e8171940c1c91e52e506646dfc37ee45f6f31614e4193ed09612",
+      "0091-tests-color-Add-a-guarded-real-callback-delivery-bar.patch": "e70af82de62b623a269bef0521f85ee38ebb784f8a42065615b94cc3dfde6d19",
+      "0092-tests-color-Exercise-shutdown-at-actual-asynchronous.patch": "12091b255b96e259fc25368ec2acab9ff96ac6c790943a7ac9eac126ca9b5edc",
+      "0093-tests-color-Transfer-context-ownership-exactly-once-.patch": "6b7d9d9daa46b8d107671483865c1645a6fc3aa8edd137f69f80081786f6b86b",
+      "0094-color-store-sequence-cancellable-lookup-before-trans.patch": "1076e5a4d772b2f71addaa9e77c4b96681b4ac76a3243a1e58457fc9b06c6d08",
+      "0095-color-store-return-ineligible-requests-before-creati.patch": "d26c4eac9b787ee2d75dc6a9b37f8cb15baaa01e599d7dd0ea0c9d1a057ae23d",
+      "0096-backend-destroy-the-owned-Clutter-event-source-befor.patch": "0f975926c300ffc2c13307a8b27f7c743a7ab88defdb5ac35343fecc5d17d07b",
+      "0097-native-seat-detach-incoming-signal-targets-before-di.patch": "f52fcea0b2be2bfbbbf62f683f873136e3fbf06b7bd4defd4679d27c8b40c84a",
+      "0098-tests-assert-native-seat-keymap-disconnection-at-can.patch": "225402a2221ad00e530f07ae6808c09f6da634156b256413f7061ac8955ad239",
+      "0099-tests-isolate-ineligible-caller-fixture-from-shared-.patch": "ebc8de0773ae5d25e14d487a1cfb270edb961743fbcf8126bfd18e907acc8af1",
+      "0100-clutter-stage-view-Reuse-compatible-offscreen-buffer.patch": "c7eb4e4abcc035f58e5d7e854c029d07725c4bdb422ff81fd26a61d6cdf6256e",
+      "0101-tests-Exercise-offscreen-reuse-across-colour-state-r.patch": "08d637ff9447b0f4e23622c411c4d18c0cc8438547b034f30626e0910ef6a194",
+      "0102-debian-prepare-nativehdr10-candidate-with-warnings-a.patch": "d87a565d98058183ec5cf765102599a0bd62fc78b8a5bb2114bd3f887364d5a7",
+      "0103-debian-bind-nativehdr10-exported-symbols-to-precise-.patch": "29e44f8f4e95b03ee3805e582f2c942b8bc5a6f0963fc22410e5f525c2ee91b4",
+      "0104-tests-initialize-mastering-peak-sentinel-for-optimiz.patch": "2756677eba015451b2db024f5a01201eb76e33cbf21d2bb0fc472c4b28f3939a"
+    },
+    "candidate_tree": "2e8ee2e27d9f4965bd4035b1a95bc8caf5ee0b16",
+    "all_canonical_hashes_equal_mac": true,
+    "full_replay_tree_equal_native_candidate": true,
+    "units_executed": 0
+  },
+  "requests": {
+    "package_receipt_recovery": "1bf2df964cad43e4b0f83c2228266573",
+    "elf_audit": "d42a6cac693f4a75b4b5a1f0559cd8c5",
+    "canonical_replay": "9acfba5def10481db7717dffdc15af81",
+    "export_headroom": "c46274fc78994ac88ad60dbc85f2cc89"
+  },
+  "build_flags": {
+    "Werror": true,
+    "units": "DEB_BUILD_OPTIONS/PROFILES=nocheck; no affected unit execution"
+  },
+  "failed_attempt": {
+    "tree": "4ed54f0605292c36e388e9a66658f01d20da427e",
+    "exit_code": 2,
+    "build_log_sha256": "3878ef9b601ecad5b75157d0dbe28bfd088ec2ffc90dcfadb6d015cbcffc044a",
+    "cause": "Optimized GCC maybe-uninitialized in mastering_round_trip local peak; Ubuntu104 initializes sentinel -1.0, getter and expected measured assertions unchanged"
+  },
+  "export_recovery": {
+    "cause": "Runner exports exceed4MiB after native build completed",
+    "repair": "Moved only integration-owned accumulated exports into owned preserved-exports; inherited exports unchanged. Retrieved actual packages in17 independently hash-verified400KiB-or-less parts",
+    "archive_bytes": 6666240,
+    "archive_sha256": "a74b5a21ce3931ccbfb7a7ed610dbdfa5df06092684f68377e2bbc355c7d8456",
+    "compilation_repeated_for_export": false
+  },
+  "hdr9_library_amd64": [
+    {
+      "file": "libdisplay-info-bin_0.3.0-1ubuntu1~hdr9_amd64.deb",
+      "bytes": 35750,
+      "sha256": "6bcdf691d4a208deed5e0d2551dd2ae476c842a4129bbc86b5c4c55c0e68c846",
+      "control": "Package: libdisplay-info-bin\nVersion: 0.3.0-1ubuntu1~hdr9\nArchitecture: amd64\nDepends: libc6 (>= 2.43), libdisplay-info3 (>= 0.3.0)"
+    },
+    {
+      "file": "libdisplay-info-dev_0.3.0-1ubuntu1~hdr9_amd64.deb",
+      "bytes": 34436,
+      "sha256": "957d13c1315c00d172a5ed98d4b6f4fa40ce3f1918fc4a2b74bd65ab363f224b",
+      "control": "Package: libdisplay-info-dev\nVersion: 0.3.0-1ubuntu1~hdr9\nArchitecture: amd64\nDepends: libdisplay-info3 (= 0.3.0-1ubuntu1~hdr9)"
+    },
+    {
+      "file": "libdisplay-info3_0.3.0-1ubuntu1~hdr9_amd64.deb",
+      "bytes": 95310,
+      "sha256": "080a4add280ebb94ed7d0da5a0b46fe259fd84b7f35a44d27a128dea24664949",
+      "control": "Package: libdisplay-info3\nVersion: 0.3.0-1ubuntu1~hdr9\nArchitecture: amd64\nDepends: libc6 (>= 2.27)\nProvides: libdisplay-info3-native-hdr-api (= 2)"
+    }
+  ],
+  "stock_rollback_fallback": [
+    {
+      "Package": "mutter",
+      "Version": "51.0-1ubuntu3",
+      "Architecture": "amd64",
+      "Filename": "pool/universe/m/mutter/mutter_51.0-1ubuntu3_amd64.deb",
+      "Size": "133730",
+      "SHA512": "fbb1baabe676b164a64597d33de44ca04fbb7edc43d42f62f8c50eb87525a596a98ca75a57bb8dc3c636fd6251046ff0abfa1164b95fd33a93a36a7056e57ce7",
+      "file": "mutter_51.0-1ubuntu3_amd64.deb",
+      "sha256": "f2f0576d473a7c6468e88c57fd4c2ffe6ba346fc2b666b40441997180e784f3c",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/universe/m/mutter/mutter_51.0-1ubuntu3_amd64.deb",
+      "role": "Stock Ubuntu compositor fallback; NOT restoration of previously installed private nativehdr8/9 compositor"
+    },
+    {
+      "Package": "mutter-common",
+      "Version": "51.0-1ubuntu3",
+      "Architecture": "all",
+      "Filename": "pool/main/m/mutter/mutter-common_51.0-1ubuntu3_all.deb",
+      "Size": "40744",
+      "SHA512": "44fae1b257f4f4b2534a0ea2ed18a2d1cf034d359885e1876fbe0b340cf1952d135a0311caeccada3f6b4afed2857d694904033d125a8a08e1fbceb99d251659",
+      "file": "mutter-common_51.0-1ubuntu3_all.deb",
+      "sha256": "f9bdbf9515a31043dab9dd0e518b68cf2b2e058ea1af40f66e7c42b629ba7899",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/mutter-common_51.0-1ubuntu3_all.deb",
+      "role": "Stock Ubuntu compositor fallback; NOT restoration of previously installed private nativehdr8/9 compositor"
+    },
+    {
+      "Package": "mutter-common-bin",
+      "Version": "51.0-1ubuntu3",
+      "Architecture": "amd64",
+      "Filename": "pool/main/m/mutter/mutter-common-bin_51.0-1ubuntu3_amd64.deb",
+      "Size": "56660",
+      "SHA512": "3f4d19d4a6e6f9580880551157dcd184a4190ec5ae5451aeab72cdea63bafc190946d3f8a1ff33dc245fc97e6c5865c2f1f935952e6bfca3d71adbc1f22e769f",
+      "file": "mutter-common-bin_51.0-1ubuntu3_amd64.deb",
+      "sha256": "3522b6e1a2dd972c582fb3aeced820c7ed52d6e730f7cbb21552697d2af2ed3a",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/mutter-common-bin_51.0-1ubuntu3_amd64.deb",
+      "role": "Stock Ubuntu compositor fallback; NOT restoration of previously installed private nativehdr8/9 compositor"
+    },
+    {
+      "Package": "libmutter-51-0",
+      "Version": "51.0-1ubuntu3",
+      "Architecture": "amd64",
+      "Filename": "pool/main/m/mutter/libmutter-51-0_51.0-1ubuntu3_amd64.deb",
+      "Size": "1531024",
+      "SHA512": "320d57ed0ad08cca4d8b5a702bb524d9a3efd086e09963174f1594ebf24715c22acf8cda441a0b89b1f45a62658b422680d241bf691ef74d2fe2ef8e5cbc69e0",
+      "file": "libmutter-51-0_51.0-1ubuntu3_amd64.deb",
+      "sha256": "9628f740a15a41135005d98fee031e7cb7953459357af2c4033e6ad5a172dc6d",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/libmutter-51-0_51.0-1ubuntu3_amd64.deb",
+      "role": "Stock Ubuntu compositor fallback; NOT restoration of previously installed private nativehdr8/9 compositor"
+    },
+    {
+      "Package": "gir1.2-mutter-51",
+      "Version": "51.0-1ubuntu3",
+      "Architecture": "amd64",
+      "Filename": "pool/main/m/mutter/gir1.2-mutter-51_51.0-1ubuntu3_amd64.deb",
+      "Size": "137690",
+      "SHA512": "74da8aaa1b61234301236a7a436670ec06065f7af8a5497e1dc4bd5bc05dcf59db7e44ebae6c45fd257c4dfa98cf8cd2f55ec60244e571bf070d470c41d0ec6f",
+      "file": "gir1.2-mutter-51_51.0-1ubuntu3_amd64.deb",
+      "sha256": "4a6219dadf83adf438005754c1a23844d79b4451c5124070290ecf597b968159",
+      "url": "https://archive.ubuntu.com/ubuntu/pool/main/m/mutter/gir1.2-mutter-51_51.0-1ubuntu3_amd64.deb",
+      "role": "Stock Ubuntu compositor fallback; NOT restoration of previously installed private nativehdr8/9 compositor"
+    }
+  ],
+  "limits": [
+    "Stock fallback is not rollback to the previously installed private nativehdr8/9 compositor; preserve actual earlier kit and monitors.xml at coordinated trial",
+    "No current live host dependency audit or install simulation",
+    "No i386 package delivered yet",
+    "No new core source-review approval or unit/physical/optical/Dolby claim"
+  ]
+}

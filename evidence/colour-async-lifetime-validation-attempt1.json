@@ -1,0 +1,453 @@
+{
+  "schema": 1,
+  "task": "t_8eee5d9f",
+  "status": "FAILED_AFFECTED_VALIDATION_NOT_SOURCE_READY",
+  "review": {
+    "task": "t_a26a1173",
+    "reviewer": "hdr-astra",
+    "decision": "approved-for-one-affected-batch",
+    "manifest_sha256": "a9b4881562bf0190cbffb4cf35c31bbb89d6f3a7b389ef3ffff375293da99245",
+    "report_sha256": "93c522f0afa2fbfdbfb2ca634cb4749d19a47e06c8e7375015484772c27c07be"
+  },
+  "native_head": "65b5c00a35f675a84658c52c4cd80cf89b1c4947",
+  "native_tree": "648f28ce4e22e014098a803bc453841abb9eaad9",
+  "source_changed_since_review": false,
+  "native_request": "a13b687f22424f2c81abf8abdd38b28f",
+  "native_x86_64": true,
+  "renderer": "llvmpipe",
+  "affected_invocations": 24,
+  "passed": 6,
+  "failed": 18,
+  "retries": 0,
+  "seconds": 37.23036500706803,
+  "pre_post_identity_equal": true,
+  "per_check_log_hashes_verified": 96,
+  "environment": {
+    "LIBGL_ALWAYS_SOFTWARE": "1",
+    "GALLIUM_DRIVER": "llvmpipe",
+    "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+    "G_DEBUG": "fatal-warnings",
+    "G_ENABLE_DIAGNOSTIC": "1"
+  },
+  "environment_limit": "G_ENABLE_DIAGNOSTIC=1 was added by builder beyond tests.sh recipe. It exposes two real unreturned-GTask errors; diagnostic acceptance scope requires thinker adjudication, not suppression. No failed check retried. Meson default setup and fatal warnings retained.",
+  "result_groups": {
+    "PASS": [
+      "mutter:color-lifecycle-color-lifecycle-startup-queued-success",
+      "mutter:color-lifecycle-color-lifecycle-finish-queued-assigned",
+      "mutter:color-lifecycle-color-lifecycle-directory-query",
+      "mutter:color-lifecycle-color-lifecycle-profile-retained-assigned",
+      "mutter:color-management-profile-conflict",
+      "mutter:wayland-color-management"
+    ],
+    "Invalid GObject class pointer": [
+      "mutter:color-lifecycle-color-lifecycle-startup-cancelled"
+    ],
+    "Clutter default context assertion": [
+      "mutter:color-lifecycle-color-lifecycle-generation-directory-query",
+      "mutter:color-lifecycle-color-lifecycle-generation-directory-create",
+      "mutter:color-lifecycle-color-lifecycle-generation-write-result",
+      "mutter:color-lifecycle-color-lifecycle-generation-profile-result",
+      "mutter:color-lifecycle-color-lifecycle-generation-efi-success",
+      "mutter:color-lifecycle-color-lifecycle-generation-efi-fallback",
+      "mutter:color-lifecycle-color-lifecycle-shared-caller-cancel",
+      "mutter:color-lifecycle-color-lifecycle-finish-queued-device",
+      "mutter:color-lifecycle-color-lifecycle-assigned-connect",
+      "mutter:color-lifecycle-color-lifecycle-assigned-read",
+      "mutter:color-lifecycle-color-lifecycle-profile-retained-owner"
+    ],
+    "SIGSEGV without captured stack": [
+      "mutter:color-lifecycle-color-lifecycle-directory-read",
+      "mutter:color-lifecycle-color-lifecycle-local-ready-shutdown",
+      "mutter:color-lifecycle-color-lifecycle-local-ready-finalize",
+      "mutter:color-lifecycle-color-lifecycle-profile-create-after-finalize"
+    ],
+    "Unreturned GTask diagnostic": [
+      "mutter:color-management",
+      "mutter:monitor-dbus-tests"
+    ]
+  },
+  "checks": [
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-startup-queued-success",
+      "result": "PASS",
+      "exit_code": 0,
+      "executed_tap": [
+        "ok 1 /color-lifecycle/startup/queued-success"
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/01/testlog-mutter_default.junit.xml": "e11daf1833011c536bb87ef6ea91ee007bc092f228c1579615295a527d94c208",
+        "logs/01/testlog-mutter_default.json": "0a8375b236042d41a2948c2d1ea6122d244ff96d9405252663cab8f08478801f",
+        "logs/01/command-output.txt": "ad17b121af66db108cdcc53b06aa65adbe868af7a0d1efeea82265eb9fd485fb",
+        "logs/01/testlog-mutter_default.txt": "a601a390b902d2de3de76f3a6cce6bd39e41a9a542dcf297c56be29366b4d098"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-startup-cancelled",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/02/testlog-mutter_default.junit.xml": "6a50fadbbe435697619b640179dc5946a30806619a5038aeb4d64e68586ec96b",
+        "logs/02/testlog-mutter_default.json": "4b9a1ec785511465cca66b423131acc0b84bafa9962fb6ece9a3e14494ccc4b6",
+        "logs/02/command-output.txt": "1a16e3e43791c4aaac1089e328984dcebe78015b8d4e5dd9106ac3e66d164346",
+        "logs/02/testlog-mutter_default.txt": "28146b91fc40b3ca3ad52cea540d6559e6e10e68e5f48a0f7ab56d0685ad4216"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-directory-query",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/03/testlog-mutter_default.junit.xml": "1bc4aaebf5a37717923ecd13f823f24a9b6e16c94dd8d5b6bc24dd44590069fb",
+        "logs/03/testlog-mutter_default.json": "be1fed70979c51d1d09f336e6c79231c6ba0cd8a9e1bf7a1ca7687292a29a3a7",
+        "logs/03/command-output.txt": "aeedfe86141e2599fa760cb56adf27432c1cf2defc94157ac10b749a2097a85c",
+        "logs/03/testlog-mutter_default.txt": "c906a4c5c14cb9d623d6fa315e3cca98ec7be098802c6d9bc2b0b8dda22ef30d"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-directory-create",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/04/testlog-mutter_default.junit.xml": "586440a1ff6d31066df8ceafc3d551a8002d88f7bb32bf0dd4a7b40c8a679979",
+        "logs/04/testlog-mutter_default.json": "456cd17741bfbb38b4311f47cc12f649a2b99994551014891e5c274c01e945b5",
+        "logs/04/command-output.txt": "a658437e769d1625a1b93e670974b948ece6706ed8e83046f662656264cda0d6",
+        "logs/04/testlog-mutter_default.txt": "ada7fd5deea6ddf162f5efa92e697fd44a9f58357e03a884f0beb6533dd9636a"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-write-result",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/05/testlog-mutter_default.junit.xml": "dea1879a302ae893eef456e50d03bd2b10e0dd2b31be3b21c74e765d55de73be",
+        "logs/05/testlog-mutter_default.json": "02c8f7370d1e415a59b31483309d843fd9570c4fa130810f78d3f43c1f362f54",
+        "logs/05/command-output.txt": "d4a0f299bb5d405f30af421eb70560fde9a9079575d699f5ce8528cb54e7ac75",
+        "logs/05/testlog-mutter_default.txt": "a5e378d1c701ddc22bd09f73797a7ddd7d5921b12bbead1421aef28008c929a9"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-profile-result",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/06/testlog-mutter_default.junit.xml": "8659647069fa1286f6ead9bde6c626a961e4c4a6e5a3284ea153c138341a7474",
+        "logs/06/testlog-mutter_default.json": "1e880c9fe334cbe149a3124682b19549f3bdef694864c7ebb27abba5036742c4",
+        "logs/06/command-output.txt": "7dd15b8ebaf93012903dd6ae1c7e518ab9646687dcb525e21bc8e536af76b2e3",
+        "logs/06/testlog-mutter_default.txt": "82e12e3c63228964f8533a040181aafb5ffa67abbf96565a00ddafedd1938dc8"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-efi-success",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/07/testlog-mutter_default.junit.xml": "98433ccf80ef648d3b66c1bf984979e81b7fcbcf33017b279100c95bc5344b57",
+        "logs/07/testlog-mutter_default.json": "8b10541b198a9a5198529aea4c0bf5571767f317af2618b256b0c74608a1d654",
+        "logs/07/command-output.txt": "212fa7685d5bb6d2c051e22fdb4a9b494b9c5d716c163fc9c3403f10c72bc699",
+        "logs/07/testlog-mutter_default.txt": "69e4b747a85e0d6771b516735583b09c5195fb694a651ff1c3c3f80c0a4c7268"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-efi-fallback",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/08/testlog-mutter_default.junit.xml": "d75ce61c5372dec241db6d46c0b4a2a6953a6ff54d6c811b7cc0552b187563d2",
+        "logs/08/testlog-mutter_default.json": "94e59f07c16c25e3f0b02dd878d01ed6d63bf60e111dec8560a2c8d4d8e6c8cb",
+        "logs/08/command-output.txt": "4d017ccc39d48d6a26d6e80d3c911528c266b5fd272d1b4428de0ee35260348a",
+        "logs/08/testlog-mutter_default.txt": "4c14dbb8d8b729fe9f1e0e90bbeeb31a4c584133f4c388ff39a31680cf96875b"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-shared-caller-cancel",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/09/testlog-mutter_default.junit.xml": "e170ffa970122601a59937997e71514c9e7e044104ac887f3b6ff902b81dadd8",
+        "logs/09/testlog-mutter_default.json": "7904127ca485d01758be6144885e9f3a78746c8af4accc1af8e970c06b608396",
+        "logs/09/command-output.txt": "32d2fdcb383c13086e9ab9055be438507a6b13a868f2dfb836141f58466183a6",
+        "logs/09/testlog-mutter_default.txt": "c59bf96efd652a7fe1648ab7d2523b9b3ebceaef58aea531ffccd5c5b1192c2e"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-finish-queued-device",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/10/testlog-mutter_default.junit.xml": "c16f09909deb9731d00f6563fc90cdc27b5aff09324c39438db4d7a1a33702ef",
+        "logs/10/testlog-mutter_default.json": "bf600b2f5a37dd71f8c373e7548c35c59f17d13fa77ec3614813fd81f886e83e",
+        "logs/10/command-output.txt": "557be7b644e9d32650c1610e40caf3fb201b5d91715497d4ab6caa48c231a418",
+        "logs/10/testlog-mutter_default.txt": "3ebd84b84466ad9b264d3cb5a8116b56f4104bee2256d15affca6880dba59ea9"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-assigned-connect",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/11/testlog-mutter_default.junit.xml": "a279863d3dc8f3dba5c70fe97edce1e3b7deebe1684a707e83bcdf7f0ace7126",
+        "logs/11/testlog-mutter_default.json": "1793345e81bc640340a075d6c0cf1c4fc888b399c465c37a9e50e86c435e0889",
+        "logs/11/command-output.txt": "d0b15a3fec6346dc66f02e50358b2c2fd8956172ac7cfe3177cf17618d091f7c",
+        "logs/11/testlog-mutter_default.txt": "b15062c95f9932a81a4c9dd8f29387fb62fbe748654e46d109cd25ada647a039"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-assigned-read",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/12/testlog-mutter_default.junit.xml": "41722ca78e2ec369babf35595d008f2066601824531a797a8be9a64665947913",
+        "logs/12/testlog-mutter_default.json": "049b56ca6b60061b27a4dd614e7b0bd9d32f8ca8e3a8a9ea887574310d3403af",
+        "logs/12/command-output.txt": "fc7cb912ba6d2153da945bfd756d645203859bc00c6f76e98986112e9b48bd04",
+        "logs/12/testlog-mutter_default.txt": "c58b8a6e7e59427ffd00228da7115fd424e6ad3c3ec810e819815220ccad13a3"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-finish-queued-assigned",
+      "result": "PASS",
+      "exit_code": 0,
+      "executed_tap": [
+        "ok 1 /color-lifecycle/finish/queued-assigned"
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/13/testlog-mutter_default.junit.xml": "b00d46922c3c5a135dea48c512fc0a75a52db901e459fdd7642d575cb021f458",
+        "logs/13/testlog-mutter_default.json": "0c804f6f949f80cdfb45e9c3dadea91f6930eb96257fb2cc447f0280207c5c90",
+        "logs/13/command-output.txt": "818259c07d2effa9e9edb0bf698ef80a4c4c52447a85b4e83934d555d9679998",
+        "logs/13/testlog-mutter_default.txt": "5f149610b4dfcff8b7614a70282bc20a3ce7fd96b58a4cd6ea159b861936ff9d"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-directory-query",
+      "result": "PASS",
+      "exit_code": 0,
+      "executed_tap": [
+        "ok 1 /color-lifecycle/directory/query"
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/14/testlog-mutter_default.junit.xml": "158c483033ae7d9564dc17e0648934f35743e8a598676442857c7256a9a19641",
+        "logs/14/testlog-mutter_default.json": "59a95e344f7003c105de8a4bb865f01b52dc8f9f16cc861a9b44f734f3cd8a54",
+        "logs/14/command-output.txt": "8fb704466b7cc76f742a27a3a3c318f72ea80faadad188a08ca2b10a2c246aa4",
+        "logs/14/testlog-mutter_default.txt": "cfeddf406e74647fddd88b77ed1e0feea216f73f95b91b50f3c08109d930cce8"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-directory-read",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/15/testlog-mutter_default.junit.xml": "e243d49ea9d5fbb7aec113a46fb0dfabd76f3fbbd66a5dfdff0c7a1f2c10d415",
+        "logs/15/testlog-mutter_default.json": "c76641167a3d1f99a9b6b5520ec9d88512093b7111b16f08d56f24922964d7d0",
+        "logs/15/command-output.txt": "e8488d0adea4dcd56a12ded20e1c6afc35fadadcd9b054f6cb8293fe0c9d19b8",
+        "logs/15/testlog-mutter_default.txt": "d2de6a474e674571d7436957c92455bd2ebaecdf8e83afe0caaa3ac1c32ab874"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-local-ready-shutdown",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/16/testlog-mutter_default.junit.xml": "0db95769d04fb65d811c6aa0a4f67a337c23fbc498d4b20f51ca9db2e09fc863",
+        "logs/16/testlog-mutter_default.json": "518f90045b32ca600b1e8cd12eea1b650462f6e107dc03b6db9da91ddf861861",
+        "logs/16/command-output.txt": "a77d7e48b286afde0616788ad896efcddda07a1c9dd3ea015e532e98a642f64c",
+        "logs/16/testlog-mutter_default.txt": "76e0901288b443796921aafe58bc71faa0341784716dcdad50d610c17aa8fed3"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-local-ready-finalize",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/17/testlog-mutter_default.junit.xml": "9a664f4909fd2fcfeb156f3ed32a19a7d17df0ecff30316bc788a3b1165b27b9",
+        "logs/17/testlog-mutter_default.json": "f987d25fef243028ace1e7a7557a8cabb9f3c38413ec2e539e131c100cfe7a47",
+        "logs/17/command-output.txt": "91dca85b95da76bd2988be4c61cc1edd488bea5eadc4c0aab0dd61e7600553a5",
+        "logs/17/testlog-mutter_default.txt": "ee67c767f9d16ba253bbb2cb67ff9efe077a87fd8d0cab0b46344bd40d9327a9"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-create-after-finalize",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/18/testlog-mutter_default.junit.xml": "45cb5063d2fffa91cdebcc19b0a143a08e3b1a1fa3c95e4d13d0ca8e4792c12f",
+        "logs/18/testlog-mutter_default.json": "f33a2d6ce1dc9520a37a5b13e2c49ffa80d615f3ab7089993ae56fa7e748ba86",
+        "logs/18/command-output.txt": "b20acb727efe4d9c9bb37b8d7b6fd734f783304f53a3c6aad4a8551065b09a9d",
+        "logs/18/testlog-mutter_default.txt": "90c4405cc600c34f8c5ccdfdab15606bd5d5b34a437f246eda78ac44ac8998b5"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-retained-owner",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/19/testlog-mutter_default.junit.xml": "4e5c1f11c4de0055b591eab910f006fdc352f8fbb9d5a60158efade07ae33d5b",
+        "logs/19/testlog-mutter_default.json": "3a0efdf292643d34d6ba6644355168aca156b7817a26589a512ad2049fa8ba1b",
+        "logs/19/command-output.txt": "acd65086f4d3430a640143675f156b162b03d412de4cd1c162c13367f6cb2805",
+        "logs/19/testlog-mutter_default.txt": "a227b882711526f544c11a2ea095934bf6bdbfbfb6a10a1abf0968ba3b13ae26"
+      }
+    },
+    {
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-retained-assigned",
+      "result": "PASS",
+      "exit_code": 0,
+      "executed_tap": [
+        "ok 1 /color-lifecycle/profile/retained-assigned"
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/20/testlog-mutter_default.junit.xml": "8af7fe3c3beb106af7eecc5b98167545c0e57fd54030dc0e1a5671f00b28420c",
+        "logs/20/testlog-mutter_default.json": "674fbd84effeb8ad378c38a768aa18402cf1c1631299ef96bbd6dd8caf1f924f",
+        "logs/20/command-output.txt": "f64c9ec678fe885b8809eed7929bdd42f23fe8bef79e0884cd2d4e5937734fab",
+        "logs/20/testlog-mutter_default.txt": "9f507da88afb22843bbe58a7f6efbd9281a15f2807e4921d365a496673178c37"
+      }
+    },
+    {
+      "target": "mutter:color-management",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [
+        "ok 1 /color-management/device/basic",
+        "ok 2 /color-management/device/no-gamma",
+        "ok 3 /color-management/device/no-edid"
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/21/testlog-mutter_default.junit.xml": "1307d20f43717f6e978dd6cbd091e356b1688290a5045cf593913ee5a411a5dc",
+        "logs/21/testlog-mutter_default.json": "fcb37d0a864c499d2ecbe84d7a436bc5d6591e0790c0d3d55a6baed1a16cec30",
+        "logs/21/command-output.txt": "61274077e087ab80f1a92fd0273eb63c1c48874705d2384920a24d1628eefc86",
+        "logs/21/testlog-mutter_default.txt": "1cd514d60ae2a5909416fa73204fb85c3d92c562f90f4a47d0d24df609a16b70"
+      }
+    },
+    {
+      "target": "mutter:color-management-profile-conflict",
+      "result": "PASS",
+      "exit_code": 0,
+      "executed_tap": [
+        "ok 1 /color-manegement/profile/conflict"
+      ],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/22/testlog-mutter_default.junit.xml": "fb2f715d8e75fcd3eff8cbeb9d0f6125a5b69a55fd418e0c6d3d7dd161494f43",
+        "logs/22/testlog-mutter_default.json": "c7d9b6c1b42d6387b8c83f4d43ab8d9133e477b6e14fe9e3016ec9b080216192",
+        "logs/22/command-output.txt": "ca6731ebc04801d51e9309af76b4b185edee2e7bbd2a1b7e1995c6170bfa647a",
+        "logs/22/testlog-mutter_default.txt": "852aa214cda99a448d5f3654aecdfb8d96ab39fc05f0da4cab0dce2fe76e817d"
+      }
+    },
+    {
+      "target": "mutter:monitor-dbus-tests",
+      "result": "FAIL",
+      "exit_code": 1,
+      "executed_tap": [],
+      "intentional_skipped_tap": [],
+      "logs": {
+        "logs/23/testlog-mutter_default.junit.xml": "9a793353075f000bb06c2efa505bcea8edbafe627bffab042bb45447412f48f8",
+        "logs/23/testlog-mutter_default.json": "8c38fe40df3eaa57457ae001209d91ebcac319ae0a182f5bce8f21243adbb755",
+        "logs/23/command-output.txt": "774f8568874bbd85f3e72de53f1ee1657030ab028e7416ffda5bd90609e82aaf",
+        "logs/23/testlog-mutter_default.txt": "b362f828029fb3299f13451d8e17928b7543d8d3cac80ed6d8e0681d9e752104"
+      }
+    },
+    {
+      "target": "mutter:wayland-color-management",
+      "result": "PASS",
+      "exit_code": 0,
+      "executed_tap": [
+        "ok 1 /wayland/color-management",
+        "ok 7 /wayland/custom-primaries/negative-coordinate",
+        "ok 8 /wayland/custom-primaries/unsupported",
+        "ok 10 /wayland/icc-file/wrapping-range",
+        "ok 11 /wayland/icc-file/past-end",
+        "ok 12 /wayland/icc-file/exact-end",
+        "ok 13 /wayland/icc-file/unsupported-content",
+        "ok 14 /wayland/icc-file/truncated-before-read",
+        "ok 16 /wayland/hlg/creation",
+        "ok 17 /wayland/hlg/invalid-black-level",
+        "ok 18 /wayland/creator-params/mastering-luminance-invalid",
+        "ok 19 /wayland/creator-params/mastering-primaries-twice",
+        "ok 20 /wayland/creator-params/mastering-luminance-twice",
+        "ok 21 /wayland/creator-params/max-cll-twice",
+        "ok 22 /wayland/creator-params/max-fall-twice",
+        "ok 23 /wayland/creator-params/max-fall-above-max-cll",
+        "ok 24 /wayland/creator-params/v1-max-cll-above-mastering",
+        "ok 25 /wayland/creator-params/v2-light-levels",
+        "ok 26 /wayland/creator-params/extended-target-volume",
+        "ok 27 /wayland/creator-params/mastering-round-trip"
+      ],
+      "intentional_skipped_tap": [
+        "ok 2 /wayland/target-luminance/v1 # SKIP by request (-s option)",
+        "ok 3 /wayland/target-luminance/v2 # SKIP by request (-s option)",
+        "ok 4 /wayland/target-primaries/v1 # SKIP by request (-s option)",
+        "ok 5 /wayland/target-primaries/v2 # SKIP by request (-s option)",
+        "ok 6 /wayland/sdr-native/unusable-edid-primaries # SKIP by request (-s option)",
+        "ok 9 /wayland/custom-primaries/info-round-trip # SKIP by request (-s option)",
+        "ok 15 /wayland/icc-file/zero-descriptor # SKIP by request (-s option)",
+        "ok 28 /wayland/mapping/blending-target # SKIP by request (-s option)",
+        "ok 29 /wayland/mapping/target-gamut # SKIP by request (-s option)",
+        "ok 30 /wayland/published/reference-factor # SKIP by request (-s option)",
+        "ok 31 /wayland/night-light/bt2100-scanout # SKIP by request (-s option)",
+        "ok 32 /wayland/night-light/bt2100-capture # SKIP by request (-s option)",
+        "ok 33 /wayland/display-targets/cta # SKIP by request (-s option)",
+        "ok 34 /wayland/display-targets/sdr-native # SKIP by request (-s option)",
+        "ok 35 /wayland/display-targets/user-override # SKIP by request (-s option)"
+      ],
+      "logs": {
+        "logs/24/testlog-mutter_default.junit.xml": "b46ada178eef0023e8d18fdf86bd11c900a615b3ec7be3748732372630580fc2",
+        "logs/24/testlog-mutter_default.json": "478d37b77a6dea552864e1358aa300751b79c939de702c286a5afb21f91ce324",
+        "logs/24/command-output.txt": "edd109a2c6a4ccd23ccba47d0f0243ecbd27fbd43adefad247a7371e81fdacc2",
+        "logs/24/testlog-mutter_default.txt": "9ea4002532bac408b3517920c242d6b26827a919783456e5653cfd8a13745ca3"
+      }
+    }
+  ],
+  "private_artifact_hashes": {
+    "logs.tar.gz": "55e867eb23aadc8a9dfba233d15f1624aa61bf9db6e9d729eb425e677ee37a0f",
+    "approved-manifest.json": "a9b4881562bf0190cbffb4cf35c31bbb89d6f3a7b389ef3ffff375293da99245",
+    "post-execution-identity.json": "8693be5a7e5152ddbecfc16923d80271bed403b6ff2227bedb034adbd8e10f0e",
+    "pre-execution-identity.json": "8693be5a7e5152ddbecfc16923d80271bed403b6ff2227bedb034adbd8e10f0e",
+    "receipt.json": "d0dc1782ca2a8f9478ef6e8ec04f9d696c004bec24b74525e887809c7cb1aaea"
+  },
+  "static_diagnosis": {
+    "Clutter": "Lifecycle fixture calls meta_context_setup but not meta_context_start. Its hotplug paths and retained callbacks may require complete context initialization/lifetime; observed assertion lacks a captured stack. Do not reduce cancellation/release assertions or add sleeps.",
+    "GTask": "meta-color-store.c:605 creates callback-bearing GTask before no-EDID/no-gamma branch619-620 returns FALSE without completing it. Diagnostic cause traced in source; preserve synchronous FALSE/no-callback semantics by designing eligibility before task construction with shutdown-before-device access. No fix applied.",
+    "other": "Startup cancelled invalid class and4SIGSEGV cases have no captured stack; exact frame/root cause remains unknown. Read-only source/core inspection needed before correction."
+  },
+  "next": "Automatic thinker recovery should adjudicate exact fixture/production repairs, source-file ownership, retained6passes and scoped failed/genuinely invalidated retries; builder compiles/exports fixes, independent review precedes retries.",
+  "constraints": [
+    "Frozen nativehdr10 source/build/accepted ledger unchanged",
+    "Offscreen branch uncombined",
+    "PR16 held; local-only no push/merge/deployment/devices/AppleTV/credentials",
+    "No measured leak, physical or full Dolby acceptance"
+  ]
+}

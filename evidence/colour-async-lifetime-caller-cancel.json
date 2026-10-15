@@ -1,0 +1,672 @@
+{
+  "task": "t_457bd73c",
+  "status": "COMPILE_ONLY_AWAITING_INDEPENDENT_REVIEW_AND_SCOPED_ACCEPTANCE",
+  "native_head": "e2d7cfbad8d3a44dd1a9a9d89a124444e44e9bb9",
+  "native_tree": "1a92b068c246b127fed721e78b4fbbd16a8d5d2b",
+  "replay_tree": "1a92b068c246b127fed721e78b4fbbd16a8d5d2b",
+  "canonical_patch_count": 87,
+  "prefix0001_0086_unchanged": true,
+  "appended_patch": "0087-tests-isolate-ineligible-caller-fixture-from-shared-.patch",
+  "appended_patch_sha256": "ebc8de0773ae5d25e14d487a1cfb270edb961743fbcf8126bfd18e907acc8af1",
+  "changed_function": "src/tests/color-lifecycle-tests.c:test_shared_caller_cancel",
+  "changed_lines": "Four additions: stable synthetic ineligible serial, explanatory comment, explicit pointer-distinctness assertion. No production/shared-helper/Meson/API edits or added waits.",
+  "diagnosis": {
+    "invocations": 1,
+    "result": "FAIL_TIMEOUT_DIAGNOSTIC_NOT_ACCEPTANCE",
+    "seconds": 31.36893948004581,
+    "last_boundary": "Immediately before wait_for_delivery; no return breadcrumb before original30s child timeout.",
+    "observed": "Identical ineligible/eligible device pointers (equal=1) and serial; eligible EDID/gamma, delivery queue0 and store pending0. Already-cancelled callback1, ineligible callback0.",
+    "instrumentation_private_excluded": true,
+    "production_unchanged": true,
+    "archive_sha256": "0f371a11d0f8241bd161e4281226914a355b5fec36911d5e3911e7e7f0ea2ff6"
+  },
+  "compile": {
+    "baseline_seconds": 95.25562493805774,
+    "affected_seconds": 0.6635493929497898,
+    "affected_actions": 2,
+    "warnings_as_errors": true,
+    "binary_sha256": "217b1768760687f03d473173430246980dacb7e6c6a004db0ecb136e9b510052",
+    "object_sha256": "8c063c64bf6ce036eea28fdd2e1e5419755c4f02d05a6b7a910d069bf342ddb6",
+    "production_binary_unchanged_in_new_build": true,
+    "production_binary_sha256": "0e4de2aa0762f42f1bde1219a5793d34166a73437163d38a73b779d2c40318cf"
+  },
+  "equivalence": {
+    "config_h_byte_identical": true,
+    "all_build_options_identical": true,
+    "all_compile_commands_path_normalized_identical": true,
+    "compile_command_count": 3476,
+    "old_source_still_clean_unchanged": true,
+    "new_source_clean": true,
+    "old_source_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+    "new_source_head": "e2d7cfbad8d3a44dd1a9a9d89a124444e44e9bb9",
+    "diagnostic_invocations": 1,
+    "corrected_acceptance_invocations": 0
+  },
+  "binding": {
+    "sha256": "6cd72cf4c9bc51b39d036c175a3199bb9dd1fdcdaa55031411cebf638abfcc09",
+    "registration_count": 24,
+    "elf_count": 21,
+    "fixture_inputs": 398,
+    "runtime_library_count": 161,
+    "no_missing_dependency": true,
+    "runtime_policy": {
+      "G_ENABLE_DIAGNOSTIC": "1",
+      "G_DEBUG": "fatal-warnings",
+      "LIBGL_ALWAYS_SOFTWARE": "1",
+      "GALLIUM_DRIVER": "llvmpipe",
+      "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1"
+    },
+    "retention_equivalence": {
+      "entire_source_delta_ID9_only": [
+        "src/tests/color-lifecycle-tests.c"
+      ],
+      "all_source_inputs_byte_identical": true,
+      "normalized_all24_registrations_identical": true,
+      "system_runtime_libraries_python_services_schema_identical": true
+    }
+  },
+  "acceptance_invocations": 0,
+  "new_results": null,
+  "per_id_proposals": [
+    {
+      "id": 1,
+      "target": "mutter:color-lifecycle-color-lifecycle-startup-queued-success",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/startup/queued-success"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_startup(TRUE) and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 2,
+      "target": "mutter:color-lifecycle-color-lifecycle-startup-cancelled",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/startup/cancelled"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_startup(FALSE) and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 3,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-directory-query",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/directory-query"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_generation_shutdown and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 4,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-directory-create",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/directory-create"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_generation_shutdown and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 5,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-write-result",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/write-result"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_generation_shutdown and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 6,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-profile-result",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/profile-result"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_generation_shutdown and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 7,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-efi-success",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/efi-success"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_generation_shutdown and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 8,
+      "target": "mutter:color-lifecycle-color-lifecycle-generation-efi-fallback",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/generation/efi-fallback"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "PASS",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-retain-pass",
+      "reason": "test_generation_shutdown and its data-specific callback barrier, shared helpers and all production paths are unchanged by the ID9-local identity/assertion addition. Runtime libraries, source fixtures, normalized registrations/build options/compile commands remain equivalent; old pass retains its actual executing tree.",
+      "new_result": null
+    },
+    {
+      "id": 9,
+      "target": "mutter:color-lifecycle-color-lifecycle-shared-caller-cancel",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/shared/caller-cancel"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "FAIL",
+      "historical_head": "45a2f20ade8d85664a7a99f49026a5c2ec540b40",
+      "historical_tree": "ec79554021bb1ce99de1b230044385493cf2cb0b",
+      "disposition": "propose-failed-retry",
+      "reason": "Actual attempt2 timeout; identity-reuse write barrier corrected locally. Needs reviewed retry on new candidate.",
+      "new_result": null
+    },
+    {
+      "id": 10,
+      "target": "mutter:color-lifecycle-color-lifecycle-finish-queued-device",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/finish/queued-device"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 11,
+      "target": "mutter:color-lifecycle-color-lifecycle-assigned-connect",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/assigned/connect"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 12,
+      "target": "mutter:color-lifecycle-color-lifecycle-assigned-read",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/assigned/read"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 13,
+      "target": "mutter:color-lifecycle-color-lifecycle-finish-queued-assigned",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/finish/queued-assigned"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 14,
+      "target": "mutter:color-lifecycle-color-lifecycle-directory-query",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/directory/query"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 15,
+      "target": "mutter:color-lifecycle-color-lifecycle-directory-read",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/directory/read"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 16,
+      "target": "mutter:color-lifecycle-color-lifecycle-local-ready-shutdown",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/local-ready/shutdown"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 17,
+      "target": "mutter:color-lifecycle-color-lifecycle-local-ready-finalize",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/local-ready/finalize"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 18,
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-create-after-finalize",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/profile/create-after-finalize"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 19,
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-retained-owner",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/profile/retained-owner"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 20,
+      "target": "mutter:color-lifecycle-color-lifecycle-profile-retained-assigned",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-lifecycle/profile/retained-assigned"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 21,
+      "target": "mutter:color-management",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 21,
+        "required_non_skipped_tap_paths": [
+          "/color-management/device/basic",
+          "/color-management/device/no-gamma",
+          "/color-management/device/no-edid",
+          "/color-management/device/no-edid-no-gamma",
+          "/color-management/device/unplug-referenced",
+          "/color-management/device/moved-connector",
+          "/color-management/device/unplug-during-setup",
+          "/color-management/profile/device",
+          "/color-management/profile/device-bogus",
+          "/color-management/profile/system",
+          "/color-management/profile/efivar",
+          "/color-management/night-light/calibrated",
+          "/color-management/night-light/bt2100",
+          "/color-management/night-light/bt2100-from-warm-lut",
+          "/color-management/night-light/bt2100-from-warm-ctm",
+          "/color-management/night-light/planckian-chromaticity",
+          "/color-management/night-light/uncalibrated",
+          "/color-management/night-light/prefer-gamma-lut",
+          "/color-management/night-light/ctm-fallback",
+          "/color-management/night-light/ctm-scale-clamping",
+          "/color-management/night-light/supported"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 22,
+      "target": "mutter:color-management-profile-conflict",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 1,
+        "required_non_skipped_tap_paths": [
+          "/color-manegement/profile/conflict"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 23,
+      "target": "mutter:monitor-dbus-tests",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 2,
+        "required_non_skipped_tap_paths": [
+          "/backends/monitor/target-overrides-dbus",
+          "/backends/monitor/has-external-monitor"
+        ],
+        "allowed_skipped_paths": [],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    },
+    {
+      "id": 24,
+      "target": "mutter:wayland-color-management",
+      "selection_expectations": {
+        "minimum_non_skipped_tap_cases": 20,
+        "required_non_skipped_tap_paths": [
+          "/wayland/color-management",
+          "/wayland/custom-primaries/negative-coordinate",
+          "/wayland/custom-primaries/unsupported",
+          "/wayland/icc-file/wrapping-range",
+          "/wayland/icc-file/past-end",
+          "/wayland/icc-file/exact-end",
+          "/wayland/icc-file/unsupported-content",
+          "/wayland/icc-file/truncated-before-read",
+          "/wayland/hlg/creation",
+          "/wayland/hlg/invalid-black-level",
+          "/wayland/creator-params/mastering-luminance-invalid",
+          "/wayland/creator-params/mastering-primaries-twice",
+          "/wayland/creator-params/mastering-luminance-twice",
+          "/wayland/creator-params/max-cll-twice",
+          "/wayland/creator-params/max-fall-twice",
+          "/wayland/creator-params/max-fall-above-max-cll",
+          "/wayland/creator-params/v1-max-cll-above-mastering",
+          "/wayland/creator-params/v2-light-levels",
+          "/wayland/creator-params/extended-target-volume",
+          "/wayland/creator-params/mastering-round-trip"
+        ],
+        "allowed_skipped_paths": [
+          "/wayland/target-luminance/v1",
+          "/wayland/target-luminance/v2",
+          "/wayland/target-primaries/v1",
+          "/wayland/target-primaries/v2",
+          "/wayland/sdr-native/unusable-edid-primaries",
+          "/wayland/custom-primaries/info-round-trip",
+          "/wayland/icc-file/zero-descriptor",
+          "/wayland/mapping/blending-target",
+          "/wayland/mapping/target-gamut",
+          "/wayland/published/reference-factor",
+          "/wayland/display-targets/cta",
+          "/wayland/display-targets/sdr-native",
+          "/wayland/display-targets/user-override",
+          "/wayland/night-light/bt2100-scanout",
+          "/wayland/night-light/bt2100-capture"
+        ],
+        "require_meson_exit_code": 0,
+        "require_exactly_one_passing_meson_record": true,
+        "reject_timeout_crash_empty_selection": true,
+        "reject_unexpected_skip": true,
+        "note": "Paths derived statically, not a claimed execution result. Preserve literal color-manegement spelling in profile-conflict source. Full intended top-level TAP path set required; skip only explicit emitted -s paths."
+      },
+      "historical_result": "NOTRUN",
+      "historical_head": null,
+      "historical_tree": null,
+      "disposition": "propose-pending-execution",
+      "reason": "Not executed after attempt2 stopped at ID9; needs reviewed first execution on this repair lineage.",
+      "new_result": null
+    }
+  ],
+  "historical_accounting": {
+    "original": "6PASS18FAIL/96logs immutable",
+    "attempt2": "8PASS1FAIL15NOTRUN/36logs immutable",
+    "attempt2_receipt_sha256": "464404065870f3759acaf92f4fffaa8ba36405142a1d32d4f0ee0c15d4567075"
+  },
+  "failures_and_recovery": [
+    "New-clone wrapper request unconsumed180s; fixed owned-integration wrapper used, no native selection executed during failed setup.",
+    "Full delivery exceeded aggregate4MiB mailbox return AFTER compile/export/replay; recovered exact existing594355-byte archive in3chunks, preserving all originals. No successful compile/replay/test repeated.",
+    "Static binding compared generated __pycache__ bytecode by mistake; excluded generated .pyc from semantic fixture equality and resumed static hash probe only.",
+    "Mac patch repository cannot verify upstream bundle because d82671c prerequisite is not in its graph; native full-series replay equality establishes source delivery. Bundle is for upstream-source checkout with that base."
+  ],
+  "limits": [
+    "Independent review t_63560e90 must confirm retained-eight/scoped-resumption manifest; this evidence is not review or retry authorization.",
+    "No publication, merge, deployment, packaging, physical/optical/Dolby claim. PR16held.",
+    "Frozen/offscreen lanes, original source/build/ledgers and historical receipts unchanged."
+  ]
+}

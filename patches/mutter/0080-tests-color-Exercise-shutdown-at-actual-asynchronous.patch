@@ -1,0 +1,1012 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Sol Agent <sol-agent@invalid>
+Date: Mon, 12 Oct 2026 19:44:53 +0000
+Subject: [PATCH] tests/color: Exercise shutdown at actual asynchronous
+ delivery boundaries
+
+---
+ config.h.meson                    |   1 +
+ src/tests/color-lifecycle-tests.c | 945 ++++++++++++++++++++++++++++++
+ src/tests/meson.build             |  28 +
+ 3 files changed, 974 insertions(+)
+ create mode 100644 src/tests/color-lifecycle-tests.c
+
+diff --git a/config.h.meson b/config.h.meson
+index 5e7e09b..87b4bc5 100644
+--- a/config.h.meson
++++ b/config.h.meson
+@@ -118,3 +118,4 @@
+ 
+ /* Whether ASan testing is enabled */
+ #mesondefine HAVE_ASAN_TESTS
++#mesondefine HAVE_COLOR_LIFECYCLE_TESTS
+diff --git a/src/tests/color-lifecycle-tests.c b/src/tests/color-lifecycle-tests.c
+new file mode 100644
+index 0000000..6170930
+--- /dev/null
++++ b/src/tests/color-lifecycle-tests.c
+@@ -0,0 +1,945 @@
++/*
++ * Copyright (C) 2026 Sol Agent
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ */
++
++#include "config.h"
++
++#include <glib/gstdio.h>
++
++#include "backends/meta-color-device.h"
++#include "backends/meta-color-lifecycle-test-private.h"
++#include "backends/meta-color-manager-private.h"
++#include "backends/meta-color-profile.h"
++#include "backends/meta-color-store.h"
++#include "backends/meta-monitor-manager-private.h"
++#include "backends/meta-monitor-private.h"
++#include "meta-test/meta-context-test.h"
++#include "tests/meta-monitor-test-utils.h"
++
++#define SYSTEM_PROFILE_ID "icc-112034c661b5e0c91c51f109684612a0"
++
++/* A capture parks an EXISTING callback-data transfer. It owns only source and
++ * result refs. In particular manager/profile callback_data stays borrowed. */
++typedef struct
++{
++  const char *point;
++  GObject *source;
++  GAsyncResult *result;
++  gpointer callback_data;
++  GAsyncReadyCallback callback;
++} Delivery;
++
++typedef struct
++{
++  GQueue deliveries;
++  const char *hold_point;
++  gboolean hold_startup;
++  unsigned int startup_seen;
++  unsigned int callbacks_returned;
++  gboolean manager_gone;
++  gboolean client_gone;
++  CdClient *client;
++  char *generated_profile_id;
++  char *generated_path;
++} Fixture;
++
++typedef struct
++{
++  unsigned int calls;
++  gboolean colord;
++  gboolean defer_finish;
++  GAsyncResult *result;
++  MetaColorProfile *profile;
++  GError *error;
++} Result;
++
++typedef struct
++{
++  const char *point;
++  const char *efi_input;
++  gboolean create_directory;
++} GenerationCase;
++
++static MetaContext *test_context;
++
++static GDBusProxy * colord_mock (void);
++
++static MonitorTestCaseSetup monitor_setup = {
++  .modes = { { .width = 1024, .height = 768, .refresh_rate = 60.0 } },
++  .n_modes = 1,
++  .outputs = {
++    {
++      .crtc = 0,
++      .modes = { 0 }, .n_modes = 1, .preferred_mode = 0,
++      .possible_crtcs = { 0 }, .n_possible_crtcs = 1,
++      .width_mm = 222, .height_mm = 125,
++      .has_edid_info = TRUE,
++      .edid_info = {
++        .default_gamma = 2.2f,
++        .default_color_primaries = {
++          .primary = {
++            { .x = 0.64f, .y = 0.33f },
++            { .x = 0.30f, .y = 0.60f },
++            { .x = 0.15f, .y = 0.06f },
++          },
++          .default_white = { .x = 0.3127f, .y = 0.3290f },
++        },
++      },
++    },
++  },
++  .n_outputs = 1,
++  .crtcs = { { .current_mode = 0 } },
++  .n_crtcs = 1,
++};
++
++static void
++on_finalized (gpointer data,
++              GObject *object)
++{
++  gboolean *gone = data;
++
++  g_assert_false (*gone);
++  *gone = TRUE;
++}
++
++static void
++watch (gpointer  object,
++       gboolean *gone)
++{
++  g_assert_nonnull (object);
++  g_object_weak_ref (G_OBJECT (object), on_finalized, gone);
++}
++
++static void
++wait_for_release (gboolean *gone)
++{
++  while (!*gone)
++    g_main_context_iteration (NULL, TRUE);
++}
++
++static gboolean
++run_in_fresh_process (void)
++{
++  if (g_test_subprocess ())
++    return TRUE;
++
++  /* Failure bound, never a race barrier. Each child configures one context. */
++  g_test_trap_subprocess (NULL, 30 * G_USEC_PER_SEC, 0);
++  g_test_trap_assert_passed ();
++  return FALSE;
++}
++
++static gboolean
++intercept (const char          *point,
++           GObject             *source,
++           GAsyncResult        *result,
++           gpointer             callback_data,
++           GAsyncReadyCallback  callback,
++           gpointer             user_data)
++{
++  Fixture *fixture = user_data;
++  gboolean startup = g_str_has_prefix (point, "manager:");
++  Delivery *delivery;
++
++  if (startup)
++    {
++      fixture->startup_seen++;
++      if (g_str_equal (point, "manager:cd_client_connect_cb"))
++        {
++          g_assert_null (fixture->client);
++          fixture->client = g_object_ref (CD_CLIENT (source));
++          watch (source, &fixture->client_gone);
++        }
++    }
++
++  if (g_str_equal (point, "device:on_profile_written") &&
++      !fixture->manager_gone && !g_task_had_error (G_TASK (result)))
++    {
++      g_autofree char *contents = NULL;
++      g_autofree char *checksum = NULL;
++      g_autoptr (GError) error = NULL;
++      size_t size;
++
++      /* Read only the synthetic file whose actual write has completed. */
++      g_assert_true (g_file_get_contents (g_file_peek_path (G_FILE (source)),
++                                          &contents, &size, &error));
++      g_assert_no_error (error);
++      checksum = g_compute_checksum_for_data (G_CHECKSUM_MD5,
++                                               (guchar *) contents, size);
++      g_free (fixture->generated_profile_id);
++      fixture->generated_profile_id = g_strdup_printf ("icc-%s", checksum);
++      g_free (fixture->generated_path);
++      fixture->generated_path = g_file_get_path (G_FILE (source));
++    }
++
++  if (!(startup && fixture->hold_startup) &&
++      g_strcmp0 (point, fixture->hold_point) != 0)
++    return FALSE;
++
++  delivery = g_new0 (Delivery, 1);
++  delivery->point = point;
++  delivery->source = source ? g_object_ref (source) : NULL;
++  delivery->result = g_object_ref (result);
++  delivery->callback_data = callback_data;
++  delivery->callback = callback;
++  g_queue_push_tail (&fixture->deliveries, delivery);
++  return TRUE;
++}
++
++static Delivery *
++wait_for_delivery (Fixture *fixture)
++{
++  while (g_queue_is_empty (&fixture->deliveries))
++    g_main_context_iteration (NULL, TRUE);
++
++  return g_queue_peek_head (&fixture->deliveries);
++}
++
++static void
++replay_one (Fixture *fixture)
++{
++  Delivery *delivery = g_queue_pop_head (&fixture->deliveries);
++
++  g_assert_nonnull (delivery);
++  /* Consume the record before entering the real callback. Never unref its
++   * opaque callback_data: the original body discharges that transfer. */
++  meta_color_lifecycle_test_set_hook (NULL, NULL);
++  delivery->callback (delivery->source, delivery->result,
++                      delivery->callback_data);
++  fixture->callbacks_returned++;
++  g_clear_object (&delivery->source);
++  g_clear_object (&delivery->result);
++  g_free (delivery);
++  meta_color_lifecycle_test_set_hook (intercept, fixture);
++}
++
++static MetaMonitorTestSetup *
++initial_monitor_setup (MetaBackend *backend)
++{
++  MonitorTestCaseSetup setup = monitor_setup;
++
++  setup.n_outputs = 0;
++  return meta_create_monitor_test_setup (backend, &setup,
++                                         MONITOR_TEST_FLAG_NO_STORED);
++}
++
++static MetaColorManager *
++setup_fixture (Fixture *fixture,
++               gboolean wait_ready)
++{
++  MetaColorManager *manager;
++  g_autoptr (GError) error = NULL;
++  g_autoptr (GDBusProxy) mock = colord_mock ();
++  g_autoptr (GVariant) reply = NULL;
++
++  reply = g_dbus_proxy_call_sync (mock, "Reset", NULL,
++                                  G_DBUS_CALL_FLAGS_NO_AUTO_START, -1,
++                                  NULL, &error);
++  g_assert_no_error (error);
++  g_assert_nonnull (reply);
++  meta_color_lifecycle_test_set_hook (intercept, fixture);
++  g_assert_true (meta_context_setup (test_context, &error));
++  g_assert_no_error (error);
++  manager = meta_backend_get_color_manager (
++    meta_context_get_backend (test_context));
++  watch (manager, &fixture->manager_gone);
++
++  if (wait_ready)
++    {
++      while (!meta_color_manager_is_ready (manager) || fixture->startup_seen < 3)
++        g_main_context_iteration (NULL, TRUE);
++      g_assert_cmpuint (fixture->startup_seen, ==, 3);
++      g_assert_nonnull (meta_color_manager_get_color_store (manager));
++    }
++
++  return manager;
++}
++
++static void
++destroy_manager (Fixture *fixture)
++{
++  /* Neither fixture nor queue owns the manager. Do not use its raw pointer
++   * even for a checked cast after this weak-notification assertion. */
++  g_clear_object (&fixture->client);
++  meta_context_destroy (test_context);
++  g_clear_object (&test_context);
++  g_assert_true (fixture->manager_gone);
++}
++
++static void
++finish_fixture (Fixture *fixture)
++{
++  g_assert_true (g_queue_is_empty (&fixture->deliveries));
++  meta_color_lifecycle_test_set_hook (NULL, NULL);
++  if (test_context)
++    destroy_manager (fixture);
++  g_clear_object (&fixture->client);
++  wait_for_release (&fixture->client_gone);
++  g_clear_pointer (&fixture->generated_profile_id, g_free);
++  if (fixture->generated_path)
++    {
++      g_assert_cmpint (g_unlink (fixture->generated_path), ==, 0);
++      g_clear_pointer (&fixture->generated_path, g_free);
++    }
++  meta_set_color_efivar_test_path (NULL);
++}
++
++static MetaColorDevice *
++add_monitor (MetaColorManager *manager)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *monitor_manager = meta_backend_get_monitor_manager (backend);
++  MetaMonitorTestSetup *setup;
++  MetaMonitor *monitor;
++
++  setup = meta_create_monitor_test_setup (backend, &monitor_setup,
++                                          MONITOR_TEST_FLAG_NO_STORED);
++  meta_monitor_manager_test_emulate_hotplug (
++    META_MONITOR_MANAGER_TEST (monitor_manager), setup);
++  monitor = meta_monitor_manager_get_monitors (monitor_manager)->data;
++  return g_object_ref (meta_color_manager_get_color_device (manager, monitor));
++}
++
++static void
++finish_result (MetaColorStore *store,
++               Result         *result,
++               GAsyncResult   *async_result)
++{
++  if (result->colord)
++    result->profile = meta_color_store_ensure_colord_profile_finish (
++      store, async_result, &result->error);
++  else
++    {
++      MetaColorProfile *profile;
++
++      /* Device ensure's successful result is borrowed from the store. */
++      profile = meta_color_store_ensure_device_profile_finish (
++        store, async_result, &result->error);
++      if (profile)
++        result->profile = g_object_ref (profile);
++    }
++}
++
++static void
++on_result (GObject      *source,
++           GAsyncResult *async_result,
++           gpointer      user_data)
++{
++  Result *result = user_data;
++
++  result->calls++;
++  g_assert_cmpuint (result->calls, ==, 1);
++  if (result->defer_finish)
++    result->result = g_object_ref (async_result);
++  else
++    finish_result ((MetaColorStore *) source, result, async_result);
++}
++
++static void
++wait_for_result (Result *result)
++{
++  while (result->calls == 0)
++    g_main_context_iteration (NULL, TRUE);
++  g_assert_cmpuint (result->calls, ==, 1);
++}
++
++static void
++assert_cancelled (Result *result)
++{
++  wait_for_result (result);
++  g_assert_null (result->profile);
++  g_assert_error (result->error, G_IO_ERROR, G_IO_ERROR_CANCELLED);
++}
++
++static void
++clear_result (Result *result)
++{
++  g_clear_object (&result->result);
++  g_clear_object (&result->profile);
++  g_clear_error (&result->error);
++}
++
++static void
++test_startup (gconstpointer user_data)
++{
++  gboolean queued_success = GPOINTER_TO_INT (user_data);
++  Fixture fixture = { .hold_startup = TRUE };
++
++  if (!run_in_fresh_process ())
++    return;
++
++  setup_fixture (&fixture, FALSE);
++  if (!queued_success)
++    destroy_manager (&fixture);
++
++  while (g_queue_get_length (&fixture.deliveries) < 3)
++    g_main_context_iteration (NULL, TRUE);
++  g_assert_cmpuint (fixture.startup_seen, ==, 3);
++
++  if (queued_success)
++    {
++      GList *l;
++
++      for (l = fixture.deliveries.head; l; l = l->next)
++        {
++          Delivery *delivery = l->data;
++
++          g_assert_true (G_IS_TASK (delivery->result));
++          g_assert_false (g_task_had_error (G_TASK (delivery->result)));
++          g_assert_false (g_cancellable_is_cancelled (
++            g_task_get_cancellable (G_TASK (delivery->result))));
++        }
++      destroy_manager (&fixture);
++    }
++
++  g_assert_true (fixture.manager_gone);
++  while (!g_queue_is_empty (&fixture.deliveries))
++    {
++      Delivery *delivery = g_queue_peek_head (&fixture.deliveries);
++
++      g_assert_true (g_cancellable_is_cancelled (
++        g_task_get_cancellable (G_TASK (delivery->result))));
++      replay_one (&fixture);
++    }
++  g_assert_cmpuint (fixture.callbacks_returned, ==, 3);
++  finish_fixture (&fixture);
++}
++
++static void
++test_generation_shutdown (gconstpointer user_data)
++{
++  const GenerationCase *test = user_data;
++  Fixture fixture = {};
++  MetaColorManager *manager;
++  g_autoptr (MetaColorStore) store = NULL;
++  g_autoptr (MetaColorDevice) device = NULL;
++  g_autoptr (GCancellable) caller = g_cancellable_new ();
++  g_autofree char *efi_path = NULL;
++  g_autofree char *directory = NULL;
++  Result first = {}, second = {};
++  gboolean store_gone = FALSE, device_gone = FALSE, task_gone = FALSE;
++  Delivery *delivery;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = g_object_ref (meta_color_manager_get_color_store (manager));
++  watch (store, &store_gone);
++  fixture.hold_point = test->point;
++
++  if (test->create_directory)
++    {
++      directory = g_build_filename (g_get_user_data_dir (), "icc", NULL);
++      g_assert_cmpint (g_rmdir (directory), ==, 0);
++    }
++  if (test->efi_input)
++    {
++      if (g_str_equal (test->efi_input, "success"))
++        efi_path = g_test_build_filename (G_TEST_DIST, "icc-profiles",
++                                          "sRGB.icc", NULL);
++      else
++        efi_path = g_build_filename (g_get_user_data_dir (),
++                                     "missing-synthetic-efi.icc", NULL);
++      meta_set_color_efivar_test_path (efi_path);
++    }
++
++  device = add_monitor (manager);
++  watch (device, &device_gone);
++  delivery = wait_for_delivery (&fixture);
++  g_assert_cmpstr (delivery->point, ==, test->point);
++  g_assert_true (meta_color_store_has_pending_profiles (store));
++  g_assert_null (meta_color_device_get_device_profile (device));
++  /* Here callback_data is an independently owned transferred GTask, not a
++   * borrowed manager/profile. Its weak release proves the transfer balances. */
++  g_assert_true (G_IS_TASK (delivery->callback_data));
++  watch (delivery->callback_data, &task_gone);
++  if (!test->efi_input || g_str_equal (test->efi_input, "success"))
++    g_assert_false (g_task_had_error (G_TASK (delivery->result)));
++  else
++    g_assert_true (g_task_had_error (G_TASK (delivery->result)));
++
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, device, caller, on_result, &first));
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, device, NULL, on_result, &second));
++  destroy_manager (&fixture);
++  /* Repeated shutdown must neither clear pending entries nor complete twice. */
++  meta_color_store_shutdown (store);
++  meta_color_store_shutdown (store);
++  g_assert_true (meta_color_store_has_pending_profiles (store));
++  g_assert_false (g_cancellable_is_cancelled (caller));
++  replay_one (&fixture);
++  g_assert_cmpuint (fixture.callbacks_returned, ==, 1);
++  assert_cancelled (&first);
++  assert_cancelled (&second);
++  g_assert_false (meta_color_store_has_pending_profiles (store));
++  g_assert_null (meta_color_device_get_device_profile (device));
++  if (fixture.generated_profile_id)
++    g_assert_null (meta_color_store_get_profile (store,
++                                                fixture.generated_profile_id));
++  clear_result (&first);
++  clear_result (&second);
++  g_clear_object (&device);
++  g_clear_object (&store);
++  wait_for_release (&task_gone);
++  wait_for_release (&device_gone);
++  wait_for_release (&store_gone);
++  finish_fixture (&fixture);
++}
++
++static void
++test_shared_caller_cancel (void)
++{
++  Fixture fixture = { .hold_point = "device:on_profile_written" };
++  MetaColorManager *manager;
++  g_autoptr (MetaColorDevice) device = NULL;
++  MetaColorStore *store;
++  g_autoptr (GCancellable) cancelled = g_cancellable_new ();
++  Result first = {}, second = {};
++  gboolean device_gone = FALSE;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = meta_color_manager_get_color_store (manager);
++  device = add_monitor (manager);
++  watch (device, &device_gone);
++  wait_for_delivery (&fixture);
++  g_assert_true (meta_color_store_has_pending_profiles (store));
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, device, cancelled, on_result, &first));
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, device, NULL, on_result, &second));
++  g_cancellable_cancel (cancelled);
++  replay_one (&fixture);
++  assert_cancelled (&first);
++  wait_for_result (&second);
++  g_assert_no_error (second.error);
++  g_assert_nonnull (second.profile);
++  g_assert_false (meta_color_store_has_pending_profiles (store));
++  while (!meta_color_device_is_ready (device))
++    g_main_context_iteration (NULL, TRUE);
++  g_assert_nonnull (meta_color_store_get_profile (
++    store, meta_color_profile_get_id (second.profile)));
++  g_assert_false (fixture.manager_gone);
++  clear_result (&first);
++  clear_result (&second);
++  destroy_manager (&fixture);
++  g_clear_object (&device);
++  wait_for_release (&device_gone);
++  finish_fixture (&fixture);
++}
++
++static void
++test_queued_device_finish (void)
++{
++  Fixture fixture = {};
++  MetaColorManager *manager;
++  g_autoptr (MetaColorDevice) device = NULL;
++  g_autoptr (MetaColorStore) store = NULL;
++  Result result = { .defer_finish = TRUE };
++  Result after_shutdown = {};
++  gboolean store_gone = FALSE, device_gone = FALSE, result_gone = FALSE;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = g_object_ref (meta_color_manager_get_color_store (manager));
++  device = add_monitor (manager);
++  watch (store, &store_gone);
++  watch (device, &device_gone);
++  while (!meta_color_device_is_ready (device))
++    g_main_context_iteration (NULL, TRUE);
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, device, NULL, on_result, &result));
++  wait_for_result (&result);
++  g_assert_false (g_task_had_error (G_TASK (result.result)));
++  watch (result.result, &result_gone);
++  destroy_manager (&fixture);
++  finish_result (store, &result, result.result);
++  assert_cancelled (&result);
++  /* Even a NULL device is safe: shutdown must precede device/monitor access. */
++  g_assert_true (meta_color_store_ensure_device_profile (
++    store, NULL, NULL, on_result, &after_shutdown));
++  assert_cancelled (&after_shutdown);
++  clear_result (&result);
++  clear_result (&after_shutdown);
++  g_clear_object (&device);
++  g_clear_object (&store);
++  wait_for_release (&result_gone);
++  wait_for_release (&device_gone);
++  wait_for_release (&store_gone);
++  finish_fixture (&fixture);
++}
++
++static GDBusProxy *
++colord_mock (void)
++{
++  g_autoptr (GError) error = NULL;
++  GDBusProxy *proxy;
++
++  proxy = g_dbus_proxy_new_for_bus_sync (
++    G_BUS_TYPE_SYSTEM,
++    G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START | G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS,
++    NULL, "org.freedesktop.ColorManager", "/org/freedesktop/ColorManager",
++    "org.freedesktop.DBus.Mock", NULL, &error);
++  g_assert_no_error (error);
++  g_assert_nonnull (proxy);
++  return proxy;
++}
++
++static void
++on_find_system_profile (GObject      *source,
++                        GAsyncResult *result,
++                        gpointer      user_data)
++{
++  CdProfile **profile = user_data;
++  g_autoptr (GError) error = NULL;
++
++  *profile = cd_client_find_profile_finish (CD_CLIENT (source), result, &error);
++  g_assert_no_error (error);
++  g_assert_nonnull (*profile);
++}
++
++static CdProfile *
++add_system_profile (Fixture *fixture)
++{
++  g_autoptr (GDBusProxy) proxy = colord_mock ();
++  g_autofree char *path = NULL;
++  g_autoptr (GError) error = NULL;
++  g_autoptr (GVariant) reply = NULL;
++  CdProfile *profile = NULL;
++
++  path = g_test_build_filename (G_TEST_DIST, "icc-profiles", "sRGB.icc", NULL);
++  reply = g_dbus_proxy_call_sync (
++    proxy, "AddSystemProfile", g_variant_new ("(ss)", SYSTEM_PROFILE_ID, path),
++    G_DBUS_CALL_FLAGS_NO_AUTO_START, -1, NULL, &error);
++  g_assert_no_error (error);
++  g_assert_nonnull (reply);
++  cd_client_find_profile (fixture->client, SYSTEM_PROFILE_ID, NULL,
++                          on_find_system_profile, &profile);
++  while (!profile)
++    g_main_context_iteration (NULL, TRUE);
++  return profile;
++}
++
++static void
++test_assigned_profile (gconstpointer user_data)
++{
++  const char *point = user_data;
++  Fixture fixture = {};
++  MetaColorManager *manager;
++  g_autoptr (MetaColorStore) store = NULL;
++  g_autoptr (CdProfile) cd_profile = NULL;
++  Result result = { .colord = TRUE };
++  gboolean store_gone = FALSE, task_gone = FALSE;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = g_object_ref (meta_color_manager_get_color_store (manager));
++  watch (store, &store_gone);
++  cd_profile = add_system_profile (&fixture);
++  fixture.hold_point = point;
++  result.defer_finish = point == NULL;
++  meta_color_store_ensure_colord_profile (store, cd_profile, NULL,
++                                         on_result, &result);
++  if (point)
++    {
++      Delivery *delivery = wait_for_delivery (&fixture);
++
++      g_assert_cmpstr (delivery->point, ==, point);
++      g_assert_false (g_task_had_error (G_TASK (delivery->result)));
++      watch (delivery->callback_data, &task_gone);
++      g_assert_null (meta_color_store_get_profile (store, SYSTEM_PROFILE_ID));
++    }
++  else
++    {
++      wait_for_result (&result);
++      g_assert_false (g_task_had_error (G_TASK (result.result)));
++      watch (result.result, &task_gone);
++    }
++
++  destroy_manager (&fixture);
++  if (point)
++    {
++      replay_one (&fixture);
++      g_assert_cmpuint (fixture.callbacks_returned, ==, 1);
++    }
++  else
++    finish_result (store, &result, result.result);
++  assert_cancelled (&result);
++  if (point)
++    g_assert_null (meta_color_store_get_profile (store, SYSTEM_PROFILE_ID));
++  clear_result (&result);
++  g_clear_object (&store);
++  wait_for_release (&task_gone);
++  wait_for_release (&store_gone);
++  finish_fixture (&fixture);
++}
++
++static char *
++copy_local_profile (void)
++{
++  g_autofree char *source_path = NULL;
++  g_autoptr (GFile) source = NULL;
++  g_autoptr (GFile) dest = NULL;
++  g_autoptr (GError) error = NULL;
++  char *dest_path;
++
++  source_path = g_test_build_filename (G_TEST_DIST, "icc-profiles", "sRGB.icc", NULL);
++  dest_path = g_build_filename (g_get_user_data_dir (), "icc", "lifecycle-local.icc", NULL);
++  source = g_file_new_for_path (source_path);
++  dest = g_file_new_for_path (dest_path);
++  g_assert_true (g_file_copy (source, dest, G_FILE_COPY_NONE, NULL, NULL, NULL, &error));
++  g_assert_no_error (error);
++  return dest_path;
++}
++
++static void
++test_directory_request (gconstpointer user_data)
++{
++  Fixture fixture = { .hold_point = user_data };
++  MetaColorManager *manager;
++  g_autoptr (MetaColorStore) store = NULL;
++  g_autofree char *path = NULL;
++  gboolean store_gone = FALSE;
++  Delivery *delivery;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = g_object_ref (meta_color_manager_get_color_store (manager));
++  watch (store, &store_gone);
++  path = copy_local_profile ();
++  delivery = wait_for_delivery (&fixture);
++  g_assert_cmpstr (delivery->point, ==, fixture.hold_point);
++  g_assert_false (g_task_had_error (G_TASK (delivery->result)));
++  g_assert_false (meta_color_store_has_pending_profiles (store));
++  destroy_manager (&fixture);
++  /* Drop the fixture ref too: only the real query/read transfer keeps store. */
++  g_clear_object (&store);
++  g_assert_false (store_gone);
++  replay_one (&fixture);
++  g_assert_cmpuint (fixture.callbacks_returned, ==, 1);
++  wait_for_release (&store_gone);
++  g_assert_cmpint (g_unlink (path), ==, 0);
++  finish_fixture (&fixture);
++}
++
++static void
++on_profile_ready (MetaColorProfile *profile,
++                  gboolean          success,
++                  unsigned int     *count)
++{
++  g_assert_true (success);
++  (*count)++;
++}
++
++static void
++test_local_ready (gconstpointer user_data)
++{
++  gboolean finalize_store = GPOINTER_TO_INT (user_data);
++  Fixture fixture = { .hold_point = "profile:on_cd_profile_connected" };
++  MetaColorManager *manager;
++  g_autoptr (MetaColorStore) store = NULL;
++  g_autoptr (MetaColorProfile) profile = NULL;
++  g_autofree char *path = NULL;
++  gboolean store_gone = FALSE, profile_gone = FALSE;
++  unsigned int ready_count = 0;
++  Delivery *delivery;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = g_object_ref (meta_color_manager_get_color_store (manager));
++  watch (store, &store_gone);
++  path = copy_local_profile ();
++  delivery = wait_for_delivery (&fixture);
++  g_assert_cmpstr (delivery->point, ==, "profile:on_cd_profile_connected");
++  g_assert_false (g_task_had_error (G_TASK (delivery->result)));
++  g_assert_true (meta_color_store_has_pending_profiles (store));
++  /* This separate retained-profile fixture ref is safe only because the live
++   * store's pending entry independently owns it BEFORE manager teardown. */
++  profile = g_object_ref ((MetaColorProfile *) delivery->callback_data);
++  watch (profile, &profile_gone);
++  g_assert_cmpuint (ready_count, ==, 0);
++  g_signal_connect (profile, "ready", G_CALLBACK (on_profile_ready), &ready_count);
++  destroy_manager (&fixture);
++  if (finalize_store)
++    {
++      g_clear_object (&store);
++      g_assert_true (store_gone);
++    }
++  replay_one (&fixture);
++  g_assert_cmpuint (fixture.callbacks_returned, ==, 1);
++  g_assert_cmpuint (ready_count, ==, 1);
++  if (store)
++    {
++      g_assert_false (meta_color_store_has_pending_profiles (store));
++      g_assert_null (meta_color_store_get_profile (store, SYSTEM_PROFILE_ID));
++      g_clear_object (&store);
++    }
++  wait_for_release (&store_gone);
++  g_assert_false (profile_gone);
++  g_clear_object (&profile);
++  wait_for_release (&profile_gone);
++  g_assert_cmpint (g_unlink (path), ==, 0);
++  finish_fixture (&fixture);
++}
++
++static void
++test_profile_create_after_store_finalize (void)
++{
++  Fixture fixture = { .hold_point = "profile:on_cd_profile_created" };
++  MetaColorManager *manager;
++  g_autoptr (MetaColorStore) store = NULL;
++  g_autoptr (MetaColorProfile) profile = NULL;
++  g_autofree char *path = NULL;
++  gboolean store_gone = FALSE, profile_gone = FALSE;
++  unsigned int ready_count = 0;
++  Delivery *delivery;
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  store = g_object_ref (meta_color_manager_get_color_store (manager));
++  watch (store, &store_gone);
++  path = copy_local_profile ();
++  delivery = wait_for_delivery (&fixture);
++  g_assert_false (g_task_had_error (G_TASK (delivery->result)));
++  g_assert_true (meta_color_store_has_pending_profiles (store));
++  profile = g_object_ref ((MetaColorProfile *) delivery->callback_data);
++  watch (profile, &profile_gone);
++  g_signal_connect (profile, "ready", G_CALLBACK (on_profile_ready), &ready_count);
++  destroy_manager (&fixture);
++  g_clear_object (&store);
++  g_assert_true (store_gone);
++  replay_one (&fixture);
++  while (ready_count == 0)
++    g_main_context_iteration (NULL, TRUE);
++  g_assert_cmpuint (fixture.callbacks_returned, ==, 1);
++  g_assert_cmpuint (ready_count, ==, 1);
++  g_clear_object (&profile);
++  wait_for_release (&profile_gone);
++  g_assert_cmpint (g_unlink (path), ==, 0);
++  finish_fixture (&fixture);
++}
++
++static void
++test_retained_profile (gconstpointer user_data)
++{
++  gboolean owner = GPOINTER_TO_INT (user_data);
++  Fixture fixture = {};
++  MetaColorManager *manager;
++  g_autoptr (MetaColorDevice) device = NULL;
++  g_autoptr (MetaColorProfile) profile = NULL;
++  g_autoptr (CdProfile) cd_profile = NULL;
++  gboolean profile_gone = FALSE, icc_gone = FALSE, device_gone = FALSE;
++  unsigned int ready_count = 0;
++  Result result = { .colord = TRUE };
++
++  if (!run_in_fresh_process ())
++    return;
++
++  manager = setup_fixture (&fixture, TRUE);
++  if (owner)
++    {
++      device = add_monitor (manager);
++      watch (device, &device_gone);
++      while (!meta_color_device_is_ready (device))
++        g_main_context_iteration (NULL, TRUE);
++      profile = g_object_ref (meta_color_device_get_device_profile (device));
++      g_assert_nonnull (meta_color_profile_get_calibration (profile));
++    }
++  else
++    {
++      cd_profile = add_system_profile (&fixture);
++      meta_color_store_ensure_colord_profile (
++        meta_color_manager_get_color_store (manager), cd_profile, NULL,
++        on_result, &result);
++      wait_for_result (&result);
++      g_assert_no_error (result.error);
++      g_assert_nonnull (result.profile);
++      profile = g_steal_pointer (&result.profile);
++      clear_result (&result);
++      g_signal_connect (profile, "ready", G_CALLBACK (on_profile_ready), &ready_count);
++      while (ready_count == 0)
++        g_main_context_iteration (NULL, TRUE);
++      g_assert_cmpuint (ready_count, ==, 1);
++    }
++  watch (profile, &profile_gone);
++  watch (meta_color_profile_get_cd_icc (profile), &icc_gone);
++  destroy_manager (&fixture);
++  g_clear_object (&device);
++  if (owner)
++    wait_for_release (&device_gone);
++  g_assert_false (profile_gone);
++  g_assert_false (icc_gone);
++  g_assert_false (fixture.client_gone);
++  /* Release only: arbitrary LCMS operations after deleting the manager's
++   * context are deliberately outside the supported test/production contract. */
++  g_clear_object (&profile);
++  wait_for_release (&profile_gone);
++  wait_for_release (&icc_gone);
++  finish_fixture (&fixture);
++}
++
++static const GenerationCase generation_cases[] = {
++  { "device:on_directory_queried", NULL, FALSE },
++  { "device:on_directories_created", NULL, TRUE },
++  { "device:on_profile_written", NULL, FALSE },
++  { "store:on_profile_generated", NULL, FALSE },
++  { "device:on_efi_panel_color_info_loaded", "success", FALSE },
++  { "device:on_efi_panel_color_info_loaded", "missing", FALSE },
++};
++
++int
++main (int argc, char **argv)
++{
++  int result;
++
++  test_context = meta_create_test_context (META_CONTEXT_TEST_TYPE_TEST,
++                                           META_CONTEXT_TEST_FLAG_NONE);
++  g_assert_true (meta_context_configure (test_context, &argc, &argv, NULL));
++  meta_init_monitor_test_setup (initial_monitor_setup);
++
++  g_test_add_data_func ("/color-lifecycle/startup/queued-success", GINT_TO_POINTER (TRUE), test_startup);
++  g_test_add_data_func ("/color-lifecycle/startup/cancelled", GINT_TO_POINTER (FALSE), test_startup);
++  g_test_add_data_func ("/color-lifecycle/generation/directory-query", &generation_cases[0], test_generation_shutdown);
++  g_test_add_data_func ("/color-lifecycle/generation/directory-create", &generation_cases[1], test_generation_shutdown);
++  g_test_add_data_func ("/color-lifecycle/generation/write-result", &generation_cases[2], test_generation_shutdown);
++  g_test_add_data_func ("/color-lifecycle/generation/profile-result", &generation_cases[3], test_generation_shutdown);
++  g_test_add_data_func ("/color-lifecycle/generation/efi-success", &generation_cases[4], test_generation_shutdown);
++  g_test_add_data_func ("/color-lifecycle/generation/efi-fallback", &generation_cases[5], test_generation_shutdown);
++  g_test_add_func ("/color-lifecycle/shared/caller-cancel", test_shared_caller_cancel);
++  g_test_add_func ("/color-lifecycle/finish/queued-device", test_queued_device_finish);
++  g_test_add_data_func ("/color-lifecycle/assigned/connect", "store:on_cd_profile_connected", test_assigned_profile);
++  g_test_add_data_func ("/color-lifecycle/assigned/read", "store:on_cd_profile_contents_loaded", test_assigned_profile);
++  g_test_add_data_func ("/color-lifecycle/finish/queued-assigned", NULL, test_assigned_profile);
++  g_test_add_data_func ("/color-lifecycle/directory/query", "store:query_file_info_cb", test_directory_request);
++  g_test_add_data_func ("/color-lifecycle/directory/read", "store:on_store_file_read", test_directory_request);
++  g_test_add_data_func ("/color-lifecycle/local-ready/shutdown", GINT_TO_POINTER (FALSE), test_local_ready);
++  g_test_add_data_func ("/color-lifecycle/local-ready/finalize", GINT_TO_POINTER (TRUE), test_local_ready);
++  g_test_add_func ("/color-lifecycle/profile/create-after-finalize", test_profile_create_after_store_finalize);
++  g_test_add_data_func ("/color-lifecycle/profile/retained-owner", GINT_TO_POINTER (TRUE), test_retained_profile);
++  g_test_add_data_func ("/color-lifecycle/profile/retained-assigned", GINT_TO_POINTER (FALSE), test_retained_profile);
++
++  /* Not meta_context_test_run_tests(): replay owns dispatch after destroying
++   * the context, so no outer compositor harness may access that context. */
++  result = g_test_run ();
++  g_clear_object (&test_context);
++  return result;
++}
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 51ec016..467c586 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -502,6 +502,34 @@ test_cases += [
+     'suite': 'unit',
+     'sources': [ 'color-management-tests.c', ],
+   },
++  {
++    'name': 'color-lifecycle',
++    'suite': 'unit',
++    'sources': [ 'color-lifecycle-tests.c', ],
++    'timeout': 120,
++    'separate_cases': [
++      '/color-lifecycle/startup/queued-success',
++      '/color-lifecycle/startup/cancelled',
++      '/color-lifecycle/generation/directory-query',
++      '/color-lifecycle/generation/directory-create',
++      '/color-lifecycle/generation/write-result',
++      '/color-lifecycle/generation/profile-result',
++      '/color-lifecycle/generation/efi-success',
++      '/color-lifecycle/generation/efi-fallback',
++      '/color-lifecycle/shared/caller-cancel',
++      '/color-lifecycle/finish/queued-device',
++      '/color-lifecycle/assigned/connect',
++      '/color-lifecycle/assigned/read',
++      '/color-lifecycle/finish/queued-assigned',
++      '/color-lifecycle/directory/query',
++      '/color-lifecycle/directory/read',
++      '/color-lifecycle/local-ready/shutdown',
++      '/color-lifecycle/local-ready/finalize',
++      '/color-lifecycle/profile/create-after-finalize',
++      '/color-lifecycle/profile/retained-owner',
++      '/color-lifecycle/profile/retained-assigned',
++    ],
++  },
+   {
+     'name': 'color-management-profile-conflict',
+     'suite': 'unit',

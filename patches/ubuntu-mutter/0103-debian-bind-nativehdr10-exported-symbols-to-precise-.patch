@@ -1,0 +1,109 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Engineering Agent <hdr-agent@invalid>
+Date: Tue, 13 Oct 2026 02:18:50 -0400
+Subject: [PATCH] debian: bind nativehdr10 exported symbols to precise
+ introduction minima
+
+---
+ debian/libmutter-51-0.symbols | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/debian/libmutter-51-0.symbols b/debian/libmutter-51-0.symbols
+index af30c9e..4bcd534 100644
+--- a/debian/libmutter-51-0.symbols
++++ b/debian/libmutter-51-0.symbols
+@@ -95,6 +95,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_close_dialog_show@Base 43.0
+  meta_clutter_button_to_evdev@Base 45.1
+  meta_clutter_tool_button_to_evdev@Base 47.0
++ meta_color_chromaticity_from_fixed@Base 51.0-1ubuntu3+nativehdr10~
+  meta_color_chromaticity_to_fixed@Base 51.0-1ubuntu3+nativehdr5~
+  meta_color_colorimetry_from_edid_primaries@Base 51.0-1ubuntu3+nativehdr5~
+  meta_color_device_get_assigned_profile@Base 43.0
+@@ -108,7 +109,10 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_color_device_is_ready@Base 43.0
+  meta_color_device_set_reference_luminance_factor@Base 51.0-1ubuntu3+nativehdr6~
+  meta_color_device_update@Base 51.0-1ubuntu3+nativehdr3~
++ meta_color_get_planckian_chromaticity@Base 51.0-1ubuntu3+nativehdr10~
+  meta_color_get_temperature_rgb_scales@Base 51~rc
++ meta_color_lifecycle_test_intercept@Base 51.0-1ubuntu3+nativehdr10~
++ meta_color_lifecycle_test_set_hook@Base 51.0-1ubuntu3+nativehdr10~
+  meta_color_manager_get_color_device@Base 43.0
+  meta_color_manager_get_color_store@Base 43.0
+  meta_color_manager_get_num_color_devices@Base 43.0
+@@ -119,10 +123,16 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_color_profile_get_cd_icc@Base 43.0
+  meta_color_profile_get_file_path@Base 51~rc
+  meta_color_profile_get_id@Base 43.0
++ meta_color_store_ensure_colord_profile@Base 51.0-1ubuntu3+nativehdr10~
++ meta_color_store_ensure_colord_profile_finish@Base 51.0-1ubuntu3+nativehdr10~
++ meta_color_store_ensure_device_profile@Base 51.0-1ubuntu3+nativehdr10~
++ meta_color_store_ensure_device_profile_finish@Base 51.0-1ubuntu3+nativehdr10~
+  meta_color_store_get_profile@Base 43.0
+  meta_color_store_has_pending_profiles@Base 43.0
++ meta_color_store_shutdown@Base 51.0-1ubuntu3+nativehdr10~
+  meta_color_target_luminance_init@Base 51.0-1ubuntu3+nativehdr3~
+  meta_color_target_primaries_init@Base 51.0-1ubuntu3+nativehdr4~
++ meta_color_target_provenance_to_string@Base 51.0-1ubuntu3+nativehdr10~
+  meta_comp_effect_get_type@Base 43.0
+  meta_compositor_disable_unredirect@Base 48.0
+  meta_compositor_enable_unredirect@Base 48.0
+@@ -481,6 +491,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_monitor_get_serial@Base 43.0
+  meta_monitor_get_suggested_position@Base 43.0
+  meta_monitor_get_supported_color_modes@Base 48.0
++ meta_monitor_get_target_override@Base 51.0-1ubuntu3+nativehdr10~
+  meta_monitor_get_type@Base 43.0
+  meta_monitor_get_vendor@Base 43.0
+  meta_monitor_is_active@Base 43.0
+@@ -493,6 +504,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_monitor_logical_to_crtc_transform@Base 43.0
+  meta_monitor_manager_apply_monitors_config@Base 45.1
+  meta_monitor_manager_can_switch_config@Base 43.0
++ meta_monitor_manager_confirm_configuration@Base 51.0-1ubuntu3+nativehdr10~
+  meta_monitor_manager_create_virtual_monitor@Base 43.0
+  meta_monitor_manager_ensure_configured@Base 43.0
+  meta_monitor_manager_get_backend@Base 43.0
+@@ -772,6 +784,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_verify_monitor_mode_spec@Base 43.0
+  meta_verify_monitor_spec@Base 43.0
+  meta_verify_monitors_config@Base 43.0
++ meta_verify_target_override@Base 51.0-1ubuntu3+nativehdr10~
+  meta_virtual_mode_info_free@Base 50~
+  meta_virtual_mode_info_new@Base 50~
+  meta_virtual_monitor_get_crtc_mode@Base 43.0
+@@ -1493,14 +1506,17 @@ libmutter-clutter-51.so.0 libmutter-51-0 #MINVER#
+  clutter_color_state_icc_is_linearized@Base 51~beta
+  clutter_color_state_icc_new@Base 49.0
+  clutter_color_state_identical@Base 51.0-1ubuntu3+nativehdr6~
++ clutter_color_state_params_get_adapted_white@Base 51.0-1ubuntu3+nativehdr10~
+  clutter_color_state_params_get_colorimetry@Base 48.0
+  clutter_color_state_params_get_eotf@Base 48.0
+  clutter_color_state_params_get_luminance@Base 48.0
+  clutter_color_state_params_get_peak_headroom@Base 51.0-1ubuntu3+nativehdr6~
++ clutter_color_state_params_get_reference_white@Base 51.0-1ubuntu3+nativehdr10~
+  clutter_color_state_params_get_target_volume@Base 51.0-1ubuntu3+nativehdr6~
+  clutter_color_state_params_get_type@Base 48.0
+  clutter_color_state_params_is_signal_range_bounded@Base 51.0-1ubuntu3+nativehdr8~
+  clutter_color_state_params_new@Base 48.0
++ clutter_color_state_params_new_adapted_display_target@Base 51.0-1ubuntu3+nativehdr10~
+  clutter_color_state_params_new_display_target@Base 51.0-1ubuntu3+nativehdr8~
+  clutter_color_state_params_new_from_cicp@Base 49.0
+  clutter_color_state_params_new_from_primitives@Base 48.0
+@@ -1514,6 +1530,7 @@ libmutter-clutter-51.so.0 libmutter-51-0 #MINVER#
+  clutter_color_transform_get_pipeline@Base 51~beta
+  clutter_color_transform_get_type@Base 51~beta
+  clutter_color_transform_new@Base 51~beta
++ clutter_color_transform_requires_composition@Base 51.0-1ubuntu3+nativehdr10~
+  clutter_color_transform_requires_gamut_compression@Base 51.0-1ubuntu3+nativehdr7~
+  clutter_color_transform_requires_highlight_mapping@Base 51.0-1ubuntu3+nativehdr6~
+  clutter_color_transform_requires_mapping@Base 51.0-1ubuntu3+nativehdr7~
+@@ -1523,6 +1540,8 @@ libmutter-clutter-51.so.0 libmutter-51-0 #MINVER#
+  clutter_colorimetry_get_absolute_bt2020_matrices@Base 51.0-1ubuntu3+nativehdr7~
+  clutter_colorimetry_get_linear_bt2020_matrices@Base 51.0-1ubuntu3+nativehdr5~
+  clutter_colorimetry_get_primaries@Base 51~beta
++ clutter_colorimetry_get_white_adaptation_factors@Base 51.0-1ubuntu3+nativehdr10~
++ clutter_colorimetry_get_white_adaptation_matrix@Base 51.0-1ubuntu3+nativehdr10~
+  clutter_colorimetry_to_XYZ@Base 51~beta
+  clutter_colorimetry_to_string@Base 51~beta
+  clutter_colorimetry_type_get_type@Base 48.0

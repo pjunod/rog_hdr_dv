@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "task": "t_4fd9d2d2",
+  "status": "CORRECTED_SOURCE_REVIEW_PENDING",
+  "parent_head": "080e49df092cb54925529b1414a0dfebff3fcef0",
+  "parent_tree": "1ff494c14ed3bd13efebfb30396747a949b07203",
+  "sources": {
+    "tools/dolby_harness/build.py": "41cc21f36d58d7e913351cd8706305d387e7efbee4eb464ed8a5bbc332effe29",
+    "tools/dolby_harness/contracts.py": "6b2c1d25416f58c5949ee44cea38b524f352cbf83100d3b06328a02c896e39bb",
+    "tools/dolby_harness/harness.py": "1905fffce6fb7fd72c856656538cccd839555769f81ea9f216df5086c064839c",
+    "tools/dolby_harness/make_fixture.py": "b32b28f25142eee39e1bc1397d7f3a770ce054882c8b74c566ef26e55296868b",
+    "tools/dolby_harness/metric.py": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90",
+    "tools/dolby_harness/provenance.py": "c86c9cd6f72035bbcfde2e182f70f599e305b10667f67a5dd1a96c9f0c24180f",
+    "tools/dolby_harness/headless_render.c": "11cf72cdb78320b35908eb82516d1310a8196cfe907a4458eb781d687831baf8",
+    "tools/dolby_harness/dependencies.json": "520d52a44d1575a3f18b852bc106113117ecb8023a4d848768e782c3db8fa152",
+    "tests/test_dolby_harness.py": "e95f3516670d8e8c8ac8d47bc8ba60eaa3dcd9fa0aa96bfc5a081688e5feaf66"
+  },
+  "compile_inputs_unchanged": [
+    "tools/dolby_harness/headless_render.c",
+    "tools/dolby_harness/build.py",
+    "tools/dolby_harness/dependencies.json"
+  ],
+  "retained_compile_evidence": {
+    "file": "evidence/dolby-harness-compile.json",
+    "sha256": "e1874a6025b8f54b3a402d7c75c5a0fb4b4d7f70e6c7d103ce4129d59927f008",
+    "archive_sha256": "89a0148ed48a21861548767784cec8c20adfba4841039c081cdd34221824c4a1",
+    "compile_receipt_sha256": "5e1b6a51f5191a22fcb91f3463914906393343bc8061894fe31110b76ce986d6",
+    "binary_sha256": "14f23387883cbf3baaa29405b5e8be7d4ca580ca76da55c7a9992d5e7f37d84e",
+    "historical_source_hashes_verified": 8,
+    "header_bindings_retained": 49,
+    "runtime_bindings_retained": 34,
+    "new_native_runtime_readback": false
+  },
+  "test_methods": 27,
+  "deferred_tests": [
+    "MetricTests.test_pq_endpoints_and_roundtrip",
+    "MetricTests.test_achromatic_and_known_delta",
+    "MetricTests.test_annex4_public_vector",
+    "MetricTests.test_itp_weighting",
+    "MetricTests.test_summary_nearest_rank",
+    "MetricTests.test_invalid_metric_inputs",
+    "ContractTests.test_valid_public_fixture",
+    "ContractTests.test_missing_and_wrong_hash",
+    "ContractTests.test_exact_byte_count_and_nonfinite",
+    "ContractTests.test_source_interpretation",
+    "ContractTests.test_unknown_duplicate_and_boolean",
+    "ContractTests.test_target_validation",
+    "ContractTests.test_no_fabricated_metadata",
+    "ContractTests.test_reference_absent_misaligned_and_encoding",
+    "ContractTests.test_identical_reference_statistics",
+    "ContractTests.test_reference_identity_mismatch_table",
+    "ContractTests.test_comparison_snapshot_and_implementation_provenance",
+    "ContractTests.test_environment_and_frontend_tamper",
+    "ContractTests.test_requested_effective_semantics_annotation",
+    "ContractTests.test_native_cpu_render_alignment_and_repeatability",
+    "ContractTests.test_native_limited_10bit_rgb",
+    "ContractTests.test_native_chromatic_bt2020nc_full_limited_depths",
+    "ContractTests.test_native_target_peak_mapping",
+    "ContractTests.test_native_narrow_gamut_preserves_encoding",
+    "ContractTests.test_native_positive_min_is_ignored_baseline",
+    "ContractTests.test_native_rejects_controls_and_pixels_without_output",
+    "ContractTests.test_native_provenance_rejects_elf_source_and_runtime_tamper"
+  ],
+  "changed_test_methods": [
+    "ContractTests.test_reference_identity_mismatch_table",
+    "ContractTests.test_comparison_snapshot_and_implementation_provenance",
+    "ContractTests.test_environment_and_frontend_tamper",
+    "ContractTests.test_requested_effective_semantics_annotation",
+    "ContractTests.test_native_cpu_render_alignment_and_repeatability",
+    "ContractTests.test_native_limited_10bit_rgb",
+    "ContractTests.test_native_chromatic_bt2020nc_full_limited_depths",
+    "ContractTests.test_native_target_peak_mapping",
+    "ContractTests.test_native_narrow_gamut_preserves_encoding",
+    "ContractTests.test_native_positive_min_is_ignored_baseline",
+    "ContractTests.test_native_rejects_controls_and_pixels_without_output",
+    "ContractTests.test_native_provenance_rejects_elf_source_and_runtime_tamper"
+  ],
+  "removed_methods": [
+    "ContractTests.test_native_limited_10bit_rgb_and_yuv"
+  ],
+  "dispositions": {
+    "R1": "Requested/effective PQ minima, RPU-owned range and zero-L1 fallback annotations; unchanged upstream baseline; positive-min public coverage deferred",
+    "R2": "Chromatic full/limited 8/10/12/16-bit independent oracle, non-vacuous three-peak bounds, narrow gamut/encoding, positive minima, direct native negatives and table alignment checks written",
+    "R3": "Per-invocation source/ELF/clean-environment resolved runtime verification before/after, retained exact compile receipt, Python source/interpreter binding; exact parsed manifest snapshot identities and renderer/options provenance in comparator"
+  },
+  "new_compiles": 0,
+  "units_run": 0,
+  "render_probes_run": 0,
+  "limits": [
+    "Adversarial correction review pending; qualification remains gated",
+    "Runtime verification code written, not executed in this correction phase",
+    "Historical compiler front-end/test hashes are superseded by current source map, not retroactively altered",
+    "No genuine RPU or private reference comparison; no trims/new black mapping",
+    "No optical/physical/package/full-Dolby acceptance; no push/merge/devices/credentials"
+  ]
+}

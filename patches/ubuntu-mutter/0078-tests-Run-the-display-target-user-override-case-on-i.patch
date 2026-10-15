@@ -1,0 +1,27 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Mon, 12 Oct 2026 03:52:20 +0000
+Subject: [PATCH] tests: Run the display target user override case on its own
+
+/wayland/display-targets/user-override replaces the fixture output's
+EDID, connector type, supported HDR EOTFs and color spaces, toggles
+forced HDR and the reference luminance factor, and restores only the
+color mode. Like its display target neighbours, it must run in its own
+invocation, so that later cases of the main invocation do not depend on
+registration order, and so that it has its own retryable result.
+---
+ src/tests/meson.build | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 36e5389..fdc811b 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -969,6 +969,7 @@ wayland_test_cases = [
+       '/wayland/published/reference-factor',
+       '/wayland/display-targets/cta',
+       '/wayland/display-targets/sdr-native',
++      '/wayland/display-targets/user-override',
+       '/wayland/night-light/bt2100-scanout',
+     ],
+     'depends': [

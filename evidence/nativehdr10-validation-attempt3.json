@@ -1,0 +1,3639 @@
+{
+  "schema": 1,
+  "task": "t_e5c490e6",
+  "stage": "required-check retry gate failed; acceptance incomplete",
+  "native_head": "980bb21f3adc84ade0edbeb2e85e4f798a228ae6",
+  "native_tree": "41605eb0894088936cfa633c4e048fedcfdb27a6",
+  "runner_sha256": "7d927854a8da5a33ab323eb2c8b865c87b17fa3cd1af8cc68d8c92c2783a1f61",
+  "recorded_latest_status_counts": {
+    "passed": 70,
+    "failed": 1
+  },
+  "candidate_validity_counts": {
+    "passed": 55,
+    "pending-invalidated": 15,
+    "failed": 1
+  },
+  "checks": [
+    {
+      "id": "mutter-actor-color-state",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "29445ba010c235ec70bf4d282f050344a4b95881eaee748859305268993b44a4",
+      "log": "mutter-actor-color-state-3f0bdcfd4958403db5d9266ed40d8ae5.log",
+      "log_sha256": "8ebde19ba8d8f122efbb7b87c438d710629c2f3f62f8ee211559506fa63c0f4b",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:actor-color-state"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/clutter/conform/actor-color-state",
+        "at9111578e_sha256": "23d4f5c821360fe3643fa8cd3838cbaf64b9815381d5be3b9c664a73d6ad3f2b",
+        "at41605eb0_sha256": "23d4f5c821360fe3643fa8cd3838cbaf64b9815381d5be3b9c664a73d6ad3f2b",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-color-hdr",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "a8847717ea673fc6a34603aa5a99a9755e0b74ce",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "9111578e2e03bda319277c8c7f48adabb6dec646"
+        }
+      },
+      "fingerprint": "fbea5d10135168daff705d41eb7d488fbed32567ee01aca162bada280a738901",
+      "log": "mutter-color-hdr-b1c219b54aea4b938f9d8f21114d4e28.log",
+      "log_sha256": "f4b1e0ea8dfb224ac172e39cee244f50126a7f259de0fa2152cb74f977515a6a",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:color-hdr"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 3,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/clutter/conform/color-hdr",
+        "at9111578e_sha256": "be799c9b9c765b0eb6e9a97f433622d81c64126ef3b6c9d16a2ceb0bd9bf452b",
+        "at41605eb0_sha256": "be799c9b9c765b0eb6e9a97f433622d81c64126ef3b6c9d16a2ceb0bd9bf452b",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-color-management",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "980bb21f3adc84ade0edbeb2e85e4f798a228ae6",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "41605eb0894088936cfa633c4e048fedcfdb27a6"
+        }
+      },
+      "fingerprint": "3d4c5740652745b6197f4f2d10be25f474c609221fc4cfb32c171461a0cb1286",
+      "log": "mutter-color-management-72e8bfcaa2e740fe827230de40f0e32d.log",
+      "log_sha256": "062f78a4a89720eaea3e506e9511871e9eac12ae20bc305b1db6789c6d3ce57a",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:color-management"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 3,
+      "candidate_validity": "passed",
+      "rationale": "Actual required-phase attempt on41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-color-management",
+        "at9111578e_sha256": "41a43fa6527f22cb31f5a3d56b0891624e61e54a3e5b193dfb7d579f5177cb2d",
+        "at41605eb0_sha256": "c3b3eeb59edba6eb7d4241e6c9722147a59a0183fbd135b4afabafde048d7f76",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-color-management-profile-conflict",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "c0d4f69b6165041842623e5aa320842a2f71b1b4437b39a1935a1cd8dca7b9ce",
+      "log": "mutter-color-management-profile-conflict-205ff794fcde4c05a93638475d2d9519.log",
+      "log_sha256": "a1a4b9ecd1ef74375f77dad96b503d32bc99667fe871927c8d334b7cecee94ca",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:color-management-profile-conflict"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-color-management-profile-conflict",
+        "at9111578e_sha256": "eb172ddf9d85a413002919d3f50ba09c31b34c1dd2dc82f4322d3757ac61a331",
+        "at41605eb0_sha256": "eb172ddf9d85a413002919d3f50ba09c31b34c1dd2dc82f4322d3757ac61a331",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-color-pipeline",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "3979283705f1334aa3947a81bcfac5ee59eac21031a046d2aadc17c7e7e19d25",
+      "log": "mutter-color-pipeline-fb8fddd7c4354933ba2d63bcc667bb4b.log",
+      "log_sha256": "21bf76c6291476d62f147ed0b0684eeee0833c1a6f92eca7886a64e5a86120ca",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:color-pipeline"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/clutter/conform/color-pipeline",
+        "at9111578e_sha256": "b8c1199ee8309f984adaf0cfff92ab03bbbbb966db8cb72ceb69e6a0c0337130",
+        "at41605eb0_sha256": "b8c1199ee8309f984adaf0cfff92ab03bbbbb966db8cb72ceb69e6a0c0337130",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-color-state-transform",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "14345d70f4469e90cbbf377f8f80be4b18cbe9e4b1ffbe1e8996846395705aba",
+      "log": "mutter-color-state-transform-374aae699a634922aeed93fb3c433ffb.log",
+      "log_sha256": "ed692109c2044f118dd5b6147439c6299bceb06e6480baf2924e0491b8fbaef7",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:color-state-transform"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/clutter/conform/color-state-transform",
+        "at9111578e_sha256": "584238561efbec2292e5b6b7251d978b5b7849232004336bef40ef4718e91c0f",
+        "at41605eb0_sha256": "584238561efbec2292e5b6b7251d978b5b7849232004336bef40ef4718e91c0f",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-cursor-overlay-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "11d19afc0c63369292f8ca2ede6b5428547195f05ec10d26be99d6989bc6f84c",
+      "log": "mutter-cursor-overlay-tests-21c6172141334607aa518e5499be5df8.log",
+      "log_sha256": "036fcb0fbe0976eec138235123c2dbcc8110651c81c069f242123a594f7dc6fe",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:cursor-overlay-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-cursor-overlay-tests",
+        "at9111578e_sha256": "c3db61a3bad2f163ad51f7b61718b1102f623e6a7caea157706c857f0618ca25",
+        "at41605eb0_sha256": "c3db61a3bad2f163ad51f7b61718b1102f623e6a7caea157706c857f0618ca25",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-cursor-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "07176b8a4c1aac887bbe4f96db4caa21cacaba70bfeedb021cd42aedb14318fe",
+      "log": "mutter-cursor-tests-ecb10da9a312465fb182dc4224077b9e.log",
+      "log_sha256": "2d8cadd0e814771d4a11beaca3cd882d4caee331c96312b4346bee1838efaeeb",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:cursor-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-cursor-tests",
+        "at9111578e_sha256": "0c02b74a5a2dc62c13ff20cc30364a6a5baae5da97a694d11675bff07ec46139",
+        "at41605eb0_sha256": "0c02b74a5a2dc62c13ff20cc30364a6a5baae5da97a694d11675bff07ec46139",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-abstraction-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "29f0f142065b565abe74456c4e195ca888c50d3c7feebf69d8eba8960bfce8e4",
+      "log": "mutter-monitor-abstraction-tests-472f81c3309547d79b32bed372e2b808.log",
+      "log_sha256": "c01c0ea5d6f82479d5154077f6d9cbfbbe8de265738d7b6c5cff29634ee7f5e8",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-abstraction-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-abstraction-tests",
+        "at9111578e_sha256": "71ce1929f3e6bd4945d1d000cb758c7d51ae6abfe0797c21045c6958a14eabb8",
+        "at41605eb0_sha256": "71ce1929f3e6bd4945d1d000cb758c7d51ae6abfe0797c21045c6958a14eabb8",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-backlight",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "d4c291c1536c5618e0645286ea20239ad2aaf684165868d8dc7329f546a0e167",
+      "log": "mutter-monitor-backlight-05b062b27775458991f7b024137d3cb1.log",
+      "log_sha256": "5669811c310098ade810ab39e466b18da9aa787be4af4f4b396acf60df6f083e",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-backlight"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-backlight",
+        "at9111578e_sha256": "97cbaffd5d1a2847f8186fe26f4089d0f6c6f133fa76d85a24e49823748405c6",
+        "at41605eb0_sha256": "97cbaffd5d1a2847f8186fe26f4089d0f6c6f133fa76d85a24e49823748405c6",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-color-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "ae6ff8fc4ffa83fd801c61fef9b4c27a7e24eae647a55f0fba07ddb804ecd433",
+      "log": "mutter-monitor-color-tests-95467ca42b094af592edc98ac0115f3d.log",
+      "log_sha256": "b0fa36e5d56b14894a0453c976b9672b080cf6a848dd783f61b340705a33c25b",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-color-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-color-tests",
+        "at9111578e_sha256": "d3f53785bdfb51571646952f945ae861271f6b58eda07b1983792a3e7aee716e",
+        "at41605eb0_sha256": "d3f53785bdfb51571646952f945ae861271f6b58eda07b1983792a3e7aee716e",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-config-migration-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "12d8344a6367469edc3705f7adeaf23164e0ce2876a53553035ef1303f0b0fc6",
+      "log": "mutter-monitor-config-migration-tests-67370047e5f14b05a70726bcd7264ea3.log",
+      "log_sha256": "a3f93b1f39be863c5ee3f23bdf269cc1b2a0180cc5c017ea592ed1010138df43",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-config-migration-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-config-migration-tests",
+        "at9111578e_sha256": "686e1d08308c419e45a7ea92caa7507b9c9091643f46db01cbc5b984318bfc5c",
+        "at41605eb0_sha256": "686e1d08308c419e45a7ea92caa7507b9c9091643f46db01cbc5b984318bfc5c",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-config-policy-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "d4fd390416ca32b358c4165d85585ce03fe541109b41cd15a8247b2b74eacebb",
+      "log": "mutter-monitor-config-policy-tests-b4b11ef32aad4ea08c16e2a3bb48e9e3.log",
+      "log_sha256": "1ef46031339970888efc374ec64591701ccd8adf6dd8d737244ed3b05a185d84",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-config-policy-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-config-policy-tests",
+        "at9111578e_sha256": "12681eec158338f97f50d394c5b85b605f79e9d0d4b06daf2ddbff4556f5d7d1",
+        "at41605eb0_sha256": "12681eec158338f97f50d394c5b85b605f79e9d0d4b06daf2ddbff4556f5d7d1",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-config-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "c39a98ece438ea663f1c7e6995a39a8ca68787599572c6a879092b8e39e51304",
+      "log": "mutter-monitor-config-tests-77ba179af80f4d99a2f3971d1d80ce6b.log",
+      "log_sha256": "d6a8d606666ec2cb73b48c88a368cb0abc7bb522284cb8d12c43c53c06ce013d",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-config-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-config-tests",
+        "at9111578e_sha256": "33d503d5704438b27250c1227a66b4e27dab7d80c496f3cfb229394979790954",
+        "at41605eb0_sha256": "33d503d5704438b27250c1227a66b4e27dab7d80c496f3cfb229394979790954",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-custom-config-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "cf7eb756509d71345a0fa9939e99d67339d8ced1f42f29bd7806ff5a7edb7884",
+      "log": "mutter-monitor-custom-config-tests-0e16527f0b31449798a9fc09bd0d7ab3.log",
+      "log_sha256": "bec977a50c83682a99ec59225d97ba2465446b236d115b1ee6276f989de69474",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-custom-config-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-custom-config-tests",
+        "at9111578e_sha256": "9dd231f69330578cde1355c85e187cd0980d805ee9d853b80060051daea8744f",
+        "at41605eb0_sha256": "9dd231f69330578cde1355c85e187cd0980d805ee9d853b80060051daea8744f",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-dbus-tests",
+      "recorded_status": "failed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "980bb21f3adc84ade0edbeb2e85e4f798a228ae6",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "41605eb0894088936cfa633c4e048fedcfdb27a6"
+        }
+      },
+      "fingerprint": "307b6b6c8a6f1dacea03d2476fb06c17d00cfd03fc23d6ad1e9edbce1a985446",
+      "log": "mutter-monitor-dbus-tests-e761a6428d7a4505897c2f345b5ba836.log",
+      "log_sha256": "20a1e8684e553828c50abb86aa50ec1a0251f20f451c17f8459b16420e09fb8e",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-dbus-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 5,
+      "candidate_validity": "failed",
+      "rationale": "Actual required-phase attempt on41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-dbus-tests",
+        "at9111578e_sha256": "d2de1eb23c8b7dc25bb294712c4a3b77c05c6aab9207e9b37ceffe8fbb82ba63",
+        "at41605eb0_sha256": "2f01d452cb7e15602af619704454d62dae9d5a08098b461e59f589a69b9fab63",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-gdctl",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "53b00a1c4cacdd92d815874293a8fa6526f4c7f18e094c8d91731a7ddc495ea3",
+      "log": "mutter-monitor-gdctl-342c90da7bc0463bbc0f43db22b9a0f4.log",
+      "log_sha256": "dbd28d0078138f9bb8e243aadfb040bbcc6954f727d79fb1bfbd8a841d6f3eeb",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-gdctl"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-gdctl",
+        "at9111578e_sha256": "26769994e1dfd3e00912586b22861ba854c27838bab7a2d76544d77db0c327d2",
+        "at41605eb0_sha256": "26769994e1dfd3e00912586b22861ba854c27838bab7a2d76544d77db0c327d2",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-orientation-phone-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "04564894f5bdcb4693d9c1d1b0fe8ade0068ef2375e2610067092a712f284e2a",
+      "log": "mutter-monitor-orientation-phone-tests-faca27c5691a4686a5b5b4bbf0ef6d4f.log",
+      "log_sha256": "5de16f501d19c8b13533479a80be11dc7982fb414610df5eeab6d2028a0d06f3",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-orientation-phone-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-orientation-phone-tests",
+        "at9111578e_sha256": "182e2f1d4a58e8107e8e01fcea3377eca7609131f5108f48b5d29f2f42b9dc28",
+        "at41605eb0_sha256": "182e2f1d4a58e8107e8e01fcea3377eca7609131f5108f48b5d29f2f42b9dc28",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-orientation-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "8a292da51de0604c07e104f838c88b0df0a1c31b9f221040bf36f6f119e418c1",
+      "log": "mutter-monitor-orientation-tests-8bfaa8540bc64b6492ed6278961315e1.log",
+      "log_sha256": "f9ca4bb8c70cd846396001a5850d8f93a2d882ce4037318e39f831daa1ce41df",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-orientation-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-orientation-tests",
+        "at9111578e_sha256": "0490fa7045ccf2d4b1bbf5aa273bd6e97f7a311d9dc750eaf6bca5bbb61267ba",
+        "at41605eb0_sha256": "0490fa7045ccf2d4b1bbf5aa273bd6e97f7a311d9dc750eaf6bca5bbb61267ba",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-scale-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "d495c3137c6f021d41ec5307da3b50546a562ca51a04b84eb5a567cb61cac839",
+      "log": "mutter-monitor-scale-tests-2f885964f17645fa8cd89d69ac4941c6.log",
+      "log_sha256": "023bd8203b204b143f9626f4985654d23bf6c90a9fbc96d05ced6829e01c7c21",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-scale-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-scale-tests",
+        "at9111578e_sha256": "ff11f596617e757371261123347c117d13e205545863790a19d83ee0f8a077ad",
+        "at41605eb0_sha256": "ff11f596617e757371261123347c117d13e205545863790a19d83ee0f8a077ad",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-storage-tests",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "2f12f9189a540fddd4fd5ef69b690abae82519bc8e73f7b65cee66871f64677e",
+      "log": "mutter-monitor-storage-tests-5732ca94ab4c4ef7a2399a14e1395c8e.log",
+      "log_sha256": "87dab88039406e128dad6a5f304865ea6382f012d7f74a7c13baac1abd9613a8",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-storage-tests"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-storage-tests",
+        "at9111578e_sha256": "b41a112a3e5e8a627ff2d73628c36d2bac7c31db3b971fe2f4985f3d8f89751f",
+        "at41605eb0_sha256": "b41a112a3e5e8a627ff2d73628c36d2bac7c31db3b971fe2f4985f3d8f89751f",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-monitor-utils",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "f24bee21a49c58b5af967455d6d086a996849b540ba5ebaaa1b4f349e1f8eb7b",
+      "log": "mutter-monitor-utils-4a8d16fba439448ea79361664a7a9b5e.log",
+      "log_sha256": "597622312cc962fa468c31a409fb884216d806a1ab039517bdffee5e8af0442b",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:monitor-utils"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "A",
+      "rationale": "Fable t_6b592492: no MetaContext/backend/color-manager construction, changed code cannot execute; original executing tree retained",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-monitor-utils",
+        "at9111578e_sha256": "f324af7cbb74ab4c1866d14f548e28b7040dba3ef3d130a93358a6c8f5a8f351",
+        "at41605eb0_sha256": "f324af7cbb74ab4c1866d14f548e28b7040dba3ef3d130a93358a6c8f5a8f351",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-native-hdr",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "2a7c7d32c188abb51c3f4df4e1d929fc5a4f110f0e487e9ccf31e7a2a05eb89e",
+      "log": "mutter-native-hdr-8d1ff104c44342799537b039e9e2ebdf.log",
+      "log_sha256": "83179a423450b51f70d3ef4298b607d17feca1a5b2f753c5ee8c4c9ae396876a",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:native-hdr"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "A",
+      "rationale": "Fable t_6b592492: no MetaContext/backend/color-manager construction, changed code cannot execute; original executing tree retained",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-native-hdr",
+        "at9111578e_sha256": "66ba7fcc06468d3c22c76f41cd0e5f7dfdeabbd8172032ef41dea894f3b5bd49",
+        "at41605eb0_sha256": "66ba7fcc06468d3c22c76f41cd0e5f7dfdeabbd8172032ef41dea894f3b5bd49",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-tiling-hotplug-test",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "1f5e5325a4366e6a1fca59c841edcd9a3758e9f7024e00cf6704f4eb0b8fcd93",
+      "log": "mutter-tiling-hotplug-test-0a63355e831142e4a0f521aebb62ab33.log",
+      "log_sha256": "1ca30c33307d6089db49371fd1d356063a1b2f55140bfdca4f97c5a73b324653",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:tiling-hotplug-test"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-tiling-hotplug-test",
+        "at9111578e_sha256": "cea011f14b869a40b7cbf802178e7857b3e282b9308ba39877951afb18caf8a2",
+        "at41605eb0_sha256": "cea011f14b869a40b7cbf802178e7857b3e282b9308ba39877951afb18caf8a2",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-unit",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "d32f542ecf410f79182a01e9ab760a92853c0c632c9aad6066a05ecdc229b7ec",
+      "log": "mutter-unit-9ff8ec6b908b44bf8fabadd40d46e93b.log",
+      "log_sha256": "23d954121e9c785b372c09223940def5ce23ed35e3c2deb10fa4d58b9e0bc0c2",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:unit"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "pending-invalidated",
+      "rationale": "TEST-context colord traffic changed in0072-0073; required-check gate stopped before execution; old pass is not valid acceptance for41605eb0",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-unit",
+        "at9111578e_sha256": "90490663d5296986ba79efcd257153bf82504fb354f901894f6f163b6e1c54cb",
+        "at41605eb0_sha256": "90490663d5296986ba79efcd257153bf82504fb354f901894f6f163b6e1c54cb",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "e2736359448aefdce0c652d0d42c14ad815627e33d1faa339ec44b44585c4c4c",
+      "log": "mutter-wayland-color-management-8c24752c24514c46a184d96aaa5cbf3e.log",
+      "log_sha256": "fcd90a77538afb92c91bc2e74453e35b5aa71084557a2ee15312f7272d227a28",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-custom-primaries-info-round-trip",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "2535f8bcab64b1c0ed500c1a5483dcb0c5fa107e1be1c7730f1dae20d6d37d78",
+      "log": "mutter-wayland-color-management-wayland-custom-primaries-info-round-trip-eb8d739b43354efe9ea5f1fbd53c922e.log",
+      "log_sha256": "f6e66ba46eaba503bd0ecbd63da978ee6c268b1faa684d388d73d83d96224c7f",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-custom-primaries-info-round-trip"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-display-targets-cta",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "ef88afd0903af98ab7f8da0cc7b657ab56e33da7254a13ad95852da2baec7a25",
+      "log": "mutter-wayland-color-management-wayland-display-targets-cta-b94354b0a90746498dc2b18741b2bd07.log",
+      "log_sha256": "054bb363bac496aac0e2887539a846cbb9e8911871059e6db53d80b6357cc8c9",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-display-targets-cta"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-display-targets-sdr-native",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "aeb17d3bb906f9cb58d759755aa986682c02cd509f31bcb12f33a8704bc15d8e",
+      "log": "mutter-wayland-color-management-wayland-display-targets-sdr-native-f3e9301d51dc462fae446773d6812566.log",
+      "log_sha256": "1f431afa28a782f1bbf3e38b59c7eb703984daa3e1c427bdb8091beb55321d1c",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-display-targets-sdr-native"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-display-targets-user-override",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "8b38537140316d3e210b034fd15daffe49c703a0a6351e55c1b865d8578a602c",
+      "log": "mutter-wayland-color-management-wayland-display-targets-user-override-7ebf2911b73a4761b3802a0b36f05220.log",
+      "log_sha256": "1fe6577cc9f3e60823b5d04bc75dd6264fd8e162a0fde514ec280920bf058924",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-display-targets-user-override"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-icc-file-zero-descriptor",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "04a7449a28caac3bec635eb873c5f49115b293a2327cb799180ff353a37f3265",
+      "log": "mutter-wayland-color-management-wayland-icc-file-zero-descriptor-d7f66132a96349a19b3c098ab7d4a3c9.log",
+      "log_sha256": "ce2bddb33966df041e68c0c090d55c3bbab74eedd654870fe973b773ede318d7",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-icc-file-zero-descriptor"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-mapping-blending-target",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "e8b6638ac317fc58dc77b53949acded48cb314fced5784fa54953105f1936e79",
+      "log": "mutter-wayland-color-management-wayland-mapping-blending-target-a87e4f135afd43eb9974acc58a702db3.log",
+      "log_sha256": "548057e46e21ff0f43ad00043627eda14e0b09469820eb8f4cb68c41981a220f",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-mapping-blending-target"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-mapping-target-gamut",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "9f2f1ee334fb2dcfcdf7e66655b998a81de96060e4b87d8d1692d81da18611c9",
+      "log": "mutter-wayland-color-management-wayland-mapping-target-gamut-41395c4546e14683a2d5e2af79f027cb.log",
+      "log_sha256": "6fd6c35df5a33621e7297ee9645c4e32cce3a753ce76197a6454801811eae660",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-mapping-target-gamut"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-night-light-bt2100-capture",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "5b33365779204926e8cf10ff650de05304e90ac9e30f2e715212ab9972fb25c4",
+      "log": "mutter-wayland-color-management-wayland-night-light-bt2100-capture-afef8347eea34e06b40b5231ff26eb13.log",
+      "log_sha256": "395613226f935157a168239793c0ec3a412f13bf08120b73bca4f4a68b59b2ef",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-night-light-bt2100-capture"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-night-light-bt2100-scanout",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "414e6bf148181300b71d661e3613f5753027edf511a0bbf8f7af550b841fa796",
+      "log": "mutter-wayland-color-management-wayland-night-light-bt2100-scanout-945eff44046046b2aa4d582b578db3f8.log",
+      "log_sha256": "498cf0fb730c87eb9b4edf3b1260c400a7552dd9fa58054d5209cd4ae2e957c6",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-night-light-bt2100-scanout"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-published-reference-factor",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "07fb64d8ddac01cab6b29e18bacfe0253b972e342e5fb338a57af33c83da6ce8",
+      "log": "mutter-wayland-color-management-wayland-published-reference-factor-4109349ca5704198b522edb1d86effdd.log",
+      "log_sha256": "386606a0d5a513b3bd3c056f89118fca073e410c448a0ffd3d7d9770e74d2a45",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-published-reference-factor"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-sdr-native-unusable-edid-primaries",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "4bfb670b31f3daded45b011eb73c05e223067b689c4606693f48e50e50b1f14a",
+      "log": "mutter-wayland-color-management-wayland-sdr-native-unusable-edid-primaries-b20e15c298f94fd9aa4656340c671c74.log",
+      "log_sha256": "903246c861dbdfc64e57fa3b1be63e4b723cdf0095ebb79a1eb9e5d586409469",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-sdr-native-unusable-edid-primaries"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-target-luminance-v1",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "01de9d5bf20f23df8107751d7a1d46188c42fb8951886cb2e084fab2aea98681",
+      "log": "mutter-wayland-color-management-wayland-target-luminance-v1-7fc906985706496aac653679709629f8.log",
+      "log_sha256": "8347942630ec481912f8454115910f0784cc7a2d3626345eac0b82f2414e5979",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-target-luminance-v1"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-target-luminance-v2",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "55e890dc1af7e867751c21c82313cdbadd24cd0bd5f969f05eb4f095d1dca815",
+      "log": "mutter-wayland-color-management-wayland-target-luminance-v2-5ce966fe5bd54856868ef10416fb0a18.log",
+      "log_sha256": "cdf45b7e2ebf7ba061557e0b7095729ad137e5cc9ba6e274da709922ef0223d9",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-target-luminance-v2"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-target-primaries-v1",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "43b4dc026b6f836fdf285a92028cb73ee59848de876ebb8bb009ba46431ed9df",
+      "log": "mutter-wayland-color-management-wayland-target-primaries-v1-7b3b1045600e40a19fe91717ba8013c1.log",
+      "log_sha256": "9fd5155b86a0548987b1ca39bc370dc16d4acf1254edf723c25227a0f31d5c8c",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-target-primaries-v1"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-management-wayland-target-primaries-v2",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "93ddbcf7d0a67288018ad4f61829eedcbc6b989aa54cd6d307dea0bc2a91179e",
+      "log": "mutter-wayland-color-management-wayland-target-primaries-v2-94a291a39308413fa703849846fb7395.log",
+      "log_sha256": "c7e8a5f861cf33ebee459cf564f2afe7b780f633a30538bf027e36d139ace322",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-management-wayland-target-primaries-v2"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-management",
+        "at9111578e_sha256": "181f6a5818336e2349bdfe095fe61117a4e52dc2052f3d1db99ff54f2b1122ad",
+        "at41605eb0_sha256": "d48011dd9c24593242dfdfff3d08966499bd00cf06e3ede0e7eee9f30edaa103",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "mutter-wayland-color-representation",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "library": {
+          "head": "dd599cbec26833b505f15b060b54a5139d9b2ac7",
+          "path": "/work/hdr-nativehdr10-20261011/src/libdisplay-info",
+          "tree": "72626245922181526fbcb990de3eb7f575efa56b"
+        },
+        "mutter": {
+          "head": "9570f9bbcf01af2bf80e1036c170d5a4c3c96a0d",
+          "path": "/work/hdr-nativehdr10-20261011/src/mutter",
+          "tree": "ac02a18f61c60638ebc204e76d73683a7645bcd5"
+        }
+      },
+      "fingerprint": "460e9b83ec1fe8715efac8a33178e505f1ccb137fef891528d94ff933a953b15",
+      "log": "mutter-wayland-color-representation-5377ee75d9e2421ba4a015688085f915.log",
+      "log_sha256": "94bac6e81320a170ce273bf44fe52a0f3c80ec808b6f58ecbf722aad5b732f1c",
+      "command": {
+        "argv": [
+          "/usr/bin/meson",
+          "test",
+          "-C",
+          "/work/hdr-nativehdr10-20261011/build-mutter",
+          "--setup",
+          "mutter:default",
+          "--no-rebuild",
+          "--num-processes",
+          "1",
+          "--timeout-multiplier",
+          "2",
+          "--print-errorlogs",
+          "mutter:wayland-color-representation"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/mutter",
+        "env": {
+          "GALLIUM_DRIVER": "llvmpipe",
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "LIBGL_ALWAYS_SOFTWARE": "1",
+          "LP_NUM_THREADS": "2",
+          "META_DBUS_RUNNER_DISABLE_LOGIND_PASSTHROUGH": "1",
+          "PATH": "/bin:/usr/bin"
+        },
+        "timeout_seconds": 700
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "retention_tier": "B",
+      "rationale": "Fable t_6b592492: HEADLESS virtual monitors only; changed unregister has no colord call and identical observable effect; original executing tree retained, not binary-identity proof",
+      "correction_executable_identity": {
+        "path": "./src/tests/mutter-wayland-color-representation",
+        "at9111578e_sha256": "f286cc455713412cd510a04c623fdee1abdd732b4d80da77f736874419489892",
+        "at41605eb0_sha256": "f286cc455713412cd510a04c623fdee1abdd732b4d80da77f736874419489892",
+        "scope": "Opus before/after3 inventories, not a rewritten executing receipt"
+      }
+    },
+    {
+      "id": "runner-test-argv-is-literal-and-environment-not-inherited",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "36e0ae0f1bbb3b43b60299bf89003687b1be1ba312d1d298be234f9f31d1d6c2",
+      "log": "runner-test-argv-is-literal-and-environment-not-inherited-f971d2436be54195940c525a8faa25a2.log",
+      "log_sha256": "171f9fed8abf553604901132e92a65bd81c41039167e58a7bba28f8124dacd32",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_argv_is_literal_and_environment_not_inherited"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-cancellation-during-launch-reaps-child-and-restores-handlers",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "737d8ba22bce80109d01bd3b2b8aa1cdd13ba2c23a029f28dc8b00f3fedb39ab",
+      "log": "runner-test-cancellation-during-launch-reaps-child-and-restores-handlers-531aa0dbaa7e41409834152ca2c27a10.log",
+      "log_sha256": "a6307945af20cae91122572eed5e588abaf5dbdaf993b0132d6328db2446b2bf",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_cancellation_during_launch_reaps_child_and_restores_handlers"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-changed-source-requires-explicit-invalidation",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "c71d191da11612d2d40cae23a8f0ab78f0a45554a7e91faa0773844d793ad246",
+      "log": "runner-test-changed-source-requires-explicit-invalidation-2423dc73c0c147959b2e0f99da964650.log",
+      "log_sha256": "8d2aa9aa78d605085fd4474ffea4a0b683bcfbf1c71c2ebbfe5232c1b480fb23",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_changed_source_requires_explicit_invalidation"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-command-environment-timeout-and-scope-changes-need-invalidation",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "a9120904373319f1328de3f7b2f7a23aedc1cf076796510a13e63c024b430cfe",
+      "log": "runner-test-command-environment-timeout-and-scope-changes-need-invalidation-570de6ead9c94c0799d36a03b66390b9.log",
+      "log_sha256": "e90009b231298ffaf99218180cf2547f6afc4bcdaac3faa973fa5037ac66b18f",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_command_environment_timeout_and_scope_changes_need_invalidation"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-concurrent-ledger-use-is-rejected",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "27486cd18667962bc9304792dc728139291ba3bf15eb7e3afcce99deaba75582",
+      "log": "runner-test-concurrent-ledger-use-is-rejected-e0e08dea55ff4218a6255c2daa550b4a.log",
+      "log_sha256": "7ce1777498421b6839354eb96d273f83717dfe8fc76c0466b6da183903affe30",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_concurrent_ledger_use_is_rejected"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-corrupt-receipt-is-not-an-imported-pass",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "a4fb83616fb48c81d8bef706f78f211bf8bdfaa1284f525096da5c0563462b67",
+      "log": "runner-test-corrupt-receipt-is-not-an-imported-pass-68dce60257434ac48eab0203d3cc2541.log",
+      "log_sha256": "b8f085214eae455a0e447220f6486647ec24c763fe930bad5a79458e1c4467b9",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_corrupt_receipt_is_not_an_imported_pass"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-dirty-tracked-or-untracked-source-is-rejected",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "811d905bc1ed6507c2b217a734c42739587183e3283c2542abcdddb0e4da140a",
+      "log": "runner-test-dirty-tracked-or-untracked-source-is-rejected-bb851c4f4f3f451a8c94f1e593340670.log",
+      "log_sha256": "4271fead667bab5c63c596497906753185491557e5d942901ef0e9097a06c368",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_dirty_tracked_or_untracked_source_is_rejected"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-duplicate-keys-and-invalid-manifest-shapes-are-rejected",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "715076a4d299d204ff5a316eba136c7dbfc8a63e0cf8fb012b1552e55ceb9ede",
+      "log": "runner-test-duplicate-keys-and-invalid-manifest-shapes-are-rejected-c94541086b3140b2ada7d10608af01c7.log",
+      "log_sha256": "5f885db6ccf81d34c105b7d388cabe2c9618cf0f7b904fa78f5477011abaf76f",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_duplicate_keys_and_invalid_manifest_shapes_are_rejected"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-failure-retries-without-repeating-success",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "dcd7e61bac51d5a8df56cfff97ce46719421094283dbb8813cbd99939fd2abfd",
+      "log": "runner-test-failure-retries-without-repeating-success-c4cc89ec86c74836a4109276cb6bfb4f.log",
+      "log_sha256": "196dc85d64e4e7f95605805b1fe453546e47e483b9c811b231530792d4e6f59c",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_failure_retries_without_repeating_success"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-full-preflight-prevents-partial-rerun",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "377d4d7a69a9c588d486a113a6bf3204fc999b7076112615333eaacac3bf1a1d",
+      "log": "runner-test-full-preflight-prevents-partial-rerun-e5c716e7c66f40a6875f5c7962aef980.log",
+      "log_sha256": "787387142331589ad85c89231c44ff267d3fd18d650efc1ed6a0d627f32ac6f1",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_full_preflight_prevents_partial_rerun"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-identical-tree-new-commit-does-not-invalidate",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "7c573c9e972468258147229d7c8d7f2c8ced96b1473d9f42c79119c62f539254",
+      "log": "runner-test-identical-tree-new-commit-does-not-invalidate-ae7a532199244ef594c25b68dbbe74e6.log",
+      "log_sha256": "7eb6d6ae8db5a7657f38209000bd0f02d95f2b74cbcd1ab5f08be3e60bcb2a73",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_identical_tree_new_commit_does_not_invalidate"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-ignored-output-directory-is-supported",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "0e5456fcacb6e419faf916dd7c57bc40e3641fb8a2aa6b557087292e46b2afa8",
+      "log": "runner-test-ignored-output-directory-is-supported-97cb75db37454705ab0400f8fbdaca3b.log",
+      "log_sha256": "62252ea77fd03387c58bdb48af5a03a65a0283dd7d745d4bda6e942ce20bd5c6",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_ignored_output_directory_is_supported"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-imported-batch-restores-sigterm-handler-on-success-and-error",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "93bc16b8998fdb3f5dcb933e1357d14be9191223cb89b03c6f52799b7d76495f",
+      "log": "runner-test-imported-batch-restores-sigterm-handler-on-success-and-error-35fa0a5792c64c0aa0d61a9877c6f134.log",
+      "log_sha256": "b8155d1d95671a30d004be9acacf500e37af19a2258d5c34550ff2ad83e91694",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_imported_batch_restores_sigterm_handler_on_success_and_error"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-interrupt-preserves-nonpassing-attempt-for-retry",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "3414a992c3e5443ce2734075d2f0a17060d82fb086df81da5e007214ea687317",
+      "log": "runner-test-interrupt-preserves-nonpassing-attempt-for-retry-edf66b37d779432aab350c51d14ad286.log",
+      "log_sha256": "bf43d0d2577b03d5dc080fd95df652ba174853f59f6ee89824e6b7af71769e6e",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_interrupt_preserves_nonpassing_attempt_for_retry"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-interrupted-mask-install-restores-callers-mask",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "2014cb5a94b5fcc48252d8b5b4754ae6c9e1459198b1384b25213ee67eabadd4",
+      "log": "runner-test-interrupted-mask-install-restores-callers-mask-50e6ea8ece174513bcbe7301eef4e7d2.log",
+      "log_sha256": "d1de419b6febca414a2c4f9ff5857204c16abbf53ea22dbe7f11a5fa637cd816",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_interrupted_mask_install_restores_callers_mask"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-invalidations-require-reason-existing-receipt-and-known-id",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "1cdd303bdd5481d8eb634204d3824f8d359335709a2ccc4bfe0e3c54bef5b880",
+      "log": "runner-test-invalidations-require-reason-existing-receipt-and-known-id-9db3a00e8ffc49c0ab8c3f5f19293840.log",
+      "log_sha256": "82c98a1af14b1871894475c75fa59af63c676a0d1164434657e5fd58da632c49",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_invalidations_require_reason_existing_receipt_and_known_id"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-ledger-in-nonignored-source-path-is-rejected",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "ae8cd361ad010b8e0d030a82b8b8adc44f03ffea496d7d742a340c6bcd94581b",
+      "log": "runner-test-ledger-in-nonignored-source-path-is-rejected-84e7008ae5024e7893e3fe89750b4465.log",
+      "log_sha256": "6b7dc33e8f2f5539be13b7b615a81fa4fb36cba5f2f2957964644b7d4b55e872",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_ledger_in_nonignored_source_path_is_rejected"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-ledger-inside-source-must-not-overwrite-tracked-file",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "13ec9665cc72adc4a9832464c37ffc880f579f7ba6e6775bf6dbc2ccd53ccc59",
+      "log": "runner-test-ledger-inside-source-must-not-overwrite-tracked-file-3505930eb7a14a91a35f36b7b77c1ba7.log",
+      "log_sha256": "882595b475d92a9735874d80aea7874e23c4e97ece0d4955a9cecfbc5d2dc78f",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_ledger_inside_source_must_not_overwrite_tracked_file"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-missing-executable-and-timeout-are-failures",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "a93d77fe13f6759a0c86be3ed74b71c1f530a04727ebe038b21b64620b7736cc",
+      "log": "runner-test-missing-executable-and-timeout-are-failures-9e2febf32cd74807b61fa803b9aabecf.log",
+      "log_sha256": "664ca64568b1938081aa2e1b6e453dc0850223fe56685de490810a5a78dd5796",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_missing_executable_and_timeout_are_failures"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-missing-scoped-path-and-duplicate-check-are-rejected",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "d7d2f305c711deecd363944336ad3f25d90d3272d197f3f4280c4487837d3b34",
+      "log": "runner-test-missing-scoped-path-and-duplicate-check-are-rejected-6da0687b8a0341ccac2ba7725f08e615.log",
+      "log_sha256": "76a5ac4309199ca12fe35183716202b9d9b9d38623a13fbd7e61f5a50b47bb6c",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_missing_scoped_path_and_duplicate_check_are_rejected"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-multiple-source-dependencies-and-cwd-dependency-are-checked",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "f1dd13a4b49f17dff52edb25a3920d32c5aa45e1f3522e47693732cccdac5fd6",
+      "log": "runner-test-multiple-source-dependencies-and-cwd-dependency-are-checked-92dc648559f143578221402c0d50b51f.log",
+      "log_sha256": "537c0c1c6c92f20fb19de2820ef6217e8c57edc7ac1079d8e09327161e711955",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_multiple_source_dependencies_and_cwd_dependency_are_checked"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-running-attempt-is-retried-not-counted-as-pass",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "061ffa2f370ad912d245c571d828f402f0ae3e53af7f12be64d71ad8c117088b",
+      "log": "runner-test-running-attempt-is-retried-not-counted-as-pass-fdfe3836d605411f8db0ecf7e38fd20d.log",
+      "log_sha256": "15830d4a8f66b5e8a08543bf46c2164ccae24a5c150306454e6fae9d74eb2bd0",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_running_attempt_is_retried_not_counted_as_pass"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-scoped-unaffected-success-is-not-rerun",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "3e1cfc40b452106b4d570df201ded8cbc3eb88cc99e558f253a647cfc999bd4f",
+      "log": "runner-test-scoped-unaffected-success-is-not-rerun-78b1d7b24cfc45a5a3b8f0783365359c.log",
+      "log_sha256": "faeed1886324473ea97a7700e563b6d9abf6dbf97562cc0252e4b802f612bfe9",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_scoped_unaffected_success_is_not_rerun"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-signal-during-handler-restoration-cannot-leak-other-handler",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "129d445ce6972072729ae8cc13cb790bd75e0742feb34ac75ef83683a97ea04f",
+      "log": "runner-test-signal-during-handler-restoration-cannot-leak-other-handler-cfd3b723bb454d369bab86fc162abf97.log",
+      "log_sha256": "7c548fe0ed7f47dd6b5cfe9cc14893a16e018d68069e3b33ad93bd653cdd9ba2",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_signal_during_handler_restoration_cannot_leak_other_handler"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-sigterm-kills-check-and-descendant-before-retry",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "31efff97112a87342f781eeb0fecd9b1331ed982769d3017a4879c956e1c6ed3",
+      "log": "runner-test-sigterm-kills-check-and-descendant-before-retry-e28d09295a2849ea8c052c7e30207222.log",
+      "log_sha256": "c217594c895b763a84702c20da6af937d212d4615a2c352333c517785a518dbd",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_sigterm_kills_check_and_descendant_before_retry"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-source-mutation-during-zero-exit-never-passes-or-runs-next-check",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "d3512595b9faa3c6455e1d076a02d0b8cd89cb195762e0165da105a1416cf85a",
+      "log": "runner-test-source-mutation-during-zero-exit-never-passes-or-runs-next-check-c8b11409f94f41488f65610fc6ed1cc6.log",
+      "log_sha256": "af5885da787c0fb0c8e111727bf9e79c0bf4e13b1258df4eaa29607f75b9cc85",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_source_mutation_during_zero_exit_never_passes_or_runs_next_check"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-submodules-are-not-silently-hashed-as-plain-sources",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "f0a36a23260062b09490cf245cc3eabd1f5cac2d113b3fb3fadf4c652df7d7a9",
+      "log": "runner-test-submodules-are-not-silently-hashed-as-plain-sources-d22c9006218c46a096d786e47a919ade.log",
+      "log_sha256": "6009f01e73efce363474af65d50e7335c0f79f4721b21718fcd86cca6860f02c",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_submodules_are_not_silently_hashed_as_plain_sources"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-success-is-executed-once-and-receipt-is-exact",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "b32baa4891027114fbb6e31b73b51cdb5e6e0a732c9286f42a9bc5c854431427",
+      "log": "runner-test-success-is-executed-once-and-receipt-is-exact-34d231b8eeec4cc1bccfb6ccc9b6d92d.log",
+      "log_sha256": "82aa29a8fb7395e7a29fbc9cde6130ac9ba337c9012f950dd205132d0794bd57",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_success_is_executed_once_and_receipt_is_exact"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    },
+    {
+      "id": "runner-test-success-log-loss-requires-explicit-invalidation",
+      "recorded_status": "passed",
+      "executing_sources": {
+        "repository": {
+          "head": "8966a057de4ffaccd363acaf63a13972ad3040ca",
+          "input_sha256": "ffb1c32c4101bed7fab520781eb26047c26e4d6d029a55158daf26303ad00701",
+          "path": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+          "paths": [
+            "scripts/nativehdr10_validation.py",
+            "tests/test_nativehdr10_validation.py"
+          ],
+          "tree": "d6d5eef21c39fc69ea8b55c5a991277febf6900f"
+        }
+      },
+      "fingerprint": "bbfbb9925fa703dd786c6a89a69e39d4a8e3ab5c0ce1020e424d62292a7bb15f",
+      "log": "runner-test-success-log-loss-requires-explicit-invalidation-e7466e3cc6d849c38ea974eb97336cba.log",
+      "log_sha256": "2ee7b35168c90d5805959438d584de2f1b22bf27c53c5d767ab14abd016372be",
+      "command": {
+        "argv": [
+          "/usr/bin/python3",
+          "-B",
+          "-m",
+          "unittest",
+          "-v",
+          "test_nativehdr10_validation.ValidationTests.test_success_log_loss_requires_explicit_invalidation"
+        ],
+        "cwd": "/work/hdr-nativehdr10-20261011/src/hdr-validation",
+        "env": {
+          "HOME": "/work/hdr-nativehdr10-20261011/validation/home",
+          "LC_ALL": "C",
+          "PATH": "/bin:/usr/bin",
+          "PYTHONPATH": "tests",
+          "TMPDIR": "/work/hdr-nativehdr10-20261011/validation"
+        },
+        "timeout_seconds": 120
+      },
+      "history_events": 1,
+      "candidate_validity": "passed",
+      "rationale": "Unchanged scoped runner/test bytes; actual prior receipt retained"
+    }
+  ],
+  "new_attempts": 2,
+  "new_invalidations": 2,
+  "prior_histories_unchanged": 69,
+  "hash_verified_execution_logs": 75,
+  "pending_invalidated_ids": [
+    "mutter-monitor-abstraction-tests",
+    "mutter-monitor-backlight",
+    "mutter-monitor-color-tests",
+    "mutter-monitor-config-migration-tests",
+    "mutter-monitor-config-policy-tests",
+    "mutter-monitor-config-tests",
+    "mutter-monitor-custom-config-tests",
+    "mutter-monitor-gdctl",
+    "mutter-monitor-orientation-phone-tests",
+    "mutter-monitor-orientation-tests",
+    "mutter-monitor-scale-tests",
+    "mutter-monitor-storage-tests",
+    "mutter-tiling-hotplug-test",
+    "mutter-cursor-tests",
+    "mutter-unit"
+  ],
+  "ledger_sha256": "480cbb50699512fce164b4ae23fe927de0fd51e77fc339856d893b383e0b9f13",
+  "manifests_sha256": {
+    "affected-checks.json": "100aadf4558e8300bdeb762bc6a4448f6816472abc43ac6f5deb3657fa05e727",
+    "retry3-checks.json": "fe816ee5f1fcca7ac5b5adc3a12e07d1a57c059580d9c9732d06dd411232852f",
+    "retry3-required.json": "cf4e03dd5da651179ca4c7481d825f887c0df72d74d02c6e11fe8f041c0135bf",
+    "retry3-dependent.json": "a265696d7f3fc460e8ea69f352220f4be5be8913733cf0234a948f44d001ecbf"
+  },
+  "batch_request": ".peer-linux/results/72177b63822b4ff9a1f538c9c467338f/output.txt",
+  "saved_log_retrieval": ".peer-linux/results/804ed0f5308947c1ba741b78da891faf/output.txt",
+  "execution_policy": "Full17 manifest split required2/dependent15 with unchanged objects/sources and same ledger/runner because runner continues ordinary failures; phase2 not run after phase1 rc1. No further retry.",
+  "failure": "monitor-dbus target-overrides-dbus passed; has-external-monitor stops after reconnect HasExternalMonitor TRUE; Meson exit245, no fatal-colord warning printed; signal/root cause not established by this evidence",
+  "success": "color-management:20/20 subcases including unplug-referenced/moved-connector passed; saved Meson stdout retained",
+  "retention_policy": {
+    "owner": "Fable t_6b592492",
+    "decision_sha256": "019f558252aabfefe941d30024d959e6330cd69aefaed6efd7a7d1e3daaf8f40",
+    "statement": "Reviewer-attested source unreachability(tierA)/virtual-monitor observable equivalence(tierB); not automatic whole-tree reuse, not rewritten receipts",
+    "library_delta": {
+      "./src/libmutter-51.so.0.0.0": {
+        "before": "fb44ceec59a6329ead5e8119cc25dc36488e8ec185c67347b86e861dea66ecae",
+        "after": "3eb20c0cc8703cb240ed7c60ef036d819eba57bc844a8ebacb172a82677dd13d"
+      }
+    },
+    "debug_only_evidence": ".peer-linux/opus-colord/export/debug-only-check.txt"
+  },
+  "next_tasks": [
+    "t_ef832f3b",
+    "t_c88207c7"
+  ],
+  "limits": [
+    "Raw70passed1failed is not acceptance:15invalidated checks pending",
+    "Final integrity deferred until final evidence/docs commit",
+    "PR16 held;no devices/AppleTV/credentials/push/merge/deployment/packages/optical/Dolby qualification"
+  ]
+}

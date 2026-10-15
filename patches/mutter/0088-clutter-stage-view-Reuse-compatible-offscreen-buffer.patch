@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Sol <hdr-sol@example.invalid>
+Date: Mon, 12 Oct 2026 18:51:12 +0000
+Subject: [PATCH] clutter/stage-view: Reuse compatible offscreen buffers on
+ state changes
+
+Revalidate the current allocation against dimensions and every acceptable format, retaining fp16 fallback allocations across uniform-only changes. Continue invalidating the output pipeline and requesting a full redraw; release the buffer when direct painting becomes possible.
+---
+ clutter/clutter/clutter-stage-view.c | 31 +++++++++++++++++++++-------
+ 1 file changed, 24 insertions(+), 7 deletions(-)
+
+diff --git a/clutter/clutter/clutter-stage-view.c b/clutter/clutter/clutter-stage-view.c
+index 52d61bd..6e51046 100644
+--- a/clutter/clutter/clutter-stage-view.c
++++ b/clutter/clutter/clutter-stage-view.c
+@@ -184,12 +184,6 @@ ensure_stage_view_offscreen (ClutterStageView *view)
+   g_autoptr (CoglOffscreen) offscreen = NULL;
+   g_autoptr (GError) local_error = NULL;
+ 
+-  if (priv->offscreen)
+-    return;
+-
+-  clutter_stage_view_invalidate_projection (view);
+-  clutter_stage_view_invalidate_viewport (view);
+-
+   required_format = clutter_color_state_required_format (priv->color_state);
+ 
+   if (required_format <= CLUTTER_ENCODING_REQUIRED_FORMAT_UINT8)
+@@ -223,6 +217,30 @@ ensure_stage_view_offscreen (ClutterStageView *view)
+       offscreen_height = onscreen_height;
+     }
+ 
++  if (priv->offscreen)
++    {
++      CoglFramebuffer *framebuffer = COGL_FRAMEBUFFER (priv->offscreen);
++      CoglPixelFormat format = cogl_framebuffer_get_internal_format (framebuffer);
++      size_t i;
++
++      /* State changes still refresh the output pipeline, but need not
++       * replace a buffer with the same dimensions and a usable format.
++       * Check all candidates: allocation may have used a fallback format.
++       */
++      if (cogl_framebuffer_get_width (framebuffer) == offscreen_width &&
++          cogl_framebuffer_get_height (framebuffer) == offscreen_height)
++        {
++          for (i = 0; i < n_formats; i++)
++            {
++              if (format == formats[i])
++                return;
++            }
++        }
++    }
++
++  clutter_stage_view_invalidate_projection (view);
++  clutter_stage_view_invalidate_viewport (view);
++
+   offscreen = cogl_offscreen_new_from_formats (cogl_context,
+                                                formats,
+                                                n_formats,
+@@ -313,7 +331,6 @@ clutter_stage_view_invalidate_offscreen (ClutterStageView *view)
+     }
+ 
+   g_clear_object (&priv->offscreen_pipeline);
+-  g_clear_object (&priv->offscreen);
+ 
+   if (priv->ensure_offscreen_idle_id != 0)
+     return;

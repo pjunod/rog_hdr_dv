@@ -1,0 +1,68 @@
+Experimental RPU-aware Player (Ubuntu 26.10)
+
+Launch from Applications, Open With, or:
+    hermes-hdr-player -- /absolute/path/to/local-video.mp4
+    hermes-hdr-player --silent -- /absolute/path/to/local-video.mp4
+No files opens a drag-and-drop window. Space pauses/resumes, q quits,
+f toggles fullscreen. The launcher does not set desktop HDR or Night Light;
+use the normal desktop settings beforehand. --silent disables only this
+player's audio. Normal user launches enable ordinary mpv audio, unlike the
+initial coordinated silent trial; audio behavior is not qualified here.
+
+The launcher uses existing /usr/bin/mpv, gpu-next + Vulkan Wayland, software
+video decoding and compositor-preferred target hinting. No global mpv.conf,
+profile, session, compositor, kernel or audio setting is edited. User mpv
+configs and autoload scripts are deliberately not read by this launcher.
+There are no forced target-peak/primaries/TRC or source-dynamic hints.
+
+Intended DV path: Profile 5 and Profile 8 with supported consumer metadata,
+no residual enhancement. Genuine Profile 5 was played on the target with
+advancing frames and observed gpu-next reshaping using the installed stock
+implementation. Profile 8 is source-supported, not newly exercised by this
+package. Profile 7 FEL/residual reconstruction is excluded. HDR10-only input
+may also play normally; it is NOT evidence of DV.
+
+Private diagnostics: $XDG_STATE_HOME/hermes-hdr/player/<run>/receipt.json
+(default ~/.local/state). A private IPC socket shares that directory. There is
+NO continuous mpv logfile or default verbose logging. Startup collection stops
+after approximately 35 seconds or 35 attempts, sooner on a byte bound or failed
+persistence; normal playback/idle waiting continues without further sampling.
+Late drag/drop after this startup window stays unconfirmed. This receipt does
+not verify every playlist item or necessarily the item playing when you read it.
+Each IPC property receives at most 65536 bytes including events (64 messages);
+each retained sample is at most 65536 bytes, all samples at most 524288 bytes,
+and the encoded receipt at most 1048576 bytes. Atomic replacement can retain
+one temporary receipt.new of the same maximum size if failure prevents cleanup;
+it is not successful evidence. These per-run bounds do not depend on closing
+IPC later. Separate launches retain separate bounded receipts; there is no
+automatic deletion/total historical-run cap. Remove old exited runs as below.
+The receipt's observed-dv-reshaping requires gpu-next, VO INPUT colormatrix
+=dolbyvision, a real reshaping pass, and advancing sampled PTS. Otherwise it
+says unconfirmed; it does not block playback or claim a false DV success.
+video-out-params is VO INPUT, NOT output surface encoding. video-target-params
+is separately collected for rendered target parameters. Detailed Wayland logs
+belong only to the separately coordinated, retained stock-player trial, not
+this launcher's default collection. Exact wire identity and absence of
+compositor remapping are NOT established by these properties alone.
+If diagnostic IPC is unavailable, playback continues without confirmation.
+After mpv starts, a receipt write/rename/serialization failure disables further
+persistence and warns once; playback returns mpv's actual status. The last
+successfully saved receipt can be stale/incomplete, without a final exit code.
+Initial state/receipt setup failure occurs before starting mpv. Paths/receipts
+may identify your media; keep them private. Remove run directories
+manually only after retaining wanted evidence, and only when that player exits.
+
+This is EXPERIMENTAL: existing libplacebo reshaping and L1 maximum/average
+mapping, not Dolby's full display manager. L1 minimum and L2/L8 creative
+trims, official-reference accuracy, exact preferred-black/tagging/no-double
+mapping and optical calibration remain separate ongoing work. No Dolby
+certification or full-fidelity claim. No appearance or audio result is implied
+by metadata/shader evidence. No DRM/decryption or Apple TV integration.
+
+Install/removal require the coordinated operator, not the launcher:
+    apt-get --simulate install ./hermes-hdr-experimental-player_1.0~experimental2_all.deb
+The intended supported host already has all dependencies. Stop if the plan
+upgrades/removes compositor or audio packages. Actual install only after the
+review/qualification and coordinated operator window. Removing only this
+package removes the launcher, not stock mpv or its libraries. Never use
+"autoremove" as rollback. Diagnostic state remains user-owned and private.

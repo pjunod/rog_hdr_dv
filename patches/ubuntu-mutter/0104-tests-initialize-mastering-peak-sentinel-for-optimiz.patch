@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Engineering Agent <hdr-agent@invalid>
+Date: Tue, 13 Oct 2026 02:40:56 -0400
+Subject: [PATCH] tests: initialize mastering peak sentinel for optimized GCC
+ builds
+
+The getter intentionally leaves its out value untouched for unknown peaks. Initialize the test local to an impossible physical value so optimized distribution builds with -Werror can prove it is defined. Keep both success/failure assertions and all measured expectations unchanged.
+---
+ src/tests/wayland-color-management-test.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index f8e8ae5..6665eba 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1007,7 +1007,7 @@ mastering_round_trip (void)
+   g_autoptr (ClutterColorState) plain = NULL;
+   ClutterColorState *color_state;
+   const ClutterColorTargetVolume *target_volume;
+-  double peak;
++  double peak = -1.0;
+ 
+   /* The client also checks the advertised features. */
+   client = meta_wayland_test_client_new_with_args (test_context,

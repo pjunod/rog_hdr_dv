@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@example.invalid>
+Date: Tue, 13 Oct 2026 06:17:44 -0400
+Subject: [PATCH] frames: use the GTK interface color-scheme property
+
+Preserve the existing dark-versus-light mapping while avoiding the deprecated boolean property warning. Require GTK 4.20, which introduced the enum and property. Ubuntu Build-Depends remains 4.22; existing generated mutter-common-bin shlibs also requires libgtk-4-1 >= 4.22.0.
+---
+ meson.build                      | 2 +-
+ src/frames/meta-window-tracker.c | 4 +++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 9da2693..eb41efa 100644
+--- a/meson.build
++++ b/meson.build
+@@ -20,7 +20,7 @@ glib_req = '>= 2.81.1'
+ gi_req = '>= 0.9.5'
+ graphene_req = '>= 1.10.2'
+ gtk3_req = '>= 3.19.8'
+-gtk4_req = '>= 4.14.0'
++gtk4_req = '>= 4.20.0'
+ pango_req = '>= 1.46.0'
+ cairo_req = '>= 1.10.0'
+ pangocairo_req = '>= 1.20'
+diff --git a/src/frames/meta-window-tracker.c b/src/frames/meta-window-tracker.c
+index 3f08388..885ce62 100644
+--- a/src/frames/meta-window-tracker.c
++++ b/src/frames/meta-window-tracker.c
+@@ -102,7 +102,9 @@ update_color_scheme (MetaWindowTracker *window_tracker)
+   is_dark = color_scheme == G_DESKTOP_COLOR_SCHEME_PREFER_DARK;
+ 
+   g_object_set (gtk_settings_get_default (),
+-                "gtk-application-prefer-dark-theme", is_dark,
++                "gtk-interface-color-scheme",
++                is_dark ? GTK_INTERFACE_COLOR_SCHEME_DARK
++                        : GTK_INTERFACE_COLOR_SCHEME_LIGHT,
+                 NULL);
+ }
+ 

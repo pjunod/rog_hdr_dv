@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Sol Agent <sol-agent@example.invalid>
+Date: Tue, 13 Oct 2026 00:47:33 +0000
+Subject: [PATCH] tests: isolate ineligible caller fixture from shared
+ generation
+
+---
+ src/tests/color-lifecycle-tests.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/tests/color-lifecycle-tests.c b/src/tests/color-lifecycle-tests.c
+index 28faf0d..6f8c1e4 100644
+--- a/src/tests/color-lifecycle-tests.c
++++ b/src/tests/color-lifecycle-tests.c
+@@ -543,6 +543,9 @@ test_shared_caller_cancel (void)
+ 
+   /* An active monitor without EDID or gamma support is synchronously
+    * ineligible: FALSE promises that no completion callback is scheduled. */
++  /* Keep this scenario distinct from the eligible shared generation below:
++   * identical monitor identities reuse the existing color device. */
++  ineligible_setup.outputs[0].serial = "lifecycle-ineligible";
+   ineligible_setup.outputs[0].has_edid_info = FALSE;
+   ineligible_setup.crtcs[0].disable_gamma_lut = TRUE;
+   ineligible_device = add_monitor_with_setup (manager, &ineligible_setup);
+@@ -564,6 +567,7 @@ test_shared_caller_cancel (void)
+   clear_result (&cancelled_before_request);
+ 
+   device = add_monitor (manager);
++  g_assert_true (device != ineligible_device);
+   watch (device, &device_gone);
+   wait_for_delivery (&fixture);
+   g_assert_true (meta_color_store_has_pending_profiles (store));

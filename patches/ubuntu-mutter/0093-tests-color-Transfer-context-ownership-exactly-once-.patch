@@ -1,0 +1,24 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Sol Agent <sol-agent@invalid>
+Date: Mon, 12 Oct 2026 20:27:02 +0000
+Subject: [PATCH] tests/color: Transfer context ownership exactly once during
+ teardown
+
+---
+ src/tests/color-lifecycle-tests.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/src/tests/color-lifecycle-tests.c b/src/tests/color-lifecycle-tests.c
+index 6170930..b26f2fd 100644
+--- a/src/tests/color-lifecycle-tests.c
++++ b/src/tests/color-lifecycle-tests.c
+@@ -266,8 +266,7 @@ destroy_manager (Fixture *fixture)
+   /* Neither fixture nor queue owns the manager. Do not use its raw pointer
+    * even for a checked cast after this weak-notification assertion. */
+   g_clear_object (&fixture->client);
+-  meta_context_destroy (test_context);
+-  g_clear_object (&test_context);
++  meta_context_destroy (g_steal_pointer (&test_context));
+   g_assert_true (fixture->manager_gone);
+ }
+ 
