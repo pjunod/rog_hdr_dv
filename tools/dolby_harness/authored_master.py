@@ -17,12 +17,12 @@ from tools.dolby_harness.master_pixels import (geometry, read_bounded, sha,
                                               validate_decoder, verify)
 
 STAGE = 'authored-master-baseline'
-TRANSLATION = 'dolby-xml205-l1-direct-baseline-v1'
+TRANSLATION = 'dolby-xml205-l1-shot-inheritance-v2'
 P3 = [0.68, 0.32, 0.265, 0.69, 0.15, 0.06, 0.3127, 0.329]
 IDENTITIES = ('stage analysis_sha256 original_analysis_sha256 declaration_repair_sha256 '
               'source_manifest_sha256 parser xml_version algorithm_versions selected_cm_name mapping translation')
 EXPORT_KEYS = ('schema ' + IDENTITIES + ' source_sha256 frame_index pts l1 records')
-MAPPING_KEYS = ('output_id track_id shot_id frame_id source_parent_id source_in '
+MAPPING_KEYS = ('output_id track_id shot_id frame_id selection_kind source_parent_id source_in '
                 'shot_in shot_duration edit_offset edit_rate')
 REFERENCE_V1 = 'hdr.sparks-source-associated-reference.v1'
 REFERENCE_V2 = 'hdr.sparks-source-associated-reference.v2'
@@ -39,7 +39,7 @@ def validation(function):
 
 
 def parser_identity():
-    return {'name': 'dolby-harness-authored-xml205', 'version': '1',
+    return {'name': 'dolby-harness-authored-xml205', 'version': '2',
             'sha256': sha(Path(__file__).read_bytes())}
 
 
@@ -398,6 +398,7 @@ def selected_metadata(root, obj, sequence):
             raise ValueError('selected authored source duration mapping unsupported')
         offsets = set()
         shot_records = records(shot, 'shot', targets)
+        selected_frame = None
         for frame in shot.findall('Frame'):
             offset, fid = xml_int(frame, 'EditOffset'), value(frame, 'UniqueID')
             if offset in offsets or offset >= duration or fid in frame_ids:
@@ -407,9 +408,24 @@ def selected_metadata(root, obj, sequence):
             frame_records = records(frame, 'frame', targets)
             if start + offset != f['index']:
                 continue
-            l1_records = [x for x in frame_records if x['level'] == 1]
+            selected_frame = (offset, fid, frame_records)
+        if start <= f['index'] < end:
+            offset = f['index'] - start
+            if selected_frame is not None:
+                offset, fid, frame_records = selected_frame
+                selection_kind = 'explicit-frame'
+            else:
+                fid, frame_records = None, []
+                selection_kind = 'shot-inherited'
+            # Pinned dovi_tool applies actual shot blocks to each edit unit,
+            # with only matching optional Frame edits overriding them. Do not
+            # create a Frame node, duplicate a record or invent a frame UUID.
+            effective_records = frame_records if selected_frame is not None else shot_records
+            l1_records = [x for x in effective_records if x['level'] == 1]
             if len(l1_records) != 1:
-                raise ValueError('explicit selected frame-local authored L1 required')
+                if selected_frame is not None:
+                    raise ValueError('explicit selected frame-local authored L1 required')
+                raise ValueError('selected inherited shot authored L1 required')
             lo, avg, hi = decimals(l1_records[0]['fields'][0]['text'], 3)
             shot_l1 = [x for x in shot_records if x['level'] == 1]
             if shot_l1 and decimals(shot_l1[0]['fields'][0]['text'], 3) != [lo, avg, hi]:
@@ -421,7 +437,7 @@ def selected_metadata(root, obj, sequence):
             if not any(x['level'] == 2 and str(x['target_id']) == target_id for x in shot_records + frame_records):
                 raise ValueError('selected authored target trim absent')
             mapping = dict(output_id=value(output, 'UniqueID'), track_id=value(t, 'UniqueID'),
-                           shot_id=sid, frame_id=fid, source_parent_id=parent_id,
+                           shot_id=sid, frame_id=fid, selection_kind=selection_kind, source_parent_id=parent_id,
                            source_in=source_in, shot_in=start, shot_duration=duration,
                            edit_offset=offset, edit_rate=edit_rate)
             selected.append((mapping, {'min_pq': lo, 'avg_pq': avg, 'max_pq': hi}, shot_records + frame_records))
@@ -480,7 +496,7 @@ def parsed_export(analysis_raw, original_raw, repair_raw, source_path, source_ra
     if argv.count('-f') != 1 or str(obj['frame']['index']) != argv[argv.index('-f') + 1]:
         raise ValueError('authored selected original frame/acquisition mismatch')
     mapping, l1, preserved_records = selected_metadata(root, obj, sequence)
-    return {'schema': 3, 'stage': STAGE, 'analysis_sha256': sha(analysis_raw),
+    return {'schema': 4, 'stage': STAGE, 'analysis_sha256': sha(analysis_raw),
             'original_analysis_sha256': sha(original_raw), 'declaration_repair_sha256': sha(repair_raw),
             'source_manifest_sha256': sha(source_raw), 'source_sha256': obj['frame']['input']['sha256'],
             'frame_index': obj['frame']['index'], 'pts': obj['frame']['pts'],
@@ -518,8 +534,12 @@ def validate_alignment(a):
         raise ValueError('authored parser identity mismatch')
     m = a['mapping']
     keys(m, MAPPING_KEYS)
-    for k in ('output_id', 'track_id', 'shot_id', 'frame_id', 'source_parent_id'):
+    for k in ('output_id', 'track_id', 'shot_id', 'source_parent_id'):
         text(m[k])
+    if m['selection_kind'] == 'explicit-frame':
+        text(m['frame_id'])
+    elif m['selection_kind'] != 'shot-inherited' or m['frame_id'] is not None:
+        raise ValueError('authored selection kind/frame identity mismatch')
     for k in ('source_in', 'shot_in', 'edit_offset', 'shot_duration'):
         integer(m[k], 1 if k == 'shot_duration' else 0)
     keys(m['edit_rate'], 'num den')

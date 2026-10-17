@@ -1,5 +1,21 @@
 # Authored-master baseline adapter
 
+Current follow-up (2026-10-17): source-grounded public mapping work adds truthful
+shot inheritance for later genuine shots that have L1/trims but no Frame node.
+New exports use integer schema4, parser version2 and translation
+`dolby-xml205-l1-shot-inheritance-v2`. Input/source-storage schemas stay3.
+Mappings distinguish `explicit-frame` (original nonempty frame UUID) from
+`shot-inherited` (JSON-null frame_id, actual shot UUID and computed edit offset).
+Records retain their actual shot/frame scope without duplication or invented
+metadata. Unique enclosing shot, target, ParentID, source range, rate and PTS
+proof still apply. Missing/ambiguous/gapped selections reject. The explicit
+frame path retains its existing L1/conflict rejection; general conflicting
+frame override support is not silently broadened. Historical schema3 exports
+and old parser receipts remain immutable, not relabelled as current execution.
+New regression definitions are syntax-checked, not executed; independent
+references/accuracy, adversarial review and one affected unit batch remain open.
+The older status/contracts below retain their original phase boundaries.
+
 Status (2026-10-15): the original frame0 adapter passed independent review and
 its 40 selected units; 31 historical passes were retained. Its actual full-raster
 comparison FAILED unchanged limits (mean10.742194879314294,

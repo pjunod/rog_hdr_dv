@@ -6,6 +6,7 @@ Run once only after complete adapter review/fixes. Native tests reject controls
 before Vulkan; the one genuine candidate render belongs to recovery validation.
 """
 import copy
+from fractions import Fraction
 import io
 import json
 import math
@@ -258,6 +259,87 @@ class GenuineAuthoredTests(unittest.TestCase):
         self.assertEqual([f['index'] for f in self.sequence['frames']], [self.obj['frame']['index']])
         self.assertGreater(mapping['shot_duration'], len(self.sequence['frames']))
         self.assertEqual(mapping['edit_rate'], {'num': 60000, 'den': 1001})
+
+    def request_frame(self, index):
+        # Parser-only selection request over the actual original XML. This is
+        # not an acquired image/manifest/reference and never reaches a vendor.
+        obj = copy.deepcopy(self.obj)
+        pts = Fraction(index * 1001, 60000)
+        obj['frame'].update(index=index, pts={'num': pts.numerator, 'den': pts.denominator})
+        return obj
+
+    def test_genuine_shot_only_and_sparse_frame_inheritance_no_synthetic_id(self):
+        root = master.document(self.actual)
+        mapping, l1, records = self.selected(root=root, obj=self.request_frame(714))
+        second = master.track(root)[1].findall('Shot')[1]
+        self.assertEqual(len(second.findall('Frame')), 0)
+        self.assertEqual(mapping['selection_kind'], 'shot-inherited')
+        self.assertIsNone(mapping['frame_id'])
+        self.assertEqual(mapping['shot_id'], second.findtext('UniqueID'))
+        self.assertEqual(mapping['edit_offset'], 714 - int(second.findtext('Record/In')))
+        self.assertTrue(all(r['scope'] == 'shot' for r in records))
+        self.assertEqual([l1[k] for k in ('min_pq', 'avg_pq', 'max_pq')],
+                         master.decimals(second.findtext('PluginNode/DolbyEDR[@level="1"]/ImageCharacter'), 3))
+        first = master.track(root)[1].find('Shot')
+        selected = next(f for f in first.findall('Frame')
+                        if int(f.findtext('EditOffset')) == self.obj['frame']['index'])
+        original_id = selected.findtext('UniqueID')
+        before, _, _ = self.selected(root=root)
+        self.assertEqual(before['selection_kind'], 'explicit-frame')
+        self.assertEqual(before['frame_id'], original_id)
+        first.remove(selected) # sparse edit absent; genuine shot metadata remains
+        inherited, _, retained = self.selected(root=root)
+        self.assertEqual(inherited['selection_kind'], 'shot-inherited')
+        self.assertIsNone(inherited['frame_id'])
+        self.assertTrue(all(r['scope'] == 'shot' for r in retained))
+
+    def test_shot_inheritance_adjacent_boundary_gap_and_source_range(self):
+        before, _, _ = self.selected(obj=self.request_frame(511))
+        after, _, _ = self.selected(obj=self.request_frame(512))
+        self.assertNotEqual(before['shot_id'], after['shot_id'])
+        self.assertEqual((before['edit_offset'], after['edit_offset']), (511, 0))
+        root = master.document(self.actual)
+        second = master.track(root)[1].findall('Shot')[1]
+        second.find('Record/In').text = '513'
+        second.find('Record/Duration').text = '404'
+        with self.assertRaisesRegex(ValueError, 'missing/ambiguous selected'):
+            self.selected(root=root, obj=self.request_frame(512))
+        root = master.document(self.actual)
+        second = master.track(root)[1].findall('Shot')[1]
+        second.find('Source/In').text = '99999999'
+        with self.assertRaisesRegex(ValueError, 'source range/rate'):
+            self.selected(root=root, obj=self.request_frame(714))
+
+    def test_shot_inheritance_missing_actual_l1_or_target_rejects(self):
+        for level, message in (('1', 'inherited shot authored L1'), ('2', 'target trim absent')):
+            root = master.document(self.actual)
+            node = master.track(root)[1].findall('Shot')[1].find('PluginNode')
+            for record in list(node):
+                if record.get('level') == level and (level == '1' or record.findtext('TID') == self.obj['target']['id']):
+                    node.remove(record)
+            with self.assertRaisesRegex(ValueError, message):
+                self.selected(root=root, obj=self.request_frame(714))
+
+    def test_selection_discriminant_null_identity_and_bound_export(self):
+        aligned = alignment(self.obj, self.meta)
+        for key, value in (('selection_kind', 'shot-inherited'), ('selection_kind', 'unknown'), ('frame_id', None)):
+            bad = copy.deepcopy(aligned)
+            bad['mapping'][key] = value
+            with self.assertRaises(ValueError):
+                master.validate_alignment(bad)
+        # Even a structurally valid inherited/null pair cannot impersonate the
+        # actual explicit Frame: strict reparsing binds the selection origin.
+        forged = copy.deepcopy(self.meta)
+        del forged['max_pq_y'], forged['avg_pq_y']
+        forged['mapping'].update(selection_kind='shot-inherited', frame_id=None)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'forged-export.json'
+            raw = json.dumps(forged).encode()
+            path.write_bytes(raw)
+            envelope = copy.deepcopy(self.obj['metadata'])
+            envelope['export'] = {'file': str(path), 'sha256': sha(raw)}
+            with self.assertRaisesRegex(ValueError, 'export differs'):
+                master.metadata(self.base, envelope, self.obj)
 
     def test_original_repair_rollback_exact_and_only_two_insertions(self):
         master.repaired(self.original, self.actual, self.repair)
