@@ -5,11 +5,39 @@ not imported. Whole stage contracts are kept separate, with explicit finite
 extensions and target-black policy. All RGB here is linear BT.2020 in nits.
 """
 import math
+from fractions import Fraction
 
 from tools.dolby_harness.metric import pq_eotf, pq_inverse
 
 BAKER_WEIGHTS = (0.22897, 0.69174, 0.07929)
 BT2020_WEIGHTS = (0.2627, 0.6780, 0.0593)
+
+
+def xml_lgg_coefficients(controls, convention):
+    """Finite declared XML convention hypotheses, never a fitted scale.
+
+    Wire-continuous composes the pinned serializer/public decoder algebra.
+    Direct LGG is a neutral-preserving authoring-unit hypothesis only, not
+    established official XML pixel semantics. Input order is L/G/H/C/Q.
+    """
+    if convention not in ('xml-wire-continuous-v1', 'xml-direct-lgg-hypothesis-v1'):
+        raise ValueError('unknown declared XML convention')
+    if len(controls) != 5:
+        raise ValueError('five original XML controls required')
+    values = tuple(Fraction(str(v)) for v in controls)
+    if not all(-1 <= v <= 1 for v in values):
+        raise ValueError('XML controls outside supported domain')
+    unit = Fraction(1, 2) if convention == 'xml-wire-continuous-v1' else Fraction(1)
+    lift, gain, gamma = unit * values[0], 1 + unit * values[1], 1 + unit * values[2]
+    if gamma <= 0:
+        raise ValueError('positive authoring gamma required')
+    def clip(v):
+        return min(Fraction(1, 2), max(Fraction(-1, 2), v))
+    sop = (1 + clip(gain * (1 - lift) - 1), clip(gain * lift), 1 + clip(1 / gamma - 1))
+    return {'convention': convention, 'sop': tuple(float(v) for v in sop),
+            'color': (float(unit * values[3]), float(unit * values[4])),
+            'physical_lgg': tuple(float(v) for v in (lift, gain, gamma)),
+            'direct_XML_pixel_semantics_proven': False}
 
 
 def solve3(rows, rhs):

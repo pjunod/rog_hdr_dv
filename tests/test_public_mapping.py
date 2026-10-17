@@ -13,6 +13,25 @@ from tools.dolby_harness import public_mapping as pm
 
 
 class PublicMappingMathTests(unittest.TestCase):
+    def test_two_named_xml_conventions_neutral_limits_and_exact_composition(self):
+        for name in ('xml-wire-continuous-v1', 'xml-direct-lgg-hypothesis-v1'):
+            neutral = pm.xml_lgg_coefficients(['0'] * 5, name)
+            self.assertEqual(neutral['sop'], (1, 0, 1))
+            self.assertEqual(neutral['color'], (0, 0))
+            self.assertFalse(neutral['direct_XML_pixel_semantics_proven'])
+        controls = ('-0.028', '0', '0.001', '-0.002', '0')
+        wire = pm.xml_lgg_coefficients(controls, 'xml-wire-continuous-v1')
+        direct = pm.xml_lgg_coefficients(controls, 'xml-direct-lgg-hypothesis-v1')
+        self.assertEqual(wire['sop'], (1.014, -.014, 2000/2001))
+        self.assertEqual(direct['sop'], (1.028, -.028, 1000/1001))
+        self.assertEqual(wire['color'], (-.001, 0))
+        self.assertEqual(direct['color'], (-.002, 0))
+        for controls, name in ((['0'] * 5, 'fitted-alpha'),
+                               (('0', '0', '-1', '0', '0'), 'xml-direct-lgg-hypothesis-v1'),
+                               (('0', '0', 'NaN', '0', '0'), 'xml-wire-continuous-v1')):
+            with self.assertRaises(ValueError):
+                pm.xml_lgg_coefficients(controls, name)
+
     def test_rational_anchor_solution_poles_and_singularities(self):
         xs, ys = (0, 10, 1000), (0, 8, 100)
         c = pm.rational_prepare(xs, ys)

@@ -48,6 +48,9 @@ No metadata/frame identity was invented. The coupled HPE/IPT/Eq8 chain also fail
 one invalid final PQ-domain pixel makes the full primary metric unavailable;
 partial34559 diagnostics1.93870/4.47002 are not acceptance. No failed diagnostic
 was promoted into the GPU or used to replace older qualification receipts.
+One predeclared direct-LGG versus retained wire-composition convention test on
+the unchanged pre-Y chain FAILS5.53573/9.05053. Improved blacks do not offset its
+worse midtones; no intermediate factor or black/bright splice was selected.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready

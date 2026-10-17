@@ -60,6 +60,7 @@ are diagnostics, NOT full-raster acceptance or a threshold change.
 | Scalar PQ-Y pre-SOP domain only | 1.4240802336088687 | 2.9756704295090786 | FAIL mean; removes much of per-channel chromaticity error, not yet GPU-integrated |
 | Disclosed target-PQ-normalized scalar post-curve composition | 1.9822876353154848 | 4.507778761496315 | FAIL; adverse black/midtone predictions confirmed, not adopted |
 | Coupled HPE/IPT scalar pre-SOP with disclosed automatic chroma factor | unavailable | unavailable | FAIL; one final output-domain-invalid pixel prevents an all-sample primary metric; partial diagnostics also fail |
+| Predeclared direct-LGG XML units on unchanged scalar-Y pre-SOP chain | 5.535727406752872 | 9.050526281113827 | FAIL; black improves but midtones worsen as predicted; wire baseline retained, not rerun |
 
 The original mean<=1 and p95<=3 limits remain unchanged. Prior stock and
 Hermite/absolute-PQ failures remain failures and were not rerun. Residuals are
@@ -88,7 +89,20 @@ not exclude detail globally or identify a filter.
 The XML factors remain a hypothesis for direct authoring semantics: their
 algebra is exactly the pinned serializer-to-public-raw-decoder composition,
 not a primary-source proof of the official XML renderer's control scaling.
-No factor was doubled or tuned against this frame.
+No free scale factor was tuned against this frame.
+
+A later finite encoding-convention discriminator keeps the exact pre-Y chain
+and changes only the complete authoring-unit interpretation. W is the retained
+serializer/public-decoder composition with physical LGG `(L/2,1+G/2,1+H/2)`;
+A is the explicitly unproven direct-unit hypothesis `(L,1+G,1+H)`. Both derive
+the complete operative SOP via the published Eq1 and preserve CW/SG status.
+No continuous scale parameter or intermediate factor is available. A's exact
+SOP `(1.028,-.028,1000/1001)` fails all-sample mean5.53573/p959.05053, with
+11,422 negative affine bases and11,423 PQ-floor activations. Reference-black
+mean.00581 improves while nonblack-neutral mean8.36993 and chromatic mean7.36413
+worsen. Reject A for this declared chain; do not splice its black behavior or
+change order to rescue it. W remains a failed, provisional best diagnostic,
+not proof of direct XML pixel semantics. All original metadata bytes are unchanged.
 
 The coupled discriminator embeds the same M neutral scalar transfer in the
 LMS/PQ/IPT path with the US9961237B2 Eq8/9 automatic chroma multiplier
