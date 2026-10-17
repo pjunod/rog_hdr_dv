@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-15 (America/New_York) · **State:** main-targeting HDR
+**Updated:** 2026-10-17 (America/New_York) · **State:** main-targeting HDR
 foundations/tooling/experimental-launcher source independently reviewed and qualified;
 three support-helper defects corrected and re-reviewed, all 29 affected methods passed.
 Previously qualified component source and exact historical receipts are selected
@@ -14,6 +14,28 @@ defines validation, and [review](REVIEW.md) records findings and their resolutio
 Source qualification is separate from package delivery and physical measurement.
 
 ## HDR foundations — main-targeting candidate
+
+Merged-package lane `t_b2f97e54` now owns [normal Ubuntu source/binary packaging](MERGED_UBUNTU_PACKAGES.md)
+in a new isolated clone from actual main2735b97f. Done: source/receipt inventory;
+done: launcher experimental3 and coherent nine-package Mutter nativehdr10.1 normal
+source/binary construction, including .dsc/archive/.changes/.buildinfo and matched
+debug symbols, with nocheck/no repeated upstream units. Retained hdr9 source
+applicability, private kit and isolated-install qualification are now complete
+within the explicitly recorded architecture/baseline limits.
+Done: independent review REVIEW316 (CHANGES NEEDED) and its four corrections:
+typed source manifests bound to the final .dsc, real artifact closure/ABI/debug/
+source inspections with two negative regressions, current launcher instructions
+with `1.0~experimental4` reserved, and a hash-bound provenance/errata companion;
+focused closure of those corrections (two blockers fixed at `249ccf7`). Done,
+run 317 ([receipt](../evidence/merged-ubuntu-packages-run317.json)): launcher
+`1.0~experimental4` constructed once, existing-source audits clean, provenance
+companion written, the one affected batch passed 14/14, the actual isolated
+forward/rollback transaction adjudicated PASS with one labelled limit
+(baseline-owned trigger directories), host state invariant, and the canonical
+kit retrieved and hash-verified (78 checksum-listed files, 54 source-manifest
+entries). Remaining: final repository fast lane and [PR21](https://github.com/pjunod/rog_hdr_dv/pull/21) landing. The kit is constructed,
+qualified and retrieved — NOT released and NOT physically installed; a ROG
+installation stays owner / Linux-Media coordinated. Unqualified Dolby work is excluded.
 
 Done: selected nativehdr10 upstream90/Ubuntu105 source, unchanged library pins,
 the qualified public schema1/schema2 headless harness and experimental2 launcher.

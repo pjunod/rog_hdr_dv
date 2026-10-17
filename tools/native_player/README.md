@@ -22,8 +22,10 @@ affected batch/package qualification in `t_64e178b2`. No units run during this l
 Full accuracy and final combined delivery remain independent programme work.
 
 See [usage](USAGE.txt) for launch/install/rollback commands and limitations.
-The package is `hermes-hdr-experimental-player`, version `1.0~experimental2`,
-Architecture all (Python launcher; the qualified runtime is Ubuntu x86_64).
+The package is `hermes-hdr-experimental-player`, Architecture all (Python
+launcher; the qualified runtime is Ubuntu x86_64). Its current version is the
+top entry of [debian/changelog](debian/changelog); a kit selects one exact
+package by SHA256, never by version alone.
 There are no maintainer scripts, services, global config, audio settings or
 profile activation. Desktop Open With and an idle drag/drop window are supplied.
 Diagnostics are private and advisory, never a gate claiming full Dolby fidelity.
@@ -63,25 +65,51 @@ archives (upstream mpv archive root `mpv-player-mpv-2c219aa`, libplacebo commit
 | Output parameters → Wayland tag | mpv `video/out/wayland_common.c:3503–3564,4216+`: creates a parametric description from rendered `target_params`, sets named encoding plus target-derived mastering values and sets it on the surface (`2132–2139`). It does NOT reuse the exact preferred image-description object. |
 | Observable evidence | Bounded startup IPC `current-vo`, advancing `video-pts`, `video-out-params` DV representation and `vo-passes` real reshaping pass together; `video-target-params` separately describes target. Detailed preferred-feedback/tag logs are retained from the separately coordinated original stock trial, not collected continuously by the launcher. No profile-header-only or HDR10 fallback success. |
 
-## Reproducible construction (native fixed builder only)
+## Normal source construction (native fixed builder only)
 
-Establish Python/compiler/package backend inventory in a new task-owned native
-HOME/XDG/TMPDIR first. The inherited build source was actually syntax-compiled
-in that environment; an initial attempt used a snapshot without the harness and
-failed, then the immutable qualification source was correctly used. No C or
-upstream build metadata changed, so no new C compiler loop is necessary.
+The launcher is an ordinary Ubuntu source package: `debian/control`, `rules`,
+`copyright`, a versioned `changelog` and source format `3.0 (native)`, built
+with debhelper 14 and `dpkg-buildpackage -F -us -uc`. Construction uses pinned
+committed inputs; it is normal source packaging, not a bit-for-bit
+reproducibility claim. Prepare the committed source before transfer, never
+`.git` or credentials:
 
-Transfer only this directory and the deferred focused test, never .git or
-credentials, through the existing fixed wrapper's supported bounded import.
-In the isolated native source copy run:
+    git archive --format=tar -o launcher-source.tar COMMIT:tools/native_player
+    sha256sum launcher-source.tar
 
-    python3 tools/native_player/build.py --output /work/<owned-correction-lane>/candidate1/build --epoch 1791906751
+Transfer only that archive, [build.py](build.py) and the deferred scoped tests
+through the existing fixed wrapper's supported bounded import, then in a fresh
+task-owned durable output on the native builder run:
 
-The builder refuses an existing output directory, byte-compiles the launcher,
-constructs an ordinary root-owned .deb via unprivileged `dpkg-deb`, and writes
-package/payload/source hashes, backend/version/contents and `SHA256SUMS`. It
-never installs, starts mpv or invokes units. Keep the source-bound receipt and
-recover the package through a bounded export without removing peer exports.
+    python3 build.py --source-archive launcher-source.tar --sha256 SHA256 \
+        --commit COMMIT --output /work/<owned-lane>/launcher
+
+`build.py` refuses an ephemeral or existing output directory, a short commit
+or a mismatched archive hash, extracts the hash-verified source, and builds
+with `nocheck`. It never installs, starts mpv or invokes units.
+
+Artifact contract of one construction, all written beside each other and
+listed with SHA256 in `SHA256SUMS` and `build-receipt.json`:
+
+| Artifact | Meaning |
+|---|---|
+| `hermes-hdr-experimental-player_VERSION.dsc`, `_VERSION.tar.xz` | Normal native source package; the archive members are the committed `tools/native_player` tree |
+| `hermes-hdr-experimental-player_VERSION_all.deb` | The only binary: `/usr/bin/hermes-hdr-player`, the desktop entry, `USAGE.txt`, `inputs.json`, `copyright` and `changelog.gz`; no maintainer scripts |
+| `_VERSION_amd64.changes`, `_VERSION_amd64.buildinfo` | Closure of the files above by size and SHA256 |
+| `committed-source.tar`, `build.log`, `build-receipt.json` | The consumed source archive, the construction log and the receipt binding the full source commit, archive hash and every artifact hash |
+
+Scoped qualification is a single later affected batch, not build-time: the
+`tests/test_merged_ubuntu_packages.py` artifact inspections (exact payload,
+modes, dependencies, source-archive equality with the committed source, closure
+of `.dsc`/`.changes`/`.buildinfo`) plus the one launcher method whose metadata
+path changed. The 29 unchanged launcher algorithm methods keep their retained
+receipts and are not re-executed by a packaging revision.
+
+Each changed payload gets a new version. `1.0~experimental4` corrects only the
+installed `USAGE.txt` (no stale hardcoded package version; it is shipped
+uncompressed) and leaves `player.py` unchanged; `1.0~experimental3`, the first
+normal source construction, stays immutable as a superseded construction and
+is never relabelled.
 
 Before coordinated installation, the exact host APT simulation must show only
 one NEW launcher package with no core/audio changes, and a candidate-installed
@@ -90,27 +118,26 @@ owns those checks; a simulated state is not an actual installation. Runtime
 requirements already exist on the inspected target. Rollback is removal of only
 this launcher, with no `autoremove`, stock package changes or session action.
 
-## Deferred validation
+## Historical experimental2 evidence
 
-After independent complete-candidate source/package review and corrections:
-
-- One `python3 -m unittest discover -s tests -p test_native_player.py -v` batch
-  under durable task TMPDIR: deterministic argv/literal filename separation,
-  silent/idle behavior, DV-vs-HDR10 classifier and correlated progress, malformed
-  PTS, real pass descriptions, IPC event/request correlation/bounds, private
-  durable state and desktop/control contract; mid-run/final write and rename
-  failures, final serialization and receipt overflow, actual child status,
-  signal forwarding/restoration/races, cancellation/fatal cleanup and reaping,
-  IPC absolute deadline/aggregate bytes, sample count/bytes, unavailable IPC
-  and absence of continuous logs. These deferred lifecycle tests use real
-  private receipt bytes and fixture children/clocks, not player execution.
-  Shape fixtures are not Dolby
-  metadata, trims or reference renders.
-- Inspect actual .deb payload/modes/no maintainer scripts and source equality;
-  verify hashes. Disposable solver forward/reverse plans as described above.
-- Retain original successful installed-stock trial identities. No duplicate
-  playback or renderer suite for another reviewer. Any launcher-specific trial
-  requires a separately coordinated operator window; no device action here.
+`1.0~experimental2` was a standalone `dpkg-deb` construction with an `--epoch`
+builder interface that no longer exists. Its evidence is retained as history,
+not rewritten: [QUALIFICATION.md](QUALIFICATION.md) records the single
+post-review `python3 -m unittest discover -s tests -p test_native_player.py -v`
+batch (30 methods and 34 subtests) under a durable task TMPDIR: deterministic
+argv/literal filename separation, silent/idle behavior, DV-vs-HDR10 classifier
+and correlated progress, malformed PTS, real pass descriptions, IPC
+event/request correlation/bounds, private durable state and desktop/control
+contract; mid-run/final write and rename failures, final serialization and
+receipt overflow, actual child status, signal forwarding/restoration/races,
+cancellation/fatal cleanup and reaping, IPC absolute deadline/aggregate bytes,
+sample count/bytes, unavailable IPC and absence of continuous logs. Those
+lifecycle tests use real private receipt bytes and fixture children/clocks,
+not player execution; shape fixtures are not Dolby metadata, trims or reference
+renders. The experimental2 package, its solver receipts and the original
+successful installed-stock trial identities remain valid at their own scope.
+No duplicate playback or renderer suite is run for another reviewer; any
+launcher-specific trial requires a separately coordinated operator window.
 
 ## Precise remaining integration patches (not a first-playback gate)
 
