@@ -264,8 +264,6 @@ class NativeArtifactTests(unittest.TestCase):
         for directory in (cls.mutter, cls.launcher, cls.library, cls.library_source):
             if not directory.is_dir():
                 raise AssertionError('required fixture directory missing: ' + str(directory))
-        cls.scratch = cls.artifacts / 'validation-scratch'
-        cls.scratch.mkdir(exist_ok=True)
 
     def control(self, path, name):
         return subprocess.check_output(['dpkg-deb', '-f', str(path), name], text=True).strip()
@@ -286,7 +284,7 @@ class NativeArtifactTests(unittest.TestCase):
             return result
 
     def readelf(self, data, *flags):
-        with tempfile.TemporaryDirectory(dir=self.scratch) as temporary:
+        with tempfile.TemporaryDirectory(prefix='merged-validation-') as temporary:
             target = Path(temporary) / 'payload.elf'
             target.write_bytes(data)
             return subprocess.check_output(['readelf', '-W', *flags, str(target)], text=True)
@@ -346,7 +344,6 @@ class NativeArtifactTests(unittest.TestCase):
         self.assertEqual(audit['source_package']['dsc'], dsc.name)
         self.assertEqual(set(audit['packaging_deltas']), set(release.ALLOWED_PACKAGING_DELTAS[component]))
         self.assertGreater(audit['runtime_entry_counts']['file'], 0)
-        self.assertGreaterEqual(audit['runtime_entry_counts']['symlink'], 0)
         return audit
 
     def test_normal_source_and_binary_closures(self):
@@ -550,7 +547,8 @@ class NativeArtifactTests(unittest.TestCase):
                     self.assertEqual(member.uid, 0)
                     self.assertEqual(member.gid, 0)
                     self.assertEqual(member.mode & 0o6000, 0)
-                    self.assertEqual(member.mode & 0o022, 0, 'group/other writable')
+                    if not member.issym():  # dpkg stores symlinks as 0o777; only real entries carry permissions
+                        self.assertEqual(member.mode & 0o022, 0, 'group/other writable')
                     self.assertFalse(member.ischr() or member.isblk() or member.isfifo())
 
     def inspect_elf(self, package, name, data, arch):
@@ -626,8 +624,14 @@ class NativeArtifactTests(unittest.TestCase):
                 self.assertEqual(self.control(ddeb, 'Architecture'), 'amd64')
                 self.assertEqual(self.control(ddeb, 'Depends'), package + ' (= ' + version + ')')
                 debug_files = {}
+                # dh_dwz moves debug info shared across this package's ELF objects
+                # into one multifile named after the package; it has no build-id
+                # of its own and is referenced via .gnu_debugaltlink.
+                dwz = 'usr/lib/debug/.dwz/' + TRIPLET['amd64'] + '/' + package + '.debug'
                 for name, (member, data) in self.payload(ddeb).items():
-                    if member.isfile():
+                    if member.isfile() and name == dwz:
+                        self.assertTrue(data.startswith(b'\x7fELF'), name)
+                    elif member.isfile():
                         match = re.fullmatch(r'usr/lib/debug/\.build-id/([0-9a-f]{2})/([0-9a-f]{38})\.debug', name)
                         self.assertIsNotNone(match, package + '-dbgsym unexpected member ' + name)
                         self.assertTrue(data.startswith(b'\x7fELF'), name)

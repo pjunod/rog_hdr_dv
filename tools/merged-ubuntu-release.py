@@ -197,8 +197,8 @@ def patch_header(component, head, expected, source):
         ' repository patch series from which that tree was built.\n'
         'Origin: other, commit:' + head + '\n'
         'X-Canonical-Tree: ' + expected + '\n'
-        'Forwarded: not-needed\n'
         'Last-Update: ' + date + '\n'
+        '---\n'
     )
 
 
