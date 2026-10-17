@@ -75,8 +75,10 @@ Independent source review and new affected units remain pending. It is not
 qualified/merged/packaged/released/installed.
 [Source-grounded public RGB mapping](docs/PUBLIC_RGB_MAPPING.md) compares two
 whole published chains against immutable official outputs, with explicit
-continuous-XML adaptation and a real ABI365 scalar/GPU RGB-pre-PQ/rational path.
-Native full/noDV and consumer compilation passed; sampled agreement still fails.
+continuous-XML adaptation and real ABI365 RGB/ABI366 scalar-Y PQ-pre/rational paths.
+Native full/noDV and consumer compilation passed; one ABI366 development render
+tracks the scalar diagnostic closely but sampled agreement still fails. A fixed
+cached HALF-interval audit is diagnostic only, not a fitted replacement curve.
 Full-raster/independent accuracy, review, one affected batch and Ubuntu delivery
 remain required. This active lane does not stop at an experimental operator.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) now includes a

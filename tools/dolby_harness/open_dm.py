@@ -25,8 +25,9 @@ ABSOLUTE_VARIANT = 'l1-hermite-sop-absolute-pq'
 ABSOLUTE_ALGORITHM = 'open-xml205-hermite-absolute-pq-sop-v1'
 VARIANTS = ('l1-rational', 'l1-hermite', 'l1-hermite-sop', ABSOLUTE_VARIANT)
 RGB_VARIANT = 'rgb-pq-pre-rational'
-VARIANTS += (RGB_VARIANT,)
-SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT, RGB_VARIANT)
+Y_VARIANT = 'y-pq-pre-rational'
+VARIANTS += (RGB_VARIANT, Y_VARIANT)
+SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT, RGB_VARIANT, Y_VARIANT)
 FROZEN_DECISIONS = {
     'spec_sha256': '3179434d7e0a88dfd50ec61f7df2a7db9b7fac04e062d2c2ad49a05160046183',
     'parameter_decision_sha256': '0d418f1915ba26faf713ce6eae23e16aa67eacd025ba5cc5122729700c6d99e1',
@@ -111,7 +112,7 @@ def algorithm(obj, meta, variant):
         result['sop_domain'] = 'PL_DOVI_DM_SOP_ABSOLUTE_PQ'
         result['sop_equation'] = 'u=clamp(S*y+O,0,1); output=clamp(pow(u,P),PQ(target.black),PQ(target.peak))'
         result['sop_clamp_policy'] = 'OPEN finite/nonnegative input and physical output-volume clamps; not normative'
-    if variant == RGB_VARIANT:
+    if variant in (RGB_VARIANT, Y_VARIANT):
         from tools.dolby_harness.public_mapping import mpc_prepare
         original = [Fraction(x) for x in trims[0].split(',')]
         if not all(-1 <= original[i] <= 1 for i in (6, 7)):
@@ -140,6 +141,22 @@ def algorithm(obj, meta, variant):
                 'Actual scalar/GPU caps post-color PQ at1 as explicit finite physical-domain extension',
                 'Target black0 required; singular/flat L1 intervals rejected',
                 'CW is present but ineffective when SG is0 under this operator'])
+        if variant == Y_VARIANT:
+            if sg != 0:
+                raise ValueError('Y-PQ-pre supports exact SG0 only; no RGB fallback')
+            if applied['S'] + applied['O'] > 1:
+                raise ValueError('Y-PQ-pre SOP exceeds physical PQ domain')
+            result.update(id='open-continuous-xml-y-pq-pre-rational-v1',
+                domain='absolute PQ of scalar linear BT2020 Y before rational Y',
+                color_factors={'cw':cw,'sg':sg,'status':'supported-SG0-only; CW present/no effect'},
+                applied_stages=['linear source-to-BT2020 basis conversion', 'scalar Y absolute-PQ SOP',
+                    'rational scalar luminance once', 'restore original linear RGB ratios',
+                    'existing final physical gamut mapping once'],
+                hypotheses=['W continuous XML serializer/public-decoder composition, not direct XML pixel identity',
+                    'Scalar Y extension, not a complete official/patent mapper',
+                    'Exact SG0 only; nonzero SG unsupported without fallback',
+                    'Zero Y maps to black; nonnegative affine/published post-power PQ floor1e-5',
+                    'Full-domain SOP must remain within PQ1; no RGB per-channel trim or stock compensation'])
     return result
 
 
@@ -150,7 +167,7 @@ def control(obj, meta, variant):
         values += [v['min_nits'], v['max_nits'], *v['primaries']]
     values += [meta['l1'][k] for k in ('min_pq', 'avg_pq', 'max_pq')]
     values += [VARIANTS.index(variant)] + [a['applied_factors'][k] for k in ('S', 'O', 'P')]
-    if variant == RGB_VARIANT:
+    if variant in (RGB_VARIANT, Y_VARIANT):
         values += [a['color_factors'][k] for k in ('cw','sg')]
     return ' '.join(str(x) for x in values) + '\n'
 

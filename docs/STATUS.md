@@ -32,8 +32,11 @@ residuals guide source-stage analysis, not parameter fitting. Original reference
 baseline pixels and prior failures remain unchanged; old tests were not repeated.
 Subsequent one-at-a-time source discriminators: curve-before-SOP order alone
 1.75578/3.72667 FAIL (black improves, nonblack neutral worsens); scalar PQ-Y
-pre-SOP domain alone1.42408/2.97567 still FAILS mean. The latter reduces chromatic
-residuals but is not yet integrated into the GPU; it is not final acceptance.
+pre-SOP domain alone1.42408/2.97567 still FAILS mean. Its separate ABI366 SG0-only
+scalar/GPU implementation is now compiled full/noDV and with the matched consumer
+using warnings as errors (library5a7500f, native request11df1b13). One actual
+frame256 development render94c753eb gives sampled1.42340/2.97584, still FAIL mean;
+scalar/GPU deltaEITP mean.001175/p95.002912/max.007141. It is not final acceptance.
 The complete target-PQ-normalized scalar post-curve composition also FAILS
 1.98229/4.50778, including its predeclared adverse black/midtone behavior; no
 black/bright splice followed. Cached exact-input reference dispersion is small
@@ -51,6 +54,21 @@ was promoted into the GPU or used to replace older qualification receipts.
 One predeclared direct-LGG versus retained wire-composition convention test on
 the unchanged pre-Y chain FAILS5.53573/9.05053. Improved blacks do not offset its
 worse midtones; no intermediate factor or black/bright splice was selected.
+
+The joint thinkers' reconciled v2 audit ran ONCE on the unchanged34560 cache:
+8527 reference-floor flags, zero source-SOP clamp/floor activations,22387 failed
+channel-scale overlaps,3 active/undefined physical-P3 rays,3646 eligible diagnostic
+samples. Original black8439/nearblack-neutral155/nonblack-neutral33/chroma25933
+groups are unchanged. Nineteen occupied1/8-decade bins supply one predeclared
+quadruple; CRx1.0045260613 is inside conservative CRy[.9922560170,1.0079000635],
+so this interval test does not refute the family. Exact rational W sanity passed;
+floating discrepancy2.22e-16. No fitted coefficients, replacement quadruple or
+subset acceptance. All-sample WpreY1.4240802336/2.9756704295 remains FAIL.
+Frame714/target27 remains reserved: parser2 selection proves source-frame202
+and retains a schema4-shaped preparation draft with unresolved acquisition
+bindings explicit; no executable export, source/reference render or vendor call
+is claimed. Audit export initially exceeded the shared4MiB staging cap after
+successful analysis; native JSON and its hash were retained, not recomputed.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready

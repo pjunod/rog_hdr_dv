@@ -57,7 +57,8 @@ are diagnostics, NOT full-raster acceptance or a threshold change.
 | One source-justified target-native P3-basis correction | 1.7247103852018388 | 3.8852842669051495 | FAIL; negligible basis benefit, not selected by fitting |
 | Actual ABI365 GPU M implementation plus existing gamut once | 1.7278739741440665 | 3.894005612470684 | FAIL; correspondence localizes discrepancy before final gamut/compiler |
 | Disclosed curve-before-SOP order only | 1.7557783422296565 | 3.7266675986867153 | FAIL; black improves, nonblack neutral worsens; not adopted |
-| Scalar PQ-Y pre-SOP domain only | 1.4240802336088687 | 2.9756704295090786 | FAIL mean; removes much of per-channel chromaticity error, not yet GPU-integrated |
+| Scalar PQ-Y pre-SOP domain only | 1.4240802336088687 | 2.9756704295090786 | FAIL mean; frozen cached scalar diagnostic, not acceptance |
+| Actual ABI366 SG0 scalar-Y GPU development render | 1.4233977137640779 | 2.9758393807633636 | FAIL mean; scalar/GPU mean difference.001175 deltaEITP, not acceptance |
 | Disclosed target-PQ-normalized scalar post-curve composition | 1.9822876353154848 | 4.507778761496315 | FAIL; adverse black/midtone predictions confirmed, not adopted |
 | Coupled HPE/IPT scalar pre-SOP with disclosed automatic chroma factor | unavailable | unavailable | FAIL; one final output-domain-invalid pixel prevents an all-sample primary metric; partial diagnostics also fail |
 | Predeclared direct-LGG XML units on unchanged scalar-Y pre-SOP chain | 5.535727406752872 | 9.050526281113827 | FAIL; black improves but midtones worsen as predicted; wire baseline retained, not rerun |
@@ -149,6 +150,54 @@ with warnings as errors; its new regressions remain unexecuted. Exercised
 earlier library/consumer artifacts were preserved before warm compilation.
 The new source pin is
 `wip/libplacebo-dm/public-rgb/SOURCE.json`.
+
+## ABI366 continuation and fixed cached family audit
+
+Private ABI366 adds the distinct `PL_DOVI_DM_OPEN_Y_PQ_PRE` evaluator and GPU
+path, with `y-pq-pre-rational` frontend selection. It applies absolute-PQ SOP to
+linear BT.2020 Y, rational mapping once, restores original linear RGB ratios,
+then uses the existing physical gamut stage once. Exact SG0 only is supported;
+nonzero SG rejects rather than falling back to RGB. The full-domain SOP must
+remain inside PQ1; zero Y maps to black. This is an explicit scalar extension,
+not a complete official mapper. Native full/noDV and matched consumer compilation
+passed for library5a7500f/tree77878b06 (request11df1b13). Older exercised c21
+artifacts were preserved before warm rebuilding. No unit execution occurred.
+The ONE frame256 development render94c753eb tracks the frozen scalar diagnostic:
+scalar/GPU deltaEITP mean.0011750457/p95.0029119424/max.0071413286; maximum absolute
+PQ difference9.40758e-6. Its all-sample diagnostic still fails mean1.
+
+Both thinkers reconciled one audit v2, executed once on the original cache SHA256
+`ab04648968e03a8c97a831095f8ea39e0391333aa7e072138b3e465176fc2fb8`.
+Reference intervals span adjacent representable HALF PQ codes (subnormals
+included); original input source is exact, with no invented quantization tolerance.
+Monotone EOTF endpoints and interval arithmetic use outward binary64 expansion;
+libm transcendental evaluation is disclosed, not a formally certified interval
+implementation. Per-channel scale intervals must overlap, and the hypothetical
+source ray at observed Yref must remain inside physical P3[0,600]. Flags overlap:
+8527 reference-floor samples, zero SOP-clamp/floor samples,22387 scale-overlap
+failures,3 active/undefined P3 rays;3646 samples are eligible for this diagnostic.
+The original8439 black/155 nearblack-neutral/33 nonblack-neutral/25933 chromatic
+groups are unchanged. Eligibility is NOT an acceptance population.
+
+Descriptive1/8-decade x bins retain paired y/x intervals and actual lower-median
+by-x representatives, ties by coordinate order, each with its OWN reference
+interval. Empty bins are retained. Nineteen occupied bins give the predeclared
+indices0,6,12,18: CRx1.0045260613 versus conservative CRy[.9922560170,1.0079000635],
+with absolute log-difference bounds[0,.0122899729]. Thus this test does not refute
+the fractional-linear family; it does not establish that family either. Exact
+rational W sanity preserves CR, with actual binary64 discrepancy2.22e-16.
+No replacement quadruple, fitted Möbius, renderer coefficient or threshold change.
+Non-overlap can localize violated colour/scalar assumptions, not automatically
+prove mean1/p953 impossibility. Frozen all-sample WpreY remains
+1.4240802336/2.9756704295 FAIL. Private full audit JSON SHA256 is
+`1c6d367357570073e6c48586ede545f9ff94bb6d66f95ff1bb60cffba53e8e3d`;
+the initial export-cap failure occurred AFTER the analysis and did not rerun it.
+
+Reserved frame714/target27 preparation binds actual shot-inherited parser2
+selection with null frame UUID and proves source-frame0+(714-512)=202. A schema4
+draft keeps missing original-acquisition/normalization/reference-receipt bindings
+explicitly null; it is NOT an executable validated export. No vendor call or
+reference/candidate render on714 occurred, preserving its unused evidence status.
 
 ## Done, current and remaining
 

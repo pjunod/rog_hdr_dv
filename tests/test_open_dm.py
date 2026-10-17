@@ -98,7 +98,7 @@ class OpenAuthenticTests(unittest.TestCase):
         for variant in dm.VARIANTS:
             with self.subTest(variant=variant):
                 a = dm.algorithm(self.obj, self.meta, variant)
-                indexes = ([0, 1, 2, 8] if variant == dm.RGB_VARIANT else
+                indexes = ([0, 1, 2, 8] if variant in (dm.RGB_VARIANT, dm.Y_VARIANT) else
                            [0, 1, 2, 6, 7, 8] if variant in dm.SOP_VARIANTS else list(range(9)))
                 self.assertEqual(a['unapplied_trim_indexes'], indexes)
                 self.assertEqual(a['unapplied_trim_values'],
@@ -114,13 +114,32 @@ class OpenAuthenticTests(unittest.TestCase):
         for i, variant in enumerate(dm.VARIANTS):
             tokens = dm.control(self.obj, self.meta, variant).split()
             self.assertEqual(tokens[:4], ['DVH3', '4096', '2160', '1'])
-            self.assertEqual(len(tokens), 33 if variant == dm.RGB_VARIANT else 31)
+            self.assertEqual(len(tokens), 33 if variant in (dm.RGB_VARIANT, dm.Y_VARIANT) else 31)
             self.assertEqual(int(tokens[27]), i)
             self.assertEqual(tokens[24:27], ['0.0', '0.290273', '0.879591'])
             if i < 2:
                 self.assertEqual(tokens[28:], ['1.0', '0.0', '1.0'])
         self.assertEqual(saved, self.meta)
         self.assertEqual(dm.algorithm(self.obj, self.meta, 'l1-rational')['l1_curve_domain'], 'nits rational')
+
+    def test_scalar_y_contract_and_failclosed_unsupported_controls(self):
+        a = dm.algorithm(self.obj, self.meta, dm.Y_VARIANT)
+        self.assertEqual(a['id'], 'open-continuous-xml-y-pq-pre-rational-v1')
+        self.assertEqual(a['color_factors']['sg'], 0)
+        self.assertEqual(a['color_factors']['status'], 'supported-SG0-only; CW present/no effect')
+        self.assertIn('restore original linear RGB ratios', a['applied_stages'])
+        # Rejection-only mutations of retained metadata; never vendor input.
+        for index, value, reason in ((7, '-0.004', 'exact SG0'),
+                                     (4, '0.1', 'exceeds physical PQ domain')):
+            m = copy.deepcopy(self.meta)
+            for record in m['records']:
+                if record['level'] == 2 and record['target_id'] == 27:
+                    field = next(f for f in record['fields'] if f['name'] == 'Trim')
+                    controls = field['text'].split(',')
+                    controls[index] = value
+                    field['text'] = ','.join(controls)
+            with self.assertRaisesRegex(ValueError, reason):
+                dm.algorithm(self.obj, m, dm.Y_VARIANT)
 
     def test_duplicate_selection_and_conflict_rejection(self):
         m = copy.deepcopy(self.meta)
@@ -165,7 +184,7 @@ class OpenAuthenticTests(unittest.TestCase):
 
     def test_actual_compile_source_header_library_abi_closure(self):
         prov.validate_compile(self.compile, live=True)
-        self.assertEqual(self.compile['abi'], 365)
+        self.assertEqual(self.compile['abi'], 366)
         self.assertEqual(self.compile['binary_sha256'], prov.sha(self.native))
         for edit in ('abi', 'sources', 'library_sources', 'headers'):
             c = copy.deepcopy(self.compile)
@@ -183,11 +202,11 @@ class OpenAuthenticTests(unittest.TestCase):
 class OpenActualResultTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Only the new once-rendered RGB variant belongs to this source. The
-        # original303/315 results retain OLD frontend/ABI362/364 identities.
+        # Only the once-rendered Y variant belongs to the ABI366 source. The
+        # original RGB/303/315 outputs retain OLD frontend/ABI365/362/364 identities.
         cls.paths = parse_json(read_bounded(os.environ['HDR_OPEN_RESULTS'], 4 * 1024 * 1024))
-        if set(cls.paths) != {dm.RGB_VARIANT}:
-            raise AssertionError('new RGB result required; no old-result relabelling')
+        if set(cls.paths) != {dm.Y_VARIANT}:
+            raise AssertionError('new Y result required; no old-result relabelling')
 
     def test_genuine_source_bound_results_and_rejection_only_tampering(self):
         for variant in self.paths:

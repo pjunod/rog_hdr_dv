@@ -1,4 +1,4 @@
-"""Source-bound OPEN ABI365 compiler/execution closure, separate from baseline."""
+"""Source-bound OPEN ABI366 compiler/execution closure, separate from baseline."""
 from pathlib import Path
 import platform
 import sys
@@ -31,10 +31,10 @@ def implementation():
 
 
 def validate_compile(receipt, live=False):
-    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 365 or
+    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 366 or
             receipt.get('architecture') != 'x86_64' or
             receipt.get('status') != 'compiled-not-executed'):
-        raise ValueError('OPEN ABI365 compile receipt required')
+        raise ValueError('OPEN ABI366 compile receipt required')
     for p in COMPILE_INPUTS:
         if receipt['sources'][p] != sha(ROOT / p):
             raise ValueError('OPEN compile input changed: ' + p)

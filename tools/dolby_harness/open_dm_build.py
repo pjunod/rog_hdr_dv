@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compile the separate OPEN consumer against an exact private ABI365 build.
+"""Compile the separate OPEN consumer against an exact private ABI366 build.
 
 No tests or renders. Source manifest is generated from the committed library by
 source export tooling; all actual files are checked before and after compilation.
@@ -39,7 +39,7 @@ def main():
         raise ValueError('native C compiler absent')
     compiler = Path(compiler_path).resolve(strict=True)
     native = output / 'open-dm-render'
-    library = (build / 'src/libplacebo.so.365').resolve(strict=True)
+    library = (build / 'src/libplacebo.so.366').resolve(strict=True)
     cmd = [str(compiler), '-std=c11', '-O2', '-fno-fast-math', '-Wall', '-Wextra', '-Werror',
            '-MD', '-MF', str(output / 'compile.d'),
            '-I' + str(build / 'src/include'), '-I' + str(source / 'src/include'),
@@ -75,8 +75,8 @@ def main():
     runtime[str(p.base.CPU.resolve(strict=True))] = p.sha(p.base.CPU)
     runtime[str(p.base.ICD)] = p.sha(p.base.ICD)
     if runtime.get(str(library)) != p.sha(library):
-        raise ValueError('actual loader did not select private ABI365 library')
-    receipt = {'schema': p.SCHEMA, 'status': 'compiled-not-executed', 'abi': 365,
+        raise ValueError('actual loader did not select private ABI366 library')
+    receipt = {'schema': p.SCHEMA, 'status': 'compiled-not-executed', 'abi': 366,
                'architecture': platform.machine(), 'command': cmd,
                'compiler': subprocess.check_output([str(compiler), '--version'], text=True),
                'compiler_sha256': p.sha(compiler), 'binary_sha256': p.sha(native),
@@ -91,7 +91,7 @@ def main():
                'compile_stderr_sha256': p.sha(output / 'compile.stderr'), 'units_run': 0, 'renders_run': 0}
     p.validate_compile(receipt, live=True)
     (output / 'compile-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-    print(json.dumps({'compiled': True, 'abi': 365, 'binary_sha256': receipt['binary_sha256'], 'units_run': 0}))
+    print(json.dumps({'compiled': True, 'abi': 366, 'binary_sha256': receipt['binary_sha256'], 'units_run': 0}))
 
 
 if __name__ == '__main__':
