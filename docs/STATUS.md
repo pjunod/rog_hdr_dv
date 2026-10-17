@@ -34,6 +34,20 @@ Subsequent one-at-a-time source discriminators: curve-before-SOP order alone
 1.75578/3.72667 FAIL (black improves, nonblack neutral worsens); scalar PQ-Y
 pre-SOP domain alone1.42408/2.97567 still FAILS mean. The latter reduces chromatic
 residuals but is not yet integrated into the GPU; it is not final acceptance.
+The complete target-PQ-normalized scalar post-curve composition also FAILS
+1.98229/4.50778, including its predeclared adverse black/midtone behavior; no
+black/bright splice followed. Cached exact-input reference dispersion is small
+in the limited repeated nonblack population, not evidence of a recovered detail
+stage. A scalar API marker null-callback hazard was corrected and compiled
+full/noDV with -Werror; new regressions remain deferred. Current analysis is the
+documented coupled intensity/chroma path, not a coefficient sweep. Later genuine
+shots require explicit shot-inheritance provenance support in the strict adapter
+before independent held-out comparisons; the parser2/export4 extension and four
+genuine-XML regression definitions are now written/syntax-checked, not executed.
+No metadata/frame identity was invented. The coupled HPE/IPT/Eq8 chain also fails:
+one invalid final PQ-domain pixel makes the full primary metric unavailable;
+partial34559 diagnostics1.93870/4.47002 are not acceptance. No failed diagnostic
+was promoted into the GPU or used to replace older qualification receipts.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready

@@ -59,6 +59,38 @@ class PublicMappingMathTests(unittest.TestCase):
         post = pm.mpc_post(rgb, curve, (1, -.01, 1), (0, 0))
         self.assertNotEqual(pre, post)
 
+    def test_coupled_matrix_inverse_and_explicit_domain_rejection(self):
+        forward = ((1, .1, 0), (0, 1, .1), (.1, 0, 1))
+        inverse = pm.inverse_matrix(forward)
+        for rgb in ((1, 0, 0), (0, 1, 0), (0, 0, 1)):
+            got = pm.apply_matrix(inverse, pm.apply_matrix(forward, rgb))
+            for a, b in zip(got, rgb):
+                self.assertAlmostEqual(a, b, places=12)
+        with self.assertRaises(ValueError):
+            pm.inverse_matrix(((1, 1, 1),) * 3)
+        for rgb, color in (((-1, 0, 0), (0, 0)), ((1, 1, 1), (0, .1))):
+            with self.assertRaises(ValueError):
+                pm.mpc_pre_ipt(rgb, {'identity': True}, (1, 0, 1), color, {})
+
+    def test_normalized_scalar_post_curve_has_no_mpc_floor_or_rgb_sop(self):
+        curve = {'identity': True, 'peak': 600}
+        sop = (1, -.1, 1)
+        counts = {}
+        self.assertEqual(pm.mpc_post_normalized_y((0, 0, 0), curve, sop, (-.001, 0)), (0, 0, 0))
+        self.assertEqual(pm.mpc_post_normalized_y((.001, .001, .001), curve, sop, (-.001, 0), counts), (0, 0, 0))
+        self.assertEqual(counts['affine_negative'], 1)
+        rgb = (1, 2, 3)
+        result = pm.mpc_post_normalized_y(rgb, curve, (1, -.01, 1), (-.001, 0))
+        self.assertAlmostEqual(result[0]/rgb[0], result[1]/rgb[1], places=12)
+        self.assertAlmostEqual(result[1]/rgb[1], result[2]/rgb[2], places=12)
+        for invalid in ((math.nan, 1, 1), (-1, 1, 1)):
+            with self.assertRaises(ValueError):
+                pm.mpc_post_normalized_y(invalid, curve, sop, (-.001, 0))
+        with self.assertRaises(ValueError):
+            pm.mpc_post_normalized_y(rgb, curve, sop, (-.001, .1))
+        with self.assertRaises(ValueError):
+            pm.mpc_post_normalized_y(rgb, curve, (1, math.inf, 1), (-.001, 0))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -170,6 +170,89 @@ def mpc_pre_y(rgb, curve, sop, color):
     return tuple(v * mapped / y for v in rgb)
 
 
+def mpc_post_normalized_y(rgb, curve, sop, color, counters=None):
+    """Eq6/5/7 scalar post-curve adaptation, not the complete patent model.
+
+    No MPC PQ floor, source-black subtraction, or internal target clipping.
+    The caller owns the existing final physical-volume policy.
+    """
+    if color[1] != 0:
+        raise ValueError('normalized Y discrimination requires neutral saturation')
+    if not all(math.isfinite(v) and 0 <= v <= 10000 for v in rgb):
+        raise ValueError('nonnegative finite RGB nits required')
+    s, o, p = sop
+    if not all(math.isfinite(v) for v in sop) or p <= 0:
+        raise ValueError('finite SOP and positive power required')
+    peak = curve['peak']
+    if not math.isfinite(peak) or not 0 < peak <= 10000:
+        raise ValueError('physical positive target peak required')
+    y = sum(w * v for w, v in zip(BT2020_WEIGHTS, rgb))
+    if y == 0:
+        return (0.0, 0.0, 0.0)
+    base = y if curve['identity'] else rational_eval(curve['coefficients'], y)
+    if not 0 <= base <= 10000:
+        raise ValueError('mapped Y outside physical PQ input domain')
+    lo, hi = pq_inverse(0), pq_inverse(peak)
+    u = (pq_inverse(base) - lo) / (hi - lo)
+    affine = s * u + o
+    if counters is not None:
+        for name, active in (('affine_negative', affine < 0),
+                             ('normalized_u_outside_target', not 0 <= u <= 1)):
+            counters[name] = counters.get(name, 0) + int(active)
+    q = lo + (hi - lo) * max(0.0, affine) ** p
+    if not math.isfinite(q) or not 0 <= q <= 1:
+        raise ValueError('trimmed PQ outside physical domain')
+    mapped = pq_eotf(q)
+    result = tuple(v * mapped / y for v in rgb)
+    if not all(math.isfinite(v) and v >= 0 for v in result):
+        raise ValueError('nonfinite normalized Y result')
+    return result
+
+
+def inverse_matrix(matrix):
+    columns = [solve3(matrix, tuple(float(i == j) for i in range(3))) for j in range(3)]
+    return tuple(zip(*columns))
+
+
+def mpc_pre_ipt(rgb, curve, sop, color, matrices, counters=None):
+    """M neutral scalar transfer in the disclosed IPT/Eq8 chroma composition.
+
+    Renderer-specific frozen forward matrices, not a patent-matrix identity.
+    Returns raw RGB; a single declared physical-target policy must follow.
+    """
+    if color[1] != 0:
+        raise ValueError('IPT discrimination requires neutral saturation')
+    if not all(math.isfinite(v) and 0 <= v <= 10000 for v in rgb):
+        raise ValueError('nonnegative finite RGB nits required')
+    lms = apply_matrix(matrices['rgb2lms'], rgb)
+    ipt = apply_matrix(matrices['lms2ipt'], tuple(pq_inverse(v) for v in lms))
+    intensity = ipt[0]
+    s, o, p = sop
+    if not all(math.isfinite(v) for v in sop) or p <= 0:
+        raise ValueError('finite SOP and positive power required')
+    affine = s * intensity + o
+    z = max(1e-5, max(affine, 0.0) ** p)
+    value = pq_eotf(z)
+    mapped = value if curve['identity'] else max(0.0, rational_eval(curve['coefficients'], value))
+    j = pq_inverse(mapped)
+    k = 1 + j - intensity
+    lmspq = apply_matrix(matrices['ipt2lms'], (j, k * ipt[1], k * ipt[2]))
+    if not all(math.isfinite(v) and v <= 1 for v in lmspq):
+        raise ValueError('inverse LMS-PQ exceeds physical domain')
+    if counters is not None:
+        counters['affine_negative'] = counters.get('affine_negative', 0) + int(affine < 0)
+        counters['pq_floor'] = counters.get('pq_floor', 0) + int(z == 1e-5)
+        counters['negative_inverse_lms_pq'] = counters.get('negative_inverse_lms_pq', 0) + sum(v < 0 for v in lmspq)
+        counters['inverse_lms_pq_below_black'] = counters.get('inverse_lms_pq_below_black', 0) + sum(v < pq_inverse(0) for v in lmspq)
+        counters['k_min'] = min(counters.get('k_min', k), k)
+        counters['k_max'] = max(counters.get('k_max', k), k)
+    linear_lms = tuple(pq_eotf(max(v, pq_inverse(0))) for v in lmspq)
+    result = apply_matrix(matrices['lms2rgb'], linear_lms)
+    if not all(math.isfinite(v) for v in result):
+        raise ValueError('nonfinite inverse RGB')
+    return result
+
+
 def convert_matrix(source, target):
     a, b = rgb_matrix(source), rgb_matrix(target)
     columns = [solve3(b, col) for col in zip(*a)]

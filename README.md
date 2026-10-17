@@ -79,7 +79,9 @@ continuous-XML adaptation and a real ABI365 scalar/GPU RGB-pre-PQ/rational path.
 Native full/noDV and consumer compilation passed; sampled agreement still fails.
 Full-raster/independent accuracy, review, one affected batch and Ubuntu delivery
 remain required. This active lane does not stop at an experimental operator.
-[Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) separates sparse
+[Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) now includes a
+source-only parser2/export4 shot-inheritance extension with explicit provenance
+and no invented frame UUID; new units remain deferred. It separates sparse
 P3D65/PQ HALF/XML2.0.5 transport from unresolved trim processing and acceptance.
 Its isolated follow-up binds ordinary nonzero-frame references explicitly while
 preserving v1 frame0 receipts; the actual frame0 numerical failure remains and

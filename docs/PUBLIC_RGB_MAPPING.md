@@ -58,6 +58,8 @@ are diagnostics, NOT full-raster acceptance or a threshold change.
 | Actual ABI365 GPU M implementation plus existing gamut once | 1.7278739741440665 | 3.894005612470684 | FAIL; correspondence localizes discrepancy before final gamut/compiler |
 | Disclosed curve-before-SOP order only | 1.7557783422296565 | 3.7266675986867153 | FAIL; black improves, nonblack neutral worsens; not adopted |
 | Scalar PQ-Y pre-SOP domain only | 1.4240802336088687 | 2.9756704295090786 | FAIL mean; removes much of per-channel chromaticity error, not yet GPU-integrated |
+| Disclosed target-PQ-normalized scalar post-curve composition | 1.9822876353154848 | 4.507778761496315 | FAIL; adverse black/midtone predictions confirmed, not adopted |
+| Coupled HPE/IPT scalar pre-SOP with disclosed automatic chroma factor | unavailable | unavailable | FAIL; one final output-domain-invalid pixel prevents an all-sample primary metric; partial diagnostics also fail |
 
 The original mean<=1 and p95<=3 limits remain unchanged. Prior stock and
 Hermite/absolute-PQ failures remain failures and were not rerun. Residuals are
@@ -67,6 +69,41 @@ residuals persist. A cached black/neutral audit shows reference-black samples
 cluster near the source display's declared black; this is evidence for further
 stage analysis, not permission to relabel scene L1 or fit an anchor.
 
+The normalized scalar composition uses US12573352B2 Eq6/5/7 around the same
+rational-Y curve. It changes both order and normalization relative to pre-Y;
+it is not a one-variable or complete-patent reproduction. No source-black
+subtraction, post-SOP PQ floor or internal target clamp was inserted. All
+34,560 samples were valid, with zero negative affine bases and zero normalized
+inputs outside the target span. Reference-black mean2.07936 and nonblack-neutral
+mean1.22107 confirm the predeclared adverse predictions. No part of that failed
+chain was spliced into another candidate.
+
+A separate exact-input audit found 89 repeated source-color groups containing
+nonblack references (208 samples); 28 have differing reference codes, with
+observed diameter p95.06332 and maximum.11737 deltaEITP. The 96 repeated
+all-black groups (7,037 samples) have zero reference dispersion. These limited
+repeats do not support spatial detail as the main order-one residual, and do
+not exclude detail globally or identify a filter.
+
+The XML factors remain a hypothesis for direct authoring semantics: their
+algebra is exactly the pinned serializer-to-public-raw-decoder composition,
+not a primary-source proof of the official XML renderer's control scaling.
+No factor was doubled or tuned against this frame.
+
+The coupled discriminator embeds the same M neutral scalar transfer in the
+LMS/PQ/IPT path with the US9961237B2 Eq8/9 automatic chroma multiplier
+`1 + mapped_I - original_I`, not libplacebo's hull-ratio compensation. Exact
+current library forward matrices (HPE plus4% crosstalk) are frozen; this is a
+renderer-specific matrix adaptation, not a claimed patent-matrix identity.
+Consistent double inverses have maximum identity residual2.22e-16. Its output
+policy is one fixed physical P3 clip[0,600], then BT2020/PQ encoding, unlike
+earlier raw Y diagnostics. One final encoding-domain-invalid pixel means the
+all34,560 primary metric is unavailable. The partial34,559 diagnostic mean1.93870/
+p954.47002 is NOT an acceptance statistic. Raw BT2020 negatives793 and P3
+excursions1217 are retained; the raw metric is also unavailable rather than
+omitting those samples. Nonblack-neutral transfer remains approximately.92348/
+1.19216, while chromatic error worsens. This chain is not GPU-promoted.
+
 ## Actual implementation and finite boundaries
 
 Private ABI365 adds `PL_DOVI_DM_OPEN_RGB_PQ_PRE`, scalar preparation/evaluation,
@@ -75,7 +112,9 @@ CW/SG cache identity. Existing no-DM and older diagnostic operators are preserve
 The RGB path replaces stock I mapping, compensation and post-I SOP; the existing
 physical-gamut stage executes once afterward. It does not append two mappers.
 The standalone scalar-I generator rejects the RGB operation rather than silently
-substituting a scalar LUT.
+substituting a scalar LUT. Prepared PQ parameters also have a non-null scalar
+marker callback: generic scalar generation/sampling returns NaNs, not an
+accidental scalar substitute or null-callback dereference.
 
 Target black must be zero for this named hypothesis; unsupported flat/singular
 L1 intervals reject. Rational preparation checks denominator/derivative over the
@@ -90,7 +129,11 @@ Full and no-DV native x86_64 warnings-as-errors compilation and the matched
 ABI365 consumer/header/compiler-dependency/runtime closure passed. Native
 scalar/GPU/cache regressions are written and compiled, not yet executed. Source
 export and SHA256SUMS were generated deliberately for the new appended patch;
-all older series/pins remain historical and unchanged. The new source pin is
+all older series/pins remain historical and unchanged. The scalar-marker safety
+correction was incrementally compiled in both full and no-DV configurations
+with warnings as errors; its new regressions remain unexecuted. Exercised
+earlier library/consumer artifacts were preserved before warm compilation.
+The new source pin is
 `wip/libplacebo-dm/public-rgb/SOURCE.json`.
 
 ## Done, current and remaining
@@ -100,8 +143,22 @@ contract table; continuous XML bridge and source provenance; two-chain cached
 analysis; one basis question resolved negatively; actual scalar/GPU operator and
 native compilation; one authentic GPU development render.
 
-Current: source-stage/black/neutral residual reasoning with the independent
-thinker; supported correction work continues rather than waiting for Dolby.
+Current: source-stage/black/neutral and coupled intensity/chroma reasoning with
+the independent thinker; supported correction work continues rather than waiting
+for Dolby. Independent-shot preparation identified genuine shot-level L1/trims
+without frame nodes in later original shots. The strict current adapter admits
+only explicit frame-local L1; a truthful shot-inheritance extension is required
+before those held-out frames can be consumed. That extension is now written
+with export schema4, parser version2 and translation
+`dolby-xml205-l1-shot-inheritance-v2`: unique enclosing shot, actual shot L1/trims,
+`selection_kind=shot-inherited`, JSON-null frame_id and computed edit offset.
+Explicit-frame selection retains its original UUID and conflict rejection.
+No Frame node/UUID or metadata record is fabricated. Source/target/rate/range
+proof remains mandatory; missing/gapped/ambiguous selections reject. Historical
+schema3 exports/old parser receipts stay immutable, not relabelled as current
+execution. New boundary/gap/missing-L1/target/null-discriminant regressions are
+written and syntax-checked, not executed. No new independent image/reference
+was acquired by this preparation.
 
 Remaining: passing exact full-raster official output and independent retained
 frames/targets, genuine completed-batch adversarial review/fixes, one affected

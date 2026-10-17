@@ -1,8 +1,8 @@
 From a69b88154cb2c4120e8637cdaf69e1cc08f5606f Mon Sep 17 00:00:00 2001
 From: HDR Builder <hdr-builder@example.invalid>
 Date: Sat, 17 Oct 2026 18:50:12 -0400
-Subject: [PATCH] dovi: implement source-grounded RGB PQ-pre SOP and rational
- luminance
+Subject: [PATCH 1/2] dovi: implement source-grounded RGB PQ-pre SOP and
+ rational luminance
 
 ---
  meson.build                      |   1 +
@@ -455,6 +455,66 @@ index ca51388..c0c9852 100644
  #ifdef PL_HAVE_VULKAN
      shader_cache_tests();
  #endif
+-- 
+2.54.0 (Apple Git-157)
+
+
+From c21b4a993ab9bba35a88f93541d4756e5370e60e Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 17 Oct 2026 19:05:37 -0400
+Subject: [PATCH 2/2] dovi: reject scalar evaluation of the RGB marker without
+ a null callback
+
+---
+ src/dovi_dm.c       | 12 ++++++++++--
+ src/tests/dovi_dm.c |  8 ++++++++
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index 238d0ae..fe88268 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -29,11 +29,19 @@ static const struct pl_tone_map_function open_hermite = {
+     .scaling = PL_HDR_PQ, .map = hermite_map,
+ };
+ 
++static void rgb_scalar_unsupported(float *lut, const struct pl_tone_map_params *p)
++{
++    for (size_t i = 0; i < p->lut_size; i++)
++        lut[i] = NAN;
++}
++
+ // Marker only: RGB mapping is not representable by an IPT-I scalar LUT.
+-// generate() rejects this marker; the separate RGB APIs own evaluation.
++// pl_dovi_dm_generate() rejects this marker. Generic scalar calls on the
++// prepared PQ parameters return NaNs rather than dereference a NULL callback;
++// the separate RGB APIs own evaluation.
+ static const struct pl_tone_map_function open_rgb = {
+     .name = "open-rgb-pq-pre", .description = "OPEN RGB PQ-pre rational Y",
+-    .scaling = PL_HDR_NITS,
++    .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
+ };
+ 
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index c0c9852..b46f485 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -133,6 +133,14 @@ static void rgb_tests(void)
+     assert(fabsf(c.coeffs[0]) < 1e-7f);
+     assert(fabsf(c.coeffs[1]-.6831692335f) < 1e-4f);
+     assert(fabsf(c.coeffs[2]-.0008293202f) < 1e-7f);
++    struct pl_tone_map_params scalar = {.lut_size=4};
++    assert(pl_dovi_dm_prepare(&dm,&target,&scalar) == PL_DOVI_DM_L1);
++    float lut[4] = {1,2,3,4};
++    assert(!pl_dovi_dm_generate(lut,&scalar));
++    assert(lut[0] == 1 && lut[3] == 4); // boolean API rejects before writing
++    pl_tone_map_generate(lut,&scalar);
++    for (int i=0; i<4; i++) assert(isnan(lut[i]));
++    assert(isnan(pl_tone_map_sample(.2f,&scalar)));
+     float input[3]={0,.01f,100}, output[3], bypass[3];
+     assert(pl_dovi_dm_rgb_eval(&c,&dm.open_sop,input,output));
+     dm.open_sop.chroma_weight=.5f; // SG0 makes CW ineffective, not absent
 -- 
 2.54.0 (Apple Git-157)
 
