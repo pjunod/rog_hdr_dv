@@ -59,8 +59,14 @@ mapping and optical calibration remain separate ongoing work. No Dolby
 certification or full-fidelity claim. No appearance or audio result is implied
 by metadata/shader evidence. No DRM/decryption or Apple TV integration.
 
-Install/removal require the coordinated operator, not the launcher:
-    apt-get --simulate install ./hermes-hdr-experimental-player_1.0~experimental2_all.deb
+Install/removal require the coordinated operator, not the launcher. Use the
+exact launcher package of the selected kit: verify it against that kit's
+SHA256SUMS first and give apt that operator-selected local path (PACKAGE
+below). Do not pick a package by version alone; this text names none.
+    sha256sum -c --ignore-missing SHA256SUMS
+    dpkg-deb -f PACKAGE Package Version
+    apt-get --simulate install ./PACKAGE
+    dpkg-query -W hermes-hdr-experimental-player
 The intended supported host already has all dependencies. Stop if the plan
 upgrades/removes compositor or audio packages. Actual install only after the
 review/qualification and coordinated operator window. Removing only this

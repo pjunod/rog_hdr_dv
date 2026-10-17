@@ -9,6 +9,10 @@ override_dh_auto_build:
 override_dh_auto_test:
 	# Qualification is a single separately reviewed affected batch, not build-time.
 
+override_dh_compress:
+	# Installed instructions and the pinned input inventory stay plain text.
+	dh_compress -XUSAGE.txt -Xinputs.json
+
 override_dh_auto_install:
 	install -D -m755 player.py debian/hermes-hdr-experimental-player/usr/bin/hermes-hdr-player
 	install -D -m644 player.desktop debian/hermes-hdr-experimental-player/usr/share/applications/hermes-hdr-player.desktop
