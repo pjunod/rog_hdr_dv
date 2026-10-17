@@ -1,4 +1,4 @@
-"""Source-bound OPEN ABI364 compiler/execution closure, separate from baseline."""
+"""Source-bound OPEN ABI365 compiler/execution closure, separate from baseline."""
 from pathlib import Path
 import platform
 import sys
@@ -13,8 +13,9 @@ SCHEMA = 'hdr.open-dm-compile.v1'
 COMPILE_INPUTS = ('tools/dolby_harness/open_dm_render.c',
                   'tools/dolby_harness/open_dm_build.py',
                   'tools/dolby_harness/open_dm_provenance.py',
-                  'wip/libplacebo-dm/absolute-pq/SOURCE.json')
+                  'wip/libplacebo-dm/public-rgb/SOURCE.json')
 FRONTEND_INPUTS = (*base.FRONTEND_INPUTS, 'tools/dolby_harness/open_dm.py',
+                   'tools/dolby_harness/public_mapping.py',
                    'tools/dolby_harness/open_dm_provenance.py')
 sha = base.sha
 native_environment = base.native_environment
@@ -30,10 +31,10 @@ def implementation():
 
 
 def validate_compile(receipt, live=False):
-    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 364 or
+    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 365 or
             receipt.get('architecture') != 'x86_64' or
             receipt.get('status') != 'compiled-not-executed'):
-        raise ValueError('OPEN ABI364 compile receipt required')
+        raise ValueError('OPEN ABI365 compile receipt required')
     for p in COMPILE_INPUTS:
         if receipt['sources'][p] != sha(ROOT / p):
             raise ValueError('OPEN compile input changed: ' + p)
@@ -41,7 +42,7 @@ def validate_compile(receipt, live=False):
         if not receipt[key]:
             raise ValueError('OPEN compile closure missing: ' + key)
     identity = receipt['library_identity']
-    pinned = parse_json(read_bounded(ROOT / 'wip/libplacebo-dm/absolute-pq/SOURCE.json', 4 * 1024 * 1024))
+    pinned = parse_json(read_bounded(ROOT / 'wip/libplacebo-dm/public-rgb/SOURCE.json', 4 * 1024 * 1024))
     if not am.strict_equal(identity, pinned['identity']) or not am.strict_equal(receipt['library_sources'], pinned['sources']):
         raise ValueError('OPEN library differs from committed candidate source pin')
     for key in ('head', 'tree'):
@@ -49,7 +50,7 @@ def validate_compile(receipt, live=False):
             raise ValueError('OPEN library Git identity malformed')
     # Full tracked source set, not a hardcoded baseline-input bypass. The build
     # supplied Git manifest is retained in the receipt and rehashed on execution.
-    required = ('src/dovi_dm.c', 'src/include/libplacebo/dovi_dm.h',
+    required = ('src/dovi_dm.c', 'src/dovi_dm_rgb.c', 'src/include/libplacebo/dovi_dm.h',
                 'src/shaders/colorspace.c', 'src/renderer.c', 'meson.build')
     if any(k not in receipt['library_sources'] for k in required):
         raise ValueError('OPEN library source set incomplete')

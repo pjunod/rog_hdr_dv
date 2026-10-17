@@ -98,7 +98,8 @@ class OpenAuthenticTests(unittest.TestCase):
         for variant in dm.VARIANTS:
             with self.subTest(variant=variant):
                 a = dm.algorithm(self.obj, self.meta, variant)
-                indexes = [0, 1, 2, 6, 7, 8] if variant in dm.SOP_VARIANTS else list(range(9))
+                indexes = ([0, 1, 2, 8] if variant == dm.RGB_VARIANT else
+                           [0, 1, 2, 6, 7, 8] if variant in dm.SOP_VARIANTS else list(range(9)))
                 self.assertEqual(a['unapplied_trim_indexes'], indexes)
                 self.assertEqual(a['unapplied_trim_values'],
                                  {str(i): a['original_trim'].split(',')[i] for i in indexes})
@@ -113,7 +114,7 @@ class OpenAuthenticTests(unittest.TestCase):
         for i, variant in enumerate(dm.VARIANTS):
             tokens = dm.control(self.obj, self.meta, variant).split()
             self.assertEqual(tokens[:4], ['DVH3', '4096', '2160', '1'])
-            self.assertEqual(len(tokens), 31)
+            self.assertEqual(len(tokens), 33 if variant == dm.RGB_VARIANT else 31)
             self.assertEqual(int(tokens[27]), i)
             self.assertEqual(tokens[24:27], ['0.0', '0.290273', '0.879591'])
             if i < 2:
@@ -164,7 +165,7 @@ class OpenAuthenticTests(unittest.TestCase):
 
     def test_actual_compile_source_header_library_abi_closure(self):
         prov.validate_compile(self.compile, live=True)
-        self.assertEqual(self.compile['abi'], 364)
+        self.assertEqual(self.compile['abi'], 365)
         self.assertEqual(self.compile['binary_sha256'], prov.sha(self.native))
         for edit in ('abi', 'sources', 'library_sources', 'headers'):
             c = copy.deepcopy(self.compile)
@@ -182,11 +183,11 @@ class OpenAuthenticTests(unittest.TestCase):
 class OpenActualResultTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Only the new once-rendered variant belongs to this source. The three
-        # original303 results retain OLD frontend/ABI362 executing identities.
+        # Only the new once-rendered RGB variant belongs to this source. The
+        # original303/315 results retain OLD frontend/ABI362/364 identities.
         cls.paths = parse_json(read_bounded(os.environ['HDR_OPEN_RESULTS'], 4 * 1024 * 1024))
-        if set(cls.paths) != {dm.ABSOLUTE_VARIANT}:
-            raise AssertionError('new absolute-PQ result required; no old-result relabelling')
+        if set(cls.paths) != {dm.RGB_VARIANT}:
+            raise AssertionError('new RGB result required; no old-result relabelling')
 
     def test_genuine_source_bound_results_and_rejection_only_tampering(self):
         for variant in self.paths:

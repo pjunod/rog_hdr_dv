@@ -24,7 +24,9 @@ ALGORITHM = 'open-xml205-hermite-pq-sop-v1'
 ABSOLUTE_VARIANT = 'l1-hermite-sop-absolute-pq'
 ABSOLUTE_ALGORITHM = 'open-xml205-hermite-absolute-pq-sop-v1'
 VARIANTS = ('l1-rational', 'l1-hermite', 'l1-hermite-sop', ABSOLUTE_VARIANT)
-SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT)
+RGB_VARIANT = 'rgb-pq-pre-rational'
+VARIANTS += (RGB_VARIANT,)
+SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT, RGB_VARIANT)
 FROZEN_DECISIONS = {
     'spec_sha256': '3179434d7e0a88dfd50ec61f7df2a7db9b7fac04e062d2c2ad49a05160046183',
     'parameter_decision_sha256': '0d418f1915ba26faf713ce6eae23e16aa67eacd025ba5cc5122729700c6d99e1',
@@ -109,6 +111,35 @@ def algorithm(obj, meta, variant):
         result['sop_domain'] = 'PL_DOVI_DM_SOP_ABSOLUTE_PQ'
         result['sop_equation'] = 'u=clamp(S*y+O,0,1); output=clamp(pow(u,P),PQ(target.black),PQ(target.peak))'
         result['sop_clamp_policy'] = 'OPEN finite/nonnegative input and physical output-volume clamps; not normative'
+    if variant == RGB_VARIANT:
+        from tools.dolby_harness.public_mapping import mpc_prepare
+        original = [Fraction(x) for x in trims[0].split(',')]
+        if not all(-1 <= original[i] <= 1 for i in (6, 7)):
+            raise ValueError('public RGB XML color controls require [-1,1]')
+        cw, sg = float(original[6]/2), float(original[7]/2)
+        result.update(id='open-continuous-xml-rgb-pq-pre-rational-v1',
+            domain='absolute PQ BT2020 RGB SOP/color before linear-nits rational luminance',
+            l1_curve_domain='linear BT2020 CIE Y nits; continuous scene L1 anchors',
+            prepared_curve=mpc_prepare(tuple(l1[k] for k in ('min_pq','avg_pq','max_pq')), 600),
+            color_factors={'cw':cw,'sg':sg,'status':'bypass-neutral-sg' if sg == 0 else 'applied'},
+            applied_stages=['linear source-to-BT2020 basis conversion', 'RGB absolute-PQ SOP',
+                'public inside-exponent color expression', 'rational luminance once',
+                'existing final physical gamut mapping once'],
+            unapplied_trim_indexes=[0,1,2,8],
+            unapplied_trim_values={str(i):trims[0].split(',')[i] for i in (0,1,2,8)},
+            unapplied_stages=['detail','L3','L8','midcontrast','CM selection','temporal rules',
+                'target interpolation','raw-RPU SOP'],
+            curve_defaults={'min_knee':.1,'max_knee':.8,'default_knee':.4,'adaptation':.4},
+            frozen_decisions={'DoViBaker':'ffba39830b694ddca0bf5f73dcf1b462713bb7f4',
+                'MPC':'6bb2f3d702993f04e888bf5abd0944a83333b3c5',
+                'serializer':'614c816b6446dcd1dbaf433403d499a6026fbb5a',
+                'scope':'independent continuous-XML RGB adaptation, not official CM identity'},
+            hypotheses=['Continuous XML serializer composition; no raw12 or UINT nits quantization',
+                'MPC6 mathematical stage order, not official implementation identity',
+                'Negative SOP bases clamp before power; published post-power PQ floor1e-5',
+                'Actual scalar/GPU caps post-color PQ at1 as explicit finite physical-domain extension',
+                'Target black0 required; singular/flat L1 intervals rejected',
+                'CW is present but ineffective when SG is0 under this operator'])
     return result
 
 
@@ -119,6 +150,8 @@ def control(obj, meta, variant):
         values += [v['min_nits'], v['max_nits'], *v['primaries']]
     values += [meta['l1'][k] for k in ('min_pq', 'avg_pq', 'max_pq')]
     values += [VARIANTS.index(variant)] + [a['applied_factors'][k] for k in ('S', 'O', 'P')]
+    if variant == RGB_VARIANT:
+        values += [a['color_factors'][k] for k in ('cw','sg')]
     return ' '.join(str(x) for x in values) + '\n'
 
 

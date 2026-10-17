@@ -73,6 +73,12 @@ Native full/noDV and matched consumer compilation passed with warnings as errors
 Its single development comparison FAILED unchanged limits (mean9.6113/p9516.3684).
 Independent source review and new affected units remain pending. It is not
 qualified/merged/packaged/released/installed.
+[Source-grounded public RGB mapping](docs/PUBLIC_RGB_MAPPING.md) compares two
+whole published chains against immutable official outputs, with explicit
+continuous-XML adaptation and a real ABI365 scalar/GPU RGB-pre-PQ/rational path.
+Native full/noDV and consumer compilation passed; sampled agreement still fails.
+Full-raster/independent accuracy, review, one affected batch and Ubuntu delivery
+remain required. This active lane does not stop at an experimental operator.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) separates sparse
 P3D65/PQ HALF/XML2.0.5 transport from unresolved trim processing and acceptance.
 Its isolated follow-up binds ordinary nonzero-frame references explicitly while

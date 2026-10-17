@@ -15,6 +15,35 @@ Source qualification is separate from package delivery and physical measurement.
 
 ## nativehdr10 — reviewed source batch and validation
 
+### Source-grounded public RGB correction (2026-10-17)
+
+Done: immutable original/reference/compiler preparation; two distinct complete
+public contracts and continuous XML bridge; cached34560-pixel diagnostics;
+ABI365 actual scalar/GPU RGB-pre-PQ SOP/color/rational-Y implementation with
+frame/cache identity and one physical gamut stage. Native full/noDV -Werror and
+matched consumer/header/runtime compilation passed; new regressions are compiled
+but not executed. One actual new GPU development render succeeded.
+
+Current: accuracy still FAILS. DoViBaker sampled mean71.124/p95151.445;
+MPC continuous-XML1.72847/3.89322; one target-native-basis correction1.72471/3.88528;
+actual GPU1.72787/3.89401. Samples do not meet the unchanged1/3 bar and are not
+full-raster acceptance. The negligible basis effect and signed dark/neutral
+residuals guide source-stage analysis, not parameter fitting. Original reference,
+baseline pixels and prior failures remain unchanged; old tests were not repeated.
+Subsequent one-at-a-time source discriminators: curve-before-SOP order alone
+1.75578/3.72667 FAIL (black improves, nonblack neutral worsens); scalar PQ-Y
+pre-SOP domain alone1.42408/2.97567 still FAILS mean. The latter reduces chromatic
+residuals but is not yet integrated into the GPU; it is not final acceptance.
+
+Remaining: passing full-raster and independent official references, completed
+batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
+substantial PR and versioned Ubuntu source/binary package delivery with isolated
+install/rollback evidence. No support-email prerequisite, full-Dolby/CM/rawRPU/L8,
+chroma/detail/temporal/seek or physical acceptance claim. See
+[public RGB mapping](PUBLIC_RGB_MAPPING.md). Earlier ABI364 software qualification
+is retained319, distinct from its failed image agreement; checkpoints below are
+historical, not the current review gate. No deployment; PR16 remains held.
+
 ### Isolated OPEN XML205 diagnostic (2026-10-15)
 
 Current follow-up: the corrected original source was independently approved301;
