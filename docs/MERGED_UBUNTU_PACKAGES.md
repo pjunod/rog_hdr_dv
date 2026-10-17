@@ -14,11 +14,10 @@ Dolby mapping. The selected source is main `2735b97f7ae6f8b091fcb834df21a8e34b95
   command passed once in 533.52 seconds. Both use nocheck; no upstream units ran.
   Normal `.dsc`, source archives, `.changes`, `.buildinfo`, actual binaries and
   matched Mutter debug symbols exist privately, not a recipe-only milestone.
-- Current: unchanged hdr9 multiarch applicability/source closure, private kit,
-  and actual isolated-install environment. Native namespace creation is denied;
-  task-private public PRoot plus libtalloc starts with `PROOT_NO_SECCOMP=1`.
-  This proves compatibility only, not installation. Never call a status MODEL
-  or copied baseline an install.
+- Done: unchanged hdr9 source/applicability audit and private-root preparation.
+  Native namespace creation is denied; task-private public PRoot plus libtalloc
+  uses `PROOT_NO_SECCOMP=1`. Preparation alone was not an installation; the actual
+  forward/rollback transaction and its limits are recorded below.
 - Done: independent adversarial packaging review (REVIEW316, `t_c3e311e9`)
   returned CHANGES NEEDED with four corrections, all implemented on this branch:
   typed source manifests bound to the final `.dsc` (R1), real artifact
@@ -26,19 +25,62 @@ Dolby mapping. The selected source is main `2735b97f7ae6f8b091fcb834df21a8e34b95
   current launcher instructions and the reserved `1.0~experimental4` (R3), and
   the hash-bound provenance/errata companion below (R4). No unit, build or
   install ran for those corrections.
-- Current: focused independent closure of the corrections against this exact
-  diff; then the launcher `1.0~experimental4` source/binary construction from
-  the closed commit, the supplemental `--audit-existing` receipts for the
-  existing Mutter and library source packages, and the provenance companion.
-- Remaining: ONE affected batch (the eleven existing scoped package methods,
-  the two new negative regressions and the one changed launcher method), actual
-  isolated forward/rollback installation, canonical kit and serialized PR
+- Done: focused independent closure of the corrections (two blockers found
+  and fixed at `249ccf7`). Run 317 from that commit, recorded in
+  [evidence/merged-ubuntu-packages-run317.json](../evidence/merged-ubuntu-packages-run317.json):
+  launcher `1.0~experimental4` constructed once (`.deb` SHA256
+  `8dceaefed1f32a37463c7888615f3e7f0542149c93a46b0e73d8702cc1eb73e4`,
+  experimental3 untouched); `--audit-existing` of the Mutter and library source
+  packages clean (no problems, runtime equal, only the allowed packaging deltas,
+  `quilt_applied` = receipt series + aggregate); provenance companion written;
+  the ONE affected batch of fourteen methods passed 14/14 in one native process
+  (0 failures, errors or skips); the actual isolated forward/rollback transaction
+  ran once in the private root and was adjudicated PASS with one labelled limit
+  (below); the canonical kit `kit317` was retrieved and hash-verified.
+- Done: local delivery assembled from 430 transport parts; the 42,106,880-byte
+  archive matches SHA256
+  `0bc18cc41bb8ba14dcac7e20f646caabf28bd7825ac480733c26bd88ae71fb76`.
+  All 78 checksum-listed files and all 54 source-manifest entries verified.
+  This is delivery integrity verification, not another unit or native test run.
+- Remaining: final repository fast lane and serialized [PR21](https://github.com/pjunod/rog_hdr_dv/pull/21)
   landing. Mutter `nativehdr10.1` and the hdr9 binaries are not rebuilt.
 
-This is not yet a released or newly installed kit. Existing installed binaries,
-source merge, compiler success, solver simulation, isolated installation and
-live installation are distinct states. No ROG/session/audio/display action is
-authorized here. No Apple TV access of any kind.
+States, kept distinct: **constructed** (run 316/317), **qualified** (run 317
+batch and isolated transaction), **kit retrieved** (private, hash-verified).
+NOT **released** and NOT **physically installed**: a ROG installation remains a
+separately coordinated owner / Linux-Media operation. Existing installed
+binaries, source merge, compiler success, solver simulation, isolated
+installation and live installation are distinct states. No ROG/session/audio/
+display action is authorized here. No Apple TV access of any kind.
+
+## Run 317 — isolated forward/rollback transaction
+
+The explicit runtime set (five Mutter runtime/common/GIR packages, the hdr9
+runtime, the launcher, plus the matched `libdisplay-info-dev` upgrade that the
+exact-version dependency requires) was simulated and then installed in the
+task-private PRoot root with `APT::Install-Recommends=false`, from an offline
+local repository of the kit `.deb`s and a SHA512-verified dependency cache,
+no `--force` flags and no autoremove. Forward: 91 installed, 0 removed, only
+libdisplay-info3/-dev upgraded 0.3.0-1 → hdr9; `apt-get` exit 0; every version
+correct; `dpkg --audit` empty; `ldd` resolved; the payload, modes and symlinks
+of all eight kit packages identical to their `.deb`s. Reverse: the live
+simulation equalled the plan derived from the forward plan; purge of the 89
+newly added packages and downgrade to the preserved stock libdisplay-info
+originals exited 0; the package table, selections, audit, APT auto state and
+stock library payload all equal the recorded baseline. Host package state was
+invariant throughout.
+
+A first attempt aborted inside dpkg before any package change (`unknown system
+group '_chrony' in statoverride file`): the copied dpkg statoverride names host
+system accounts that the prepared root's two-entry passwd/group allowlist did
+not carry. The root's public passwd/group were replaced by the host's (never
+shadow) and the transaction ran. Labelled limit, adjudicated by the
+coordinator: after rollback `dpkg --verify` differed from the reduced-baseline
+copy only by `/var/cache/ldconfig` and `/var/cache/man`, directories created by
+the baseline-owned libc-bin and man-db triggers during the forward install
+(REVIEW316 limit (a)); not a kit payload or rollback defect. i386 library
+packages were not solver-provable offline (no i386 architecture in the root)
+and remain optional and unproven.
 
 ## Runtime inventory
 
@@ -46,7 +88,7 @@ authorized here. No Apple TV access of any kind.
 |---|---|---|
 | Mutter nativehdr10 Night Light, target overrides, async lifetime, offscreen reuse and GTK frames API correction | Ubuntu Mutter51.0-1ubuntu3, canonical105 tree `08740f943fb2ddda60411fa4d72bb4ccc4238e5f`; constructed `51.0-1ubuntu3+nativehdr10.1` | Nine normal distribution runtime/GIR/dev/test/common packages and matching debug symbols; prior104/105 construction identities remain historical |
 | libdisplay-info native luminance/chromaticity API | hdr9 canonical tree `96d65c11ed0f408792c41cd42c2866255b1089d0` | SONAME3 runtime/dev/decoder, amd64 and i386; unchanged source tests retained at original identities; inspect actual Multi-Arch applicability before reuse |
-| Experimental player launcher | `hermes-hdr-experimental-player` `1.0~experimental4`, `tools/native_player/debian` (committed; construction follows closure). `1.0~experimental3`, the first normal source construction, is superseded and immutable | `/usr/bin/hermes-hdr-player`, desktop entry, uncompressed `USAGE.txt`, `inputs.json`, copyright and changelog; unchanged qualified player algorithm and stock runtime dependencies |
+| Experimental player launcher | `hermes-hdr-experimental-player` `1.0~experimental4`, `tools/native_player/debian`, constructed once from `249ccf7` in run 317. `1.0~experimental3`, the first normal source construction, is superseded and immutable | `/usr/bin/hermes-hdr-player`, desktop entry, uncompressed `USAGE.txt`, `inputs.json`, copyright and changelog; unchanged qualified player algorithm and stock runtime dependencies |
 | Stock mpv/FFmpeg/libplacebo/Python | Ubuntu packages declared by launcher Depends | No fork/new runtime algorithm in this release; retain original source inventory in `tools/native_player/inputs.json` |
 
 The public headless harness and review/build tools are development utilities,
