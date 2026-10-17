@@ -399,7 +399,7 @@ class PlayerTests(unittest.TestCase):
     def test_desktop_control_and_no_global_configuration_payload(self):
         directory = ROOT / 'tools/native_player'
         desktop = (directory / 'player.desktop').read_text()
-        control = (directory / 'control').read_text()
+        control = (directory / 'debian/control').read_text()
         self.assertIn('Exec=hermes-hdr-player -- %F', desktop)
         self.assertIn('Architecture: all', control)
         self.assertIn('libplacebo360 (>= 7.360.1)', control)
