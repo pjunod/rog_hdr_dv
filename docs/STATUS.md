@@ -21,8 +21,13 @@ done: launcher experimental3 and coherent nine-package Mutter nativehdr10.1 norm
 source/binary construction, including .dsc/archive/.changes/.buildinfo and matched
 debug symbols, with nocheck/no repeated upstream units. Current: retained hdr9
 multiarch source/applicability, private kit and actual isolated-install environment.
-Remaining: independent review/fixes, one affected package batch, actual isolated
-install/rollback evidence, canonical kit and PR landing.
+Done: independent review REVIEW316 (CHANGES NEEDED) and its four corrections:
+typed source manifests bound to the final .dsc, real artifact closure/ABI/debug/
+source inspections with two negative regressions, current launcher instructions
+with `1.0~experimental4` reserved, and a hash-bound provenance/errata companion.
+Current: focused closure of those corrections. Remaining: launcher experimental4
+construction, existing-source audits, one affected package batch (fourteen
+methods), actual isolated install/rollback evidence, canonical kit and PR landing.
 Not yet a fresh release or live installation. Unqualified Dolby work is excluded.
 
 Done: selected nativehdr10 upstream90/Ubuntu105 source, unchanged library pins,
