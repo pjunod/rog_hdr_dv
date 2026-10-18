@@ -247,11 +247,121 @@ are retained. No radius/weight/coordinate sweep, reference perturbation, old
 comparison rerun, or holdout operation is authorized. Failed or invalid results
 stop this hypothesis; passing sampled results alone would not be acceptance.
 
-Separately, Opus has a bounded read-only source/assumption audit, not final
-adversarial acceptance review. Neither assignment is a completed exchange or
-an accuracy improvement. Current: new spatial diagnostic and fresh source
-audit pending; last implemented full-raster candidate remains failing. Final
-review and qualification must not be claimed on the strength of these tasks.
+### Completed spatial experiment — rejected, no general detail exclusion
+
+Sol executed the frozen chain once on each shot. Binary64 native compilation
+used `-O2 -fno-fast-math -ffp-contract=off -Wall -Wextra -Werror`; no units ran.
+The original full source raster supplies neighborhoods, but these are still
+34,560-point accuracy diagnostics, NOT full-raster image comparisons:
+
+| Shot | Mean deltaEITP | p95 | Maximum | Result |
+| --- | ---: | ---: | ---: | --- |
+| 256 | 1.0727706874 | 2.5210250427 | 5.5551544028 | FAIL mean |
+| 714 | 3.2572137911 | 10.0101611734 | 37.9152220679 | FAIL, worsens |
+
+Both full-raster scalar-field calculations had zero source/scalar/spatial
+invalids; both lattices had zero invalids. Below-PQ-black projection occurred
+on 980,912 full-field / 3,831 sampled pixels in 256, and zero in 714. The
+zero-Y convention was not exercised. It is a finite convention, not a general
+continuity claim when the neighborhood-derived map is positive at zero input.
+
+On 714 the mean projected scalar change `720*(Is-Im)` is -0.352889 in the
+reference-Y 1-10-nit bin, -2.088244 at 10-100 nits and +3.393017 at 100-600
+nits: the wrong direction for the missing midtone/shoulder behavior. These
+are disjoint reference-Y bins, not cumulative populations. Reject this fixed
+hybrid; do not tune a filter or exclude all possible local/detail mechanisms.
+
+Locally verified immutable result SHA256 identities:
+- 256: `9f81a0dfcb19e8bd6f5e7ea6e4ed8a45d07ca0290101e7560b0b31c904c13888`
+- 714: `a5fab901698181bdbca751a9db7a02e0d3bbf529d3717abbed6266b3c53b3572`
+- Receipt archive: `998ec9b0dc0a5301fff4280359a2abee8b408fc0277954751c002195cb5b9f4a`
+
+Sol's three new analysis files are committed as `55abd49`; index and native
+leases were released. There was no library/frontend implementation edit, GPU
+render, full-raster accuracy rerun, reference acquisition or holdout operation.
+
+## Source-display white preflight — rejected without an image run
+
+US8593480B1 describes source color-timing display black/white anchors. Unlike
+the previously tested `mastK4` (constant knee adaptation0.4), the new check uses
+the declared source white4000nits instead of L1max for automatic preparation,
+with current MB knee/trim otherwise unchanged. Original L1 is preserved in
+the receipt, not rewritten as display metadata.
+
+`astra357_mastering_white.py` predicts selected-to-new differences in720PQ:
+
+| Shot | Source1nit | 10nit | 100nit | 1700nit |
+| --- | ---: | ---: | ---: | ---: |
+| 256 | -1.748565 | -2.928536 | -3.870614 | -4.195089 |
+| 714 | -4.204371 | -6.775336 | -8.875985 | -10.013716 |
+
+It darkens the already-dark mids. Despite stronger shoulder compression, this
+is not a useful next complete candidate; no image/native comparison followed.
+These are analytic neutral transfer differences, not measured deltaEITP.
+Receipt SHA256: `3a19b3ed07aa8f425448f7fa6bf1392d9e078f94e250aa006e24161dd8e76bde`.
+
+## Distinct published colorfulness compensation — still fails
+
+US10540920B2 paragraphs0079-0082 Eq11-13 supplies
+`K = J*(0.5*I+1)/(I*(0.5*J+1))`, with the printed example constants0.5 and1.
+This is not US9961237 Eq8's `1+J-I`, nor libplacebo's cubic-hull compensation.
+One complete diagnostic replaced only that factor in the earlier corrected-MB
+EbnerEq1/PQ/IPT RGB-pre chain. Actual W SOP/CW/SG, matrix definitions, inverse
+LMS below-black projection and one physical P3 clip remained unchanged.
+
+`astra357_colorfulness.py` executed once per retained 34,560-point lattice:
+
+| Shot | Final-P3 mean | p95 | Maximum | Signed720 I/T/P |
+| --- | ---: | ---: | ---: | --- |
+| 256 | 1.2426697116 | 3.1409269743 | 8.8613094204 | -0.953924 / -0.106209 / +0.284377 |
+| 714 | 2.2417412746 | 4.6423715159 | 6.8058755559 | -0.975730 / -0.037686 / +0.150912 |
+
+Both improve on the older IPT/Eq8 composition, but only714 improves on MB-Y;
+neither passes and no renderer adoption follows. 256 has11,740 raw-negative
+pixels, so its raw all-population metric is unavailable; the complete final-P3
+metric remains valid. 714 has no raw-negative pixels and10 physical-P3
+excursions. Its chroma error is substantially reduced, while signed-I remains
+-2.200151 in reference-Y1-10nit, -3.740649 at10-100nit and+3.573977 at100-600nit.
+The declared chain still needs a correct intensity mapping, not an arbitrary
+saturation coefficient. Source-family identity and full accuracy are unproven.
+Receipt SHA256: `f8217cba4aeab352c0dd622e93e9afa026dad9f225926e116cf92f6af0f01698`.
+
+Without recomputing pixels, summing `Nbin*abs(meanSignedIbin)/N` over the
+existing disjoint reference-Y bins gives lower bounds1.0125834972 (256) and
+2.1372504171 (714) on this candidate's mean absolute720ITP-I error. Every
+sample is covered once. This is a bound on the measured candidate, not an
+exclusion of all IPT-I-preserving pipelines (IPT-I is not the metric's I).
+It reinforces the concrete need to change intensity behavior rather than only
+remove chroma residuals at fixed metric intensity.
+
+## Additional primary sources do not supply a free correction coefficient
+
+Two public forward citations of US10600166B2 were retrieved and read:
+
+- [WO2021222310A1](https://patents.google.com/patent/WO2021222310A1/en),
+  image-dependent contrast/brightness. Its APL boost and peak-luminance
+  adjustment use explicit user-defined parameters alpha/beta. The described
+  reduction of mapping peak followed by linear-light stretch is a meaningful
+  mechanism, but there is no identified original-control bridge here selecting
+  nonzero settings. It is not justification for an effective-peak sweep.
+- [US11468547B2](https://patents.google.com/patent/US11468547B2/en), adjustments
+  to video-processing curves. Its Table1 ambient function requires an
+  illumination/preference scaling factor; its Gaussian brightness curve and
+  derivative-shaped contrast adjustment require a requested amplitude. The
+  text expressly distinguishes the original mapping from these adjustments.
+  A plausible residual shape is not evidence of those unmeasured controls.
+
+HTML SHA256 respectively:
+`3b1a12f8a946f4ffd72415d87eb930e246fa41634ff19d6fbdc0d7b81688e84d`
+and `4fd3cd6a7af22176f66cb5f06726b51df090c159421118b75ef44a7bfa1b70d7`.
+No image experiment, parameter fitting, ambient/device measurement or
+implementation was commissioned from these sources.
+
+Current: no promoted candidate. A bounded independent source/assumption audit
+was queued, but had not been claimed at the last readback; this is not final
+adversarial review or a completed peer exchange. The remaining automatic-curve
+decision is unresolved. Existing full-raster failures, final independent
+review and qualification gates remain unchanged.
 
 Remaining: source-grounded passing complete chain, full-raster development and
 independent evidence, genuinely independent adversarial review/fixes, one
