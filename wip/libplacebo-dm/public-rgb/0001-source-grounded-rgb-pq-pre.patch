@@ -1,0 +1,1907 @@
+From a69b88154cb2c4120e8637cdaf69e1cc08f5606f Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@example.invalid>
+Date: Sat, 17 Oct 2026 18:50:12 -0400
+Subject: [PATCH 1/8] dovi: implement source-grounded RGB PQ-pre SOP and
+ rational luminance
+
+---
+ meson.build                      |   1 +
+ src/dovi_dm.c                    |  21 ++++-
+ src/dovi_dm_rgb.c                | 143 +++++++++++++++++++++++++++++++
+ src/include/libplacebo/dovi_dm.h |  18 ++++
+ src/meson.build                  |   1 +
+ src/renderer.c                   |   4 +
+ src/shaders/colorspace.c         |  45 +++++++++-
+ src/tests/dovi_dm.c              |  59 +++++++++++++
+ 8 files changed, 287 insertions(+), 5 deletions(-)
+ create mode 100644 src/dovi_dm_rgb.c
+
+diff --git a/meson.build b/meson.build
+index c364c9c..9de719e 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '365': 'private source-grounded RGB pre-PQ SOP and rational luminance operator',
+       '364': 'private OPEN absolute-PQ SOP domain, separate from observer ABI363',
+       '363': 'reserved for separate private observer candidate; no observer code here',
+       '362': 'private OPEN analytic PQ-Hermite and typed target-PQ SOP candidate',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index aff30c0..238d0ae 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -29,6 +29,13 @@ static const struct pl_tone_map_function open_hermite = {
+     .scaling = PL_HDR_PQ, .map = hermite_map,
+ };
+ 
++// Marker only: RGB mapping is not representable by an IPT-I scalar LUT.
++// generate() rejects this marker; the separate RGB APIs own evaluation.
++static const struct pl_tone_map_function open_rgb = {
++    .name = "open-rgb-pq-pre", .description = "OPEN RGB PQ-pre rational Y",
++    .scaling = PL_HDR_NITS,
++};
++
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
+     struct pl_tone_map_params *tone)
+@@ -49,14 +56,21 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+         !pl_primaries_valid(&target->prim))
+         return PL_DOVI_DM_INVALID;
+     if (dm->curve != PL_DOVI_DM_ST2094_10 && dm->curve != PL_DOVI_DM_SPLINE &&
+-        !(dm->version == 2 && dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ))
++        !(dm->version == 2 && (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
++                              dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE)))
+         return PL_DOVI_DM_INVALID;
+     if (dm->version == 2 && !pl_dovi_dm_sop_valid(&dm->open_sop))
+         return PL_DOVI_DM_INVALID;
++    if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE) {
++        struct pl_dovi_dm_rgb_curve rgb;
++        if (!pl_dovi_dm_rgb_prepare(dm, target, &rgb))
++            return PL_DOVI_DM_INVALID;
++    }
+ 
+     // Work on a copy so rejected optional data cannot poison the generic mapper.
+     struct pl_tone_map_params t = *tone;
+-    t.function = dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ? &open_hermite :
++    t.function = dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ? &open_rgb :
++                 dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ? &open_hermite :
+                  dm->curve == PL_DOVI_DM_SPLINE ? &pl_tone_map_spline :
+                                                 &pl_tone_map_st2094_10;
+     t.param = 0.0f; // use existing constants, not backwards-compat tuning knobs
+@@ -74,7 +88,8 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     t.output_max = fmaxf(t.output_min, t.output_max);
+     // Dedicated analytic Hermite uses actual physical bounds, NOT min(C,b).
+     // The shader evaluates analytically; generate remains a sampled CPU API.
+-    if (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ)
++    if (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
++        dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE)
+         t.output_max = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
+     *tone = t;
+     return dm->min_pq == dm->max_pq ? PL_DOVI_DM_FLAT : PL_DOVI_DM_L1;
+diff --git a/src/dovi_dm_rgb.c b/src/dovi_dm_rgb.c
+new file mode 100644
+index 0000000..646a3ae
+--- /dev/null
++++ b/src/dovi_dm_rgb.c
+@@ -0,0 +1,143 @@
++/* Independently expressed public RGB mapping mathematics.
++ * Copyright (c) 2026 HDR contributors
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * Not Dolby CM identity, certification or a transplant of GPL implementation.
++ */
++#include <math.h>
++#include <libplacebo/dovi_dm.h>
++
++static bool pq_valid(float x)
++{
++    return isfinite(x) && x >= 0 && x <= 1;
++}
++
++static double smooth(double a, double b, double x)
++{
++    double t = fmin(1.0, fmax(0.0, (x-a)/(b-a)));
++    return t*t*(3-2*t);
++}
++
++static bool rgb_sop_valid(const struct pl_dovi_dm_sop *s)
++{
++    return s && pl_dovi_dm_sop_valid(s) && (!s->version ||
++        (s->domain == PL_DOVI_DM_SOP_ABSOLUTE_PQ &&
++         isfinite(s->chroma_weight) && fabsf(s->chroma_weight) <= .5f &&
++         isfinite(s->saturation_gain) && fabsf(s->saturation_gain) <= .5f));
++}
++
++bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
++    const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out)
++{
++    if (!dm || !target || !out || dm->version != 2 || !dm->has_l1 ||
++        dm->curve != PL_DOVI_DM_OPEN_RGB_PQ_PRE || !rgb_sop_valid(&dm->open_sop) ||
++        !pq_valid(dm->min_pq) || !pq_valid(dm->avg_pq) || !pq_valid(dm->max_pq) ||
++        dm->min_pq > dm->avg_pq || dm->avg_pq > dm->max_pq ||
++        dm->min_pq >= dm->max_pq || target->min_luma != 0 ||
++        !isfinite(target->max_luma) || target->max_luma <= 0 || target->max_luma > 10000)
++        return false;
++    struct pl_dovi_dm_rgb_curve c = {
++        .input_peak = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dm->max_pq),
++    };
++    if (target->max_luma >= c.input_peak) {
++        c.identity = true; // curve identity only; SOP still executes first
++        *out = c;
++        return true;
++    }
++    double lo = dm->min_pq, hi = dm->max_pq;
++    double dsthi = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
++    double dstlo = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, 0);
++    double src = fmin(lo+.8*(hi-lo), fmax(lo+.1*(hi-lo), dm->avg_pq));
++    double t = (src-lo)/(hi-lo);
++    double adapt = .4+.6*(1-smooth(.8,.4,t)*smooth(.1,.4,t));
++    double dst = src+adapt*(dstlo+t*(dsthi-dstlo)-src);
++    dst = fmin(dstlo+.8*(dsthi-dstlo), fmax(dstlo+.1*(dsthi-dstlo), dst));
++    double xs[3] = {pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, lo),
++                    pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, src), c.input_peak};
++    double ys[3] = {0, pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dst), target->max_luma};
++    // Solve a+b*x-c*x*y=y with pivoting and normalized x, not fitted anchors.
++    double a[3][4];
++    for (int i = 0; i < 3; i++) {
++        a[i][0] = 1;
++        a[i][1] = xs[i]/xs[2];
++        a[i][2] = -a[i][1]*ys[i];
++        a[i][3] = ys[i];
++    }
++    for (int j = 0; j < 3; j++) {
++        int pivot = j;
++        for (int i = j+1; i < 3; i++)
++            if (fabs(a[i][j]) > fabs(a[pivot][j]))
++                pivot = i;
++        if (!isfinite(a[pivot][j]) || fabs(a[pivot][j]) < 1e-15)
++            return false;
++        for (int k = 0; k < 4; k++) {
++            double v = a[j][k]; a[j][k] = a[pivot][k]; a[pivot][k] = v;
++        }
++        double scale = a[j][j];
++        for (int k = 0; k < 4; k++)
++            a[j][k] /= scale;
++        for (int i = 0; i < 3; i++) {
++            if (i == j)
++                continue;
++            scale = a[i][j];
++            for (int k = 0; k < 4; k++)
++                a[i][k] -= scale*a[j][k];
++        }
++    }
++    c.coeffs[0] = a[0][3];
++    c.coeffs[1] = a[1][3]/xs[2];
++    c.coeffs[2] = a[2][3]/xs[2];
++    for (int i = 0; i < 3; i++)
++        if (!isfinite(c.coeffs[i]))
++            return false;
++    // Check all physical RGB nits, not merely the sampled source anchors.
++    if (fmin(1, 1+c.coeffs[2]*10000) <= 0 ||
++        c.coeffs[1]-c.coeffs[0]*c.coeffs[2] < 0)
++        return false;
++    *out = c;
++    return true;
++}
++
++bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
++    const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
++{
++    if (!c || !rgb_sop_valid(s) || !in || !out)
++        return false;
++    const float weights[3] = {.2627f, .6780f, .0593f};
++    float q[3], rgb[3], y = 0;
++    for (int i = 0; i < 3; i++) {
++        if (!isfinite(in[i]) || in[i] < 0 || in[i] > 10000)
++            return false;
++        q[i] = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, in[i]);
++        if (s->version)
++            q[i] = powf(fmaxf(s->slope*q[i]+s->offset, 0), s->power);
++        q[i] = fmaxf(q[i], 1e-5f); // published post-SOP PQ floor
++        y += weights[i]*q[i];
++    }
++    for (int i = 0; i < 3; i++) {
++        if (s->version && s->saturation_gain != 0)
++            q[i] *= powf((1+s->chroma_weight)*q[i]/y, s->saturation_gain);
++        if (!isfinite(q[i]))
++            return false;
++        // Explicit physical PQ-domain extension after color, not a fitted
++        // curve coefficient. The published expression has no upper guard.
++        q[i] = fminf(q[i], 1);
++        rgb[i] = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, q[i]);
++    }
++    y = weights[0]*rgb[0]+weights[1]*rgb[1]+weights[2]*rgb[2];
++    float scale = 1;
++    if (!c->identity && y > 0) {
++        float den = 1+c->coeffs[2]*y;
++        if (!isfinite(den) || den <= 0)
++            return false;
++        scale = fmaxf((c->coeffs[0]+c->coeffs[1]*y)/den, 0)/y;
++    }
++    float result[3];
++    for (int i = 0; i < 3; i++) {
++        result[i] = rgb[i]*scale;
++        if (!isfinite(result[i]) || result[i] < 0 || result[i] > 10000)
++            return false;
++    }
++    for (int i = 0; i < 3; i++)
++        out[i] = result[i];
++    return true;
++}
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+index c9e380b..68a77dc 100644
+--- a/src/include/libplacebo/dovi_dm.h
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -25,6 +25,7 @@ enum pl_dovi_dm_curve {
+     PL_DOVI_DM_ST2094_10, // existing rational curve/knee, with real NITS scaling
+     PL_DOVI_DM_SPLINE,   // diagnostic B: existing spline with explicit DM bounds
+     PL_DOVI_DM_OPEN_HERMITE_PQ, // US10600166B2 improved midpoint, analytic Eq7
++    PL_DOVI_DM_OPEN_RGB_PQ_PRE, // continuous-XML public RGB SOP before rational Y
+ };
+ 
+ #define PL_DOVI_DM_MAX_BLOCKS 32
+@@ -51,6 +52,9 @@ struct pl_dovi_dm_sop {
+     uint32_t version; // 1
+     enum pl_dovi_dm_sop_domain domain;
+     float slope, offset, power;
++    // Only OPEN_RGB_PQ_PRE uses these actual continuous factors. Zero SG
++    // bypasses the color expression exactly; it does not mean CW is absent.
++    float chroma_weight, saturation_gain;
+ };
+ 
+ struct pl_dovi_dm_metadata {
+@@ -131,5 +135,19 @@ PL_API bool pl_dovi_dm_sop_valid(const struct pl_dovi_dm_sop *sop);
+ PL_API float pl_dovi_dm_sop_eval(const struct pl_dovi_dm_sop *sop,
+     struct pl_dovi_dm_pq_bounds target, float y);
+ 
++// Public RGB-pre-PQ/rational hypothesis, NOT a selected/certified Dolby CM.
++// Linear BT.2020 nits in/out. Target black must be zero; target primaries are
++// handled by the subsequent single gamut stage. Unsupported/singular intervals
++// reject rather than substituting a curve. All fields are copied by value.
++struct pl_dovi_dm_rgb_curve {
++    float coeffs[3]; // (a+b*Y)/(1+c*Y)
++    float input_peak;
++    bool identity;
++};
++PL_API bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
++    const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out);
++PL_API bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *curve,
++    const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
++
+ PL_API_END
+ #endif
+diff --git a/src/meson.build b/src/meson.build
+index 1e9cf6b..c56e90b 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -97,6 +97,7 @@ sources = [
+   'convert.cc',
+   'dither.c',
+   'dovi_dm.c',
++  'dovi_dm_rgb.c',
+   'dispatch.c',
+   'dummy.c',
+   'filters.c',
+diff --git a/src/renderer.c b/src/renderer.c
+index a675855..77e35e5 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -3692,6 +3692,10 @@ static uint64_t dovi_signature(const struct pl_dovi_dm_metadata *dm,
+         DM_HASH(dm->open_sop.slope);
+         DM_HASH(dm->open_sop.offset);
+         DM_HASH(dm->open_sop.power);
++        if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE) {
++            DM_HASH(dm->open_sop.chroma_weight);
++            DM_HASH(dm->open_sop.saturation_gain);
++        }
+     }
+     DM_HASH(target->version);
+     DM_HASH(target->generation);
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 4dc39de..2b83212 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1714,10 +1714,11 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         SH_FAIL(sh, "Invalid explicit OPEN DM payload/target");
+         return;
+     }
++    bool rgb_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE;
+     bool hermite_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ;
+     const struct pl_dovi_dm_sop *sop = dm_active && args->dovi_dm->version == 2 ?
+         &args->dovi_dm->open_sop : NULL;
+-    bool sop_active = sop && sop->version &&
++    bool sop_active = !rgb_active && sop && sop->version &&
+         !(sop->slope == 1 && sop->offset == 0 && sop->power == 1);
+     if (dm_present && !dm_active)
+         PL_WARN(sh, "Open DM fallback: %s", pl_dovi_dm_status_name(dm_status));
+@@ -1825,7 +1826,7 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         can_fast = true;
+     }
+ 
+-    bool need_tone_map = dm_active || !pl_tone_map_params_noop(&tone);
++    bool need_tone_map = !rgb_active && (dm_active || !pl_tone_map_params_noop(&tone));
+     bool need_gamut_map = !pl_gamut_map_params_noop(&gamut);
+ 
+     if (!args->prelinearized)
+@@ -1836,6 +1837,46 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+     ident_t lms2ipt = SH_MAT3(pl_ipt_lms2ipt);
+     ident_t ipt2lms = SH_MAT3(pl_ipt_ipt2lms);
+ 
++    if (rgb_active) {
++        struct pl_dovi_dm_rgb_curve c;
++        if (!pl_dovi_dm_rgb_prepare(args->dovi_dm, dm_volume, &c)) {
++            SH_FAIL(sh, "Invalid explicit RGB PQ-pre curve");
++            return;
++        }
++        sh_describe(sh, "OPEN RGB PQ-pre SOP/rational Y (not selected Dolby CM)");
++        // Source encoding and working RGB basis are distinct. Convert in
++        // linear light before RGB trims; do not run stock I tone/compensation.
++        const struct pl_raw_primaries *bt = pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020);
++        pl_matrix3x3 basis = pl_ipt_lms2rgb(bt);
++        pl_matrix3x3_mul(&basis, &rgb2lms);
++        GLSL("color.rgb = max("$" * color.rgb, vec3(0.0)); \n", SH_MAT3(basis));
++        struct pl_color_space working = pl_color_space_hdr10;
++        pl_shader_delinearize(sh, &working);
++        if (sop->version) {
++            GLSL("color.rgb = pow(max("$" * color.rgb + vec3("$"), vec3(0.0)), vec3("$")); \n",
++                 SH_FLOAT(sop->slope), SH_FLOAT(sop->offset), SH_FLOAT(sop->power));
++        }
++        GLSL("color.rgb = max(color.rgb, vec3(1e-5)); \n");
++        if (sop->version && sop->saturation_gain != 0) {
++            GLSL("float rgb_qY = dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
++                 "color.rgb *= pow((1.0 + "$") * color.rgb / rgb_qY, vec3("$")); \n",
++                 SH_FLOAT(sop->chroma_weight), SH_FLOAT(sop->saturation_gain));
++        }
++        // Explicit physical PQ-domain safety extension, paired with scalar.
++        GLSL("color.rgb = min(color.rgb, vec3(1.0)); \n");
++        pl_shader_linearize(sh, &working);
++        if (!c.identity) {
++            GLSL("float rgb_Y = %f * dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
++                 "float rgb_mapped = max(("$" + "$" * rgb_Y) / (1.0 + "$" * rgb_Y), 0.0); \n"
++                 "if (rgb_Y > 0.0) color.rgb *= rgb_mapped / rgb_Y; \n",
++                 PL_COLOR_SDR_WHITE, SH_FLOAT(c.coeffs[0]), SH_FLOAT(c.coeffs[1]), SH_FLOAT(c.coeffs[2]));
++        }
++        src.primaries = PL_COLOR_PRIM_BT_2020;
++        rgb2lms = pl_ipt_rgb2lms(bt);
++        // The existing physical-gamut stage below executes once. No second
++        // stock tone map, I SOP, or compensation is appended to this RGB chain.
++    }
++
+     if (need_gamut_map && gamut.function == &pl_gamut_map_saturation && can_fast) {
+         const pl_matrix3x3 lms2src = pl_ipt_lms2rgb(&gamut.input_gamut);
+         const pl_matrix3x3 dst2lms = pl_ipt_rgb2lms(&gamut.output_gamut);
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index ca51388..c0c9852 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -118,6 +118,36 @@ static void absolute_sop_tests(void)
+     s.power = 1; s.offset = 0.6f; assert(!pl_dovi_dm_sop_valid(&s));
+ }
+ 
++static void rgb_tests(void)
++{
++    struct pl_dovi_dm_metadata dm = {.version=2, .has_l1=true,
++        .origin=PL_DOVI_DM_OFFICIAL_XML, .min_pq=0, .avg_pq=.290273f,
++        .max_pq=.879591f, .curve=PL_DOVI_DM_OPEN_RGB_PQ_PRE,
++        .open_sop={.version=1,.domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,
++            .slope=1.014f,.offset=-.014f,.power=2000.0f/2001,
++            .chroma_weight=-.001f,.saturation_gain=0}};
++    struct pl_hdr_metadata target = {.min_luma=0,.max_luma=600,
++        .prim=*pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020)};
++    struct pl_dovi_dm_rgb_curve c;
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    assert(fabsf(c.coeffs[0]) < 1e-7f);
++    assert(fabsf(c.coeffs[1]-.6831692335f) < 1e-4f);
++    assert(fabsf(c.coeffs[2]-.0008293202f) < 1e-7f);
++    float input[3]={0,.01f,100}, output[3], bypass[3];
++    assert(pl_dovi_dm_rgb_eval(&c,&dm.open_sop,input,output));
++    dm.open_sop.chroma_weight=.5f; // SG0 makes CW ineffective, not absent
++    assert(pl_dovi_dm_rgb_eval(&c,&dm.open_sop,input,bypass));
++    assert(memcmp(output,bypass,sizeof(output)) == 0);
++    input[0]=NAN;
++    assert(!pl_dovi_dm_rgb_eval(&c,&dm.open_sop,input,output));
++    target.min_luma=.001f;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    target.min_luma=0; dm.min_pq=dm.max_pq;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    dm.min_pq=0; dm.open_sop.domain=PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++}
++
+ #ifdef PL_HAVE_VULKAN
+ static void readback(pl_gpu gpu, pl_tex tex, float out[16])
+ {
+@@ -220,6 +250,34 @@ static void shader_cache_tests(void)
+             pl_dovi_dm_hermite_eval(&curve,input[4*i]));
+         for (int c=0; c<3; c++) assert(fabsf(altered[4*i+c]-expected) < 5e-5f);
+     }
++    // Actual new GPU branch vs independent scalar API, then mixing-cache CW/SG
++    // changes at fixed frame signatures. No vendor metadata or reference use.
++    src.dovi_dm.curve = PL_DOVI_DM_OPEN_RGB_PQ_PRE;
++    src.dovi_dm.open_sop = (struct pl_dovi_dm_sop) {.version=1,
++        .domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,.slope=1.014f,.offset=-.014f,
++        .power=2000.0f/2001,.chroma_weight=-.001f};
++    dst.dovi_target.volume.min_luma=0;
++    struct pl_dovi_dm_rgb_curve rgb;
++    assert(pl_dovi_dm_rgb_prepare(&src.dovi_dm,&dst.dovi_target.volume,&rgb));
++    assert(pl_render_image(rr,&src,&dst,&params));
++    readback(gpu,dst_tex,altered);
++    for (int i=0; i<4; i++) {
++        float in[3], out[3];
++        for (int c=0; c<3; c++) in[c]=pl_hdr_rescale(PL_HDR_PQ,PL_HDR_NITS,input[4*i+c]);
++        assert(pl_dovi_dm_rgb_eval(&rgb,&src.dovi_dm.open_sop,in,out));
++        for (int c=0; c<3; c++)
++            assert(fabsf(altered[4*i+c]-pl_hdr_rescale(PL_HDR_NITS,PL_HDR_PQ,out[c])) < 1e-4f);
++    }
++    assert(pl_render_image_mix(rr,&mix,&dst,&params));
++    src.dovi_dm.open_sop.saturation_gain=.25f;
++    src.dovi_dm.open_sop.chroma_weight=.2f;
++    assert(pl_render_image_mix(rr,&mix,&dst,&params));
++    readback(gpu,dst_tex,altered);
++    pl_renderer other = pl_renderer_create(NULL,gpu);
++    assert(other && pl_render_image_mix(other,&mix,&dst,&params));
++    readback(gpu,dst_tex,fresh);
++    for (int i=0; i<16; i++) assert(fabsf(altered[i]-fresh[i]) < 1e-5f);
++    pl_renderer_destroy(&other);
+     assert(pl_renderer_get_errors(rr).errors == PL_RENDER_ERR_NONE);
+     pl_renderer_destroy(&rr);
+     pl_tex_destroy(gpu,&src_tex); pl_tex_destroy(gpu,&dst_tex);
+@@ -232,6 +290,7 @@ int main(void)
+     hermite_tests();
+     sop_tests();
+     absolute_sop_tests();
++    rgb_tests();
+ #ifdef PL_HAVE_VULKAN
+     shader_cache_tests();
+ #endif
+-- 
+2.54.0 (Apple Git-157)
+
+
+From c21b4a993ab9bba35a88f93541d4756e5370e60e Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 17 Oct 2026 19:05:37 -0400
+Subject: [PATCH 2/8] dovi: reject scalar evaluation of the RGB marker without
+ a null callback
+
+---
+ src/dovi_dm.c       | 12 ++++++++++--
+ src/tests/dovi_dm.c |  8 ++++++++
+ 2 files changed, 18 insertions(+), 2 deletions(-)
+
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index 238d0ae..fe88268 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -29,11 +29,19 @@ static const struct pl_tone_map_function open_hermite = {
+     .scaling = PL_HDR_PQ, .map = hermite_map,
+ };
+ 
++static void rgb_scalar_unsupported(float *lut, const struct pl_tone_map_params *p)
++{
++    for (size_t i = 0; i < p->lut_size; i++)
++        lut[i] = NAN;
++}
++
+ // Marker only: RGB mapping is not representable by an IPT-I scalar LUT.
+-// generate() rejects this marker; the separate RGB APIs own evaluation.
++// pl_dovi_dm_generate() rejects this marker. Generic scalar calls on the
++// prepared PQ parameters return NaNs rather than dereference a NULL callback;
++// the separate RGB APIs own evaluation.
+ static const struct pl_tone_map_function open_rgb = {
+     .name = "open-rgb-pq-pre", .description = "OPEN RGB PQ-pre rational Y",
+-    .scaling = PL_HDR_NITS,
++    .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
+ };
+ 
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index c0c9852..b46f485 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -133,6 +133,14 @@ static void rgb_tests(void)
+     assert(fabsf(c.coeffs[0]) < 1e-7f);
+     assert(fabsf(c.coeffs[1]-.6831692335f) < 1e-4f);
+     assert(fabsf(c.coeffs[2]-.0008293202f) < 1e-7f);
++    struct pl_tone_map_params scalar = {.lut_size=4};
++    assert(pl_dovi_dm_prepare(&dm,&target,&scalar) == PL_DOVI_DM_L1);
++    float lut[4] = {1,2,3,4};
++    assert(!pl_dovi_dm_generate(lut,&scalar));
++    assert(lut[0] == 1 && lut[3] == 4); // boolean API rejects before writing
++    pl_tone_map_generate(lut,&scalar);
++    for (int i=0; i<4; i++) assert(isnan(lut[i]));
++    assert(isnan(pl_tone_map_sample(.2f,&scalar)));
+     float input[3]={0,.01f,100}, output[3], bypass[3];
+     assert(pl_dovi_dm_rgb_eval(&c,&dm.open_sop,input,output));
+     dm.open_sop.chroma_weight=.5f; // SG0 makes CW ineffective, not absent
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 5a7500f81376dd2edf67a854abd782a2b1288d38 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 17 Oct 2026 19:24:38 -0400
+Subject: [PATCH 3/8] dovi: add distinct SG0 scalar-Y PQ-pre evaluator and GPU
+ path
+
+---
+ meson.build                      |  1 +
+ src/dovi_dm.c                    | 15 +++++--
+ src/dovi_dm_rgb.c                | 43 +++++++++++++++++++-
+ src/include/libplacebo/dovi_dm.h |  5 +++
+ src/renderer.c                   |  2 +-
+ src/shaders/colorspace.c         | 17 ++++++--
+ src/tests/dovi_dm.c              | 68 ++++++++++++++++++++++++++++++++
+ 7 files changed, 142 insertions(+), 9 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 9de719e..206aeee 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '366': 'private scalar-Y PQ-pre rational operator with distinct RGB evaluator',
+       '365': 'private source-grounded RGB pre-PQ SOP and rational luminance operator',
+       '364': 'private OPEN absolute-PQ SOP domain, separate from observer ABI363',
+       '363': 'reserved for separate private observer candidate; no observer code here',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index fe88268..9d0919e 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -44,6 +44,11 @@ static const struct pl_tone_map_function open_rgb = {
+     .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
+ };
+ 
++static const struct pl_tone_map_function open_y = {
++    .name = "open-y-pq-pre", .description = "OPEN scalar Y PQ-pre rational Y",
++    .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
++};
++
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
+     struct pl_tone_map_params *tone)
+@@ -65,11 +70,12 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+         return PL_DOVI_DM_INVALID;
+     if (dm->curve != PL_DOVI_DM_ST2094_10 && dm->curve != PL_DOVI_DM_SPLINE &&
+         !(dm->version == 2 && (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
+-                              dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE)))
++                              dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ||
++                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE)))
+         return PL_DOVI_DM_INVALID;
+     if (dm->version == 2 && !pl_dovi_dm_sop_valid(&dm->open_sop))
+         return PL_DOVI_DM_INVALID;
+-    if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE) {
++    if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE) {
+         struct pl_dovi_dm_rgb_curve rgb;
+         if (!pl_dovi_dm_rgb_prepare(dm, target, &rgb))
+             return PL_DOVI_DM_INVALID;
+@@ -77,7 +83,8 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+ 
+     // Work on a copy so rejected optional data cannot poison the generic mapper.
+     struct pl_tone_map_params t = *tone;
+-    t.function = dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ? &open_rgb :
++    t.function = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ? &open_y :
++                 dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ? &open_rgb :
+                  dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ? &open_hermite :
+                  dm->curve == PL_DOVI_DM_SPLINE ? &pl_tone_map_spline :
+                                                 &pl_tone_map_st2094_10;
+@@ -97,7 +104,7 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     // Dedicated analytic Hermite uses actual physical bounds, NOT min(C,b).
+     // The shader evaluates analytically; generate remains a sampled CPU API.
+     if (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
+-        dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE)
++        dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE)
+         t.output_max = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
+     *tone = t;
+     return dm->min_pq == dm->max_pq ? PL_DOVI_DM_FLAT : PL_DOVI_DM_L1;
+diff --git a/src/dovi_dm_rgb.c b/src/dovi_dm_rgb.c
+index 646a3ae..dbd4dfe 100644
+--- a/src/dovi_dm_rgb.c
++++ b/src/dovi_dm_rgb.c
+@@ -29,12 +29,17 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out)
+ {
+     if (!dm || !target || !out || dm->version != 2 || !dm->has_l1 ||
+-        dm->curve != PL_DOVI_DM_OPEN_RGB_PQ_PRE || !rgb_sop_valid(&dm->open_sop) ||
++        (dm->curve != PL_DOVI_DM_OPEN_RGB_PQ_PRE && dm->curve != PL_DOVI_DM_OPEN_Y_PQ_PRE) ||
++        !rgb_sop_valid(&dm->open_sop) ||
+         !pq_valid(dm->min_pq) || !pq_valid(dm->avg_pq) || !pq_valid(dm->max_pq) ||
+         dm->min_pq > dm->avg_pq || dm->avg_pq > dm->max_pq ||
+         dm->min_pq >= dm->max_pq || target->min_luma != 0 ||
+         !isfinite(target->max_luma) || target->max_luma <= 0 || target->max_luma > 10000)
+         return false;
++    if (dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE &&
++        (dm->origin != PL_DOVI_DM_OFFICIAL_XML || dm->open_sop.saturation_gain != 0 ||
++         (dm->open_sop.version && dm->open_sop.slope + dm->open_sop.offset > 1)))
++        return false; // scalar PQ SOP must be safe over its physical domain
+     struct pl_dovi_dm_rgb_curve c = {
+         .input_peak = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dm->max_pq),
+     };
+@@ -141,3 +146,39 @@ bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
+         out[i] = result[i];
+     return true;
+ }
++
++bool pl_dovi_dm_y_eval(const struct pl_dovi_dm_rgb_curve *c,
++    const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
++{
++    if (!c || !rgb_sop_valid(s) || s->saturation_gain != 0 || !in || !out)
++        return false;
++    for (int i = 0; i < 3; i++)
++        if (!isfinite(in[i]) || in[i] < 0 || in[i] > 10000)
++            return false;
++    float y = .2627f*in[0] + .6780f*in[1] + .0593f*in[2];
++    float mapped = 0;
++    if (y > 0) {
++        float q = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, y);
++        if (s->version)
++            q = powf(fmaxf(s->slope*q+s->offset, 0), s->power);
++        q = fmaxf(q, 1e-5f);
++        if (!isfinite(q) || q > 1)
++            return false;
++        mapped = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, q);
++        if (!c->identity) {
++            float den = 1+c->coeffs[2]*mapped;
++            if (!isfinite(den) || den <= 0)
++                return false;
++            mapped = fmaxf((c->coeffs[0]+c->coeffs[1]*mapped)/den, 0);
++        }
++    }
++    float result[3];
++    for (int i = 0; i < 3; i++) {
++        result[i] = y > 0 ? in[i]*(mapped/y) : 0;
++        if (!isfinite(result[i]) || result[i] < 0 || result[i] > 10000)
++            return false;
++    }
++    for (int i = 0; i < 3; i++)
++        out[i] = result[i];
++    return true;
++}
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+index 68a77dc..f7bf5d3 100644
+--- a/src/include/libplacebo/dovi_dm.h
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -26,6 +26,7 @@ enum pl_dovi_dm_curve {
+     PL_DOVI_DM_SPLINE,   // diagnostic B: existing spline with explicit DM bounds
+     PL_DOVI_DM_OPEN_HERMITE_PQ, // US10600166B2 improved midpoint, analytic Eq7
+     PL_DOVI_DM_OPEN_RGB_PQ_PRE, // continuous-XML public RGB SOP before rational Y
++    PL_DOVI_DM_OPEN_Y_PQ_PRE, // scalar PQ(Y) SOP before rational Y; SG0 only
+ };
+ 
+ #define PL_DOVI_DM_MAX_BLOCKS 32
+@@ -148,6 +149,10 @@ PL_API bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out);
+ PL_API bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *curve,
+     const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
++// Distinct scalar-Y operator. Exact SG0 required; CW is present/no effect.
++// No per-channel RGB SOP or stock compensation. Failures leave out untouched.
++PL_API bool pl_dovi_dm_y_eval(const struct pl_dovi_dm_rgb_curve *curve,
++    const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
+ 
+ PL_API_END
+ #endif
+diff --git a/src/renderer.c b/src/renderer.c
+index 77e35e5..a85cf04 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -3692,7 +3692,7 @@ static uint64_t dovi_signature(const struct pl_dovi_dm_metadata *dm,
+         DM_HASH(dm->open_sop.slope);
+         DM_HASH(dm->open_sop.offset);
+         DM_HASH(dm->open_sop.power);
+-        if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE) {
++        if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE) {
+             DM_HASH(dm->open_sop.chroma_weight);
+             DM_HASH(dm->open_sop.saturation_gain);
+         }
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 2b83212..53b0550 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1714,7 +1714,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         SH_FAIL(sh, "Invalid explicit OPEN DM payload/target");
+         return;
+     }
+-    bool rgb_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE;
++    bool y_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE;
++    bool rgb_active = dm_active && (args->dovi_dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || y_active);
+     bool hermite_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ;
+     const struct pl_dovi_dm_sop *sop = dm_active && args->dovi_dm->version == 2 ?
+         &args->dovi_dm->open_sop : NULL;
+@@ -1843,13 +1844,20 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+             SH_FAIL(sh, "Invalid explicit RGB PQ-pre curve");
+             return;
+         }
+-        sh_describe(sh, "OPEN RGB PQ-pre SOP/rational Y (not selected Dolby CM)");
++        sh_describe(sh, y_active ? "OPEN scalar Y PQ-pre SOP/rational Y (SG0 only)" :
++                                 "OPEN RGB PQ-pre SOP/rational Y (not selected Dolby CM)");
+         // Source encoding and working RGB basis are distinct. Convert in
+         // linear light before RGB trims; do not run stock I tone/compensation.
+         const struct pl_raw_primaries *bt = pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020);
+         pl_matrix3x3 basis = pl_ipt_lms2rgb(bt);
+         pl_matrix3x3_mul(&basis, &rgb2lms);
+         GLSL("color.rgb = max("$" * color.rgb, vec3(0.0)); \n", SH_MAT3(basis));
++        if (y_active) {
++            // Evaluate PQ helpers on replicated scalar Y, not source channels.
++            GLSL("{ vec3 dm_y_source = color.rgb; \n"
++                 "float dm_y_sourceY = dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
++                 "color.rgb = vec3(dm_y_sourceY); \n");
++        }
+         struct pl_color_space working = pl_color_space_hdr10;
+         pl_shader_delinearize(sh, &working);
+         if (sop->version) {
+@@ -1863,7 +1871,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                  SH_FLOAT(sop->chroma_weight), SH_FLOAT(sop->saturation_gain));
+         }
+         // Explicit physical PQ-domain safety extension, paired with scalar.
+-        GLSL("color.rgb = min(color.rgb, vec3(1.0)); \n");
++        if (!y_active)
++            GLSL("color.rgb = min(color.rgb, vec3(1.0)); \n");
+         pl_shader_linearize(sh, &working);
+         if (!c.identity) {
+             GLSL("float rgb_Y = %f * dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
+@@ -1871,6 +1880,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                  "if (rgb_Y > 0.0) color.rgb *= rgb_mapped / rgb_Y; \n",
+                  PL_COLOR_SDR_WHITE, SH_FLOAT(c.coeffs[0]), SH_FLOAT(c.coeffs[1]), SH_FLOAT(c.coeffs[2]));
+         }
++        if (y_active)
++            GLSL("color.rgb = dm_y_sourceY > 0.0 ? dm_y_source * (color.r / dm_y_sourceY) : vec3(0.0); } \n");
+         src.primaries = PL_COLOR_PRIM_BT_2020;
+         rgb2lms = pl_ipt_rgb2lms(bt);
+         // The existing physical-gamut stage below executes once. No second
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index b46f485..9b9a830 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -118,6 +118,50 @@ static void absolute_sop_tests(void)
+     s.power = 1; s.offset = 0.6f; assert(!pl_dovi_dm_sop_valid(&s));
+ }
+ 
++static void y_tests(void)
++{
++    struct pl_dovi_dm_metadata dm = {.version=2,.has_l1=true,
++        .origin=PL_DOVI_DM_OFFICIAL_XML,.min_pq=0,.avg_pq=.290273f,.max_pq=.879591f,
++        .curve=PL_DOVI_DM_OPEN_Y_PQ_PRE,
++        .open_sop={.version=1,.domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,
++            .slope=1.014f,.offset=-.014f,.power=2000.0f/2001,.chroma_weight=-.001f}};
++    struct pl_hdr_metadata target = {.min_luma=0,.max_luma=600,
++        .prim=*pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020)};
++    struct pl_dovi_dm_rgb_curve c;
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    float in[3]={1,2,3},out[3],saved[3];
++    assert(pl_dovi_dm_y_eval(&c,&dm.open_sop,in,out));
++    assert(fabsf(out[0]/in[0]-out[2]/in[2]) < 1e-6f);
++    memcpy(saved,out,sizeof(out));
++    dm.open_sop.saturation_gain=.001f;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    assert(!pl_dovi_dm_y_eval(&c,&dm.open_sop,in,out));
++    assert(memcmp(saved,out,sizeof(out)) == 0);
++    dm.open_sop.saturation_gain=0; dm.open_sop.chroma_weight=.5f;
++    assert(pl_dovi_dm_y_eval(&c,&dm.open_sop,in,out));
++    assert(memcmp(saved,out,sizeof(out)) == 0);
++    in[0]=NAN; assert(!pl_dovi_dm_y_eval(&c,&dm.open_sop,in,out));
++    in[0]=in[1]=in[2]=0;
++    assert(pl_dovi_dm_y_eval(&c,&dm.open_sop,in,out));
++    assert(out[0]==0 && out[1]==0 && out[2]==0);
++    dm.origin=PL_DOVI_DM_RPU;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    dm.origin=PL_DOVI_DM_OFFICIAL_XML;
++    dm.open_sop.slope=1.5f; dm.open_sop.offset=0;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    dm.open_sop.slope=1; dm.open_sop.offset=0; dm.open_sop.power=1;
++    target.max_luma=10000;
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&c) && c.identity);
++    in[0]=in[1]=in[2]=1;
++    assert(pl_dovi_dm_y_eval(&c,&dm.open_sop,in,out));
++    assert(fabsf(out[0]-1) < 1e-4f);
++    struct pl_tone_map_params scalar={.lut_size=4}; float lut[4];
++    assert(pl_dovi_dm_prepare(&dm,&target,&scalar)==PL_DOVI_DM_L1);
++    assert(!pl_dovi_dm_generate(lut,&scalar));
++    pl_tone_map_generate(lut,&scalar);
++    for(int i=0;i<4;i++) assert(isnan(lut[i]));
++}
++
+ static void rgb_tests(void)
+ {
+     struct pl_dovi_dm_metadata dm = {.version=2, .has_l1=true,
+@@ -286,6 +330,29 @@ static void shader_cache_tests(void)
+     readback(gpu,dst_tex,fresh);
+     for (int i=0; i<16; i++) assert(fabsf(altered[i]-fresh[i]) < 1e-5f);
+     pl_renderer_destroy(&other);
++    src.dovi_dm.curve=PL_DOVI_DM_OPEN_Y_PQ_PRE;
++    src.dovi_dm.open_sop.saturation_gain=0;
++    assert(pl_dovi_dm_rgb_prepare(&src.dovi_dm,&dst.dovi_target.volume,&rgb));
++    assert(pl_render_image(rr,&src,&dst,&params));
++    readback(gpu,dst_tex,altered);
++    for (int i=0;i<4;i++) {
++        float in[3],out[3];
++        for(int c=0;c<3;c++) in[c]=pl_hdr_rescale(PL_HDR_PQ,PL_HDR_NITS,input[4*i+c]);
++        assert(pl_dovi_dm_y_eval(&rgb,&src.dovi_dm.open_sop,in,out));
++        for(int c=0;c<3;c++)
++            assert(fabsf(altered[4*i+c]-pl_hdr_rescale(PL_HDR_NITS,PL_HDR_PQ,out[c])) < 1e-4f);
++    }
++    for (int change=0;change<3;change++) {
++        if(change==1) src.dovi_dm.open_sop.offset=-.02f;
++        if(change==2) src.dovi_dm.open_sop.chroma_weight=-.3f;
++        assert(pl_render_image_mix(rr,&mix,&dst,&params));
++        readback(gpu,dst_tex,altered);
++        other=pl_renderer_create(NULL,gpu);
++        assert(other && pl_render_image_mix(other,&mix,&dst,&params));
++        readback(gpu,dst_tex,fresh);
++        for(int i=0;i<16;i++) assert(fabsf(altered[i]-fresh[i]) < 1e-5f);
++        pl_renderer_destroy(&other);
++    }
+     assert(pl_renderer_get_errors(rr).errors == PL_RENDER_ERR_NONE);
+     pl_renderer_destroy(&rr);
+     pl_tex_destroy(gpu,&src_tex); pl_tex_destroy(gpu,&dst_tex);
+@@ -299,6 +366,7 @@ int main(void)
+     sop_tests();
+     absolute_sop_tests();
+     rgb_tests();
++    y_tests();
+ #ifdef PL_HAVE_VULKAN
+     shader_cache_tests();
+ #endif
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 62e3651975017649b5ee091fe3abd72666faedab Mon Sep 17 00:00:00 2001
+From: HDR Engineering <hdr-engineering@example.invalid>
+Date: Sat, 17 Oct 2026 22:18:55 -0400
+Subject: [PATCH 4/8] dovi: add isolated mastering-black Y mapper with
+ post-ratio color
+
+---
+ meson.build                      |  1 +
+ src/dovi_dm.c                    | 17 +++++++++---
+ src/dovi_dm_rgb.c                | 46 ++++++++++++++++++++++++++++++--
+ src/include/libplacebo/dovi_dm.h |  7 ++++-
+ src/renderer.c                   |  5 +++-
+ src/shaders/colorspace.c         | 21 ++++++++++++---
+ src/tests/dovi_dm.c              | 42 +++++++++++++++++++++++++++++
+ 7 files changed, 128 insertions(+), 11 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 206aeee..92bea9d 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '367': 'private Y PQ-pre mastering-black anchor and post-ratio color operator',
+       '366': 'private scalar-Y PQ-pre rational operator with distinct RGB evaluator',
+       '365': 'private source-grounded RGB pre-PQ SOP and rational luminance operator',
+       '364': 'private OPEN absolute-PQ SOP domain, separate from observer ABI363',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index 9d0919e..997a5c4 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -49,6 +49,11 @@ static const struct pl_tone_map_function open_y = {
+     .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
+ };
+ 
++static const struct pl_tone_map_function open_y_mb = {
++    .name = "open-y-pq-pre-mastblack-v1", .description = "OPEN Y mastering black/post color",
++    .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
++};
++
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
+     struct pl_tone_map_params *tone)
+@@ -71,11 +76,13 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     if (dm->curve != PL_DOVI_DM_ST2094_10 && dm->curve != PL_DOVI_DM_SPLINE &&
+         !(dm->version == 2 && (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
+                               dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ||
+-                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE)))
++                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
++                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB)))
+         return PL_DOVI_DM_INVALID;
+     if (dm->version == 2 && !pl_dovi_dm_sop_valid(&dm->open_sop))
+         return PL_DOVI_DM_INVALID;
+-    if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE) {
++    if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
++        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB) {
+         struct pl_dovi_dm_rgb_curve rgb;
+         if (!pl_dovi_dm_rgb_prepare(dm, target, &rgb))
+             return PL_DOVI_DM_INVALID;
+@@ -83,7 +90,8 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+ 
+     // Work on a copy so rejected optional data cannot poison the generic mapper.
+     struct pl_tone_map_params t = *tone;
+-    t.function = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ? &open_y :
++    t.function = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ? &open_y_mb :
++                 dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ? &open_y :
+                  dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ? &open_rgb :
+                  dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ? &open_hermite :
+                  dm->curve == PL_DOVI_DM_SPLINE ? &pl_tone_map_spline :
+@@ -104,7 +112,8 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     // Dedicated analytic Hermite uses actual physical bounds, NOT min(C,b).
+     // The shader evaluates analytically; generate remains a sampled CPU API.
+     if (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
+-        dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE)
++        dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
++        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB)
+         t.output_max = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
+     *tone = t;
+     return dm->min_pq == dm->max_pq ? PL_DOVI_DM_FLAT : PL_DOVI_DM_L1;
+diff --git a/src/dovi_dm_rgb.c b/src/dovi_dm_rgb.c
+index dbd4dfe..c62f38d 100644
+--- a/src/dovi_dm_rgb.c
++++ b/src/dovi_dm_rgb.c
+@@ -29,7 +29,8 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out)
+ {
+     if (!dm || !target || !out || dm->version != 2 || !dm->has_l1 ||
+-        (dm->curve != PL_DOVI_DM_OPEN_RGB_PQ_PRE && dm->curve != PL_DOVI_DM_OPEN_Y_PQ_PRE) ||
++        (dm->curve != PL_DOVI_DM_OPEN_RGB_PQ_PRE && dm->curve != PL_DOVI_DM_OPEN_Y_PQ_PRE &&
++         dm->curve != PL_DOVI_DM_OPEN_Y_PQ_PRE_MB) ||
+         !rgb_sop_valid(&dm->open_sop) ||
+         !pq_valid(dm->min_pq) || !pq_valid(dm->avg_pq) || !pq_valid(dm->max_pq) ||
+         dm->min_pq > dm->avg_pq || dm->avg_pq > dm->max_pq ||
+@@ -40,6 +41,11 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+         (dm->origin != PL_DOVI_DM_OFFICIAL_XML || dm->open_sop.saturation_gain != 0 ||
+          (dm->open_sop.version && dm->open_sop.slope + dm->open_sop.offset > 1)))
+         return false; // scalar PQ SOP must be safe over its physical domain
++    bool mb = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
++    if (mb && (dm->origin != PL_DOVI_DM_OFFICIAL_XML ||
++        !isfinite(dm->source.min_luma) || dm->source.min_luma < 0 ||
++        (dm->open_sop.version && dm->open_sop.slope + dm->open_sop.offset > 1)))
++        return false;
+     struct pl_dovi_dm_rgb_curve c = {
+         .input_peak = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dm->max_pq),
+     };
+@@ -48,7 +54,7 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+         *out = c;
+         return true;
+     }
+-    double lo = dm->min_pq, hi = dm->max_pq;
++    double lo = mb ? 0 : dm->min_pq, hi = dm->max_pq;
+     double dsthi = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
+     double dstlo = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, 0);
+     double src = fmin(lo+.8*(hi-lo), fmax(lo+.1*(hi-lo), dm->avg_pq));
+@@ -59,6 +65,11 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     double xs[3] = {pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, lo),
+                     pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, src), c.input_peak};
+     double ys[3] = {0, pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dst), target->max_luma};
++    if (mb) {
++        xs[0] = dm->source.min_luma;
++        if (xs[0] >= xs[1])
++            return false;
++    }
+     // Solve a+b*x-c*x*y=y with pivoting and normalized x, not fitted anchors.
+     double a[3][4];
+     for (int i = 0; i < 3; i++) {
+@@ -147,6 +158,37 @@ bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
+     return true;
+ }
+ 
++bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *c,
++    const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
++{
++    if (!c || !rgb_sop_valid(s) || !in || !out ||
++        (s->version && s->slope + s->offset > 1))
++        return false;
++    struct pl_dovi_dm_sop intensity = *s;
++    intensity.saturation_gain = 0;
++    float rgb[3], q[3], y = 0, result[3];
++    if (!pl_dovi_dm_y_eval(c, &intensity, in, rgb))
++        return false;
++    const float weights[3] = {.2627f, .6780f, .0593f};
++    for (int i = 0; i < 3; i++) {
++        q[i] = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, rgb[i]);
++        y += weights[i]*q[i];
++    }
++    for (int i = 0; i < 3; i++) {
++        if (s->version && s->saturation_gain != 0)
++            q[i] = q[i] == 0 || y == 0 ? 0 :
++                q[i]*powf((1+s->chroma_weight)*q[i]/y, s->saturation_gain);
++        if (!pq_valid(q[i]))
++            return false;
++        result[i] = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, q[i]);
++        if (!isfinite(result[i]))
++            return false;
++    }
++    for (int i = 0; i < 3; i++)
++        out[i] = result[i];
++    return true;
++}
++
+ bool pl_dovi_dm_y_eval(const struct pl_dovi_dm_rgb_curve *c,
+     const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
+ {
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+index f7bf5d3..49ec483 100644
+--- a/src/include/libplacebo/dovi_dm.h
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -27,6 +27,7 @@ enum pl_dovi_dm_curve {
+     PL_DOVI_DM_OPEN_HERMITE_PQ, // US10600166B2 improved midpoint, analytic Eq7
+     PL_DOVI_DM_OPEN_RGB_PQ_PRE, // continuous-XML public RGB SOP before rational Y
+     PL_DOVI_DM_OPEN_Y_PQ_PRE, // scalar PQ(Y) SOP before rational Y; SG0 only
++    PL_DOVI_DM_OPEN_Y_PQ_PRE_MB, // zero-low knee, mastering black, post RGB color
+ };
+ 
+ #define PL_DOVI_DM_MAX_BLOCKS 32
+@@ -53,7 +54,7 @@ struct pl_dovi_dm_sop {
+     uint32_t version; // 1
+     enum pl_dovi_dm_sop_domain domain;
+     float slope, offset, power;
+-    // Only OPEN_RGB_PQ_PRE uses these actual continuous factors. Zero SG
++    // OPEN_RGB_PQ_PRE and OPEN_Y_PQ_PRE_MB use these continuous factors. Zero SG
+     // bypasses the color expression exactly; it does not mean CW is absent.
+     float chroma_weight, saturation_gain;
+ };
+@@ -154,5 +155,9 @@ PL_API bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *curve,
+ PL_API bool pl_dovi_dm_y_eval(const struct pl_dovi_dm_rgb_curve *curve,
+     const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
+ 
++// Mastering-black variant; actual color executes after RGB ratio restore.
++PL_API bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *curve,
++    const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
++
+ PL_API_END
+ #endif
+diff --git a/src/renderer.c b/src/renderer.c
+index a85cf04..fc533be 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -3692,7 +3692,10 @@ static uint64_t dovi_signature(const struct pl_dovi_dm_metadata *dm,
+         DM_HASH(dm->open_sop.slope);
+         DM_HASH(dm->open_sop.offset);
+         DM_HASH(dm->open_sop.power);
+-        if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE) {
++        if (dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB)
++            DM_HASH(dm->source.min_luma);
++        if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
++            dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB) {
+             DM_HASH(dm->open_sop.chroma_weight);
+             DM_HASH(dm->open_sop.saturation_gain);
+         }
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 53b0550..63b8e78 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1714,7 +1714,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         SH_FAIL(sh, "Invalid explicit OPEN DM payload/target");
+         return;
+     }
+-    bool y_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE;
++    bool mb_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
++    bool y_active = dm_active && (args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE || mb_active);
+     bool rgb_active = dm_active && (args->dovi_dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || y_active);
+     bool hermite_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ;
+     const struct pl_dovi_dm_sop *sop = dm_active && args->dovi_dm->version == 2 ?
+@@ -1844,7 +1845,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+             SH_FAIL(sh, "Invalid explicit RGB PQ-pre curve");
+             return;
+         }
+-        sh_describe(sh, y_active ? "OPEN scalar Y PQ-pre SOP/rational Y (SG0 only)" :
++        sh_describe(sh, mb_active ? "OPEN Y PQ-pre mastering black/color after ratio" :
++                       y_active ? "OPEN scalar Y PQ-pre SOP/rational Y (SG0 only)" :
+                                  "OPEN RGB PQ-pre SOP/rational Y (not selected Dolby CM)");
+         // Source encoding and working RGB basis are distinct. Convert in
+         // linear light before RGB trims; do not run stock I tone/compensation.
+@@ -1865,7 +1867,7 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                  SH_FLOAT(sop->slope), SH_FLOAT(sop->offset), SH_FLOAT(sop->power));
+         }
+         GLSL("color.rgb = max(color.rgb, vec3(1e-5)); \n");
+-        if (sop->version && sop->saturation_gain != 0) {
++        if (!mb_active && sop->version && sop->saturation_gain != 0) {
+             GLSL("float rgb_qY = dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
+                  "color.rgb *= pow((1.0 + "$") * color.rgb / rgb_qY, vec3("$")); \n",
+                  SH_FLOAT(sop->chroma_weight), SH_FLOAT(sop->saturation_gain));
+@@ -1882,6 +1884,19 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         }
+         if (y_active)
+             GLSL("color.rgb = dm_y_sourceY > 0.0 ? dm_y_source * (color.r / dm_y_sourceY) : vec3(0.0); } \n");
++        if (mb_active) {
++            pl_shader_delinearize(sh, &working);
++            if (sop->version && sop->saturation_gain != 0) {
++                GLSL("{ float mb_Yq = dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
++                     "for (int mb_i = 0; mb_i < 3; mb_i++) { \n"
++                     "float mb_v = color[mb_i]; \n"
++                     "color[mb_i] = mb_v == 0.0 || mb_Yq == 0.0 ? 0.0 : \n"
++                     "mb_v * pow((1.0 + "$") * mb_v / mb_Yq, "$"); } } \n",
++                     SH_FLOAT(sop->chroma_weight), SH_FLOAT(sop->saturation_gain));
++            }
++            GLSL("if (any(greaterThan(color.rgb, vec3(1.0)))) color.rgb = vec3(uintBitsToFloat(0x7fc00000u)); \n");
++            pl_shader_linearize(sh, &working);
++        }
+         src.primaries = PL_COLOR_PRIM_BT_2020;
+         rgb2lms = pl_ipt_rgb2lms(bt);
+         // The existing physical-gamut stage below executes once. No second
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index 9b9a830..3f18fd5 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -118,6 +118,47 @@ static void absolute_sop_tests(void)
+     s.power = 1; s.offset = 0.6f; assert(!pl_dovi_dm_sop_valid(&s));
+ }
+ 
++static void y_mb_tests(void)
++{
++    struct pl_dovi_dm_metadata dm = {.version=2,.has_l1=true,
++        .origin=PL_DOVI_DM_OFFICIAL_XML,.min_pq=.0196536f,.avg_pq=.272f,.max_pq=.853468f,
++        .source={.min_luma=.005f},.curve=PL_DOVI_DM_OPEN_Y_PQ_PRE_MB,
++        .open_sop={.version=1,.domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,
++            .slope=1.005006f,.offset=-.002006f,.power=2000.0f/2007,
++            .chroma_weight=-.0105f,.saturation_gain=-.002f}};
++    struct pl_hdr_metadata target={.min_luma=0,.max_luma=600};
++    struct pl_dovi_dm_rgb_curve c, same;
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    dm.min_pq=0; // knee ignores L1 minimum, not the actual black anchor
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&same));
++    assert(memcmp(&c,&same,sizeof(c))==0);
++    assert(fabsf(c.coeffs[0]+c.coeffs[1]*.005f)<1e-7f);
++    float input[3]={1,2,3}, actual[3], neutral[3], saved[3];
++    assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,actual));
++    dm.open_sop.saturation_gain=0;
++    assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,neutral));
++    assert(fabsf(actual[0]/input[0]-actual[2]/input[2])>1e-5f);
++    dm.open_sop.chroma_weight=.5f;
++    assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,saved));
++    assert(memcmp(saved,neutral,sizeof(saved))==0);
++    input[0]=input[1]=input[2]=0;
++    assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,actual));
++    assert(actual[0]==0 && actual[1]==0 && actual[2]==0);
++    dm.source.min_luma=NAN;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    dm.source.min_luma=100;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    dm.source.min_luma=.005f; dm.open_sop.slope=1.5f; dm.open_sop.offset=0;
++    assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    struct pl_dovi_dm_rgb_curve identity={.identity=true};
++    dm.open_sop.slope=1; dm.open_sop.power=1;
++    dm.open_sop.saturation_gain=.5f;
++    input[0]=input[1]=input[2]=10000;
++    memcpy(actual,saved,sizeof(actual));
++    assert(!pl_dovi_dm_y_mb_eval(&identity,&dm.open_sop,input,actual));
++    assert(memcmp(actual,saved,sizeof(actual))==0); // no output on PQ>1
++}
++
+ static void y_tests(void)
+ {
+     struct pl_dovi_dm_metadata dm = {.version=2,.has_l1=true,
+@@ -367,6 +408,7 @@ int main(void)
+     absolute_sop_tests();
+     rgb_tests();
+     y_tests();
++    y_mb_tests();
+ #ifdef PL_HAVE_VULKAN
+     shader_cache_tests();
+ #endif
+-- 
+2.54.0 (Apple Git-157)
+
+
+From cd4600fbea5c9003ca4706a39f0af38b4472a3b5 Mon Sep 17 00:00:00 2001
+From: HDR contributors <hdr-contributors@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 22:30:57 -0400
+Subject: [PATCH 5/8] dovi: bound mastering-black SOP by declared range and
+ evaluated pixels
+
+---
+ src/dovi_dm_rgb.c   | 15 ++++++++++++---
+ src/tests/dovi_dm.c |  5 +++++
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/src/dovi_dm_rgb.c b/src/dovi_dm_rgb.c
+index c62f38d..3f320b8 100644
+--- a/src/dovi_dm_rgb.c
++++ b/src/dovi_dm_rgb.c
+@@ -44,7 +44,8 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     bool mb = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
+     if (mb && (dm->origin != PL_DOVI_DM_OFFICIAL_XML ||
+         !isfinite(dm->source.min_luma) || dm->source.min_luma < 0 ||
+-        (dm->open_sop.version && dm->open_sop.slope + dm->open_sop.offset > 1)))
++        (dm->open_sop.version &&
++         dm->open_sop.slope * dm->max_pq + dm->open_sop.offset > 1)))
+         return false;
+     struct pl_dovi_dm_rgb_curve c = {
+         .input_peak = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dm->max_pq),
+@@ -161,8 +162,16 @@ bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
+ bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *c,
+     const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
+ {
+-    if (!c || !rgb_sop_valid(s) || !in || !out ||
+-        (s->version && s->slope + s->offset > 1))
++    if (!c || !rgb_sop_valid(s) || !in || !out)
++        return false;
++    for (int i = 0; i < 3; i++)
++        if (!isfinite(in[i]) || in[i] < 0 || in[i] > 10000)
++            return false;
++    // The new MB preparation bounds SOP over declared L1, not all PQ values.
++    // Still fail closed on an actual out-of-range pixel before power/EOTF.
++    float input_y = .2627f*in[0] + .6780f*in[1] + .0593f*in[2];
++    if (s->version && input_y > 0 &&
++        s->slope * pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, input_y) + s->offset > 1)
+         return false;
+     struct pl_dovi_dm_sop intensity = *s;
+     intensity.saturation_gain = 0;
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index 3f18fd5..e7eb4f9 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -135,6 +135,11 @@ static void y_mb_tests(void)
+     assert(fabsf(c.coeffs[0]+c.coeffs[1]*.005f)<1e-7f);
+     float input[3]={1,2,3}, actual[3], neutral[3], saved[3];
+     assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,actual));
++    memcpy(saved,actual,sizeof(saved));
++    input[0]=input[1]=input[2]=10000;
++    assert(!pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,actual));
++    assert(memcmp(actual,saved,sizeof(actual))==0);
++    input[0]=1; input[1]=2; input[2]=3;
+     dm.open_sop.saturation_gain=0;
+     assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,neutral));
+     assert(fabsf(actual[0]/input[0]-actual[2]/input[2])>1e-5f);
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 77894e1e55fe319d5f46532c1fa8d3e28bc97fdb Mon Sep 17 00:00:00 2001
+From: HDR contributors <hdr-contributors@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 22:32:49 -0400
+Subject: [PATCH 6/8] shaders: make mastering-black SOP finite extension
+ explicit
+
+---
+ src/shaders/colorspace.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 63b8e78..aa9ccd0 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1867,6 +1867,11 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                  SH_FLOAT(sop->slope), SH_FLOAT(sop->offset), SH_FLOAT(sop->power));
+         }
+         GLSL("color.rgb = max(color.rgb, vec3(1e-5)); \n");
++        // MB scalar rejects out-of-domain pixels. The shader's explicit finite
++        // extension caps SOP PQ before EOTF; agreement only proves this cap
++        // unexercised on the measured population, not the entire source range.
++        if (mb_active)
++            GLSL("color.rgb = min(color.rgb, vec3(1.0)); \n");
+         if (!mb_active && sop->version && sop->saturation_gain != 0) {
+             GLSL("float rgb_qY = dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
+                  "color.rgb *= pow((1.0 + "$") * color.rgb / rgb_qY, vec3("$")); \n",
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 9846df9017975fb9e16d37a2b1a798909e9c3246 Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@localhost>
+Date: Sun, 18 Oct 2026 02:17:23 -0400
+Subject: [PATCH 7/8] dovi: add frozen sqrt-sum powered PQ-Y post-SOP hybrid in
+ private ABI368
+
+---
+ meson.build                      |   1 +
+ src/dovi_dm.c                    |  17 +++-
+ src/dovi_dm_rgb.c                |   8 +-
+ src/dovi_dm_sqrtsum.c            | 137 ++++++++++++++++++++++++++++
+ src/include/libplacebo/dovi_dm.h |  16 ++++
+ src/meson.build                  |   2 +
+ src/renderer.c                   |   7 +-
+ src/shaders/colorspace.c         |  77 +++++++++++++++-
+ src/tests/dovi_dm_sqrtsum.c      | 148 +++++++++++++++++++++++++++++++
+ 9 files changed, 403 insertions(+), 10 deletions(-)
+ create mode 100644 src/dovi_dm_sqrtsum.c
+ create mode 100644 src/tests/dovi_dm_sqrtsum.c
+
+diff --git a/meson.build b/meson.build
+index 92bea9d..3abadef 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '368': 'private US961 sqrt-sum powered PQ-Y post-SOP hybrid and anchor representation',
+       '367': 'private Y PQ-pre mastering-black anchor and post-ratio color operator',
+       '366': 'private scalar-Y PQ-pre rational operator with distinct RGB evaluator',
+       '365': 'private source-grounded RGB pre-PQ SOP and rational luminance operator',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index 997a5c4..0b9d232 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -54,6 +54,11 @@ static const struct pl_tone_map_function open_y_mb = {
+     .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
+ };
+ 
++static const struct pl_tone_map_function open_sqrtsum = {
++    .name = "us961-sqrtsum-pq-y-post-v1", .description = "OPEN powered PQ-Y/post SOP",
++    .scaling = PL_HDR_PQ, .map = rgb_scalar_unsupported,
++};
++
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
+     struct pl_tone_map_params *tone)
+@@ -77,12 +82,14 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+         !(dm->version == 2 && (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
+                               dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ||
+                               dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
+-                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB)))
++                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ||
++                              dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM)))
+         return PL_DOVI_DM_INVALID;
+     if (dm->version == 2 && !pl_dovi_dm_sop_valid(&dm->open_sop))
+         return PL_DOVI_DM_INVALID;
+     if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
+-        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB) {
++        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ||
++        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM) {
+         struct pl_dovi_dm_rgb_curve rgb;
+         if (!pl_dovi_dm_rgb_prepare(dm, target, &rgb))
+             return PL_DOVI_DM_INVALID;
+@@ -90,7 +97,8 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+ 
+     // Work on a copy so rejected optional data cannot poison the generic mapper.
+     struct pl_tone_map_params t = *tone;
+-    t.function = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ? &open_y_mb :
++    t.function = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM ? &open_sqrtsum :
++                 dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ? &open_y_mb :
+                  dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ? &open_y :
+                  dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE ? &open_rgb :
+                  dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ? &open_hermite :
+@@ -113,7 +121,8 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     // The shader evaluates analytically; generate remains a sampled CPU API.
+     if (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ||
+         dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
+-        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB)
++        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ||
++        dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM)
+         t.output_max = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
+     *tone = t;
+     return dm->min_pq == dm->max_pq ? PL_DOVI_DM_FLAT : PL_DOVI_DM_L1;
+diff --git a/src/dovi_dm_rgb.c b/src/dovi_dm_rgb.c
+index 3f320b8..a9376af 100644
+--- a/src/dovi_dm_rgb.c
++++ b/src/dovi_dm_rgb.c
+@@ -28,6 +28,8 @@ static bool rgb_sop_valid(const struct pl_dovi_dm_sop *s)
+ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out)
+ {
++    if (dm && dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM)
++        return pl_dovi_dm_sqrtsum_prepare(dm,target,out);
+     if (!dm || !target || !out || dm->version != 2 || !dm->has_l1 ||
+         (dm->curve != PL_DOVI_DM_OPEN_RGB_PQ_PRE && dm->curve != PL_DOVI_DM_OPEN_Y_PQ_PRE &&
+          dm->curve != PL_DOVI_DM_OPEN_Y_PQ_PRE_MB) ||
+@@ -117,7 +119,7 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+ bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
+     const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
+ {
+-    if (!c || !rgb_sop_valid(s) || !in || !out)
++    if (!c || c->sqrtsum || !rgb_sop_valid(s) || !in || !out)
+         return false;
+     const float weights[3] = {.2627f, .6780f, .0593f};
+     float q[3], rgb[3], y = 0;
+@@ -162,7 +164,7 @@ bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
+ bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *c,
+     const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
+ {
+-    if (!c || !rgb_sop_valid(s) || !in || !out)
++    if (!c || c->sqrtsum || !rgb_sop_valid(s) || !in || !out)
+         return false;
+     for (int i = 0; i < 3; i++)
+         if (!isfinite(in[i]) || in[i] < 0 || in[i] > 10000)
+@@ -201,7 +203,7 @@ bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *c,
+ bool pl_dovi_dm_y_eval(const struct pl_dovi_dm_rgb_curve *c,
+     const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
+ {
+-    if (!c || !rgb_sop_valid(s) || s->saturation_gain != 0 || !in || !out)
++    if (!c || c->sqrtsum || !rgb_sop_valid(s) || s->saturation_gain != 0 || !in || !out)
+         return false;
+     for (int i = 0; i < 3; i++)
+         if (!isfinite(in[i]) || in[i] < 0 || in[i] > 10000)
+diff --git a/src/dovi_dm_sqrtsum.c b/src/dovi_dm_sqrtsum.c
+new file mode 100644
+index 0000000..ee92ee5
+--- /dev/null
++++ b/src/dovi_dm_sqrtsum.c
+@@ -0,0 +1,137 @@
++/* US9613407B2 Table2 powered rational in an explicitly named open hybrid.
++ * Copyright (c) 2026 HDR contributors
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ * Not Dolby CM identity. Positive anchor form avoids cancellation, not fitting.
++ */
++#include <math.h>
++#include <libplacebo/dovi_dm.h>
++
++static bool pq_valid(float q) { return isfinite(q) && q >= 0 && q <= 1; }
++
++static bool sop_valid(const struct pl_dovi_dm_sop *s)
++{
++    return s && s->version == 1 && pl_dovi_dm_sop_valid(s) &&
++        s->domain == PL_DOVI_DM_SOP_ABSOLUTE_PQ &&
++        isfinite(s->chroma_weight) && fabsf(s->chroma_weight) <= .5f &&
++        isfinite(s->saturation_gain) && fabsf(s->saturation_gain) <= .5f;
++}
++
++bool pl_dovi_dm_sqrtsum_prepare(const struct pl_dovi_dm_metadata *dm,
++    const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out)
++{
++    if (!dm || !target || !out || dm->curve != PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM ||
++        dm->version != 2 || dm->origin != PL_DOVI_DM_OFFICIAL_XML || !dm->has_l1 ||
++        !sop_valid(&dm->open_sop) ||
++        !pq_valid(dm->min_pq) || !pq_valid(dm->avg_pq) || !pq_valid(dm->max_pq) ||
++        !(dm->min_pq < dm->avg_pq && dm->avg_pq < dm->max_pq) ||
++        !isfinite(dm->source.min_luma) || !isfinite(dm->source.max_luma) ||
++        !(0 <= dm->source.min_luma && dm->source.min_luma < dm->source.max_luma &&
++          dm->source.max_luma <= 10000) ||
++        !isfinite(target->min_luma) || !isfinite(target->max_luma) ||
++        !(0 <= target->min_luma && target->min_luma < target->max_luma && target->max_luma <= 10000))
++        return false;
++    double sm = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm->source.min_luma);
++    double sx = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm->source.max_luma);
++    double tm = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->min_luma);
++    double tx = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
++    double ratio = fmin(1, sqrt((tx+tm)/(sx+sm)));
++    double n = 3*sqrt(1/ratio); // ScreenRatio1, Rolloff1/3
++    double key = 2*((double)dm->avg_pq-dm->min_pq)/((double)dm->max_pq-dm->min_pq);
++    double shift = dm->avg_pq*(1-ratio)*key;
++    double ys[3] = {fmax(dm->min_pq-shift,tm),dm->avg_pq-shift,fmin(dm->max_pq-shift,tx)};
++    if (!(0 <= ys[0] && ys[0] < ys[1] && ys[1] < ys[2] && ys[2] <= 1))
++        return false;
++    double z0 = pow((double)dm->min_pq/dm->max_pq,n);
++    double zm = pow((double)dm->avg_pq/dm->max_pq,n);
++    double w0 = pow(ys[0],3), wm = pow(ys[1],3), w2 = pow(ys[2],3);
++    if (!(0 <= z0 && z0 < zm && zm < 1 && w0 < wm && wm < w2))
++        return false;
++    double t = (zm-z0)/(1-z0);
++    double k = (wm-w0)*(1-t)/((w2-wm)*t);
++    struct pl_dovi_dm_rgb_curve c = {
++        .sqrtsum=true, .source_pq={dm->min_pq,dm->avg_pq,dm->max_pq},
++        .mapped_pq={ys[0],ys[1],ys[2]}, .power=n, .rolloff=1.0f/3,
++        .z0=z0, .weight=k, .w0=w0, .w2=w2,
++    };
++    // Re-close the anchor representation in its actual storage precision.
++    // In particular z0 must use the same float power/normalization as eval;
++    // casting a double z0 could make the first interior nextafter negative.
++    c.z0 = powf(c.source_pq[0]/c.source_pq[2],c.power);
++    float zmid = powf(c.source_pq[1]/c.source_pq[2],c.power);
++    c.w0 = powf(c.mapped_pq[0],3);
++    c.w2 = powf(c.mapped_pq[2],3);
++    float wmid = powf(c.mapped_pq[1],3);
++    if (!(c.z0 < zmid && zmid < 1 && c.w0 < wmid && wmid < c.w2))
++        return false;
++    t = ((double)zmid-c.z0)/(1-c.z0);
++    c.weight = ((double)wmid-c.w0)*(1-t)/(((double)c.w2-wmid)*t);
++    // Validate actual binary32 closure, not only the double preparation.
++    if (!isfinite(c.power) || c.power <= 0 || !isfinite(c.weight) || c.weight <= 0 ||
++        !(0 <= c.z0 && c.z0 < 1 && 0 <= c.w0 && c.w0 < c.w2) ||
++        !(c.mapped_pq[0] < c.mapped_pq[1] && c.mapped_pq[1] < c.mapped_pq[2]))
++        return false;
++    *out = c;
++    return true;
++}
++
++float pl_dovi_dm_sqrtsum_curve_eval(const struct pl_dovi_dm_rgb_curve *c, float q)
++{
++    if (!c || !c->sqrtsum || !pq_valid(q))
++        return NAN;
++    if (q <= c->source_pq[0])
++        return c->mapped_pq[0];
++    if (q >= c->source_pq[2])
++        return c->mapped_pq[2];
++    float t = (powf(q/c->source_pq[2],c->power)-c->z0)/(1-c->z0);
++    float den = (1-t)+c->weight*t;
++    float base = (c->w0*(1-t)+c->weight*c->w2*t)/den;
++    if (!isfinite(t) || t < 0 || t > 1 || !isfinite(base) || base < 0 || den <= 0)
++        return NAN;
++    float mapped = powf(base,c->rolloff);
++    return pq_valid(mapped) ? mapped : NAN;
++}
++
++bool pl_dovi_dm_sqrtsum_eval(const struct pl_dovi_dm_rgb_curve *c,
++    const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
++{
++    if (!c || !c->sqrtsum || !sop_valid(s) || !in || !out)
++        return false;
++    for (int i=0; i<3; i++)
++        if (!isfinite(in[i]) || in[i]<0 || in[i]>10000)
++            return false;
++    float y = .2627f*in[0]+.6780f*in[1]+.0593f*in[2];
++    float result[3] = {0};
++    if (y > 0) {
++        float q = pl_dovi_dm_sqrtsum_curve_eval(c,pl_hdr_rescale(PL_HDR_NITS,PL_HDR_PQ,y));
++        if (!pq_valid(q))
++            return false;
++        float power = powf(fmaxf(0,s->slope*q+s->offset),s->power);
++        if (!isfinite(power))
++            return false;
++        q = fmaxf(1e-5f,power);
++        if (!pq_valid(q))
++            return false;
++        float mapped = pl_hdr_rescale(PL_HDR_PQ,PL_HDR_NITS,q);
++        float qs[3], qy=0;
++        for (int i=0; i<3; i++) {
++            float v = in[i]*mapped/y;
++            if (!isfinite(v) || v<0 || v>10000)
++                return false;
++            qs[i] = pl_hdr_rescale(PL_HDR_NITS,PL_HDR_PQ,v);
++            qy += (i==0 ? .2627f : i==1 ? .6780f : .0593f)*qs[i];
++        }
++        for (int i=0; i<3; i++) {
++            float v = qs[i];
++            if (s->saturation_gain != 0)
++                v = v == 0 || qy == 0 ? 0 : v*powf((1+s->chroma_weight)*v/qy,s->saturation_gain);
++            if (!pq_valid(v))
++                return false;
++            result[i] = pl_hdr_rescale(PL_HDR_PQ,PL_HDR_NITS,v);
++            if (!isfinite(result[i]) || result[i]<0 || result[i]>10000)
++                return false;
++        }
++    }
++    for (int i=0; i<3; i++)
++        out[i] = result[i];
++    return true;
++}
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+index 49ec483..eb40b26 100644
+--- a/src/include/libplacebo/dovi_dm.h
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -28,6 +28,7 @@ enum pl_dovi_dm_curve {
+     PL_DOVI_DM_OPEN_RGB_PQ_PRE, // continuous-XML public RGB SOP before rational Y
+     PL_DOVI_DM_OPEN_Y_PQ_PRE, // scalar PQ(Y) SOP before rational Y; SG0 only
+     PL_DOVI_DM_OPEN_Y_PQ_PRE_MB, // zero-low knee, mastering black, post RGB color
++    PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM, // US961 powered PQ curve -> scalar SOP -> color
+ };
+ 
+ #define PL_DOVI_DM_MAX_BLOCKS 32
+@@ -145,6 +146,11 @@ struct pl_dovi_dm_rgb_curve {
+     float coeffs[3]; // (a+b*Y)/(1+c*Y)
+     float input_peak;
+     bool identity;
++    // ABI368: positive-weight interpolation in z=(q/Clip)^power. Algebraically
++    // the powered rational, not fitted coefficients or a fractional-base clamp.
++    bool sqrtsum;
++    float source_pq[3], mapped_pq[3];
++    float power, rolloff, z0, weight, w0, w2;
+ };
+ PL_API bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out);
+@@ -159,5 +165,15 @@ PL_API bool pl_dovi_dm_y_eval(const struct pl_dovi_dm_rgb_curve *curve,
+ PL_API bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *curve,
+     const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
+ 
++// Original declared display endpoints and strictly ordered original L1.
++// NONLITERAL constant endpoint extension, interior positive anchor form.
++// No pre-SOP/stock compensation/epsilon ratio. Exact zero Y maps to black.
++// Invalid domains fail without modifying out; generic scalar LUT unsupported.
++PL_API bool pl_dovi_dm_sqrtsum_prepare(const struct pl_dovi_dm_metadata *dm,
++    const struct pl_hdr_metadata *target, struct pl_dovi_dm_rgb_curve *out);
++PL_API float pl_dovi_dm_sqrtsum_curve_eval(const struct pl_dovi_dm_rgb_curve *curve, float q);
++PL_API bool pl_dovi_dm_sqrtsum_eval(const struct pl_dovi_dm_rgb_curve *curve,
++    const struct pl_dovi_dm_sop *sop, const float in_nits[3], float out_nits[3]);
++
+ PL_API_END
+ #endif
+diff --git a/src/meson.build b/src/meson.build
+index c56e90b..fe1f667 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -98,6 +98,7 @@ sources = [
+   'dither.c',
+   'dovi_dm.c',
+   'dovi_dm_rgb.c',
++  'dovi_dm_sqrtsum.c',
+   'dispatch.c',
+   'dummy.c',
+   'filters.c',
+@@ -139,6 +140,7 @@ tests = [
+   'common.c',
+   'dither.c',
+   'dovi_dm.c',
++  'dovi_dm_sqrtsum.c',
+   'dummy.c',
+   'lut.c',
+   'filters.c',
+diff --git a/src/renderer.c b/src/renderer.c
+index fc533be..e6bfffa 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -3694,8 +3694,13 @@ static uint64_t dovi_signature(const struct pl_dovi_dm_metadata *dm,
+         DM_HASH(dm->open_sop.power);
+         if (dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB)
+             DM_HASH(dm->source.min_luma);
++        if (dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM) {
++            DM_HASH(dm->source.min_luma);
++            DM_HASH(dm->source.max_luma);
++        }
+         if (dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE ||
+-            dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB) {
++            dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB ||
++            dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM) {
+             DM_HASH(dm->open_sop.chroma_weight);
+             DM_HASH(dm->open_sop.saturation_gain);
+         }
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index aa9ccd0..cf88fe9 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1715,8 +1715,9 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         return;
+     }
+     bool mb_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
++    bool sq_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM;
+     bool y_active = dm_active && (args->dovi_dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE || mb_active);
+-    bool rgb_active = dm_active && (args->dovi_dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || y_active);
++    bool rgb_active = dm_active && (args->dovi_dm->curve == PL_DOVI_DM_OPEN_RGB_PQ_PRE || y_active || sq_active);
+     bool hermite_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ;
+     const struct pl_dovi_dm_sop *sop = dm_active && args->dovi_dm->version == 2 ?
+         &args->dovi_dm->open_sop : NULL;
+@@ -1839,7 +1840,77 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+     ident_t lms2ipt = SH_MAT3(pl_ipt_lms2ipt);
+     ident_t ipt2lms = SH_MAT3(pl_ipt_ipt2lms);
+ 
+-    if (rgb_active) {
++    if (sq_active) {
++        struct pl_dovi_dm_rgb_curve c;
++        if (!pl_dovi_dm_rgb_prepare(args->dovi_dm, dm_volume, &c)) {
++            SH_FAIL(sh, "Invalid US961 sqrt-sum PQ-Y curve");
++            return;
++        }
++        sh_describe(sh, "us961-sqrtsum-pq-y-post-v1 positive anchors; invalid alpha0");
++        const struct pl_raw_primaries *bt = pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020);
++        pl_matrix3x3 basis = pl_get_color_mapping_matrix(
++            pl_raw_primaries_get(src.primaries),bt,PL_INTENT_RELATIVE_COLORIMETRIC);
++        GLSL("color.rgb = "$" * color.rgb; \n"
++             "bool sq_valid = all(greaterThanEqual(color.rgb,vec3(0.0))) && \n"
++             "all(lessThanEqual(color.rgb,vec3(%f))); \n"
++             "vec3 sq_source = color.rgb; \n"
++             "float sq_Y = dot(color.rgb,vec3(.2627,.6780,.0593)); \n"
++             "if (sq_valid && sq_Y > 0.0) { \n"
++             "color.rgb = vec3(sq_Y); \n", SH_MAT3(basis), 10000.0/PL_COLOR_SDR_WHITE);
++        struct pl_color_space working = pl_color_space_hdr10;
++        pl_shader_delinearize(sh, &working);
++        GLSL("float sq_q = color.r; \n"
++             "sq_valid = sq_valid && sq_q >= 0.0 && sq_q <= 1.0; \n"
++             "if (sq_q <= "$") sq_q = "$"; \n"
++             "else if (sq_q >= "$") sq_q = "$"; \n"
++             "else { \n"
++             "float sq_t = (pow(sq_q/"$", "$")-"$")/(1.0-"$"); \n"
++             "float sq_den = (1.0-sq_t)+"$"*sq_t; \n"
++             "float sq_base = ("$"*(1.0-sq_t)+"$"*"$"*sq_t)/sq_den; \n"
++             "sq_valid = sq_valid && sq_t >= 0.0 && sq_t <= 1.0 && \n"
++             "sq_den > 0.0 && sq_base >= 0.0 && sq_base <= 1.0; \n"
++             "sq_q = sq_valid ? pow(sq_base, "$") : 0.0; } \n"
++             "sq_valid = sq_valid && sq_q >= 0.0 && sq_q <= 1.0; \n"
++             "float sq_power = pow(max(0.0,"$"*sq_q+"$"),"$"); \n"
++             "sq_valid = sq_valid && sq_power >= 0.0 && sq_power <= 1.0; \n"
++             "color.rgb = vec3(sq_valid ? max(1e-5,sq_power) : 0.0); \n",
++             SH_FLOAT(c.source_pq[0]),SH_FLOAT(c.mapped_pq[0]),
++             SH_FLOAT(c.source_pq[2]),SH_FLOAT(c.mapped_pq[2]),
++             SH_FLOAT(c.source_pq[2]),SH_FLOAT(c.power),SH_FLOAT(c.z0),SH_FLOAT(c.z0),
++             SH_FLOAT(c.weight),SH_FLOAT(c.w0),SH_FLOAT(c.weight),SH_FLOAT(c.w2),
++             SH_FLOAT(c.rolloff),SH_FLOAT(sop->slope),SH_FLOAT(sop->offset),SH_FLOAT(sop->power));
++        pl_shader_linearize(sh, &working);
++        GLSL("color.rgb = sq_source * (color.r/sq_Y); \n"
++             "sq_valid = sq_valid && all(greaterThanEqual(color.rgb,vec3(0.0))) && \n"
++             "all(lessThanEqual(color.rgb,vec3(%f))); \n"
++             "if (!sq_valid) color.rgb = vec3(0.0); \n", 10000.0/PL_COLOR_SDR_WHITE);
++        pl_shader_delinearize(sh, &working);
++        if (sop->saturation_gain != 0) {
++            GLSL("float sq_qY = dot(color.rgb,vec3(.2627,.6780,.0593)); \n"
++                 "for (int sq_i=0; sq_i<3; sq_i++) { \n"
++                 "float sq_v = color[sq_i]; \n"
++                 "color[sq_i] = sq_v == 0.0 || sq_qY == 0.0 ? 0.0 : \n"
++                 "sq_v*pow((1.0+"$")*sq_v/sq_qY,"$"); } \n",
++                 SH_FLOAT(sop->chroma_weight),SH_FLOAT(sop->saturation_gain));
++        }
++        GLSL("sq_valid = sq_valid && all(greaterThanEqual(color.rgb,vec3(0.0))) && \n"
++             "all(lessThanEqual(color.rgb,vec3(1.0))); \n"
++             "if (!sq_valid) color.rgb = vec3(0.0); \n");
++        pl_shader_linearize(sh, &working);
++        GLSL("} else { color.rgb = vec3(0.0); } \n");
++        pl_matrix3x3 to_volume = pl_get_color_mapping_matrix(bt,&dm_volume->prim,
++            PL_INTENT_RELATIVE_COLORIMETRIC);
++        pl_matrix3x3 to_encoding = pl_get_color_mapping_matrix(&dm_volume->prim,
++            pl_raw_primaries_get(dst.primaries),PL_INTENT_RELATIVE_COLORIMETRIC);
++        GLSL("color.rgb = clamp("$"*color.rgb,vec3("$"),vec3("$")); \n"
++             "color.rgb = "$"*color.rgb; \n", SH_MAT3(to_volume),
++             SH_FLOAT(dm_volume->min_luma/PL_COLOR_SDR_WHITE),
++             SH_FLOAT(dm_volume->max_luma/PL_COLOR_SDR_WHITE),SH_MAT3(to_encoding));
++        // Invalid-only safe operands do not constitute an accepted fallback.
++        // Sticky alpha validity is emitted AFTER the physical gamut/PQ stage.
++        // Exactly one physical-volume RGB clip, no second IPT gamut mapper.
++        goto done;
++    } else if (rgb_active) {
+         struct pl_dovi_dm_rgb_curve c;
+         if (!pl_dovi_dm_rgb_prepare(args->dovi_dm, dm_volume, &c)) {
+             SH_FAIL(sh, "Invalid explicit RGB PQ-pre curve");
+@@ -2221,6 +2292,8 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+ 
+ done:
+     pl_shader_delinearize(sh, &dst);
++    if (sq_active)
++        GLSL("if (!sq_valid) color.a = 0.0; \n");
+     GLSL("}\n");
+ }
+ 
+diff --git a/src/tests/dovi_dm_sqrtsum.c b/src/tests/dovi_dm_sqrtsum.c
+new file mode 100644
+index 0000000..dd20424
+--- /dev/null
++++ b/src/tests/dovi_dm_sqrtsum.c
+@@ -0,0 +1,148 @@
++/* Deferred ABI368 mathematical/domain/cache regressions; not vendor fixtures.
++ * SPDX-License-Identifier: LGPL-2.1-or-later
++ */
++#include <assert.h>
++#include <math.h>
++#include <string.h>
++#include <libplacebo/renderer.h>
++#ifdef PL_HAVE_VULKAN
++#include <libplacebo/vulkan.h>
++#endif
++
++static struct pl_dovi_dm_metadata metadata(void)
++{
++    return (struct pl_dovi_dm_metadata) {.version=2,.has_l1=true,
++        .origin=PL_DOVI_DM_OFFICIAL_XML,.min_pq=.0196536f,.avg_pq=.272f,.max_pq=.853468f,
++        .source={.min_luma=.005f,.max_luma=4000},.curve=PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM,
++        .open_sop={.version=1,.domain=PL_DOVI_DM_SOP_ABSOLUTE_PQ,
++            .slope=1.005006f,.offset=-.002006f,.power=2000.0f/2007,
++            .chroma_weight=-.0105f,.saturation_gain=-.002f}};
++}
++
++static void scalar_tests(void)
++{
++    struct pl_dovi_dm_metadata dm=metadata();
++    struct pl_hdr_metadata target={.min_luma=0,.max_luma=600,
++        .prim=*pl_raw_primaries_get(PL_COLOR_PRIM_DISPLAY_P3)};
++    struct pl_dovi_dm_rgb_curve c, saved;
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&c) && c.sqrtsum);
++    assert(fabsf(c.weight-1.88583593f)<1e-4f);
++    for(int i=0;i<3;i++) {
++        float q=c.source_pq[i], value=pl_dovi_dm_sqrtsum_curve_eval(&c,q);
++        assert(isfinite(value) && fabsf(value-c.mapped_pq[i])<1e-6f);
++        for(int dir=-1;dir<=1;dir+=2) {
++            float near=pl_dovi_dm_sqrtsum_curve_eval(&c,nextafterf(q,dir<0 ? 0 : 1));
++            assert(isfinite(near) && near>=0 && near<=1);
++        }
++    }
++    assert(pl_dovi_dm_sqrtsum_curve_eval(&c,0)==c.mapped_pq[0]);
++    assert(pl_dovi_dm_sqrtsum_curve_eval(&c,1)==c.mapped_pq[2]);
++    assert(isnan(pl_dovi_dm_sqrtsum_curve_eval(&c,NAN)));
++    assert(isnan(pl_dovi_dm_sqrtsum_curve_eval(&c,-.1f)));
++    float in[3]={1,2,3}, out[3], neutral[3], unchanged[3];
++    assert(pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,out));
++    memcpy(unchanged,out,sizeof(out));
++    dm.open_sop.saturation_gain=0;
++    assert(pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,neutral));
++    assert(memcmp(out,neutral,sizeof(out))!=0); // actual nonzero SG is applied
++    dm.open_sop.chroma_weight=.5f;
++    assert(pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,out));
++    assert(memcmp(out,neutral,sizeof(out))==0); // SG0 exact color bypass
++    in[0]=in[1]=in[2]=0;
++    assert(pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,out));
++    assert(out[0]==0 && out[1]==0 && out[2]==0);
++    memcpy(out,unchanged,sizeof(out));in[0]=-1;
++    assert(!pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,out));
++    assert(memcmp(out,unchanged,sizeof(out))==0);
++    in[0]=NAN;
++    assert(!pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,out));
++    in[0]=in[1]=in[2]=10000;
++    dm.open_sop.slope=1.5f;dm.open_sop.offset=.5f;
++    assert(!pl_dovi_dm_sqrtsum_eval(&c,&dm.open_sop,in,out));
++    assert(memcmp(out,unchanged,sizeof(out))==0); // no PQ cap/fallback
++    dm=metadata();saved=c;
++    dm.source.max_luma=2000;
++    assert(pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    assert(memcmp(&saved,&c,sizeof(c))!=0); // ORIGINAL source max participates
++    for(int bad=0;bad<6;bad++) {
++        dm=metadata();
++        if(bad==0) dm.avg_pq=dm.min_pq;
++        if(bad==1) dm.avg_pq=dm.max_pq;
++        if(bad==2) dm.source.min_luma=NAN;
++        if(bad==3) dm.source.max_luma=dm.source.min_luma;
++        if(bad==4) dm.origin=PL_DOVI_DM_RPU;
++        if(bad==5) dm.open_sop.version=0;
++        assert(!pl_dovi_dm_rgb_prepare(&dm,&target,&c));
++    }
++    dm=metadata();struct pl_tone_map_params tone={.lut_size=4};float lut[4]={1,2,3,4};
++    assert(pl_dovi_dm_prepare(&dm,&target,&tone)==PL_DOVI_DM_L1);
++    assert(!pl_dovi_dm_generate(lut,&tone) && lut[0]==1);
++    pl_tone_map_generate(lut,&tone);
++    for(int i=0;i<4;i++) assert(isnan(lut[i]));
++}
++
++#ifdef PL_HAVE_VULKAN
++static void gpu_tests(void)
++{
++    pl_vulkan vk=pl_vulkan_create(NULL,pl_vulkan_params(.allow_software=true));assert(vk);
++    pl_gpu gpu=vk->gpu;
++    pl_fmt fmt=pl_find_fmt(gpu,PL_FMT_FLOAT,4,32,32,PL_FMT_CAP_SAMPLEABLE|PL_FMT_CAP_RENDERABLE);assert(fmt);
++    float input[8]={.3f,.31f,.32f,1,.5f,.5f,.5f,1};
++    pl_tex src_tex=pl_tex_create(gpu,pl_tex_params(.w=2,.h=1,.format=fmt,.sampleable=true,.initial_data=input));
++    pl_tex dst_tex=pl_tex_create(gpu,pl_tex_params(.w=2,.h=1,.format=fmt,.renderable=true,.host_readable=true));
++    assert(src_tex && dst_tex);
++    struct pl_frame src={.num_planes=1},dst={.num_planes=1};
++    src.planes[0]=(struct pl_plane){.texture=src_tex,.components=4,.component_mapping={0,1,2,3}};
++    dst.planes[0]=(struct pl_plane){.texture=dst_tex,.components=4,.component_mapping={0,1,2,3}};
++    src.repr=dst.repr=(struct pl_color_repr){.sys=PL_COLOR_SYSTEM_RGB,.levels=PL_COLOR_LEVELS_FULL,.alpha=PL_ALPHA_INDEPENDENT};
++    src.color=dst.color=pl_color_space_hdr10;src.dovi_dm=metadata();
++    src.color.hdr=src.dovi_dm.source;
++    src.color.hdr.prim=*pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020);
++    dst.color.hdr=(struct pl_hdr_metadata){.max_luma=600,.prim=*pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020)};
++    dst.dovi_target=(struct pl_dovi_dm_target){.version=1,.generation=1,.description_id=27,.volume=dst.color.hdr};
++    struct pl_render_params p=pl_render_default_params;
++    p.peak_detect_params=NULL;p.dither_params=NULL;p.deband_params=NULL;p.sigmoid_params=NULL;
++    p.upscaler=p.downscaler=NULL;p.background=PL_CLEAR_SKIP;p.background_transparency=1;
++    p.blend_params=NULL;p.blend_against_tiles=false;p.skip_target_clearing=true;
++    p.hooks=NULL;p.num_hooks=0;p.lut=NULL;p.distort_params=NULL;
++    p.preserve_mixing_cache=true;p.skip_caching_single_frame=false;
++    pl_renderer rr=pl_renderer_create(NULL,gpu);assert(rr);
++    float out[8],fresh[8];
++    assert(pl_render_image(rr,&src,&dst,&p));
++    assert(pl_tex_download(gpu,pl_tex_transfer_params(.tex=dst_tex,.ptr=out)));
++    assert(out[3]==1 && out[7]==1);
++    const struct pl_frame *frames[]={&src};uint64_t signatures[]={123};float timestamps[]={0};
++    struct pl_frame_mix mix={.num_frames=1,.frames=frames,.signatures=signatures,.timestamps=timestamps,.vsync_duration=1.0f/24};
++    assert(pl_render_image_mix(rr,&mix,&dst,&p));
++    for(int change=0;change<4;change++) {
++        if(change==0) src.dovi_dm.source.max_luma=2000;
++        if(change==1) src.dovi_dm.source.min_luma=.01f;
++        if(change==2) src.dovi_dm.open_sop.saturation_gain=.1f;
++        if(change==3) dst.dovi_target.description_id++;
++        assert(pl_render_image_mix(rr,&mix,&dst,&p));
++        assert(pl_tex_download(gpu,pl_tex_transfer_params(.tex=dst_tex,.ptr=out)));
++        pl_renderer other=pl_renderer_create(NULL,gpu);assert(other);
++        assert(pl_render_image_mix(other,&mix,&dst,&p));
++        assert(pl_tex_download(gpu,pl_tex_transfer_params(.tex=dst_tex,.ptr=fresh)));
++        for(int i=0;i<8;i++) assert(isfinite(out[i]) && fabsf(out[i]-fresh[i])<1e-5f);
++        pl_renderer_destroy(&other);
++    }
++    // Intentional scalar-SOP PQ>1: output alpha must reach rejection channel,
++    // not be hidden by physical clip, delinearize, background or output alpha.
++    src.dovi_dm.open_sop.slope=1.5f;src.dovi_dm.open_sop.offset=.5f;
++    assert(pl_render_image(rr,&src,&dst,&p));
++    assert(pl_tex_download(gpu,pl_tex_transfer_params(.tex=dst_tex,.ptr=out)));
++    assert(out[7]==0);
++    assert(pl_renderer_get_errors(rr).errors==PL_RENDER_ERR_NONE);
++    pl_renderer_destroy(&rr);pl_tex_destroy(gpu,&src_tex);pl_tex_destroy(gpu,&dst_tex);pl_vulkan_destroy(&vk);
++}
++#endif
++
++int main(void)
++{
++    scalar_tests();
++#ifdef PL_HAVE_VULKAN
++    gpu_tests();
++#endif
++    return 0;
++}
+-- 
+2.54.0 (Apple Git-157)
+
+
+From f3b1d3fceb2dfb8343ef36405e3ff07ea232daab Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@localhost>
+Date: Sun, 18 Oct 2026 02:19:36 -0400
+Subject: [PATCH 8/8] tests: use current background and border API for
+ validity-channel regressions
+
+---
+ src/tests/dovi_dm_sqrtsum.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/tests/dovi_dm_sqrtsum.c b/src/tests/dovi_dm_sqrtsum.c
+index dd20424..35ff57c 100644
+--- a/src/tests/dovi_dm_sqrtsum.c
++++ b/src/tests/dovi_dm_sqrtsum.c
+@@ -103,7 +103,7 @@ static void gpu_tests(void)
+     struct pl_render_params p=pl_render_default_params;
+     p.peak_detect_params=NULL;p.dither_params=NULL;p.deband_params=NULL;p.sigmoid_params=NULL;
+     p.upscaler=p.downscaler=NULL;p.background=PL_CLEAR_SKIP;p.background_transparency=1;
+-    p.blend_params=NULL;p.blend_against_tiles=false;p.skip_target_clearing=true;
++    p.blend_params=NULL;p.border=PL_CLEAR_SKIP; // deprecated tile/clearing flags default false
+     p.hooks=NULL;p.num_hooks=0;p.lut=NULL;p.distort_params=NULL;
+     p.preserve_mixing_cache=true;p.skip_caching_single_frame=false;
+     pl_renderer rr=pl_renderer_create(NULL,gpu);assert(rr);
+-- 
+2.54.0 (Apple Git-157)
+

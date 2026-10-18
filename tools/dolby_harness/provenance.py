@@ -22,7 +22,9 @@ FRONTEND_INPUTS = ('tools/dolby_harness/harness.py',
                    'tools/dolby_harness/contracts.py',
                    'tools/dolby_harness/metric.py',
                    'tools/dolby_harness/provenance.py',
-                   'tools/dolby_harness/postreshape.py')
+                   'tools/dolby_harness/postreshape.py',
+                   'tools/dolby_harness/authored_master.py',
+                   'tools/dolby_harness/master_pixels.py')
 
 
 def sha_bytes(data):

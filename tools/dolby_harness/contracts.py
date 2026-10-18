@@ -195,28 +195,48 @@ def source_target(s, t):
 
 def input_manifest(path, snapshot=None):
     obj = parse_json(Path(path).read_bytes() if snapshot is None else snapshot)
-    if not isinstance(obj, dict) or type(obj.get('schema')) is not int or obj['schema'] not in (1, 2):
+    if not isinstance(obj, dict) or type(obj.get('schema')) is not int or obj['schema'] not in (1, 2, 3):
         raise ValueError('unknown harness schema')
-    keys(obj, 'schema frame source target metadata' + (' stage' if obj['schema'] == 2 else ''))
+    keys(obj, 'schema frame source target metadata' + (' stage' if obj['schema'] in (2, 3) else ''))
     if obj['schema'] == 2 and obj['stage'] != 'post-reshape':
         raise ValueError('unknown display-management stage')
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import STAGE
+        if obj['stage'] != STAGE:
+            raise ValueError('unknown authored-master stage')
     f = obj['frame']
     keys(f, 'input width height index pts content_id')
-    w, h = integer(f['width'], 1, 3840), integer(f['height'], 1, 2160)
-    if w * h > MAX_PIXELS:
+    w, h = integer(f['width'], 1, 4096 if obj['schema'] == 3 else 3840), integer(f['height'], 1, 2160)
+    if w * h > (4096 * 2160 if obj['schema'] == 3 else MAX_PIXELS):
         raise ValueError('stage1 frame size bound exceeded')
     integer(f['index'])
     text(f['content_id'])
     keys(f['pts'], 'num den')
     integer(f['pts']['num'], -2**53 + 1)
     integer(f['pts']['den'], 1)
-    p = bound_file(Path(path).parent, f['input'])
-    pixels(p, w, h, f['input']['sha256'])
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import snapshot as master_snapshot
+        from tools.dolby_harness.authored_master import pixel_samples
+        p, frame_raw = master_snapshot(Path(path).parent, f['input'], w * h * 12)
+        if len(frame_raw) != w * h * 12:
+            raise ValueError('exact tightly packed RGB-f32le byte count required')
+        pixel_samples(frame_raw)
+        del frame_raw
+    else:
+        p = bound_file(Path(path).parent, f['input'])
+        pixels(p, w, h, f['input']['sha256'])
     s = obj['source']
     t = obj['target']
-    source_target(s, t)
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import source_target as master_source_target
+        master_source_target(s, t)
+    else:
+        source_target(s, t)
     metadata = None
-    if obj['schema'] == 2:
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import metadata as master_metadata
+        metadata = master_metadata(Path(path).parent, obj['metadata'], obj)
+    elif obj['schema'] == 2:
         if s['system'] != 'rgb' or s['range'] != 'full':
             raise ValueError('post-reshape requires explicit full-range RGB PQ')
         from tools.dolby_harness.postreshape import metadata as postreshape_metadata
@@ -240,6 +260,12 @@ def alignment(obj, metadata=None):
             'metadata_sha256': m['export']['sha256'] if m else None}
     if obj['schema'] == 1:
         result['rpu_sha256'] = m['rpu']['sha256'] if m else None
+    elif obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import IDENTITIES
+        if metadata is None:
+            raise ValueError('validated authored-master metadata required for alignment')
+        for key in IDENTITIES.split():
+            result[key] = metadata[key]
     else:
         if metadata is None:
             raise ValueError('validated post-reshape metadata required for alignment')
@@ -277,22 +303,33 @@ def postreshape_alignment(a):
 def result_manifest(path, snapshot=None):
     obj = parse_json(Path(path).read_bytes() if snapshot is None else snapshot)
     keys(obj, 'schema role alignment encoding output provenance')
-    if type(obj['schema']) is not int or obj['schema'] not in (1, 2) or obj['role'] not in ('candidate', 'reference'):
+    if type(obj['schema']) is not int or obj['schema'] not in (1, 2, 3) or obj['role'] not in ('candidate', 'reference'):
         raise ValueError('unknown result contract')
     if obj['encoding'] != ENCODING:
         raise ValueError('reference/candidate encoding mismatch')
     a = obj['alignment']
-    keys(a, 'content_id source_sha256 width height frame_index pts source target metadata_sha256 ' +
-         ('rpu_sha256' if obj['schema'] == 1 else 'stage analysis_sha256 source_manifest_sha256 parser xml_version analysis_version mapping translation'))
-    w, h = integer(a['width'], 1, 3840), integer(a['height'], 1, 2160)
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import IDENTITIES
+        extra = IDENTITIES
+    else:
+        extra = 'rpu_sha256' if obj['schema'] == 1 else 'stage analysis_sha256 source_manifest_sha256 parser xml_version analysis_version mapping translation'
+    keys(a, 'content_id source_sha256 width height frame_index pts source target metadata_sha256 ' + extra)
+    w, h = integer(a['width'], 1, 4096 if obj['schema'] == 3 else 3840), integer(a['height'], 1, 2160)
     text(a['content_id'])
     digest(a['source_sha256'])
     integer(a['frame_index'])
     keys(a['pts'], 'num den')
     integer(a['pts']['num'], -2**53 + 1)
     integer(a['pts']['den'], 1)
-    source_target(a['source'], a['target'])
-    if obj['schema'] == 2:
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import source_target as master_source_target, validate_alignment
+        master_source_target(a['source'], a['target'])
+        validate_alignment(a)
+    else:
+        source_target(a['source'], a['target'])
+    if obj['schema'] == 3:
+        pass  # Already checked through the separate authored-master contract.
+    elif obj['schema'] == 2:
         postreshape_alignment(a)
     elif a['source']['system'] == 'dolbyvision':
         digest(a['metadata_sha256'])
@@ -301,5 +338,8 @@ def result_manifest(path, snapshot=None):
         raise ValueError('unexpected metadata identity')
     if not isinstance(obj['provenance'], dict) or not obj['provenance']:
         raise ValueError('renderer/reference provenance required')
+    if obj['schema'] == 3:
+        from tools.dolby_harness.authored_master import pixel_samples, validate_result
+        return obj, pixel_samples(validate_result(Path(path).parent, obj))
     p = bound_file(Path(path).parent, obj['output'])
     return obj, pixels(p, w, h, obj['output']['sha256'])

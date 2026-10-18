@@ -1,0 +1,677 @@
+From eac19259d1ceda0a5124592c97e720762bfd5fe4 Mon Sep 17 00:00:00 2001
+From: HDR Contributor <hdr-contributor@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 15:13:38 -0400
+Subject: [PATCH 3/3] dovi: add explicit OPEN analytic PQ-Hermite and typed
+ target-PQ SOP
+
+---
+ meson.build                      |   1 +
+ src/dovi_dm.c                    | 155 ++++++++++++++++++++++++++++-
+ src/include/libplacebo/dovi_dm.h |  45 ++++++++-
+ src/renderer.c                   |  44 +++++++-
+ src/shaders/colorspace.c         |  81 ++++++++++++++-
+ src/tests/dovi_dm.c              | 166 +++++++++++++++++++++++++++++++
+ 6 files changed, 484 insertions(+), 8 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 71509ff..cf7a0b2 100644
+--- a/meson.build
++++ b/meson.build
+@@ -12,6 +12,7 @@ project('libplacebo', ['c', 'cpp'],
+     7,
+     # API version
+     {
++      '362': 'private OPEN analytic PQ-Hermite and typed target-PQ SOP candidate',
+       '361': 'experimental frame-owned open Dolby DM and explicit average presence',
+       '360': 'add pl_d3d11_swapchain_params.{alpha,color}_bits',
+       '359': 'add pl_vulkan_swapchain_params.{alpha,color}_bits',
+diff --git a/src/dovi_dm.c b/src/dovi_dm.c
+index 8c5b0d7..264a28a 100644
+--- a/src/dovi_dm.c
++++ b/src/dovi_dm.c
+@@ -12,13 +12,30 @@ static bool pq_valid(float v)
+     return isfinite(v) && v >= 0.0f && v <= 1.0f;
+ }
+ 
++static void hermite_map(float *lut, const struct pl_tone_map_params *p)
++{
++    struct pl_dovi_dm_hermite c;
++    bool valid = pl_dovi_dm_hermite_prepare((struct pl_dovi_dm_pq_anchors) {
++        p->input_min, p->input_avg, p->input_max },
++        (struct pl_dovi_dm_pq_bounds) { p->output_min, p->output_max }, &c);
++    for (size_t i = 0; i < p->lut_size; i++)
++        lut[i] = valid ? pl_dovi_dm_hermite_eval(&c, lut[i]) : NAN;
++}
++
++// Distinct private function identity: prepare/generate must never silently
++// evaluate the rational curve when a caller explicitly requested Hermite.
++static const struct pl_tone_map_function open_hermite = {
++    .name = "open-hermite-pq", .description = "OPEN US10600166B2 improved Eq7",
++    .scaling = PL_HDR_PQ, .map = hermite_map,
++};
++
+ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     const struct pl_dovi_dm_metadata *dm, const struct pl_hdr_metadata *target,
+     struct pl_tone_map_params *tone)
+ {
+     if (!dm || !dm->version)
+         return PL_DOVI_DM_ABSENT;
+-    if (dm->version != 1 ||
++    if ((dm->version != 1 && dm->version != 2) ||
+         (dm->origin != PL_DOVI_DM_RPU && dm->origin != PL_DOVI_DM_OFFICIAL_XML) ||
+         dm->num_blocks < 0 || dm->num_blocks > PL_DOVI_DM_MAX_BLOCKS)
+         return PL_DOVI_DM_INVALID;
+@@ -31,12 +48,16 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+         target->min_luma >= target->max_luma || target->max_luma > 10000.0f ||
+         !pl_primaries_valid(&target->prim))
+         return PL_DOVI_DM_INVALID;
+-    if (dm->curve != PL_DOVI_DM_ST2094_10 && dm->curve != PL_DOVI_DM_SPLINE)
++    if (dm->curve != PL_DOVI_DM_ST2094_10 && dm->curve != PL_DOVI_DM_SPLINE &&
++        !(dm->version == 2 && dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ))
++        return PL_DOVI_DM_INVALID;
++    if (dm->version == 2 && !pl_dovi_dm_sop_valid(&dm->open_sop))
+         return PL_DOVI_DM_INVALID;
+ 
+     // Work on a copy so rejected optional data cannot poison the generic mapper.
+     struct pl_tone_map_params t = *tone;
+-    t.function = dm->curve == PL_DOVI_DM_SPLINE ? &pl_tone_map_spline :
++    t.function = dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ ? &open_hermite :
++                 dm->curve == PL_DOVI_DM_SPLINE ? &pl_tone_map_spline :
+                                                 &pl_tone_map_st2094_10;
+     t.param = 0.0f; // use existing constants, not backwards-compat tuning knobs
+     pl_tone_map_params_infer(&t); // sanitize constants, then override inference
+@@ -51,6 +72,10 @@ enum pl_dovi_dm_status pl_dovi_dm_prepare(
+     // A source below the target black still maps to target black, not an
+     // inverted output interval. No inverse peak expansion is allowed.
+     t.output_max = fmaxf(t.output_min, t.output_max);
++    // Dedicated analytic Hermite uses actual physical bounds, NOT min(C,b).
++    // The shader evaluates analytically; generate remains a sampled CPU API.
++    if (dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ)
++        t.output_max = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, target->max_luma);
+     *tone = t;
+     return dm->min_pq == dm->max_pq ? PL_DOVI_DM_FLAT : PL_DOVI_DM_L1;
+ }
+@@ -64,7 +89,7 @@ bool pl_dovi_dm_generate(float *out, const struct pl_tone_map_params *tone)
+         !pq_valid(tone->output_max) || tone->input_min > tone->input_avg ||
+         tone->input_avg > tone->input_max || tone->output_min > tone->output_max ||
+         (tone->function != &pl_tone_map_spline &&
+-         tone->function != &pl_tone_map_st2094_10))
++         tone->function != &pl_tone_map_st2094_10 && tone->function != &open_hermite))
+         return false;
+ 
+     if (tone->input_min == tone->input_max || tone->output_min == tone->output_max) {
+@@ -112,3 +137,125 @@ const char *pl_dovi_dm_status_name(enum pl_dovi_dm_status status)
+     }
+     return "unknown";
+ }
++
++static float physical_clamp(float x, struct pl_dovi_dm_pq_bounds b)
++{
++    return fminf(fmaxf(x, b.min), b.max);
++}
++
++static void hermite_coeffs(float dx, float dy, float m0, float m1, float c[3])
++{
++    c[0] = dx * m0;
++    c[1] = 3 * dy - dx * (2 * m0 + m1);
++    c[2] = -2 * dy + dx * (m0 + m1);
++}
++
++bool pl_dovi_dm_hermite_prepare(struct pl_dovi_dm_pq_anchors s,
++    struct pl_dovi_dm_pq_bounds b, struct pl_dovi_dm_hermite *out)
++{
++    if (!out || !pq_valid(s.min) || !pq_valid(s.mid) || !pq_valid(s.max) ||
++        !pq_valid(b.min) || !pq_valid(b.max) || s.min > s.mid || s.mid > s.max ||
++        b.min >= b.max)
++        return false;
++    struct pl_dovi_dm_hermite c = { .source = s, .target = b };
++    if (s.min == s.max) {
++        c.branch = PL_DOVI_DM_HERMITE_FLAT;
++        c.mapped.min = c.mapped.mid = c.mapped.max = physical_clamp(s.mid, b);
++        *out = c;
++        return true;
++    }
++    // Algebraically equivalent to improved0080-0082 offsets. This form avoids
++    // division by the target span and subtraction of large, similar offsets.
++    const double L = (double) s.mid - s.min, H = (double) s.max - s.mid;
++    const double cutoff = b.min + 0.5 * ((double) b.max - b.min);
++    const double y = s.mid <= cutoff ?
++        fmin(cutoff, fmax(s.mid, b.min + 0.5 * L)) :
++        fmax(cutoff, fmin(s.mid, b.max - 0.5 * H));
++    c.mapped.mid = y;
++    c.mapped.min = fmax(y - L, b.min);
++    c.mapped.max = fmin(y + H, b.max);
++    // Classify BEFORE division, not by an epsilon-shifted source midpoint.
++    const double u = L ? fmin(1.0, (y - b.min) / L) : 0;
++    const double v = H ? fmin(1.0, (b.max - y) / H) : 0;
++    c.slopes[0] = fmin(3 * u, u * u);
++    c.slopes[2] = fmin(fmin(3 * v, 1.0), v * v * v * v);
++    c.slopes[1] = fmin(fmin(3 * u, 3 * v), 1.0 - s.mid + y);
++    if (!L) {
++        c.branch = PL_DOVI_DM_HERMITE_COLLAPSED_TAIL;
++        c.slopes[0] = c.slopes[1] = 0;
++    } else if (!H) {
++        c.branch = PL_DOVI_DM_HERMITE_COLLAPSED_HEAD;
++        c.slopes[1] = c.slopes[2] = 0;
++    }
++    // Rounding can collapse a mapped segment; a constant interval must have
++    // both adjacent slopes zero (explicit engineering policy).
++    if (c.mapped.min == c.mapped.mid)
++        c.slopes[0] = c.slopes[1] = 0;
++    if (c.mapped.mid == c.mapped.max)
++        c.slopes[1] = c.slopes[2] = 0;
++    c.identity = L && H && b.min <= s.min && s.max <= b.max;
++    if (c.identity) {
++        c.mapped = s;
++        c.slopes[0] = c.slopes[1] = c.slopes[2] = 1;
++    }
++    hermite_coeffs(s.mid - s.min, c.mapped.mid - c.mapped.min,
++                   c.slopes[0], c.slopes[1], c.coeffs[0]);
++    hermite_coeffs(s.max - s.mid, c.mapped.max - c.mapped.mid,
++                   c.slopes[1], c.slopes[2], c.coeffs[1]);
++    for (int i = 0; i < 3; i++) {
++        if (!isfinite(c.slopes[i]) || c.slopes[i] < 0 ||
++            !isfinite(c.coeffs[0][i]) || !isfinite(c.coeffs[1][i]))
++            return false;
++    }
++    *out = c;
++    return true;
++}
++
++float pl_dovi_dm_hermite_eval(const struct pl_dovi_dm_hermite *c, float x)
++{
++    if (!c || !isfinite(x))
++        return NAN;
++    const struct pl_dovi_dm_pq_anchors s = c->source, y = c->mapped;
++    float value;
++    if (c->identity) {
++        value = x;
++    } else if (c->branch == PL_DOVI_DM_HERMITE_FLAT) {
++        value = y.mid;
++    } else if (x == s.mid) {
++        value = y.mid;
++    } else if (x <= s.min) {
++        value = y.min + (x - s.min) * c->slopes[0];
++    } else if (x >= s.max) {
++        value = y.max + (x - s.max) * c->slopes[2];
++    } else {
++        int i = x < s.mid ? 0 : 1;
++        float t = i ? (x - s.mid) / (s.max - s.mid) :
++                      (x - s.min) / (s.mid - s.min);
++        const float *k = c->coeffs[i];
++        value = (i ? y.mid : y.min) + t * (k[0] + t * (k[1] + t * k[2]));
++    }
++    // Physical output policy, not part of the unbounded patent continuations.
++    return physical_clamp(value, c->target);
++}
++
++bool pl_dovi_dm_sop_valid(const struct pl_dovi_dm_sop *s)
++{
++    return s && (!s->version || (s->version == 1 &&
++        s->domain == PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ &&
++        isfinite(s->slope) && s->slope >= 0.5f && s->slope <= 1.5f &&
++        isfinite(s->offset) && s->offset >= -0.5f && s->offset <= 0.5f &&
++        isfinite(s->power) && s->power >= 0.5f && s->power <= 1.5f));
++}
++
++float pl_dovi_dm_sop_eval(const struct pl_dovi_dm_sop *s,
++    struct pl_dovi_dm_pq_bounds b, float y)
++{
++    if (!pl_dovi_dm_sop_valid(s) || !isfinite(y) || !pq_valid(b.min) ||
++        !pq_valid(b.max) || b.min >= b.max)
++        return NAN;
++    if (!s->version || (s->slope == 1 && s->offset == 0 && s->power == 1))
++        return y; // exact identity preserves L1 bytes, even outside bounds
++    float z = (y - b.min) / (b.max - b.min);
++    z = fminf(fmaxf(s->slope * z + s->offset, 0), 1);
++    return b.min + (b.max - b.min) * powf(z, s->power);
++}
+diff --git a/src/include/libplacebo/dovi_dm.h b/src/include/libplacebo/dovi_dm.h
+index 80acf7a..f529094 100644
+--- a/src/include/libplacebo/dovi_dm.h
++++ b/src/include/libplacebo/dovi_dm.h
+@@ -24,6 +24,7 @@ enum pl_dovi_dm_origin {
+ enum pl_dovi_dm_curve {
+     PL_DOVI_DM_ST2094_10, // existing rational curve/knee, with real NITS scaling
+     PL_DOVI_DM_SPLINE,   // diagnostic B: existing spline with explicit DM bounds
++    PL_DOVI_DM_OPEN_HERMITE_PQ, // US10600166B2 improved midpoint, analytic Eq7
+ };
+ 
+ #define PL_DOVI_DM_MAX_BLOCKS 32
+@@ -39,8 +40,20 @@ struct pl_dovi_dm_block {
+     bool optional_presence_known;
+ };
+ 
++// Actual factors, NOT stored XML/raw-RPU codes or deltas. Only the explicitly
++// named OPEN normalized-PQ embodiment is supported. Version zero is absent.
++enum pl_dovi_dm_sop_domain {
++    PL_DOVI_DM_SOP_UNSPECIFIED,
++    PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ,
++};
++struct pl_dovi_dm_sop {
++    uint32_t version; // 1
++    enum pl_dovi_dm_sop_domain domain;
++    float slope, offset, power;
++};
++
+ struct pl_dovi_dm_metadata {
+-    uint32_t version; // 1, or 0 for absent
++    uint32_t version; // 1 (legacy L1), 2 (OPEN candidate), or 0 for absent
+     enum pl_dovi_dm_origin origin;
+     uint64_t stream_id, frame_id; // caller's stable content/sequence identity
+     bool has_l1; // min/average zero are present, not missing-value sentinels
+@@ -50,6 +63,7 @@ struct pl_dovi_dm_metadata {
+     enum pl_dovi_dm_curve curve;
+     int num_blocks;
+     struct pl_dovi_dm_block blocks[PL_DOVI_DM_MAX_BLOCKS];
++    struct pl_dovi_dm_sop open_sop; // used only by version2, copied with frame
+ };
+ 
+ enum pl_dovi_dm_status {
+@@ -84,5 +98,34 @@ PL_API enum pl_dovi_dm_status pl_dovi_dm_prepare(
+ PL_API bool pl_dovi_dm_generate(float *out, const struct pl_tone_map_params *tone);
+ PL_API const char *pl_dovi_dm_status_name(enum pl_dovi_dm_status status);
+ 
++// Typed normalized PQ inputs. Defaults are frozen: preservation .5/.5,
++// cutoff .5, contrast1, powers2/4. No consumer-CM identity is asserted.
++struct pl_dovi_dm_pq_anchors { float min, mid, max; };
++struct pl_dovi_dm_pq_bounds { float min, max; };
++enum pl_dovi_dm_hermite_branch {
++    PL_DOVI_DM_HERMITE_REGULAR,
++    PL_DOVI_DM_HERMITE_FLAT,
++    PL_DOVI_DM_HERMITE_COLLAPSED_TAIL,
++    PL_DOVI_DM_HERMITE_COLLAPSED_HEAD,
++};
++struct pl_dovi_dm_hermite {
++    struct pl_dovi_dm_pq_anchors source, mapped;
++    struct pl_dovi_dm_pq_bounds target;
++    float slopes[3]; // dy_PQ/dx_PQ; central derivative explicitly available
++    // Horner coefficients for y0+t*(c0+t*(c1+t*c2)), t in [0,1].
++    float coeffs[2][3];
++    enum pl_dovi_dm_hermite_branch branch;
++    bool identity;
++};
++// Reject invalid/unordered/nonfinite inputs before division. Engineering
++// policy: flat source constant clamp(mid); omit a collapsed segment and zero
++// its endpoint/shared slopes. Final target clamp is separate from Eq7 tails.
++PL_API bool pl_dovi_dm_hermite_prepare(struct pl_dovi_dm_pq_anchors source,
++    struct pl_dovi_dm_pq_bounds target, struct pl_dovi_dm_hermite *out);
++PL_API float pl_dovi_dm_hermite_eval(const struct pl_dovi_dm_hermite *curve, float x);
++PL_API bool pl_dovi_dm_sop_valid(const struct pl_dovi_dm_sop *sop);
++PL_API float pl_dovi_dm_sop_eval(const struct pl_dovi_dm_sop *sop,
++    struct pl_dovi_dm_pq_bounds target, float y);
++
+ PL_API_END
+ #endif
+diff --git a/src/renderer.c b/src/renderer.c
+index 396fbad..a675855 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -27,6 +27,7 @@
+ 
+ struct cached_frame {
+     uint64_t signature;
++    uint64_t dovi_signature; // value-owned L1/SOP/physical target, never pointers
+     uint64_t params_hash; // for detecting `pl_render_params` changes
+     struct pl_color_space color;
+     struct pl_icc_profile profile;
+@@ -3669,6 +3670,43 @@ static struct params_info render_params_info(const struct pl_render_params *para
+     return info;
+ }
+ 
++static uint64_t dovi_signature(const struct pl_dovi_dm_metadata *dm,
++                               const struct pl_dovi_dm_target *target)
++{
++    if (!dm->version)
++        return 0; // preserves ordinary cache keys and resets after a DM frame
++    uint64_t h = 0;
++#define DM_HASH(x) pl_hash_merge(&h, pl_var_hash(x))
++    DM_HASH(dm->version);
++    DM_HASH(dm->origin);
++    DM_HASH(dm->stream_id);
++    DM_HASH(dm->frame_id);
++    DM_HASH(dm->has_l1);
++    DM_HASH(dm->min_pq);
++    DM_HASH(dm->avg_pq);
++    DM_HASH(dm->max_pq);
++    DM_HASH(dm->curve);
++    if (dm->version == 2) {
++        DM_HASH(dm->open_sop.version);
++        DM_HASH(dm->open_sop.domain);
++        DM_HASH(dm->open_sop.slope);
++        DM_HASH(dm->open_sop.offset);
++        DM_HASH(dm->open_sop.power);
++    }
++    DM_HASH(target->version);
++    DM_HASH(target->generation);
++    DM_HASH(target->description_id);
++    DM_HASH(target->volume.min_luma);
++    DM_HASH(target->volume.max_luma);
++    const struct pl_raw_primaries *p = &target->volume.prim;
++    DM_HASH(p->red.x); DM_HASH(p->red.y);
++    DM_HASH(p->green.x); DM_HASH(p->green.y);
++    DM_HASH(p->blue.x); DM_HASH(p->blue.y);
++    DM_HASH(p->white.x); DM_HASH(p->white.y);
++#undef DM_HASH
++    return h;
++}
++
+ #define MAX_MIX_FRAMES 16
+ 
+ bool pl_render_image_mix(pl_renderer rr, const struct pl_frame_mix *images,
+@@ -3837,7 +3875,10 @@ retry:
+ 
+         // Check to see if we can blindly reuse this cache entry. This is the
+         // case if either the params are compatible, or the user doesn't care
+-        bool can_reuse = f->tex;
++        uint64_t dm_sig = dovi_signature(&img->dovi_dm, &target->dovi_target);
++        // DM changes invalidate even preserve_mixing_cache. A retained image
++        // signature is not a licence to retain a different output transform.
++        bool can_reuse = f->tex && f->dovi_signature == dm_sig;
+         bool strict_reuse = skip_cache || single_frame ||
+                             !params->preserve_mixing_cache;
+         if (can_reuse && strict_reuse) {
+@@ -3938,6 +3979,7 @@ retry:
+                           &shift);
+ 
+             f->params_hash = par_info.hash;
++            f->dovi_signature = dm_sig;
+             f->crop = img->crop;
+             f->color = inter_pass.img.color;
+             f->comps = inter_pass.img.comps;
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 43cf3a0..a891173 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1606,6 +1606,47 @@ static void fill_gamut_lut(void *data, const struct sh_lut_params *params)
+     pl_free(tmp);
+ }
+ 
++// Analytic evaluation shares prepared float coefficients with the CPU core.
++// No uniform LUT approximation of B/slopes and no input-anchor clipping. All
++// uniforms are value-bound on each shader dispatch, not pointer-keyed state.
++static ident_t open_hermite_shader(pl_shader sh, const struct pl_dovi_dm_hermite *c)
++{
++    ident_t fn = sh_fresh(sh, "open_hermite_pq");
++    GLSLH("float "$"(float x) { float y; \n", fn);
++    if (c->identity) {
++        GLSLH("y = x; \n");
++    } else if (c->branch == PL_DOVI_DM_HERMITE_FLAT) {
++        GLSLH("y = "$"; \n", SH_FLOAT(c->mapped.mid));
++    } else {
++        GLSLH("if (x == "$") y = "$"; \n"
++              "else if (x <= "$") y = "$" + (x - "$") * "$"; \n"
++              "else if (x >= "$") y = "$" + (x - "$") * "$"; \n",
++              SH_FLOAT(c->source.mid), SH_FLOAT(c->mapped.mid),
++              SH_FLOAT(c->source.min), SH_FLOAT(c->mapped.min),
++              SH_FLOAT(c->source.min), SH_FLOAT(c->slopes[0]),
++              SH_FLOAT(c->source.max), SH_FLOAT(c->mapped.max),
++              SH_FLOAT(c->source.max), SH_FLOAT(c->slopes[2]));
++        // Do not emit any division for an omitted segment, even on a branch
++        // which would not execute. This also keeps generated SPIR-V finite.
++        for (int i = 0; i < 2; i++) {
++            float lo = i ? c->source.mid : c->source.min;
++            float hi = i ? c->source.max : c->source.mid;
++            if (lo == hi)
++                continue;
++            GLSLH("else if (x < "$") { float t = (x - "$") / "$"; \n"
++                  "y = "$" + t * ("$" + t * ("$" + t * "$")); } \n",
++                  SH_FLOAT(hi), SH_FLOAT(lo), SH_FLOAT(hi - lo),
++                  SH_FLOAT(i ? c->mapped.mid : c->mapped.min),
++                  SH_FLOAT(c->coeffs[i][0]), SH_FLOAT(c->coeffs[i][1]),
++                  SH_FLOAT(c->coeffs[i][2]));
++        }
++        GLSLH("else y = "$"; \n", SH_FLOAT(c->mapped.max));
++    }
++    GLSLH("return clamp(y, "$", "$"); } \n",
++          SH_FLOAT(c->target.min), SH_FLOAT(c->target.max));
++    return fn;
++}
++
+ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *params,
+                             const struct pl_color_map_args *args)
+ {
+@@ -1667,6 +1708,17 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         args->dovi_target->version == 1 ? &args->dovi_target->volume : NULL;
+     enum pl_dovi_dm_status dm_status = pl_dovi_dm_prepare(args->dovi_dm, dm_volume, &tone);
+     bool dm_active = dm_status == PL_DOVI_DM_L1 || dm_status == PL_DOVI_DM_FLAT;
++    // Version2 is an explicit diagnostic request, never silently substitute
++    // stock behavior when its payload/target is invalid or missing.
++    if (dm_present && args->dovi_dm->version == 2 && !dm_active) {
++        SH_FAIL(sh, "Invalid explicit OPEN DM payload/target");
++        return;
++    }
++    bool hermite_active = dm_active && args->dovi_dm->curve == PL_DOVI_DM_OPEN_HERMITE_PQ;
++    const struct pl_dovi_dm_sop *sop = dm_active && args->dovi_dm->version == 2 ?
++        &args->dovi_dm->open_sop : NULL;
++    bool sop_active = sop && sop->version &&
++        !(sop->slope == 1 && sop->offset == 0 && sop->power == 1);
+     if (dm_present && !dm_active)
+         PL_WARN(sh, "Open DM fallback: %s", pl_dovi_dm_status_name(dm_status));
+     if (dm_active && !args->state) {
+@@ -1832,11 +1884,23 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+ 
+     if (need_tone_map) {
+         const struct pl_tone_map_function *fun = tone.function;
+-        sh_describef(sh, "%s tone map (%.0f -> %.0f)", fun->name,
++        sh_describef(sh, "%s tone map (%.0f -> %.0f)",
++                     hermite_active ? "OPEN PQ-Hermite" : fun->name,
+                      pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, tone.input_max),
+                      pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, tone.output_max));
+ 
+-        if (dm_active && (tone.input_min == tone.input_max ||
++        if (hermite_active) {
++            struct pl_dovi_dm_hermite curve;
++            if (!pl_dovi_dm_hermite_prepare((struct pl_dovi_dm_pq_anchors) {
++                    tone.input_min, tone.input_avg, tone.input_max },
++                    (struct pl_dovi_dm_pq_bounds) { tone.output_min, tone.output_max }, &curve)) {
++                SH_FAIL(sh, "Invalid OPEN PQ-Hermite curve");
++                return;
++            }
++            ident_t fn = open_hermite_shader(sh, &curve);
++            GLSL("#define tone_map(x) ("$"(x)) \n", fn);
++
++        } else if (dm_active && (tone.input_min == tone.input_max ||
+                           tone.output_min == tone.output_max)) {
+             // Resolve zero/flat intervals before any LUT normalization division.
+             float value = fminf(fmaxf(tone.input_max, tone.output_min), tone.output_max);
+@@ -1973,6 +2037,19 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+         }
+     }
+ 
++    if (sop_active) {
++        // OPEN Eq5/6/7 target-normalized PQ embodiment. Apply only after L1's
++        // existing compensation, so SOP does not affect that compensation.
++        float a = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->min_luma);
++        float b = pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, dm_volume->max_luma) - a;
++        sh_describe(sh, "OPEN target-PQ SOP (chroma/detail unapplied)");
++        GLSL("float open_z = (ipt.x - "$") / "$"; \n"
++             "open_z = clamp("$" * open_z + "$", 0.0, 1.0); \n"
++             "ipt.x = "$" + "$" * pow(open_z, "$"); \n",
++             SH_FLOAT(a), SH_FLOAT(b), SH_FLOAT(sop->slope), SH_FLOAT(sop->offset),
++             SH_FLOAT(a), SH_FLOAT(b), SH_FLOAT(sop->power));
++    }
++
+     if (need_gamut_map) {
+         const struct pl_gamut_map_function *fun = gamut.function;
+         sh_describef(sh, "gamut map (%s)", fun->name);
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index 566a058..33c8481 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -5,9 +5,175 @@
+ #include <math.h>
+ #include <string.h>
+ #include <libplacebo/dovi_dm.h>
++#include <libplacebo/renderer.h>
++#ifdef PL_HAVE_VULKAN
++#include <libplacebo/vulkan.h>
++#endif
++
++// Mathematical coordinates/policies only; these are NOT authored metadata or
++// vendor reference fixtures. Original-content integration lives in the Python
++// tests and must use the retained real input, never these scalar controls.
++static void hermite_tests(void)
++{
++    struct pl_dovi_dm_hermite c;
++    struct pl_dovi_dm_pq_anchors s = {0, 0.4f, 1};
++    struct pl_dovi_dm_pq_bounds b = {0, 0.1f};
++    assert(pl_dovi_dm_hermite_prepare(s, b, &c));
++    assert(fabsf(c.mapped.mid - 0.05f) < 1e-7f); // cosine counterexample
++    assert(c.mapped.min == 0 && c.mapped.max == b.max);
++    // Exact derivative minima of each quadratic, not monotonic sample repair.
++    for (int j = 0; j < 2; j++) {
++        const float *k = c.coeffs[j];
++        double qa = 3.0 * k[2], qb = 2.0 * k[1], qc = k[0];
++        double minimum = fmin(qc, qa + qb + qc);
++        if (qa > 0) {
++            double t = -qb / (2 * qa);
++            if (t > 0 && t < 1)
++                minimum = fmin(minimum, (qa * t + qb) * t + qc);
++        }
++        assert(minimum >= -1e-8); // float coefficient rounding tolerance only
++    }
++    assert(pl_dovi_dm_hermite_eval(&c, s.min) == c.mapped.min);
++    assert(pl_dovi_dm_hermite_eval(&c, s.mid) == c.mapped.mid);
++    assert(pl_dovi_dm_hermite_eval(&c, s.max) == c.mapped.max);
++    s = (struct pl_dovi_dm_pq_anchors) {0.1f, 0.3f, 0.5f};
++    b = (struct pl_dovi_dm_pq_bounds) {0, 0.8f};
++    assert(pl_dovi_dm_hermite_prepare(s, b, &c) && c.identity);
++    assert(pl_dovi_dm_hermite_eval(&c, 0.75f) == 0.75f); // linear tail
++    b = (struct pl_dovi_dm_pq_bounds) {0.6f, 0.9f};
++    assert(pl_dovi_dm_hermite_prepare(s, b, &c));
++    assert(c.mapped.max > s.max); // retain actual target, not min(C,b)
++    for (int branch = 0; branch < 3; branch++) {
++        s = branch == 0 ? (struct pl_dovi_dm_pq_anchors) {0, 0, 0} :
++            branch == 1 ? (struct pl_dovi_dm_pq_anchors) {0, 0, 1} :
++                          (struct pl_dovi_dm_pq_anchors) {0, 1, 1};
++        assert(pl_dovi_dm_hermite_prepare(s, b, &c));
++        float prev = b.min;
++        for (int i = 0; i <= 1000; i++) {
++            float y = pl_dovi_dm_hermite_eval(&c, i / 1000.0f);
++            assert(isfinite(y) && y >= b.min && y <= b.max);
++            assert(y + 1e-6f >= prev);
++            prev = y;
++        }
++    }
++    s = (struct pl_dovi_dm_pq_anchors) {0.2f, 0.1f, 0.9f};
++    assert(!pl_dovi_dm_hermite_prepare(s, b, &c));
++    s.min = NAN;
++    assert(!pl_dovi_dm_hermite_prepare(s, b, &c));
++    s = (struct pl_dovi_dm_pq_anchors) {0, 0.3f, 1};
++    b.max = b.min;
++    assert(!pl_dovi_dm_hermite_prepare(s, b, &c));
++}
++
++static void sop_tests(void)
++{
++    struct pl_dovi_dm_sop s = { .version = 1,
++        .domain = PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ,
++        .slope = 1, .offset = 0, .power = 1 };
++    struct pl_dovi_dm_pq_bounds b = {0.2f, 0.7f};
++    assert(pl_dovi_dm_sop_eval(&s, b, 0.456f) == 0.456f);
++    s.slope = 1.014f; s.offset = -0.014f; s.power = 2000.0f / 2001;
++    assert(pl_dovi_dm_sop_eval(&s, b, b.min) == b.min);
++    assert(pl_dovi_dm_sop_eval(&s, b, b.max) == b.max);
++    float y = 0.45f, z = (y - b.min) / (b.max - b.min);
++    float expected = b.min + (b.max - b.min) * powf(s.slope * z + s.offset, s.power);
++    assert(fabsf(pl_dovi_dm_sop_eval(&s, b, y) - expected) < 1e-7f);
++    s.domain = PL_DOVI_DM_SOP_UNSPECIFIED;
++    assert(!pl_dovi_dm_sop_valid(&s) && isnan(pl_dovi_dm_sop_eval(&s, b, y)));
++    s.domain = PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ;
++    s.power = NAN;
++    assert(!pl_dovi_dm_sop_valid(&s));
++}
++
++#ifdef PL_HAVE_VULKAN
++static void readback(pl_gpu gpu, pl_tex tex, float out[16])
++{
++    assert(pl_tex_download(gpu, pl_tex_transfer_params(.tex = tex, .ptr = out)));
++    for (int i = 0; i < 16; i++)
++        assert(isfinite(out[i]));
++}
++
++// GPU/operator/cache regressions use explicitly synthetic mathematical control
++// vectors, not claimed authored Dolby metadata/reference agreement. No official
++// tool sees them. Execute only in recovery's single post-review affected batch.
++static void shader_cache_tests(void)
++{
++    pl_vulkan vk = pl_vulkan_create(NULL, pl_vulkan_params(.allow_software = true));
++    assert(vk);
++    pl_gpu gpu = vk->gpu;
++    pl_fmt fmt = pl_find_fmt(gpu, PL_FMT_FLOAT, 4, 32, 32,
++                            PL_FMT_CAP_SAMPLEABLE | PL_FMT_CAP_RENDERABLE);
++    assert(fmt);
++    float input[16] = {0.2f,0.2f,0.2f,1, 0.4f,0.4f,0.4f,1,
++                       0.6f,0.6f,0.6f,1, 0.7f,0.7f,0.7f,1};
++    pl_tex src_tex = pl_tex_create(gpu, pl_tex_params(.w=4,.h=1,.format=fmt,
++        .sampleable=true,.initial_data=input));
++    pl_tex dst_tex = pl_tex_create(gpu, pl_tex_params(.w=4,.h=1,.format=fmt,
++        .renderable=true,.host_readable=true));
++    assert(src_tex && dst_tex);
++    struct pl_frame src = {.num_planes=1}, dst = {.num_planes=1};
++    src.planes[0] = (struct pl_plane) {.texture=src_tex,.components=3,.component_mapping={0,1,2,-1}};
++    dst.planes[0] = (struct pl_plane) {.texture=dst_tex,.components=3,.component_mapping={0,1,2,-1}};
++    src.repr = dst.repr = (struct pl_color_repr) {.sys=PL_COLOR_SYSTEM_RGB,
++        .levels=PL_COLOR_LEVELS_FULL,.alpha=PL_ALPHA_NONE};
++    src.color = dst.color = pl_color_space_hdr10;
++    struct pl_hdr_metadata volume = {.min_luma=0,.max_luma=10000,
++        .prim=*pl_raw_primaries_get(PL_COLOR_PRIM_BT_2020)};
++    src.color.hdr = dst.color.hdr = volume;
++    dst.dovi_target = (struct pl_dovi_dm_target) {.version=1,.generation=1,
++        .description_id=1,.volume=volume};
++    src.dovi_dm = (struct pl_dovi_dm_metadata) {.version=2,
++        .origin=PL_DOVI_DM_OFFICIAL_XML,.has_l1=true,.min_pq=0,.avg_pq=0.4f,.max_pq=1,
++        .curve=PL_DOVI_DM_OPEN_HERMITE_PQ};
++    struct pl_render_params params = pl_render_default_params;
++    params.peak_detect_params = NULL; params.dither_params = NULL;
++    params.preserve_mixing_cache = true;
++    params.skip_caching_single_frame = false;
++    pl_renderer rr = pl_renderer_create(NULL, gpu);
++    assert(rr);
++    float plain[16], identity[16], altered[16], fresh[16];
++    assert(pl_render_image(rr,&src,&dst,&params));
++    readback(gpu,dst_tex,plain);
++    src.dovi_dm.open_sop = (struct pl_dovi_dm_sop) {.version=1,
++        .domain=PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ,.slope=1,.power=1};
++    assert(pl_render_image(rr,&src,&dst,&params));
++    readback(gpu,dst_tex,identity);
++    assert(memcmp(plain,identity,sizeof(plain)) == 0); // exact SOP bypass
++    const struct pl_frame *frames[] = {&src};
++    uint64_t signatures[] = {123};
++    float timestamps[] = {0};
++    struct pl_frame_mix mix = {.num_frames=1,.frames=frames,.signatures=signatures,
++        .timestamps=timestamps,.vsync_duration=1.0f/24};
++    assert(pl_render_image_mix(rr,&mix,&dst,&params)); // populate one cache key
++    for (int change = 0; change < 5; change++) {
++        if (change == 0) src.dovi_dm.open_sop.offset = -0.05f; // L1 identity still SOP
++        if (change == 1) src.dovi_dm.avg_pq = 0.25f;
++        if (change == 2) { dst.dovi_target.volume.max_luma=600; dst.dovi_target.generation++; }
++        if (change == 3) { dst.dovi_target.volume.min_luma=0.1f; dst.dovi_target.description_id++; }
++        if (change == 4) src.dovi_dm.version = 0; // missing next frame resets
++        assert(pl_render_image_mix(rr,&mix,&dst,&params));
++        readback(gpu,dst_tex,altered);
++        pl_renderer other = pl_renderer_create(NULL,gpu);
++        assert(other && pl_render_image_mix(other,&mix,&dst,&params));
++        readback(gpu,dst_tex,fresh);
++        for (int i=0; i<16; i++) assert(fabsf(altered[i]-fresh[i]) < 1e-5f);
++        if (change == 0) assert(memcmp(plain,altered,sizeof(plain)) != 0);
++        pl_renderer_destroy(&other);
++    }
++    assert(pl_renderer_get_errors(rr).errors == PL_RENDER_ERR_NONE);
++    pl_renderer_destroy(&rr);
++    pl_tex_destroy(gpu,&src_tex); pl_tex_destroy(gpu,&dst_tex);
++    pl_vulkan_destroy(&vk);
++}
++#endif
+ 
+ int main(void)
+ {
++    hermite_tests();
++    sop_tests();
++#ifdef PL_HAVE_VULKAN
++    shader_cache_tests();
++#endif
+     struct pl_tone_map_params tone = {
+         .function = &pl_tone_map_st2094_10,
+         .constants = { PL_TONE_MAP_CONSTANTS },

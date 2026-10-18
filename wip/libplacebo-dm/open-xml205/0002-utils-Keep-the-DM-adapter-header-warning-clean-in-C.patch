@@ -1,0 +1,53 @@
+From a3ac8a884585bc7832e4cf86da7f68b3ce99030e Mon Sep 17 00:00:00 2001
+From: HDR Engineering Agent <hdr-agent@users.noreply.github.com>
+Date: Tue, 13 Oct 2026 13:43:41 -0400
+Subject: [PATCH 2/3] utils: Keep the DM adapter header warning-clean in C++
+
+---
+ src/include/libplacebo/utils/dovi_dm.h | 20 +++++++++++---------
+ src/tests/include/meson.build          |  1 +
+ 2 files changed, 12 insertions(+), 9 deletions(-)
+
+diff --git a/src/include/libplacebo/utils/dovi_dm.h b/src/include/libplacebo/utils/dovi_dm.h
+index ed146e3..9808c5e 100644
+--- a/src/include/libplacebo/utils/dovi_dm.h
++++ b/src/include/libplacebo/utils/dovi_dm.h
+@@ -49,15 +49,17 @@ static inline bool pl_dovi_dm_from_av(struct pl_dovi_dm_metadata *out,
+     if (!header->disable_residual_flag || color->source_min_pq > 4095 ||
+         color->source_max_pq > 4095 || color->source_min_pq > color->source_max_pq)
+         return false;
+-    struct pl_dovi_dm_metadata dm = {
+-        .version = 1, .origin = PL_DOVI_DM_RPU,
+-        .stream_id = stream_id, .frame_id = frame_id,
+-        .source = {
+-            .min_luma = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, color->source_min_pq / 4095.0f),
+-            .max_luma = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, color->source_max_pq / 4095.0f),
+-        },
+-        .num_blocks = metadata->num_ext_blocks,
+-    };
++    // Keep the header warning-clean in both C and C++. Zero all members
++    // explicitly rather than rely on a partial designated aggregate.
++    struct pl_dovi_dm_metadata dm;
++    memset(&dm, 0, sizeof(dm));
++    dm.version = 1;
++    dm.origin = PL_DOVI_DM_RPU;
++    dm.stream_id = stream_id;
++    dm.frame_id = frame_id;
++    dm.source.min_luma = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, color->source_min_pq / 4095.0f);
++    dm.source.max_luma = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, color->source_max_pq / 4095.0f);
++    dm.num_blocks = metadata->num_ext_blocks;
+     for (int i = 0; i < metadata->num_ext_blocks; i++) {
+         const AVDOVIDmData *ext = av_dovi_get_ext(metadata, i);
+         struct pl_dovi_dm_block *b = &dm.blocks[i];
+diff --git a/src/tests/include/meson.build b/src/tests/include/meson.build
+index b6a9cff..537b676 100644
+--- a/src/tests/include/meson.build
++++ b/src/tests/include/meson.build
+@@ -8,6 +8,7 @@ foreach h : headers
+   if (h.contains('internal') or
+       h.contains('dav1d') and not dav1d.found() or
+       h.contains('libav') and not libav_found or
++      h == 'utils/dovi_dm.h' and not lavu.found() or
+       h.contains('d3d11') and not d3d11_header)
+     continue
+   endif
