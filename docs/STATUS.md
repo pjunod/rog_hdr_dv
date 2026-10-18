@@ -122,13 +122,16 @@ have an explicit zero-black domain gap; one labelled metadata-only extension
 overshoots midtones and was not run on image populations. Sol's bounded public
 source retrieval is now complete with no new automatic contract. Two additional
 metadata-only preparations (mastering-black default spline and standard-offset
-BT2390) were rejected before pixels. A new explicitly hybrid display-endpoint/
-content-knee preparation uses declared0.005/4000nit source endpoints and actual
-shot midpoint metadata with fixed public adaptation0.4: its synthetic714 probes
-raise mids and lower the shoulder, while its256 neutral probe may worsen.
-Astra owns the equation decision; Sol owns ONE new retained-lattice complete
-diagnostic, not native/renderer work. Actual metrics are pending, not presumed
-from transfer probes. See the linked current hypotheses for hashes and limits.
+BT2390) were rejected before pixels. The explicit display-endpoint/content-knee
+hybrid subsequently ran once per retained lattice, all34,560 samples valid:
+256 mean1.306632/p953.107560;714 mean2.095011/p954.435191. Both FAIL; the chain
+is rejected with no extra endpoint variants or renderer promotion. One new
+scalar-HK trim-placement preflight on synthetic colours has too little714
+midtone effect to justify a population run; it is not a measured accuracy result.
+Current: Astra retains equation decisions; Sol's bounded new public-source
+collection targets XML ToneDetail/operator semantics, not another knee search.
+No native/renderer work, unit rerun or holdout access follows from these results.
+See the linked current hypotheses for exact source/receipt hashes and limits.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready

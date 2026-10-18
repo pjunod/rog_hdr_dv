@@ -509,7 +509,7 @@ zero-output/mastering-black curve has a singular boundary. Ward's source still
 does not supply a unique XML detail-to-filter/scale contract. Neither finding
 licenses an arbitrary domain patch, coefficient, filter or repeat experiment.
 
-## Frozen display-endpoint/content-knee hybrid — diagnostic commissioned
+## Frozen display-endpoint/content-knee hybrid — completed and rejected
 
 The earlier mastering-white preflight replaced both the adaptation range and
 the rational white endpoint. These are distinct roles. US8593480 describes
@@ -539,10 +539,58 @@ reference. Preserve that adverse prediction. These are not accuracy results.
 Receipt SHA256:
 `5c4c021e4dedc928ebdc0466545c80769b2647365831f1b1f135bad922a0db23`.
 
-Sol owns one new cached complete-chain diagnostic on both retained development
-lattices, with no baseline rerun, new source/reference acquisition, units,
-native request or holdout access. Its report must preserve every invalid and
-the reconstructed-source qualification on256. There is no parameter grid,
-fallback variant or renderer promotion. Current: await actual metrics before
-the next mathematical/implementation decision. Passing samples alone would
-still not satisfy full-raster, independent evidence or final review gates.
+Sol subsequently completed this exact frozen chain once per retained lattice;
+all34,560 samples were valid on each shot, with exact metadata/preparation
+agreement against the retained preflight. No baseline rerun, new reference,
+units, native request or holdout access occurred:
+
+| Shot | Mean deltaEITP | p95 | Maximum | Result |
+| --- | ---: | ---: | ---: | --- |
+| 256 | 1.3066321788 | 3.1075600862 | 7.6065103658 | FAIL |
+| 714 | 2.0950114609 | 4.4351906108 | 10.5859290973 | FAIL |
+
+256 worsens as anticipated. 714 improves its aggregate relative to MB-Y but
+still fails, with original/nonblack-neutral signed720I=-4.003460 versus
+original/chroma +1.807432. Those marginal populations have different source
+luminances; opposite signs alone do not identify a coupled defect. No extra
+endpoint variant or renderer promotion follows. The256 reconstructed-source
+qualification remains, and each pixel had exactly one physical P3 clip.
+
+Read-only hash verification of Sol's released script and reports, without
+candidate or metric reexecution:
+
+- Script: `bf9f10b467dddc708d1c846369e722e7447bf719d46fdceedb1938fc79590684`.
+- Results: `f0981102bb27a9838687ea542b8e8c8f9d3d18fe332b8808942942ad7921fd65`.
+- Report: `a3d9dfd2e95d69f22fec1ff72094cb8c1f687103e8c415727a904b0626210c99`.
+
+## Scalar-HK trim placement — synthetic preflight only (Astra364)
+
+The corrected-MB IPT/Eq12/HK diagnostics all applied RGB-PQ SOP before the
+perceptual transform. This is distinct from placing SOP on one scalar, as the
+best Y implementation does. The public IPT intensity/chroma architecture admits
+a scalar tone operation, but does not establish this MB/pre-SOP composition as
+the official runtime. One complete new hybrid was frozen for synthetic probes:
+actual RGB-PQ CW/SG without SOP; Ebner/PQ/IPT; HK forward coordinate; actual
+scalar SOP on K; unchanged MB curve; exact inverse HK using original normalized
+chroma; unchanged inverse-domain policy and final P3 clip. No fitted constants.
+
+`astra364_scalar_hk_preflight.py` evaluated only fixed synthetic P3 rays at six
+fixed source luminances, using retained metadata, not development pixels. All
+probes were finite. Relative to the old RGB-pre/HK function on these synthetic
+inputs, the714 seven-ray signed720ITP-I changes at10nit span +0.000029 to
++0.050259, and at300nit -0.031250 to -0.000005. These changes are small compared
+with the retained2-4-unit midtone deficit.256 chroma changes are larger, but
+this does not justify a joint-candidate population run. That request is rejected;
+this finite preflight is not an all-pixel impossibility proof or accuracy result.
+
+Receipt SHA256:
+`09216cd739cb853ec7da21f6ab158e853da6e914c4f9464d1e5930d5e7f56e6d`.
+
+Current: bounded public-source collection specifically for the actual negative
+XML ToneDetail control's operator/weight semantics, not another automatic-knee
+search. ST2094-10's method-independent [0,1] detail factor, raw signed ms_weight
+and its override sentinel, and XML -0.75 are separate contracts. The previously
+failed unweighted Gaussian hybrid must not be rerun or supplied a fitted weight.
+Sol owns only new private collection artifacts; Astra retains all equation
+decisions. No new renderer candidate, full-raster result, final review or package
+acceptance has been obtained. The original remaining gates above still apply.
