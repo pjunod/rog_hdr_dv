@@ -1,11 +1,13 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: rog-hdr-dm-experimental
 Source: https://github.com/pjunod/rog_hdr_dv
-Disclaimer: PREPARATORY RECIPE ONLY. The repository has not selected a grant
- for owner-original utilities/documentation. This notice is not a licence and
- does not satisfy LGPL-2.1 section 6 customer-modification/reverse-engineering
- rights for the combined executable. Do not publish source/binary packages
- until the owner decision and corresponding notices are recorded.
+Comment: The owner selected MIT for original utilities and documentation on
+ 2026-10-18. Existing third-party licences and attribution remain unchanged.
+ The executable is dynamically linked to the private LGPL library. Customer
+ modification and reverse engineering for debugging those modifications are
+ permitted; corresponding-source, shared-library/relinking and other LGPL-2.1
+ section 6 obligations remain applicable. This notice is not evidence of a
+ completed package build or qualification.
 
 Files: library/*
 Copyright: libplacebo authors; see the original per-file notices and library/LICENSE
@@ -19,9 +21,33 @@ License: Apache-2.0-or-MIT
  See the full original LICENSE-APACHE and LICENSE-MIT files retained in the
  pinned dependency source. This stanza does not change upstream terms.
 
-Files: tools/* docs/* packaging/* scripts/* LICENSES.md
+Files: tools/dolby_harness/* docs/* packaging/rog-hdr-dm-experimental/*
+ scripts/reconstruct_mapping.py scripts/prepare_mapping_package.py
+ scripts/prepare_current_baseline_fixture.py tests/* LICENSES.md LICENSE-MIT
+ debian/* PACKAGE-SOURCE.json
 Copyright: respective repository contributors; see original source attribution
-License: LicenseRef-no-public-grant
- No separate public licence grant has been selected. Public visibility does
- not grant redistribution, modification or reverse-engineering rights.
- Owner-input decision t_886b8dbc must resolve this before distribution.
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+Files: wip/libplacebo-dm/*
+Copyright: libplacebo authors and patch contributors; see retained source/mail attribution
+License: LGPL-2.1+
+ Upstream-derived patch material retains the applicable library and per-file
+ notices; it is not relicensed by the original-utility MIT grant. The full
+ library licence is retained in library/LICENSE in the source package.

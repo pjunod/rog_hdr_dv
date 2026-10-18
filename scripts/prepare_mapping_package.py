@@ -47,7 +47,7 @@ def main():
         if (rel.startswith('tools/dolby_harness/') and '/analysis/' not in rel or
                 rel.startswith('wip/libplacebo-dm/') or rel.startswith('packaging/rog-hdr-dm-experimental/') or
                 rel in ('scripts/reconstruct_mapping.py', 'scripts/prepare_mapping_package.py',
-                        'scripts/prepare_current_baseline_fixture.py', 'LICENSES.md') or
+                        'scripts/prepare_current_baseline_fixture.py', 'LICENSES.md', 'LICENSE-MIT') or
                 rel.startswith('tests/') and Path(rel).name in ('test_absolute_sop.py', 'test_authored_master.py',
                     'test_dolby_harness.py', 'test_dolby_postreshape.py', 'test_mapping_package.py',
                     'test_open_dm.py', 'test_original_targets.py', 'test_public_mapping.py', 'test_sqrtsum.py') or

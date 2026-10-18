@@ -15,8 +15,9 @@ These observations remain bound to their original executing sources, not new
 integration renders. Original numerical/native/provenance bytes and library
 tree are preserved; held PR16 history is excluded. Done: scoped transplantation,
 exact public-base library replay and package-relative native consumer compile.
-Current: independent-review source/fixture freeze. Remaining: narrow owner-original
-licence grant decision, final independent review/fixes, ONE affected unit batch/
+Current: independent-review source/fixture freeze, including the owner's scoped
+[MIT grant for original utilities and docs](LICENSES.md). Remaining:
+final independent review/fixes, ONE affected unit batch/
 repository gate, publication/merge, actual versioned Ubuntu source/binary and
 isolated install/rollback. No new units, package execution or physical deployment
 in this preparation. No complete CM/rawRPU/L8/temporal/player/optical claim.

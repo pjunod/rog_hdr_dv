@@ -33,12 +33,18 @@ merge `t_656472e9`, then actual Ubuntu source/binary construction, closure,
 isolated install/rollback `t_c97cbefb`. No unit batch, publication, package
 transaction, Apple TV access or physical display deployment in this phase.
 
-Public-distribution prerequisite: owner-original utility/documentation licence
-is unselected in [LICENSES.md](../LICENSES.md). Owner-input card `t_886b8dbc`
-records the narrow grant question. `LicenseRef-no-public-grant` is a notice of
-missing rights, NOT permission or satisfaction of LGPL2.1 section6. Preparatory
-recipes/compilation continue; final review/distribution awaits the recorded
-decision and corresponding notices. Upstream/vendor terms must not change.
+The owner selected MIT licensing for original utilities and documentation on
+2026-10-18: “Use MIT for the original utilities and docs.” The full grant is
+in [LICENSE-MIT](../LICENSE-MIT), with scope/exclusions in
+[LICENSES.md](../LICENSES.md) and package copyright. Licensing card `t_886b8dbc`
+records the actual owner-message reference and exact included original-file
+inventory in its additive `LICENSE_DECISION.json`; updated review/source
+manifests bind the notice-integrated head without rewriting old receipts.
+The source preparation and binary install recipes carry the full MIT text.
+No upstream/library/vendor material is relicensed. Existing LGPL2.1 section6
+source, shared-library/relinking and customer-modification/debugging
+reverse-engineering obligations remain. Independent review must verify the
+actual notices and eventual package closure; the grant is not package approval.
 
 ## Source closure and attribution
 
@@ -160,7 +166,7 @@ be retried; successful source/reference/metric observations remain immutable.
 
 ### Normal downstream package build
 
-After licence decision, independent review/fixes, single affected batch/gate and
+After independent review/fixes, single affected batch/gate and
 merge, use a fresh source preparation directory and a dependency-complete
 isolated native Ubuntu build root. Prepare from the exact reviewed source:
 

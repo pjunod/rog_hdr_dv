@@ -24,7 +24,7 @@ shutil.copy2(ROOT / 'build/package-consumer/open-dm-render', exe / 'open-dm-rend
 shutil.copy2(ROOT / 'packaging' / P / 'run.py', exe / 'run.py')
 for folder in ('tools/dolby_harness', 'wip/libplacebo-dm'):
     shutil.copytree(ROOT / folder, share / folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-for name in ('LICENSES.md', 'PACKAGE-SOURCE.json'):
+for name in ('LICENSES.md', 'LICENSE-MIT', 'PACKAGE-SOURCE.json'):
     shutil.copy2(ROOT / name, share / name)
 for name in ('SQRTSUM_PQ_Y_POST.md', 'MAPPING_ABI368_DELIVERY.md'):
     (share / 'docs').mkdir(exist_ok=True)

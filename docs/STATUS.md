@@ -10,12 +10,14 @@ Done: scoped transplantation directly on public mainb13ceae3 without heldPR16
 ancestry; original library patch replay to frozen treefb4c3879/all249 hashes;
 unchanged historical compiler/accuracy receipts; separate package-relative
 consumer compile with actual ELF RUNPATH inspection and additive genuine parser
-fixture preparation. Current: freeze source/recipe/validation inputs for review.
-Remaining: final independent review `t_2f09b7c1` (also awaits narrow owner-original
-licence decision `t_886b8dbc`), ONE affected whole-candidate batch/gate and PR/merge
+fixture preparation. The owner selected scoped MIT licensing for original
+utilities/docs; the full grant, package copyright and licence propagation are
+integrated without changing numerical/native/upstream bytes. Current: freeze
+updated source/recipe/validation inputs for independent licence/source review.
+Remaining: final independent review `t_2f09b7c1`, ONE affected whole-candidate batch/gate and PR/merge
 `t_656472e9`, then actual source+binary packages and isolated install/rollback
-`t_c97cbefb`. Unselected original-utility grant holds distribution/final readiness,
-not engineering preparation; a missing-grant notice is not permission. No units,
+`t_c97cbefb`. Existing upstream terms and LGPL source/relink obligations remain;
+the MIT decision is not a completed package-qualification claim. No units,
 package construction/transaction, vendor/render/metric repetition or device action
 in this phase. [Current delivery boundaries](MAPPING_ABI368_DELIVERY.md),
 [equations/evidence/limits](SQRTSUM_PQ_Y_POST.md). PR16 remains held/unmerged.
