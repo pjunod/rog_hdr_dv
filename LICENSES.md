@@ -17,7 +17,35 @@ OEM components.
 - Ubuntu packaging changes retain their source package's copyright/licensing
   declarations, including notices carried by the patch series.
 
-Original repository documentation and utility code have no separate public
-licence grant selected yet. Public repository visibility does not change those
-terms. Publication of patches does not imply upstream acceptance. No Dolby/ASUS
+## Original utilities and documentation — MIT
+
+The owner selected MIT licensing for the original utilities and documentation
+on 2026-10-18. Owner-original repository utility code (including the Dolby
+harness, packaging/build helpers and test utilities) and documentation are
+licensed under the [MIT License](LICENSE-MIT). Existing contributor attribution
+is retained; this notice does not invent individual copyright ownership,
+years, signoffs or authority over third-party material.
+
+For `rog-hdr-dm-experimental`, this grant covers the owner-original files in
+`tools/dolby_harness/`, `packaging/rog-hdr-dm-experimental/`, the selected
+`scripts/` and `tests/` utilities, accompanying `docs/`, and these licensing
+notices. The source preparation manifest inventories the actual included
+files; Debian copyright records their MIT terms and retained third-party terms.
+The native consumer's existing reference to this file resolves to that grant
+without changing its source bytes or historical compile bindings.
+
+This grant does NOT relicense upstream-derived patches or library files,
+vendored dependencies/protocols, vendor/OEM material, or other separately
+licensed third-party content. In particular, libplacebo and modifications to
+it retain their LGPL/file-level notices; the shipped `library/demos/*` source
+retains CC0-1.0 and its `library/demos/LICENSE`. fast_float offers Apache-2.0
+or MIT or BSL-1.0; this package elects Apache-2.0 or MIT, retains all upstream
+licence files in source, and installs the elected Apache/MIT texts with the binary.
+The combined executable's LGPL-2.1 section 6 obligations
+(including customer modification and reverse engineering for debugging those
+modifications, shared-library/relinking and corresponding-source requirements)
+remain applicable; MIT imposes no additional prohibition on those activities.
+Selecting MIT is not proof that a not-yet-built package meets all obligations.
+
+Publication of patches does not imply upstream acceptance. No Dolby/ASUS
 binary, proprietary documentation or profile payload is distributed here.

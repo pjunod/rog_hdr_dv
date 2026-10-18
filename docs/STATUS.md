@@ -1,6 +1,44 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-17 (America/New_York) · **State:** main-targeting HDR
+**Updated:** 2026-10-18 (America/New_York) · **Current:** frozen ABI368 mapping
+main-based integration independently reviewed and affected checks qualified; publication in progress.
+Exact unchanged full-raster256/27 and714/27 development PASS and independent
+1200/48 PASS retained (mean0.535635380895007/p951.1341677325267563,
+8,847,360pixels,GPUinvalid0). No new observations or broader Dolby claim.
+
+Done: scoped transplantation directly on public mainb13ceae3 without heldPR16
+ancestry; original library patch replay to frozen treefb4c3879/all249 hashes;
+unchanged historical compiler/accuracy receipts; separate package-relative
+consumer compile with actual ELF RUNPATH inspection and additive genuine parser
+fixture preparation. The owner selected scoped MIT licensing for original
+utilities/docs; the full grant, package copyright and licence propagation are
+integrated without changing numerical/native/upstream bytes. Fable's final
+independent review APPROVES exact `a6b8dcc` / tree `60c573e4` after resolving F1:
+shipped demos CC0-1.0 and valid fast_float DEP5 Apache-2.0 or MIT terms
+(BSL not elected). The reviewed out-of-BT.2020 source-domain rejection limit is
+documented, not changed. The approved once-only supported-baseline fixture is
+prepared; missing historical log retention was repaired with exact-SHA copies,
+not manifest edits or new vendor calls. The single affected batch returned
+75/76 Python passes (zero skips), four effective native passes and repository
+gate PASS (249 patches, six series and documentation links). Its fifth native
+check exited zero but skipped the CPU and remains INVALID/UNCOUNTED. Fable's
+narrow review APPROVES test-only `5d6d1e2` and the CPU-enabled Vulkan recipe.
+Only the failed binary64-PQ black expectation and invalidated CPU Vulkan check
+were retried: both PASS, with actual llvmpipe texture/render markers and no skip
+or failed markers. All 76 Python and five native checks now have valid passing
+receipts; no production/numerical changes or successful-suite repeats.
+[Granular qualification evidence](../evidence/abi368-qualification.json).
+Current: scoped PR/exact-head CI/merge `t_656472e9`; final documentation links
+are checked separately without repeating units.
+Remaining: broader 30-new-frame/target-pair validation `t_857c31e4` (pending,
+not a general-accuracy pass), then actual source+binary packages and isolated
+install/rollback `t_c97cbefb`. Existing upstream terms and LGPL source/relink
+obligations remain. No package construction/transaction, repeated official
+renders/metrics or device action in this qualification.
+[Current delivery boundaries](MAPPING_ABI368_DELIVERY.md),
+[equations/evidence/limits](SQRTSUM_PQ_Y_POST.md). PR16 remains held/unmerged.
+
+**Previous source state:** main-targeting HDR
 foundations/tooling/experimental-launcher source independently reviewed and qualified;
 three support-helper defects corrected and re-reviewed, all 29 affected methods passed.
 Previously qualified component source and exact historical receipts are selected
