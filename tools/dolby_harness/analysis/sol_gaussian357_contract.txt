@@ -1,0 +1,44 @@
+t_77559dbf fixed diagnostic contract (Astra357 decision; Sol358 execution)
+
+Public primary: US10540920B2 paragraphs0062-0065 Eq5. Independently written
+11x11 separable Gaussian sigma2 on full4096x2160 correction raster, no fitting.
+This is a HYBRID on PQ(linear BT2020 Y), NOT full patent IPT or official XML
+mapping. XML detail-.75 does NOT select sigma, weight or this operator.
+
+Source: exact immutable HALF-expanded-f32 P3D65 PQ source; binary64 EOTF then
+existing linear P3->BT2020 matrix, no rescale/crop/resize. Y=.2627R+.6780G+.0593B.
+Io=PQ(Y). Actual shot-bound W SOP/L1 and .005nit mastering-black existing
+mpc_mastblack_prepare. For Y>0 Im=PQ(max(0,rational(EOTF(max(1e-5,
+max(0,S*Io+O)^P))))). Y0 Im=PQ0. Reject affine>1, power/Q>1, nonfinite
+or physical-domain invalid; never cap PQ internally to hide invalidity.
+Delta=Io-Im full source raster; horizontal then vertical convolution with
+h[k]=exp(-k*k/8)/sum(exp(-j*j/8)), k,j=-5..5. H=h outer h.
+Edge replication is an explicitly counted implementation extension; no wrap.
+RawIs=Io-filter(Delta). Project ONLY RawIs<PQ0 toPQ0. Reject Is>1/nonfinite.
+Map=EOTF(Is); restoreRGB=originalRGB*Map/Y forY>0. ForY0 use(Map,Map,Map):
+explicit finite convention, NOT general continuity. Count Y0 and positiveMap.
+Apply existing actual inside-exponent CW/SG on restoredRGB inPQ (714 SG=-.002
+must remain). Same physical-PQ finite guards. Exactly one final physical P3
+clip[0,600], convert toBT2020, existing nonnegative output roundoff policy,
+PQ encode. No extra IPT compensation, peak clamp before final gamut, or weights.
+
+Existing numpy is absent; independently implemented binary64 C helper compiled
+with -O2 -fno-fast-math -ffp-contract=off -Wall -Wextra -Werror uses existing cc.
+Only full scalar fields prerequisite to true spatial neighborhoods is evaluated
+full raster. New complete-chain output and unchanged BT.2124 metric are computed
+ONLY on original top-left stride16 lattice34560 per shot. Signed720*(Is-Im)
+preprojection and projected distributions are separately labelled from same pass.
+Retain source/reference/cache/script/frontend/control/compiler/output hashes,
+coordinates, metadata, coefficients/sum, invalid/projection/edge/Y0/excursion
+counts, mean/p95/max/signed720ITP and same referenceY/neutral strata.
+
+One candidate execution per authorized256/714, no variant/sweep/retry/tuning.
+Each shot has exclusive new output dir marker, never overwrite or resume pixels.
+Any invalid full scalar/lattice pixel makes primary all-population metric
+unavailable; partial metrics labelled partial. Failure mean<=1/p95<=3 or worsening
+vs2561.123974/2.719644,7142.418842/5.553420 rejects this fixed hybrid and STOPS
+promotion/variants. Results are sampled diagnostics, NEVER full-raster acceptance.
+No renderer/vendor/reference generation, units, old passing comparison/build,
+1200/48 access, source/GPU integration, publication, merge, packages or devices.
+Measured renderer identity remains211c119/library77894e1; analysis HEAD distinct.
+Native files solely /work/hdr-nativehdr10-20261011/t_77559dbf/gaussian357.
