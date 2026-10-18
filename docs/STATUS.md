@@ -132,11 +132,16 @@ The bounded detail-control collection is complete: actual ninth-Trim carrier
 serialization is established, but its pixel operator remains unresolved. A new
 root-resaturation synthetic preflight resolved the complete-product black limit
 but has adverse midtone direction and one downstream domain failure; no image
-run follows from it. Current: Astra retains equation decisions; Sol is assigned
-one fixed source-example edge-aware spatial diagnostic, reusing old lattice
-fields without repeating the rejected Gaussian metric. Its implementation and
-comparison are pending; it does not reinterpret XML detail-0.75 as a blend.
-No renderer change, unit rerun or holdout access follows from these results.
+run follows from it. The fixed source-example edge-aware spatial diagnostic
+subsequently completed once per lattice with zero invalids/center mismatches:
+256 mean1.072781/p952.521025 and714 mean3.249286/p959.970671, both FAIL. Its
+small literal derivative weights barely change the rejected Gaussian; no
+gain/weight variant or renderer promotion follows. XML detail-0.75 remains
+unresolved/unapplied. Current: Astra retains equation decisions; Sol is checking
+a newly retrieved US9613407 primary Eq9/Fig5 source-transcription question.
+The printed derivative-based LMS-PQ chroma factor loses chroma at an identity
+tone curve in an algebra-only witness; no silent unity-term repair or image
+experiment is selected. No renderer change, unit rerun or holdout access follows.
 See the linked current hypotheses for exact source/receipt hashes and limits.
 
 Remaining: passing full-raster and independent official references, completed

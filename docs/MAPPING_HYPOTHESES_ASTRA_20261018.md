@@ -691,4 +691,84 @@ convolution or metric. New derivative neighborhoods require original full
 resolution source access because the old helper freed its full fields; only
 the new chain is compared once per original lattice. Invalids or failure of
 either unchanged1/3 gate stop this hypothesis, without further weight variants.
-Current dispatch is not a completed comparison or renderer acceptance.
+That bounded comparison subsequently completed, as recorded below; it is not
+renderer acceptance.
+
+### Completed edge-protection diagnostic — rejected (Astra368 reconciliation)
+
+Sol ran the frozen chain exactly once per retained development lattice. Both
+34,560-point populations are valid, with zero derivative-neighborhood source,
+scalar or spatial invalids and zero exact RGB/Y/Io/Im center mismatches:
+
+| Shot | Mean deltaEITP | p95 | Maximum | Result |
+| --- | ---: | ---: | ---: | --- |
+| 256 | 1.0727812529 | 2.5210250396 | 5.5549897106 | FAIL mean |
+| 714 | 3.2492860183 | 9.9706706284 | 37.8003747691 | FAIL |
+
+Alpha mean/max is0.000100056/0.002964138 on256 and
+0.001504816/0.024553977 on714. Thus the literal normalized derivative example
+barely changes the rejected Gaussian; it does not support adding an unsourced
+gain or selecting another weight. Both original thresholds remain unchanged.
+This rejects this exact hybrid, not all edge-aware or local operators. Original
+XML detail-0.75 is still unresolved/unapplied. No renderer promotion follows.
+
+Read-only local SHA verification, without candidate or metric reexecution:
+
+- Result256: `9f012dccc57f8b16669984c4e05cd2796cd8b8d683209c82a72be6cf1162f214`.
+- Result714: `d8b66d24d6d517c1997a7d8abc0ec089dfedc37d1e175a1f6e23798f30709d7f`.
+- Native closure: `7ca6921f06b266f0aaf22c4c7c03a0f3dae67dae0ccd1571ace5fe5e668d00f7`.
+- Report: `7aa7bfe2ebb7dd9dc81db666bc1871ca3f6e1e3e0d3a95fc9ee38328fb70de53`.
+
+The three released `analysis/sol_edge366_*` files are preserved unchanged.
+The native warnings-as-errors compile is inherited evidence, not rerun by this
+reconciliation. No units, reference acquisition, new GPU render, full-raster
+comparison, or holdout operation was performed.
+
+## New primary-source lead: LMS-PQ intensity/saturation adjustment
+
+Two direct links from the retained root patent were retrieved once each with
+verified TLS, HTTP200 and no redirects; raw HTML and headers are retained
+privately. No broad search, vendor tool, or device operation was involved.
+
+1. [EP4783108A1](https://patents.google.com/patent/EP4783108A1/en),
+   paragraphs0038-0048 and0103: additional HDR_RL/SDR_RL reference anchors
+   constrain an already selected tone curve. They are not present in this
+   source contract; the initial curve is not specified. No anchor was invented
+   or fitted, and this lead supplies no next candidate.
+2. [US9613407B2](https://patents.google.com/patent/US9613407B2/en),
+   paragraphs0065-0072: a distinct LMS-PQ architecture subtracts a
+   saturation-dependent intensity term and uses a derivative-based chroma
+   factor. This is not the prior IPT Eq8/Eq12/HK composition:
+
+       S = V_IL - Io
+       CM = (sum(abs(S_i))*Wc)^2 * WTM
+       SM = clip(1 - dIm/dIo, 0, 1) * Wg
+       V_OL = SM*S + Imf - CM
+
+   The explicit examples include Wc=0.1, WTM=1 and Wg=0.25. Paragraph0042
+   permits max(L,M,S), a weighted average, or a scene-weighted blend; these
+   are separate disclosed choices, not a license to sweep the driver.
+
+The printed combination has a serious identity-property question: for an
+identity tone curve with detail bypass, dIm/dIo=1 makes SM=0 and discards
+chroma. One algebra-only synthetic witness used the disclosed max intensity:
+LMS-PQ(0.4,0.3,0.2) becomes(0.3991,0.3991,0.3991). This is not an image
+comparison or a physical RGB acceptance result. No extra unity term, inverted
+factor or XML-control interpretation was invented to repair the formula.
+
+HTML SHA256 respectively:
+
+    2b242746050986a59265e01ea33eb893d621e04983bb02352bbce6e9cfc4c952
+    dd8584d4b80095d1499e476f4f3cb6b1ee387e9e2c392d9ba89c72add681b511
+
+Algebra/source manifest SHA256:
+`246c0884e203ac0a543cd047082d8c783f9f00286f80916ecf4d50a6188b609c`.
+
+Current: a bounded source-only Sol task is checking the primary PDF Eq9 and
+Fig5 for a missing direct chroma path or a confirmed unresolved formula.
+Primary graphical verification is pending; no complete new candidate is frozen.
+The previously retained implementation-identity report already documents the
+CM2.9 metadata-family classification, but not the runtime equations; no
+duplicate selector investigation is needed. Remaining full-raster/independent
+accuracy, final review/fixes, one affected unit batch, repository gate, merge
+and Ubuntu delivery requirements above remain unchanged.1200/48 is untouched.

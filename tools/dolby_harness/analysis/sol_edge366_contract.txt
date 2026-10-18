@@ -1,0 +1,41 @@
+Frozen independent diagnostic: US10540920B2 paragraph0069/0078, Fig6 pseudocode.
+Not an equation numbered0078. Not full patent IPT, official CM, or acceptance.
+Source: retained us10540920b2.txt lines866-884. Explicit MS_weight=0,
+MS_edge_weight=1 example. XML original ninth Trim/detail=-0.75 is UNRESOLVED
+and UNAPPLIED; raw signed carrier is not equated to [0,1] patent weights.
+No fitting, sweep, alternate coefficients/normalization/domain/order/threshold.
+
+Reuse hash-verified old Gaussian357 fields little-endian binary64
+RGB[3],Y,Io,Im,rawIs,projectedIs (8 doubles), fields6 RAW (zero-indexed).
+Immutable source256/714/target27/control/metadata/cache/reference/frontend closure
+from old FROZEN.json and RESULT.json. Old metrics inherited, never recomputed.
+No old Gaussian convolution/output/metric execution.
+
+New work: exact original full-resolution11x11 neighborhoods around original
+stride16 lattice34560points. Source binary32 PQ P3 decoded/matrix binary64 and
+same scalar SOP/L1/.005black/MB prep as old. Cache each primitive coordinate once.
+Only these derivative-neighborhood scalars are regenerated, explicitly counted;
+no full-raster candidate or subsampled neighborhoods. Edge replicate coordinates.
+h[k]=exp(-k*k/8)/sum k=-5..5; d[k]=-k*h[k]/4 (sigma2 derivative).
+dx=sum_{l,k}d[k]*h[l]*Delta(x+k,y+l); dy=sum h[k]*d[l]*Delta(...).
+NO independent derivative gain or normalization or division4095 (normalizedPQ).
+alpha=clamp(abs(dx)+abs(dy),0,1).
+filteredDelta=oldIo-old_rawIs; Delta=oldIo-oldIm.
+rawIs=oldIo-alpha*Delta-(1-alpha)*filteredDelta.
+Project only rawIs<PQ0; reject nonfinite/>1; no target clamp early.
+Restore old originalRGB via EOTF(projectedIs)/oldY, explicit finite achromaticY0
+convention (not a continuity claim). Actual PQ CW/SG (714 SG=-.002), guards,
+one final physicalP3clip[0,600]/BT2020PQ encoding exactly old helper.
+Any source/scalar invalid in ANY original neighborhood (even if unsampled), any
+spatial invalid or center mismatch makes entire primary unavailable; partial
+statistics labelled. Old full-source validity inherited not rerun.
+
+Native binary64 cc C11 -O2 -fno-fast-math -ffp-contract=off -Wall -Wextra -Werror.
+Compile and freeze code/contracts/source identities before pixels. One new chain
+per shot even if first valid shot fails original mean<=1/p95<=3. If invalid or
+fails either shot reject/STOP after both; no variants, tuning or automatic GPU.
+If both pass freeze/await Astra. Sampled diagnostic is not acceptance.
+No units, baseline/comparison reruns, vendor/GPU/render/holdout1200/48 operations.
+No library/frontend/index/status edits or commits by Sol. No device/AppleTV,
+credentials/owner~/code/tmp access. PR16 held. Final fullraster/independent evidence,
+adversarial review/fixes, one affectedunitbatch/gate/PR/merge/packages downstream.
