@@ -73,12 +73,19 @@ def factors(trim):
 def algorithm(obj, meta, variant):
     if variant not in VARIANTS or type(obj['schema']) is not int or obj['schema'] != 3:
         raise ValueError('OPEN candidate requires schema3 and a fixed variant')
-    if not am.strict_equal(obj['target'], {'id': '27', 'min_nits': 0, 'max_nits': 600, 'primaries': am.P3}):
+    if variant == SQRTSUM_VARIANT:
+        target_id = am.original_target(obj['target'])
+    elif not am.strict_equal(obj['target'], {'id': '27', 'min_nits': 0, 'max_nits': 600, 'primaries': am.P3}):
         raise ValueError('only exact original target27/600nit/0black/P3D65 is selected')
-    selected = [r for r in meta['records'] if r['level'] == 2 and r['target_id'] == 27]
+    else:
+        target_id = 27
+    selected = [r for r in meta['records'] if r['level'] == 2 and r['target_id'] == target_id]
     if not selected:
-        raise ValueError('original target27 Trim required')
-    trims = [next(f['text'] for f in r['fields'] if f['name'] == 'Trim') for r in selected]
+        raise ValueError('original target' + str(target_id) + ' Trim required')
+    fields = [[f['text'] for f in r['fields'] if f['name'] == 'Trim'] for r in selected]
+    if any(len(f) != 1 for f in fields):
+        raise ValueError('missing/ambiguous selected Trim field')
+    trims = [f[0] for f in fields]
     if len(set(trims)) != 1:
         raise ValueError('conflicting frame/shot Trim')
     derived = factors(trims[0])
@@ -95,7 +102,7 @@ def algorithm(obj, meta, variant):
                        if absolute else 'normalized-PQ; existing HPE-LMS/PQ/IPT I placement'),
             'l1_curve_domain': 'nits rational' if variant == 'l1-rational' else 'normalized-PQ analytic Hermite',
             'l1': l1, 'l1_presence': True, 'degenerate_branch': branch,
-            'target': obj['target'], 'target_generation': 1, 'target_description_id': 27,
+            'target': obj['target'], 'target_generation': 1, 'target_description_id': target_id,
             'source_records': meta['records'], 'selected_records': selected,
             'original_trim': trims[0], 'derived_factors': derived, 'applied_factors': applied,
             'selected_cm_name': None, 'algorithm_versions': meta['algorithm_versions'],
@@ -294,7 +301,8 @@ def render(manifest, variant, native, compile_receipt, output):
                                  'control_sha256': prov.sha(stage / 'control.txt'),
                                  'stdout_sha256': prov.sha(stage / 'native.stdout'),
                                  'stderr_sha256': prov.sha(stage / 'native.stderr'),
-                                 'target': obj['target'], 'target_generation': 1, 'target_description_id': 27}}
+                                 'target': obj['target'], 'target_generation': 1,
+                                 'target_description_id': algo['target_description_id']}}
         if domain is not None:
             result['provenance']['gpu_domain'] = domain
         (stage / 'candidate.json').write_text(json.dumps(result, indent=2, allow_nan=False) + '\n')
@@ -322,7 +330,8 @@ def validate_result(path, raw=None):
     if not am.strict_equal(r['algorithm'], algorithm(obj, meta, variant)):
         raise ValueError('OPEN algorithm metadata/factors mismatch')
     if (not am.strict_equal(p['target'], obj['target']) or
-            not am.strict_equal([p['target_generation'], p['target_description_id']], [1, 27])):
+            not am.strict_equal([p['target_generation'], p['target_description_id']],
+                                [1, r['algorithm']['target_description_id']])):
         raise ValueError('OPEN immutable target mismatch')
     _, compiled_raw = am.snapshot(path.parent, {'file': 'compile-receipt.json',
                                               'sha256': p['execution']['compile_receipt_sha256']})

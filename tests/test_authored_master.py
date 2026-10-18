@@ -464,7 +464,7 @@ class GenuineAuthoredTests(unittest.TestCase):
         self.assertEqual(len(provenance['logs']), 3)
         bad = copy.deepcopy(self.obj)
         bad['target']['max_nits'] = 601
-        with self.assertRaisesRegex(ValueError, 'only acquired'):
+        with self.assertRaisesRegex(ValueError, 'declaration/volume mismatch'):
             master.reference_provenance(self.base, self.obj['metadata']['declaration_repair'], bad, self.meta, reference)
 
 

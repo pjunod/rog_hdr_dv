@@ -149,6 +149,52 @@ def display(node):
             'primaries': primaries(node)}
 
 
+def original_target(target):
+    """Native DVH4 scope: canonical declared ID and a full-PQ P3 volume.
+
+    Declaration equality is checked by selected_metadata, not inferred from ID.
+    This does not qualify arbitrary gamuts or interpolate absent target trims.
+    """
+    keys(target, 'id min_nits max_nits primaries')
+    token = text(target['id'])
+    if not re.fullmatch(r'[1-9][0-9]*', token) or not 1 <= int(token) <= 65535:
+        raise ValueError('canonical native target ID in [1,65535] required')
+    luminance(target)
+    if target['primaries'] != P3:
+        raise ValueError('only original P3D65 target volume supported')
+    return int(token)
+
+
+def target_declaration(root, target):
+    tid = original_target(target)
+    _, t = track(root)
+    characteristics = one(one(one(t, 'PluginNode'), 'DolbyEDR'), 'Characteristics')
+    matches = [n for n in characteristics.findall('TargetDisplay') if xml_int(n, 'ID') == tid]
+    if len(matches) != 1 or value(matches[0], 'ID') != target['id']:
+        raise ValueError('missing/ambiguous/noncanonical original target declaration')
+    node = matches[0]
+    signal(node)
+    if display(node) != {k: v for k, v in target.items() if k != 'id'}:
+        raise ValueError('original target declaration/volume mismatch')
+    return node
+
+
+def target_log(contents, field, node, target):
+    """Bind one actual vendor display field, never an echoed argv substring."""
+    lines = re.findall(r'cm_offline:\s+' + re.escape(field) + r':\s*([^\r\n]*)', contents)
+    if len(lines) != 1:
+        raise ValueError('reference actual target log evidence missing/ambiguous')
+    match = re.fullmatch(r'.*\(ID ([0-9]+)\): Bit Depth: ([0-9]+)bit - Diagonal: '
+                        r'([0-9.]+)in - Application Type: ALL - Color Info: '
+                        r'"pq\(([^,]+),([^\)]+)\) rgb computer p3d65"', lines[0].strip())
+    if (not match or match[1] != target['id'] or
+            match[2] != value(node, 'BitDepth') or
+            decimals(match[3], 1, 0, 10000) != decimals(value(node, 'DiagonalSize'), 1, 0, 10000) or
+            decimals(match[4] + ',' + match[5], 2, 0, 10000) !=
+            [target['min_nits'], target['max_nits']]):
+        raise ValueError('reference actual target log ID/volume/encoding mismatch')
+
+
 def signal(node):
     if tuple(value(node, k) for k in ('Encoding', 'ColorSpace', 'SignalRange', 'ChromaFormat')) != ('pq', 'rgb', 'computer', '444'):
         raise ValueError('authored PQ RGB full 444 declaration required')
@@ -355,7 +401,7 @@ def selected_metadata(root, obj, sequence):
     targets = {}
     for target in characteristics.findall('TargetDisplay'):
         tid = str(xml_int(target, 'ID'))
-        if tid in targets:
+        if value(target, 'ID') != tid or tid in targets:
             raise ValueError('ambiguous authored target ID')
         targets[tid] = target
     target_id = obj['target']['id']
@@ -569,21 +615,38 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
     f, target = obj['frame'], obj['target']
     binding = reference_frame(r, f, metadata['mapping']['edit_rate'])
     index = binding['index']
+    tid = original_target(target)
     if ((f['width'], f['height']) != (4096, 2160) or
-            target != {'id': '27', 'min_nits': 0, 'max_nits': 600, 'primaries': P3} or
+            (r['schema'] == REFERENCE_V1 and
+             target != {'id': '27', 'min_nits': 0, 'max_nits': 600, 'primaries': P3}) or
             obj['source']['mastering'] != {'min_nits': 0.005, 'max_nits': 4000, 'primaries': P3}):
-        raise ValueError('reference only acquired original full frame target27')
+        raise ValueError('reference only acquired original full frame/P3 target')
+    # Rebind the actual unchanged authored declaration, not a receipt's claim
+    # about a target or an argv echo. Parser/export source identities stay strict.
+    _, actual_raw = snapshot(base, obj['metadata']['analysis'])
+    _, original_raw = snapshot(base, obj['metadata']['original_analysis'])
+    root, _ = repaired(original_raw, actual_raw, raw)
+    node = target_declaration(root, target)
+    mapping, l1, original_records = selected_metadata(root, obj, {'edit_rate': metadata['mapping']['edit_rate']})
+    if (not strict_equal(mapping, metadata['mapping']) or not strict_equal(l1, metadata['l1']) or
+            not strict_equal(original_records, metadata['records'])):
+        raise ValueError('reference original metadata/target association mismatch')
+    tuple_fields = ('Primaries/Red', 'Primaries/Green', 'Primaries/Blue', 'WhitePoint',
+                    'PeakBrightness', 'MinimumBrightness', 'Encoding', 'SignalRange', 'ColorSpace', 'ChromaFormat')
+    declaration = {name: value(one(node, 'Primaries'), name.split('/')[1])
+                   if name.startswith('Primaries/') else value(node, name) for name in tuple_fields}
     if (r['new_derivative']['sha256'] != metadata['analysis_sha256'] or
             r['originals'][1]['sha256'] != metadata['original_analysis_sha256'] or
             r['Mac_reference']['sha256'] != reference_binding['sha256'] or
             r['target']['source_xml_sha256'] != metadata['analysis_sha256'] or
-            r['target']['target_id'] != 27 or r['target']['verified'] is not True):
+            not strict_equal(r['target']['target_id'], tid) or r['target']['verified'] is not True or
+            not strict_equal(r['target']['exact_original_tuple'], declaration)):
         raise ValueError('reference XML/output/target identity mismatch')
     a = r['render']['argv']
     expected = [a[0], '--cpu-only', '-t', '2', '--disable-font-color', '-m',
                 r['validation']['command']['argv'][-1], '--source-format',
                 'half rgb full pq p3d65', '--output-format', 'half rgb full pq bt2020',
-                '-r', '60000/1001', '--targ', '27', '--echo-metadata',
+                '-r', '60000/1001', '--targ', target['id'], '--echo-metadata',
                 a[-4], a[-3], '-f', str(index)]
     if a != expected or metadata['mapping']['edit_rate'] != {'num': 60000, 'den': 1001}:
         raise ValueError('reference argv/frame/rate/encoding mismatch')
@@ -617,12 +680,14 @@ def reference_provenance(base, repair_binding, obj, metadata, reference_binding)
         if request_id == r['validation']['request']:
             required = ['Algorithm version: 0 0', 'No issues found in the Metadata']
         elif request_id == r['target_info_request']:
-            required = ['(ID 27)', 'pq(0,600) rgb computer p3d65']
+            target_log(contents, 'target info', node, target)
+            required = []
         else:
             required = ['Src Info:', f'4096x2160x3 f16 planar 444 le tight {index}-{index} 24fps top_left pq rgb computer p3d65',
                         'Dst Info:', f'4096x2160x3 f16 planar 444 le tight {index}-{index} 59.94fps top_left pq rgb computer bt2020',
                         f'Frames: {index}-{index}', 'completed 1 frames', reference_binding['sha256']]
             if r['schema'] == REFERENCE_V2:
+                target_log(contents, 'Target Display', node, target)
                 # Bind actual normal log fields, not just an argv echoed by the
                 # recorder. Reject duplicate/contradictory fields as ambiguous.
                 fields = {'Source': a[-4], 'Destination': a[-3],

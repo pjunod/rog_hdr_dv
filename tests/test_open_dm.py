@@ -230,11 +230,11 @@ class OpenAuthenticTests(unittest.TestCase):
 class OpenActualResultTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Only the once-rendered Y variant belongs to the ABI366 source. The
-        # original RGB/303/315 outputs retain OLD frontend/ABI365/362/364 identities.
+        # Current-head ABI368 result only. Historical outputs stay bound to
+        # their preserved executing frontend; never rerender to refresh a test.
         cls.paths = parse_json(read_bounded(os.environ['HDR_OPEN_RESULTS'], 4 * 1024 * 1024))
-        if set(cls.paths) != {dm.Y_VARIANT}:
-            raise AssertionError('new Y result required; no old-result relabelling')
+        if set(cls.paths) != {dm.SQRTSUM_VARIANT}:
+            raise AssertionError('frozen independent sqrt-sum result required; no old-result relabelling')
 
     def test_genuine_source_bound_results_and_rejection_only_tampering(self):
         for variant in self.paths:
@@ -243,8 +243,11 @@ class OpenActualResultTests(unittest.TestCase):
             self.assertEqual(r['algorithm']['variant'], variant)
             self.assertEqual(len(pixels), 4096 * 2160)
             del pixels
-            self.assertEqual(r['source_alignment']['frame_index'], 256)
-            self.assertEqual(r['algorithm']['applied_factors']['S'], 1.014)
+            self.assertEqual(r['source_alignment']['frame_index'], 1200)
+            self.assertEqual(r['algorithm']['target_description_id'], 48)
+            self.assertEqual(r['algorithm']['original_trim'], '0,0,0,-0.008,0,0.013,-0.012,0,-0.75')
+            self.assertEqual(r['algorithm']['applied_factors']['S'], 1.004)
+            self.assertEqual(r['provenance']['gpu_domain']['invalid'], 0)
             for field in ('algorithm', 'encoding', 'source_alignment', 'provenance'):
                 changed = copy.deepcopy(r)
                 if field == 'algorithm':
@@ -255,6 +258,12 @@ class OpenActualResultTests(unittest.TestCase):
                     changed[field]['frame_index'] = 0
                 else:
                     changed[field]['execution']['native_sha256'] = '0' * 64
+                with self.assertRaises(ValueError):
+                    dm.validate_result(path, json.dumps(changed).encode())
+            for key, value in (('target_description_id', 27), ('target_generation', 2),
+                               ('gpu_domain', {})):
+                changed = copy.deepcopy(r)
+                changed['provenance'][key] = value
                 with self.assertRaises(ValueError):
                     dm.validate_result(path, json.dumps(changed).encode())
 

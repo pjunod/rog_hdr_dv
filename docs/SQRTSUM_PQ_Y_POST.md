@@ -60,9 +60,31 @@ Old variants retain DVH3 unchanged. New DVH4 ordered fields:
 magic, width, height, primaries-code1, ORIGINAL target-description-ID,
 source(min_nits,max_nits,RGBW8), target(min_nits,max_nits,RGBW8),
 L1(min,avg,max), variant-index7, S,O,P,CW,SG. Native carries that explicit ID
-into its immutable target snapshot. Current frontend intentionally still
-accepts ONLY original target27/0black/600nit/P3. Target48 selection and
-reserved1200 evidence require separately authorized downstream work.
+into its immutable target snapshot. The original-target frontend extension
+accepts canonical numeric IDs1..65535 with the actual bound original P3D65,
+full-PQ declaration and its selected Trim. It rejects absent/conflicting trims,
+ambiguous IDs, changed volume and unsupported gamut; no borrowing target27
+or interpolation. Only this DVH4 variant is extended: all DVH3 variants retain
+exact target27/0black/600nit/P3 scope. The numerical oracle/library are unchanged.
+
+Reference v2 retains its explicit original global-frame binding and schema
+meaning. Selected target ID/volume must agree across the unchanged original
+XML, reversible declaration repair, receipt, exact vendor argv, actual unique
+normal target-info field and actual unique render Target Display field. Echoed
+argv alone is insufficient. v1 remains implicit frame0/target27. Parser version2
+and export schema4 semantics are unchanged; the whole-parser source SHA changes,
+so new-head consumers need additive newly parsed exports/manifests, NEVER
+rewritten historical executions. Old result validation uses its frozen frontend.
+
+The independently reserved case is original global1200/source283, shot3
+Record[917,1484), original target48: black0/1000nit/P3D65/full, verified from
+original XML SHA a18f5960f61f868932416000c35f08bb39d9966b1dc35a8b6778e9718bb16c0f.
+The complete frontend, provenance, test definitions and unchanged mathematical
+source/build identities must be committed and frozen BEFORE acquiring or
+inspecting those pixels. Then one ordinary reference, one ABI368 candidate,
+one full unchanged BT.2124 comparison; mean<=1 AND nearest-rank p95<=3.
+No baseline/variant/tuning, scalar diagnosis or repeated development metric.
+Independent result is pending at this source freeze, not implied by design.
 
 GPU invalid-only safe operands avoid undefined pow/EOTF but a sticky validity
 bit marks alpha0 AFTER mapping; valid alpha is preserved. No MB PQ1 cap is
