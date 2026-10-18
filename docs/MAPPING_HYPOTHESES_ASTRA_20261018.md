@@ -1,8 +1,9 @@
 # Mapping equation continuation — Astra, 2026-10-18
 
 Status: ongoing analysis, not accepted mapping. This continues the committed
-[Fable checkpoint](MAPPING_HYPOTHESES_FABLE_20261017.md). Sol owns implementation,
-native compilation, and the once-only development GPU/full-raster comparisons.
+[Fable checkpoint](MAPPING_HYPOTHESES_FABLE_20261017.md). Sol completed and released
+the previous implementation/native lease; the full-raster results still fail.
+New bounded work and file/native ownership are recorded on the shared board.
 The untouched frame1200/target48 remains reserved for a frozen development-passing
 candidate; none of this analysis accesses it.
 
@@ -199,6 +200,58 @@ do not substitute more exact-invariant exclusion work for that implementation
 goal. Preserve the neutral-coverage limitation when interpreting marginal bins.
 Full-raster and independent accuracy, final independent review/fixes, the one
 affected unit batch, merge and versioned Ubuntu delivery remain outstanding.
+
+## Per-component mapping embedding — rejected (Astra357)
+
+The primary ST2094-10 Annex B.3 applies its rational independently to RGB
+components. A single new complete hybrid checked that embedding using the
+unchanged MB anchors and W absolute-PQ trim: each linear BT2020 component gets
+its own PQ SOP then the MB nits rational, followed by actual PQ CW/SG and the
+single physical P3 clip. This is not the earlier DoViBaker chain, which used a
+different knee and linear target-normalized trim, nor an official model claim.
+
+`tools/dolby_harness/analysis/astra357_components.py` ran once per retained
+development lattice. Each had 34,560 valid samples and zero invalid samples:
+
+| Shot | Mean deltaEITP | p95 | Maximum | Signed 720 I/T/P |
+| --- | ---: | ---: | ---: | --- |
+| 256 | 1.4402063301 | 3.8733587698 | 13.0358200967 | -0.870196 / -0.205620 / +0.487878 |
+| 714 | 2.7992570343 | 7.9617637696 | 23.6757642022 | -0.887333 / -0.558558 / +0.731863 |
+
+Both worsen against the selected MB-Y chain and fail. The hypothesis is
+rejected, not promoted to the renderer. Source reconstruction qualification on
+256 is unchanged; 714 uses exact retained source triples. There were no native
+requests, new references, GPU renders, unit runs, or holdout accesses. Receipt
+SHA256: `c58557b7666a6f759e172abc90685ee4baa76521db38ae6dc769d8859045cb49`.
+
+The public CPU trace was also rechecked: all-three UINT L1 transport and its
+guards are already represented in `fable_eval.py:130-142`. It supplies no new
+untried caller correction, so no transport comparison was repeated.
+
+## Next bounded decision — a specified spatial operator, not sharpening
+
+US10540920B2 paragraphs0062-0065 Eq5 specifies
+`Is = Io - Gaussian(Io - Im)`, with an example separable 11-by-11 Gaussian of
+sigma2. It is a concrete untested spatial mechanism rather than an arbitrary
+detail enhancement. The source does NOT identify XML detail -0.75 with that
+filter, a weight, or a selection mode. The diagnostic is explicitly a hybrid
+of that fixed operator on PQ(Y) and the current MB chain, not the complete
+patent's IPT model or a discovered official detail contract.
+
+A bounded Sol card owns the native lane for one complete new diagnostic on
+256 and 714, using original full-source neighborhoods but the existing fixed
+34,560-point metric lattice. Kernel radius5/sigma2, normalized separable weights,
+edge replication, below-PQ-black projection and the achromatic zero-Y extension
+are frozen before execution. Actual CW/SG and the final physical gamut stage
+are retained. No radius/weight/coordinate sweep, reference perturbation, old
+comparison rerun, or holdout operation is authorized. Failed or invalid results
+stop this hypothesis; passing sampled results alone would not be acceptance.
+
+Separately, Opus has a bounded read-only source/assumption audit, not final
+adversarial acceptance review. Neither assignment is a completed exchange or
+an accuracy improvement. Current: new spatial diagnostic and fresh source
+audit pending; last implemented full-raster candidate remains failing. Final
+review and qualification must not be claimed on the strength of these tasks.
 
 Remaining: source-grounded passing complete chain, full-raster development and
 independent evidence, genuinely independent adversarial review/fixes, one
