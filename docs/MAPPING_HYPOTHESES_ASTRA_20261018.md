@@ -84,6 +84,50 @@ Current: inspect the remaining metadata/normalization and scalar-curve contract
 without fitting free coefficients or repeating rejected chains. Sol's existing
 frozen candidate and full-raster comparison ownership remain unchanged.
 
+## Normalized scalar post-SOP preflight — no population run
+
+`astra356_normalization.py` checks a disclosed alternative from US12573352
+Eq6/7: the selected MB rational first, followed by scalar SOP normalized to the
+target PQ interval, then ratio restoration. This differs from the older failed
+normalized-post experiment's black/curve anchors and from Fable's absolute-RGB
+post-trim grid. Metadata-only neutral transfer predictions were computed before
+deciding whether to commission a new comparison.
+
+At source 1/3/10/30/100 nits, the normalized-post minus selected-pre differences
+in 720*PQ are respectively:
+
+| Shot | 1 nit | 3 nits | 10 nits | 30 nits | 100 nits |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 256 | 2.108227 | 2.204463 | 2.273680 | 2.251991 | 2.036320 |
+| 714 | 0.201039 | 0.164012 | 0.107456 | 0.050212 | 0.019871 |
+
+This could materially change 256, but not supply the dominant 714 midtone
+correction; it also raises 714 highlights rather than lowering them. No lattice
+or full-raster comparison was commissioned. These numbers are analytic neutral
+transfer differences, NOT measured deltaEITP or an all-pixel impossibility proof.
+Continue automatic-curve/driver investigation, not another small trim-order
+permutation. The original cosine Table1 midpoint rule also gives zero offsets
+for these below-midrange source averages, just like the previously tested
+improved rule; merely reverting that rule offers no distinct candidate here.
+
+## Comparator transport blocker — policy recorded, repair owned by Sol
+
+The first full-raster comparison stopped before its metric: `algorithm()`
+returned tuples in `prepared_curve`, JSON encoded these as arrays, and the
+validator's deliberately exact-type comparison rejected lists versus tuples.
+No rendered pixel was invalidated by this transport mismatch.
+
+Decision: future metadata must be JSON-native; do not weaken strict equality.
+For existing immutable renders, a separately hashed comparison-only driver must
+validate the exact archived rendering frontend/compile source closure, preserve
+every existing schema/alignment/target/control/log/output check, and normalize
+only the expected algorithm container representation through JSON. Reference
+validation and exact same-input association remain independent. Renderer and
+comparator identities must remain distinct, with unchanged candidate manifests
+and pixels; no monkeypatch, hash rewrite, skipped closure check, or rerender.
+The metric itself is unchanged. This note records a design decision, not an
+assertion that Sol's repair or either full-raster comparison has finished.
+
 Remaining: source-grounded passing complete chain, full-raster development and
 independent evidence, genuinely independent adversarial review/fixes, one
 whole-candidate affected unit batch and repository gate, substantial PR/merge,
