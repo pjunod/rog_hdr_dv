@@ -84,9 +84,18 @@ tracks the scalar diagnostic closely but sampled agreement still fails. A fixed
 cached HALF-interval audit is diagnostic only, not a fitted replacement curve.
 Full-raster/independent accuracy, review, one affected batch and Ubuntu delivery
 remain required. Its additive ABI367 mastering-black Y/post-ratio-color
-continuation is compiled, with a lower but failing frame256 lattice and a
-frame714 guard-specification discrepancy awaiting thinker reconciliation.
-No full-raster or holdout acceptance is claimed. This active lane does not stop
+continuation is compiled and measured: full-raster256 mean1.118260/p952.707715
+and714 mean2.414865/p955.549514 still FAIL unchanged accuracy limits. The
+documented comparison-only JSON transport correction verifies the archived
+renderer without rerendering or relabeling execution. Untouched1200/48 remains
+reserved. [Current source hypotheses](docs/MAPPING_HYPOTHESES_ASTRA_20261018.md)
+record rejected alternatives; no full mapping or holdout acceptance is claimed.
+The preceding [Fable hypothesis checkpoint](docs/MAPPING_HYPOTHESES_FABLE_20261017.md)
+and historical [joint analysis](docs/wip-notes/FABLE_JOINT_ANALYSIS_20261017.md),
+[implementation brief](docs/wip-notes/IMPLEMENTATION_BRIEF.md) and
+[joint thinker brief](docs/wip-notes/JOINT_THINKER_BRIEF.md) preserve working
+provenance, not current ownership or acceptance. Current board claims govern.
+This active lane does not stop
 at an experimental operator.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) now includes a
 source-only parser2/export4 shot-inheritance extension with explicit provenance

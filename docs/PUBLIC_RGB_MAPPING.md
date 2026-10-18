@@ -266,7 +266,7 @@ Sanitized receipt: [second-shot evidence](../evidence/public-mapping-shot714-dev
 
 ## Done, current and remaining
 
-### ABI367 mastering-black continuation (in progress)
+### ABI367 mastering-black continuation (measured, accuracy FAIL)
 
 The additive `y-pq-pre-mastblack` / `open-y-pq-pre-mastblack-v1` operator uses
 the zero-PQ-low MPC knee, declared source mastering black as the rational nits
@@ -276,8 +276,11 @@ P3 gamut stage follows once. Earlier variants and their receipts remain distinct
 The zero-low knee is grounded in pinned MPC DX11VideoProcessor.cpp2369–2371
 UINT-nits minimum truncation; the mastering-black anchor follows the shader's
 named semantics. These remain disclosed applicability hypotheses, not an official
-CM identity or fitted correction. Missing/nonfinite mastering black rejects;
-the original full-domain S+O<=1 guard is retained as specified.
+CM identity or fitted correction. Missing/nonfinite mastering black rejects.
+Fable's recorded reconciliation changes ONLY MB: preparation rejects
+S*L1max_pq+O>1; scalar evaluation fails closed if actual S*PQ(Y)+O>1, before
+power/EOTF. The GPU explicitly caps SOP PQ at1 as a finite extension. Post-ratio
+color PQ>1 still rejects. Existing SG0-only Y keeps its full-domain S+O<=1 guard.
 
 Native full/noDV and matched ABI367 consumer compilation passed with -Werror
 for library62e3651/tree26e1d848 (requestcf927164). ABI366 source, generated
@@ -288,23 +291,57 @@ rebuild. New regressions are written and compiled, not executed.
 |---|---:|---:|---:|---|
 | Frame256 fixed double chain | 1.123974038284229 | 2.7196443032245785 | 7.345997615839801 | FAIL mean; 34560 exact-cache samples, raw before final gamut |
 | Frame256 native C scalar | 1.12386483513616 | 2.7193929454778396 | 7.345997615839801 | FAIL mean; same cache and actual ABI367 evaluator |
-| Frame714 | unavailable | unavailable | unavailable | Stopped before evaluation: mandated S+O guard rejects actual1.005006−.002006=1.003 |
+| Frame714 fixed double chain | 2.418842198716092 | 5.553420219156015 | 16.700345289860316 | FAIL; missing lattice executed once after guard reconciliation |
+| Frame714 native C scalar | 2.418863181354413 | 5.553267576315724 | 16.699943126161788 | FAIL; same exact cache, actual nonzero SG |
+| Frame256 full-raster GPU | 1.1182596907971711 | 2.7077148379316305 | 9.635916901592578 | FAIL mean; 8,847,360 pixels |
+| Frame714 full-raster GPU | 2.4148650268866025 | 5.54951429234905 | 51.900494117471645 | FAIL mean and p95; 8,847,360 pixels |
 
 Frame256 mean signed720ITP is(-.9221676116914387,-.05867643838091357,
 .20148548404367084). C-versus-double deltaEITP mean.0005339534/p95.0014968954/
 max.0042305511. All34560 samples are valid; affine-negative/PQ-floor0,
 rational-negative clamps11677, raw physical-P3-negative34, above600nit0.
-Strata and all counters are retained privately. This successful lattice is not
-to be rerun. No candidate GPU render or full-raster comparison has yet occurred.
+Strata and all counters are retained privately. This successful256 lattice was
+not rerun.714 signed720ITP is(-.8195592407901202,.0016045517376339232,
+.125236812480125); invalid/affine>PQ1/post-color>PQ1 counters are0 on its34560
+samples, physicalP3-negative0/above600nit10. No source coefficients were tuned.
 
-Current blocker: the frozen request also requires evaluating frame714 despite
-its S+O=1.003, which contradicts the mandated whole-domain rejection. Fable owns
-the routine source-grounded guard reconciliation; no human action is required.
-No clipping, coefficient adjustment or SG drop was substituted. After that
-decision, resume only missing714 evaluation and the two candidate GPU/full-raster
-comparisons. Reserved1200/48 remains untouched under coordinator clarification;
-it is not a development comparison. Review, affected units, merge and packages
-remain downstream, not claimed by compilation or this partial result.
+The guard-only correction compiles at cd4600f, and explicit shader finite cap at
+77894e1/treec595a7b4 (nativeffa70dbd full/noDV/consumer -Werror). Only genuinely
+invalidated compile closures reran; prior ABI366 and initial ABI367 artifacts
+were preserved. No units executed. One GPU development render per shot gives
+sampled2561.1229053006/2.7193929455 and7142.4176843018/5.5502987854.
+GPU-versus-retained-double deltaEITP mean/p95/max is256
+.0016219377/.0039502363/.0128638421,714.0029444085/.0065655785/.0272562940.
+Native-C/GPU means are.0015947494/.0032052254; not every statistic is <=.003.
+Cap-unexercised evidence is limited to the evaluated lattice, not all raster pixels.
+
+The first reference manifest rebind failed on missing relocated historical logs;
+hash-verified copies repaired that storage prerequisite without changing receipts
+or repeating normalization/reference rendering. Old open_dm.compare then rejected
+algorithm metadata BEFORE the metric: Python tuples in prepared_curve become
+JSON arrays/lists, and strict_equal correctly rejects differing types.
+Astra356 authorized a separately source-hashed comparison-only driver:
+`tools/dolby_harness/analysis/recorded_open_compare.py`, SHA256
+`823bc794c7a6056cf8e25e107940b68bf7ba8bbed296c2526940d2a7ebd2cb7d`.
+It checks the complete archived FRONTEND_INPUTS and COMPILE_INPUTS maps against
+recorded execution/compile hashes, runs archived prov.validate_record unchanged,
+and reproduces schema/alignment/target/control/log/output/reference checks. ONLY
+the expected algorithm is serialized/parsed before strict equality; no numeric
+or type relaxation. Unchanged metric.compare_pixels then ran ONCE per full raster.
+The table reports this corrected comparison of old immutable execution, NOT old
+open_dm.compare success or a new-source render. Future algorithm() returns native
+JSON containers; regression definitions preserve exact controls and reject factor/
+type tampering. Their units remain deferred to whole-batch review/qualification.
+
+Completed sanitized receipt: [mastering-black evidence](../evidence/public-mapping-mastblack-completed-development.json).
+The initial [partial receipt](../evidence/public-mapping-mastblack-development.json)
+is retained as history, not current status. Both development shots still FAIL,
+although lower than the retained sampled WpreY2561.42408 and complete W MpreRGB714
+6.01533 baselines (not new full-raster W comparisons). Reserved1200/48 remains
+untouched under coordinator clarification; no holdout consumption/correction.
+Review, one affected unit batch, merge and packages remain downstream. Current
+source hypotheses are recorded by the [coordinating thinker](MAPPING_HYPOTHESES_ASTRA_20261018.md),
+not treated as independent final adversarial review.
 
 Done: exact retained input/reference/compiler preparation; distinct public
 contract table; continuous XML bridge and source provenance; two-chain cached

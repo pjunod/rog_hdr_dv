@@ -85,11 +85,32 @@ ABI367 mastering-black continuation is compiled full/noDV/consumer with -Werror
 operator applies actual PQ color after RGB ratio restoration; older variants
 remain distinct. Frame256 exact-cache lattice ran once: double mean1.123974/
 p952.719644/max7.345998, native C1.123865/2.719393/max7.345998, still FAIL mean.
-Current: Fable reconciles the frozen guard contradiction: actual714 S+O=1.003
-fails the mandated S+O<=1 preparation guard, so714 evaluation stopped before
-rendering. No tuning or SG drop. Candidate GPU/full-raster256/714 remain unrun;
-successful256 lattice and full/noDV/consumer builds will not be repeated unless
-actually invalidated.1200/48 remains untouched, not development evidence.
+The guard contradiction is resolved by Fable's recorded MB-only rule: SOP stays
+within PQ1 over declared L1; scalar out-of-range pixels fail closed, while the
+GPU has an explicit finite SOP cap. Library77894e1/treec595a7b4 compiles full/noDV
+and with the matched ABI367 consumer using -Werror (nativeffa70dbd). The missing
+714 lattice ran once: double2.4188421987/5.5534202192, native2.4188631814/5.5532675763.
+No successful256 lattice was repeated. One GPU render per shot gives sampled
+2561.1229053/2.7193929 and7142.4176843/5.5502988. GPU-versus-double means
+.00162194/.00294441, p95.00395024/.00656558, maxima.01286384/.02725629;
+these are not a universal .003 bound. Zero domain violations establish only
+evaluated-lattice safety; no full-raster domain-counter claim is made.
+
+Completed full-raster development comparisons (8,847,360 pixels each):
+256 mean1.1182596908/p952.7077148379/max9.6359169016;714 mean2.4148650269/
+p955.5495142923/max51.9004941175. BOTH FAIL unchanged mean<=1/p95<=3.
+The original open_dm.compare attempt stopped before metric evaluation because
+prepared-curve tuples serialize as JSON lists. A separately source-hashed
+comparison-only driver, authorized by the coordinating thinker, rechecks the
+exact archived rendering frontend/compiler closure and every original result/
+reference check, canonicalizing ONLY expected algorithm JSON. Unchanged
+metric.compare_pixels ran once per raster; this is NOT old open_dm.compare
+success or a new-source render. Future algorithm metadata is JSON-native;
+regressions are written, unit execution still deferred. Original outputs,
+frontend, failures and partial receipts remain immutable. See
+[completed evidence](../evidence/public-mapping-mastblack-completed-development.json)
+and [current hypotheses](MAPPING_HYPOTHESES_ASTRA_20261018.md).
+1200/48 remains untouched, not development evidence. No tuning or SG drop.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
