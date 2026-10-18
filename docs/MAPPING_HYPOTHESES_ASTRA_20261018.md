@@ -872,3 +872,31 @@ unit suites are repeated. Independent1200/48 remains reserved and untouched;
 final review/fixes, one affected whole-candidate unit batch/repository gate,
 substantial PR/merge and versioned Ubuntu source/binary installation/rollback
 remain downstream. PR16 remains held. No renderer accuracy result exists yet.
+
+### Stable representation and concurrent instrumentation review
+
+Sol and Astra independently derived the same positive-weight representation.
+Let z=q^n, wi=yi^(1/Rolloff), t=(z-z0)/(z2-z0), tm=(zm-z0)/(z2-z0), and
+k=(wm-w0)*(1-tm)/((w2-wm)*tm). Then the powered output base is
+
+    v = [w0*(1-t) + k*w2*t] / [(1-t) + k*t]
+
+and output=v^Rolloff. Strictly ordered anchors give k>0. On the supported
+interval this has a positive denominator and nonnegative convex numerator;
+it exactly interpolates all three anchors. Expanding numerator/denominator
+gives the same unique rational function, not an additional fit. Normalizing
+all z by Clip^n cancels algebraically. Finite coefficient rounding is distinct
+from exact functional equivalence: the metadata-only Fraction/anchor-neighbour
+witness changes the stored c coefficient by -2.220446049250313e-16 and removes
+the direct714 lower-anchor cancellation. This is not a GPU precision guarantee
+or another lattice run. Witness SHA256:
+`c58533479eed3e296d0a5d3c3ac0a33697baf70f53c9930fe26f61faa689c09e`.
+
+Concurrent read-only review also challenged the proposed GPU validity channel:
+default renderer background composition can turn invalid alpha0 into1 even
+with independent RGBA. The matched consumer must explicitly disable background
+and blending, retain four components/independent alpha, and check every
+downloaded alpha before writing RGB output. Invalid-only safe operands must
+retain sticky failure; valid pixels may not gain undocumented clamps. This
+source challenge is not final independent adversarial review or a successfully
+executed negative regression. Actual full-raster validation remains pending.
