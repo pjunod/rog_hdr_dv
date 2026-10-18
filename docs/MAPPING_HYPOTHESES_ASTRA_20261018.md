@@ -461,9 +461,88 @@ HTML SHA256 (in the order WO2018132329, US10580367, US10056042, WO2018017596):
 WO PDF SHA256: `04e0d2f3dc3e39b7e0cf0b43fa6784a73ecec41281a3b6c01ab141fda155201e`.
 Double-rational preflight: `461b59ee67aeee18fb76615b6261c394cf33ac259be1874e2d16464a6be99e8e`.
 
-Current: Astra remains the sole equation decision owner. Sol has a bounded new
-public-source retrieval/extraction task, not source/native ownership or a second
-thinker role. It must return actual new numeric/default/control evidence or an
-explicit negative result; repeated known curves, invented defaults and another
-parameter sweep are not useful substitutes. No new unit/native/render/holdout
-operation was performed in this continuation. The main task is incomplete.
+That bounded source retrieval subsequently completed with an explicit negative
+result, reconciled below. Astra remains the sole equation decision owner. No
+new unit/native/render/holdout operation was performed in that continuation.
+The main task is incomplete.
+
+## Bounded source retrieval reconciled (Astra362)
+
+Sol's report has SHA256
+`f180e03e5eb2a53cbc3b8da684a211993896f7984689f95af6613a23f0f23908`.
+Its six public search requests and three source pages yielded no new complete
+automatic mapping contract. The suggested PCT/US2016/013352 lead is the known
+US9961237 family, not a new curve. EP3566203B1 supplies an OOTF interpolation but
+not the needed environment-to-alpha rule. Samsung US10708564B2 supplies an
+input knee ratio, but its output knee depends on an unspecified user/colorist
+tone-preservation input and different scene statistics; its table also leaves
+normalization ambiguities. No default or CM2.9 control bridge was invented.
+This bounded negative finding is not a global absence proof or final review.
+
+## Two additional metadata-only alternatives rejected before pixels
+
+1. The previous library-spline diagnostics used scene or zero minimum, not
+   declared mastering black. `astra362_spline_preflight.py` checks the latter
+   preparation with unchanged documented slope tuning1.5, offset0.2 and
+   contrast0.5. On256, synthetic source1.476nit maps to0.660330nit, versus
+   selected0.813089 and the retained near-neutral reference approximately
+   0.829980. On714, source10/100nit shifts -3.712320/-13.173008 in720PQ relative
+   to selected. It deepens the missing midtones; no population run followed.
+2. `astra362_bt2390_preflight.py` checks the standard-offset0.5 EETF with
+   declared mastering black, L1max input peak, the existing scalar pre-SOP and
+   actual post-ratio color. This is an explicit hybrid, not native library or
+   official Dolby identity. Source1.476nit on256 instead maps to1.040705nit;
+   source10nit on714 shifts +17.506190 in720PQ. The overshoot is far larger
+   than the measured deficit, so no population run followed. Source/input and
+   target interval clamps are explicit, not hidden repairs.
+
+These are synthetic neutral transfer differences, not measured deltaEITP or
+all-pixel impossibility proofs. Receipt SHA256 identities respectively:
+
+    099c4683e1cd23b58d6dbc5f8203ce0dad2872708c97b3f4ff0e91ecbbed066b
+    edc08241e0c95dd4b31c19631ed86df5492673c1149bd336e845914288b3011f
+
+The retained root-patent resaturation and Ward notes were read, not rerun.
+The full native-RGB/per-component resaturation chain is not excluded by the
+older pure-Y invariants. Nevertheless adding its log-elasticity directly to a
+zero-output/mastering-black curve has a singular boundary. Ward's source still
+does not supply a unique XML detail-to-filter/scale contract. Neither finding
+licenses an arbitrary domain patch, coefficient, filter or repeat experiment.
+
+## Frozen display-endpoint/content-knee hybrid — diagnostic commissioned
+
+The earlier mastering-white preflight replaced both the adaptation range and
+the rational white endpoint. These are distinct roles. US8593480 describes
+declared source-display endpoints while allowing content-derived midtone
+information. One new explicit hybrid retains actual L1avg/max for midpoint
+selection, with the documented constant adaptation0.4 and existing0.1/0.8
+knee limits, but without the extra smoothstep tuning. The rational endpoints
+are the actual declared source0.005/4000nit mapped to target0/600nit. Nothing
+is fitted; this composition is not claimed to be literal MPC or official CM.
+Original L1 remains unchanged in provenance.
+
+`astra362_display_endpoints.py` fixes the preparation. All subsequent stages
+remain the selected scalar-Y PQ pre-SOP, rational, original RGB ratio restore,
+actual post-ratio PQ CW/SG, and one final physical P3 clip. Metadata-only probes:
+
+| Shot | Source luminance | Change relative to selected,720PQ |
+| --- | ---: | ---: |
+| 256 | 1.476nit | +2.442203 |
+| 714 | 10nit | +4.107736 |
+| 714 | 30nit | +4.466332 |
+| 714 | 100nit | +3.925228 |
+| 714 | 1700nit | -6.518818 |
+
+This has the desired714 midtone/shoulder directions at a plausible scale, but
+the256 neutral probe worsens:0.871473nit versus the approximately0.829980
+reference. Preserve that adverse prediction. These are not accuracy results.
+Receipt SHA256:
+`5c4c021e4dedc928ebdc0466545c80769b2647365831f1b1f135bad922a0db23`.
+
+Sol owns one new cached complete-chain diagnostic on both retained development
+lattices, with no baseline rerun, new source/reference acquisition, units,
+native request or holdout access. Its report must preserve every invalid and
+the reconstructed-source qualification on256. There is no parameter grid,
+fallback variant or renderer promotion. Current: await actual metrics before
+the next mathematical/implementation decision. Passing samples alone would
+still not satisfy full-raster, independent evidence or final review gates.

@@ -119,10 +119,16 @@ fixed diagnostic ran once per34560-point development lattice:256 mean1.177968/
 p952.870972;714 mean2.071912/p954.277430. Both still FAIL and are not renderer
 changes or full-raster results. Newly retrieved double-rational midpoint rules
 have an explicit zero-black domain gap; one labelled metadata-only extension
-overshoots midtones and was not run on image populations. Astra owns the next
-equation decision; Sol's bounded public-source retrieval must supply new numeric
-contract evidence or an explicit negative report. See the linked current
-hypotheses for source hashes, rejected alternatives and unresolved limits.
+overshoots midtones and was not run on image populations. Sol's bounded public
+source retrieval is now complete with no new automatic contract. Two additional
+metadata-only preparations (mastering-black default spline and standard-offset
+BT2390) were rejected before pixels. A new explicitly hybrid display-endpoint/
+content-knee preparation uses declared0.005/4000nit source endpoints and actual
+shot midpoint metadata with fixed public adaptation0.4: its synthetic714 probes
+raise mids and lower the shoulder, while its256 neutral probe may worsen.
+Astra owns the equation decision; Sol owns ONE new retained-lattice complete
+diagnostic, not native/renderer work. Actual metrics are pending, not presumed
+from transfer probes. See the linked current hypotheses for hashes and limits.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
