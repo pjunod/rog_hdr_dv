@@ -26,15 +26,29 @@ no complete CM/raw-RPU/L8/temporal/player/optical/certification claim follows.
 Done: exact-byte scoped harness/source/test/evidence transplantation; public-base
 library patch replay to the frozen tree; warm native compiler prerequisite;
 separate package-relative consumer compilation and static RUNPATH inspection;
-additive genuine parser-input preparation. Fable's final independent review
-approved the numerical/test/package design pending the F1 notice correction;
-the notice-only fix is prepared (demos CC0-1.0 and valid fast_float DEP5 terms).
-Current: exact updated-head/manifest recheck by that reviewer, not final approval.
-Remaining graph: independent final review
-`t_2f09b7c1`, ONE affected whole-candidate batch/repository gate and publication/
-merge `t_656472e9`, then actual Ubuntu source/binary construction, closure,
-isolated install/rollback `t_c97cbefb`. No unit batch, publication, package
-transaction, Apple TV access or physical display deployment in this phase.
+additive genuine parser-input preparation. Fable's final independent adversarial
+review `t_2f09b7c1` APPROVES exact `a6b8dcc176b07622b70fa42db2d96ec71c233754`
+/ tree `60c573e4ae72c4daebc28c960179603959a2a2b4`, including the F1 notice-only
+fix (demos CC0-1.0 and valid fast_float DEP5 terms). Review receipt SHA256:
+`e1e9da4e6018d419714a52db59b9fca0438dcd462431047f147cdfbc4f56b69b`.
+The single affected batch and reviewed failure-only correction are complete:
+[qualification evidence](../evidence/abi368-qualification.json) enumerates every
+method and binds original and retry receipts separately. Initial results were
+75 Python PASS, one incorrect exact-zero expectation FAIL, zero skips; four
+native PASS and one CPU-device skip INVALID/UNCOUNTED; repository gate PASS.
+Fable's independent narrow review APPROVES test-only `5d6d1e2` (no production
+change) and the task-private CPU-enabled upstream Vulkan recipe. Only that failed
+method and invalidated native check were retried, both PASS. CPU stdout proves
+actual `pl_texture_tests:` and `pl_render_tests:` on llvmpipe, not just a device
+enumeration/zero exit. All76 Python and five native checks have valid passing
+receipts; prior75/four successes were not repeated. Original numerical,
+compiler and three-case accuracy evidence retain their executing identities.
+Current: final documentation gate and scoped publication/exact-head CI/
+merge `t_656472e9`. Remaining: broader 30-new-frame/target-pair validation
+`t_857c31e4`, then actual Ubuntu source/binary construction, closure and isolated
+install/rollback `t_c97cbefb`. Broader validation is pending; the release makes
+only the three-case experimental claim above. No package transaction, Apple TV
+access or physical display deployment in this phase.
 
 The owner selected MIT licensing for original utilities and documentation on
 2026-10-18: “Use MIT for the original utilities and docs.” The full grant is
@@ -46,8 +60,8 @@ manifests bind the notice-integrated head without rewriting old receipts.
 The source preparation and binary install recipes carry the full MIT text.
 No upstream/library/vendor material is relicensed. Existing LGPL2.1 section6
 source, shared-library/relinking and customer-modification/debugging
-reverse-engineering obligations remain. Independent review must verify the
-actual notices and eventual package closure; the grant is not package approval.
+reverse-engineering obligations remain. Independent source review verified the actual notices; eventual package closure
+still requires actual construction/inspection. The grant is not package approval.
 
 ## Source closure and attribution
 

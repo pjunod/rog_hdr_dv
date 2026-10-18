@@ -6,7 +6,7 @@ panel calibration and full Dolby Vision. macOS-like consistency and ease of
 use are the quality reference. Plurx is one consumer; this repository owns
 the operating-system display work independently.
 
-**Current mapping preparation (2026-10-18):** [frozen ABI368 main-based source
+**Current mapping qualification (2026-10-18):** [frozen ABI368 main-based source
 and isolated headless package recipes](docs/MAPPING_ABI368_DELIVERY.md).
 The unchanged [sqrt-sum PQ-Y/post-SOP candidate](docs/SQRTSUM_PQ_Y_POST.md)
 retains full-raster256/27 and714/27 development PASS and once-only independently
@@ -15,12 +15,16 @@ These observations remain bound to their original executing sources, not new
 integration renders. Original numerical/native/provenance bytes and library
 tree are preserved; held PR16 history is excluded. Done: scoped transplantation,
 exact public-base library replay and package-relative native consumer compile.
-Current: independent-review source/fixture freeze, including the owner's scoped
-[MIT grant for original utilities and docs](LICENSES.md). Remaining:
-final independent review/fixes, ONE affected unit batch/
-repository gate, publication/merge, actual versioned Ubuntu source/binary and
-isolated install/rollback. No new units, package execution or physical deployment
-in this preparation. No complete CM/rawRPU/L8/temporal/player/optical claim.
+Done: Fable's independent final APPROVE of exact `a6b8dcc` after the notice-only
+F1 fix, including the owner's scoped [MIT grant](LICENSES.md).
+Done: the [single affected batch and reviewed failure-only correction](evidence/abi368-qualification.json)
+provide valid passes for all 76 Python methods (zero skips) and five native
+checks. The initial CPU Vulkan skip remains uncounted; the corrected CPU-enabled
+check proves real texture/render shader execution. No successful checks repeated.
+Current: scoped publication/exact-head CI/merge. Remaining: broader 30-new-pair validation, actual
+versioned Ubuntu source/binary and isolated install/rollback. The broader batch
+is pending; the three retained observations are not general accuracy evidence.
+No physical deployment or complete CM/rawRPU/L8/temporal/player/optical claim.
 
 **Previous source batch (2026-10-15):** [HDR foundations, tooling and an
 experimental launcher](docs/QUALIFIED_HDR_FOUNDATIONS.md), prepared directly

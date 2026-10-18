@@ -1,0 +1,640 @@
+{
+  "schema": "hdr.abi368.qualification.v1",
+  "task": "t_656472e9",
+  "date": "2026-10-18",
+  "qualification": "PASS for selected affected source checks; not package or general accuracy acceptance",
+  "whole_candidate_review": {
+    "head": "a6b8dcc176b07622b70fa42db2d96ec71c233754",
+    "tree": "60c573e4ae72c4daebc28c960179603959a2a2b4",
+    "verdict": "APPROVE",
+    "review_sha256": "e1e9da4e6018d419714a52db59b9fca0438dcd462431047f147cdfbc4f56b69b"
+  },
+  "narrow_review": {
+    "head": "5d6d1e2739b43102c47a8df3025092b5fd503ad6",
+    "tree": "b1820c358cc5dc2b63caf0215bfa7d001b0beefb",
+    "verdict": "APPROVE",
+    "report_sha256": "126326597ed055eb4655e6c7b7ad18295414003f85af32d44aa60c53329534cd",
+    "scope": "one failed test expectation; CPU Vulkan compile recipe and actual-coverage requirement; no production changes"
+  },
+  "executions": {
+    "whole_batch": {
+      "native_receipt": "378acc8c7afa4dee9799073b337bb8ed",
+      "head": "a6b8dcc176b07622b70fa42db2d96ec71c233754",
+      "python": {
+        "testsRun": 76,
+        "failures": 1,
+        "errors": 0,
+        "skips": 0,
+        "expected_failures": 0,
+        "unexpected_successes": 0,
+        "successful": false,
+        "seconds": 507.8769208921585
+      },
+      "effective_native_pass": 4,
+      "native4": "INVALID/UNCOUNTED: zero exit skipped sole CPU device",
+      "repository_gate": "PASS 249 patches, 6 series, documentation links",
+      "source_unchanged": true,
+      "archive_sha256": "0745aa8e6dfcda1c6eff5d1e89e58e927a9a854c8c0ae1e30e53b08bd4a52831"
+    },
+    "failed_invalidated_only_retry": {
+      "native_receipt": "05f0aabd8e5b4a6598c6c284e18b956a",
+      "python_source": "original approved archive plus exactly the independently approved test method fix",
+      "results": [
+        {
+          "name": "python-failed-only",
+          "exit": 0,
+          "seconds": 0.06407486996613443,
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "7352bec65183a8aef73c4cf51e8e1118b8f177321e11126d18c07bc7b6a815cb"
+        },
+        {
+          "name": "cpu-vulkan-only",
+          "exit": 0,
+          "seconds": 13.643934592138976,
+          "stdout_sha256": "c45c5595445b77e8ef812055c2c5d20e98e70221363d523a088dc75ce6625ec9",
+          "stderr_sha256": "0ca982f224551856a4065b883d108d60f2b49d5a60d05abfd3db21c2debcfd0d"
+        }
+      ],
+      "coverage": {
+        "testing_software_device": true,
+        "texture_tests": true,
+        "render_tests": true,
+        "failed_marker": false,
+        "skipped_device": false,
+        "stdout_bytes": 1971920,
+        "helper_sha256": "b0f1cd7be80446495a5860b92c875120d7140903cfcea6adf36ba2ff0f85ee50"
+      },
+      "archive_sha256": "42ab19579f695a0e74413835e149ba990d4c57652fbc50ca5defe104fb70af16",
+      "original_passes_repeated": 0
+    }
+  },
+  "aggregate_valid_check_receipts": {
+    "python_pass": 76,
+    "python_skips": 0,
+    "native_pass": 5,
+    "original_native4_still_invalid": true,
+    "meaning": "75 original Python passes + sole failed-method corrected pass; 4 original native passes + CPU-enabled Vulkan actual shader coverage"
+  },
+  "methods": [
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_output_snapshot_exact_short_oversize_and_bounded_read",
+      "original_status": "PASS",
+      "original_seconds": 0.0007197679951786995,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_output_snapshot_hash_and_sample_domain",
+      "original_status": "PASS",
+      "original_seconds": 0.0007944051176309586,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_half_exact_channels_rows_no_integer_or_gamma_transform",
+      "original_status": "PASS",
+      "original_seconds": 0.00027380906976759434,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_zip_and_verbatim_storage",
+      "original_status": "PASS",
+      "original_seconds": 0.0006660139188170433,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_half_finite_domain_and_tamper_rejection",
+      "original_status": "PASS",
+      "original_seconds": 0.0007889908738434315,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_geometry_and_schema_separation",
+      "original_status": "PASS",
+      "original_seconds": 0.0029572059866040945,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_dvh2_metadata_free_transport_and_physical_encoding_separation",
+      "original_status": "PASS",
+      "original_seconds": 0.00016458495520055294,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_native_dvh2_rejections_before_vulkan",
+      "original_status": "PASS",
+      "original_seconds": 0.014901197981089354,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_xml_security_and_strict_json_types",
+      "original_status": "PASS",
+      "original_seconds": 0.0002498161047697067,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_legacy_dvh1_control_bytes_unchanged",
+      "original_status": "PASS",
+      "original_seconds": 5.118804983794689e-05,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.StorageTransportTests.test_new_frontend_sources_and_artifact_hash_tamper",
+      "original_status": "PASS",
+      "original_seconds": 0.0012813678476959467,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_actual_selected_mapping_rate_and_sparse_acquisition",
+      "original_status": "PASS",
+      "original_seconds": 0.01332143391482532,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_genuine_shot_only_and_sparse_frame_inheritance_no_synthetic_id",
+      "original_status": "PASS",
+      "original_seconds": 0.02842752798460424,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_shot_inheritance_adjacent_boundary_gap_and_source_range",
+      "original_status": "PASS",
+      "original_seconds": 0.04845614288933575,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_shot_inheritance_missing_actual_l1_or_target_rejects",
+      "original_status": "PASS",
+      "original_seconds": 0.019747737096622586,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_selection_discriminant_null_identity_and_bound_export",
+      "original_status": "PASS",
+      "original_seconds": 7.105627112090588,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_original_repair_rollback_exact_and_only_two_insertions",
+      "original_status": "PASS",
+      "original_seconds": 0.06665221089497209,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_l2_verbatim_unapplied_and_no_named_cm_or_cie_y_claim",
+      "original_status": "PASS",
+      "original_seconds": 0.005595586029812694,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_parser_ambiguity_rejections_not_stale_export_guard",
+      "original_status": "PASS",
+      "original_seconds": 0.04213396203704178,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_selected_l1_missing_conflicting_and_target_source_rejections",
+      "original_status": "PASS",
+      "original_seconds": 0.049897655146196485,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_export_and_alignment_strict_tamper_rejection",
+      "original_status": "PASS",
+      "original_seconds": 29.42345995386131,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_sparse_manifest_domain_rejections",
+      "original_status": "PASS",
+      "original_seconds": 0.0007188930176198483,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_sparse_duplicate_and_normalized_identity_rejections",
+      "original_status": "PASS",
+      "original_seconds": 8.025138254044577,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineAuthoredTests.test_retained_reference_binding_and_log_hashes_without_vendor_call",
+      "original_status": "PASS",
+      "original_seconds": 0.07176578813232481,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.FrameReceiptTests.test_v1_implicit_frame0_and_v2_exact_nonzero_time_identity",
+      "original_status": "PASS",
+      "original_seconds": 0.00012864009477198124,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.FrameReceiptTests.test_v2_missing_duplicate_malformed_and_mismatched_time_identity",
+      "original_status": "PASS",
+      "original_seconds": 0.00022563710808753967,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineNonzeroReceiptTests.test_actual_v2_nonzero_and_unchanged_v1_reference",
+      "original_status": "PASS",
+      "original_seconds": 11.994615382980555,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineNonzeroReceiptTests.test_v2_original_source_argv_output_and_duplicate_identity_rejections",
+      "original_status": "PASS",
+      "original_seconds": 0.3556681608315557,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineNonzeroReceiptTests.test_v2_render_log_frame_and_output_mismatches",
+      "original_status": "PASS",
+      "original_seconds": 0.2503594739828259,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineNonzeroReceiptTests.test_v2_export_original_source_binding_cannot_be_rebased",
+      "original_status": "PASS",
+      "original_seconds": 7.009258290054277,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineResultTests.test_genuine_results_positive_single_bounded_snapshot",
+      "original_status": "PASS",
+      "original_seconds": 28.086356492014602,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineResultTests.test_current_parser_rejects_stale_baseline_before_output_read",
+      "original_status": "PASS",
+      "original_seconds": 0.016795648960396647,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.GenuineResultTests.test_genuine_results_wrong_output_hash_after_provenance",
+      "original_status": "PASS",
+      "original_seconds": 12.190537732094526,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.CurrentBaselineResultTests.test_genuine_results_positive_single_bounded_snapshot",
+      "original_status": "PASS",
+      "original_seconds": 45.004229261074215,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.CurrentBaselineResultTests.test_genuine_candidate_compile_frontend_control_log_tamper",
+      "original_status": "PASS",
+      "original_seconds": 96.54000511183403,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_authored_master.CurrentBaselineResultTests.test_genuine_results_wrong_output_hash_after_provenance",
+      "original_status": "PASS",
+      "original_seconds": 24.630840528057888,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAlgebraTests.test_scalar_identity_and_direct_exponent",
+      "original_status": "PASS",
+      "original_seconds": 0.00021899514831602573,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAlgebraTests.test_scalar_supported_range_and_gamma_clamp",
+      "original_status": "PASS",
+      "original_seconds": 0.00014617294073104858,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenProtocolMathTests.test_equal_decimal_flat_and_collapsed_l1_acceptance",
+      "original_status": "PASS",
+      "original_seconds": 0.007447093026712537,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenProtocolMathTests.test_descending_and_invalid_l1_rejection",
+      "original_status": "PASS",
+      "original_seconds": 0.017755392007529736,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_real_selection_factors_and_unapplied_fields",
+      "original_status": "PASS",
+      "original_seconds": 0.0023669670335948467,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_fixed_variant_control_geometry_domain",
+      "original_status": "PASS",
+      "original_seconds": 0.002550654811784625,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_prepared_curve_json_roundtrip_preserves_strict_types_and_control",
+      "original_status": "PASS",
+      "original_seconds": 0.003300171811133623,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_scalar_y_contract_and_failclosed_unsupported_controls",
+      "original_status": "PASS",
+      "original_seconds": 0.001059441827237606,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_duplicate_selection_and_conflict_rejection",
+      "original_status": "PASS",
+      "original_seconds": 0.0005005057901144028,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_exact_target_and_variant_no_nearest_fallback",
+      "original_status": "PASS",
+      "original_seconds": 0.00012359791435301304,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_native_protocol_rejection_before_vulkan",
+      "original_status": "PASS",
+      "original_seconds": 0.03378534712828696,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenAuthenticTests.test_actual_compile_source_header_library_abi_closure",
+      "original_status": "PASS",
+      "original_seconds": 0.030694507993757725,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_open_dm.OpenActualResultTests.test_genuine_source_bound_results_and_rejection_only_tampering",
+      "original_status": "PASS",
+      "original_seconds": 90.33201205986552,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_absolute_sop.AbsoluteAuthenticTests.test_explicit_absolute_algorithm_domain_and_original_association",
+      "original_status": "PASS",
+      "original_seconds": 0.015114386100322008,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_absolute_sop.AbsoluteAuthenticTests.test_native_variant3_explicit_acceptance_and_no_fallback",
+      "original_status": "PASS",
+      "original_seconds": 0.011770735029131174,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_absolute_sop.AbsoluteAuthenticTests.test_absolute_result_rejects_domain_algorithm_and_old_abi",
+      "original_status": "PASS",
+      "original_seconds": 48.76946848607622,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_mastblack_zero_low_knee_and_declared_anchor",
+      "original_status": "PASS",
+      "original_seconds": 0.00017780601046979427,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_mastblack_color_after_ratio_not_sg_drop",
+      "original_status": "FAIL",
+      "original_seconds": 0.0008061940316110849,
+      "final_status": "PASS",
+      "retry_receipt": "05f0aabd8e5b4a6598c6c284e18b956a"
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_two_named_xml_conventions_neutral_limits_and_exact_composition",
+      "original_status": "PASS",
+      "original_seconds": 0.00028277398087084293,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_rational_anchor_solution_poles_and_singularities",
+      "original_status": "PASS",
+      "original_seconds": 6.95488415658474e-05,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_color_zero_limits_and_nonzero_chroma_neutral_sg_bypass",
+      "original_status": "PASS",
+      "original_seconds": 5.1055802032351494e-05,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_linear_basis_matrix_and_declared_black_floor_separation",
+      "original_status": "PASS",
+      "original_seconds": 0.00017772591672837734,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_scene_anchor_knee_and_curve_identity_does_not_skip_sop",
+      "original_status": "PASS",
+      "original_seconds": 8.400203660130501e-05,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_coupled_matrix_inverse_and_explicit_domain_rejection",
+      "original_status": "PASS",
+      "original_seconds": 9.972695261240005e-05,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_public_mapping.PublicMappingMathTests.test_normalized_scalar_post_curve_has_no_mpc_floor_or_rgb_sop",
+      "original_status": "PASS",
+      "original_seconds": 7.666484452784061e-05,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_sqrtsum.SqrtSumMathTests.test_positive_anchor_closure_and_neighbours",
+      "original_status": "PASS",
+      "original_seconds": 0.00016297586262226105,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_sqrtsum.SqrtSumMathTests.test_original_display_bounds_and_invalid_metadata",
+      "original_status": "PASS",
+      "original_seconds": 0.00010586297139525414,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_sqrtsum.SqrtSumMathTests.test_zero_y_and_actual_nonzero_sg",
+      "original_status": "PASS",
+      "original_seconds": 0.00013269600458443165,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_sqrtsum.SqrtSumMathTests.test_gpu_download_receipt_failclosed",
+      "original_status": "PASS",
+      "original_seconds": 0.00031533814035356045,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_sqrtsum.SqrtSumAuthenticTests.test_real_original_target_protocol_and_nonzero_sg",
+      "original_status": "PASS",
+      "original_seconds": 24.33060318697244,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_original_targets.OriginalTargetTests.test_original48_source283_global1200_control_and_reference",
+      "original_status": "PASS",
+      "original_seconds": 0.04101383103989065,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_original_targets.OriginalTargetTests.test_target27_metadata_and_legacy_protocol_unchanged",
+      "original_status": "PASS",
+      "original_seconds": 12.37674748012796,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_original_targets.OriginalTargetTests.test_noncanonical_id_volume_and_original_declaration_rejections",
+      "original_status": "PASS",
+      "original_seconds": 0.009814485907554626,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_original_targets.OriginalTargetTests.test_missing_conflicting_and_ambiguous_selected_trim",
+      "original_status": "PASS",
+      "original_seconds": 0.00028523802757263184,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_original_targets.OriginalTargetTests.test_reference_id_volume_argv_and_source_rejections",
+      "original_status": "PASS",
+      "original_seconds": 0.18011534796096385,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_original_targets.OriginalTargetTests.test_actual_target_info_and_render_log_mismatch_or_duplicates",
+      "original_status": "PASS",
+      "original_seconds": 0.0005077091045677662,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_mapping_package.PackageWrapperTests.test_environment_does_not_inherit_loader_display_or_driver_overrides",
+      "original_status": "PASS",
+      "original_seconds": 0.00017807516269385815,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_mapping_package.PackageWrapperTests.test_duplicate_fields_and_changed_package_schema_fail_closed",
+      "original_status": "PASS",
+      "original_seconds": 0.0006502019241452217,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_mapping_package.PackageWrapperTests.test_system_temporary_and_existing_stages_rejected_without_changes",
+      "original_status": "PASS",
+      "original_seconds": 0.0007665639277547598,
+      "final_status": "PASS",
+      "retry_receipt": null
+    },
+    {
+      "id": "tests.test_mapping_package.PackageWrapperTests.test_dependency_resolution_rejects_missing_or_empty_closure",
+      "original_status": "PASS",
+      "original_seconds": 0.00043505895882844925,
+      "final_status": "PASS",
+      "retry_receipt": null
+    }
+  ],
+  "fixture": {
+    "failed_prerequisite": "1b118fd5: failed before PLAN/output/render",
+    "retention_repair": "exact-SHA copies only, independently accepted; manifests/executables/results unchanged",
+    "successful_fixture": "90943a81: exactly one current supported-baseline fixture; no vendor acquisition or metric",
+    "baseline_replayed": false
+  },
+  "source_retention": {
+    "library_head": "f3b1d3fceb2dfb8343ef36405e3ff07ea232daab",
+    "library_tree": "fb4c387992dfd578ffd7694c380e56cc852ea2e5",
+    "independent_executing_frontend": "ed6d6214",
+    "independent_executing_tree": "99ffcdfc",
+    "numerical_source_change": false,
+    "old_outputs_or_metrics_repeated": false,
+    "historical_accuracy": "Exactly three retained frame/target observations, at original executing identities. Not integration-head renders.",
+    "independent_result_sha256": "221b780845d1ee8a73f8c79a101e52192389ed4c7faa80b9692e186246798666"
+  },
+  "remaining": [
+    "Exact publication-head CI and merge recorded separately in private LANDING.json",
+    "Broader 30-new-frame/target experiment t_857c31e4 pending; no general-accuracy claim",
+    "Actual versioned Ubuntu source/binary construction and isolated install/runtime/rollback t_c97cbefb",
+    "Full CM/rawRPU/L8/temporal/player/optical/certification unproven"
+  ],
+  "boundaries": {
+    "pr16": "held/unmerged; excluded ancestry",
+    "device_actions": 0,
+    "package_transactions": 0,
+    "package_version_frozen": "0.1.0~abi368.1-0ubuntu26.10.1"
+  }
+}
