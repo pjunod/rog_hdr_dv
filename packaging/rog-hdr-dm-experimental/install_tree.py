@@ -29,6 +29,11 @@ for name in ('LICENSES.md', 'PACKAGE-SOURCE.json'):
 for name in ('SQRTSUM_PQ_Y_POST.md', 'MAPPING_ABI368_DELIVERY.md'):
     (share / 'docs').mkdir(exist_ok=True)
     shutil.copy2(ROOT / 'docs' / name, share / 'docs' / name)
+doc = stage / 'usr/share/doc' / P
+doc.mkdir(parents=True, exist_ok=True)
+shutil.copy2(ROOT / 'library/LICENSE', doc / 'COPYING.libplacebo')
+for name in ('LICENSE-MIT', 'LICENSE-APACHE'):
+    shutil.copy2(ROOT / 'library/3rdparty/fast_float' / name, doc / ('COPYING.fast_float-' + name))
 # Public package build record is intentionally separate from the exact private
 # compiler dependency evidence retained by build_consumer.py.
 r = json.loads((ROOT / 'build/package-consumer/compile-private.json').read_text())
