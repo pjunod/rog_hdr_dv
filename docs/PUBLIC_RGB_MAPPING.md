@@ -193,11 +193,76 @@ prove mean1/p953 impossibility. Frozen all-sample WpreY remains
 `1c6d367357570073e6c48586ede545f9ff94bb6d66f95ff1bb60cffba53e8e3d`;
 the initial export-cap failure occurred AFTER the analysis and did not rerun it.
 
-Reserved frame714/target27 preparation binds actual shot-inherited parser2
+Historical run343 frame714/target27 preparation binds actual shot-inherited parser2
 selection with null frame UUID and proves source-frame0+(714-512)=202. A schema4
 draft keeps missing original-acquisition/normalization/reference-receipt bindings
 explicitly null; it is NOT an executable validated export. No vendor call or
-reference/candidate render on714 occurred, preserving its unused evidence status.
+reference/candidate render on714 occurred in that preparation. Run346 below
+supersedes the draft as current acquisition evidence without modifying its history.
+
+## Genuine second-shot development evidence (run346)
+
+The preselected producer global frame714 maps through original XML Record512,
+duration405, sourceIn0 to shot source202. The exact producer global EXR sequence
+key00714 was acquired, not an unrelated source-number202 frame. The producer's
+published original EXR sequence and paired Dolby metadata supply this association;
+EXR rate60000/1001 and raw timeCode are retained, not promoted into embedded
+asset-UUID authentication or IMF/EXR pixel equality. One ordinary target27 render
+uses the unchanged source-associated declaration repair, full P3D65/PQ input and
+full BT2020/PQ output. Exact HALF-to-f32 normalization has transforms=[] on both
+sides. Existing successful normal validation/target-info evidence is retained
+against rehashed unchanged tools/XML/runtime, not executed again.
+
+Actual strict parser2/schema4 export binds the real acquired frame, null frame_id,
+shot-inherited L1(.0196536,.272,.853468) and target27 trim
+`0,0,0,-0.004,0.006,0.007,-0.021,-0.004,-0.75`. The original W bridge supplies
+S1.005006/O-.002006/P2000/2007, CW-.0105/SG-.002; the rational preparation uses
+this shot's actual anchors. Rounded brief P=.996512207274539 failed a script
+assertion before any cache existed; the assertion was corrected to the existing
+exact2000/2007, with no coefficient change. That failure remains in the ledger.
+
+Only the existing COMPLETE W MpreRGB scalar chain was evaluated, including its
+actual nonzero-SG inside-exponent color expression. SG0-only Y preparation
+explicitly rejects the metadata; no Y render/substitution, SG removal, alternate
+order/domain, coefficient fitting or extra vendor variant occurred. As with the
+earlier scalar M diagnostic, metrics are raw before final GPU physical-volume
+enforcement; excursions are counted rather than clipped into agreement.
+
+On the single4096x2160/16x16 top-left lattice (34560 samples):
+
+- All-sample deltaEITP mean6.015329278630697, p9511.063448559052905,
+  max16.229605381653798: FAIL unchanged1/3 bar; invalid0.
+- Mean signed720ITP(-5.622285931186368,.09912824114385256,.041147748877907155).
+  Full signed-axis and black/neutral/chroma/reference-Y strata remain in the
+  private diagnostic receipt, not just a favorable subset.
+- Affine-negative/above1, power-PQ-floor, post-color-PQ-above1 and negative
+  rational-Y clamp counts are all0. Raw candidate414 physical-P3 excursions
+  comprise409 negative and5 above600nit; reference excursions0.
+- Reference black0, nearblack-neutral4, nonblack-neutral251, chroma34305.
+  SourceY ranges .022108716426156236..1749.4373850948507nit; no sampled Y lies
+  below L1min.008377000623053363/mastering.005 or above L1max2540.9552848421195/
+  mastering4000. Shot L1 is not relabelled as per-frame observed extrema.
+- v2 numerical interval accounting: floor0, subnormal0, zero-source0,
+  scale-overlap-fail29881, active/undefined hypothetical P3 rays34, eligible4679.
+  Floor threshold is a disclosed diagnostic convention, not an observed714
+  black plateau. Eligible samples never replace the primary population.
+
+The audit preserves exactly the seven v2 per-sample columns and flag order,
+plus a separately named exact-input table (sourceP3PQ, computed linearBT2020/Y,
+referenceBT2020PQ/Y). Its new SOP/curve/cache identities are explicit. Old local
+thinker scripts with hardcoded frame256 driver constants must not mislabel those
+constants as714; structural columns remain compatible. No CR quadruple or bin
+selection was requested. The20893190-byte JSON was retrieved hash-exact through
+87 owned <=64KiB XZ export pieces; the22-file receipt archive uses one additional
+bounded piece. No cache/analysis/render repetition or other worker's staging
+cleanup was used. Private JSON SHA256:
+`8b2c7a7cae4db0d5d8c2b19f30a39231d75659cb2252c32937fa15603df54170`.
+
+Shot 714/target27 becomes DEVELOPMENT evidence as soon as the thinkers inspect its results; it is no longer an untouched final holdout. A distinct, untouched genuine shot/target must be reserved and recorded (by the thinkers, not here) for FINAL independent acceptance BEFORE any mapper change is accepted. Frame256 status remains WpreY 1.4240802336/2.9756704295 FAIL; nothing on this card is accuracy acceptance, review, merge or package progress.
+
+Both thinkers reserved frame1200/source283/target48 as untouched final evidence
+before the714 results. This task did not acquire, render, cache or inspect it.
+Sanitized receipt: [second-shot evidence](../evidence/public-mapping-shot714-development.json).
 
 ## Done, current and remaining
 
@@ -206,12 +271,11 @@ contract table; continuous XML bridge and source provenance; two-chain cached
 analysis; one basis question resolved negatively; actual scalar/GPU operator and
 native compilation; one authentic GPU development render.
 
-Current: source-stage/black/neutral and coupled intensity/chroma reasoning with
-the independent thinker; supported correction work continues rather than waiting
+Current: source-stage/black/neutral and coupled intensity/chroma reasoning by
+both joint thinkers; supported correction work continues rather than waiting
 for Dolby. Independent-shot preparation identified genuine shot-level L1/trims
 without frame nodes in later original shots. The strict current adapter admits
-only explicit frame-local L1; a truthful shot-inheritance extension is required
-before those held-out frames can be consumed. That extension is now written
+explicit frame-local L1 and truthful shot inheritance. That extension is written
 with export schema4, parser version2 and translation
 `dolby-xml205-l1-shot-inheritance-v2`: unique enclosing shot, actual shot L1/trims,
 `selection_kind=shot-inherited`, JSON-null frame_id and computed edit offset.
@@ -220,8 +284,8 @@ No Frame node/UUID or metadata record is fabricated. Source/target/rate/range
 proof remains mandatory; missing/gapped/ambiguous selections reject. Historical
 schema3 exports/old parser receipts stay immutable, not relabelled as current
 execution. New boundary/gap/missing-L1/target/null-discriminant regressions are
-written and syntax-checked, not executed. No new independent image/reference
-was acquired by this preparation.
+written and syntax-checked, not executed. The preparation alone acquired no
+image/reference; run346 has now acquired714 once as DEVELOPMENT evidence above.
 
 Remaining: passing exact full-raster official output and independent retained
 frames/targets, genuine completed-batch adversarial review/fixes, one affected

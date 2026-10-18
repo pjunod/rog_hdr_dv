@@ -76,6 +76,9 @@ qualified/merged/packaged/released/installed.
 [Source-grounded public RGB mapping](docs/PUBLIC_RGB_MAPPING.md) compares two
 whole published chains against immutable official outputs, with explicit
 continuous-XML adaptation and real ABI365 RGB/ABI366 scalar-Y PQ-pre/rational paths.
+Its [genuine second-shot diagnostic](docs/PUBLIC_RGB_MAPPING.md#genuine-second-shot-development-evidence-run346)
+retains the nonzero-SG714 failure and exact acquisition/interval evidence; it is
+development evidence, not final accuracy acceptance.
 Native full/noDV and consumer compilation passed; one ABI366 development render
 tracks the scalar diagnostic closely but sampled agreement still fails. A fixed
 cached HALF-interval audit is diagnostic only, not a fitted replacement curve.

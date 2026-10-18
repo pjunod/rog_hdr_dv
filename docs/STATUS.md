@@ -64,11 +64,21 @@ quadruple; CRx1.0045260613 is inside conservative CRy[.9922560170,1.0079000635],
 so this interval test does not refute the family. Exact rational W sanity passed;
 floating discrepancy2.22e-16. No fitted coefficients, replacement quadruple or
 subset acceptance. All-sample WpreY1.4240802336/2.9756704295 remains FAIL.
-Frame714/target27 remains reserved: parser2 selection proves source-frame202
-and retains a schema4-shaped preparation draft with unresolved acquisition
-bindings explicit; no executable export, source/reference render or vendor call
-is claimed. Audit export initially exceeded the shared4MiB staging cap after
-successful analysis; native JSON and its hash were retained, not recomputed.
+That historical frame256 audit initially exceeded the shared4MiB export cap
+after successful analysis; its native JSON was retained, not recomputed.
+The preselected genuine frame714/target27 is now acquired once, with producer
+global-sequence/source202 association, actual ordinary reference logs and a REAL
+parser2/schema4 export. Its complete existing nonzero-SG W MpreRGB scalar diagnostic
+FAILS mean6.0153292786/p9511.0634485591/max16.2296053817 on the new34560 lattice;
+invalid0, affine/PQ-floor/rational-clamp0. This reports raw pre-final-GPU-volume
+output, not a GPU or full-raster acceptance result:414 outputs leave physical P3
+(409 negative,5 above600nit), while all reference samples are inside. Exact v2
+interval columns plus sourceP3PQ/linearBT2020/sourceY/referencePQ/referenceY are
+retained locally, with actual714 SOP/curve/cache identities and no fitted values.
+SG0-only Y preparation explicitly rejects714; no fallback or Y image evaluation.
+714 is DEVELOPMENT evidence on inspection. Thinkers reserve untouched1200/target48
+for final frozen-candidate acceptance; this task did not acquire or inspect it.
+No old render/build/unit was repeated; no new mapper/source change is accepted.
 
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
