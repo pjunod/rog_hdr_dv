@@ -98,7 +98,7 @@ class OpenAuthenticTests(unittest.TestCase):
         for variant in dm.VARIANTS:
             with self.subTest(variant=variant):
                 a = dm.algorithm(self.obj, self.meta, variant)
-                indexes = ([0, 1, 2, 8] if variant in (dm.RGB_VARIANT, dm.Y_VARIANT) else
+                indexes = ([0, 1, 2, 8] if variant in (dm.RGB_VARIANT, dm.Y_VARIANT, dm.MB_VARIANT) else
                            [0, 1, 2, 6, 7, 8] if variant in dm.SOP_VARIANTS else list(range(9)))
                 self.assertEqual(a['unapplied_trim_indexes'], indexes)
                 self.assertEqual(a['unapplied_trim_values'],
@@ -114,7 +114,7 @@ class OpenAuthenticTests(unittest.TestCase):
         for i, variant in enumerate(dm.VARIANTS):
             tokens = dm.control(self.obj, self.meta, variant).split()
             self.assertEqual(tokens[:4], ['DVH3', '4096', '2160', '1'])
-            self.assertEqual(len(tokens), 33 if variant in (dm.RGB_VARIANT, dm.Y_VARIANT) else 31)
+            self.assertEqual(len(tokens), 33 if variant in (dm.RGB_VARIANT, dm.Y_VARIANT, dm.MB_VARIANT) else 31)
             self.assertEqual(int(tokens[27]), i)
             self.assertEqual(tokens[24:27], ['0.0', '0.290273', '0.879591'])
             if i < 2:
@@ -122,12 +122,35 @@ class OpenAuthenticTests(unittest.TestCase):
         self.assertEqual(saved, self.meta)
         self.assertEqual(dm.algorithm(self.obj, self.meta, 'l1-rational')['l1_curve_domain'], 'nits rational')
 
+    def test_prepared_curve_json_roundtrip_preserves_strict_types_and_control(self):
+        for variant in (dm.RGB_VARIANT, dm.Y_VARIANT, dm.MB_VARIANT):
+            a = dm.algorithm(self.obj, self.meta, variant)
+            serialized = json.loads(json.dumps(a, allow_nan=False))
+            self.assertTrue(am.strict_equal(a, serialized))
+            for key in ('coefficients', 'source_anchors', 'mapped_anchors'):
+                self.assertIs(type(a['prepared_curve'][key]), list)
+            for value in (1, True, 1.000000001):
+                tampered = copy.deepcopy(serialized)
+                tampered['applied_factors']['P'] = value
+                self.assertFalse(am.strict_equal(a, tampered))
+            expected = ['DVH3', '4096', '2160', '1']
+            for volume in (self.obj['source']['mastering'], self.obj['target']):
+                expected += list(map(str, (volume['min_nits'], volume['max_nits'], *volume['primaries'])))
+            expected += ['0.0', '0.290273', '0.879591', str(dm.VARIANTS.index(variant)),
+                         '1.014', '-0.014', str(2000/2001), '-0.001', '0.0']
+            self.assertEqual(dm.control(self.obj, self.meta, variant), ' '.join(expected) + '\n')
+
     def test_scalar_y_contract_and_failclosed_unsupported_controls(self):
         a = dm.algorithm(self.obj, self.meta, dm.Y_VARIANT)
         self.assertEqual(a['id'], 'open-continuous-xml-y-pq-pre-rational-v1')
         self.assertEqual(a['color_factors']['sg'], 0)
         self.assertEqual(a['color_factors']['status'], 'supported-SG0-only; CW present/no effect')
         self.assertIn('restore original linear RGB ratios', a['applied_stages'])
+        mb = dm.algorithm(self.obj, self.meta, dm.MB_VARIANT)
+        self.assertEqual(mb['id'], 'open-y-pq-pre-mastblack-v1')
+        self.assertEqual(mb['mastering_black_nits'], self.obj['source']['mastering']['min_nits'])
+        self.assertEqual(mb['prepared_curve']['source_anchors'][0], mb['mastering_black_nits'])
+        self.assertIn('public inside-exponent PQ color after ratio', mb['applied_stages'])
         # Rejection-only mutations of retained metadata; never vendor input.
         for index, value, reason in ((7, '-0.004', 'exact SG0'),
                                      (4, '0.1', 'exceeds physical PQ domain')):
@@ -184,7 +207,7 @@ class OpenAuthenticTests(unittest.TestCase):
 
     def test_actual_compile_source_header_library_abi_closure(self):
         prov.validate_compile(self.compile, live=True)
-        self.assertEqual(self.compile['abi'], 366)
+        self.assertEqual(self.compile['abi'], 367)
         self.assertEqual(self.compile['binary_sha256'], prov.sha(self.native))
         for edit in ('abi', 'sources', 'library_sources', 'headers'):
             c = copy.deepcopy(self.compile)

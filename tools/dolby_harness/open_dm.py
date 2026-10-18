@@ -145,8 +145,10 @@ def algorithm(obj, meta, variant):
         if variant in (Y_VARIANT, MB_VARIANT):
             if variant == Y_VARIANT and sg != 0:
                 raise ValueError('Y-PQ-pre supports exact SG0 only; no RGB fallback')
-            if applied['S'] + applied['O'] > 1:
+            if variant == Y_VARIANT and applied['S'] + applied['O'] > 1:
                 raise ValueError('Y-PQ-pre SOP exceeds physical PQ domain')
+            if variant == MB_VARIANT and applied['S'] * l1['max_pq'] + applied['O'] > 1:
+                raise ValueError('mastering-black SOP exceeds PQ1 over declared L1 range')
             result.update(id='open-continuous-xml-y-pq-pre-rational-v1',
                 domain='absolute PQ of scalar linear BT2020 Y before rational Y',
                 color_factors={'cw':cw,'sg':sg,'status':'supported-SG0-only; CW present/no effect'},
@@ -174,9 +176,12 @@ def algorithm(obj, meta, variant):
                         'lo-forced-0 knee follows pinned MPC CPU UINT-nits minimum truncation',
                         'Declared mastering-black rational anchor follows named shader semantics; not fitted',
                         'Color-after-ratio scalar extension; nonzero SG applied, not substituted',
-                        'Zero Y maps to black before color; full-domain SOP within PQ1',
+                        'Zero Y maps to black before color; SOP within PQ1 over declared L1 range',
+                        'Scalar per-pixel affine SOP fails closed above PQ1; GPU finite PQ1 cap must be unexercised',
                         'Published 1e-5 post-SOP PQ floor; reject post-color PQ above1, no clipping'])
-    return result
+    # This object is a JSON protocol value, including prepared-curve vectors.
+    # Make its transport representation explicit without weakening strict_equal.
+    return json.loads(json.dumps(result, allow_nan=False))
 
 
 def control(obj, meta, variant):

@@ -226,11 +226,13 @@ def mpc_pre_y_mastblack(rgb, curve, sop, color, counters=None):
     if not all(math.isfinite(v) and 0 <= v <= 10000 for v in rgb):
         raise ValueError('nonnegative finite RGB nits required')
     s, o, p = sop
-    if not all(math.isfinite(v) for v in sop) or p <= 0 or s + o > 1:
+    if not all(math.isfinite(v) for v in sop) or p <= 0:
         raise ValueError('scalar SOP outside physical PQ domain')
     y = sum(w * v for w, v in zip(BT2020_WEIGHTS, rgb))
     if y > 0:
         affine = s * pq_inverse(y) + o
+        if affine > 1:
+            raise ValueError('scalar SOP affine exceeds physical PQ domain')
         power = max(0.0, affine) ** p
         q = max(1e-5, power)
         if not math.isfinite(q) or q > 1:

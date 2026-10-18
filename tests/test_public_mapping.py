@@ -39,7 +39,7 @@ class PublicMappingMathTests(unittest.TestCase):
         self.assertEqual(pm.mpc_pre_y_mastblack(rgb, c, sop, (-.5, 0)),
                          pm.mpc_pre_y_mastblack(rgb, c, sop, (.5, 0)))
         with self.assertRaises(ValueError):
-            pm.mpc_pre_y_mastblack(rgb, c, (1.5, 0, 1), (0, 0))
+            pm.mpc_pre_y_mastblack((10000,)*3, c, sop, (0, 0))
         with self.assertRaises(ValueError):
             pm.mpc_pre_y_mastblack((10000,)*3, {'identity': True}, (1, 0, 1), (.5, .5))
 

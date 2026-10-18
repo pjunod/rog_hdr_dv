@@ -1,7 +1,7 @@
 From a69b88154cb2c4120e8637cdaf69e1cc08f5606f Mon Sep 17 00:00:00 2001
 From: HDR Builder <hdr-builder@example.invalid>
 Date: Sat, 17 Oct 2026 18:50:12 -0400
-Subject: [PATCH 1/4] dovi: implement source-grounded RGB PQ-pre SOP and
+Subject: [PATCH 1/6] dovi: implement source-grounded RGB PQ-pre SOP and
  rational luminance
 
 ---
@@ -462,7 +462,7 @@ index ca51388..c0c9852 100644
 From c21b4a993ab9bba35a88f93541d4756e5370e60e Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Sat, 17 Oct 2026 19:05:37 -0400
-Subject: [PATCH 2/4] dovi: reject scalar evaluation of the RGB marker without
+Subject: [PATCH 2/6] dovi: reject scalar evaluation of the RGB marker without
  a null callback
 
 ---
@@ -522,7 +522,7 @@ index c0c9852..b46f485 100644
 From 5a7500f81376dd2edf67a854abd782a2b1288d38 Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Sat, 17 Oct 2026 19:24:38 -0400
-Subject: [PATCH 3/4] dovi: add distinct SG0 scalar-Y PQ-pre evaluator and GPU
+Subject: [PATCH 3/6] dovi: add distinct SG0 scalar-Y PQ-pre evaluator and GPU
  path
 
 ---
@@ -851,7 +851,7 @@ index b46f485..9b9a830 100644
 From 62e3651975017649b5ee091fe3abd72666faedab Mon Sep 17 00:00:00 2001
 From: HDR Engineering <hdr-engineering@example.invalid>
 Date: Sat, 17 Oct 2026 22:18:55 -0400
-Subject: [PATCH 4/4] dovi: add isolated mastering-black Y mapper with
+Subject: [PATCH 4/6] dovi: add isolated mastering-black Y mapper with
  post-ratio color
 
 ---
@@ -1173,6 +1173,100 @@ index 9b9a830..3f18fd5 100644
  #ifdef PL_HAVE_VULKAN
      shader_cache_tests();
  #endif
+-- 
+2.54.0 (Apple Git-157)
+
+
+From cd4600fbea5c9003ca4706a39f0af38b4472a3b5 Mon Sep 17 00:00:00 2001
+From: HDR contributors <hdr-contributors@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 22:30:57 -0400
+Subject: [PATCH 5/6] dovi: bound mastering-black SOP by declared range and
+ evaluated pixels
+
+---
+ src/dovi_dm_rgb.c   | 15 ++++++++++++---
+ src/tests/dovi_dm.c |  5 +++++
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/src/dovi_dm_rgb.c b/src/dovi_dm_rgb.c
+index c62f38d..3f320b8 100644
+--- a/src/dovi_dm_rgb.c
++++ b/src/dovi_dm_rgb.c
+@@ -44,7 +44,8 @@ bool pl_dovi_dm_rgb_prepare(const struct pl_dovi_dm_metadata *dm,
+     bool mb = dm->curve == PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
+     if (mb && (dm->origin != PL_DOVI_DM_OFFICIAL_XML ||
+         !isfinite(dm->source.min_luma) || dm->source.min_luma < 0 ||
+-        (dm->open_sop.version && dm->open_sop.slope + dm->open_sop.offset > 1)))
++        (dm->open_sop.version &&
++         dm->open_sop.slope * dm->max_pq + dm->open_sop.offset > 1)))
+         return false;
+     struct pl_dovi_dm_rgb_curve c = {
+         .input_peak = pl_hdr_rescale(PL_HDR_PQ, PL_HDR_NITS, dm->max_pq),
+@@ -161,8 +162,16 @@ bool pl_dovi_dm_rgb_eval(const struct pl_dovi_dm_rgb_curve *c,
+ bool pl_dovi_dm_y_mb_eval(const struct pl_dovi_dm_rgb_curve *c,
+     const struct pl_dovi_dm_sop *s, const float in[3], float out[3])
+ {
+-    if (!c || !rgb_sop_valid(s) || !in || !out ||
+-        (s->version && s->slope + s->offset > 1))
++    if (!c || !rgb_sop_valid(s) || !in || !out)
++        return false;
++    for (int i = 0; i < 3; i++)
++        if (!isfinite(in[i]) || in[i] < 0 || in[i] > 10000)
++            return false;
++    // The new MB preparation bounds SOP over declared L1, not all PQ values.
++    // Still fail closed on an actual out-of-range pixel before power/EOTF.
++    float input_y = .2627f*in[0] + .6780f*in[1] + .0593f*in[2];
++    if (s->version && input_y > 0 &&
++        s->slope * pl_hdr_rescale(PL_HDR_NITS, PL_HDR_PQ, input_y) + s->offset > 1)
+         return false;
+     struct pl_dovi_dm_sop intensity = *s;
+     intensity.saturation_gain = 0;
+diff --git a/src/tests/dovi_dm.c b/src/tests/dovi_dm.c
+index 3f18fd5..e7eb4f9 100644
+--- a/src/tests/dovi_dm.c
++++ b/src/tests/dovi_dm.c
+@@ -135,6 +135,11 @@ static void y_mb_tests(void)
+     assert(fabsf(c.coeffs[0]+c.coeffs[1]*.005f)<1e-7f);
+     float input[3]={1,2,3}, actual[3], neutral[3], saved[3];
+     assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,actual));
++    memcpy(saved,actual,sizeof(saved));
++    input[0]=input[1]=input[2]=10000;
++    assert(!pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,actual));
++    assert(memcmp(actual,saved,sizeof(actual))==0);
++    input[0]=1; input[1]=2; input[2]=3;
+     dm.open_sop.saturation_gain=0;
+     assert(pl_dovi_dm_y_mb_eval(&c,&dm.open_sop,input,neutral));
+     assert(fabsf(actual[0]/input[0]-actual[2]/input[2])>1e-5f);
+-- 
+2.54.0 (Apple Git-157)
+
+
+From 77894e1e55fe319d5f46532c1fa8d3e28bc97fdb Mon Sep 17 00:00:00 2001
+From: HDR contributors <hdr-contributors@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 22:32:49 -0400
+Subject: [PATCH 6/6] shaders: make mastering-black SOP finite extension
+ explicit
+
+---
+ src/shaders/colorspace.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/shaders/colorspace.c b/src/shaders/colorspace.c
+index 63b8e78..aa9ccd0 100644
+--- a/src/shaders/colorspace.c
++++ b/src/shaders/colorspace.c
+@@ -1867,6 +1867,11 @@ void pl_shader_color_map_ex(pl_shader sh, const struct pl_color_map_params *para
+                  SH_FLOAT(sop->slope), SH_FLOAT(sop->offset), SH_FLOAT(sop->power));
+         }
+         GLSL("color.rgb = max(color.rgb, vec3(1e-5)); \n");
++        // MB scalar rejects out-of-domain pixels. The shader's explicit finite
++        // extension caps SOP PQ before EOTF; agreement only proves this cap
++        // unexercised on the measured population, not the entire source range.
++        if (mb_active)
++            GLSL("color.rgb = min(color.rgb, vec3(1.0)); \n");
+         if (!mb_active && sop->version && sop->saturation_gain != 0) {
+             GLSL("float rgb_qY = dot(color.rgb, vec3(.2627,.6780,.0593)); \n"
+                  "color.rgb *= pow((1.0 + "$") * color.rgb / rgb_qY, vec3("$")); \n",
 -- 
 2.54.0 (Apple Git-157)
 
