@@ -166,17 +166,27 @@ are unmeasured; negative-domain/endpoint regressions are compiled, not run.
 The earlier714 bright-stratum residual and unresolved XML detail remain visible.
 See [frozen implementation and evidence](SQRTSUM_PQ_Y_POST.md).
 
-Current: advance this SAME numerical candidate to the independently preselected
-global1200/source283/original target48. Necessary original-target selection and
-strict reference-provenance plumbing must be committed and frozen BEFORE any
-reserved output inspection; no tuning or alternative curve. The independent
-comparison is not yet acquired or passed at this checkpoint. Development
-passes are not official CM identity or final programme acceptance. No successful
-render/comparison or unit batch is repeated for this handoff.
+The SAME numerical candidate now also passes the independently preselected
+global1200/source283/original target48 full-raster comparison:8,847,360 pixels,
+mean0.5356353809/p951.1341677325/max15.3819901181, GPU valid8,847,360/invalid0.
+Original48 is black0/1000nit/P3D65/full. Complete frontend ed6d6214/tree99ffcdfc
+and unchanged numerical library were frozen BEFORE reserved pixels were acquired
+(freeze faa9b5a8); original-target provenance and regression definitions were
+already committed. ONE ordinary reference, ONE actual GPU output, ONE unchanged
+full-raster metric; no tuning or extra variant. The holdout is now consumed PASS
+for this exact frozen source/scope only, not official CM identity or general
+content/profile acceptance. See the separately hash-bound independent receipt
+in [implementation evidence](SQRTSUM_PQ_Y_POST.md#once-only-frozen-independent-qualification-run376).
 
-Remaining: passing frozen independent official reference, completed
-batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
-substantial PR and versioned Ubuntu source/binary package delivery with isolated
+Current: main-based scoped integration and genuinely independent final adversarial
+review. The historical working branch contains held PR16 ancestry: transplant
+required mapping source/tests/docs onto current main, never merge that history.
+Preserve exact numerical files, passing receipts and original executing heads.
+No successful render/comparison or unit batch is repeated for this handoff.
+
+Remaining: final integrated-candidate adversarial review/fixes, one affected
+whole-candidate unit batch/repository gate, merge-ready substantial PR and
+versioned Ubuntu source/binary package delivery with isolated
 install/rollback evidence. No support-email prerequisite, full-Dolby/CM/rawRPU/L8,
 chroma/detail/temporal/seek or physical acceptance claim. See
 [public RGB mapping](PUBLIC_RGB_MAPPING.md). Earlier ABI364 software qualification
