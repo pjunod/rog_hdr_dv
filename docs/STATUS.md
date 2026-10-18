@@ -112,6 +112,18 @@ frontend, failures and partial receipts remain immutable. See
 and [current hypotheses](MAPPING_HYPOTHESES_ASTRA_20261018.md).
 1200/48 remains untouched, not development evidence. No tuning or SG drop.
 
+Latest bounded analysis: independent source audit completed with no supported
+next-chain contract (not final acceptance review). Its forward-only HK shoulder
+argument was corrected by including the algebraic inverse. The new complete
+fixed diagnostic ran once per34560-point development lattice:256 mean1.177968/
+p952.870972;714 mean2.071912/p954.277430. Both still FAIL and are not renderer
+changes or full-raster results. Newly retrieved double-rational midpoint rules
+have an explicit zero-black domain gap; one labelled metadata-only extension
+overshoots midtones and was not run on image populations. Astra owns the next
+equation decision; Sol's bounded public-source retrieval must supply new numeric
+contract evidence or an explicit negative report. See the linked current
+hypotheses for source hashes, rejected alternatives and unresolved limits.
+
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
 substantial PR and versioned Ubuntu source/binary package delivery with isolated

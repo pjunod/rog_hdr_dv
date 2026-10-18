@@ -357,14 +357,113 @@ and `4fd3cd6a7af22176f66cb5f06726b51df090c159421118b75ef44a7bfa1b70d7`.
 No image experiment, parameter fitting, ambient/device measurement or
 implementation was commissioned from these sources.
 
-Current: no promoted candidate. A bounded independent source/assumption audit
-was queued, but had not been claimed at the last readback; this is not final
-adversarial review or a completed peer exchange. The remaining automatic-curve
-decision is unresolved. Existing full-raster failures, final independent
-review and qualification gates remain unchanged.
+Current: no promoted candidate. The bounded independent source/assumption audit
+completed with no supported next-chain contract; it is not final adversarial
+review. Its forward-only HK direction argument was subsequently corrected and
+the new complete inverse-coordinate diagnostic below still fails. The remaining
+automatic-curve decision is unresolved. Existing full-raster failures, final
+independent review and qualification gates remain unchanged.
 
 Remaining: source-grounded passing complete chain, full-raster development and
 independent evidence, genuinely independent adversarial review/fixes, one
 whole-candidate affected unit batch and repository gate, substantial PR/merge,
 and uniquely versioned Ubuntu source/binary packages with isolated install and
 rollback evidence. PR16 stays held; no physical device deployment.
+
+## Audit reconciliation: HK forward and inverse must be considered together
+
+The completed bounded Opus audit found no new automatic-curve contract. Its
+claim that the US10540920 Eq1 HK term necessarily worsens the shoulder considered
+only the forward intensity increase, not a complete coordinate round trip.
+Eq1 and Eq15-17 give the following invertible coordinate construction:
+
+    C = hypot(P,T); K = I + 0.202*C
+    (Pn,Tn) = (P,T)*(1/K + 0.5)
+    J = h(K)
+    (Pm,Tm) = (Pn,Tn)/(1/J + 0.5)
+    Im = J - 0.202*hypot(Pm,Tm)
+
+The inverse is algebraically derived; the patent does not explicitly identify
+this hybrid with the current MB curve as its official consumer implementation.
+For no intensity change it is an identity, whereas applying only the forward HK
+term is not. With C=0, it retains the prior neutral intensity transfer.
+`astra360_hk_preflight.py` verified the synthetic coordinate round trip to
+1.39e-17. For the 714 metadata and synthetic C/I=0.1, the change in720*IPT-I is
++0.087646 at10nit and -1.307397 at300nit: the shoulder can darken, not brighten.
+These coordinate probes are analytic, not measured deltaEITP.
+
+One complete diagnostic was frozen before execution: actual RGB-PQ SOP/CW/SG,
+Ebner Eq1/PQ/IPT, this forward coordinate, the unchanged MB curve on K, exact
+inverse coordinate, the unchanged inverse-LMS domain policy and one physical
+P3 clip. No parameter/matrix/order sweep or fitted constants were introduced.
+`astra360_hk.py` executed exactly once per retained development lattice:
+
+| Shot | Valid pixels | Final-P3 mean | p95 | Maximum |
+| --- | ---: | ---: | ---: | ---: |
+| 256 | 34560 | 1.1779675707 | 2.8709721809 | 9.8129018035 |
+| 714 | 34560 | 2.0719123823 | 4.2774302654 | 5.5295529115 |
+
+Both improve over the preceding IPT/Eq12 diagnostic, but still FAIL. 256 does
+not improve on MB-Y. No renderer adoption follows. 256 has8306 raw-negative
+pixels, so its raw all-population primary metric is unavailable; its complete
+final-P3 metric is valid. 714 has no raw-negative pixels and10 P3 excursions.
+714 signed720*ITP-I in disjoint reference-Y1-10/10-100/100-600nit bins is
+-2.098311/-3.802460/+2.034702. The shoulder improvement is real for this
+diagnostic, but midtone behavior remains wrong. This rejects the fixed hybrid,
+not the HK family or an unknown official pipeline.
+
+Receipt SHA256:
+- Metadata preflight: `40ab639c4f6f0ea99a7a6a1f584c36f33720d2e539cfbb1fa662735c5d86014d`
+- Complete diagnostic: `8f4bfd5c3a53f480880050dbf0b9b62165c59710828b8df1fbea88c78f258f53`
+
+## Bounded additional source search and the automatic-curve decision
+
+The following linked public documents were retrieved, with extraction retained
+privately. They do not supply a selected new renderer contract:
+
+- [WO2018132329A1](https://patents.google.com/patent/WO2018132329A1/en), cited by
+  US8593480, and its US family member
+  [US10580367B2](https://patents.google.com/patent/US10580367B2/en), disclose
+  log-piecewise/spline and double-rational midtone rules. These are distinct
+  from the already-tested libplacebo knee. Literal targetblack0 is undefined
+  in log(y1) and y3/y1. The double-rational example states a maximum domain
+  of0.0001-10000nit, but its initialization floors x1, not y1. It also prints
+  final white anchor(x3,x3), in conflict with the prose's x3->y3 mapping.
+  Both conflicts remain explicit; do not silently call a repair literal source.
+- The primary WO PDF has no text layer. Read-file extraction failed with
+  NeedsOcrError; local150dpi page12-17 OCR recovered the relevant paragraphs
+  and pseudo-code. Math OCR is imperfect. The US HTML independently confirms
+  the targetblack division and source-only initialization; no visual equation
+  verification is claimed.
+- ONE metadata-only preflight, `astra360_double_rational.py`, explicitly
+  labels two extensions: internal black0.0001 from the stated domain and the
+  prose's x3->y3 white endpoint. The declared original target remains0. The
+  resulting knees are8.609999->7.501554nit (256) and6.813581->6.101001nit (714).
+  With existing scalar pre-SOP, the synthetic10nit outputs shift+13.395665 and
+  +13.097257 units720PQ versus MB-Y; even256's1.476nit point shifts+9.251436.
+  This is far larger than the retained deficit. No population experiment or
+  claim of an official floor/endpoint correction follows. Literal zero-black
+  failure and extension assumptions are preserved in the receipt.
+- [US10056042B2](https://patents.google.com/patent/US10056042B2/en) describes
+  temporal filtering and backlight-dependent display ranges. It requires a
+  temporal/display-control contract, not an independently fixed per-shot knee.
+- [WO2018017596A1](https://patents.google.com/patent/WO2018017596A1/en) fits a
+  second metadata curve to an already known first curve; it does not identify
+  the missing first consumer curve. It does not license fitting official pixels.
+
+HTML SHA256 (in the order WO2018132329, US10580367, US10056042, WO2018017596):
+
+    d5f55c87ff709adc22588e96e983f8099facda11635e0b28b5dbf0c47c3643cc
+    d09fde18e9e724264f3cf3c84c584d9968dad17608c9f21d78532694447af52c
+    3fac2e8a84e7d6db8008a44f2dd988714413d0342d7ad30ee2703ec40ead544c
+    2ceeaa508292d052acb07eecfcf24ba5d327d695fa3da36fe359ddf1b2517d09
+
+WO PDF SHA256: `04e0d2f3dc3e39b7e0cf0b43fa6784a73ecec41281a3b6c01ab141fda155201e`.
+Double-rational preflight: `461b59ee67aeee18fb76615b6261c394cf33ac259be1874e2d16464a6be99e8e`.
+
+Current: Astra remains the sole equation decision owner. Sol has a bounded new
+public-source retrieval/extraction task, not source/native ownership or a second
+thinker role. It must return actual new numeric/default/control evidence or an
+explicit negative result; repeated known curves, invented defaults and another
+parameter sweep are not useful substitutes. No new unit/native/render/holdout
+operation was performed in this continuation. The main task is incomplete.
