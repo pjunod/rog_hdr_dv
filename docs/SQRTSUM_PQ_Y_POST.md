@@ -196,3 +196,20 @@ whole-candidate unit batch/repository gate, substantial PR/merge and versioned
 Ubuntu source/binary isolated installation/rollback. New definitions are only
 syntax-checked; zero new units executed. No publication or deployment here;
 PR16 stays held, no Apple TV or physical display action.
+
+For the results-paper comparison, later run389 executed the existing unmodified
+stock libplacebo7.360.1 baseline exactly once per retained frame, reusing the
+identical source/reference pixels and unchanged full-raster BT.2124 metric:
+714/source202/target27 (600-nit P3) mean4.6016304475, p9516.0823123702,
+max33.2132016538; 1200/source283/target48 (1000-nit P3) mean9.3190925809,
+p9516.8724733626, max29.8504963736. Each population is8847360 pixels, with
+nearest-rank p95 and8847360 downloaded RGB finite/PQ-valid,0invalid; stock has
+no sticky-alpha domain counter, so these are not ABI368 alpha-validity counts.
+This reuses the original stock256/run289 DVH2/ABI360 consumer, not the distinct
+sqrt-sum ABI368 consumer; original L1 max/average enter stock slots, while L1
+minimum and trims/detail remain unapplied. It is a fixed headless baseline,
+not proof of every player's configuration or raw-RPU/full-Dolby equivalence.
+Both baselines fail unchanged mean1/p953 limits. No new reference acquisition,
+variant, tuning, sqrt-sum rerun or unit execution occurred; the already-spent
+1200 holdout gains no new independence. [Sanitized comparison evidence](../evidence/stock-baseline389.json)
+binds all hashes; frozen implementation/review/delivery gates are unchanged.

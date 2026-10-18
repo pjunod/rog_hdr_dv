@@ -1,0 +1,142 @@
+{
+  "schema": "hdr.stock-baseline.comparison.v1",
+  "task": "t_db187d64",
+  "purpose": "Comparison-only existing stock baseline on retained source/reference pixels; no numerical implementation change.",
+  "stock_baseline": {
+    "library": "libplacebo 7.360.1 (ABI360), unmodified stock path",
+    "protocol": "DVH2",
+    "consumer": "Existing headless_render.c baseline, identical ELF/runtime to frame256 stock run289; NOT ABI368 open-dm-render.",
+    "consumer_sha256": "43d9109467fe1287dff6e822b91abad295b3091a2e831ac21a5604aeb2d894f7",
+    "library_sha256": "00acb5b05e0d39256402f96c3d2462c8b73b2133268fa35fd51a7eb0a578f580",
+    "compile_receipt_sha256": "26602d93e1a15e236ff53047d7a9d2c51bce71c68e26c97aa1d5733fa678438f",
+    "semantics": "Authored P3D65/PQ/full source; original normalized L1 max/average in stock HDR slots; original target volume; BT2020/PQ/full output. L1 minimum/L2 trims/detail/L3/L8 unapplied. No raw-RPU/full-player equivalence inferred.",
+    "peak_detection": false,
+    "dithering": false,
+    "scaling": false
+  },
+  "frontend_sources": {
+    "tools/dolby_harness/harness.py": "4a985a8f6f953814e8e38ad1e6fc8524a8ddb6a55a5140ea7391cd6c896ffa34",
+    "tools/dolby_harness/contracts.py": "6f136968ad1f67a9b7c4d1f1cf448ea9b1c37f9821f02865e7e4d56c6e8609f6",
+    "tools/dolby_harness/metric.py": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90",
+    "tools/dolby_harness/provenance.py": "1b94da58a772252b4e42203b05a7d855927138711cfe96862460b3fe940de85e",
+    "tools/dolby_harness/postreshape.py": "a6b4d99cdbf14e69cc57f0736a713d47d9efb5147027df5b05f99cadf1add95d",
+    "tools/dolby_harness/authored_master.py": "0ece573bda9c738f965f842a0c9a7cde4b253aaa2928905325cd1cefe266a833",
+    "tools/dolby_harness/master_pixels.py": "977ea623577162869ed80959447d88f56fab8aa124d2c9371da1559d3ff6777d"
+  },
+  "metric": {
+    "name": "ITU-R BT.2124-0 Annex 1 deltaE_ITP",
+    "source_sha256": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90",
+    "population": "whole 4096x2160 raster, no subset or fitting",
+    "percentile": "nearest-rank-ceil(0.95*N)"
+  },
+  "freeze_sha256": "11f4d1f316bba1a1a9b6789900f5d2cf32f1bbf74e15e7f0ab36416bc54b52dc",
+  "private_receipt_archive_sha256": "aa9206bc6c0df7fc7fb2c22855be4a37655c281155f98651a4546404f1a9af24",
+  "private_receipt_archive_members": 25,
+  "private_native_manifest_sha256": "035b8ba315576de6d7ce16adb48e5f0ee9ea2a1a8c369cba005517d8f35e1c71",
+  "execution_request": "811d30cd39374b1ea46465afc998cffe",
+  "archive_verification_request": "ac7339fdfc7a462e96bab1303f464599",
+  "shots": {
+    "714": {
+      "statistics": {
+        "pixels": 8847360,
+        "mean": 4.60163044752661,
+        "p95": 16.082312370230596,
+        "max": 33.213201653780715,
+        "percentile": "nearest-rank-ceil(0.95*N)"
+      },
+      "gpu_output_domain": {
+        "population": 8847360,
+        "valid": 8847360,
+        "invalid": 0,
+        "criterion": "every downloaded RGB channel finite and within [0,1] PQ",
+        "evidence": "Unchanged stock native write_pixels checks entire readback before creating output; exit0 plus harness pixels validation. Counts derived from validated raster size, not a native alpha counter.",
+        "alpha_domain_valid": null,
+        "alpha_domain_invalid": null,
+        "alpha_domain_reason": "Stock ABI360 consumer has no sticky-alpha validity instrumentation."
+      },
+      "candidate_sha256": "801c48c06287d9c6c8b92f6db52ab3bc3979477c2d3fe8ba480435e7fd5946d6",
+      "reference_sha256": "486040df3578c003a8d2895176bf7ad585c9e884850d45743b82b549122d204d",
+      "source_sha256": "3be98d16f1dcdf19311108430c4abfe4bd158079e37b5e7761acea611e355a99",
+      "comparison_sha256": "1312e23bab91fcd9abbffba5d3083176adbdb6ec22d7593052cf2ec8d7512550",
+      "candidate_manifest_sha256": "f8958e5674064c219d7584d542578fd526d7ce32fe789d0751aff1daca777005",
+      "target": {
+        "id": "27",
+        "min_nits": 0,
+        "max_nits": 600,
+        "primaries": [
+          0.68,
+          0.32,
+          0.265,
+          0.69,
+          0.15,
+          0.06,
+          0.3127,
+          0.329
+        ]
+      },
+      "source_frame": 202,
+      "passes_unchanged_mean1_p953": false
+    },
+    "1200": {
+      "statistics": {
+        "pixels": 8847360,
+        "mean": 9.319092580946759,
+        "p95": 16.87247336257501,
+        "max": 29.850496373637462,
+        "percentile": "nearest-rank-ceil(0.95*N)"
+      },
+      "gpu_output_domain": {
+        "population": 8847360,
+        "valid": 8847360,
+        "invalid": 0,
+        "criterion": "every downloaded RGB channel finite and within [0,1] PQ",
+        "evidence": "Unchanged stock native write_pixels checks entire readback before creating output; exit0 plus harness pixels validation. Counts derived from validated raster size, not a native alpha counter.",
+        "alpha_domain_valid": null,
+        "alpha_domain_invalid": null,
+        "alpha_domain_reason": "Stock ABI360 consumer has no sticky-alpha validity instrumentation."
+      },
+      "candidate_sha256": "f99962f8328cf7ae1c6f4d5cf22e826c7d17ead498417202cce3c230ed081afa",
+      "reference_sha256": "917f8d69af6341a77e799c6e67e808a2842a30cec22fa40ba773a683692273a0",
+      "source_sha256": "c3f627762664730fdcd667a6151cd5c69425af22eb0be43128b728fa6f336c56",
+      "comparison_sha256": "a35108164ba619b3ef45a47b830284ab99dc7802365a110b80cb77b561797e0a",
+      "candidate_manifest_sha256": "10dff582ea2b85a5f81485cad934233e159dc408f869c761d4c8ed0653cd2a8e",
+      "target": {
+        "id": "48",
+        "min_nits": 0.0,
+        "max_nits": 1000.0,
+        "primaries": [
+          0.68,
+          0.32,
+          0.265,
+          0.69,
+          0.15,
+          0.06,
+          0.3127,
+          0.329
+        ]
+      },
+      "source_frame": 283,
+      "passes_unchanged_mean1_p953": false
+    }
+  },
+  "counts_per_frame": {
+    "renders": 1,
+    "full_metrics": 1,
+    "vendor_acquisitions": 0,
+    "sqrt_sum_runs": 0
+  },
+  "integrity": {
+    "same_source_reference_pixels_as_sqrt_sum": true,
+    "old_pixels_unchanged": true,
+    "historical_stock256_unchanged": true,
+    "new_variants": 0,
+    "tuning": 0,
+    "unit_runs": 0
+  },
+  "limits": [
+    "Counts are full-raster downloaded RGB finite/PQ validity derived from successful failclosed stock validation; alpha-domain counters unavailable, not equivalent to ABI368 sticky-alpha validity.",
+    "Headless CPU Vulkan baseline under fixed harness settings, not a benchmark of all player configurations.",
+    "Frame1200 was already-spent holdout; this is comparison-only, not fresh independence.",
+    "No certification, optical, temporal or universal Dolby Vision agreement claim."
+  ]
+}
