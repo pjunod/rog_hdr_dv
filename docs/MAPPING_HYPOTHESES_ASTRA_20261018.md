@@ -586,11 +586,109 @@ this finite preflight is not an all-pixel impossibility proof or accuracy result
 Receipt SHA256:
 `09216cd739cb853ec7da21f6ab158e853da6e914c4f9464d1e5930d5e7f56e6d`.
 
-Current: bounded public-source collection specifically for the actual negative
-XML ToneDetail control's operator/weight semantics, not another automatic-knee
-search. ST2094-10's method-independent [0,1] detail factor, raw signed ms_weight
-and its override sentinel, and XML -0.75 are separate contracts. The previously
-failed unweighted Gaussian hybrid must not be rerun or supplied a fitted weight.
-Sol owns only new private collection artifacts; Astra retains all equation
-decisions. No new renderer candidate, full-raster result, final review or package
-acceptance has been obtained. The original remaining gates above still apply.
+That bounded detail-control collection is complete and reconciled below.
+ST2094-10's method-independent [0,1] detail factor, raw signed ms_weight and its
+override sentinel, and XML -0.75 remain distinct pixel-processing contracts.
+No new renderer candidate, full-raster result, final review or package acceptance
+has been obtained. The original remaining gates above still apply.
+
+## Detail-carrier provenance and source-retrieval limits (Astra366)
+
+Sol's completed report has SHA256
+`8688aa606728f6f3f5d2afbdc8be2f43311bd76e232b8bc795ab0334a1378c58`.
+Pinned MIT dovi_tool revision614c816b6446dcd1dbaf433403d499a6026fbb5a,
+`dolby_vision/src/xml/parser.rs:600-653`, maps the ninth XML Trim vector value t
+to `min(4095, round(2048*t+2048))`, stored as ms_weight. Our actual frontend
+reads exactly this nine-value Trim representation, not a separate named
+ToneDetail element (`authored_master.py:304-330`, `open_dm.py:77-83`). Thus the
+missing named-tag correspondence in the collection report is not an additional
+carrier obstacle for these inputs. The original -0.75 maps to raw512; this is
+neither the raw-1 override sentinel nor raw2048 default. It still supplies no
+pixel blend, filter strength, placement or official-runtime identity.
+
+The collection's six initiated search requests included an uninstrumented
+redirect, so its strict six-HTTP-transaction bound was not met. The source
+limitations and negative result are retained, not relabelled as complete.
+A targeted verified-TLS curl follow-up recovered the failed Dolby article
+request:301, then one explicitly followed language URL returned200. The result
+was only a Salesforce application shell, not article text; no control wording
+was recovered or inferred. Shell SHA256:
+`14bca643001b13b510e0ffa223447f52833be4d08d889726c9fd93cbe357ba02`.
+No broader search, authentication, challenge bypass or vendor operation followed.
+
+A suspected powered-curve transcription discrepancy was also resolved without
+rerunning anything: US9961237 Eq2 explicitly uses exponent Slope, whereas
+US10540920 Table2/Eq4 uses n=Slope/Rolloff and a different source/target rule.
+The existing diagnostics represent distinct contracts; this is not a source bug
+that justifies changing an exponent and repeating a failed candidate.
+
+## Root resaturation: finite black limit, but adverse synthetic preflight
+
+The earlier mastering-black singularity observation concerns elasticity alone,
+not the complete per-component output. For the n=1 rational with black B>0,
+
+    F(C) = b*(C-B)/(1+c*C)
+    e(Y) = Y*(1+c*B)/((Y-B)*(1+c*Y))
+    H(e) = (1+k1)*e^k2/(1+k1*e^k2)
+    output(C,Y) = max(0,F(C))*exp((H(e)-e)*log(C/Y))
+
+with the source examples k1=1.6774, k2=0.9925. These follow US8593480 Eq26-31,
+independently differentiating F instead of copying the apparent printed
+denominator typo. For c>=0, Y>B and C>B, the expression is finite. Project C<=B
+to zero before evaluating its logarithm. As Y approaches B from above, e tends
+to infinity but H(e) remains bounded. For B<C<=Y the positive exponential is
+bounded by `exp(e*log(Y/B))`, whose exponent tends to1, while F(C) tends to0.
+For a fixed C>B the exponential tends to0; if C also approaches B, the product
+still tends to0. The complete projected product therefore has a continuous
+zero boundary, not a justification for an arbitrary elasticity cap or epsilon.
+Extending Y<=B to black remains an explicit MB black-projection policy, not a
+statement that the patent specifies this below-boundary extension.
+
+One fixed SYNTHETIC-only hybrid used the selected scalar PQ-Y pre-SOP, native
+P3 per-component MB rational plus this resaturation, actual post-map PQ CW/SG,
+and one final P3 clip. It is not the previous BT2020 per-component experiment
+or a literal official pipeline. Seven fixed colour rays at six luminances
+were evaluated; black-limit probes were mathematical checks, not a parameter
+search. No development pixels, population metric, native work or units ran.
+
+On714 at10nit, signed720ITP-I changes versus selected range from-0.844689 to0:
+the wrong direction for the missing midtone output. A7140.01nit red probe also
+fails the subsequent PQ colour-domain guard; that failure is retained, not
+clipped away. The native root mapping itself has finite boundary results; the
+largest output in the relative1e-12 black-limit probes is3.542484e-15nit.
+No image diagnostic follows from this rejected hybrid. This is not an
+all-pixel accuracy result or a family-wide exclusion.
+
+Private preflight script SHA256:
+`472dcb589d1d2224bc83e123d51b3a843b70490b394d37035fd63ebaae30de1f`.
+Receipt SHA256:
+`f6943a0071b21eef9dc25bb88a6974eba1c84e95f82d06e806b803267ed3256d`.
+
+## Next frozen spatial decision: source-example edge protection
+
+US10540920 paragraphs0069/0078 (not an equation numbered0078) specify an
+edge-aware operator that was not exercised by the failed unweighted Eq5:
+
+    Delta = Io-Im
+    alpha = clamp(abs(dx)+abs(dy), 0, 1)
+    Is = Io-alpha*Delta-(1-alpha)*Gaussian(Delta)
+
+This uses the text's explicit example MS_weight0/MS_edge_weight1. The gradient
+filters are first derivatives of the same normalized11-tap sigma2 Gaussian:
+`d[k]=-k*h[k]/4`, with separable d*h and h*d kernels. No independent derivative
+gain or normalization is introduced. Since the signal is already normalized
+PQ, the integer-code division by max_value is not applied a second time.
+Edge replication and the existing below-PQ-black projection remain explicit
+engineering policies. These [0,1] patent parameters are NOT equated with the
+signed XML carrier; original detail-0.75 remains unresolved/unapplied.
+
+The implementation reason is source-provided suppression of the unweighted
+Gaussian's large edge corrections, not a fitted blend or a presumption that
+midtones will improve. One bounded Sol diagnostic is commissioned, retaining
+the same MB/PQ(Y), actual CW/SG and final-P3 chain. It reuses the old verified
+lattice Io/Im/rawIs and reference cache, without rerunning the old Gaussian
+convolution or metric. New derivative neighborhoods require original full
+resolution source access because the old helper freed its full fields; only
+the new chain is compared once per original lattice. Invalids or failure of
+either unchanged1/3 gate stop this hypothesis, without further weight variants.
+Current dispatch is not a completed comparison or renderer acceptance.

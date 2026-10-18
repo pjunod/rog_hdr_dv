@@ -128,9 +128,15 @@ hybrid subsequently ran once per retained lattice, all34,560 samples valid:
 is rejected with no extra endpoint variants or renderer promotion. One new
 scalar-HK trim-placement preflight on synthetic colours has too little714
 midtone effect to justify a population run; it is not a measured accuracy result.
-Current: Astra retains equation decisions; Sol's bounded new public-source
-collection targets XML ToneDetail/operator semantics, not another knee search.
-No native/renderer work, unit rerun or holdout access follows from these results.
+The bounded detail-control collection is complete: actual ninth-Trim carrier
+serialization is established, but its pixel operator remains unresolved. A new
+root-resaturation synthetic preflight resolved the complete-product black limit
+but has adverse midtone direction and one downstream domain failure; no image
+run follows from it. Current: Astra retains equation decisions; Sol is assigned
+one fixed source-example edge-aware spatial diagnostic, reusing old lattice
+fields without repeating the rejected Gaussian metric. Its implementation and
+comparison are pending; it does not reinterpret XML detail-0.75 as a blend.
+No renderer change, unit rerun or holdout access follows from these results.
 See the linked current hypotheses for exact source/receipt hashes and limits.
 
 Remaining: passing full-raster and independent official references, completed
