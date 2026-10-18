@@ -26,8 +26,11 @@ no complete CM/raw-RPU/L8/temporal/player/optical/certification claim follows.
 Done: exact-byte scoped harness/source/test/evidence transplantation; public-base
 library patch replay to the frozen tree; warm native compiler prerequisite;
 separate package-relative consumer compilation and static RUNPATH inspection;
-additive genuine parser-input preparation. Current: exact source/recipe/fixture
-freeze for independent review. Remaining graph: independent final review
+additive genuine parser-input preparation. Fable's final independent review
+approved the numerical/test/package design pending the F1 notice correction;
+the notice-only fix is prepared (demos CC0-1.0 and valid fast_float DEP5 terms).
+Current: exact updated-head/manifest recheck by that reviewer, not final approval.
+Remaining graph: independent final review
 `t_2f09b7c1`, ONE affected whole-candidate batch/repository gate and publication/
 merge `t_656472e9`, then actual Ubuntu source/binary construction, closure,
 isolated install/rollback `t_c97cbefb`. No unit batch, publication, package
@@ -75,7 +78,12 @@ patch, global sources.json pin or held PR16 history is imported.
 
 For compiler source closure, initialize only the required pinned fast_float
 submodule (`97b54ca9e75f5303507699d27c6b4f4efe4641a1`); its original licences
-are retained. Demos/OpenGL are disabled in the package; system Jinja/MarkupSafe,
+are retained. fast_float offers Apache-2.0 or MIT or BSL-1.0; this package elects
+Apache-2.0 or MIT and installs those two texts. All upstream licence files,
+including LICENSE-BOOST, remain in the pinned source. The shipped
+`library/demos/*` source is CC0-1.0 with its original `library/demos/LICENSE`,
+not the general library LGPL-2.1+ notice. Demos/OpenGL are disabled in the package;
+system Jinja/MarkupSafe,
 Vulkan, shaderc, LCMS and FFmpeg development inputs are explicit Build-Depends.
 Do not silently use a historical `/work` shaderc path in a public artifact.
 The native builder's base currently lacks shaderc/FFmpeg/Jinja development

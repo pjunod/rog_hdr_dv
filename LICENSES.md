@@ -37,8 +37,11 @@ without changing its source bytes or historical compile bindings.
 This grant does NOT relicense upstream-derived patches or library files,
 vendored dependencies/protocols, vendor/OEM material, or other separately
 licensed third-party content. In particular, libplacebo and modifications to
-it retain their LGPL/file-level notices, and fast_float retains its original
-Apache-2.0-or-MIT terms. The combined executable's LGPL-2.1 section 6 obligations
+it retain their LGPL/file-level notices; the shipped `library/demos/*` source
+retains CC0-1.0 and its `library/demos/LICENSE`. fast_float offers Apache-2.0
+or MIT or BSL-1.0; this package elects Apache-2.0 or MIT, retains all upstream
+licence files in source, and installs the elected Apache/MIT texts with the binary.
+The combined executable's LGPL-2.1 section 6 obligations
 (including customer modification and reverse engineering for debugging those
 modifications, shared-library/relinking and corresponding-source requirements)
 remain applicable; MIT imposes no additional prohibition on those activities.

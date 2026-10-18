@@ -12,8 +12,13 @@ unchanged historical compiler/accuracy receipts; separate package-relative
 consumer compile with actual ELF RUNPATH inspection and additive genuine parser
 fixture preparation. The owner selected scoped MIT licensing for original
 utilities/docs; the full grant, package copyright and licence propagation are
-integrated without changing numerical/native/upstream bytes. Current: freeze
-updated source/recipe/validation inputs for independent licence/source review.
+integrated without changing numerical/native/upstream bytes. Fable's independent
+review approved the numerical/test/package design pending F1, a notice-only
+correction now prepared: shipped demos CC0-1.0 and valid fast_float DEP5
+Apache-2.0 or MIT terms (BSL not elected). The reviewed out-of-BT.2020
+source-domain rejection limit is documented, not changed. Current: independent
+recheck of the exact corrected head and refreshed package/review manifests;
+final approval is still pending.
 Remaining: final independent review `t_2f09b7c1`, ONE affected whole-candidate batch/gate and PR/merge
 `t_656472e9`, then actual source+binary packages and isolated install/rollback
 `t_c97cbefb`. Existing upstream terms and LGPL source/relink obligations remain;

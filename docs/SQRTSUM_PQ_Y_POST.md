@@ -100,6 +100,13 @@ TRACE native logs retain generated shader source/config for static inspection.
 Cache identity includes original source min AND max plus actual CW/SG, algorithm,
 frame/source identity and full target generation/description/volume.
 
+Source pixels outside BT.2020 after basis conversion reject the whole frame:
+for example, saturated P3 red produces a BT.2020 blue component of about
+-0.00121. The shader's `sq_valid` marks alpha0, the consumer refuses output,
+and the scalar oracle raises `ValueError`; no gamut repair is applied.
+All three measured rasters below had invalid0. This is a reviewed support
+limit, not a numerical change or a claim for arbitrary P3 content.
+
 ## Actual status and remaining acceptance
 
 Done: additive scalar/header/GPU/native transport and source/cache identity;
