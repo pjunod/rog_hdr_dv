@@ -340,8 +340,11 @@ although lower than the retained sampled WpreY2561.42408 and complete W MpreRGB7
 6.01533 baselines (not new full-raster W comparisons). Reserved1200/48 remains
 untouched under coordinator clarification; no holdout consumption/correction.
 Review, one affected unit batch, merge and packages remain downstream. Current
-source hypotheses are recorded by the [coordinating thinker](MAPPING_HYPOTHESES_ASTRA_20261018.md),
-not treated as independent final adversarial review.
+source hypotheses were recorded by the coordinating thinker in the historical
+research branch, not treated as independent final adversarial review. That
+analysis-only document is intentionally not transplanted into the main-based
+delivery. See the [later frozen candidate](SQRTSUM_PQ_Y_POST.md) for actual
+subsequent independent acceptance; this section remains dated predecessor history.
 
 Done: exact retained input/reference/compiler preparation; distinct public
 contract table; continuous XML bridge and source provenance; two-chain cached

@@ -1,0 +1,37 @@
+#!/usr/bin/make -f
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export PYTHONDONTWRITEBYTECODE = 1
+export TMPDIR = $(CURDIR)/build-scratch
+P = rog-hdr-dm-experimental
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	mkdir -p build-scratch
+	meson setup build library --prefix=/usr --libdir=lib/$(P) --buildtype=debugoptimized --wrap-mode=nodownload -Dwerror=true -Dvulkan=enabled -Dopengl=disabled -Dd3d11=disabled -Dshaderc=enabled -Dglslang=disabled -Ddovi=enabled -Dlibdovi=disabled -Dunwind=disabled -Dxxhash=disabled -Ddemos=false -Dtests=false -Dlcms=enabled
+
+override_dh_auto_build:
+	ninja -C build
+	python3 packaging/rog-hdr-dm-experimental/build_consumer.py
+
+override_dh_auto_test:
+	# Post-review whole-candidate tests are a separate source-bound receipt.
+	# Package construction does not repeat passed units or reference renders.
+
+override_dh_auto_install:
+	python3 packaging/rog-hdr-dm-experimental/install_tree.py debian/$(P)
+
+override_dh_makeshlibs:
+	# Private SONAME is not a system-wide provider. Resolve self-dependency locally.
+	printf 'libplacebo 368 $(P) (= $${binary:Version})\n' > debian/shlibs.local
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/debian/$(P)/usr/lib/$(P) -- -x$(P)
+
+override_dh_gencontrol:
+	python3 packaging/rog-hdr-dm-experimental/install_manifest.py debian/$(P)
+	dh_gencontrol
+
+override_dh_auto_clean:
+	rm -rf build build-scratch

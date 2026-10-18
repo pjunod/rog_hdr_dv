@@ -601,7 +601,13 @@ class GenuineNonzeroReceiptTests(unittest.TestCase):
 
 
 class GenuineResultTests(unittest.TestCase):
-    """Consume the ONE later real render/normalization; never render in tests."""
+    """Current reference and stale historical baseline, never relabel execution.
+
+    The original three deep baseline methods remain at their historical commits
+    and receipts. A changed parser/frontend cannot truthfully call their old
+    candidate a new-head positive. Current OPEN candidate deep checks are in
+    test_open_dm; this class explicitly consumes BOTH real fixture identities.
+    """
     @classmethod
     def setUpClass(cls):
         cls.paths = {}
@@ -610,6 +616,85 @@ class GenuineResultTests(unittest.TestCase):
             source = os.environ.get(variable)
             if not source:
                 raise AssertionError(variable + ' real reviewed result required; no fake/skip replacement')
+            cls.paths[role] = Path(source)
+
+    def test_genuine_results_positive_single_bounded_snapshot(self):
+        original_open, original_read_bytes = Path.open, Path.read_bytes
+        for role, path in (('reference', self.paths['reference']),):
+            obj = json.loads(path.read_bytes())
+            self.assertEqual((obj['schema'], obj['role']), (3, role))
+            output = path.parent / obj['output']['file']
+            expected = obj['alignment']['width'] * obj['alignment']['height'] * 12
+            reads, opens = [], []
+            class Stream:
+                def __enter__(self):
+                    self.stream = original_open(output, 'rb')
+                    return self
+                def __exit__(self, *args):
+                    self.stream.close()
+                def read(self, size=-1):
+                    reads.append(size)
+                    return self.stream.read(size)
+            def opened(p, *args, **kwargs):
+                if p == output:
+                    opens.append(p)
+                    return Stream()
+                return original_open(p, *args, **kwargs)
+            def read_bytes(p):
+                if p == output:
+                    raise AssertionError('schema3 output must never use unbounded read_bytes')
+                return original_read_bytes(p)
+            with self.subTest(role=role), patch.object(Path, 'open', opened), patch.object(Path, 'read_bytes', read_bytes):
+                accepted, samples = result_manifest(path)
+                self.assertEqual(accepted, obj)
+                self.assertEqual(len(samples), expected // 12)
+                self.assertEqual(opens, [output])
+                self.assertEqual(reads, [expected + 1])
+                del samples
+
+    def test_current_parser_rejects_stale_baseline_before_output_read(self):
+        path = self.paths['candidate']
+        original = json.loads(path.read_bytes())
+        self.assertEqual((original['schema'], original['role']), (3, 'candidate'))
+        self.assertNotEqual(original['provenance']['execution']['frontend']['sources'],
+                            implementation()['sources'])
+        output = (path.parent / original['output']['file']).resolve()
+        original_open = Path.open
+        def opened(p, *args, **kwargs):
+            if p.resolve() == output:
+                raise AssertionError('stale baseline must reject before reading its pixels')
+            return original_open(p, *args, **kwargs)
+        with patch.object(Path, 'open', opened):
+            with self.assertRaisesRegex(ValueError, 'unsupported authored baseline alignment|authored parser identity mismatch|export differs|implementation changed'):
+                result_manifest(path)
+
+    def test_genuine_results_wrong_output_hash_after_provenance(self):
+        for role, path in (('reference', self.paths['reference']),):
+            bad = json.loads(path.read_bytes())
+            bad['output']['sha256'] = '0' * 64
+            if role == 'reference':
+                # Rejection-only result mutation; authentic XML/vendor provenance
+                # stays intact. Reach the shared output guard, not earlier equality.
+                bad['provenance']['storage_conversion']['normalized']['sha256'] = '0' * 64
+            with self.subTest(role=role), self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
+                result_manifest(path, json.dumps(bad).encode())
+
+
+class CurrentBaselineResultTests(unittest.TestCase):
+    """Use the once-only post-review current supported-baseline fixture.
+
+    Original three baseline positives/deep-tamper checks are invalidated, not
+    counted as retained passes. This branch remains supported, so these current
+    equivalents require a genuine new fixture; OPEN coverage is not a substitute.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.paths = {}
+        for role, variable in (('candidate', 'HDR_AUTHORED_CURRENT_BASELINE_CANDIDATE'),
+                               ('reference', 'HDR_AUTHORED_CURRENT_BASELINE_REFERENCE')):
+            source = os.environ.get(variable)
+            if not source:
+                raise AssertionError(variable + ' once-only current baseline fixture required')
             cls.paths[role] = Path(source)
 
     def test_genuine_results_positive_single_bounded_snapshot(self):
@@ -677,8 +762,6 @@ class GenuineResultTests(unittest.TestCase):
             bad = json.loads(path.read_bytes())
             bad['output']['sha256'] = '0' * 64
             if role == 'reference':
-                # Rejection-only result mutation; authentic XML/vendor provenance
-                # stays intact. Reach the shared output guard, not earlier equality.
                 bad['provenance']['storage_conversion']['normalized']['sha256'] = '0' * 64
             with self.subTest(role=role), self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):
                 result_manifest(path, json.dumps(bad).encode())

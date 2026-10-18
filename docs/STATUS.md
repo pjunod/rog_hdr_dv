@@ -1,6 +1,26 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-17 (America/New_York) · **State:** main-targeting HDR
+**Updated:** 2026-10-18 (America/New_York) · **Current:** frozen ABI368 mapping
+main-based integration/package-source preparation; final review and delivery pending.
+Exact unchanged full-raster256/27 and714/27 development PASS and independent
+1200/48 PASS retained (mean0.535635380895007/p951.1341677325267563,
+8,847,360pixels,GPUinvalid0). No new observations or broader Dolby claim.
+
+Done: scoped transplantation directly on public mainb13ceae3 without heldPR16
+ancestry; original library patch replay to frozen treefb4c3879/all249 hashes;
+unchanged historical compiler/accuracy receipts; separate package-relative
+consumer compile with actual ELF RUNPATH inspection and additive genuine parser
+fixture preparation. Current: freeze source/recipe/validation inputs for review.
+Remaining: final independent review `t_2f09b7c1` (also awaits narrow owner-original
+licence decision `t_886b8dbc`), ONE affected whole-candidate batch/gate and PR/merge
+`t_656472e9`, then actual source+binary packages and isolated install/rollback
+`t_c97cbefb`. Unselected original-utility grant holds distribution/final readiness,
+not engineering preparation; a missing-grant notice is not permission. No units,
+package construction/transaction, vendor/render/metric repetition or device action
+in this phase. [Current delivery boundaries](MAPPING_ABI368_DELIVERY.md),
+[equations/evidence/limits](SQRTSUM_PQ_Y_POST.md). PR16 remains held/unmerged.
+
+**Previous source state:** main-targeting HDR
 foundations/tooling/experimental-launcher source independently reviewed and qualified;
 three support-helper defects corrected and re-reviewed, all 29 affected methods passed.
 Previously qualified component source and exact historical receipts are selected

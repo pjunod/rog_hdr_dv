@@ -71,8 +71,11 @@ class AbsoluteAuthenticTests(unittest.TestCase):
                 self.assertFalse((root/'absent-output').exists())
 
     def test_absolute_result_rejects_domain_algorithm_and_old_abi(self):
+        # Current-head genuine independent result supplies a runnable negative
+        # control. Historical ABI364 positives remain bound to their old head;
+        # do not rerender or relabel them to satisfy this new regression.
         paths = json.loads(Path(os.environ['HDR_OPEN_RESULTS']).read_bytes())
-        path = Path(paths[dm.ABSOLUTE_VARIANT])
+        path = Path(paths[dm.SQRTSUM_VARIANT])
         actual = json.loads(path.read_bytes())
         for key, value in (('id',dm.ALGORITHM), ('sop_domain','PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ'),
                            ('domain','target-normalized PQ'), ('variant','l1-hermite-sop')):
@@ -80,7 +83,7 @@ class AbsoluteAuthenticTests(unittest.TestCase):
             with self.assertRaises(ValueError):dm.validate_result(path,json.dumps(bad).encode())
         compiled = copy.deepcopy(actual['provenance']['execution']['compile_receipt'])
         compiled['abi'] = 362
-        with self.assertRaisesRegex(ValueError,'ABI364'):prov.validate_compile(compiled)
+        with self.assertRaisesRegex(ValueError,'ABI368'):prov.validate_compile(compiled)
 
 
 if __name__ == '__main__':unittest.main()

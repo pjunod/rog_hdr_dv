@@ -1,0 +1,17 @@
+Source: rog-hdr-dm-experimental
+Section: graphics
+Priority: optional
+Maintainer: HDR Engineering <hdr-engineering@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13), meson, ninja-build, pkg-config, python3, python3-jinja2, python3-markupsafe, libfast-float-dev, libvulkan-dev, libshaderc-dev, liblcms2-dev, libavutil-dev
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+Homepage: https://github.com/pjunod/rog_hdr_dv
+
+Package: rog-hdr-dm-experimental
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, python3, mesa-vulkan-drivers
+Description: isolated ABI368 experimental headless display-management consumer
+ Private libplacebo ABI368 and a CPU-Vulkan native DVH4 file consumer.
+ No global libplacebo replacement, player or compositor integration. Original
+ authored controls and exact tested scope only; not general Dolby Vision,
+ raw-RPU, L8, temporal, optical calibration or vendor certification.

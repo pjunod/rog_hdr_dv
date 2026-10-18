@@ -6,7 +6,22 @@ panel calibration and full Dolby Vision. macOS-like consistency and ease of
 use are the quality reference. Plurx is one consumer; this repository owns
 the operating-system display work independently.
 
-**Current source batch (2026-10-15):** [HDR foundations, tooling and an
+**Current mapping preparation (2026-10-18):** [frozen ABI368 main-based source
+and isolated headless package recipes](docs/MAPPING_ABI368_DELIVERY.md).
+The unchanged [sqrt-sum PQ-Y/post-SOP candidate](docs/SQRTSUM_PQ_Y_POST.md)
+retains full-raster256/27 and714/27 development PASS and once-only independently
+reserved1200/48 PASS (mean0.535635/p951.134168,8,847,360pixels,GPUinvalid0).
+These observations remain bound to their original executing sources, not new
+integration renders. Original numerical/native/provenance bytes and library
+tree are preserved; held PR16 history is excluded. Done: scoped transplantation,
+exact public-base library replay and package-relative native consumer compile.
+Current: independent-review source/fixture freeze. Remaining: narrow owner-original
+licence grant decision, final independent review/fixes, ONE affected unit batch/
+repository gate, publication/merge, actual versioned Ubuntu source/binary and
+isolated install/rollback. No new units, package execution or physical deployment
+in this preparation. No complete CM/rawRPU/L8/temporal/player/optical claim.
+
+**Previous source batch (2026-10-15):** [HDR foundations, tooling and an
 experimental launcher](docs/QUALIFIED_HDR_FOUNDATIONS.md), prepared directly
 on `main` without merging held PR16 history. It combines nativehdr10 Night
 Light/monitor targets, asynchronous lifetime and offscreen fixes, the Ubuntu
@@ -78,6 +93,12 @@ pins from the actual historical package construction identities.
 [The headless harness](docs/DOLBY_HARNESS.md) documents public contracts and the
 private reference boundary. [The open display-management contract](docs/OPEN_DV_DISPLAY_MANAGEMENT.md)
 describes the unfinished full-fidelity target, not a claim for the launcher.
+[Authored-master transport](docs/AUTHORED_MASTER_BASELINE.md),
+[OPEN frame-owned mapping](docs/OPEN_XML205_CANDIDATE.md),
+[absolute-PQ predecessor](docs/OPEN_ABSOLUTE_PQ_SOP.md) and
+[public RGB/Y predecessor](docs/PUBLIC_RGB_MAPPING.md) preserve dated source
+dependencies separately from the [current frozen mapping](docs/SQRTSUM_PQ_Y_POST.md)
+and [ABI368 source/package boundary](docs/MAPPING_ABI368_DELIVERY.md).
 [Launcher source/usage](tools/native_player/README.md) and
 [qualification](tools/native_player/QUALIFICATION.md) describe the experimental milestone.
 [Continuation](docs/HANDOFF.md) and the [programme ledger](docs/FULL_HDR_HANDOFF.md)
