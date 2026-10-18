@@ -98,8 +98,11 @@ validation. Compilation and exact-source full-raster development256/714 PASS
 review and units remain separately required, not inferred from these passes.
 Its original-target frontend extension binds explicit canonical target IDs to
 the unchanged declared P3/full/PQ volume, selected Trim, vendor argv and actual
-normal display logs. Old variants stay target27-only; frozen1200/48 independent
-qualification is separate from the retained development executions.
+normal display logs. Old variants stay target27-only. Once-only frozen
+1200/source283/48 independent qualification PASS:8847360 pixels,
+mean0.535635/p951.134168, GPU invalid0.
+This scoped evidence is separate from final review, the deferred affected unit
+batch, publication and Ubuntu delivery; no universal CM/physical identity claim.
 The preceding [Fable hypothesis checkpoint](docs/MAPPING_HYPOTHESES_FABLE_20261017.md)
 and historical [joint analysis](docs/wip-notes/FABLE_JOINT_ANALYSIS_20261017.md),
 [implementation brief](docs/wip-notes/IMPLEMENTATION_BRIEF.md) and

@@ -84,7 +84,8 @@ source/build identities must be committed and frozen BEFORE acquiring or
 inspecting those pixels. Then one ordinary reference, one ABI368 candidate,
 one full unchanged BT.2124 comparison; mean<=1 AND nearest-rank p95<=3.
 No baseline/variant/tuning, scalar diagnosis or repeated development metric.
-Independent result is pending at this source freeze, not implied by design.
+At the pre-output source freeze the independent result was pending, never
+implied by design. The later actual observation is recorded separately below.
 
 GPU invalid-only safe operands avoid undefined pow/EOTF but a sticky validity
 bit marks alpha0 AFTER mapping; valid alpha is preserved. No MB PQ1 cap is
@@ -137,10 +138,61 @@ retains74 files, including actual generated shaders/receipts/samples; all artifa
 hashes verified. Static shader inspection confirms sticky alpha/no background
 repair/no generic IPT/no old MB cap; invalid-regression execution remains deferred.
 
-Remaining: coordinator-owned independent evidence and acceptance, not a repeat
-of these successful renders/comparisons. Return to coordinator for
-frozen independent evidence, genuinely independent final adversarial review,
-fixes, ONE whole-candidate affected unit batch/repository gate, substantial
-PR/merge and versioned Ubuntu source/binary installation/rollback. No such
-final acceptance, publication or deployment is claimed here. PR16 stays held;
-no Apple TV or physical display action.
+## Once-only frozen independent qualification (run376)
+
+Complete frontend/provenance/regression definitions committed BEFORE any reserved
+pixels were acquired: implementation `d3e7298`, executing frontend `ed6d6214`,
+tree `99ffcdfc324225b06bf5e712f98d06114d3b9c49`. Immutable freeze SHA256
+`faa9b5a8b551f443bf006bddfa896ea60a8e102716f899029135e9c0679923ee`.
+All249 numerical-library files remain pinned to `f3b1d3f`/`fb4c3879`;
+sqrtsum.py, metric.py, native consumer/build/provenance and source pin are
+byte-identical to the development candidate. No new numerical decision.
+Original48 selected Trim is `0,0,0,-0.008,0,0.013,-0.012,0,-0.75`, not target27's.
+
+Actual producer global EXR01200/source283 association was verified BEFORE vendor
+execution (native `e93cdf1e`). The same authorized ScopeA publication/paired-XML
+route identifies the global frame, not an invented source283 EXR or Frame UUID.
+No embedded source UUID/cryptographic or IMF pixel authentication is claimed.
+One ordinary validation, target-info48 and vendor reference render `16a456ce`
+completed with unchanged authored controls and metadata validation enabled.
+Both actual target-info and render logs identify48/black0/1000nit/P3/full.
+Source and reference HALF->f32 are storage-only, transforms=[]; REAL parser2/
+schema4 export and immutable input/reference hashes were bound in acquisition
+freeze `5ccec641b0b0270569e5862f445a9e7aaeefb586add57a26215a9e74ee206cd9`
+BEFORE the candidate. First binding attempt failed solely on a historical Mac
+provenance path; existing SHA-retained relocation repaired only the failed
+step, with no source change or vendor rerender. An initial oversized freeze
+transfer was likewise split; successful frontend transfers were not repeated.
+
+One actual ABI368 GPU render `fa8c963c`, then ONE unchanged full-raster
+BT.2124 comparison `0faf0139`:
+
+| Frame/source/target | Pixels | Mean | p95 | Max | GPU valid / invalid |
+|---|---:|---:|---:|---:|---:|
+| 1200 / 283 / 48 | 8847360 | 0.5356353809 | 1.1341677325 | 15.3819901181 | 8847360 / 0 |
+
+PASS unchanged mean<=1 AND nearest-rank p95<=3, no subset/trimmed pass or
+extra baseline/variant/scalar diagnostic. Holdout now consumed: this applies
+ONLY to the exact frozen candidate and tested source/target. No tuning followed.
+Actual output SHA256 `4dd2021837464058243c8ac77b4b2b50d98c570379f29bfe986b845d4363ad51`;
+comparison receipt `221b780845d1ee8a73f8c79a101e52192389ed4c7faa80b9692e186246798666`.
+[Sanitized independent evidence](../evidence/sqrtsum-independent376.json) binds
+all identities. Compact private49-file archive SHA256
+`950a18f90ae785263fa9a19c77c48fc5929f9032c7510b0558753a45308f39f6`
+was retrieved and every48 manifest entry verified. All95 historical exports and
+73 development artifacts remained hash-identical. New-parser256/714 manifests/
+exports are additive test inputs only, never relabeled historical executions.
+The unchanged compiled consumer/library were verified/reused, not rebuilt.
+
+Warnings remain explicit:13 later-shot missing-target1 warnings, vendor source
+reader24fps versus original60000/1001 and override/destination59.94fps, and
+normal f32P3->f16BT2020 slow-path conversion. No inference of selected CM from
+ContentMap3(2). Detail-.75, full CM/rawRPU/L8/temporal and physical identity are
+still unresolved. This is scoped independent accuracy evidence, not final
+programme completion or calibration/certification.
+
+Remaining: genuinely independent final adversarial review/fixes, ONE affected
+whole-candidate unit batch/repository gate, substantial PR/merge and versioned
+Ubuntu source/binary isolated installation/rollback. New definitions are only
+syntax-checked; zero new units executed. No publication or deployment here;
+PR16 stays held, no Apple TV or physical display action.
