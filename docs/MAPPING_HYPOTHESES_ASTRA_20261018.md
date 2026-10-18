@@ -128,6 +128,78 @@ and pixels; no monkeypatch, hash rewrite, skipped closure check, or rerender.
 The metric itself is unchanged. This note records a design decision, not an
 assertion that Sol's repair or either full-raster comparison has finished.
 
+### Subsequent verified completion of the comparison repair
+
+Sol completed each corrected full-raster comparison exactly once. Local report
+hashes were independently checked, without rerendering or recomparing:
+
+| Shot | Pixels | Mean deltaEITP | p95 | Maximum | Result |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 256 | 8847360 | 1.1182596907971711 | 2.7077148379316305 | 9.635916901592578 | FAIL mean |
+| 714 | 8847360 | 2.4148650268866025 | 5.54951429234905 | 51.900494117471645 | FAIL mean/p95 |
+
+Report SHA256 identities:
+- 256: `10358cb3d07c9f1b510319b38d02d8a996723838d5e349db59704eea168d6efc`
+- 714: `eb6a86f7e151767a47c8eae24cad216dec34b34b33da8587c2f92e475a4a1f20`
+- Comparator: `823bc794c7a6056cf8e25e107940b68bf7ba8bbed296c2526940d2a7ebd2cb7d`
+
+The old `open_dm.compare` attempt did NOT succeed. These receipts identify the
+new comparison-only driver and the archived original renderer independently.
+Source/evidence inspection is not final independent adversarial review. Previous
+W results are sampled baselines, not new full-raster W measurements. Sol released
+the source/native lease at repo `211c119` / library `77894e1`; unit runs remain
+zero. Frame1200/target48 is untouched. No acceptance or package claim follows.
+
+## Distinct scene-key powered curve — metadata preflight rejected
+
+US10540920B2 paragraphs0049–0061/Table2 differs materially from the previously
+rejected US9961237 display-midpoint construction. It specifies:
+
+    ratio = (Tmax-Tmin)/(Smax-Smin), in PQ
+    Slope = 1/ratio
+    Key = (Mid-Crush)/(Clip-Crush)
+    Shift = Mid*(1-ratio)*2*Key
+    Rolloff = 1/3
+    n = Slope/Rolloff
+
+Table2 solves a rational through transformed anchors x^n and y^(1/Rolloff).
+The metadata-only `astra356_powered.py` uses the declared .005/4000-nit source
+display, 0/600-nit target and actual scene L1 statistics, without fitted values.
+Automatic mapping followed by absolute-PQ SOP is explicitly a neutral-transfer
+hypothesis, not a full official color/detail chain.
+
+The first diagnostic exited1 at shot714's negative below-Crush fractional-power
+base. The reporter was then corrected to retain invalid rows explicitly; the
+failed metadata diagnostic completed on retry with unchanged equations. No image
+metric or render ran. At source1.476nit, shot256 predicts .479482nit after SOP,
+versus selected .813089 and the retained near-neutral reference .829980. Shot714
+predicts -15.5185 units720PQ relative to selected at1nit but +13.2219 at100nit.
+The literal source formula is invalid at0/.005nit on714. This is not a justified
+next image hypothesis; neither a clamp nor new coefficient was introduced to
+rescue it. A transfer prediction is not an all-pixel impossibility proof.
+
+## Neutral coverage and the remaining implementation decision
+
+`astra356_neutral_coverage.py` reads only retained input/reference rows. It does
+not evaluate a candidate or recompute an error metric. It keeps the existing
+reference-linear-BT2020 relative-spread <=1% definition:
+
+- 256: 153 near-black samples, 2 at source .0159–.0173nit, and 33 at1.476–2.197nit.
+- 714: 233 of255 at source1699.62–1749.44nit; only13 at3.996–99.175nit, with the
+  remaining9 below.383nit. Thus its marginal neutral signed-I residual chiefly
+  describes highlights, not a broad neutral midtone population.
+
+The current evidence motivates fixing midtone/shoulder behaviour, but does not
+justify fitting a free contrast or knee coefficient. Source-grounded modified
+IPT composition, normalized post-SOP and the distinct scene-key powered curve
+have now been tested or preflighted and rejected as described above. There is no
+new promoted candidate. The unresolved decision is a complete source-supported
+automatic curve/driver or coupled stage that improves both development shots;
+do not substitute more exact-invariant exclusion work for that implementation
+goal. Preserve the neutral-coverage limitation when interpreting marginal bins.
+Full-raster and independent accuracy, final independent review/fixes, the one
+affected unit batch, merge and versioned Ubuntu delivery remain outstanding.
+
 Remaining: source-grounded passing complete chain, full-raster development and
 independent evidence, genuinely independent adversarial review/fixes, one
 whole-candidate affected unit batch and repository gate, substantial PR/merge,
