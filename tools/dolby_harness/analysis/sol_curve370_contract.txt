@@ -1,0 +1,48 @@
+Frozen bounded diagnostic: us961-sqrtsum-pq-y-post-v1
+Owner: Sol, task t_871482d9; design: Astra370 shared2454-2456.
+Only development frame256/target27 and714/target27, original34560-point lattices.
+No baseline/preflight execution, fitted variants, native/GPU/vendor/network work,
+fullraster, holdout1200/48, renderer changes, units, commits or devices.
+
+Source: retained US9613407B2.html paragraphs0048-0062, Table2.
+Absolute PQ source display .005/4000nit; actual target0/600nit.
+ratio=min(1,sqrt((Tmax+Tmin)/(Smax+Smin))); ScreenRatio=1;
+Slope=sqrt(1/ratio); Rolloff=1/3; n=Slope/Rolloff.
+Key=2*(L1avg-L1min)/(L1max-L1min); Shift=L1avg*(1-ratio)*Key.
+Source anchors=(L1min,L1avg,L1max).
+Target anchors=(max(L1min-Shift,PQ0),L1avg-Shift,min(L1max-Shift,PQ600)).
+Solve (a+b*x^n)/(1+c*x^n)=target^(1/Rolloff) with existing pm.solve3.
+Preparation fields/coefficients must equal retained metadata preflight exactly.
+Prove increasing numerator ratio and positive denominator on supported interval
+using exact fractions of the binary64 coefficients/powered endpoints; preserve
+binary64 anchor residuals. Intended endpoint continuity has reported finite
+coefficient closure error, not fitted repair.
+This is an automatic-curve continuity claim only, NOT differentiability at the
+joins or global continuity of the separate zero-Y/SOP-floor convention.
+
+ENGINEERING EXTENSION, NOT literal patent: q<=Crush returns target Min;
+q>=Clip returns target Max; strictly interior uses exact powered rational.
+Count both tails (inclusive boundaries) across all samples. Reject negative or
+nonfinite interior base and nonphysical PQ rather than clipping it.
+The retained literal714 below-Crush fractional-power failures remain evidence.
+
+Complete hybrid: original linearBT2020 RGB -> unchanged BT2020_WEIGHTS Y ->
+absolute PQ -> this automatic curve -> actual original scalar W absolute-PQ SOP
+(f.sop_pq, negative-affine clamp, 1e-5 power floor) -> EOTF -> original RGB*Yout/Y
+-> existing f._colour_only with actual CW AND SG -> ONE evaluator physicalP3
+clip[0,600]. Y==0 returns exact black; scalar/tail/SOP counters still recorded,
+colour step bypass counted. No intermediate gamut/physical clipping or epsilon.
+Record original-input/restored/post-colour negatives and domain failures,
+physicalP3 negative/above600 counts, affine clamp/floor, zeroY, and tails.
+No LMS/Eq9 repair; XMLdetail=-.75 remains unresolved/unapplied. This is not the
+complete patent or an identified CM2.9 renderer.
+
+Unchanged BT2124 deltaEITP/nearest-rank p95; mean<=1 AND p95<=3.
+Invalid>0 => primary all-population unavailable, partial metrics diagnostic only.
+Preserve adapter strata, four original reference-defined groups and their Y cells,
+and source-Y halfdecade strata.256 remains reconstructed-source prospect only;
+714 exact retained source triples. Run new chain once each; FAIL means reject
+and stop without variants. Sample pass only reports to coordinator, never auto-
+promotes into fullraster/holdout/renderer work. Final review/fixes/affected batch,
+accuracy/independent1200/48/gate/substantialPR/merge/Ubuntu+rollback remain open.
+Freeze all source/import/cache/metadata/reference-manifest hashes before pixels.

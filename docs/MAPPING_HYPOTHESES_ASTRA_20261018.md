@@ -830,5 +830,45 @@ Private preflight script SHA256:
 `5bbb8518f4dc32932e6831313c6929447852ae640e1a2b2fe7ef3cf2852701ab`.
 Receipt SHA256:
 `a351b04fb26a634877611313ebe8626f36a728bdf5989704b97fdc4bfc636166`.
-Current: bounded implementation/comparison running, no new measured accuracy
-result yet. Original full-raster failures and downstream gates are unchanged.
+The bounded diagnostic is now complete. Exact preparation and source/input
+identities were frozen before one new evaluation per development lattice:
+
+| Shot | Valid / invalid | Mean deltaEITP | p95 | Maximum | Disposition |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 256 | 34560 / 0 | 0.5603548662 | 1.1879074668 | 4.6285121595 | SAMPLE PASS; reconstructed-source prospect |
+| 714 | 34560 / 0 | 0.7419340669 | 2.0535960357 | 9.4000887824 | SAMPLE PASS; exact retained source triples |
+
+Both whole populations meet unchanged mean<=1/p95<=3. These are not full-raster
+or renderer acceptance. The714 referenceY[100,600) stratum has mean1.8166644566/
+p953.4041302337; retain this residual rather than substituting a subset gate.
+Every sample used actual CW/SG and one final physical P3 clip. Input-tail and
+zero-Y counts are zero: those branches remain unexercised. The256 affine
+negative/floor counts are9509/9513;714 has neither. Five714 pixels exceed600nit
+in preclip physical P3; no hidden intermediate physical clamp was added.
+
+Verified read-only SHA256 identities, without candidate or metric reruns:
+
+- Frozen contract/inputs: `b63633817a2b41c73a361fad57a42dac225ad2cb5312fdc3db3869905993b34b`.
+- Results: `596d3abddaf4e2d7fdf7fca198ff8813ba7a8e84a18f31b2ba03278356a749ee`.
+- Final manifest: `6fae2c953aa34b354ac0fa130bb14d0696717b154e41ee9fa112e2fbfd5d0052`.
+
+## Implementation decision after sampled passes (Astra372)
+
+Advance this exact frozen chain, not another coefficient/curve variant. Sol
+owns one additive ABI368 scalar/GPU implementation, variant
+`y-pq-post-sqrtsum`, with enum `PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM`; the algorithm
+identity remains `us961-sqrtsum-pq-y-post-v1`. Preparation consumes original
+declared mastering/display endpoints and actual L1, not hardcoded diagnostic
+values. The existing exact-target27 harness scope remains. Preserve old curves,
+records and failures. Unsupported/invalid domains must not silently fall back
+or clip into validity; full-raster domain qualification is distinct from the
+successful sampled counters. An algebraically equivalent stable representation
+may address finite-precision cancellation, but cannot introduce fitted anchors.
+
+Next evidence is the new native scalar/GPU agreement and exact-source full-raster
+256/714 comparisons against immutable official references. Source256 must no
+longer use the diagnostic reconstruction. No old successful diagnostics or
+unit suites are repeated. Independent1200/48 remains reserved and untouched;
+final review/fixes, one affected whole-candidate unit batch/repository gate,
+substantial PR/merge and versioned Ubuntu source/binary installation/rollback
+remain downstream. PR16 remains held. No renderer accuracy result exists yet.

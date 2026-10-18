@@ -142,10 +142,16 @@ Eq9/reconstruction supplies no identity-chroma repair, while Fig5 wire
 connectivity remains unverified. No silent unity term is added. The same
 source's distinct sqrt-sum automatic-curve preparation has now had one
 metadata-only preflight: plausible714 midtone/shoulder correction and a retained
-below-Crush extrapolation failure. Current: Sol implements one explicitly
-hybrid PQ-Y/post-SOP diagnostic with constant endpoint extension; no new image
-result yet. This is not the rejected literal LMS chroma chain or official CM
-identity. No renderer change, unit rerun or holdout access follows.
+below-Crush extrapolation failure. The complete frozen hybrid subsequently ran
+once per retained lattice:256 mean0.5603548662/p951.1879074668 and714
+mean0.7419340669/p952.0535960357, each34,560 valid/zero invalid. BOTH SAMPLE-PASS
+the unchanged1/3 limits;256 remains reconstructed-source prospect evidence.
+The714 referenceY[100,600) stratum still has p953.40413, and input-tail/zeroY
+branches were unexercised. Current: the exact chain is selected for additive
+ABI368 scalar/GPU implementation and original-source full-raster development
+qualification; no new renderer/full-raster result exists yet. This is not the
+rejected literal LMS chroma chain or official CM identity. No unit rerun or
+reserved1200/48 access is authorized by the implementation handoff.
 See the linked current hypotheses for exact source/receipt hashes and limits.
 
 Remaining: passing full-raster and independent official references, completed
