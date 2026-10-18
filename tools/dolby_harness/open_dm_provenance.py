@@ -19,7 +19,14 @@ FRONTEND_INPUTS = (*base.FRONTEND_INPUTS, 'tools/dolby_harness/open_dm.py',
                    'tools/dolby_harness/public_mapping.py',
                    'tools/dolby_harness/open_dm_provenance.py')
 sha = base.sha
-native_environment = base.native_environment
+
+
+def native_environment(stage):
+    # ABI368 owns compiler/driver scratch in the durable execution stage too.
+    # This wrapper leaves historical baseline environment receipts unchanged.
+    return {**base.native_environment(stage), 'TMPDIR': str(stage)}
+
+
 LOADED = {p: sha(ROOT / p) for p in FRONTEND_INPUTS}
 
 
