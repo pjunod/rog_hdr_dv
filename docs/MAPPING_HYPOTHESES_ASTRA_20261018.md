@@ -764,11 +764,71 @@ HTML SHA256 respectively:
 Algebra/source manifest SHA256:
 `246c0884e203ac0a543cd047082d8c783f9f00286f80916ecf4d50a6188b609c`.
 
-Current: a bounded source-only Sol task is checking the primary PDF Eq9 and
-Fig5 for a missing direct chroma path or a confirmed unresolved formula.
-Primary graphical verification is pending; no complete new candidate is frozen.
+The bounded source-only primary-PDF check is complete. Original PDF page11,
+printed column9 OCR corroborates the literal reconstruction and Eq9; claim19
+on page14 omits clipping but still uses the complement of the derivative.
+Neither supplies a justified identity repair. Actual Fig5 is original page5;
+OCR labels do not establish wire connectivity, which remains UNVERIFIED.
+No graphical bypass absence or patent-error claim follows. PDF SHA256:
+`53fcb6dad2aa824bdb1cd965b0a4323f829341ffdcc9e010660ddacf4c422c47`;
+source report `ed7f49ec70d90708abbf5520245711ffe5d29ecf0574eb3650992d80c55c1583`.
 The previously retained implementation-identity report already documents the
 CM2.9 metadata-family classification, but not the runtime equations; no
 duplicate selector investigation is needed. Remaining full-raster/independent
 accuracy, final review/fixes, one affected unit batch, repository gate, merge
 and Ubuntu delivery requirements above remain unchanged.1200/48 is untouched.
+
+## Distinct sqrt-sum automatic curve (Astra370)
+
+Rejecting that source's literal chroma equation does not reject its independently
+specified automatic curve. Its paragraphs0048-0061/Table2 use a third, distinct
+display/scene preparation, not the earlier US9961237 midpoint-difference or
+US10540920 range-ratio rules. All display quantities below are absolute PQ:
+
+    ratio = min(1, sqrt((Tmax+Tmin)/(Smax+Smin)))
+    Slope = sqrt(1/ratio) * ScreenRatio
+    Key = 2*(Mid-Crush)/(Clip-Crush)
+    Shift = Mid*(1-ratio)*Key*ScreenRatio
+    n = Slope/Rolloff
+
+ScreenRatio1 and Rolloff1/3 are explicit source examples. The original declared
+source .005/4000nit, target0/600nit and actual scene L1 are retained. The
+rational in x^n and y^(1/Rolloff) interpolates source(Crush,Mid,Clip) and
+target(max(Crush-Shift,Tmin),Mid-Shift,min(Clip-Shift,Tmax)). Paragraph0062
+permits subsequent scalar SOP; our actual W control composition is an explicit
+existing engineering hypothesis, not a newly established metadata equivalence.
+
+ONE metadata-only neutral preflight ran, not a candidate image comparison.
+After actual W post-SOP, changes relative to the selected MB/pre transfer are:
+
+| Shot | Source nits | Change in720PQ |
+| --- | ---: | ---: |
+| 256 | 1.476 | +0.103098 |
+| 256 | 10 | +2.650265 |
+| 714 | 10 | +3.476755 |
+| 714 | 30 | +4.053314 |
+| 714 | 100 | +1.588064 |
+| 714 | 1700 | -2.607110 |
+
+These directions/scales motivate one complete hybrid; they are not measured
+accuracy. Literal714 extrapolation at0/.005nit produces a negative fractional-
+power base, retained as a failure. The chosen NONLITERAL engineering extension
+holds the mapping constant at its declared endpoint outside[Crush,Clip]. It
+adds no epsilon or fitted coefficient, and is continuous at both anchors;
+invalid interior evaluation still rejects. Input-tail counts remain visible.
+
+Frozen hybrid `us961-sqrtsum-pq-y-post-v1`: PQ(Y) automatic mapping with that
+extension, actual scalar W absolute-PQ SOP, original RGB ratio restoration,
+actual post-ratio PQ CW/SG and one physical P3 clip. The explicit zero-Y branch
+returns black. This is neither the patent's complete LMS model nor an official
+CM identity claim; unknown detail-0.75 remains unapplied. Sol owns its new
+analysis-only implementation and one retained lattice run per shot. No old
+baseline/metric reruns, renderer promotion, unit batch or holdout operation is
+authorized by this diagnostic; failures stop it without further variants.
+
+Private preflight script SHA256:
+`5bbb8518f4dc32932e6831313c6929447852ae640e1a2b2fe7ef3cf2852701ab`.
+Receipt SHA256:
+`a351b04fb26a634877611313ebe8626f36a728bdf5989704b97fdc4bfc636166`.
+Current: bounded implementation/comparison running, no new measured accuracy
+result yet. Original full-raster failures and downstream gates are unchanged.

@@ -137,11 +137,15 @@ subsequently completed once per lattice with zero invalids/center mismatches:
 256 mean1.072781/p952.521025 and714 mean3.249286/p959.970671, both FAIL. Its
 small literal derivative weights barely change the rejected Gaussian; no
 gain/weight variant or renderer promotion follows. XML detail-0.75 remains
-unresolved/unapplied. Current: Astra retains equation decisions; Sol is checking
-a newly retrieved US9613407 primary Eq9/Fig5 source-transcription question.
-The printed derivative-based LMS-PQ chroma factor loses chroma at an identity
-tone curve in an algebra-only witness; no silent unity-term repair or image
-experiment is selected. No renderer change, unit rerun or holdout access follows.
+unresolved/unapplied. The US9613407 primary-source check is complete: textual
+Eq9/reconstruction supplies no identity-chroma repair, while Fig5 wire
+connectivity remains unverified. No silent unity term is added. The same
+source's distinct sqrt-sum automatic-curve preparation has now had one
+metadata-only preflight: plausible714 midtone/shoulder correction and a retained
+below-Crush extrapolation failure. Current: Sol implements one explicitly
+hybrid PQ-Y/post-SOP diagnostic with constant endpoint extension; no new image
+result yet. This is not the rejected literal LMS chroma chain or official CM
+identity. No renderer change, unit rerun or holdout access follows.
 See the linked current hypotheses for exact source/receipt hashes and limits.
 
 Remaining: passing full-raster and independent official references, completed
