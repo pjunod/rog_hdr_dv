@@ -148,13 +148,33 @@ mean0.7419340669/p952.0535960357, each34,560 valid/zero invalid. BOTH SAMPLE-PAS
 the unchanged1/3 limits;256 remains reconstructed-source prospect evidence.
 The714 referenceY[100,600) stratum still has p953.40413, and input-tail/zeroY
 branches were unexercised. Current: the exact chain is selected for additive
-ABI368 scalar/GPU implementation and original-source full-raster development
-qualification; no new renderer/full-raster result exists yet. This is not the
-rejected literal LMS chroma chain or official CM identity. No unit rerun or
-reserved1200/48 access is authorized by the implementation handoff.
-See the linked current hypotheses for exact source/receipt hashes and limits.
+ABI368 scalar/GPU implementation, now completed and compiled full/noDV/matched
+consumer with warnings as errors. Exact ORIGINAL-source full-raster development
+qualification ran once per shot, 8,847,360 pixels each:256 mean0.5542771866/
+p951.1767793301/max6.3258488471;714 mean0.7337404231/p952.0160825394/
+max16.0386581163. BOTH PASS unchanged mean<=1 AND p95<=3. Every downloaded
+GPU pixel has valid alpha, invalid0 each; this is actual full-raster domain
+evidence, not sampled inference. The exact-source256 result supersedes only
+the reconstructed-source prospect limitation, not its historical receipt.
 
-Remaining: passing full-raster and independent official references, completed
+Frozen library f3b1d3f/treefb4c3879 and frontend f8980e78 retain compiler,
+source/reference/candidate, control and generated-shader closure. Source/native
+ownership was explicitly released after verified closeout. Scalar/GPU sampled
+means .001493629/.002943773 and p95 .003744749/.006502622 are separate precision
+evidence, not a universal .003 bound. Full-raster endpoint/zeroY branch counts
+are unmeasured; negative-domain/endpoint regressions are compiled, not run.
+The earlier714 bright-stratum residual and unresolved XML detail remain visible.
+See [frozen implementation and evidence](SQRTSUM_PQ_Y_POST.md).
+
+Current: advance this SAME numerical candidate to the independently preselected
+global1200/source283/original target48. Necessary original-target selection and
+strict reference-provenance plumbing must be committed and frozen BEFORE any
+reserved output inspection; no tuning or alternative curve. The independent
+comparison is not yet acquired or passed at this checkpoint. Development
+passes are not official CM identity or final programme acceptance. No successful
+render/comparison or unit batch is repeated for this handoff.
+
+Remaining: passing frozen independent official reference, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
 substantial PR and versioned Ubuntu source/binary package delivery with isolated
 install/rollback evidence. No support-email prerequisite, full-Dolby/CM/rawRPU/L8,
