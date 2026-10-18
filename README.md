@@ -93,8 +93,9 @@ record rejected alternatives; no full mapping or holdout acceptance is claimed.
 [Frozen sqrt-sum PQ-Y/post-SOP hybrid](docs/SQRTSUM_PQ_Y_POST.md) implements
 the next source-grounded candidate in private ABI368 with positive powered
 anchors, explicit original-target DVH4 identity and whole-raster RGBA domain
-validation. Compilation passed; renderer/accuracy/final review/units remain
-separately required, not inferred from earlier sampled passes.
+validation. Compilation and exact-source full-raster development256/714 PASS
+(mean0.554277/0.733740; p951.176779/2.016083); independent final acceptance,
+review and units remain separately required, not inferred from these passes.
 The preceding [Fable hypothesis checkpoint](docs/MAPPING_HYPOTHESES_FABLE_20261017.md)
 and historical [joint analysis](docs/wip-notes/FABLE_JOINT_ANALYSIS_20261017.md),
 [implementation brief](docs/wip-notes/IMPLEMENTATION_BRIEF.md) and

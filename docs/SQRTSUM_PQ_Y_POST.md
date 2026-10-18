@@ -86,15 +86,37 @@ flags, corrected to current API and retained. New C/domain/cache/invalid-alpha
 and Python metadata/protocol regressions are authored/compiled or syntax-checked,
 NOT executed. No unit batch has run for this candidate.
 
-Current: exact-source256/714 native/scalar/GPU agreement and full-raster
-qualification are pending at this source checkpoint. Earlier reconstructed256
-and exact71434560 diagnostics sample-pass but are NOT renderer/full-raster
-acceptance. The714 referenceY[100,600) sampled p953.40413 residual and unexercised
-tails/zero-Y remain explicit. No old diagnostic is rerun to update this status.
+Completed development qualification: ONE actual GPU output and ONE unchanged
+full BT.2124 comparison for each exact original frame, 8,847,360 pixels each:
 
-Remaining: one new GPU output and unchanged full BT.2124 comparison per approved
-development shot, exact freeze/manifests and full-raster GPU validity counts.
-On valid accuracy FAIL stop without tuning. On PASS return to coordinator for
+| Frame/target | Mean | p95 | Max | Full GPU valid/invalid |
+|---|---:|---:|---:|---:|
+| 256/27 | 0.5542771866 | 1.1767793301 | 6.3258488471 | 8847360 / 0 |
+| 714/27 | 0.7337404231 | 2.0160825394 | 16.0386581163 | 8847360 / 0 |
+
+BOTH pass unchanged aggregate mean<=1 AND p95<=3. Native requests ea052e03
+(renders),98ba18bc/ba44904a(comparisons). This is exact-source development
+evidence, NOT independent final acceptance or full Dolby identity. Original
+PQ/cache and original-derived BT2020/cache maximum differences are zero for
+both34560 lattices. NEW production-double vs RETAINED frozen outputs has maximum
+deltaEITP2.40e-11/5.50e-11; old candidates/official metrics were not rerun.
+Native C vs retained-double means.000527303/.001304986; GPU vs retained-double
+means.001493629/.002943773, p95.003744749/.006502622, maxima.008261643/.027977601.
+The714 referenceY[100,600) earlier sampled p953.40413 residual remains explicit.
+Full GPU domain validity is measured, but full-raster tail/zero-Y branch counts
+are not claimed. Deferred negative-domain/endpoint/cache regressions remain
+required. Native C's existing rescaler defines PQ0 as0 versus binary64
+PQ0=7.309559e-7; exact float preparation fields are retained, not silently repaired.
+
+[Sanitized development evidence](../evidence/sqrtsum-development373.json)
+binds source/reference/candidate and comparison hashes. Private complete
+archive SHA256 bed09cfc7e18206f90f8f5a6dce5df42d8e85d09ccc2dedf4c4a08c9513cdf0e
+retains74 files, including actual generated shaders/receipts/samples; all artifact
+hashes verified. Static shader inspection confirms sticky alpha/no background
+repair/no generic IPT/no old MB cap; invalid-regression execution remains deferred.
+
+Remaining: coordinator-owned independent evidence and acceptance, not a repeat
+of these successful renders/comparisons. Return to coordinator for
 frozen independent evidence, genuinely independent final adversarial review,
 fixes, ONE whole-candidate affected unit batch/repository gate, substantial
 PR/merge and versioned Ubuntu source/binary installation/rollback. No such
