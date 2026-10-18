@@ -35,7 +35,16 @@ class PublicMappingMathTests(unittest.TestCase):
         for x, q in zip(actual, expected):
             self.assertAlmostEqual(x, pm.pq_eotf(q), places=12)
         self.assertNotEqual(actual, base)
-        self.assertEqual(pm.mpc_pre_y_mastblack((0, 0, 0), c, sop, (-.01, -.002)), (0, 0, 0))
+        # This legacy composition still applies PQ colour after the zero-Y
+        # branch. Binary64 inverse PQ(0) is C1**M2, not zero; negative SG
+        # slightly lifts that code. Do not change the frozen oracle to make
+        # its tiny positive EOTF result agree with native PQ's exact-zero path.
+        black_code = (3424 / 4096) ** (2523 / 32)
+        expected_black = pm.pq_eotf(black_code * .99 ** -.002)
+        self.assertGreater(expected_black, 0)
+        black = pm.mpc_pre_y_mastblack((0, 0, 0), c, sop, (-.01, -.002))
+        for channel in black:
+            self.assertAlmostEqual(channel, expected_black, delta=expected_black * 1e-12)
         self.assertEqual(pm.mpc_pre_y_mastblack(rgb, c, sop, (-.5, 0)),
                          pm.mpc_pre_y_mastblack(rgb, c, sop, (.5, 0)))
         with self.assertRaises(ValueError):
