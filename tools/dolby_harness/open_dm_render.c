@@ -18,7 +18,7 @@
 #endif
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
                "IEEE754 binary32 required");
-_Static_assert(PL_MAJOR_VER == 7 && PL_API_VER == 367, "Private matched ABI367 required");
+_Static_assert(PL_MAJOR_VER == 7 && PL_API_VER == 368, "Private matched ABI368 required");
 #if !defined(PL_HAVE_VULKAN) || !defined(PL_HAVE_DOVI)
 #error "Private full Vulkan/DOVI build required"
 #endif
@@ -127,8 +127,18 @@ static bool read_pixels(const char *path, size_t count, float *rgba)
     return ok;
 }
 
-static bool write_pixels(const char *path, size_t count, const float *rgba)
+static bool write_pixels(const char *path, size_t count, const float *rgba, bool validity_alpha)
 {
+    size_t valid = 0, invalid = 0;
+    if (validity_alpha) {
+        for (size_t i=0; i<count; i++) {
+            if (rgba[4*i+3] == 1.0f) valid++;
+            else invalid++;
+        }
+        printf("{\"schema\":\"hdr.sqrtsum.gpu-domain.v1\",\"population\":%zu,\"valid\":%zu,\"invalid\":%zu,\"channel\":\"downloaded-RGBA-alpha-exact1\"}\n",
+               count,valid,invalid);
+        if (invalid) return false;
+    }
     for (size_t i = 0; i < count; i++) {
         for (int c = 0; c < 3; c++) {
             float v = rgba[4 * i + c];
@@ -159,23 +169,27 @@ int main(int argc, char **argv)
         fprintf(stderr, "Usage: open-dm-render CONTROL INPUT-F32LE OUTPUT-F32LE\n");
         return 2;
     }
-    int width = 0, height = 0, primaries = 0, variant = 0;
+    int width = 0, height = 0, primaries = 0, variant = 0, target_id = 27;
     struct pl_frame src = {.num_planes = 1}, dst = {.num_planes = 1};
     struct pl_dovi_dm_metadata *dm = &src.dovi_dm;
     struct pl_dovi_dm_sop factors = { .version = 1,
         .domain = PL_DOVI_DM_SOP_TARGET_NORMALIZED_PQ };
     FILE *control = fopen(argv[1], "r");
     char magic[64], trailing[64];
-    bool valid = control && token(control, magic) && !strcmp(magic, "DVH3") &&
+    bool valid = control && token(control, magic) &&
+        (!strcmp(magic, "DVH3") || !strcmp(magic, "DVH4"));
+    bool v4 = valid && !strcmp(magic,"DVH4");
+    valid = valid &&
         read_int(control, 1, 4096, &width) && read_int(control, 1, 2160, &height) &&
         read_int(control, 1, 1, &primaries) &&
+        (!v4 || read_int(control,1,65535,&target_id)) &&
         read_volume(control, &src.color.hdr) && read_volume(control, &dst.color.hdr) &&
         read_l1(control, dm) &&
-        read_int(control, 0, 6, &variant) &&
+        read_int(control, 0, 7, &variant) &&
         read_float(control, 0.5f, 1.5f, &factors.slope) &&
         read_float(control, -0.5f, 0.5f, &factors.offset) &&
         read_float(control, 0.5f, 1.5f, &factors.power);
-    if (valid && (variant == 4 || variant == 5 || variant == 6))
+    if (valid && (variant == 4 || variant == 5 || variant == 6 || variant == 7))
         valid = read_float(control, -0.5f, 0.5f, &factors.chroma_weight) &&
                 read_float(control, -0.5f, 0.5f, &factors.saturation_gain);
     if (valid && (token(control, trailing) || ferror(control)))
@@ -184,8 +198,9 @@ int main(int argc, char **argv)
         valid = false;
     if (variant < 2 && (factors.slope != 1 || factors.offset != 0 || factors.power != 1))
         valid = false;
+    if (v4 != (variant == 7)) valid = false; // old variants retain literal DVH3
     if (!valid) {
-        fprintf(stderr, "Invalid DVH3 control protocol\n");
+        fprintf(stderr, "Invalid DVH3/DVH4 control protocol\n");
         return 2;
     }
     dm->version = 2;
@@ -199,13 +214,15 @@ int main(int argc, char **argv)
         dm->curve = PL_DOVI_DM_OPEN_Y_PQ_PRE;
     if (variant == 6)
         dm->curve = PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
-    if (variant == 3 || variant == 4 || variant == 5 || variant == 6)
+    if (variant == 7)
+        dm->curve = PL_DOVI_DM_OPEN_Y_PQ_POST_SQRTSUM;
+    if (variant == 3 || variant == 4 || variant == 5 || variant == 6 || variant == 7)
         factors.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
     if (variant >= 2)
         dm->open_sop = factors;
     // Frame owns both complete values for this output's entire lifetime.
     dst.dovi_target = (struct pl_dovi_dm_target) {
-        .version = 1, .generation = 1, .description_id = 27, .volume = dst.color.hdr };
+        .version = 1, .generation = 1, .description_id = target_id, .volume = dst.color.hdr };
     struct pl_tone_map_params tone = {.constants = {PL_TONE_MAP_CONSTANTS}, .lut_size = 256};
     enum pl_dovi_dm_status status = pl_dovi_dm_prepare(dm, &dst.dovi_target.volume, &tone);
     if (status != PL_DOVI_DM_L1 && status != PL_DOVI_DM_FLAT) {
@@ -213,7 +230,8 @@ int main(int argc, char **argv)
         return 2;
     }
     src.repr = dst.repr = (struct pl_color_repr) {
-        .sys = PL_COLOR_SYSTEM_RGB, .levels = PL_COLOR_LEVELS_FULL, .alpha = PL_ALPHA_NONE };
+        .sys = PL_COLOR_SYSTEM_RGB, .levels = PL_COLOR_LEVELS_FULL,
+        .alpha = v4 ? PL_ALPHA_INDEPENDENT : PL_ALPHA_NONE };
     src.color.primaries = PL_COLOR_PRIM_DISPLAY_P3;
     dst.color.primaries = PL_COLOR_PRIM_BT_2020;
     src.color.transfer = dst.color.transfer = PL_COLOR_TRC_PQ;
@@ -231,7 +249,7 @@ int main(int argc, char **argv)
     if (PL_FIX_VER != 1)
         goto cleanup;
     log = pl_log_create(PL_API_VER, pl_log_params(
-        .log_cb = pl_log_simple, .log_priv = stderr, .log_level = PL_LOG_INFO));
+        .log_cb = pl_log_simple, .log_priv = stderr, .log_level = v4 ? PL_LOG_TRACE : PL_LOG_INFO));
     vk = pl_vulkan_create(log, pl_vulkan_params(.allow_software = true));
     if (!vk)
         goto cleanup;
@@ -259,19 +277,30 @@ int main(int argc, char **argv)
     if (!source_tex || !target_tex || !renderer)
         goto cleanup;
     src.planes[0] = (struct pl_plane) {
-        .texture = source_tex, .components = 3, .component_mapping = {0, 1, 2, -1}};
+        .texture = source_tex, .components = v4 ? 4 : 3, .component_mapping = {0, 1, 2, v4 ? 3 : -1}};
     dst.planes[0] = (struct pl_plane) {
-        .texture = target_tex, .components = 3, .component_mapping = {0, 1, 2, -1}};
+        .texture = target_tex, .components = v4 ? 4 : 3, .component_mapping = {0, 1, 2, v4 ? 3 : -1}};
     struct pl_render_params params = pl_render_default_params;
     params.peak_detect_params = NULL;
     params.dither_params = NULL;
     params.deband_params = NULL;
     params.sigmoid_params = NULL;
     params.upscaler = params.downscaler = NULL;
+    if (v4) {
+        // Alpha is a domain-validity side channel, NOT compositing opacity.
+        // Preserve it across output; background/tiles would hide alpha0 errors.
+        params.background = PL_CLEAR_SKIP;
+        params.background_transparency = 1;
+        params.blend_params = NULL;
+        params.border = PL_CLEAR_SKIP; // deprecated tile/clearing flags default false
+        params.hooks = NULL; params.num_hooks = 0;
+        params.lut = NULL; params.distort_params = NULL;
+        printf("{\"protocol\":\"DVH4\",\"target_description_id\":%d,\"RGBA_components\":4,\"independent_alpha\":true,\"background\":\"skip\",\"background_transparency\":1,\"blend\":false,\"tiles\":false,\"hooks\":0,\"lut\":false,\"distortion\":false}\n", target_id);
+    }
     if (!pl_render_image(renderer, &src, &dst, &params) ||
         pl_renderer_get_errors(renderer).errors != PL_RENDER_ERR_NONE ||
         !pl_tex_download(gpu, pl_tex_transfer_params(.tex = target_tex, .ptr = output)) ||
-        !write_pixels(argv[3], count, output))
+        !write_pixels(argv[3], count, output, v4))
         goto cleanup;
     result = 0;
 cleanup:

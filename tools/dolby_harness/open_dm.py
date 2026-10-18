@@ -27,8 +27,9 @@ VARIANTS = ('l1-rational', 'l1-hermite', 'l1-hermite-sop', ABSOLUTE_VARIANT)
 RGB_VARIANT = 'rgb-pq-pre-rational'
 Y_VARIANT = 'y-pq-pre-rational'
 MB_VARIANT = 'y-pq-pre-mastblack'
-VARIANTS += (RGB_VARIANT, Y_VARIANT, MB_VARIANT)
-SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT, RGB_VARIANT, Y_VARIANT, MB_VARIANT)
+SQRTSUM_VARIANT = 'y-pq-post-sqrtsum'
+VARIANTS += (RGB_VARIANT, Y_VARIANT, MB_VARIANT, SQRTSUM_VARIANT)
+SOP_VARIANTS = ('l1-hermite-sop', ABSOLUTE_VARIANT, RGB_VARIANT, Y_VARIANT, MB_VARIANT, SQRTSUM_VARIANT)
 FROZEN_DECISIONS = {
     'spec_sha256': '3179434d7e0a88dfd50ec61f7df2a7db9b7fac04e062d2c2ad49a05160046183',
     'parameter_decision_sha256': '0d418f1915ba26faf713ce6eae23e16aa67eacd025ba5cc5122729700c6d99e1',
@@ -179,6 +180,46 @@ def algorithm(obj, meta, variant):
                         'Zero Y maps to black before color; SOP within PQ1 over declared L1 range',
                         'Scalar per-pixel affine SOP fails closed above PQ1; GPU finite PQ1 cap must be unexercised',
                         'Published 1e-5 post-SOP PQ floor; reject post-color PQ above1, no clipping'])
+    if variant == SQRTSUM_VARIANT:
+        from tools.dolby_harness import sqrtsum
+        original = [Fraction(x) for x in trims[0].split(',')]
+        if not all(-1 <= original[i] <= 1 for i in (6, 7)):
+            raise ValueError('public XML color controls require [-1,1]')
+        source, target = obj['source']['mastering'], obj['target']
+        curve = sqrtsum.prepare(tuple(l1[k] for k in ('min_pq','avg_pq','max_pq')),
+            source['min_nits'], source['max_nits'], target['min_nits'], target['max_nits'])
+        cw, sg = float(original[6]/2), float(original[7]/2)
+        result.update(id=sqrtsum.ALGORITHM, protocol='DVH4',
+            target_description_id=int(target['id']),
+            domain='absolute PQ of original linear BT2020 CIE Y; curve then scalar W SOP',
+            l1_curve_domain='absolute PQ powered rational with explicit constant endpoint extension',
+            prepared_curve=curve,
+            field_provenance={'source_display':'source.mastering original declared min_nits/max_nits',
+                'target_display':'original selected target declaration min_nits/max_nits',
+                'L1':'original metadata min_pq/avg_pq/max_pq, unaltered',
+                'SOP_CW_SG':'original selected Trim continuous W serializer composition'},
+            color_factors={'cw':cw,'sg':sg,'status':'bypass-neutral-sg' if sg == 0 else 'applied-after-ratio'},
+            curve_defaults={'screen_ratio':1.,'rolloff':1./3.},
+            applied_stages=['linear source-to-BT2020 basis conversion', 'original CIE Y absolute PQ',
+                'US961 sqrt-sum powered rational', 'scalar W absolute-PQ post-SOP',
+                'restore original linear RGB ratios', 'actual PQ CW/SG after ratio',
+                'ONE final physical P3 clip'],
+            unapplied_trim_indexes=[0,1,2,8],
+            unapplied_trim_values={str(i):trims[0].split(',')[i] for i in (0,1,2,8)},
+            unapplied_stages=['detail','L3','L8','midcontrast','CM selection','temporal rules',
+                'target interpolation','raw-RPU SOP','stock L1 compensation'],
+            frozen_decisions={'source':'US9613407B2 paragraphs0048-0062/Table2',
+                'source_html_sha256':'dd8584d4b80095d1499e476f4f3cb6b1ee387e9e2c392d9ba89c72add681b511',
+                'frozen_contract_sha256':'4deb62586fae800209128174e5555faa56ec43216aacfdf14e83035a319ffbb8',
+                'representation':sqrtsum.REPRESENTATION},
+            hypotheses=['Open hybrid; no literal complete patent or official CM identity',
+                'Constant endpoint saturation is a NONLITERAL engineering extension',
+                'Positive-weight powered anchors are algebraically the same rational; finite closure differs',
+                'Y==0 exact black/color bypass; no epsilon ratio',
+                'SOP max0 affine and postpower1e-5 floor; no PQ1 cap',
+                'Negative/nonfinite base, PQ>1, restored/color domain violations reject',
+                'GPU invalid-only safe operands with sticky alpha0; RGBA alpha must survive output',
+                'XML detail-.75 unresolved/unapplied'])
     # This object is a JSON protocol value, including prepared-curve vectors.
     # Make its transport representation explicit without weakening strict_equal.
     return json.loads(json.dumps(result, allow_nan=False))
@@ -186,14 +227,31 @@ def algorithm(obj, meta, variant):
 
 def control(obj, meta, variant):
     a = algorithm(obj, meta, variant)
-    values = ['DVH3', obj['frame']['width'], obj['frame']['height'], 1]
+    sq = variant == SQRTSUM_VARIANT
+    values = ['DVH4' if sq else 'DVH3', obj['frame']['width'], obj['frame']['height'], 1]
+    if sq:
+        values += [a['target_description_id']]
     for v in (obj['source']['mastering'], obj['target']):
         values += [v['min_nits'], v['max_nits'], *v['primaries']]
     values += [meta['l1'][k] for k in ('min_pq', 'avg_pq', 'max_pq')]
     values += [VARIANTS.index(variant)] + [a['applied_factors'][k] for k in ('S', 'O', 'P')]
-    if variant in (RGB_VARIANT, Y_VARIANT, MB_VARIANT):
+    if variant in (RGB_VARIANT, Y_VARIANT, MB_VARIANT, SQRTSUM_VARIANT):
         values += [a['color_factors'][k] for k in ('cw','sg')]
     return ' '.join(str(x) for x in values) + '\n'
+
+
+def sqrtsum_gpu_domain(stdout, obj):
+    records = [parse_json(line.encode()) for line in stdout.decode().splitlines() if line.startswith('{')]
+    expected_config = {'protocol':'DVH4', 'target_description_id':int(obj['target']['id']),
+        'RGBA_components':4, 'independent_alpha':True, 'background':'skip',
+        'background_transparency':1, 'blend':False, 'tiles':False, 'hooks':0,
+        'lut':False, 'distortion':False}
+    population = obj['frame']['width'] * obj['frame']['height']
+    expected_domain = {'schema':'hdr.sqrtsum.gpu-domain.v1','population':population,
+        'valid':population,'invalid':0,'channel':'downloaded-RGBA-alpha-exact1'}
+    if not am.strict_equal(records,[expected_config,expected_domain]):
+        raise ValueError('GPU whole-raster domain/config validity receipt mismatch')
+    return records[1]
 
 
 def render(manifest, variant, native, compile_receipt, output):
@@ -227,15 +285,18 @@ def render(manifest, variant, native, compile_receipt, output):
         if len(pixels) != f['width'] * f['height'] * 12:
             raise ValueError('OPEN output geometry mismatch')
         am.pixel_samples(pixels)
+        domain = sqrtsum_gpu_domain((stage / 'native.stdout').read_bytes(),obj) if variant == SQRTSUM_VARIANT else None
         result = {'schema': SCHEMA, 'role': 'candidate', 'source_alignment': alignment(obj, meta),
                   'encoding': ENCODING, 'algorithm': algo,
                   'output': {'file': 'output.f32', 'sha256': sha(pixels)},
                   'provenance': {'input_manifest': {'file': str(Path(manifest).resolve()), 'sha256': sha(raw)},
-                                 'execution': binding, 'protocol': 'DVH3',
+                                 'execution': binding, 'protocol': 'DVH4' if variant == SQRTSUM_VARIANT else 'DVH3',
                                  'control_sha256': prov.sha(stage / 'control.txt'),
                                  'stdout_sha256': prov.sha(stage / 'native.stdout'),
                                  'stderr_sha256': prov.sha(stage / 'native.stderr'),
                                  'target': obj['target'], 'target_generation': 1, 'target_description_id': 27}}
+        if domain is not None:
+            result['provenance']['gpu_domain'] = domain
         (stage / 'candidate.json').write_text(json.dumps(result, indent=2, allow_nan=False) + '\n')
         (stage / 'source.f32').unlink()
         os.rename(stage, output)
@@ -267,10 +328,14 @@ def validate_result(path, raw=None):
                                               'sha256': p['execution']['compile_receipt_sha256']})
     prov.validate_record(p['execution'], parse_json(compiled_raw))
     _, native_control = am.snapshot(path.parent, {'file': 'control.txt', 'sha256': p['control_sha256']})
-    if p['protocol'] != 'DVH3' or native_control != control(obj, meta, variant).encode():
+    if p['protocol'] != ('DVH4' if variant == SQRTSUM_VARIANT else 'DVH3') or native_control != control(obj, meta, variant).encode():
         raise ValueError('OPEN native protocol mismatch')
     for name in ('stdout', 'stderr'):
         am.snapshot(path.parent, {'file': 'native.' + name, 'sha256': p[name + '_sha256']})
+    if variant == SQRTSUM_VARIANT:
+        domain = sqrtsum_gpu_domain((path.parent / 'native.stdout').read_bytes(),obj)
+        if not am.strict_equal(p.get('gpu_domain'),domain):
+            raise ValueError('GPU whole-raster domain record differs from native download')
     normalized = am.output_snapshot(path.parent, r['output'], obj['frame']['width'], obj['frame']['height'])
     return r, am.pixel_samples(normalized)
 

@@ -1,4 +1,4 @@
-"""Source-bound OPEN ABI367 compiler/execution closure, separate from baseline."""
+"""Source-bound OPEN ABI368 compiler/execution closure, separate from baseline."""
 from pathlib import Path
 import platform
 import sys
@@ -15,6 +15,7 @@ COMPILE_INPUTS = ('tools/dolby_harness/open_dm_render.c',
                   'tools/dolby_harness/open_dm_provenance.py',
                   'wip/libplacebo-dm/public-rgb/SOURCE.json')
 FRONTEND_INPUTS = (*base.FRONTEND_INPUTS, 'tools/dolby_harness/open_dm.py',
+                   'tools/dolby_harness/sqrtsum.py',
                    'tools/dolby_harness/public_mapping.py',
                    'tools/dolby_harness/open_dm_provenance.py')
 sha = base.sha
@@ -31,10 +32,10 @@ def implementation():
 
 
 def validate_compile(receipt, live=False):
-    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 367 or
+    if (receipt.get('schema') != SCHEMA or receipt.get('abi') != 368 or
             receipt.get('architecture') != 'x86_64' or
             receipt.get('status') != 'compiled-not-executed'):
-        raise ValueError('OPEN ABI367 compile receipt required')
+        raise ValueError('OPEN ABI368 compile receipt required')
     for p in COMPILE_INPUTS:
         if receipt['sources'][p] != sha(ROOT / p):
             raise ValueError('OPEN compile input changed: ' + p)
@@ -50,7 +51,7 @@ def validate_compile(receipt, live=False):
             raise ValueError('OPEN library Git identity malformed')
     # Full tracked source set, not a hardcoded baseline-input bypass. The build
     # supplied Git manifest is retained in the receipt and rehashed on execution.
-    required = ('src/dovi_dm.c', 'src/dovi_dm_rgb.c', 'src/include/libplacebo/dovi_dm.h',
+    required = ('src/dovi_dm.c', 'src/dovi_dm_rgb.c', 'src/dovi_dm_sqrtsum.c', 'src/include/libplacebo/dovi_dm.h',
                 'src/shaders/colorspace.c', 'src/renderer.c', 'meson.build')
     if any(k not in receipt['library_sources'] for k in required):
         raise ValueError('OPEN library source set incomplete')

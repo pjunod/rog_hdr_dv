@@ -90,6 +90,11 @@ documented comparison-only JSON transport correction verifies the archived
 renderer without rerendering or relabeling execution. Untouched1200/48 remains
 reserved. [Current source hypotheses](docs/MAPPING_HYPOTHESES_ASTRA_20261018.md)
 record rejected alternatives; no full mapping or holdout acceptance is claimed.
+[Frozen sqrt-sum PQ-Y/post-SOP hybrid](docs/SQRTSUM_PQ_Y_POST.md) implements
+the next source-grounded candidate in private ABI368 with positive powered
+anchors, explicit original-target DVH4 identity and whole-raster RGBA domain
+validation. Compilation passed; renderer/accuracy/final review/units remain
+separately required, not inferred from earlier sampled passes.
 The preceding [Fable hypothesis checkpoint](docs/MAPPING_HYPOTHESES_FABLE_20261017.md)
 and historical [joint analysis](docs/wip-notes/FABLE_JOINT_ANALYSIS_20261017.md),
 [implementation brief](docs/wip-notes/IMPLEMENTATION_BRIEF.md) and

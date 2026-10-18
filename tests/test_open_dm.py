@@ -98,7 +98,7 @@ class OpenAuthenticTests(unittest.TestCase):
         for variant in dm.VARIANTS:
             with self.subTest(variant=variant):
                 a = dm.algorithm(self.obj, self.meta, variant)
-                indexes = ([0, 1, 2, 8] if variant in (dm.RGB_VARIANT, dm.Y_VARIANT, dm.MB_VARIANT) else
+                indexes = ([0, 1, 2, 8] if variant in (dm.RGB_VARIANT, dm.Y_VARIANT, dm.MB_VARIANT, dm.SQRTSUM_VARIANT) else
                            [0, 1, 2, 6, 7, 8] if variant in dm.SOP_VARIANTS else list(range(9)))
                 self.assertEqual(a['unapplied_trim_indexes'], indexes)
                 self.assertEqual(a['unapplied_trim_values'],
@@ -113,6 +113,11 @@ class OpenAuthenticTests(unittest.TestCase):
         saved = copy.deepcopy(self.meta)
         for i, variant in enumerate(dm.VARIANTS):
             tokens = dm.control(self.obj, self.meta, variant).split()
+            if variant == dm.SQRTSUM_VARIANT:
+                self.assertEqual(tokens[:5], ['DVH4','4096','2160','1','27'])
+                self.assertEqual(len(tokens),34)
+                self.assertEqual(int(tokens[28]),i)
+                continue
             self.assertEqual(tokens[:4], ['DVH3', '4096', '2160', '1'])
             self.assertEqual(len(tokens), 33 if variant in (dm.RGB_VARIANT, dm.Y_VARIANT, dm.MB_VARIANT) else 31)
             self.assertEqual(int(tokens[27]), i)
@@ -207,7 +212,7 @@ class OpenAuthenticTests(unittest.TestCase):
 
     def test_actual_compile_source_header_library_abi_closure(self):
         prov.validate_compile(self.compile, live=True)
-        self.assertEqual(self.compile['abi'], 367)
+        self.assertEqual(self.compile['abi'], 368)
         self.assertEqual(self.compile['binary_sha256'], prov.sha(self.native))
         for edit in ('abi', 'sources', 'library_sources', 'headers'):
             c = copy.deepcopy(self.compile)
