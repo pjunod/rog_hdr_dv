@@ -266,6 +266,46 @@ Sanitized receipt: [second-shot evidence](../evidence/public-mapping-shot714-dev
 
 ## Done, current and remaining
 
+### ABI367 mastering-black continuation (in progress)
+
+The additive `y-pq-pre-mastblack` / `open-y-pq-pre-mastblack-v1` operator uses
+the zero-PQ-low MPC knee, declared source mastering black as the rational nits
+anchor, scalar PQ(Y) SOP, original linear RGB ratio restoration, then the actual
+inside-exponent PQ color expression (including nonzero SG). The existing physical
+P3 gamut stage follows once. Earlier variants and their receipts remain distinct.
+The zero-low knee is grounded in pinned MPC DX11VideoProcessor.cpp2369–2371
+UINT-nits minimum truncation; the mastering-black anchor follows the shader's
+named semantics. These remain disclosed applicability hypotheses, not an official
+CM identity or fitted correction. Missing/nonfinite mastering black rejects;
+the original full-domain S+O<=1 guard is retained as specified.
+
+Native full/noDV and matched ABI367 consumer compilation passed with -Werror
+for library62e3651/tree26e1d848 (requestcf927164). ABI366 source, generated
+headers, libraries, test binaries and consumer were preserved before the warm
+rebuild. New regressions are written and compiled, not executed.
+
+| Development lattice | Mean deltaEITP | p95 deltaEITP | Maximum | State |
+|---|---:|---:|---:|---|
+| Frame256 fixed double chain | 1.123974038284229 | 2.7196443032245785 | 7.345997615839801 | FAIL mean; 34560 exact-cache samples, raw before final gamut |
+| Frame256 native C scalar | 1.12386483513616 | 2.7193929454778396 | 7.345997615839801 | FAIL mean; same cache and actual ABI367 evaluator |
+| Frame714 | unavailable | unavailable | unavailable | Stopped before evaluation: mandated S+O guard rejects actual1.005006−.002006=1.003 |
+
+Frame256 mean signed720ITP is(-.9221676116914387,-.05867643838091357,
+.20148548404367084). C-versus-double deltaEITP mean.0005339534/p95.0014968954/
+max.0042305511. All34560 samples are valid; affine-negative/PQ-floor0,
+rational-negative clamps11677, raw physical-P3-negative34, above600nit0.
+Strata and all counters are retained privately. This successful lattice is not
+to be rerun. No candidate GPU render or full-raster comparison has yet occurred.
+
+Current blocker: the frozen request also requires evaluating frame714 despite
+its S+O=1.003, which contradicts the mandated whole-domain rejection. Fable owns
+the routine source-grounded guard reconciliation; no human action is required.
+No clipping, coefficient adjustment or SG drop was substituted. After that
+decision, resume only missing714 evaluation and the two candidate GPU/full-raster
+comparisons. Reserved1200/48 remains untouched under coordinator clarification;
+it is not a development comparison. Review, affected units, merge and packages
+remain downstream, not claimed by compilation or this partial result.
+
 Done: exact retained input/reference/compiler preparation; distinct public
 contract table; continuous XML bridge and source provenance; two-chain cached
 analysis; one basis question resolved negatively; actual scalar/GPU operator and

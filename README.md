@@ -83,7 +83,11 @@ Native full/noDV and consumer compilation passed; one ABI366 development render
 tracks the scalar diagnostic closely but sampled agreement still fails. A fixed
 cached HALF-interval audit is diagnostic only, not a fitted replacement curve.
 Full-raster/independent accuracy, review, one affected batch and Ubuntu delivery
-remain required. This active lane does not stop at an experimental operator.
+remain required. Its additive ABI367 mastering-black Y/post-ratio-color
+continuation is compiled, with a lower but failing frame256 lattice and a
+frame714 guard-specification discrepancy awaiting thinker reconciliation.
+No full-raster or holdout acceptance is claimed. This active lane does not stop
+at an experimental operator.
 [Authored-master baseline](docs/AUTHORED_MASTER_BASELINE.md) now includes a
 source-only parser2/export4 shot-inheritance extension with explicit provenance
 and no invented frame UUID; new units remain deferred. It separates sparse

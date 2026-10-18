@@ -18,7 +18,7 @@
 #endif
 _Static_assert(sizeof(float) == 4 && FLT_RADIX == 2 && FLT_MANT_DIG == 24,
                "IEEE754 binary32 required");
-_Static_assert(PL_MAJOR_VER == 7 && PL_API_VER == 366, "Private matched ABI366 required");
+_Static_assert(PL_MAJOR_VER == 7 && PL_API_VER == 367, "Private matched ABI367 required");
 #if !defined(PL_HAVE_VULKAN) || !defined(PL_HAVE_DOVI)
 #error "Private full Vulkan/DOVI build required"
 #endif
@@ -171,11 +171,11 @@ int main(int argc, char **argv)
         read_int(control, 1, 1, &primaries) &&
         read_volume(control, &src.color.hdr) && read_volume(control, &dst.color.hdr) &&
         read_l1(control, dm) &&
-        read_int(control, 0, 5, &variant) &&
+        read_int(control, 0, 6, &variant) &&
         read_float(control, 0.5f, 1.5f, &factors.slope) &&
         read_float(control, -0.5f, 0.5f, &factors.offset) &&
         read_float(control, 0.5f, 1.5f, &factors.power);
-    if (valid && (variant == 4 || variant == 5))
+    if (valid && (variant == 4 || variant == 5 || variant == 6))
         valid = read_float(control, -0.5f, 0.5f, &factors.chroma_weight) &&
                 read_float(control, -0.5f, 0.5f, &factors.saturation_gain);
     if (valid && (token(control, trailing) || ferror(control)))
@@ -197,7 +197,9 @@ int main(int argc, char **argv)
         dm->curve = PL_DOVI_DM_OPEN_RGB_PQ_PRE;
     if (variant == 5)
         dm->curve = PL_DOVI_DM_OPEN_Y_PQ_PRE;
-    if (variant == 3 || variant == 4 || variant == 5)
+    if (variant == 6)
+        dm->curve = PL_DOVI_DM_OPEN_Y_PQ_PRE_MB;
+    if (variant == 3 || variant == 4 || variant == 5 || variant == 6)
         factors.domain = PL_DOVI_DM_SOP_ABSOLUTE_PQ;
     if (variant >= 2)
         dm->open_sop = factors;

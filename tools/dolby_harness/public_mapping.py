@@ -198,6 +198,62 @@ def mpc_pre_y(rgb, curve, sop, color):
     return tuple(v * mapped / y for v in rgb)
 
 
+def mpc_mastblack_prepare(l1, target_peak, mastering_black):
+    """Frozen zero-low knee and declared mastering-black nits anchor."""
+    if (not all(math.isfinite(v) and 0 <= v <= 1 for v in l1) or
+            not l1[0] <= l1[1] <= l1[2] or l1[0] >= l1[2]):
+        raise ValueError('ordered nondegenerate L1 required')
+    if (not math.isfinite(mastering_black) or not 0 <= mastering_black <= 10000 or
+            not math.isfinite(target_peak) or not 0 < target_peak <= 10000):
+        raise ValueError('explicit finite mastering black and target peak required')
+    curve = mpc_prepare((0.0, l1[1], l1[2]), target_peak)
+    if curve['identity']:
+        return curve
+    xs = (mastering_black, *curve['source_anchors'][1:])
+    curve.update(source_anchors=xs,
+                 coefficients=rational_prepare(xs, curve['mapped_anchors']))
+    a, b, c = curve['coefficients']
+    if min(1, 1 + c * 10000) <= 0 or b - a * c < 0:
+        raise ValueError('invalid physical-domain mastering-black rational')
+    return curve
+
+
+def mpc_pre_y_mastblack(rgb, curve, sop, color, counters=None):
+    """PQ(Y) SOP/rational -> restore RGB ratios -> actual PQ color.
+
+    Raw BT2020 nits output; the existing single physical gamut stage follows.
+    """
+    if not all(math.isfinite(v) and 0 <= v <= 10000 for v in rgb):
+        raise ValueError('nonnegative finite RGB nits required')
+    s, o, p = sop
+    if not all(math.isfinite(v) for v in sop) or p <= 0 or s + o > 1:
+        raise ValueError('scalar SOP outside physical PQ domain')
+    y = sum(w * v for w, v in zip(BT2020_WEIGHTS, rgb))
+    if y > 0:
+        affine = s * pq_inverse(y) + o
+        power = max(0.0, affine) ** p
+        q = max(1e-5, power)
+        if not math.isfinite(q) or q > 1:
+            raise ValueError('trimmed scalar PQ exceeds physical domain')
+        yt = pq_eotf(q)
+        raw = yt if curve['identity'] else rational_eval(curve['coefficients'], yt)
+        mapped = max(0.0, raw)
+        rgb = tuple(v * mapped / y for v in rgb)
+        if counters is not None:
+            for key, active in (('affine_negative', affine < 0),
+                                ('pq_floor', power < 1e-5),
+                                ('rational_negative', raw < 0)):
+                counters[key] = counters.get(key, 0) + int(active)
+    else:
+        rgb = (0.0, 0.0, 0.0)
+    if any(v > 10000 for v in rgb):
+        raise ValueError('restored RGB exceeds physical PQ domain')
+    q = color_transform(tuple(pq_inverse(v) for v in rgb), BT2020_WEIGHTS, *color)
+    if any(not math.isfinite(v) or v > 1 for v in q):
+        raise ValueError('post-ratio color PQ exceeds physical domain')
+    return tuple(pq_eotf(v) for v in q)
+
+
 def mpc_post_normalized_y(rgb, curve, sop, color, counters=None):
     """Eq6/5/7 scalar post-curve adaptation, not the complete patent model.
 

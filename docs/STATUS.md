@@ -80,6 +80,17 @@ SG0-only Y preparation explicitly rejects714; no fallback or Y image evaluation.
 for final frozen-candidate acceptance; this task did not acquire or inspect it.
 No old render/build/unit was repeated; no new mapper/source change is accepted.
 
+ABI367 mastering-black continuation is compiled full/noDV/consumer with -Werror
+(library62e3651, nativecf927164). The additive zero-low-knee/mastering-black Y
+operator applies actual PQ color after RGB ratio restoration; older variants
+remain distinct. Frame256 exact-cache lattice ran once: double mean1.123974/
+p952.719644/max7.345998, native C1.123865/2.719393/max7.345998, still FAIL mean.
+Current: Fable reconciles the frozen guard contradiction: actual714 S+O=1.003
+fails the mandated S+O<=1 preparation guard, so714 evaluation stopped before
+rendering. No tuning or SG drop. Candidate GPU/full-raster256/714 remain unrun;
+successful256 lattice and full/noDV/consumer builds will not be repeated unless
+actually invalidated.1200/48 remains untouched, not development evidence.
+
 Remaining: passing full-raster and independent official references, completed
 batch adversarial review/fixes, one affected unit batch/repository gate, merge-ready
 substantial PR and versioned Ubuntu source/binary package delivery with isolated

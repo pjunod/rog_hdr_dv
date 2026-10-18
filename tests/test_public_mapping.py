@@ -13,6 +13,36 @@ from tools.dolby_harness import public_mapping as pm
 
 
 class PublicMappingMathTests(unittest.TestCase):
+    def test_mastblack_zero_low_knee_and_declared_anchor(self):
+        l1 = (.0196536, .272, .853468)
+        c = pm.mpc_mastblack_prepare(l1, 600, .005)
+        self.assertEqual(c, pm.mpc_mastblack_prepare((0, *l1[1:]), 600, .005))
+        self.assertEqual(c['source_anchors'][0], .005)
+        for x, y in zip(c['source_anchors'], c['mapped_anchors']):
+            self.assertAlmostEqual(pm.rational_eval(c['coefficients'], x), y, places=9)
+        for black in (math.nan, math.inf, -1, 100):
+            with self.assertRaises(ValueError):
+                pm.mpc_mastblack_prepare(l1, 600, black)
+        self.assertTrue(pm.mpc_mastblack_prepare(l1, 10000, .005)['identity'])
+
+    def test_mastblack_color_after_ratio_not_sg_drop(self):
+        c = pm.mpc_mastblack_prepare((.0196536, .272, .853468), 600, .005)
+        rgb, sop = (1, 2, 3), (1.005006, -.002006, 2000/2007)
+        base = pm.mpc_pre_y(rgb, c, sop, (0, 0))
+        expected = pm.color_transform(tuple(pm.pq_inverse(v) for v in base),
+                                      pm.BT2020_WEIGHTS, -.0105, -.002)
+        actual = pm.mpc_pre_y_mastblack(rgb, c, sop, (-.0105, -.002))
+        for x, q in zip(actual, expected):
+            self.assertAlmostEqual(x, pm.pq_eotf(q), places=12)
+        self.assertNotEqual(actual, base)
+        self.assertEqual(pm.mpc_pre_y_mastblack((0, 0, 0), c, sop, (-.01, -.002)), (0, 0, 0))
+        self.assertEqual(pm.mpc_pre_y_mastblack(rgb, c, sop, (-.5, 0)),
+                         pm.mpc_pre_y_mastblack(rgb, c, sop, (.5, 0)))
+        with self.assertRaises(ValueError):
+            pm.mpc_pre_y_mastblack(rgb, c, (1.5, 0, 1), (0, 0))
+        with self.assertRaises(ValueError):
+            pm.mpc_pre_y_mastblack((10000,)*3, {'identity': True}, (1, 0, 1), (.5, .5))
+
     def test_two_named_xml_conventions_neutral_limits_and_exact_composition(self):
         for name in ('xml-wire-continuous-v1', 'xml-direct-lgg-hypothesis-v1'):
             neutral = pm.xml_lgg_coefficients(['0'] * 5, name)
