@@ -19,11 +19,10 @@ record the conflict instead of working around it.
 ## 1. Why we measure instead of guess
 
 Until 2026-10-18, each idea for the mapping was coded into the renderer,
-run on whole 4K frames and scored against the reference. That costs minutes
-per frame and returns **one number per frame**, mixing the tone curve, the
-colour handling, the trims and the final clip. A failing number says *that*
-we are wrong, not *where*. Four candidate curves scored worse than the stock
-open-source path before the order of operations was found by elimination.
+run on whole 4K frames and scored against the reference. That costs a full
+render and score per frame and returns **one number per frame**, mixing the
+tone curve, the colour handling, the trims and the final clip. A failing
+number says *that* we are wrong, not *where*.
 
 A single reference render of a synthetic colour grid returns hundreds of
 thousands of exact input → output pairs for one shot and one target, covering
@@ -40,31 +39,40 @@ The whole-frame score stays, but as the **final acceptance** step only (§6).
 
 ## 2. Rules — what every step must keep
 
-1. **Synthetic and controlled inputs through the reference kit are allowed.**
-   CM Analyze, Metafier and CM Offline (5.6.4 at the time of writing) may be
-   run on synthetic images and sequences built for measurement. The owner
-   reviewed this use against the tools' licences on 2026-10-18. Run them only
-   through their normal command-line operation on the existing reference
-   route.
+1. **Synthetic inputs through the reference kit are allowed.** CM Analyze,
+   Metafier and CM Offline (5.6.4 at the time of writing) may be run on
+   synthetic images and sequences built for measurement. The owner reviewed
+   this use against the tools' licences on 2026-10-18. Run them only through
+   their normal command-line operation on the existing reference route.
+   Inputs are synthetic grids, ramps and patterns, never edited real frames,
+   so every measurement is reproducible from its manifest alone.
 2. **Never modify, patch, disassemble, decompile or inspect the vendor
    binaries, and never bypass their normal operation.** Measuring outputs is
    the method; reading the implementation is not, and it would contaminate
    everything derived afterwards.
 3. **Use each shot's original metadata unchanged.** Do not hand-edit or
-   fabricate XML/RPU metadata to probe a behaviour. Vary the *image*, and choose
-   *targets* from those the tools offer. An edited input measures a
-   configuration no real stream contains.
-4. **Vendor outputs never enter Git.** Rendered images, grid outputs and
-   derived lookup data stay in the private retained area named in
-   [the reference corpus](HDR_REFERENCE_CORPUS.md). Git receives scripts,
-   manifests, hashes, plots of *our* residuals and written findings.
+   fabricate XML/RPU metadata to probe a behaviour. Vary the *image*, and
+   choose *targets* from those the tools offer. An edited input measures a
+   configuration no real stream contains. Display-mapping grids are rendered
+   with the source shot's original XML. When CM Analyze itself is the stage
+   being measured, the metadata it generates is that measurement's output; it
+   is never fed into a display-mapping render.
+4. **Vendor outputs never enter Git.** Rendered images, grid outputs, and
+   any per-colour or per-sample table or curve taken from them stay in the
+   private retained area named in [the reference corpus](HDR_REFERENCE_CORPUS.md).
+   Git may hold scripts, manifests, hashes, fitted scalar parameters and
+   equations (tagged `measured`), aggregate residual statistics and written
+   findings. Never commit a plot or table dense enough to reconstruct the
+   reference output, such as a full neutral curve. The repository is public,
+   and reconstructable data is the vendor's output under another name.
 5. **Label the origin of every equation term.** Each constant or functional
    form is tagged `public` (with its citation, e.g. US9613407B2
    ¶0048–0062) or `measured` (with the measurement manifest hash). Without
    the tag, nobody can later say which parts come from public sources, and
    the published write-ups depend on that distinction.
-6. **Development is not acceptance.** Grid analysis, fits and development-frame
-   scoring run immediately, without a pre-run review. Anything fitted from
+6. **Development is not acceptance.** Grid analysis, fits and
+   development-frame scoring need no review before they run, because they
+   grant no claim. Anything fitted from
    measurements must be **frozen first** and then scored **once** on held-out
    genuine content (§6). A fit that has only been checked on the data it was
    fitted to proves nothing about other shots.
@@ -79,25 +87,25 @@ The whole-frame score stays, but as the **final acceptance** step only (§6).
 
 One grid image per (shot, target). Build it in **exactly the input encoding
 the reference route already feeds the tool for that shot**: PQ, BT.2020, the
-same bit depth, container and dimensions. A different encoding measures a
-different pipeline.
+same bit depth `b`, container and frame size. A different encoding measures
+a different pipeline. Code values below are integers in `0 … 2^b − 1`.
 
 | Region | Content | What it isolates |
 |---|---|---|
-| Lattice A | 65 × 65 × 65 RGB lattice in PQ code values (274,625 colours), raster order | the full colour-volume response |
+| Lattice A | 65 × 65 × 65 RGB lattice, level `i` = round(`i` · (2^b − 1) / 64) per channel (274,625 colours), raster order | the full colour-volume response |
 | Lattice B | the same 274,625 colours, shuffled with a recorded seed | spatial independence (see below) |
-| Neutral ramp | R = G = B, 4096 PQ steps from 0 to 1 | the tone curve alone |
-| Hue ramps | 6 hues (R, Y, G, C, B, M at BT.2020 primaries/secondaries) × 8 PQ luminance levels × 64 steps from neutral to the gamut edge | saturation and hue behaviour |
+| Neutral ramp | R = G = B, min(4096, 2^b) evenly spaced code values from 0 to 2^b − 1 | the tone curve alone |
+| Hue ramps | 6 hues (BT.2020 R, Y, G, C, B, M) × 8 luminance levels (PQ 0.1, 0.2 … 0.8) × 64 steps from neutral to the BT.2020 boundary at that luminance | saturation and hue behaviour |
 | Padding | a fixed mid-grey | keeps the frame valid; never analysed |
 
-A 4096 × 2160 frame holds all of it. Write a **manifest** next to every grid:
-pixel coordinates of each region, the shuffle seed, the encoding, and SHA-256
-of the grid file. The analysis reads positions only from the manifest, never
-from assumptions.
+About 556,000 pixels in all, which fits any UHD frame. Write a **manifest**
+next to every grid: pixel coordinates of each region, the shuffle seed, the
+encoding, the frame size, and SHA-256 of the grid file. The analysis reads
+positions only from the manifest, never from assumptions.
 
 **Spatial-independence check.** Every colour appears once in lattice A and
 once in lattice B, with different neighbours. If the tool's two outputs for
-the same colour differ by more than output quantisation, the tool is doing
+the same colour differ by more than one output code value, the tool is doing
 spatial processing (for example the detail trim) at that point. Then a
 per-colour model cannot describe it, and that behaviour needs its own
 measurement (step edges, textures). Report the max and p99 difference per
@@ -128,9 +136,13 @@ primaries in the manifest.
 
 **Input:** a list of shots (source frame, original XML, target) chosen
 before any result is seen. **Do:** build each grid and manifest (§3) and
-render each (shot, target) **once**. **Output:** private grid outputs plus a
-committed manifest of hashes. **Check:** every manifest entry has an output
-whose hash is recorded; no shot was rendered twice.
+render each (shot, target) **once**. A render that fails or produces an
+invalid file may be retried once, with the reason recorded. **Output:**
+private grid outputs plus a committed manifest of hashes. **Check:** every
+(shot, target) has exactly one accepted output whose hash is recorded.
+
+Every shot measured here becomes a **development** shot. It can never again
+serve as held-out acceptance content (§6).
 
 ### 4.2 Analyse
 
@@ -145,11 +157,8 @@ the reference output. Always produce these four views, per shot and target:
   L2 chroma-weight and saturation-gain trims, and the final clip.
 - **Trims:** where in the signal and in which domain the L2 slope, offset and
   power act, compared with where the model applies them.
-- **Structure:** fit "1-D tone curve on luminance + a colour step that
-  depends only on input colour and the luminance ratio" and report the
-  residual. Normalise each neutral curve by its own anchors (input relative
-  to Crush/Mid/Clip, output relative to the target black and peak), and
-  report whether shots and targets collapse onto one family.
+- **Structure:** fit the patent's structure, a 1-D tone curve on luminance
+  followed by a colour step, and report the residual it leaves.
 
 Then tabulate every divergence against the shot's metadata: mastering black
 and peak, target black and peak, L1 Crush/Mid/Clip, L2 values, detail trim
@@ -161,26 +170,34 @@ value is a wrong dependence on that value. A divergence confined to one hue
 is in the colour step, not the tone curve. Spatial-check failures are
 excluded from the per-colour fit and listed separately.
 
+**Check:** the four views exist for every (shot, target), and the
+divergence table has one row per (shot, target) with every metadata column
+filled.
+
 ### 4.3 Hypothesise
 
 Write each hypothesis as an equation change with its origin tag (§2,
 rule 5) and a **predicted** improvement on the failing shots, before testing
 it. Prefer changes grounded in a public source. Measured corrections are
-allowed but must be labelled `measured`.
+allowed but must be labelled `measured`. **Check:** the hypothesis and its
+prediction are committed before the §4.4 run, so the prediction cannot be
+written to fit the result.
 
 ### 4.4 Test on stored data
 
 Evaluate the changed model against the stored grid outputs for **every
 measured shot**, not only the ones that motivated it. Use leave-one-shot-out
 for anything fitted: fit on all shots but one, score the one left out, and
-repeat. A change that helps the motivating shots and hurts others is
-rejected. **Check:** a residual table per shot, before and after, committed
-with the script that produced it.
+repeat. A change that makes any measured shot's mean or p95 residual worse
+is rejected unless the commit explains that shot. **Check:** a residual table
+per shot, before and after, committed with the script that produced it.
 
 ### 4.5 Freeze
 
 Commit the source, parameters and build. Record the commit and tree hash.
 Nothing after this point may change the model; a change starts a new pass.
+**Check:** `git status` is clean, and the commit and tree hash are written
+in the acceptance brief.
 
 ## 5. Handing a step to another agent
 
@@ -202,6 +219,10 @@ changes. Every brief states:
 Acceptance uses [the harness](DOLBY_HARNESS.md) on **genuine** source frames
 that were reserved before the frozen candidate existed:
 
+- Held-out frames come from shots that were never measured as grids, never
+  used in a fit and never used for a development score. Commit the hash of
+  the reserved list before the freeze, so nobody can choose it afterwards.
+
 - BT.2124 ΔE_ITP over every pixel of the full frame, with no pixels excluded.
   Pass = **mean ≤ 1 and nearest-rank p95 ≤ 3**. The thresholds never change,
   and no subset or trimmed statistic counts.
@@ -213,8 +234,8 @@ that were reserved before the frozen candidate existed:
 ## 7. Non-goals
 
 - **Not a way to ship the vendor's output.** Measurements inform the open
-  equations; vendor outputs and anything derived directly from them stay
-  private and are never distributed.
+  equations; vendor outputs and data taken directly from them stay private
+  and are never distributed (§2, rule 4).
 - **Not a licence to tune to the test set.** Held-out acceptance exists
   because a fit can match every measured shot and still be wrong elsewhere.
 - **Not reverse engineering of the binaries.** Rule 2 of §2 holds absolutely.

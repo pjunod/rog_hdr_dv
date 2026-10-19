@@ -16,8 +16,10 @@ superseded series distinguishable from the active source pins.
 Use your own clone of the primary forge remote, never the owner's checkout.
 Public work goes on a mirrored prefix (codex/, claude/ or hermes/); work not
 cleared for publication goes on private/. Push only to the forge, never to
-GitHub directly: docs/DEVELOPMENT.md explains the mirror and its fast lane. Establish the relevant compiler loop before changing C,
-kernel code or build metadata. Make normal related commits and batch them
+GitHub directly: docs/DEVELOPMENT.md explains the mirror and its fast lane.
+If the forge remote or its token is not configured for you, stop and ask the
+owner; never fall back to GitHub. Establish the relevant compiler loop
+before changing C, kernel code or build metadata. Make normal related commits and batch them
 into a larger PR. Only when ready to merge, obtain an adversarial agent review,
 fix findings, then run the required fast lane once. Rerun only failed checks
 and checks invalidated by subsequent edits. Merge after those checks pass;

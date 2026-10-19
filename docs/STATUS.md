@@ -56,12 +56,14 @@ Source qualification is separate from package delivery and physical measurement.
 The open mapping is now developed by measuring the reference tools with
 synthetic colour grids (see [the method](MEASUREMENT_DRIVEN_DEVELOPMENT.md)),
 not by scoring whole frames for each idea. Reason: the broader random30 batch
-passed 13 of 30 shots; 12 failed on accuracy and 5 produced invalid native
-output pixels, all on shots outside development. Whole-frame scores could
-not show where the model diverges. The owner reviewed measurement use
-against the tools' licences. Binary inspection remains excluded, vendor
-outputs stay private, and held-out acceptance is unchanged. Current: grid
-viability and diagnosis on four shots, then all random30 shots; the native
+of new frame/target pairs passed 13 of 30; 12 failed on accuracy and 5
+produced invalid native output pixels. Whole-frame scores could not show
+where the model diverges. The owner reviewed synthetic-input use against the
+tools' licences on 2026-10-18. Binary inspection remains excluded, vendor
+outputs stay private, and the held-out acceptance bar is unchanged. Current:
+grid viability and diagnosis on four shots, then the random30 shots, which
+thereby become development shots and are retired from acceptance; new
+held-out frames will be reserved before the next freeze. The native
 invalid-pixel defect is being root-caused separately.
 
 Since the same date the primary remote is the owner's forge, which mirrors
