@@ -96,7 +96,10 @@ historical artifacts separately from the current package construction/qualificat
 [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) distinguish source
 pins from the actual historical package construction identities.
 [The headless harness](docs/DOLBY_HARNESS.md) documents public contracts and the
-private reference boundary. [The open display-management contract](docs/OPEN_DV_DISPLAY_MANAGEMENT.md)
+private reference boundary.
+[Measurement-driven development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md) is the
+standing, model-independent method for deriving each open Dolby Vision stage
+from controlled reference measurements, with its rules and acceptance step. [The open display-management contract](docs/OPEN_DV_DISPLAY_MANAGEMENT.md)
 describes the unfinished full-fidelity target, not a claim for the launcher.
 [Authored-master transport](docs/AUTHORED_MASTER_BASELINE.md),
 [OPEN frame-owned mapping](docs/OPEN_XML205_CANDIDATE.md),

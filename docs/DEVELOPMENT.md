@@ -172,6 +172,30 @@ record these local checks because GitHub dispatch needs the workflow on the
 default branch first. Display experiments have their own receipts and never
 run automatically on the owner's laptop from public CI.
 
+### Remotes, branches and the public mirror
+
+Since 2026-10-18 the primary remote is the owner's private LAN Forgejo
+(`forge`, repository `pjunod/rog_hdr_dv`). Its URL and token come from the
+operator's local configuration, never from this repository. The forge
+push-mirrors `main`, `codex/*`, `claude/*` and `hermes/*` to the public GitHub
+repository on every push and every eight hours. Every other branch, in
+particular `private/*`, stays on the forge.
+
+- Clone from and push to the forge, and open PRs there. Never push to GitHub
+  directly: the mirror owns those branches, so a direct push races it or is
+  overwritten by it.
+- Choose the prefix before the first push. A mirrored prefix is public within
+  seconds; work the owner has not cleared for publication goes on `private/*`.
+- Authenticate with `git -c http.extraHeader="Authorization: token …"` so the
+  token never lands in a remote URL, the reflog or a file.
+- The fast lane for a mirrored branch is the manual GitHub workflow,
+  dispatched once at merge time against the mirrored branch. A `private/*`
+  branch never reaches GitHub, so run the two commands above once at merge
+  time and paste their output into the PR.
+- The mirror's branch filter is an include list, because the forge cannot
+  exclude patterns. Add a new public prefix to the forge's push-mirror
+  settings before using it, or its branches silently stay private.
+
 Update patches, source pins, SHA256SUMS, the relevant documentation and
 [status](STATUS.md) together. Retain authorship in format-patch exports. Record
 source tree, tools, commands, result and limitations in a small evidence
