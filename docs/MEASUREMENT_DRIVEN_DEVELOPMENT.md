@@ -76,9 +76,12 @@ The whole-frame score stays, but as the **final acceptance** step only (§6).
    measurements must be **frozen first** and then scored **once** on held-out
    genuine content (§6). A fit that has only been checked on the data it was
    fitted to proves nothing about other shots.
-7. **One owner of the native builder at a time.** Reference renders queue
-   serially on the shared builder. Two runners fighting over it corrupt each
-   other's receipts.
+7. **Isolate native work by directory, not by turn.** The native builder runs
+   up to three requests at once, and each request gets its own export folder
+   (since 2026-10-18). Each task reads and writes only under its own
+   `$PEER_WORK/<task-id>/` subtree and treats shared inputs as read-only;
+   that is what keeps concurrent runs from corrupting each other's receipts.
+   Serialise only steps that depend on each other.
 8. **Fix causes, not symptoms.** A residual that a clamp, mask or special
    case would hide is a finding to explain. It is not a number to make
    disappear.
