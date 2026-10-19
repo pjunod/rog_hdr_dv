@@ -76,9 +76,21 @@ The whole-frame score stays, but as the **final acceptance** step only (§6).
    measurements must be **frozen first** and then scored **once** on held-out
    genuine content (§6). A fit that has only been checked on the data it was
    fitted to proves nothing about other shots.
-7. **One owner of the native builder at a time.** Reference renders queue
-   serially on the shared builder. Two runners fighting over it corrupt each
-   other's receipts.
+7. **Keep concurrent native work apart.** The native builder runs up to three
+   requests at once (since 2026-10-18). Two separate mechanisms keep them from
+   corrupting each other's receipts, and every task relies on both:
+   - The transport gives each request a fresh read-only source snapshot
+     (`$PEER_SOURCE`) and its own empty `$PEER_WORK/export`. Files placed there
+     are returned with that request only, and nothing else in
+     `$PEER_WORK/export` survives it.
+   - `$PEER_WORK`, the persistent Linux working directory, is shared by every
+     task. Keep all persistent state under `$PEER_WORK/<work-item-id>/`, where
+     the id is your unique board card or work-item id. Never write in another
+     task's subtree, and treat retained references and corpora as read-only.
+
+   If all three slots are busy, `run.py` reports a pending request; wait a few
+   seconds and resubmit. Run your own steps one after another only when a step
+   reads another step's output.
 8. **Fix causes, not symptoms.** A residual that a clamp, mask or special
    case would hide is a finding to explain. It is not a number to make
    disappear.
