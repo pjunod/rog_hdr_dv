@@ -1,12 +1,13 @@
-# rog_hdr_dv — HDR and Dolby Vision on Linux, done properly
+# rog_hdr_dv — HDR and Dolby Vision on Linux for the ROG Zephyrus G16
 
-Linux display-stack work for the ASUS ROG Zephyrus G16 (GU605MZ) and its
-240 Hz OLED panel. The goal is the picture macOS gives you on the same kind
-of screen: HDR that just turns on, Dolby Vision that looks the way the
-colourist graded it, and colour that is consistent from one app to the next.
-Fixes go into shared Linux components (the kernel, libdisplay-info, GNOME's
-Mutter compositor, the playback libraries) rather than into one app, so other
-software and other machines benefit too. Plurx is one consumer; this
+Research and patch work on the Linux display stack for the ASUS ROG
+Zephyrus G16 (GU605MZ) and its 2560×1600, 240 Hz Samsung OLED panel. It aims
+for the picture macOS gives you on the same kind of screen: HDR that just
+turns on, Dolby Vision that follows the colourist's grade, and colour that is
+consistent from one app to the next. Fixes go into shared Linux components
+(the kernel, libdisplay-info, GNOME's Mutter compositor, the playback
+libraries) rather than into one app, so that other software and other
+machines can benefit. Plurx, the owner's media server, is one consumer; this
 repository owns the operating-system display work.
 
 > **This is research and patch work, not an installer.** The patches change
@@ -16,17 +17,21 @@ repository owns the operating-system display work.
 > Nothing here is upstream yet, and no colour accuracy is claimed without an
 > optical measurement of the panel.
 
-## What works today
+## What works today (2026-10-18)
+
+Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
+`51.0-1ubuntu3+nativehdr8` and kernel `7.3.0-rc5-nativehdr1`.
 
 | Area | State | Where it stands |
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
 | HDR desktop session | **Installed** | Mutter `nativehdr8` reports the panel's declared range (0.0004–616 cd/m², firmware values) separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | Compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
+| HDR targets on external CTA monitors and native SDR panels | **Packaged** (`nativehdr9`) | Not yet installed on the laptop |
 | Night Light in HDR, per-monitor overrides | **Packaged** (`nativehdr10`) | Built as Ubuntu packages; not yet installed on the laptop |
-| Ubuntu packages | **Merged** 2026-10-17 | Source and binary packages with tested install and rollback ([release](docs/MERGED_UBUNTU_PACKAGES.md)) |
-| Dolby Vision decode | **Experimental player** | Profile 5 plays through mpv/libplacebo with real RPU reshaping ([player](tools/native_player/README.md)) |
-| Dolby Vision display mapping | **In development** | Open mapping passes 13 of 30 new test shots; now being fixed by direct measurement (below) |
+| Ubuntu packages | **Merged** 2026-10-17 (PR 21) | Source and binary packages, with an isolated install/rollback test, not installed on the laptop ([release](docs/MERGED_UBUNTU_PACKAGES.md)) |
+| Dolby Vision decode | **Experimental player** | A genuine Profile 5 sample played for 30 s through stock mpv/libplacebo with real RPU reshaping; Profile 8, trims and appearance not yet accepted ([player](tools/native_player/README.md)) |
+| Dolby Vision display mapping | **In development** | Open mapping passes 13 of 30 new frame/target pairs (`random30`); being fixed by direct measurement (below) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
@@ -51,28 +56,33 @@ repository owns the operating-system display work.
  Samsung OLED panel (240 Hz, ~616 cd/m² declared peak)
 ```
 
-[Architecture](docs/ARCHITECTURE.md) assigns each responsibility to a
-component and explains why.
+This is the target architecture. Today the experimental player uses stock
+libplacebo tone mapping; the open display mapping and trims are not yet
+integrated into playback. [Architecture](docs/ARCHITECTURE.md) assigns each
+responsibility to a component and explains why.
 
 ## Dolby Vision — where the hard part is
 
-Decoding Dolby Vision is solved in open source. **Display mapping** is not:
-the step that fits a film mastered on a 1,000–4,000-nit reference display
-into what this panel can show, following the colourist's per-shot trims.
-Dolby supplies that code only to licensees, so every open player
-substitutes a generic tone mapper.
+Open-source decoding and reshaping of Dolby Vision exist (FFmpeg and
+libplacebo). **Display mapping** does not: the step that fits a film mastered
+on a 1,000–4,000-nit reference display into what this panel can show,
+following the colourist's per-shot trims. To our knowledge Dolby supplies
+that code only to licensees, and open players substitute a generic tone
+mapper.
 
 This repository is building an open mapping from
 [Dolby's public patent](https://patents.google.com/patent/US9613407B2/en),
 checked pixel by pixel against Dolby's own reference renderer with the
 BT.2124 ΔE_ITP colour-difference metric:
 
-- **Development and first held-out frames:** mean ΔE_ITP 0.54–0.73, against
-  4.6–9.3 for the stock open-source path
+- **Broader test (`random30`, 30 new frame/target pairs):** 13 pass the bar
+  (mean ≤ 1, p95 ≤ 3). 12 miss it, and 5 expose an invalid-pixel defect in
+  the native renderer that is being fixed at its cause.
+- **First three frames** (two development, one held-out): mean ΔE_ITP
+  0.54–0.73, against 4.6–9.3 for the stock open-source path
   ([equations and evidence](docs/SQRTSUM_PQ_Y_POST.md)).
-- **Broader test, 30 new frame/target pairs:** 13 pass the bar (mean ≤ 1,
-  p95 ≤ 3). 12 miss it, and 5 expose an invalid-pixel defect in the native
-  renderer that is being fixed at its cause.
+- These are differences from the reference renderer's output, not
+  measurements of what the panel displays.
 - **Next:** [measurement-driven development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md).
   Dolby's reference tools are measured directly with synthetic colour grids,
   so each fix is aimed at where the mapping actually differs, and each
@@ -103,10 +113,13 @@ disposable source checkout. **Before any live compositor or kernel change**,
 follow [operations](docs/OPERATIONS.md): it covers rollback packages,
 Secure Boot signing and recovery access.
 
-**To contribute**, read [AGENTS.md](AGENTS.md). In short: clone from the
-primary forge (GitHub is a push mirror of `main` and `codex/*`), work on a
-branch, get an adversarial review when ready to merge, run the fast lane
-once, then merge. [Development](docs/DEVELOPMENT.md#remotes-branches-and-the-public-mirror)
+**Issues and pull requests on GitHub are welcome.** This GitHub repository
+is a push mirror of the maintainer's private forge (`main`, `codex/*`,
+`claude/*` and `hermes/*`), so accepted changes are carried through the forge
+rather than merged here. Maintainers and agents follow [AGENTS.md](AGENTS.md):
+work on a branch, get an adversarial review when ready to merge, then run the
+fast lane (the two checks above, also available as a manual GitHub workflow)
+once before merging. [Development](docs/DEVELOPMENT.md#remotes-branches-and-the-public-mirror)
 has the remote and branch rules.
 
 ## Documentation
@@ -191,8 +204,10 @@ Audio (speakers, latency, Dolby Atmos) lives in
 
 - [x] Native HDR detection on the internal panel (HDR10 working 2026-10-08)
 - [x] Compositor colour pipeline: physical targets, HLG, highlight mapping,
-  gamut compression, Night Light in HDR
-- [x] Ubuntu source and binary packages with tested install and rollback
+  gamut compression (installed as `nativehdr8`)
+- [~] Night Light in HDR and per-monitor overrides — packaged as
+  `nativehdr10`, not installed
+- [x] Ubuntu source and binary packages, with an isolated install/rollback test
 - [~] Open Dolby Vision display mapping — 13/30 on new shots; measurement-driven
   fixes in progress
 - [~] Dolby Vision playback — Profile 5 decode and reshaping work; trims,
