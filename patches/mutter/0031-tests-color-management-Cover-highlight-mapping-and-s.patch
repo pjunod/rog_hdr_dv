@@ -89,7 +89,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  3 files changed, 958 insertions(+), 3 deletions(-)
 
 diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
-index 190024438..b0d3c1a12 100644
+index 1900244..b0d3c1a 100644
 --- a/src/tests/clutter/conform/color-hdr.c
 +++ b/src/tests/clutter/conform/color-hdr.c
 @@ -1,13 +1,16 @@
@@ -822,10 +822,10 @@ index 190024438..b0d3c1a12 100644
 +  CLUTTER_TEST_UNIT ("/color-hdr/mapping/shader-matches-cpu", mapping_shader_matches_cpu)
  )
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index c4390330e..ace55e640 100644
+index 55b9b61..de45dc6 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -951,7 +951,8 @@ wayland_test_cases = [
+@@ -964,7 +964,8 @@ wayland_test_cases = [
      # the shared Wayland colour manager, so each runs in its own invocation.
      # The SDR-native case and the info round trip rewrite the fixture
      # output's EDID and colour mode, and the zero-descriptor case replaces
@@ -835,7 +835,7 @@ index c4390330e..ace55e640 100644
      'separate_cases': [
        '/wayland/target-luminance/v1',
        '/wayland/target-luminance/v2',
-@@ -960,6 +961,7 @@ wayland_test_cases = [
+@@ -973,6 +974,7 @@ wayland_test_cases = [
        '/wayland/sdr-native/unusable-edid-primaries',
        '/wayland/custom-primaries/info-round-trip',
        '/wayland/icc-file/zero-descriptor',
@@ -844,7 +844,7 @@ index c4390330e..ace55e640 100644
      'depends': [
        test_client_executables.get('color-management'),
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index ea43ec5f8..a3d0d5686 100644
+index ea43ec5..a3d0d56 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -25,6 +25,7 @@

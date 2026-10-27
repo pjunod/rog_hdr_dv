@@ -11,10 +11,10 @@ Retain hardware LUT/CTM support while recognizing active BT.2100 monitors indepe
  2 files changed, 27 insertions(+)
 
 diff --git a/src/backends/meta-monitor-manager.c b/src/backends/meta-monitor-manager.c
-index 7a86a36..aaa5ab2 100644
+index 2b96ae4..7f036b9 100644
 --- a/src/backends/meta-monitor-manager.c
 +++ b/src/backends/meta-monitor-manager.c
-@@ -1262,6 +1262,17 @@ update_night_light_supported (MetaMonitorManager *manager)
+@@ -1271,6 +1271,17 @@ update_night_light_supported (MetaMonitorManager *manager)
          }
      }
  
@@ -32,7 +32,7 @@ index 7a86a36..aaa5ab2 100644
    if (priv->night_light_supported == night_light_supported)
      return;
  
-@@ -4300,6 +4311,8 @@ meta_monitor_manager_rebuild (MetaMonitorManager *manager,
+@@ -4309,6 +4320,8 @@ meta_monitor_manager_rebuild (MetaMonitorManager *manager,
  
    meta_monitor_manager_update_monitor_modes (manager, config);
  

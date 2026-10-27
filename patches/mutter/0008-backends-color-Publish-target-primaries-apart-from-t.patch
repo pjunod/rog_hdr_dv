@@ -37,7 +37,7 @@ Co-Authored-By: Claude Agent <claude-agent@invalid>
  6 files changed, 310 insertions(+), 31 deletions(-)
 
 diff --git a/meson.build b/meson.build
-index 11d573981..4d07a9eff 100644
+index 123edb6..69dc23f 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -151,6 +151,8 @@ if not cc.links('''
@@ -68,7 +68,7 @@ index 11d573981..4d07a9eff 100644
  
  libdrm_dep = dependency('libdrm', version: libdrm_req)
 diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
-index 07e071309..f4ee9d80a 100644
+index 07e0713..f4ee9d8 100644
 --- a/src/backends/edid-parse.c
 +++ b/src/backends/edid-parse.c
 @@ -203,6 +203,93 @@ read_native_luminance (MetaEdidInfo         *info,
@@ -174,7 +174,7 @@ index 07e071309..f4ee9d80a 100644
    di_info_destroy (di_info);
    return g_steal_pointer (&info);
 diff --git a/src/backends/edid.h b/src/backends/edid.h
-index 9a3b1ce06..35f3e13da 100644
+index 9a3b1ce..35f3e13 100644
 --- a/src/backends/edid.h
 +++ b/src/backends/edid.h
 @@ -37,6 +37,17 @@ typedef enum
@@ -205,7 +205,7 @@ index 9a3b1ce06..35f3e13da 100644
  
  META_EXPORT_TEST
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index b2931e905..1a046fea6 100644
+index b2931e9..1a046fe 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -84,6 +84,7 @@ struct _MetaColorDevice
@@ -391,7 +391,7 @@ index b2931e905..1a046fea6 100644
    if (result & UPDATE_RESULT_CALIBRATION)
      g_signal_emit (color_device, signals[CALIBRATION_CHANGED], 0);
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 563967bd6..8ca55741a 100644
+index 563967b..8ca5574 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -45,6 +45,23 @@ typedef struct
@@ -419,7 +419,7 @@ index 563967bd6..8ca55741a 100644
  const MetaColorTargetLuminance *
  meta_color_device_get_target_luminance (MetaColorDevice *color_device);
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 707791f3e..c216443db 100644
+index 707791f..c216443 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -143,6 +143,7 @@ struct _MetaWaylandDescriptionRecord

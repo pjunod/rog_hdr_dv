@@ -112,7 +112,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  7 files changed, 682 insertions(+), 23 deletions(-)
 
 diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
-index 097318be3..a78ef3ef5 100644
+index 097318b..a78ef3e 100644
 --- a/clutter/clutter/clutter-color-op-private.h
 +++ b/clutter/clutter/clutter-color-op-private.h
 @@ -59,3 +59,38 @@ void clutter_color_op_hlg_get_parameters (ClutterColorOp *op,
@@ -155,7 +155,7 @@ index 097318be3..a78ef3ef5 100644
 +
 +const ClutterBt2390EetfParameters * clutter_color_op_bt2390_eetf_get_parameters (ClutterColorOp *op);
 diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
-index 3f1704232..6616e15fb 100644
+index 3f17042..6616e15 100644
 --- a/clutter/clutter/clutter-color-op.c
 +++ b/clutter/clutter/clutter-color-op.c
 @@ -769,6 +769,136 @@ clutter_color_op_hlg_get_parameters (ClutterColorOp *op,
@@ -296,7 +296,7 @@ index 3f1704232..6616e15fb 100644
  {
    uint32_t size;
 diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
-index 306b01b8a..534a7d327 100644
+index 306b01b..534a7d3 100644
 --- a/clutter/clutter/clutter-color-pipeline-shader.c
 +++ b/clutter/clutter/clutter-color-pipeline-shader.c
 @@ -257,6 +257,62 @@ static const char hlg_inv_eotf_source[] =
@@ -423,7 +423,7 @@ index 306b01b8a..534a7d327 100644
      .get_type = clutter_color_op_unpremultiply_get_type,
      .shader_source = unpremultiply_source,
 diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
-index 17ff0fb3d..555688f72 100644
+index 17ff0fb..555688f 100644
 --- a/clutter/clutter/clutter-color-state-params-private.h
 +++ b/clutter/clutter/clutter-color-state-params-private.h
 @@ -28,9 +28,12 @@
@@ -464,7 +464,7 @@ index 17ff0fb3d..555688f72 100644
  gboolean clutter_color_state_encoding_equals (ClutterColorState *color_state,
                                                ClutterColorState *other_color_state);
 diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
-index 2b61c83bf..cbf12351c 100644
+index 2b61c83..cbf1235 100644
 --- a/clutter/clutter/clutter-color-state-params.c
 +++ b/clutter/clutter/clutter-color-state-params.c
 @@ -58,6 +58,12 @@ typedef struct _ClutterColorStateParams
@@ -806,7 +806,7 @@ index 2b61c83bf..cbf12351c 100644
    return CLUTTER_COLOR_STATE (copy);
  }
 diff --git a/clutter/clutter/clutter-color-transform-private.h b/clutter/clutter/clutter-color-transform-private.h
-index 6a1854ea9..2ffb19629 100644
+index 6a1854e..2ffb196 100644
 --- a/clutter/clutter/clutter-color-transform-private.h
 +++ b/clutter/clutter/clutter-color-transform-private.h
 @@ -40,3 +40,8 @@ ClutterColorTransform * clutter_color_transform_from_color_states (ClutterContex
@@ -819,7 +819,7 @@ index 6a1854ea9..2ffb19629 100644
 +gboolean clutter_color_transform_requires_highlight_mapping (ClutterColorState *source_color_state,
 +                                                             ClutterColorState *target_color_state);
 diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
-index 65c03f297..f1f097027 100644
+index 65c03f2..f1f0970 100644
 --- a/clutter/clutter/clutter-color-transform.c
 +++ b/clutter/clutter/clutter-color-transform.c
 @@ -1008,6 +1008,149 @@ add_luminance_mapping_op (ClutterColorPipeline *pipeline,

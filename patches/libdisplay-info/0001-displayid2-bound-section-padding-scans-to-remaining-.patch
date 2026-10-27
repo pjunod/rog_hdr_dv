@@ -1,8 +1,7 @@
-From da6168b6c046a11036c79d32df0c2c8e68e73f60 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Wed, 7 Oct 2026 22:31:52 -0400
-Subject: [PATCH 1/4] displayid2: bound section padding scans to remaining
- payload
+Subject: [PATCH] displayid2: bound section padding scans to remaining payload
 
 An oversized declared block advanced past the section payload, and a
 stale remaining length made the final padding scan read beyond its end.
@@ -138,6 +137,3 @@ index 34e150f..0a7035e 100644
 +
 +section_bounds = executable('displayid2-bounds', 'displayid2-bounds.c', dependencies: di_dep)
 +test('displayid2-bounds', section_bounds)
--- 
-2.54.0 (Apple Git-157)
-

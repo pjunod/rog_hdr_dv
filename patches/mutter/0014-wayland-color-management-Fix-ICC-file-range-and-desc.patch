@@ -51,7 +51,7 @@ can only be exercised on the compositor side.
  3 files changed, 159 insertions(+), 75 deletions(-)
 
 diff --git a/clutter/clutter/clutter-color-state-icc.c b/clutter/clutter/clutter-color-state-icc.c
-index e1d76322c..bcfcacba0 100644
+index e1d7632..bcfcacb 100644
 --- a/clutter/clutter/clutter-color-state-icc.c
 +++ b/clutter/clutter/clutter-color-state-icc.c
 @@ -229,9 +229,14 @@ get_icc_file (const uint8_t     *icc_bytes,
@@ -90,7 +90,7 @@ index e1d76322c..bcfcacba0 100644
  
    return FALSE;
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index ec5b8075d..c7c6aff92 100644
+index ec5b807..c7c6aff 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -24,6 +24,7 @@
@@ -357,7 +357,7 @@ index ec5b8075d..c7c6aff92 100644
  
  static const struct wp_image_description_creator_icc_v1_interface
 diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
-index a26d234ac..308cd9c7f 100644
+index a26d234..308cd9c 100644
 --- a/src/wayland/meta-wayland-color-management.h
 +++ b/src/wayland/meta-wayland-color-management.h
 @@ -20,10 +20,38 @@

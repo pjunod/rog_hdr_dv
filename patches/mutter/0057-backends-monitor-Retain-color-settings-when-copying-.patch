@@ -7,9 +7,9 @@ Subject: [PATCH] backends/monitor: Retain color settings when copying and
 Preserve color mode, RGB range and target overrides in amendment and orientation copies. Recover target declarations by monitor identity from the existing configuration history when synthesizing layouts; explicit D-Bus replacement remains separate. Use each mirror member for its own color-mode history. Add deferred copy, history, VERIFY nonmutation and override-only reapply regressions.
 ---
  src/backends/meta-monitor-config-manager.c |  38 +++++-
- src/backends/meta-monitor-config-utils.c   |   5 +-
+ src/backends/meta-monitor-config-utils.c   |   1 +
  src/tests/monitor-storage-tests.c          | 133 +++++++++++++++++++++
- 3 files changed, 169 insertions(+), 7 deletions(-)
+ 3 files changed, 166 insertions(+), 6 deletions(-)
 
 diff --git a/src/backends/meta-monitor-config-manager.c b/src/backends/meta-monitor-config-manager.c
 index 27ba4f7..82d16af 100644
@@ -95,17 +95,13 @@ index 27ba4f7..82d16af 100644
                                                 color_mode));
      }
 diff --git a/src/backends/meta-monitor-config-utils.c b/src/backends/meta-monitor-config-utils.c
-index c9c0b7e..bdc4b84 100644
+index b24c5f9..bdc4b84 100644
 --- a/src/backends/meta-monitor-config-utils.c
 +++ b/src/backends/meta-monitor-config-utils.c
-@@ -38,7 +38,10 @@ meta_monitor_config_copy (MetaMonitorConfig *monitor_config)
-                             sizeof (MetaMonitorModeSpec)),
-     .enable_underscanning = monitor_config->enable_underscanning,
-     .has_max_bpc = monitor_config->has_max_bpc,
--    .max_bpc = monitor_config->max_bpc
-+    .max_bpc = monitor_config->max_bpc,
-+    .rgb_range = monitor_config->rgb_range,
-+    .color_mode = monitor_config->color_mode,
+@@ -41,6 +41,7 @@ meta_monitor_config_copy (MetaMonitorConfig *monitor_config)
+     .max_bpc = monitor_config->max_bpc,
+     .rgb_range = monitor_config->rgb_range,
+     .color_mode = monitor_config->color_mode,
 +    .target_override = monitor_config->target_override,
    };
  

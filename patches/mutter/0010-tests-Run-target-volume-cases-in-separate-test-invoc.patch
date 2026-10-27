@@ -19,7 +19,7 @@ can observe another's fixture or manager lifetime.
  1 file changed, 57 insertions(+), 20 deletions(-)
 
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index a953ac84b..c8c5607a6 100644
+index c9df1e1..48c4273 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
 @@ -285,6 +285,9 @@ monitor_tests_common_deps = [
@@ -32,7 +32,7 @@ index a953ac84b..c8c5607a6 100644
  
  test_cases = []
  privileged_test_cases = []
-@@ -944,6 +947,14 @@ wayland_test_cases = [
+@@ -957,6 +960,14 @@ wayland_test_cases = [
        'wayland-color-management-test.c',
        wayland_test_utils,
      ],
@@ -47,7 +47,7 @@ index a953ac84b..c8c5607a6 100644
      'depends': [
        test_client_executables.get('color-management'),
      ],
-@@ -1314,6 +1325,10 @@ foreach test_case: test_cases
+@@ -1327,6 +1338,10 @@ foreach test_case: test_cases
  
    args = test_case.get('args', [])
    test_case_env = test_case.get('env', test_env)
@@ -58,7 +58,7 @@ index a953ac84b..c8c5607a6 100644
  
    test(test_case['name'], test_executable,
      suite: ['core', 'mutter/' + test_case['suite']],
-@@ -1323,6 +1338,17 @@ foreach test_case: test_cases
+@@ -1336,6 +1351,17 @@ foreach test_case: test_cases
      is_parallel: false,
      timeout: test_case.get('timeout', default_test_timeout),
    )
@@ -76,7 +76,7 @@ index a953ac84b..c8c5607a6 100644
  endforeach
  
  stacking_tests = [
-@@ -1602,26 +1628,37 @@ if have_installed_tests
+@@ -1615,26 +1641,37 @@ if have_installed_tests
        args = test_case.get('args', [])
      endif
  

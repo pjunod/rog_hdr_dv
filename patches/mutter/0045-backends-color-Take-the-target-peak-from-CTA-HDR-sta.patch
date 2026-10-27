@@ -49,7 +49,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  3 files changed, 160 insertions(+), 39 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 4f1845547..fe233be2a 100644
+index 4f18455..fe233be 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -854,10 +854,115 @@ get_color_metadata_from_monitor (MetaColorDevice    *color_device,
@@ -274,7 +274,7 @@ index 4f1845547..fe233be2a 100644
    if (target_luminance_equal (&color_device->target_luminance, &target) &&
        target_primaries_equal (&color_device->target_primaries, &target_primaries))
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index e33d9a174..28febff27 100644
+index e33d9a1..28febff 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -109,7 +109,7 @@ ClutterColorState * meta_color_device_get_rendering_color_state (MetaColorDevice
@@ -287,7 +287,7 @@ index e33d9a174..28febff27 100644
  
  MetaColorDevice * meta_color_device_new (MetaColorManager *color_manager,
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index 3ac09f2b4..ce4801ec5 100644
+index 3ac09f2..ce4801e 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -303,10 +303,20 @@ target_luminance (gconstpointer data)

@@ -37,7 +37,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  5 files changed, 214 insertions(+), 121 deletions(-)
 
 diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
-index 45dd3aad7..b9d754f04 100644
+index 45dd3aa..b9d754f 100644
 --- a/clutter/clutter/clutter-color-state-params-private.h
 +++ b/clutter/clutter/clutter-color-state-params-private.h
 @@ -29,11 +29,13 @@
@@ -72,7 +72,7 @@ index 45dd3aad7..b9d754f04 100644
  const ClutterColorTargetVolume * clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_state_params);
  
 diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
-index a230198f7..a8662be56 100644
+index a230198..a8662be 100644
 --- a/clutter/clutter/clutter-color-state-params.c
 +++ b/clutter/clutter/clutter-color-state-params.c
 @@ -62,8 +62,15 @@ typedef struct _ClutterColorStateParams
@@ -397,7 +397,7 @@ index a230198f7..a8662be56 100644
  
  static gboolean
 diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
-index 1286f43ac..5605c4023 100644
+index 1286f43..5605c40 100644
 --- a/clutter/clutter/clutter-color-transform.c
 +++ b/clutter/clutter/clutter-color-transform.c
 @@ -1036,10 +1036,10 @@ get_source_headroom (ClutterColorState *color_state,
@@ -428,7 +428,7 @@ index 1286f43ac..5605c4023 100644
   * followed to linear BT.2020 exactly as the renderer converts its pixels:
   *
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 4eebbdd1b..8bbd6aef9 100644
+index 4eebbdd..8bbd6ae 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -1179,9 +1179,9 @@ update_target_volume (MetaColorDevice *color_device)
@@ -476,7 +476,7 @@ index 4eebbdd1b..8bbd6aef9 100644
    else
      {
 diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
-index 5f0d21b08..575404bf1 100644
+index 5f0d21b..575404b 100644
 --- a/src/tests/clutter/conform/color-hdr.c
 +++ b/src/tests/clutter/conform/color-hdr.c
 @@ -618,7 +618,8 @@ create_pq_output (float ref_lum)

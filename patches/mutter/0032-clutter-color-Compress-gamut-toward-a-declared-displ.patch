@@ -147,7 +147,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  9 files changed, 1063 insertions(+), 48 deletions(-)
 
 diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
-index a78ef3ef5..874e5f696 100644
+index a78ef3e..874e5f6 100644
 --- a/clutter/clutter/clutter-color-op-private.h
 +++ b/clutter/clutter/clutter-color-op-private.h
 @@ -94,3 +94,44 @@ typedef struct _ClutterBt2390EetfParameters
@@ -196,7 +196,7 @@ index a78ef3ef5..874e5f696 100644
 +
 +const ClutterGamutCompressParameters * clutter_color_op_gamut_compress_get_parameters (ClutterColorOp *op);
 diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
-index 6616e15fb..c366c3425 100644
+index 6616e15..c366c34 100644
 --- a/clutter/clutter/clutter-color-op.c
 +++ b/clutter/clutter/clutter-color-op.c
 @@ -899,6 +899,138 @@ clutter_color_op_bt2390_eetf_get_parameters (ClutterColorOp *op)
@@ -339,7 +339,7 @@ index 6616e15fb..c366c3425 100644
  {
    uint32_t size;
 diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
-index 534a7d327..9a43e2a4d 100644
+index 534a7d3..9a43e2a 100644
 --- a/clutter/clutter/clutter-color-pipeline-shader.c
 +++ b/clutter/clutter/clutter-color-pipeline-shader.c
 @@ -313,6 +313,48 @@ static const char bt2390_eetf_source[] =
@@ -453,7 +453,7 @@ index 534a7d327..9a43e2a4d 100644
      .get_type = clutter_color_op_unpremultiply_get_type,
      .shader_source = unpremultiply_source,
 diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
-index 555688f72..c1d0ebd2d 100644
+index 555688f..c1d0ebd 100644
 --- a/clutter/clutter/clutter-color-state-params-private.h
 +++ b/clutter/clutter/clutter-color-state-params-private.h
 @@ -32,6 +32,8 @@
@@ -493,7 +493,7 @@ index 555688f72..c1d0ebd2d 100644
   * clutter_color_state_equals() deems close enough. */
  CLUTTER_EXPORT
 diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
-index cbf12351c..ae7278f49 100644
+index cbf1235..ae7278f 100644
 --- a/clutter/clutter/clutter-color-state-params.c
 +++ b/clutter/clutter/clutter-color-state-params.c
 @@ -120,12 +120,13 @@ clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_sta
@@ -690,7 +690,7 @@ index cbf12351c..ae7278f49 100644
    copy = g_object_new (CLUTTER_TYPE_COLOR_STATE_PARAMS,
                         "context", clutter_color_state_get_context (color_state),
 diff --git a/clutter/clutter/clutter-color-transform-private.h b/clutter/clutter/clutter-color-transform-private.h
-index 2ffb19629..43e752a49 100644
+index 2ffb196..43e752a 100644
 --- a/clutter/clutter/clutter-color-transform-private.h
 +++ b/clutter/clutter/clutter-color-transform-private.h
 @@ -41,7 +41,17 @@ ClutterColorTransform * clutter_color_transform_from_color_states (ClutterContex
@@ -713,7 +713,7 @@ index 2ffb19629..43e752a49 100644
 +gboolean clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
 +                                                   ClutterColorState *target_color_state);
 diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
-index f1f097027..f26514c6e 100644
+index f1f0970..f26514c 100644
 --- a/clutter/clutter/clutter-color-transform.c
 +++ b/clutter/clutter/clutter-color-transform.c
 @@ -1151,6 +1151,405 @@ add_highlight_mapping_op (ClutterColorPipeline *pipeline,
@@ -1149,7 +1149,7 @@ index f1f097027..f26514c6e 100644
  
    clutter_color_pipeline_simplify (pipeline);
 diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
-index 2599ec9e8..84abd0957 100644
+index 2599ec9..84abd09 100644
 --- a/clutter/clutter/clutter-color-utils-private.h
 +++ b/clutter/clutter/clutter-color-utils-private.h
 @@ -44,6 +44,25 @@ gboolean clutter_colorimetry_get_luminance_coefficients (const ClutterColorimetr
@@ -1179,7 +1179,7 @@ index 2599ec9e8..84abd0957 100644
  CLUTTER_EXPORT
  gboolean clutter_luminance_get_hlg_parameters (float    min_lum,
 diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
-index d2afe41cc..480b5c912 100644
+index d2afe41..480b5c9 100644
 --- a/clutter/clutter/clutter-color-utils.c
 +++ b/clutter/clutter/clutter-color-utils.c
 @@ -684,26 +684,40 @@ round_trip_error (const graphene_matrix_t *a,
