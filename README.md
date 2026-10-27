@@ -149,6 +149,7 @@ has the remote and branch rules.
 | [Mutter target feedback](docs/MUTTER_TARGET_LUMINANCE.md) | How the compositor reports the physical target to clients |
 | [Colour pipeline audit](docs/COLOUR_PIPELINE_AUDIT.md) | Encoding, targets, calibration and KMS metadata, traced in source |
 | [Asynchronous lifetime](docs/COLOUR_ASYNC_LIFETIME.md) · [offscreen reuse](docs/OFFSCREEN_REUSE.md) | Two reviewed compositor follow-up fixes |
+| [i915 VRR fastset](docs/I915_VRR_FASTSET.md) | Why full-screen video never got variable refresh, the kernel fix and its upstream report |
 
 ### Dolby Vision
 
