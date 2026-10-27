@@ -100,8 +100,8 @@ sudo apt install --allow-downgrades mutter=51.0-1ubuntu3 libmutter-51-0=51.0-1ub
 
 Every night at 07:23 UTC, on any push to `main` that touches the series or
 `packaging/ubuntu/`, and on demand, the workflow runs
-[`rebuild.sh`](../packaging/ubuntu/rebuild.sh) on a self-hosted runner with
-the `self-hosted` and `lab` labels and Docker:
+[`rebuild.sh`](../packaging/ubuntu/rebuild.sh) on the repository's runner
+(below):
 
 ```
  repository check (SERIES.lock agrees with the series and REVISION)
@@ -118,6 +118,47 @@ the `self-hosted` and `lab` labels and Docker:
         │
         ▼
  delete the source's older versions ──▶ publish.sh (rebuilds the indexes)
+```
+
+**Running it by hand.** Nothing needs waiting for the night. To run the
+workflow now, use Forgejo's Actions tab (`Ubuntu packages` → `Run workflow`),
+or the API:
+
+```bash
+curl -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json" \
+  -d '{"ref": "main"}' \
+  http://forge.lan:3000/api/v1/repos/pjunod/rog_hdr_dv/actions/workflows/ubuntu-packages.yml/dispatches
+```
+
+Or run the same script from a checkout on any machine with Docker; it does
+exactly what the workflow does, and nothing when the registry is current:
+
+```bash
+export FORGEJO_TOKEN=...                      # write:package scope
+export FORGEJO_URL=http://forge.lan:3000      # the default; set it if the name does not resolve
+packaging/ubuntu/rebuild.sh ~/work/ubuntu-packages   # build output goes here; emptied first
+```
+
+The steps also run alone, for example to try a refreshed patch without
+publishing anything:
+
+```bash
+packaging/ubuntu/build.sh libdisplay-info ~/work/ldi-amd64                     # newest Ubuntu source
+packaging/ubuntu/build.sh libdisplay-info ~/work/ldi-i386 --arch i386
+packaging/ubuntu/build.sh mutter ~/work/mutter --with ~/work/ldi-amd64          # against that libdisplay-info
+packaging/ubuntu/publish.sh ~/work/ldi-amd64 ~/work/ldi-i386                   # only when it should ship
+```
+
+**The runner.** The job runs on `lab3-rog-hdr-01`, a Forgejo runner on lab3
+registered to this repository only (the other runners belong to plurx's
+organisation and never pick up these jobs). It lives in
+`/opt/forgejo-runner-rog-hdr-01` as the `runner` user with Docker access, and
+runs as the systemd service `forgejo-runner-rog-hdr-01`:
+
+```bash
+systemctl status forgejo-runner-rog-hdr-01        # on lab3
+sudo systemctl restart forgejo-runner-rog-hdr-01
+sudo journalctl -u forgejo-runner-rog-hdr-01 -f   # what it is doing
 ```
 
 **The token.** The automatic Actions token can only read an owner's
