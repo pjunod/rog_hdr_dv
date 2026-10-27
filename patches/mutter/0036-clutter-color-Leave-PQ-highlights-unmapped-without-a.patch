@@ -46,7 +46,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  5 files changed, 258 insertions(+), 63 deletions(-)
 
 diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
-index c1d0ebd2d..45dd3aad7 100644
+index c1d0ebd..45dd3aa 100644
 --- a/clutter/clutter/clutter-color-state-params-private.h
 +++ b/clutter/clutter/clutter-color-state-params-private.h
 @@ -83,7 +83,11 @@ gboolean clutter_color_state_params_get_display_gamut (ClutterColorStateParams *
@@ -63,7 +63,7 @@ index c1d0ebd2d..45dd3aad7 100644
  /* Exact identity, for caches whose entries must not be shared by states that
   * clutter_color_state_equals() deems close enough. */
 diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
-index ae7278f49..a230198f7 100644
+index ae7278f..a230198 100644
 --- a/clutter/clutter/clutter-color-state-params.c
 +++ b/clutter/clutter/clutter-color-state-params.c
 @@ -120,13 +120,24 @@ clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_sta
@@ -176,7 +176,7 @@ index ae7278f49..a230198f7 100644
    if (target_volume->has_luminance)
      peak = MIN (peak, target_volume->max_lum / display_ref);
 diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
-index f26514c6e..1286f43ac 100644
+index f26514c..1286f43 100644
 --- a/clutter/clutter/clutter-color-transform.c
 +++ b/clutter/clutter/clutter-color-transform.c
 @@ -1403,7 +1403,7 @@ get_gamut_compression (ClutterColorState *source_color_state,
@@ -189,7 +189,7 @@ index f26514c6e..1286f43ac 100644
      return FALSE;
  
 diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
-index c8fe7f5e1..7983f56da 100644
+index c8fe7f5..7983f56 100644
 --- a/src/tests/clutter/conform/color-hdr.c
 +++ b/src/tests/clutter/conform/color-hdr.c
 @@ -637,6 +637,7 @@ mapping_predicate (void)
@@ -571,7 +571,7 @@ index c8fe7f5e1..7983f56da 100644
    CLUTTER_TEST_UNIT ("/color-hdr/mapping/identity", mapping_identity)
    CLUTTER_TEST_UNIT ("/color-hdr/mapping/bt2390-reference", mapping_bt2390_reference)
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index 983d4fff1..6f7792cee 100644
+index 983d4ff..6f7792c 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -949,17 +949,20 @@ get_window_target_volume (MetaWindow *window)

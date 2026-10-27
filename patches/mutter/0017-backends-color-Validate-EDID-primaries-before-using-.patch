@@ -43,7 +43,7 @@ Tests:
  5 files changed, 240 insertions(+), 18 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 169ccc6ac..c22253495 100644
+index 169ccc6..c222534 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -32,6 +32,7 @@
@@ -222,7 +222,7 @@ index 169ccc6ac..c22253495 100644
    if (meta_debug_control_is_hdr_forced (debug_control))
      {
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 63d620ba5..7d58b1e0a 100644
+index 63d620b..7d58b1e 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -68,6 +68,11 @@ META_EXPORT_TEST
@@ -238,10 +238,10 @@ index 63d620ba5..7d58b1e0a 100644
  const MetaColorTargetPrimaries *
  meta_color_device_get_target_primaries (MetaColorDevice *color_device);
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index c8c5607a6..03fe6cc7d 100644
+index 48c4273..8a36b33 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -949,11 +949,13 @@ wayland_test_cases = [
+@@ -962,11 +962,13 @@ wayland_test_cases = [
      ],
      # Target-volume cases rewrite the fixture output and the v2 cases dispose
      # the shared Wayland colour manager, so each runs in its own invocation.
@@ -256,7 +256,7 @@ index c8c5607a6..03fe6cc7d 100644
      'depends': [
        test_client_executables.get('color-management'),
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index 29e5a6347..f5b6cf11f 100644
+index 29e5a63..f5b6cf1 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
 @@ -917,6 +917,85 @@ test_chromaticity_fixed_point (void)
@@ -353,7 +353,7 @@ index 29e5a6347..f5b6cf11f 100644
    return g_test_run ();
  }
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index a66efa64b..3ea3a73d9 100644
+index a66efa6..3ea3a73 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -488,6 +488,57 @@ target_primaries (gconstpointer data)

@@ -15,7 +15,7 @@ Subject: [PATCH] backends/color: Separate the native target luminance from the
  7 files changed, 561 insertions(+), 117 deletions(-)
 
 diff --git a/meson.build b/meson.build
-index 80e42a881..11d573981 100644
+index b2013a8..123edb6 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -149,6 +149,8 @@ if not cc.links('''
@@ -47,7 +47,7 @@ index 80e42a881..11d573981 100644
  
  libdrm_dep = dependency('libdrm', version: libdrm_req)
 diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
-index 678041215..07e071309 100644
+index 6780412..07e0713 100644
 --- a/src/backends/edid-parse.c
 +++ b/src/backends/edid-parse.c
 @@ -112,6 +112,97 @@ has_native_rgb_bt2020_pq (const struct di_info *info)
@@ -157,7 +157,7 @@ index 678041215..07e071309 100644
    di_info_destroy (di_info);
    return g_steal_pointer (&info);
 diff --git a/src/backends/edid.h b/src/backends/edid.h
-index 96583b8b6..9a3b1ce06 100644
+index 96583b8..9a3b1ce 100644
 --- a/src/backends/edid.h
 +++ b/src/backends/edid.h
 @@ -25,9 +25,18 @@
@@ -191,7 +191,7 @@ index 96583b8b6..9a3b1ce06 100644
  
  META_EXPORT_TEST
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 2006fddcd..79230ad93 100644
+index 2006fdd..79230ad 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -23,6 +23,7 @@
@@ -382,7 +382,7 @@ index 2006fddcd..79230ad93 100644
  
  void
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 4288508e8..222bb741e 100644
+index 4288508..222bb74 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -21,6 +21,8 @@
@@ -427,7 +427,7 @@ index 4288508e8..222bb741e 100644
                                           MetaMonitor      *monitor);
  
 diff --git a/src/backends/meta-color-manager.c b/src/backends/meta-color-manager.c
-index 6962ce0aa..be0e2a026 100644
+index 6962ce0..be0e2a0 100644
 --- a/src/backends/meta-color-manager.c
 +++ b/src/backends/meta-color-manager.c
 @@ -65,6 +65,7 @@ enum
@@ -478,7 +478,7 @@ index 6962ce0aa..be0e2a026 100644
      g_signal_new ("ready",
                    G_TYPE_FROM_CLASS (klass),
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 555881369..efaa9dcaf 100644
+index 5558813..efaa9dc 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -37,7 +37,17 @@

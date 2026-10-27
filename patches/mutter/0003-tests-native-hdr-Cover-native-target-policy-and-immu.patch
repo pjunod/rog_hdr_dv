@@ -14,7 +14,7 @@ Subject: [PATCH] tests/native-hdr: Cover native target policy and immutable
  6 files changed, 820 insertions(+), 30 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 79230ad93..5aee553fc 100644
+index 79230ad..5aee553 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -783,6 +783,7 @@ meta_color_target_luminance_init (MetaColorTargetLuminance *target,
@@ -26,7 +26,7 @@ index 79230ad93..5aee553fc 100644
        (double) target->maximum > G_MAXUINT32)
      {
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 222bb741e..563967bd6 100644
+index 222bb74..563967b 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -67,6 +67,7 @@ const char * meta_color_device_get_id (MetaColorDevice *color_device);
@@ -46,7 +46,7 @@ index 222bb741e..563967bd6 100644
  
  float meta_color_device_get_reference_luminance_factor (MetaColorDevice *color_device);
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index 5e9c5afbc..d21a0032f 100644
+index 5e9c5af..d21a003 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
 @@ -7,6 +7,7 @@
@@ -211,7 +211,7 @@ index 5e9c5afbc..d21a0032f 100644
    return g_test_run ();
  }
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index f1ee18364..c676e1da4 100644
+index f1ee183..c676e1d 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -26,6 +26,13 @@
@@ -371,7 +371,7 @@ index f1ee18364..c676e1da4 100644
  
  int
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index 98f76e9d5..ce8f4098a 100644
+index 98f76e9..ce8f409 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -24,6 +24,8 @@
@@ -903,7 +903,7 @@ index 98f76e9d5..ce8f4098a 100644
    surface = wl_compositor_create_surface (display->compositor);
    xdg_surface = xdg_wm_base_get_xdg_surface (display->xdg_wm_base, surface);
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index efaa9dcaf..05d898886 100644
+index efaa9dc..05d8988 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -127,8 +127,9 @@ typedef struct _MetaWaylandImageDescription

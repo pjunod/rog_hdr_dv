@@ -120,10 +120,10 @@ index 49d753c..2a95361 100644
  
  META_EXPORT_TEST
 diff --git a/src/backends/meta-monitor-manager-private.h b/src/backends/meta-monitor-manager-private.h
-index 1d3dc58..a3a4b63 100644
+index caa1f4c..260c441 100644
 --- a/src/backends/meta-monitor-manager-private.h
 +++ b/src/backends/meta-monitor-manager-private.h
-@@ -299,6 +299,7 @@ void                meta_monitor_manager_power_save_mode_changed (MetaMonitorMan
+@@ -302,6 +302,7 @@ void                meta_monitor_manager_power_save_mode_changed (MetaMonitorMan
                                                                    MetaPowerSave              mode,
                                                                    MetaPowerSaveChangeReason  reason);
  
@@ -132,7 +132,7 @@ index 1d3dc58..a3a4b63 100644
                                                                  gboolean            ok);
  
 diff --git a/src/backends/meta-monitor-manager.c b/src/backends/meta-monitor-manager.c
-index 7495810..7a86a36 100644
+index 68148dd..2b96ae4 100644
 --- a/src/backends/meta-monitor-manager.c
 +++ b/src/backends/meta-monitor-manager.c
 @@ -47,6 +47,7 @@
@@ -143,7 +143,7 @@ index 7495810..7a86a36 100644
  #include "backends/meta-color-manager-private.h"
  #include "backends/meta-crtc.h"
  #include "backends/meta-logical-monitor-private.h"
-@@ -2152,6 +2153,69 @@ generate_color_modes_variant (MetaMonitor *monitor)
+@@ -2161,6 +2162,69 @@ generate_color_modes_variant (MetaMonitor *monitor)
    return g_variant_builder_end (&builder);
  }
  
@@ -213,7 +213,7 @@ index 7495810..7a86a36 100644
  static gboolean
  meta_monitor_manager_handle_get_current_state (MetaDBusDisplayConfig *skeleton,
                                                 GDBusMethodInvocation *invocation,
-@@ -2325,6 +2389,9 @@ meta_monitor_manager_handle_get_current_state (MetaDBusDisplayConfig *skeleton,
+@@ -2334,6 +2398,9 @@ meta_monitor_manager_handle_get_current_state (MetaDBusDisplayConfig *skeleton,
                               "rgb-range",
                               g_variant_new_uint32 (rgb_range));
  
@@ -223,7 +223,7 @@ index 7495810..7a86a36 100644
        g_variant_builder_add (&monitors_builder, MONITOR_FORMAT,
                               monitor_spec->connector,
                               monitor_spec->vendor,
-@@ -2602,6 +2669,70 @@ find_monitor_from_connector (MetaMonitorManager *manager,
+@@ -2611,6 +2678,70 @@ find_monitor_from_connector (MetaMonitorManager *manager,
  
  #define LOGICAL_MONITOR_CONFIG_FORMAT "(iidub" MONITOR_CONFIGS_FORMAT ")"
  
@@ -294,7 +294,7 @@ index 7495810..7a86a36 100644
  static MetaMonitorConfig *
  create_monitor_config_from_variant (MetaMonitorManager *manager,
                                      GVariant           *monitor_config_variant,
-@@ -2622,6 +2753,7 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
+@@ -2631,6 +2762,7 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
    uint32_t color_mode_value;
    MetaOutputRGBRange rgb_range = META_OUTPUT_RGB_RANGE_UNKNOWN;
    uint32_t rgb_range_value;
@@ -302,7 +302,7 @@ index 7495810..7a86a36 100644
  
    g_variant_get (monitor_config_variant, "(ss@a{sv})",
                   &connector,
-@@ -2665,6 +2797,9 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
+@@ -2674,6 +2806,9 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
                          &rgb_range_value))
      rgb_range = rgb_range_value;
  
@@ -312,7 +312,7 @@ index 7495810..7a86a36 100644
    monitor_spec = meta_monitor_spec_clone (meta_monitor_get_spec (monitor));
  
    monitor_mode_spec = g_new0 (MetaMonitorModeSpec, 1);
-@@ -2677,6 +2812,7 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
+@@ -2686,6 +2821,7 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
      .enable_underscanning = enable_underscanning,
      .color_mode = color_mode,
      .rgb_range = rgb_range,

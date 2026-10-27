@@ -121,7 +121,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  4 files changed, 1771 insertions(+), 6 deletions(-)
 
 diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
-index b0d3c1a12..c8fe7f5e1 100644
+index b0d3c1a..c8fe7f5 100644
 --- a/src/tests/clutter/conform/color-hdr.c
 +++ b/src/tests/clutter/conform/color-hdr.c
 @@ -1,10 +1,11 @@
@@ -1624,10 +1624,10 @@ index b0d3c1a12..c8fe7f5e1 100644
 +  CLUTTER_TEST_UNIT ("/color-hdr/gamut/shader-matches-cpu", gamut_shader_matches_cpu)
  )
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index ace55e640..62569367a 100644
+index de45dc6..aabadd0 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -951,8 +951,8 @@ wayland_test_cases = [
+@@ -964,8 +964,8 @@ wayland_test_cases = [
      # the shared Wayland colour manager, so each runs in its own invocation.
      # The SDR-native case and the info round trip rewrite the fixture
      # output's EDID and colour mode, and the zero-descriptor case replaces
@@ -1638,7 +1638,7 @@ index ace55e640..62569367a 100644
      'separate_cases': [
        '/wayland/target-luminance/v1',
        '/wayland/target-luminance/v2',
-@@ -962,6 +962,7 @@ wayland_test_cases = [
+@@ -975,6 +975,7 @@ wayland_test_cases = [
        '/wayland/custom-primaries/info-round-trip',
        '/wayland/icc-file/zero-descriptor',
        '/wayland/mapping/blending-target',
@@ -1647,7 +1647,7 @@ index ace55e640..62569367a 100644
      'depends': [
        test_client_executables.get('color-management'),
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index f5b6cf11f..e7d86b68c 100644
+index f5b6cf1..e7d86b6 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
 @@ -844,6 +844,79 @@ test_target_primaries_policy (void)
@@ -1739,7 +1739,7 @@ index f5b6cf11f..e7d86b68c 100644
    g_test_add_func ("/native-hdr/sdr-native-edid-primaries", test_sdr_native_edid_primaries);
    return g_test_run ();
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index a3d0d5686..983d4fff1 100644
+index a3d0d56..983d4ff 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -1292,6 +1292,222 @@ mapping_blending_target (void)

@@ -35,10 +35,10 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
  4 files changed, 217 insertions(+), 4 deletions(-)
 
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index 62569367a..0fe8def97 100644
+index aabadd0..4d4684e 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -952,7 +952,8 @@ wayland_test_cases = [
+@@ -965,7 +965,8 @@ wayland_test_cases = [
      # The SDR-native case and the info round trip rewrite the fixture
      # output's EDID and colour mode, and the zero-descriptor case replaces
      # the process's descriptor 0. The mapping cases give the fixture output a
@@ -48,7 +48,7 @@ index 62569367a..0fe8def97 100644
      'separate_cases': [
        '/wayland/target-luminance/v1',
        '/wayland/target-luminance/v2',
-@@ -963,6 +964,7 @@ wayland_test_cases = [
+@@ -976,6 +977,7 @@ wayland_test_cases = [
        '/wayland/icc-file/zero-descriptor',
        '/wayland/mapping/blending-target',
        '/wayland/mapping/target-gamut',
@@ -57,7 +57,7 @@ index 62569367a..0fe8def97 100644
      'depends': [
        test_client_executables.get('color-management'),
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index 6f7792cee..3ac09f2b4 100644
+index 6f7792c..3ac09f2 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -1298,6 +1298,105 @@ mapping_blending_target (void)
@@ -176,7 +176,7 @@ index 6f7792cee..3ac09f2b4 100644
                     mapping_target_gamut);
  }
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index 6f63efcc9..27469debe 100644
+index 6f63efc..27469de 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -2060,6 +2060,109 @@ info_round_trip_client (WaylandDisplay *display)
@@ -299,7 +299,7 @@ index 6f63efcc9..27469debe 100644
          g_error ("Unknown color-management test mode '%s'", argv[1]);
        return EXIT_SUCCESS;
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 1b7d364de..be7248359 100644
+index 1b7d364..be72483 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -563,8 +563,12 @@ update_output_record (MetaWaylandColorManagementOutput *cm_output)

@@ -16,10 +16,10 @@ Clear the ID in the idle callback before restoring.
  1 file changed, 12 insertions(+), 1 deletion(-)
 
 diff --git a/src/backends/meta-monitor-manager.c b/src/backends/meta-monitor-manager.c
-index aaa5ab2..c7d6dc1 100644
+index 7f036b9..3a9d124 100644
 --- a/src/backends/meta-monitor-manager.c
 +++ b/src/backends/meta-monitor-manager.c
-@@ -2110,6 +2110,17 @@ meta_monitor_manager_get_display_configuration_timeout (MetaMonitorManager *mana
+@@ -2119,6 +2119,17 @@ meta_monitor_manager_get_display_configuration_timeout (MetaMonitorManager *mana
    return DEFAULT_DISPLAY_CONFIGURATION_TIMEOUT;
  }
  
@@ -37,7 +37,7 @@ index aaa5ab2..c7d6dc1 100644
  static void
  save_config_timeout (gpointer user_data)
  {
-@@ -3290,7 +3301,7 @@ meta_monitor_manager_confirm_configuration (MetaMonitorManager *manager,
+@@ -3299,7 +3310,7 @@ meta_monitor_manager_confirm_configuration (MetaMonitorManager *manager,
    else
      {
        manager->restore_config_id =

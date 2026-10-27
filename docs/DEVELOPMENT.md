@@ -43,8 +43,8 @@ under `patches/` has a `series` file. Apply files in that order.
 
 | Series | Base | Purpose |
 |---|---|---|
-| libdisplay-info | Upstream `62a9346c3dce2bddba1d4dc186949e4320d6f801` | Native parser/API and regression patches; ordered inventory in sources.json. Upstream follow-up: one Display Parameters structure with per-field presence and diagnostics for reserved values (see [review](REVIEW.md#ninth-batch--independent-review-and-fixes)) |
-| mutter | Upstream `d82671c3035bfdb10fdc1ffd2c0e31859bb00ff7` | Native DisplayID eDP capability recognition |
+| libdisplay-info | Upstream `af382cf311ce60983708a9e664728a61843143e7` | Native parser/API and regression patches; ordered inventory in sources.json. Upstream follow-up: one Display Parameters structure with per-field presence and diagnostics for reserved values (see [review](REVIEW.md#ninth-batch--independent-review-and-fixes)) |
+| mutter | Upstream `2b9c0787f99dacef16ba987656e28ffcb344b9a2` | Native DisplayID eDP capability recognition |
 | ubuntu-libdisplay-info | Authenticated Ubuntu `0.3.0-1` source import | Delivered hdr6 prefix, hdr7 luminance and hdr8 chromaticity API, hdr9 packaging (installed 2026-10-11) |
 | ubuntu-mutter | Authenticated Ubuntu `51.0-1ubuntu3` source import | Delivered nativehdr2 prefix, then target feedback, colour input, HLG, highlight mapping, gamut compression and review fixes through nativehdr8 (installed 2026-10-11) |
 | wine | Wine `wine-11.0`, peeled `db11d0fe6a169c457e23d007e20404643d067aa8` | Desktop CreateFileFromAppW compatibility and the DisplayMonitor runtime class (source; test fixtures only) |

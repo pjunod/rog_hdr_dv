@@ -43,7 +43,7 @@ behaviour for unrepresentable encoding primaries.
  4 files changed, 176 insertions(+), 22 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 1a046fea6..169ccc6ac 100644
+index 1a046fe..169ccc6 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -846,24 +846,86 @@ target_geometry_valid (const TargetPoint points[4])
@@ -140,7 +140,7 @@ index 1a046fea6..169ccc6ac 100644
    if (!native_hdr || !edid_info ||
        edid_info->native_chromaticities_status != META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED)
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 8ca55741a..63d620ba5 100644
+index 8ca5574..63d620b 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -52,6 +52,22 @@ typedef struct
@@ -167,7 +167,7 @@ index 8ca55741a..63d620ba5 100644
  const MetaColorTargetPrimaries *
  meta_color_device_get_target_primaries (MetaColorDevice *color_device);
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index 32fc0b93a..29e5a6347 100644
+index 32fc0b9..29e5a63 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
 @@ -3,6 +3,7 @@
@@ -266,7 +266,7 @@ index 32fc0b93a..29e5a6347 100644
    return g_test_run ();
  }
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index c216443db..c387241d4 100644
+index c216443..c387241 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -213,12 +213,6 @@ scaled_uint32_to_float_chromaticity (uint32_t value)

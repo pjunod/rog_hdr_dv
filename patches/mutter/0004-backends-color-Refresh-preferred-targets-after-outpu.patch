@@ -15,7 +15,7 @@ Subject: [PATCH] backends/color: Refresh preferred targets after output
  7 files changed, 180 insertions(+), 35 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 5aee553fc..b2931e905 100644
+index 5aee553..b2931e9 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -783,7 +783,7 @@ meta_color_target_luminance_init (MetaColorTargetLuminance *target,
@@ -28,7 +28,7 @@ index 5aee553fc..b2931e905 100644
        (double) target->maximum > G_MAXUINT32)
      {
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index d21a0032f..f3091cb43 100644
+index d21a003..f3091cb 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
 @@ -609,7 +609,7 @@ test_target_luminance_policy (void)
@@ -55,7 +55,7 @@ index d21a0032f..f3091cb43 100644
  
  int
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index c676e1da4..6b6583155 100644
+index c676e1d..6b65831 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -30,6 +30,7 @@
@@ -161,7 +161,7 @@ index c676e1da4..6b6583155 100644
  
  static void
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index ce8f4098a..970377a83 100644
+index ce8f409..970377a 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -652,6 +652,21 @@ check_target_events (TargetClient *client,
@@ -256,7 +256,7 @@ index ce8f4098a..970377a83 100644
    wl_surface_destroy (surface);
    for (i = 0; i < client.n_outputs; i++)
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 05d898886..89b923c74 100644
+index 05d8988..89b923c 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -2064,47 +2064,85 @@ color_management_bind (struct wl_client *client,
@@ -375,7 +375,7 @@ index 05d898886..89b923c74 100644
  
  static void
 diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
-index 07cbbf2ff..ec3348f8d 100644
+index 07cbbf2..ec3348f 100644
 --- a/src/wayland/meta-wayland-color-management.h
 +++ b/src/wayland/meta-wayland-color-management.h
 @@ -23,3 +23,5 @@
@@ -385,7 +385,7 @@ index 07cbbf2ff..ec3348f8d 100644
 +
 +void meta_wayland_color_management_outputs_changed (MetaWaylandCompositor *compositor);
 diff --git a/src/wayland/meta-wayland-outputs.c b/src/wayland/meta-wayland-outputs.c
-index 84cd16ef9..b0c1cd5ab 100644
+index 84cd16e..b0c1cd5 100644
 --- a/src/wayland/meta-wayland-outputs.c
 +++ b/src/wayland/meta-wayland-outputs.c
 @@ -31,6 +31,7 @@

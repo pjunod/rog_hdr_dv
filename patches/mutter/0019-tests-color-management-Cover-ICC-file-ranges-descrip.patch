@@ -48,10 +48,10 @@ invocation.
  3 files changed, 370 insertions(+), 1 deletion(-)
 
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index b194642b3..c4390330e 100644
+index 4b13eb2..55b9b61 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -950,7 +950,8 @@ wayland_test_cases = [
+@@ -963,7 +963,8 @@ wayland_test_cases = [
      # Target-volume cases rewrite the fixture output and the v2 cases dispose
      # the shared Wayland colour manager, so each runs in its own invocation.
      # The SDR-native case and the info round trip rewrite the fixture
@@ -61,7 +61,7 @@ index b194642b3..c4390330e 100644
      'separate_cases': [
        '/wayland/target-luminance/v1',
        '/wayland/target-luminance/v2',
-@@ -958,6 +959,7 @@ wayland_test_cases = [
+@@ -971,6 +972,7 @@ wayland_test_cases = [
        '/wayland/target-primaries/v2',
        '/wayland/sdr-native/unusable-edid-primaries',
        '/wayland/custom-primaries/info-round-trip',
@@ -70,7 +70,7 @@ index b194642b3..c4390330e 100644
      'depends': [
        test_client_executables.get('color-management'),
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index 15a4e37ef..dec6f5ab6 100644
+index 15a4e37..dec6f5a 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -22,8 +22,13 @@
@@ -264,7 +264,7 @@ index 15a4e37ef..dec6f5ab6 100644
  
  int
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index 2695f76a8..1df1c17fb 100644
+index 2695f76..1df1c17 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -22,7 +22,9 @@

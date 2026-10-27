@@ -78,7 +78,7 @@ Claude-Session: https://claude.ai/code/session_01DLZiLBYev72J1s4D37L7Bi
 
 diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
 new file mode 100644
-index 000000000..097318be3
+index 0000000..097318b
 --- /dev/null
 +++ b/clutter/clutter/clutter-color-op-private.h
 @@ -0,0 +1,61 @@
@@ -144,7 +144,7 @@ index 000000000..097318be3
 +                                          float          *beta,
 +                                          const float   **coefficients);
 diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
-index 2a11736c4..3f1704232 100644
+index 2a11736..3f17042 100644
 --- a/clutter/clutter/clutter-color-op.c
 +++ b/clutter/clutter/clutter-color-op.c
 @@ -22,6 +22,7 @@
@@ -394,7 +394,7 @@ index 2a11736c4..3f1704232 100644
  {
    uint32_t size;
 diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
-index f5eddb2bf..306b01b8a 100644
+index f5eddb2..306b01b 100644
 --- a/clutter/clutter/clutter-color-pipeline-shader.c
 +++ b/clutter/clutter/clutter-color-pipeline-shader.c
 @@ -27,6 +27,7 @@
@@ -549,7 +549,7 @@ index f5eddb2bf..306b01b8a 100644
      .get_type = clutter_color_op_unpremultiply_get_type,
      .shader_source = unpremultiply_source,
 diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
-index 3768bd9af..3bb7b0a85 100644
+index 3768bd9..3bb7b0a 100644
 --- a/clutter/clutter/clutter-color-state-params.c
 +++ b/clutter/clutter/clutter-color-state-params.c
 @@ -29,7 +29,7 @@
@@ -619,7 +619,7 @@ index 3768bd9af..3bb7b0a85 100644
        g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
                     "Unhandled cicp transfer characteristics: %u",
 diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
-index 2b756d3e2..465c29f60 100644
+index 2b756d3..465c29f 100644
 --- a/clutter/clutter/clutter-color-transform.c
 +++ b/clutter/clutter/clutter-color-transform.c
 @@ -59,9 +59,11 @@
@@ -824,7 +824,7 @@ index 2b756d3e2..465c29f60 100644
      if (inv_eotf_op)
        clutter_color_pipeline_take_op (pipeline, inv_eotf_op);
 diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
-index 1fb8b8c89..2599ec9e8 100644
+index 1fb8b8c..2599ec9 100644
 --- a/clutter/clutter/clutter-color-utils-private.h
 +++ b/clutter/clutter/clutter-color-utils-private.h
 @@ -39,3 +39,15 @@ gboolean clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetr
@@ -844,7 +844,7 @@ index 1fb8b8c89..2599ec9e8 100644
 +                                               float   *beta,
 +                                               GError **error) G_GNUC_WARN_UNUSED_RESULT;
 diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
-index d5feb29d4..d2afe41cc 100644
+index d5feb29..d2afe41 100644
 --- a/clutter/clutter/clutter-color-utils.c
 +++ b/clutter/clutter/clutter-color-utils.c
 @@ -88,6 +88,8 @@ clutter_eotf_to_string (ClutterEOTF eotf)
@@ -971,7 +971,7 @@ index d5feb29d4..d2afe41cc 100644
 +  return TRUE;
 +}
 diff --git a/clutter/clutter/clutter-color-utils.h b/clutter/clutter/clutter-color-utils.h
-index 3bc18457d..6f253d067 100644
+index 3bc1845..6f253d0 100644
 --- a/clutter/clutter/clutter-color-utils.h
 +++ b/clutter/clutter/clutter-color-utils.h
 @@ -55,6 +55,7 @@ typedef enum _ClutterTransferFunction
@@ -983,7 +983,7 @@ index 3bc18457d..6f253d067 100644
  
  typedef enum _ClutterColorimetryType
 diff --git a/clutter/clutter/meson.build b/clutter/clutter/meson.build
-index f30b15ab9..47409c51e 100644
+index f30b15a..47409c5 100644
 --- a/clutter/clutter/meson.build
 +++ b/clutter/clutter/meson.build
 @@ -195,6 +195,7 @@ clutter_private_headers = [
@@ -995,7 +995,7 @@ index f30b15ab9..47409c51e 100644
    'clutter-cursor-private.h',
    'clutter-damage-history.h',
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index ac20f449a..b6e3e66de 100644
+index ac20f44..b6e3e66 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -294,6 +294,8 @@ clutter_tf_to_wayland (struct wl_resource      *resource,

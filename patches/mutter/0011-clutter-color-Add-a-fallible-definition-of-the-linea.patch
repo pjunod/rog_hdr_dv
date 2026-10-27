@@ -70,7 +70,7 @@ color state, and no matrix is substituted.
  create mode 100644 clutter/clutter/clutter-color-utils-private.h
 
 diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
-index c95a5af16..2b756d3e2 100644
+index c95a5af..2b756d3 100644
 --- a/clutter/clutter/clutter-color-transform.c
 +++ b/clutter/clutter/clutter-color-transform.c
 @@ -54,6 +54,7 @@
@@ -304,7 +304,7 @@ index c95a5af16..2b756d3e2 100644
                                      &from_linear_bt2020_stack);
 diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
 new file mode 100644
-index 000000000..1fb8b8c89
+index 0000000..1fb8b8c
 --- /dev/null
 +++ b/clutter/clutter/clutter-color-utils-private.h
 @@ -0,0 +1,41 @@
@@ -350,7 +350,7 @@ index 000000000..1fb8b8c89
 +                                                         graphene_matrix_t         *from_linear_bt2020,
 +                                                         GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
 diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
-index e27114154..d5feb29d4 100644
+index e271141..d5feb29 100644
 --- a/clutter/clutter/clutter-color-utils.c
 +++ b/clutter/clutter/clutter-color-utils.c
 @@ -22,10 +22,12 @@
@@ -798,7 +798,7 @@ index e27114154..d5feb29d4 100644
 +  return TRUE;
  }
 diff --git a/clutter/clutter/meson.build b/clutter/clutter/meson.build
-index 98dd2b22a..f30b15ab9 100644
+index 98dd2b2..f30b15a 100644
 --- a/clutter/clutter/meson.build
 +++ b/clutter/clutter/meson.build
 @@ -195,6 +195,7 @@ clutter_private_headers = [

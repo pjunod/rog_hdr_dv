@@ -44,7 +44,7 @@ static metadata.
  create mode 100644 src/tests/native-hdr-tests.c
 
 diff --git a/meson.build b/meson.build
-index cdd13b683..80e42a881 100644
+index cecc3c7..b2013a8 100644
 --- a/meson.build
 +++ b/meson.build
 @@ -137,6 +137,32 @@ libeis_dep = dependency('libeis-1.0', version: libei_req)
@@ -81,7 +81,7 @@ index cdd13b683..80e42a881 100644
  
  have_xwayland = get_option('xwayland')
 diff --git a/src/backends/edid-parse.c b/src/backends/edid-parse.c
-index 121bba731..678041215 100644
+index 121bba7..6780412 100644
 --- a/src/backends/edid-parse.c
 +++ b/src/backends/edid-parse.c
 @@ -31,10 +31,87 @@
@@ -191,7 +191,7 @@ index 121bba731..678041215 100644
    return g_steal_pointer (&info);
  }
 diff --git a/src/backends/edid.h b/src/backends/edid.h
-index ead8cc490..96583b8b6 100644
+index ead8cc4..96583b8 100644
 --- a/src/backends/edid.h
 +++ b/src/backends/edid.h
 @@ -45,6 +45,9 @@ typedef struct _MetaEdidInfo
@@ -205,7 +205,7 @@ index ead8cc490..96583b8b6 100644
  
  META_EXPORT_TEST
 diff --git a/src/backends/native/meta-output-kms.c b/src/backends/native/meta-output-kms.c
-index 3e341481b..d4ebd724b 100644
+index 3e34148..d4ebd72 100644
 --- a/src/backends/native/meta-output-kms.c
 +++ b/src/backends/native/meta-output-kms.c
 @@ -457,6 +457,69 @@ meta_output_kms_create_backlight (MetaOutput  *output,
@@ -333,7 +333,7 @@ index 3e341481b..d4ebd724b 100644
    output_info->supports_privacy_screen =
      (connector_state->privacy_screen_state != META_PRIVACY_SCREEN_UNAVAILABLE);
 diff --git a/src/backends/native/meta-output-kms.h b/src/backends/native/meta-output-kms.h
-index aac31ccf4..801ff28c6 100644
+index aac31cc..801ff28 100644
 --- a/src/backends/native/meta-output-kms.h
 +++ b/src/backends/native/meta-output-kms.h
 @@ -41,6 +41,12 @@ MetaOutputKms * meta_output_kms_from_kms_connector (MetaKmsConnector *connector)
@@ -350,10 +350,10 @@ index aac31ccf4..801ff28c6 100644
                                       MetaKmsConnector  *kms_connector,
                                       MetaOutput        *old_output,
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index a58ddacf5..a953ac84b 100644
+index 269931c..c9df1e1 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -646,6 +646,11 @@ remote_desktop_tests_client = executable('mutter-remote-desktop-tests-client',
+@@ -651,6 +651,11 @@ remote_desktop_tests_client = executable('mutter-remote-desktop-tests-client',
  
  # Native backend tests
  test_cases += [
@@ -367,7 +367,7 @@ index a58ddacf5..a953ac84b 100644
      'suite': 'backends/native',
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
 new file mode 100644
-index 000000000..5e9c5afbc
+index 0000000..5e9c5af
 --- /dev/null
 +++ b/src/tests/native-hdr-tests.c
 @@ -0,0 +1,496 @@

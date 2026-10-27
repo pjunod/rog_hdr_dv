@@ -13,7 +13,7 @@ Subject: [PATCH] wayland/color-management: Dispose target records before
  5 files changed, 47 insertions(+), 31 deletions(-)
 
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index 6b6583155..1ee1ca09b 100644
+index 6b65831..1ee1ca0 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -239,33 +239,33 @@ target_luminance (gconstpointer data)
@@ -124,7 +124,7 @@ index 6b6583155..1ee1ca09b 100644
    g_signal_handler_disconnect (device, color_handler);
    g_signal_handler_disconnect (device, target_handler);
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index 8cc2c2c73..b448eecd2 100644
+index 8cc2c2c..b448eec 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -732,6 +732,8 @@ target_luminance_client (WaylandDisplay *display,
@@ -170,7 +170,7 @@ index 8cc2c2c73..b448eecd2 100644
    info = read_target_info (display, &snapshots[0]);
    g_assert_cmpuint (info.target_max, ==, 616);
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 89b923c74..707791f3e 100644
+index 89b923c..707791f 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -58,6 +58,7 @@ struct _MetaWaylandColorManager
@@ -219,7 +219,7 @@ index 89b923c74..707791f3e 100644
 +  g_object_set_data (G_OBJECT (compositor), "-meta-wayland-color-manager", NULL);
 +}
 diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
-index ec3348f8d..a26d234ac 100644
+index ec3348f..a26d234 100644
 --- a/src/wayland/meta-wayland-color-management.h
 +++ b/src/wayland/meta-wayland-color-management.h
 @@ -24,4 +24,6 @@
@@ -230,10 +230,10 @@ index ec3348f8d..a26d234ac 100644
 +
  void meta_wayland_color_management_outputs_changed (MetaWaylandCompositor *compositor);
 diff --git a/src/wayland/meta-wayland.c b/src/wayland/meta-wayland.c
-index cf8a99042..64693f9eb 100644
+index e5b82c0..fc4b0e4 100644
 --- a/src/wayland/meta-wayland.c
 +++ b/src/wayland/meta-wayland.c
-@@ -800,6 +800,7 @@ meta_wayland_compositor_finalize (GObject *object)
+@@ -811,6 +811,7 @@ meta_wayland_compositor_finalize (GObject *object)
    MetaBackend *backend = meta_context_get_backend (compositor->context);
    ClutterActor *stage = meta_backend_get_stage (backend);
  

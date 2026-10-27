@@ -33,10 +33,10 @@ Add regressions for the custom-primaries input path:
  3 files changed, 602 insertions(+), 1 deletion(-)
 
 diff --git a/src/tests/meson.build b/src/tests/meson.build
-index 03fe6cc7d..b194642b3 100644
+index 8a36b33..4b13eb2 100644
 --- a/src/tests/meson.build
 +++ b/src/tests/meson.build
-@@ -949,13 +949,15 @@ wayland_test_cases = [
+@@ -962,13 +962,15 @@ wayland_test_cases = [
      ],
      # Target-volume cases rewrite the fixture output and the v2 cases dispose
      # the shared Wayland colour manager, so each runs in its own invocation.
@@ -54,7 +54,7 @@ index 03fe6cc7d..b194642b3 100644
      'depends': [
        test_client_executables.get('color-management'),
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index 3ea3a73d9..15a4e37ef 100644
+index 3ea3a73..15a4e37 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -33,6 +33,7 @@
@@ -421,7 +421,7 @@ index 3ea3a73d9..15a4e37ef 100644
  
  int
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index 1c5b73917..2695f76a8 100644
+index 1c5b739..2695f76 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -34,6 +34,7 @@ typedef struct _ImageDescriptionContext
