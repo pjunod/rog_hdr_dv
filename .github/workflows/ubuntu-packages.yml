@@ -29,5 +29,7 @@ jobs:
         env:
           FORGEJO_URL: ${{ github.server_url }}
           FORGEJO_OWNER: ${{ github.repository_owner }}
-          FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A personal access token with write:package: the automatic Actions
+          # token can only read an owner's packages.
+          FORGEJO_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
         run: packaging/ubuntu/rebuild.sh "$RUNNER_TEMP/ubuntu-packages"

@@ -246,12 +246,75 @@ class Checker:
             self.errors.append(f"Documentation absent from README: {self.label(doc)}")
 
 
+    UBUNTU_SERIES = ("libdisplay-info", "mutter")
+
+    def ubuntu_series_digests(self):
+        """SHA-256 of each Ubuntu series: its series file, then its patches in order."""
+        digests = {}
+        for package in self.UBUNTU_SERIES:
+            directory = self.root / "patches" / f"ubuntu-{package}"
+            series = self.read(directory / "series", binary=True)
+            if series is None:
+                continue
+            digest = hashlib.sha256(series)
+            for line in series.decode("utf-8").splitlines():
+                name = line.strip()
+                if not name or name.startswith("#"):
+                    continue
+                content = self.read(directory / name, binary=True)
+                if content is not None:
+                    digest.update(content)
+            digests[package] = digest.hexdigest()
+        return digests
+
+    def ubuntu_revision(self, lock=False):
+        """A change to an Ubuntu series must raise packaging/ubuntu/REVISION.
+
+        Without that, the nightly rebuild sees the version as published and
+        never ships the change. SERIES.lock records the series digests the
+        current revision was built from.
+        """
+        directory = self.root / "packaging" / "ubuntu"
+        text = self.read(directory / "REVISION")
+        if text is None:
+            return
+        revision = text.strip()
+        if not revision.isdigit():
+            self.errors.append("packaging/ubuntu/REVISION is not a number")
+            return
+        digests = self.ubuntu_series_digests()
+        recorded, recorded_revision = {}, None
+        lock_path = directory / "SERIES.lock"
+        if lock_path.exists():
+            for line in (self.read(lock_path) or "").splitlines():
+                key, _, value = line.partition(" ")
+                if key == "revision":
+                    recorded_revision = value
+                elif key:
+                    recorded[key] = value
+        changed = digests != recorded
+        if lock:
+            if changed and recorded_revision == revision:
+                self.errors.append(
+                    "An Ubuntu series changed: raise packaging/ubuntu/REVISION before locking it")
+                return
+            body = [f"revision {revision}"] + [f"{name} {digest}" for name, digest in sorted(digests.items())]
+            lock_path.write_text("\n".join(body) + "\n", encoding="utf-8")
+            return
+        if changed or recorded_revision != revision:
+            self.errors.append(
+                "patches/ubuntu-* or REVISION changed without packaging/ubuntu/SERIES.lock: "
+                "raise REVISION for a series change, then run "
+                "scripts/check_repository.py --lock-ubuntu-series")
+
+
 def main():
     checker = Checker(Path(__file__).resolve().parents[1])
     patches = checker.files_under(checker.root / "patches", ".patch")
     checker.manifest(patches)
     components = checker.sources(patches)
     checker.documentation()
+    checker.ubuntu_revision(lock="--lock-ubuntu-series" in sys.argv[1:])
     if checker.errors:
         print("\n".join(checker.errors), file=sys.stderr)
         return 1
