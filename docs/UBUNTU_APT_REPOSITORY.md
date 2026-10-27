@@ -32,9 +32,12 @@ sorts above Ubuntu's same version and above the hand-built `+nativehdr10` and
 `~hdr9`, but **not** always above the previous build: Ubuntu's next
 libdisplay-info would be `0.3.0-1ubuntu0.1`, and `0.3.0-1ubuntu0.1+nativehdr13`
 sorts below `0.3.0-1+nativehdr13`. So the registry holds one version per
-source: once a new version is completely published, the rebuild deletes the
-older ones, and the priority-1001 pin (below) lets APT move to it even when
-that is a numeric downgrade.
+source: once a new version has built, the rebuild deletes the older ones and
+uploads it, and the priority-1001 pin (below) lets APT move to it even when
+that is a numeric downgrade. The deletions come first because Forgejo v16
+does not rebuild the index when a version's last file is deleted (its delete
+notifier reads the version's files after they are gone); every upload
+rebuilds its architecture's index.
 
 **A series change needs a new revision.** The registry refuses a second
 upload of a version it has, and the rebuild treats a published version as
@@ -106,15 +109,15 @@ the `self-hosted` and `lab` labels and Docker:
  ask Ubuntu for its current libdisplay-info and mutter source versions
         │
         ▼
- registry has <ubuntu version>+nativehdr<REVISION> complete? ── yes ──┐
-        │ no                                                          │
-        ▼                                                             │
- build.sh in a clean ubuntu:<release> container, for that exact      │
- Ubuntu version (libdisplay-info amd64 + i386, checked identical;    │
- Mutter against the registry's libdisplay-info) ──▶ publish.sh        │
-        │                                                             │
-        ▼                                                             ▼
- delete the source's older versions from the registry ◀───────────────┘
+ registry has <ubuntu version>+nativehdr<REVISION> complete? ── yes ──▶ done
+        │ no
+        ▼
+ build.sh in a clean ubuntu:<release> container, for that exact
+ Ubuntu version (libdisplay-info amd64 + i386, checked identical;
+ Mutter against the registry's libdisplay-info)
+        │
+        ▼
+ delete the source's older versions ──▶ publish.sh (rebuilds the indexes)
 ```
 
 **The token.** The automatic Actions token can only read an owner's

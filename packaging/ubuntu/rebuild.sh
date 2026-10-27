@@ -7,11 +7,14 @@
 # publishes now, and builds and publishes that version plus this
 # repository's series when the registry does not have it complete yet: after
 # an Ubuntu update, or after packaging/ubuntu/REVISION was raised for a series
-# change. Mutter builds against the registry's libdisplay-info. Once a source's
-# new version is complete, its older versions are deleted from the registry,
-# so machines move to it even when Ubuntu's new version sorts below the old
-# build (0.3.0-1ubuntu0.1 sorts below 0.3.0-1, so 0.3.0-1ubuntu0.1+nativehdrN
-# sorts below 0.3.0-1+nativehdrN): the registry holds one version per source.
+# change. Mutter builds against the registry's libdisplay-info. Once a new
+# version has built, the source's older versions are deleted from the registry
+# and the new one is uploaded, so machines move to it even when Ubuntu's new
+# version sorts below the old build (0.3.0-1ubuntu0.1 sorts below 0.3.0-1, so
+# 0.3.0-1ubuntu0.1+nativehdrN sorts below 0.3.0-1+nativehdrN): the registry
+# holds one version per source. The deletions come before the uploads because
+# Forgejo (v16) does not rebuild the index when it deletes a version's last
+# file; each upload rebuilds its architecture's index.
 # WORK holds the build output and is emptied first.
 set -euo pipefail
 
@@ -65,9 +68,9 @@ else
     "$here/multiarch-same.sh" "$work"/libdisplay-info-amd64/"$name"_*.deb \
       "$work"/libdisplay-info-i386/"$name"_*.deb
   done
+  prune libdisplay-info "$ldi" amd64 i386
   "$here/publish.sh" "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" --release "$release"
 fi
-prune libdisplay-info "$ldi" amd64 i386
 
 if is_published mutter "$mutter" amd64; then
   echo "mutter $mutter: published"
@@ -79,6 +82,6 @@ else
   done
   "$here/build.sh" mutter "$work/mutter-amd64" --release "$release" --with "$work/with" \
     --version "$mutter_ubuntu"
+  prune mutter "$mutter" amd64 all
   "$here/publish.sh" "$work/mutter-amd64" --release "$release"
 fi
-prune mutter "$mutter" amd64 all
