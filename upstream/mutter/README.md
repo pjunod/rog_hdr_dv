@@ -4,7 +4,7 @@ Upstream: <https://gitlab.gnome.org/GNOME/mutter> (merge requests into `main`).
 Base: `b48811767189fb5446bd1b831e98271a21866e09` (`main` on 2026-10-27, "ci: Set committer
 identity for intermediate builds"). Nothing here has been submitted, pushed or posted.
 
-Start with [00-ISSUE.md](00-ISSUE.md): a design-discussion issue for Paul to open first. It
+Start with [00-ISSUE.md](00-ISSUE.md): the design-discussion issue `./submit.sh 00` opens first. It
 describes the series and its hardware evidence and asks how to coordinate with !5068 and
 !5177. Its URL is also the natural value for the commits' `Link:` lines (below).
 
@@ -91,17 +91,16 @@ except for the copyright lines (both checked with `git diff`). Changes:
 
 ## Link lines
 
-Mutter wants an issue or MR URL in each commit, and its CI rules forbid a link to the MR's own
-URL as a bare line and ask for no `Part-of:` (added at merge). Where no existing issue fits, the
-commits carry `Link: TBD-MR`, and `submit.sh` refuses to run until `--link` says what replaces it:
+Mutter wants an issue or MR URL in each commit and adds `Part-of:` itself at merge. Commits with
+no fitting existing issue carry `Link: TBD-MR`, which `submit.sh` fills in automatically:
 
-- `--link https://gitlab.gnome.org/GNOME/mutter/-/issues/<N>`: the design-discussion issue from
-  00-ISSUE.md once Paul opens it. Recommended for units 06-15.
-- `--link mr`: the unit's own MR URL; the script opens the MR as a draft, rewrites the lines with
-  its URL, force-pushes and then un-drafts it. Only allowed for units with nothing unmerged
-  below them (01-05). Note the possible conflict: the commit-rules deny a bare own-MR URL line;
-  a `Link: <url>` line does not match that regex, but maintainers may prefer the issue URL.
-  This was the instruction I was given; Paul decides.
+- a unit with no dependencies (01-05) gets its own MR's URL: the script opens the MR as a draft,
+  rewrites the lines with its URL, force-pushes and un-drafts it;
+- a stacked unit (06-15) gets the URL of the design-discussion issue opened with `./submit.sh 00`.
+
+`--link URL` overrides either default. (Decided 2026-10-27 by Claude, for Paul to look over: the
+commit rules only reject a bare own-MR URL line, which a `Link:` trailer is not; if maintainers
+prefer the issue URL everywhere, use `--link <issue URL>`.)
 
 ## Verification on lab5 (2026-10-27)
 
@@ -150,16 +149,12 @@ results quoted in 00-ISSUE.md come from Mutter 51 builds of the same changes
 
 ## Submitting
 
-One command per unit, from this directory:
+From this directory:
 
-    ./submit.sh 01 --link mr          # standalone units 01-04
-    ./submit.sh 06 --link https://gitlab.gnome.org/GNOME/mutter/-/issues/<N>
-    ./submit.sh 05 --link mr --issue https://gitlab.gnome.org/GNOME/mutter/-/issues/<N>
-    ./submit.sh all --link mr         # 01-04, stops at the first unit not marked ready
-    ./submit.sh 01 --link mr --dry-run
-
-Descriptions of units 05-15 point at the design-discussion issue: `--issue <URL>` fills it in
-(an issue URL given to `--link` is used automatically); the script refuses without one.
+    ./submit.sh 00            # open the design-discussion issue (00-ISSUE.md); its URL is saved
+    ./submit.sh all           # units in order, stopping at the first one not marked ready (01-04 today)
+    ./submit.sh 07            # one unit; stacked units bring their unmerged dependencies along
+    ./submit.sh all --dry-run # everything except fork, push and MR
 
 It clones upstream into `~/.cache/upstream-submit/` (override with `UPSTREAM_SUBMIT_DIR`), puts
 the unit and any unmerged units below it on a fresh branch of current `main` with
@@ -168,7 +163,7 @@ missing, pushes `hdr-NN-slug` and opens (or, on a rerun, updates) the MR with DE
 A unit marked blocked or hold is only submitted when asked for by number, with a warning.
 
 Before the first run: put a personal access token with `api` and `write_repository` in
-`~/.config/upstream/gitlab.gnome.org.token` (mode 600), open the issue from 00-ISSUE.md, and read
+`~/.config/upstream/gitlab.gnome.org.token` (mode 600), and read
 the descriptions; they are in Paul's voice and end with the AI-assistance statement, which is
 his to make. Units 05-12 also need a libdisplay-info release with units 02-06 (see
 `../libdisplay-info/README.md`) before Mutter's CI can build them.

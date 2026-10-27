@@ -1,13 +1,4 @@
-# Design discussion: panel-declared display targets, HLG, highlight mapping and gamut compression
-
-_Draft of a GNOME/mutter issue for Paul to open before any of the larger merge requests. It is
-written in his voice. Once opened, its URL is what `submit.sh --link <URL>` should put in the
-commits' `Link:` lines (see README.md)._
-
----
-
-**Title:** Using panel-declared HDR targets (DisplayID 2.0, CTA-861, base EDID): series overview
-and coordination with !5068 and !5177
+# Using panel-declared HDR targets (DisplayID 2.0, CTA-861, base EDID): series overview and coordination with !5068 and !5177
 
 ### Summary
 

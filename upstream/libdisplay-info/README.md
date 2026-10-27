@@ -18,7 +18,7 @@ every commit).
 | NN | Commit | Depends on | Status | Notes |
 |---|---|---|---|---|
 | 01 | displayid2: bound section padding scans to the remaining payload | - | ready | Applies alone. ASan out-of-bounds read fix plus test. Best first MR. |
-| 02 | displayid2: parse Display Interface Features data block | 01 (test/meson.build context) | needs Paul's decision | Overlaps open MR !210 (Sean Paul), same block. DESCRIPTION.md offers it as review input or an alternative and explains the differences; Paul decides whether to open it or to comment on !210 first. |
+| 02 | displayid2: parse Display Interface Features data block | 01 (test/meson.build context) | ready (opened as a **draft** MR) | Overlaps open MR !210 (Sean Paul), same block. DESCRIPTION.md offers it as review input or an alternative and explains the differences. Decided 2026-10-27 by Claude, for Paul to look over: `submit.sh` opens it as a draft so the code is visible, and Paul links it from a short comment on !210 rather than presenting a competing MR. Units 03-06 build on it. |
 | 03 | displayid2: reject unsupported nested CTA headers | 02 (context only) | ready | Builds on merged !202 and !212. |
 | 04 | edid: expose structured extension parsing failures | 03 | ready | New public API (`di_edid_has_extension_failures()`); asks for a design nod. |
 | 05 | displayid2: expose native luminance from Display Parameters | 04 | ready | Uses the data block plumbing of 02. Asks whether one Display Parameters struct is preferred. |

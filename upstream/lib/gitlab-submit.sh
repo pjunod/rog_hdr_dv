@@ -8,7 +8,8 @@
 #   LINK_POLICY   "none", or "tbd" to require --link for "Link: TBD-MR"
 #
 # units.tsv columns (tab separated, '#' comments):
-#   NN  slug  deps(comma separated NN, or -)  status(ready|blocked|hold)  title
+#   NN  slug  deps(comma separated NN, or -)  status(ready|draft|blocked|hold)  title
+#   (draft = submitted, but always as a draft MR)
 #
 # Usage of the caller: submit.sh <NN|all> [--dry-run] [--draft] [--link URL|mr]
 #   all          the units in order, stopping at the first one that is not "ready"
@@ -87,9 +88,12 @@ api() { # api METHOD PATH [JSON]; prints the body, fails on HTTP >= 400
     else
         code=$(curl -sS -o "$out" -w '%{http_code}' -X "$method" -H "PRIVATE-TOKEN: $TOKEN" "$API$path") || { rm -f "$out"; die "curl $method $path failed"; }
     fi
-    API_CODE=$code
+    # Callers run api inside $(...) or a pipeline (a subshell), so the status
+    # goes through a file; read it with api_code.
+    printf '%s' "$code" > "$SESSION_TMP/api_code"
     cat "$out"; rm -f "$out"
 }
+api_code() { cat "$SESSION_TMP/api_code" 2>/dev/null; }
 json() { python3 -c 'import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1], {"d": d}))' "$1"; }
 
 retry() { # the forges sometimes answer 502; try three times
@@ -172,11 +176,27 @@ submit_unit() {
     [ -n "$status" ] || die "unknown unit $n"
     desc=$(unit_dir "$n")/DESCRIPTION.md
     [ -f "$desc" ] || die "missing $desc"
+    UNIT_DRAFT=$DRAFT
     case $status in
         ready) ;;
+        draft) UNIT_DRAFT=1; note "unit $n is opened as a draft MR (README.md)" ;;
         *) note "unit $n status is '$status' (README.md): submitting anyway because it was asked for by number" ;;
     esac
     branch=$BRANCH_PREFIX$n-$(unit_field "$n" 2)
+    saved_issue=
+    if [ -n "${SERIES_ISSUE_FILE:-}" ] && [ -f "$SERIES_ISSUE_FILE" ]; then saved_issue=$(cat "$SERIES_ISSUE_FILE"); fi
+    [ -n "$ISSUE" ] || ISSUE=$saved_issue
+    if [ "$LINK_POLICY" = tbd ] && [ -z "$LINK" ]; then
+        # Default: a unit with no dependencies links its own MR; a stacked unit
+        # links the design-discussion issue opened with "submit.sh 00".
+        if [ "$(unit_field "$n" 3)" = - ]; then LINK_UNIT=mr
+        elif [ -n "$saved_issue" ]; then LINK_UNIT=$saved_issue
+        else die "unit $n is stacked: open the design-discussion issue first with '$(basename "$0") 00' (or pass --link URL)"
+        fi
+    else
+        LINK_UNIT=$LINK
+    fi
+    LINK_SAVED=$LINK; LINK=$LINK_UNIT
     EFFECTIVE_LINK=
     if [ "$LINK_POLICY" = tbd ] && [ -n "$LINK" ] && [ "$LINK" != mr ]; then
         case $LINK in https://*) EFFECTIVE_LINK=$LINK ;; *) die '--link takes an https:// URL or "mr"' ;; esac
@@ -204,7 +224,7 @@ submit_unit() {
 
     mr_title=$(sed -n '1s/^# //p' "$desc")
     [ -n "$mr_title" ] || mr_title=$title
-    if [ "$DRAFT" -eq 1 ] || [ "$LINK" = mr ]; then mr_title="Draft: $mr_title"; fi
+    if [ "$UNIT_DRAFT" -eq 1 ] || [ "$LINK" = mr ]; then mr_title="Draft: $mr_title"; fi
     body=$(sed '1{/^# /d}' "$desc")
     if printf '%s' "$body" | grep -q '@SERIES_ISSUE@'; then
         series=$ISSUE
@@ -227,15 +247,15 @@ submit_unit() {
     fi
 
     user=$(api GET /user | json 'd["username"]')
-    [ "$API_CODE" = 200 ] || die "token rejected by $GL_HOST (HTTP $API_CODE)"
+    [ "$(api_code)" = 200 ] || die "token rejected by $GL_HOST (HTTP $(api_code))"
     repo=${GL_UPSTREAM##*/}
     fork_enc=$(printf '%s/%s' "$user" "$repo" | sed 's#/#%2F#g')
     upstream_id=$(api GET "/projects/$UP_ENC" | json 'd["id"]')
     fork=$(api GET "/projects/$fork_enc" || true)
-    if [ "$API_CODE" = 404 ]; then
+    if [ "$(api_code)" = 404 ]; then
         note "creating fork $user/$repo"
         api POST "/projects/$UP_ENC/fork" '{}' >/dev/null
-        case $API_CODE in 201|409) ;; 403) die "forking refused (HTTP 403): on gitlab.freedesktop.org the account needs user verification first (README.md)" ;; *) die "fork failed (HTTP $API_CODE)" ;; esac
+        case $(api_code) in 201|409) ;; 403) die "forking refused (HTTP 403): on gitlab.freedesktop.org the account needs user verification first (README.md)" ;; *) die "fork failed (HTTP $(api_code))" ;; esac
         i=0
         while :; do
             st=$(api GET "/projects/$fork_enc" | json 'd.get("import_status","finished")' 2>/dev/null || echo none)
@@ -259,7 +279,7 @@ submit_unit() {
         iid=$existing; note "updated existing MR !$iid"
     else
         iid=$(api POST "/projects/$fork_id/merge_requests" "$payload" | json 'd["iid"]')
-        [ "$API_CODE" = 201 ] || die "MR creation failed (HTTP $API_CODE)"
+        [ "$(api_code)" = 201 ] || die "MR creation failed (HTTP $(api_code))"
         note "opened MR !$iid"
     fi
     url=https://$GL_HOST/$GL_UPSTREAM/-/merge_requests/$iid
@@ -270,19 +290,41 @@ submit_unit() {
         g checkout -q -B "$branch" "$BASE"
         apply_unit "$n"
         push || { rm -f "$askpass"; die "second push failed"; }
-        if [ "$DRAFT" -eq 0 ]; then
+        if [ "$UNIT_DRAFT" -eq 0 ]; then
             api PUT "/projects/$upstream_id/merge_requests/$iid" "$(python3 -c 'import json,sys; print(json.dumps({"title": sys.argv[1]}))' "${mr_title#Draft: }")" >/dev/null
         fi
     fi
     rm -f "$askpass"
+    LINK=$LINK_SAVED
     echo "$url"
 }
 
-if [ "$WHICH" = all ]; then
+open_series_issue() { # "submit.sh 00": open 00-ISSUE.md as an issue upstream, remember its URL
+    local f title body payload url
+    f=$PROJECT_DIR/00-ISSUE.md
+    [ -f "$f" ] || die "this project has no 00-ISSUE.md"
+    [ -n "${SERIES_ISSUE_FILE:-}" ] || die "SERIES_ISSUE_FILE is not set by $(basename "$0")"
+    if [ -f "$SERIES_ISSUE_FILE" ]; then note "already opened: $(cat "$SERIES_ISSUE_FILE")"; cat "$SERIES_ISSUE_FILE"; return 0; fi
+    title=$(sed -n '1s/^# //p' "$f"); body=$(sed '1{/^# /d}' "$f")
+    [ -n "$title" ] || die "00-ISSUE.md must start with '# <title>'"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        note "dry run: would open issue '$title' on $GL_UPSTREAM ($(printf '%s\n' "$body" | wc -l) lines) and save its URL to $SERIES_ISSUE_FILE"
+        return 0
+    fi
+    payload=$(python3 -c 'import json,sys; print(json.dumps({"title": sys.argv[1], "description": sys.argv[2]}))' "$title" "$body")
+    url=$(api POST "/projects/$UP_ENC/issues" "$payload" | json 'd["web_url"]')
+    [ "$(api_code)" = 201 ] || die "issue creation failed (HTTP $(api_code))"
+    mkdir -p "$(dirname "$SERIES_ISSUE_FILE")"; printf '%s\n' "$url" > "$SERIES_ISSUE_FILE"
+    note "opened $url (saved to $SERIES_ISSUE_FILE)"; echo "$url"
+}
+
+if [ "$WHICH" = 00 ]; then
+    open_series_issue
+elif [ "$WHICH" = all ]; then
     # Units are stacked: stop at the first one that is not ready.
     for n in $(awk -F '\t' '!/^#/ { print $1 }' "$UNITS"); do
         st=$(unit_field "$n" 4)
-        if [ "$st" != ready ]; then note "stopping at unit $n (status '$st'; see README.md)"; break; fi
+        if [ "$st" != ready ] && [ "$st" != draft ]; then note "stopping at unit $n (status '$st'; see README.md)"; break; fi
         submit_unit "$n"
     done
 else
