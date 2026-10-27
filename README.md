@@ -10,28 +10,30 @@ libraries) rather than into one app, so that other software and other
 machines can benefit. Plurx, the owner's media server, is one consumer; this
 repository owns the operating-system display work.
 
-> **This is research and patch work, not an installer.** The patches change
-> the kernel, the display library and the compositor. Applying them to a
-> machine is a deliberate, recoverable operation described in
-> [operations](docs/OPERATIONS.md), never something a repository check does.
-> Nothing here is upstream yet, and no colour accuracy is claimed without an
-> optical measurement of the panel.
+> **Patches to the display stack, with one installer.** The patches change
+> the kernel, the display library and the compositor. The compositor and
+> display library install as ordinary Ubuntu packages from an APT repository
+> ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)); a kernel is installed
+> deliberately, per [operations](docs/OPERATIONS.md), never by a repository
+> check. Nothing here is upstream yet, and no colour accuracy is claimed
+> without an optical measurement of the panel.
 
-## What works today (2026-10-18)
+## What works today (2026-10-27)
 
 Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
-`51.0-1ubuntu3+nativehdr8` and kernel `7.3.0-rc5-nativehdr1`.
+`51.0-1ubuntu3+nativehdr10` (since 2026-10-13), kernel
+`7.3.0-rc5-nativehdr1`, and plurx Player `0.3.2` for Dolby Vision.
 
 | Area | State | Where it stands |
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
-| HDR desktop session | **Installed** | Mutter `nativehdr8` reports the panel's declared range (0.0004–616 cd/m², firmware values) separately from the BT.2020/PQ encoding |
-| HLG, highlight mapping, gamut compression | **Installed** | Compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
-| HDR targets on external CTA monitors and native SDR panels | **Packaged** (`nativehdr9`) | Not yet installed on the laptop |
-| Night Light in HDR, per-monitor overrides | **Packaged** (`nativehdr10`) | Built as Ubuntu packages; not yet installed on the laptop |
-| Ubuntu packages | **Merged** 2026-10-17 (PR 21) | Source and binary packages, with an isolated install/rollback test, not installed on the laptop ([release](docs/MERGED_UBUNTU_PACKAGES.md)) |
-| Dolby Vision decode | **Experimental player** | A genuine Profile 5 sample played for 30 s through stock mpv/libplacebo with real RPU reshaping; Profile 8, trims and appearance not yet accepted ([player](tools/native_player/README.md)) |
-| Dolby Vision display mapping | **In development** | Open mapping passes 13 of 30 new frame/target pairs (`random30`); being fixed by direct measurement (below) |
+| HDR desktop session | **Installed** | Mutter reports the panel's declared range (0.0004–616 cd/m², firmware values) and primaries separately from the BT.2020/PQ encoding |
+| HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
+| HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
+| Night Light in HDR, per-monitor overrides | **Installed** (in `nativehdr10`) | The owner's visual check is outstanding |
+| Ubuntu packages | **APT repository** (2026-10-27) | Rebuilt from Ubuntu's current source whenever Ubuntu updates it; one command sets a machine up ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)) |
+| Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
+| Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
@@ -56,41 +58,42 @@ Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
  Samsung OLED panel (240 Hz, ~616 cd/m² declared peak)
 ```
 
-This is the target architecture. Today the experimental player uses stock
-libplacebo tone mapping; the open display mapping and trims are not yet
-integrated into playback. [Architecture](docs/ARCHITECTURE.md) assigns each
-responsibility to a component and explains why.
+The player is plurx Player: plurx's closed-form display mapping, with the
+per-shot trims, runs inside its libplacebo at the panel's peak, and it
+describes the result to Mutter so the compositor does not map it a second
+time. [Architecture](docs/ARCHITECTURE.md) assigns each responsibility to a
+component and explains why.
 
-## Dolby Vision — where the hard part is
+## Dolby Vision — the equations and where they run
 
 Open-source decoding and reshaping of Dolby Vision exist (FFmpeg and
-libplacebo). **Display mapping** does not: the step that fits a film mastered
+libplacebo). **Display mapping** did not: the step that fits a film mastered
 on a 1,000–4,000-nit reference display into what this panel can show,
-following the colourist's per-shot trims. To our knowledge Dolby supplies
-that code only to licensees, and open players substitute a generic tone
-mapper.
+following the colourist's per-shot trims. Dolby supplies that code only to
+licensees, and open players substitute a generic tone mapper.
 
-This repository is building an open mapping from
-[Dolby's public patent](https://patents.google.com/patent/US9613407B2/en),
-checked pixel by pixel against Dolby's own reference renderer with the
-BT.2124 ΔE_ITP colour-difference metric:
+This work derived it in closed form, for both of Dolby's content-mapping
+versions, by measuring Dolby's reference renderer as a black box (synthetic
+colour grids, then real frames) and scoring every change with the BT.2124
+ΔE_ITP colour difference ([measurement-driven
+development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md)):
 
-- **Broader test (`random30`, 30 new frame/target pairs):** 13 pass the bar
-  (mean ≤ 1, p95 ≤ 3). 12 miss it, and 5 expose an invalid-pixel defect in
-  the native renderer that is being fixed at its cause.
-- **First three frames** (two development, one held-out): mean ΔE_ITP
-  0.54–0.73, against 4.6–9.3 for the stock open-source path
-  ([equations and evidence](docs/SQRTSUM_PQ_Y_POST.md)).
-- These are differences from the reference renderer's output, not
-  measurements of what the panel displays.
-- **Next:** [measurement-driven development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md).
-  Dolby's reference tools are measured directly with synthetic colour grids,
-  so each fix is aimed at where the mapping actually differs, and each
-  idea is tested in seconds instead of a round of full-frame renders.
+- **Result (2026-10-26):** mean ΔE_ITP 0.0036–0.0055 from the reference on
+  selected frames of four titles at a 600-nit target, against 0.11–0.31
+  before the last CM v2.9 correction. A ΔE_ITP of 1 is about the smallest
+  difference a viewer can see. These are differences from the reference
+  renderer's output, not measurements of what the panel displays.
+- **Where they run:** in plurx, the owner's media server — its processing
+  helper and **plurx Player**, an mpv build launched from the plurx web app
+  that maps each frame on the laptop's GPU at the panel's own peak, and
+  combines Profile 7's full enhancement layer itself.
+- **What stays private:** the derivations and Dolby's measured outputs live on
+  a private branch, never on `main` or its mirror.
 
 The alternative route, running the laptop's own Windows Dolby Vision
-processor under Wine, activates but has not yet processed a frame
-([activation probe](docs/DOLBY_ACTIVATION_PROBE.md)).
+processor under Wine, activates but has not processed a frame
+([activation probe](docs/DOLBY_ACTIVATION_PROBE.md)); the closed form made it
+unnecessary for playback.
 
 ## Working with the repository
 
@@ -164,7 +167,8 @@ has the remote and branch rules.
 
 | Document | Answers |
 |---|---|
-| [Merged Ubuntu packages](docs/MERGED_UBUNTU_PACKAGES.md) | The current source/binary release and its install/rollback test |
+| [APT repository](docs/UBUNTU_APT_REPOSITORY.md) | Installing the HDR desktop packages on a machine, and how they follow Ubuntu's updates |
+| [Merged Ubuntu packages](docs/MERGED_UBUNTU_PACKAGES.md) | The hand-built 2026-10-17 release and its install/rollback test |
 | [Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) · [validation receipts](docs/NATIVEHDR10_VALIDATION.md) | The nativehdr10 delivery and its scoped validation |
 | [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) | A packaging compatibility correction and its source pins |
 | [HDR foundations](docs/QUALIFIED_HDR_FOUNDATIONS.md) | The reviewed main-targeting source batch and its provenance |
@@ -191,6 +195,8 @@ has the remote and branch rules.
 - `patches/linux/` — native luminance, AUX backlight and parser-test patches.
 - `patches/wine/` — Windows API compatibility for the processor route.
 - `sources.json` · `SHA256SUMS` — source identities and patch integrity.
+- `packaging/ubuntu/` — build, publish and nightly rebuild of the Ubuntu
+  packages, and `setup-apt.sh`, the one installer.
 - `tools/` · `scripts/` — the native player, harness and validation tools; no
   installation side effects.
 - `evidence/` — small validation receipts. Large or private captures, OEM
@@ -204,15 +210,14 @@ Audio (speakers, latency, Dolby Atmos) lives in
 
 - [x] Native HDR detection on the internal panel (HDR10 working 2026-10-08)
 - [x] Compositor colour pipeline: physical targets, HLG, highlight mapping,
-  gamut compression (installed as `nativehdr8`)
-- [~] Night Light in HDR and per-monitor overrides — packaged as
-  `nativehdr10`, not installed
-- [x] Ubuntu source and binary packages, with an isolated install/rollback test
-- [~] Open Dolby Vision display mapping — 13/30 on new shots; measurement-driven
-  fixes in progress
-- [~] Dolby Vision playback — Profile 5 decode and reshaping work; trims,
-  Profile 8 and the full mapping remain
+  gamut compression
+- [~] Night Light in HDR and per-monitor overrides — installed
+  (`nativehdr10`); the owner's visual check remains
+- [x] Ubuntu packages in an APT repository, rebuilt when Ubuntu updates
+- [x] Open Dolby Vision display mapping — closed-form CM v4.0 and CM v2.9
+- [x] Dolby Vision playback — plurx Player, Profile 5, 8.1 and 7 FEL
 - [ ] HDR/SDR, brightness, DPMS and suspend/resume qualification
 - [ ] Panel measurement and calibration (needs an instrument)
-- [ ] Qualification across apps, including Plurx
+- [~] Qualification across apps — plurx Player's acceptance on the laptop is
+  next
 - [ ] Upstream submission (the owner's decision)
