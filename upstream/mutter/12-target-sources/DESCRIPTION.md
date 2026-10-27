@@ -6,7 +6,7 @@ monitors and many laptops), and in the native SDR mode the base EDID colour char
 become the target gamut, so wider content is compressed into the panel's gamut instead of being
 clipped. Each target records its provenance, shown in the colour debug output.
 
-Hardware: on the Lenovo ThinkPad X1 Extreme gen 1 (AUO B156ZAN03.2 eDP, Intel UHD 630): an SDR panel with a base EDID only. in `sdr-native` mode the base EDID gamut is published as both the
+Hardware: the Lenovo ThinkPad X1 Extreme gen 1 (AUO B156ZAN03.2 eDP, Intel UHD 630): an SDR panel with a base EDID only. In `sdr-native` mode the base EDID gamut is published there as both the
 encoding and the target primaries (Mutter 51 build of the same change). Related: [#5001](https://gitlab.gnome.org/GNOME/mutter/-/issues/5001).
 
 ## How it was tested

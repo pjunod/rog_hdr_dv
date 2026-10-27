@@ -14,9 +14,9 @@ invented. Synthetic EDID tests cover the decision table.
 libdisplay-info!210), checked with a `cc.links()` probe in meson.build, so CI cannot pass until a
 libdisplay-info release has them.
 
-Hardware: on the ASUS ROG Zephyrus G16 (GU605MZ, Samsung ATNA60DL01-0 OLED eDP, Intel Meteor Lake): its EDID declares HDR only in DisplayID 2.0 (Display Interface Features RGB BT.2020/ST 2084; Display Parameters 400 cd/m² full, 616 cd/m² 10% window, native primaries), no CTA HDR block. it makes `bt2100` available (tested on a Mutter 51 build of the same
-change). Related: [#4847](https://gitlab.gnome.org/GNOME/mutter/-/issues/4847) and the closed #5093 describe the same symptom on other laptops; whether
-it fixes those depends on what their DisplayID blocks contain.
+Hardware: the ASUS ROG Zephyrus G16 (GU605MZ, Samsung ATNA60DL01-0 OLED eDP, Intel Meteor Lake): its EDID declares HDR only in DisplayID 2.0 (Display Interface Features RGB BT.2020/ST 2084; Display Parameters 400 cd/m² full, 616 cd/m² 10% window, native primaries), no CTA HDR block. With this change (tested on a Mutter 51 build of it) `bt2100` is offered
+there. Related: [#4847](https://gitlab.gnome.org/GNOME/mutter/-/issues/4847), and the closed [#5093](https://gitlab.gnome.org/GNOME/mutter/-/issues/5093), describe the same symptom on other laptops; whether
+this fixes them depends on what their DisplayID blocks contain.
 
 ## How it was tested
 

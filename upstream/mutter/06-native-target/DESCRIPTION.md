@@ -19,8 +19,9 @@ src/tests/meson.build).
 comparison. **Blocked on libdisplay-info** (Display Parameters luminance and chromaticities,
 libdisplay-info units 05-06). Related: [#5001](https://gitlab.gnome.org/GNOME/mutter/-/issues/5001) (panel values instead of placeholders).
 
-Hardware: on the ASUS ROG Zephyrus G16 (GU605MZ, Samsung ATNA60DL01-0 OLED eDP, Intel Meteor Lake): its EDID declares HDR only in DisplayID 2.0 (Display Interface Features RGB BT.2020/ST 2084; Display Parameters 400 cd/m² full, 616 cd/m² 10% window, native primaries), no CTA HDR block. the output description publishes target luminance 0.0004-616 cd/m² and
-the firmware primaries while the encoding stays BT.2020/PQ (Mutter 51 build of the same change).
+Hardware: the ASUS ROG Zephyrus G16 (GU605MZ, Samsung ATNA60DL01-0 OLED eDP, Intel Meteor Lake): its EDID declares HDR only in DisplayID 2.0 (Display Interface Features RGB BT.2020/ST 2084; Display Parameters 400 cd/m² full, 616 cd/m² 10% window, native primaries), no CTA HDR block. There the output description publishes target luminance 0.0004-616 cd/m²
+and the firmware primaries while the encoding stays BT.2020/PQ (Mutter 51 build of the same
+change).
 
 ## How it was tested
 
