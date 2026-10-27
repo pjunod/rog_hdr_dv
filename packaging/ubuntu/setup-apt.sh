@@ -33,8 +33,9 @@ Pin: origin "$host"
 Pin-Priority: 1001
 EOF
 
-installed=$(dpkg-query -W -f '${binary:Package} ${db:Status-Abbrev}\n' 'mutter*' 'libmutter-*' \
-  'gir1.2-mutter-*' 'libdisplay-info*' 2>/dev/null | awk '$2 ~ /^.i/ {print $1}')
+# dpkg-query fails when a pattern matches nothing (no Mutter on a server).
+installed=$({ dpkg-query -W -f '${binary:Package} ${db:Status-Abbrev}\n' 'mutter*' 'libmutter-*' \
+  'gir1.2-mutter-*' 'libdisplay-info*' 2>/dev/null || true; } | awk '$2 ~ /^.i/ {print $1}')
 held=$(apt-mark showhold | grep -E '^(mutter|libmutter-|gir1\.2-mutter-|libdisplay-info)' || true)
 [ -z "$held" ] || apt-mark unhold $held
 apt-get update

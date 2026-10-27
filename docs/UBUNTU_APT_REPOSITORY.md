@@ -26,7 +26,7 @@ same version on both architectures or APT refuses to upgrade either.
 
 **Versions.** Ubuntu's version followed by `+nativehdrN`, N from
 [`packaging/ubuntu/REVISION`](../packaging/ubuntu/REVISION): Mutter
-`51.0-1ubuntu3+nativehdr11`, libdisplay-info `0.3.0-1+nativehdr11`. That
+`51.0-1ubuntu3+nativehdr12`, libdisplay-info `0.3.0-1+nativehdr12`. That
 sorts above both Ubuntu's package and every earlier build (`+nativehdr10`,
 `~hdr9`), so APT treats each rebuild as an ordinary upgrade. Raise
 `REVISION` in the same commit as any change to either series; without that,

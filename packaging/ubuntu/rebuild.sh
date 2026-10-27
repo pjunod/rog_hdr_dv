@@ -36,14 +36,20 @@ rm -rf "$work"; mkdir -p "$work"
 ldi=$ldi_ubuntu+nativehdr$revision mutter=$mutter_ubuntu+nativehdr$revision
 echo "Ubuntu $codename: libdisplay-info $ldi_ubuntu, mutter $mutter_ubuntu; series revision $revision"
 
-for arch in amd64 i386; do
-  if published libdisplay-info3 "$ldi" "$arch"; then
-    echo "libdisplay-info $ldi $arch: published"
-  else
+# Both architectures or neither: a Multi-Arch: same library must ship
+# byte-identical shared files (its changelog, copyright) on each.
+if published libdisplay-info3 "$ldi" amd64 && published libdisplay-info3 "$ldi" i386; then
+  echo "libdisplay-info $ldi: published"
+elif published libdisplay-info3 "$ldi" amd64 || published libdisplay-info3 "$ldi" i386; then
+  echo "rebuild.sh: libdisplay-info $ldi is published for one architecture only" >&2; exit 1
+else
+  for arch in amd64 i386; do
     "$here/build.sh" libdisplay-info "$work/libdisplay-info-$arch" --release "$release" --arch "$arch"
-    "$here/publish.sh" "$work/libdisplay-info-$arch" --release "$release"
-  fi
-done
+  done
+  "$here/multiarch-same.sh" "$work"/libdisplay-info-amd64/libdisplay-info3_*.deb \
+    "$work"/libdisplay-info-i386/libdisplay-info3_*.deb
+  "$here/publish.sh" "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" --release "$release"
+fi
 
 if published mutter "$mutter" amd64; then
   echo "mutter $mutter: published"

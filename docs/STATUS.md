@@ -9,7 +9,7 @@ plays through plurx Player with the closed-form display mapping.
 | Area | State | Evidence |
 |---|---|---|
 | Desktop (Mutter `nativehdr10`, libdisplay-info `~hdr9`) | Installed on the laptop since 2026-10-13, running | `gdctl show` reports `bt2100`, target 0.0004–616 cd/m², firmware primaries |
-| Ubuntu packages | Mutter `51.0-1ubuntu3+nativehdr11` and libdisplay-info `0.3.0-1+nativehdr11` built from Ubuntu's current source and published | [APT repository](UBUNTU_APT_REPOSITORY.md); exported symbols identical to the installed builds (1,039 and 93) |
+| Ubuntu packages | Mutter `51.0-1ubuntu3+nativehdr12` and libdisplay-info `0.3.0-1+nativehdr12` built from Ubuntu's current source and published | [APT repository](UBUNTU_APT_REPOSITORY.md); exported symbols identical to the installed builds (1,039 and 93) |
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
 | Dolby Vision playback | plurx Player 0.3.2 on the laptop | A Profile 7 FEL title played 2026-10-27 at 616 nits, P3, enhancement layer composed |
 

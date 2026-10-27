@@ -43,6 +43,9 @@ patches=$repo/patches/ubuntu-$pkg
 [ -f "$patches/series" ] || { echo "build.sh: no series in $patches" >&2; exit 1; }
 revision=$(tr -d '[:space:]' < "$repo/packaging/ubuntu/REVISION")
 commit=$(git -C "$repo" rev-parse --short=12 HEAD)
+# The changelog entry is dated by the commit, so the amd64 and i386 builds of
+# a Multi-Arch: same library ship identical changelogs.
+commit_date=$(date -R -u -d "@$(git -C "$repo" log -1 --format=%ct)")
 if [ -n "$(git -C "$repo" status --porcelain -- patches packaging)" ]; then
   commit="$commit+local"
 fi
@@ -50,7 +53,7 @@ mkdir -p "$out"
 out=$(cd "$out" && pwd)
 
 docker run --rm -i \
-  -e PKG="$pkg" -e ARCH="$arch" -e REVISION="$revision" -e COMMIT="$commit" \
+  -e PKG="$pkg" -e ARCH="$arch" -e REVISION="$revision" -e COMMIT="$commit" -e COMMIT_DATE="$commit_date" \
   -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
   -v "$patches:/patches:ro" -v "$out:/out" ${with:+-v "$with:/with:ro"} \
   "ubuntu:$release" bash -s <<'CONTAINER'
@@ -96,6 +99,7 @@ codename=$(. /etc/os-release; echo "$VERSION_CODENAME")
 DEBFULLNAME="rog_hdr_dv" DEBEMAIL="noreply@rog-hdr-dv.invalid" \
   dch -v "$version" -D "$codename" --force-distribution \
   "Ubuntu $ubuntu_version with the rog_hdr_dv HDR series ($applied patches, patches/ubuntu-$PKG at $COMMIT)."
+sed -i "0,/^ -- /s/^\( -- .*>\)  .*/\1  $COMMIT_DATE/" debian/changelog
 
 options="parallel=$(nproc)"
 # Mutter's tests need a display server and a session bus.
