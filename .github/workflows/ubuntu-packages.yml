@@ -1,0 +1,35 @@
+# Rebuild the Ubuntu desktop packages (Mutter, libdisplay-info) when Ubuntu
+# publishes a new source version or the series revision changes, and publish
+# them to this owner's Forgejo Debian registry. packaging/ubuntu/rebuild.sh
+# does nothing when the registry already has the current versions.
+name: Ubuntu packages
+
+on:
+  schedule:
+    - cron: "23 7 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "packaging/ubuntu/**"
+      - "patches/ubuntu-mutter/**"
+      - "patches/ubuntu-libdisplay-info/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ubuntu-packages
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: [self-hosted, lab]
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and publish what the registry lacks
+        env:
+          FORGEJO_URL: ${{ github.server_url }}
+          FORGEJO_OWNER: ${{ github.repository_owner }}
+          # A personal access token with write:package: the automatic Actions
+          # token can only read an owner's packages.
+          FORGEJO_TOKEN: ${{ secrets.PACKAGE_TOKEN }}
+        run: packaging/ubuntu/rebuild.sh "$RUNNER_TEMP/ubuntu-packages"

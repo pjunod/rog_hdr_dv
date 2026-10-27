@@ -236,6 +236,48 @@ class RepositoryIntegrityTests(unittest.TestCase):
             readme.write("\n[bad anchor](docs/STATUS.md#does-not-exist)\n")
         self.rejected("Broken anchor in README.md: docs/STATUS.md#does-not-exist")
 
+    def lock(self):
+        return subprocess.run([sys.executable, str(self.root / "scripts/check_repository.py"),
+                               "--lock-ubuntu-series"],
+                              cwd=self.root, capture_output=True, text=True, timeout=30)
+
+    def change_ubuntu_patch(self, package):
+        """Change one Ubuntu series patch, keeping SHA256SUMS consistent."""
+        import hashlib
+        directory = self.root / f"patches/ubuntu-{package}"
+        name = (directory / "series").read_text().split()[0]
+        patch = directory / name
+        patch.write_bytes(patch.read_bytes() + b"\n")
+        sums = self.root / "SHA256SUMS"
+        relative = f"patches/ubuntu-{package}/{name}"
+        digest = hashlib.sha256(patch.read_bytes()).hexdigest()
+        sums.write_text("".join(
+            f"{digest}  {relative}\n" if line.endswith(f"  {relative}") else line + "\n"
+            for line in sums.read_text().splitlines()))
+
+    def test_ubuntu_series_change_without_revision_is_rejected(self):
+        # The nightly rebuild would see the version as published and never
+        # ship the change.
+        self.change_ubuntu_patch("mutter")
+        self.rejected("changed without packaging/ubuntu/SERIES.lock")
+        result = self.lock()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("raise packaging/ubuntu/REVISION before locking", result.stderr)
+
+    def test_ubuntu_series_change_with_raised_revision_locks_and_passes(self):
+        self.change_ubuntu_patch("libdisplay-info")
+        revision = self.root / "packaging/ubuntu/REVISION"
+        revision.write_text(f"{int(revision.read_text()) + 1}\n")
+        result = self.lock()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = self.check()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_revision_raised_without_lock_is_rejected(self):
+        revision = self.root / "packaging/ubuntu/REVISION"
+        revision.write_text(f"{int(revision.read_text()) + 1}\n")
+        self.rejected("changed without packaging/ubuntu/SERIES.lock")
+
     def test_undecodable_source_manifest_is_a_controlled_error(self):
         (self.root / "sources.json").write_bytes(b"\xff")
         self.rejected("Cannot read sources.json:")

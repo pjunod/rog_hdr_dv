@@ -1,5 +1,40 @@
 # Status — what is working and what remains
 
+**Updated:** 2026-10-27 (America/New_York) · **Current:** the HDR desktop
+packages are in an APT repository that follows Ubuntu's updates; Dolby Vision
+plays through plurx Player with the closed-form display mapping.
+
+## Where it stands (2026-10-27)
+
+| Area | State | Evidence |
+|---|---|---|
+| Desktop (Mutter `nativehdr10`, libdisplay-info `~hdr9`) | Installed on the laptop since 2026-10-13, running | `gdctl show` reports `bt2100`, target 0.0004–616 cd/m², firmware primaries |
+| Ubuntu packages | Mutter `51.0-1ubuntu3+nativehdr13` and libdisplay-info `0.3.0-1+nativehdr13` built from Ubuntu's current source and published | [APT repository](UBUNTU_APT_REPOSITORY.md); exported symbols identical to the installed builds (1,039 and 93) |
+| Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
+| Dolby Vision playback | plurx Player 0.3.2 on the laptop | A Profile 7 FEL title played 2026-10-27 at 616 nits, P3, enhancement layer composed |
+
+**Remaining.**
+
+- Install the APT repository's builds on the laptop (`setup-apt.sh`, then a
+  new login) and on the second test machine.
+- The owner's visual checks: Night Light and overrides in HDR, transitions,
+  resume, and plurx Player's acceptance (M6).
+- `Page flip failed: drmModeAtomicCommit: Invalid argument` when a video
+  goes full screen, so variable refresh never engages for video. Cause
+  (2026-10-27, `drm.debug=0x14` on 7.3.0-rc5, same code in Linux master):
+  Mutter's flip turns VRR on; i915 then switches PSR off (`_psr_compute_config`:
+  PSR is not used with VRR), which drops the set-context-latency workaround
+  for display 13/14 (`Wa_14015401596`, SCL 1 only while PSR is on) to 0.
+  Vblank start moves from 1601 to 1600, which is not fast-settable, so the
+  commit needs a full modeset that a page flip may not request. The fix
+  belongs in the kernel: keep that SCL while VRR is merely toggled.
+- Upstream submission of `patches/mutter` and `patches/libdisplay-info`
+  (the owner's identity and decision).
+- Panel measurement and calibration (needs a colourimeter); the Windows
+  trace of the OEM pipeline (needs a Windows boot).
+
+## Snapshot — 2026-10-18
+
 **Updated:** 2026-10-18 (America/New_York) · **Current:** frozen ABI368 mapping
 main-based integration independently reviewed and affected checks qualified; publication in progress.
 Exact unchanged full-raster256/27 and714/27 development PASS and independent
