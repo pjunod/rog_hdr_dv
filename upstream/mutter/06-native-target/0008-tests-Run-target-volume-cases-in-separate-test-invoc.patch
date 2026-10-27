@@ -1,0 +1,140 @@
+From 1aff5e6e45248b941b559b251c381dcd07533ab8 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 15:21:42 -0400
+Subject: [PATCH 08/11] tests: Run target-volume cases in separate test
+ invocations
+
+The target-luminance v2 case disposes the shared Wayland colour manager
+to exercise teardown with live description records, and every
+target-volume case rewrites the fixture output's connector,
+capabilities, EDID, colour mode, forced-HDR state and topology. In one
+process, cases registered after it ran against a disposed manager and
+inherited mutated fixture state.
+
+Add an optional 'separate_cases' list to test case definitions. Each
+listed GTest path runs in its own meson test invocation (and installed
+test) with '-p', and the main invocation skips it with '-s'. The test
+runner gives each invocation its own runtime directory, bus and display
+socket, so no case can observe another's fixture or manager lifetime.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
+---
+ src/tests/meson.build | 77 ++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 57 insertions(+), 20 deletions(-)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index c9df1e16b..48c4273ea 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -285,6 +285,9 @@ monitor_tests_common_deps = [
+ #  - 'name' - the test name
+ #  - 'suite' - the test suite
+ #  - 'sources' - a list of source code files
++#  - 'separate_cases' - optional test paths that each run in their own
++#    invocation (and are skipped in the main one) because they change state
++#    that later cases in the same process would observe
+ 
+ test_cases = []
+ privileged_test_cases = []
+@@ -957,6 +960,14 @@ wayland_test_cases = [
+       'wayland-color-management-test.c',
+       wayland_test_utils,
+     ],
++    # Target-volume cases rewrite the fixture output and the v2 cases dispose
++    # the shared Wayland colour manager, so each runs in its own invocation.
++    'separate_cases': [
++      '/wayland/target-luminance/v1',
++      '/wayland/target-luminance/v2',
++      '/wayland/target-primaries/v1',
++      '/wayland/target-primaries/v2',
++    ],
+     'depends': [
+       test_client_executables.get('color-management'),
+     ],
+@@ -1327,6 +1338,10 @@ foreach test_case: test_cases
+ 
+   args = test_case.get('args', [])
+   test_case_env = test_case.get('env', test_env)
++  separate_cases = test_case.get('separate_cases', [])
++  foreach separate_case: separate_cases
++    args += ['-s', separate_case]
++  endforeach
+ 
+   test(test_case['name'], test_executable,
+     suite: ['core', 'mutter/' + test_case['suite']],
+@@ -1336,6 +1351,17 @@ foreach test_case: test_cases
+     is_parallel: false,
+     timeout: test_case.get('timeout', default_test_timeout),
+   )
++
++  foreach separate_case: separate_cases
++    test(test_case['name'] + separate_case.replace('/', '-'), test_executable,
++      suite: ['core', 'mutter/' + test_case['suite']],
++      args: test_case.get('args', []) + ['-p', separate_case],
++      env: test_case_env,
++      depends: test_depends,
++      is_parallel: false,
++      timeout: test_case.get('timeout', default_test_timeout),
++    )
++  endforeach
+ endforeach
+ 
+ stacking_tests = [
+@@ -1615,26 +1641,37 @@ if have_installed_tests
+       args = test_case.get('args', [])
+     endif
+ 
+-    installed_tests_cdata = configuration_data()
+-    installed_tests_cdata.set('apiversion', libmutter_api_version)
+-    installed_tests_cdata.set('libexecdir', libexecdir)
+-    installed_tests_cdata.set('pkgdatadir', pkgdatadir)
+-    installed_tests_cdata.set('reftestresultdir', '/tmp/mutter-ref-test-results')
+-    installed_tests_cdata.set('gdctltestresultdir', '/tmp/mutter-gdctl-test-results')
+-    installed_tests_cdata.set('testname', test_case['name'])
+-    installed_tests_cdata.set('testexecutable', 'mutter-' + test_case['name'])
+-    installed_tests_cdata.set('testargs', ' '.join(args))
+-    installed_tests_cdata.set('runnerargs', ' '.join(runner_args))
+-    installed_tests_cdata.set('ldpreload', ':'.join(test_ld_preload))
+-    installed_tests_cdata.set('sanitizervariables', ' '.join(sanitizer_assignments))
+-
+-    configure_file(
+-      input: 'generic.test.in',
+-      output: test_case['name'] + '.test',
+-      configuration: installed_tests_cdata,
+-      install: true,
+-      install_dir: mutter_installed_tests_datadir,
+-    )
++    separate_cases = test_case.get('separate_cases', [])
++    main_args = args
++    installed_variants = []
++    foreach separate_case: separate_cases
++      main_args += ['-s', separate_case]
++      installed_variants += [[test_case['name'] + separate_case.replace('/', '-'), args + ['-p', separate_case]]]
++    endforeach
++    installed_variants = [[test_case['name'], main_args]] + installed_variants
++
++    foreach variant: installed_variants
++      installed_tests_cdata = configuration_data()
++      installed_tests_cdata.set('apiversion', libmutter_api_version)
++      installed_tests_cdata.set('libexecdir', libexecdir)
++      installed_tests_cdata.set('pkgdatadir', pkgdatadir)
++      installed_tests_cdata.set('reftestresultdir', '/tmp/mutter-ref-test-results')
++      installed_tests_cdata.set('gdctltestresultdir', '/tmp/mutter-gdctl-test-results')
++      installed_tests_cdata.set('testname', variant[0])
++      installed_tests_cdata.set('testexecutable', 'mutter-' + test_case['name'])
++      installed_tests_cdata.set('testargs', ' '.join(variant[1]))
++      installed_tests_cdata.set('runnerargs', ' '.join(runner_args))
++      installed_tests_cdata.set('ldpreload', ':'.join(test_ld_preload))
++      installed_tests_cdata.set('sanitizervariables', ' '.join(sanitizer_assignments))
++
++      configure_file(
++        input: 'generic.test.in',
++        output: variant[0] + '.test',
++        configuration: installed_tests_cdata,
++        install: true,
++        install_dir: mutter_installed_tests_datadir,
++      )
++    endforeach
+   endforeach
+ 
+ endif

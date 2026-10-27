@@ -1,0 +1,53 @@
+From 8e303635cc2383f09d305b48a3f1831d3779bbbe Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 13:35:34 +0000
+Subject: [PATCH 05/11] backends/color-profile: Leave a cancelled colord
+ profile creation alone
+
+A color profile asks colord to create its colord profile with its own
+cancellable, which it cancels when it is finalized. The cancelled
+request still completes afterwards, and its callback cast its user data,
+the gone profile, before it checked for the cancellation.
+
+A generated device profile whose only requester was cancelled is not
+kept by the color store, so it is finalized as soon as the cancelled
+request completes, typically while colord is still creating it. A
+monitor that is unplugged while its profile is being generated gets
+there.
+
+Check for the cancellation before using the profile.
+
+Link: TBD-MR
+---
+ src/backends/meta-color-profile.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/backends/meta-color-profile.c b/src/backends/meta-color-profile.c
+index 0d9446358..f23f80e9a 100644
+--- a/src/backends/meta-color-profile.c
++++ b/src/backends/meta-color-profile.c
+@@ -214,16 +214,20 @@ on_cd_profile_created (GObject      *source_object,
+                        gpointer      user_data)
+ {
+   CdClient *cd_client = CD_CLIENT (source_object);
+-  MetaColorProfile *color_profile = META_COLOR_PROFILE (user_data);
++  MetaColorProfile *color_profile;
+   g_autoptr (GError) error = NULL;
+   CdProfile *cd_profile;
+ 
+   cd_profile = cd_client_create_profile_finish (cd_client, res, &error);
++
++  /* A cancelled request may complete after the profile is gone. */
++  if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++    return;
++
++  color_profile = META_COLOR_PROFILE (user_data);
++
+   if (!cd_profile)
+     {
+-      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+-        return;
+-
+       if (g_error_matches (error,
+                            CD_CLIENT_ERROR, CD_CLIENT_ERROR_ALREADY_EXISTS))
+         {

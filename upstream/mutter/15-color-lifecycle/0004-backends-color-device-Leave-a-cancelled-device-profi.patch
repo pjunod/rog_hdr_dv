@@ -1,0 +1,57 @@
+From 5e93dc52d5f0b8c935e286b661f34a483bf7e47e Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 13:35:21 +0000
+Subject: [PATCH 04/11] backends/color-device: Leave a cancelled device profile
+ request alone
+
+A color device requests its device profile from the color store with its
+own cancellable, and cancels it when the color manager drops the device.
+The request does not hold the device. The profile generation it waits
+for does, if this device started it, but a cancelled task completes only
+from an idle source, after the generation has finished and released the
+device, which may have been its last reference. The request's callback
+cast its user data, the device, before it checked for the cancellation.
+
+Since devices cancel their setup when the manager drops them, a monitor
+that is unplugged while its profile is being generated gets there, and
+the completion then crashed with a segmentation fault.
+
+Check for the cancellation before using the device, as the other colord
+callbacks of the device do.
+
+Link: TBD-MR
+---
+ src/backends/meta-color-device.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index b3b251db0..d42a6a82d 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -499,7 +499,7 @@ ensure_device_profile_cb (GObject      *source_object,
+                           gpointer      user_data)
+ {
+   MetaColorStore *color_store = META_COLOR_STORE (source_object);
+-  MetaColorDevice *color_device = META_COLOR_DEVICE (user_data);
++  MetaColorDevice *color_device;
+   MetaColorProfile *color_profile;
+   g_autoptr (GError) error = NULL;
+ 
+@@ -507,11 +507,14 @@ ensure_device_profile_cb (GObject      *source_object,
+                                                                  res,
+                                                                  &error);
+ 
++  /* A cancelled request may complete after the device is gone. */
++  if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
++    return;
++
++  color_device = META_COLOR_DEVICE (user_data);
++
+   if (!color_profile)
+     {
+-      if (g_error_matches (error, G_IO_ERROR, G_IO_ERROR_CANCELLED))
+-        return;
+-
+       g_warning ("Failed to create device color profile: %s", error->message);
+ 
+       color_device->pending_state &= ~PENDING_EDID_PROFILE;

@@ -1,0 +1,68 @@
+From 198a5e50255e7cdb2357a32a058b27f29d4d4562 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 18:54:23 +0000
+Subject: [PATCH 11/11] tests/color-management: Check offscreen reuse across a
+ Night Light ramp
+
+In the BT.2100 Night Light capture case, hold the view's offscreen
+framebuffer and step the temperature from 6400 K down to 3900 K,
+painting and reading back pixels at every step, and check that the view
+keeps the same offscreen throughout and after returning to the default
+temperature, while the captures stay unchanged.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ src/tests/wayland-color-management-test.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 85648c394..b1428b6f2 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -2263,6 +2263,8 @@ night_light_bt2100_capture (void)
+   ClutterActor *actor;
+   CoglColor color;
+   CapturePixels day, night, back;
++  g_autoptr (CoglFramebuffer) offscreen = NULL;
++  int temperature;
+ 
+   set_test_color_mode (output, META_COLOR_MODE_BT2100);
+   meta_color_device_update (device);
+@@ -2278,15 +2280,26 @@ night_light_bt2100_capture (void)
+   clutter_actor_add_child (stage, actor);
+ 
+   read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &day);
++  offscreen = g_object_ref (clutter_stage_view_get_framebuffer (view));
++  g_assert_true (offscreen != clutter_stage_view_get_onscreen (view));
+   g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
+                                                                 NULL, NULL));
+ 
+-  set_night_light_temperature (device, 3900);
++  /* Hold the buffer alive so allocator address reuse cannot fake identity.
++   * Paint/read back every step, rather than coalescing the entire ramp.
++   */
++  for (temperature = 6400; temperature >= 3900; temperature -= 100)
++    {
++      set_night_light_temperature (device, temperature);
++      read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &night);
++      g_assert_true (clutter_stage_view_get_framebuffer (view) == offscreen);
++      assert_pixels_close (night.capture, day.capture);
++      assert_pixels_close (night.paint, day.paint);
++    }
++  g_test_message ("Night Light ramp: 26 painted steps, 0 offscreen replacements");
+   g_assert_true (clutter_stage_view_get_output_color_state (view) == output_color_state);
+   g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
+                                                                NULL, NULL));
+-  read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &night);
+-
+   /* The output conversion changed. */
+   g_assert_cmpint (ABS ((int) night.output[0] - (int) day.output[0]), <=, 1);
+   g_assert_cmpint (night.output[1], <=, day.output[1]);
+@@ -2299,6 +2312,7 @@ night_light_bt2100_capture (void)
+   g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
+                                                                 NULL, NULL));
+   read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &back);
++  g_assert_true (clutter_stage_view_get_framebuffer (view) == offscreen);
+   assert_pixels_close (back.output, day.output);
+   assert_pixels_close (back.capture, day.capture);
+   assert_pixels_close (back.paint, day.paint);

@@ -1,0 +1,688 @@
+From c69e6166687ae0035b89dc3226d5fa8fc20981c6 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 10:11:19 -0400
+Subject: [PATCH 05/12] clutter/color: Leave PQ highlights unmapped without a
+ declared peak
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The effective peak took the encoding's nominal maximum as a bound for
+every encoding but extended-range linear. For PQ that maximum is 10000
+cd/m², the capacity of the absolute encoding, not the peak of the
+content, so plain PQ at the protocol defaults, the common case, got a
+BT.2390 knee at about 149 cd/m² on a 600 cd/m² panel: content the panel
+can show was compressed, reference white was no longer anchored, and
+direct scanout was refused for every plain PQ surface.
+
+Introduce one explicit notion, whether an encoding's nominal maximum
+describes the content's peak: it does for SDR transfer functions and for
+HLG, whose nominal maximum is a display-referred peak; it does not for
+PQ and for extended-range linear encodings. Without MaxCLL or a
+mastering maximum the peak of the latter is unknown, and no highlight
+mapping applies, as was already the case for ext_linear.
+
+Keep it distinct from the signal-range notion the gamut rule uses,
+renamed clutter_color_state_params_is_signal_range_bounded(), each in
+one function. Document that the signal range is keyed on the transfer
+function's name, and the known gap: gamma-type floating point content
+declaring wider mastering primaries is not compressed while its
+encoding primaries lie within the target.
+
+Both predicates are exported for the tests. The tests that codified the
+old behaviour now expect plain PQ to be unmapped and kept for scanout,
+the BT.2390 reference tests declare a MaxCLL, and a new test covers
+plain PQ, MaxCLL above and below the target, and HLG at its default
+above a 616 cd/m² target.
+
+Link: TBD-MR
+---
+ .../clutter-color-state-params-private.h      |   6 +-
+ clutter/clutter/clutter-color-state-params.c  |  75 +++++--
+ clutter/clutter/clutter-color-transform.c     |   2 +-
+ src/tests/clutter/conform/color-hdr.c         | 184 +++++++++++++++---
+ src/tests/wayland-color-management-test.c     |  54 ++---
+ 5 files changed, 258 insertions(+), 63 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index c1d0ebd2d..45dd3aad7 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -83,7 +83,11 @@ gboolean clutter_color_state_params_get_display_gamut (ClutterColorStateParams *
+                                                        ClutterPrimaries        *primaries,
+                                                        float                    tolerance[3]);
+ 
+-gboolean clutter_color_state_params_is_encoding_bounded (ClutterColorStateParams *color_state_params);
++CLUTTER_EXPORT_TEST
++gboolean clutter_color_state_params_is_signal_range_bounded (ClutterColorStateParams *color_state_params);
++
++CLUTTER_EXPORT_TEST
++gboolean clutter_color_state_params_nominal_max_is_content_peak (ClutterColorStateParams *color_state_params);
+ 
+ /* Exact identity, for caches whose entries must not be shared by states that
+  * clutter_color_state_equals() deems close enough. */
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index ae7278f49..a230198f7 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -120,13 +120,24 @@ clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_sta
+ }
+ 
+ /*
+- * Whether the encoding's signal range bounds the content: the light it can
+- * reach, and the colors. Extended-range linear encodings (ext_linear,
+- * scRGB-style content) give meaning to values above 1.0 and below 0.0, so
+- * neither their nominal maximum nor their primaries bound anything.
++ * Whether the encoding's signal range bounds the content's signal: whether
++ * only signal values within [0, 1] have a meaning, so that the encoding's
++ * primaries bound the colors the content can carry. Gamut compression uses
++ * this; the content's peak luminance is a separate question, see
++ * clutter_color_state_params_nominal_max_is_content_peak(). Extended-range
++ * linear encodings (ext_linear, scRGB-style content) give meaning to values
++ * above 1.0 and below 0.0, so their primaries bound nothing.
++ *
++ * The transfer function's name stands in for the signal range: an extended
++ * range is only known from it, not from the pixel format the content
++ * arrives in. A known gap follows: content with a gamma-type transfer
++ * function in a floating point format can carry values outside [0, 1] too,
++ * but counts as bounded, so when it declares mastering primaries wider than
++ * the target, it is still not compressed while its encoding primaries lie
++ * within the target.
+  */
+ gboolean
+-clutter_color_state_params_is_encoding_bounded (ClutterColorStateParams *color_state_params)
++clutter_color_state_params_is_signal_range_bounded (ClutterColorStateParams *color_state_params)
+ {
+   const ClutterEOTF *eotf = &color_state_params->eotf;
+ 
+@@ -134,6 +145,46 @@ clutter_color_state_params_is_encoding_bounded (ClutterColorStateParams *color_s
+            eotf->tf_name == CLUTTER_TRANSFER_FUNCTION_LINEAR);
+ }
+ 
++/*
++ * Whether the encoding's nominal maximum luminance describes the content's
++ * peak: the most light the content can reach, as opposed to only the most
++ * the encoding can carry. The signal range is a separate question, see
++ * clutter_color_state_params_is_signal_range_bounded().
++ *
++ * It does for SDR transfer functions, whose maximum is reference white, and
++ * for HLG, whose nominal maximum is the peak of the display the signal is
++ * rendered for. It does not for PQ, whose 10000 cd/m² is the capacity of the
++ * absolute encoding, nor for extended-range linear encodings, which exceed
++ * their nominal maximum: their content's peak is known only from MaxCLL or
++ * a mastering maximum.
++ */
++gboolean
++clutter_color_state_params_nominal_max_is_content_peak (ClutterColorStateParams *color_state_params)
++{
++  const ClutterEOTF *eotf = &color_state_params->eotf;
++
++  switch (eotf->type)
++    {
++    case CLUTTER_EOTF_TYPE_GAMMA:
++      return TRUE;
++    case CLUTTER_EOTF_TYPE_NAMED:
++      switch (eotf->tf_name)
++        {
++        case CLUTTER_TRANSFER_FUNCTION_SRGB_PIECEWISE:
++        case CLUTTER_TRANSFER_FUNCTION_BT1886:
++        case CLUTTER_TRANSFER_FUNCTION_GAMMA22:
++        case CLUTTER_TRANSFER_FUNCTION_HLG:
++          return TRUE;
++        case CLUTTER_TRANSFER_FUNCTION_PQ:
++        case CLUTTER_TRANSFER_FUNCTION_LINEAR:
++          return FALSE;
++        }
++      break;
++    }
++
++  g_assert_not_reached ();
++}
++
+ /*
+  * clutter_color_state_params_get_peak_headroom:
+  * @min_headroom: (out) (optional): the lowest luminance of the range
+@@ -142,14 +193,15 @@ clutter_color_state_params_is_encoding_bounded (ClutterColorStateParams *color_s
+  * The range of the content as multiples of its reference white luminance,
+  * which every conversion anchors. The effective peak is the smallest of the
+  * declared maximum content light level, the declared target (mastering)
+- * maximum luminance and, for an encoding whose signal range bounds it, the
+- * encoding's own maximum. MaxFALL, an average, never lowers it. Target
++ * maximum luminance and, for an encoding whose nominal maximum describes the
++ * content's peak (see clutter_color_state_params_nominal_max_is_content_peak()),
++ * the encoding's own maximum. MaxFALL, an average, never lowers it. Target
+  * volume values are divided by the display reference luminance, the
+  * encoding's by the state's reference luminance; for a state whose
+  * luminances are absolute the two are the same.
+  *
+- * Returns: %FALSE if the effective peak is unknown: an extended-range
+- *   encoding with neither MaxCLL nor a target maximum declared.
++ * Returns: %FALSE if the effective peak is unknown: a PQ or extended-range
++ *   linear encoding with neither MaxCLL nor a target maximum declared.
+  */
+ gboolean
+ clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_state_params,
+@@ -169,8 +221,9 @@ clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_sta
+   display_ref =
+     clutter_color_state_params_get_display_reference_luminance (color_state_params);
+ 
+-  /* Extended range states can exceed their nominal maximum. */
+-  if (clutter_color_state_params_is_encoding_bounded (color_state_params))
++  /* PQ's maximum is the encoding's capacity, and extended range states can
++   * exceed their nominal maximum. */
++  if (clutter_color_state_params_nominal_max_is_content_peak (color_state_params))
+     peak = (double) MAX (lum->max, lum->mastering_max) / lum->ref;
+   if (target_volume->has_luminance)
+     peak = MIN (peak, target_volume->max_lum / display_ref);
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index f26514c6e..1286f43ac 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1403,7 +1403,7 @@ get_gamut_compression (ClutterColorState *source_color_state,
+ 
+   source_params = CLUTTER_COLOR_STATE_PARAMS (source_color_state);
+   source_volume = clutter_color_state_params_get_target_volume (source_params);
+-  bounded = clutter_color_state_params_is_encoding_bounded (source_params);
++  bounded = clutter_color_state_params_is_signal_range_bounded (source_params);
+   if (!bounded && !source_volume->has_primaries)
+     return FALSE;
+ 
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index f6d1d7582..3277c1b1f 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -680,6 +680,7 @@ mapping_predicate (void)
+   g_autoptr (ClutterColorState) mastered_below = NULL;
+   g_autoptr (ClutterColorState) cll_above = NULL;
+   g_autoptr (ClutterColorState) cll_below = NULL;
++  g_autoptr (ClutterColorState) cll_only_below = NULL;
+   g_autoptr (ClutterColorState) bright_output = NULL;
+   g_autoptr (ClutterColorState) bright_blending = NULL;
+ 
+@@ -698,24 +699,34 @@ mapping_predicate (void)
+   mastered_below = create_with_target_volume (pq, 400.0f, 0.0f);
+   cll_above = create_with_target_volume (pq, 0.0f, 1000.0f);
+   cll_below = create_with_target_volume (pq, 4000.0f, 500.0f);
++  cll_only_below = create_with_target_volume (pq, 0.0f, 500.0f);
+ 
+   /* The effective source peak exceeds the target. */
+-  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq, blending));
+-  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq, linear_blending));
+   g_assert_true (clutter_color_transform_requires_highlight_mapping (hlg, blending));
+   g_assert_true (clutter_color_transform_requires_highlight_mapping (mastered_above, blending));
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                     linear_blending));
+   g_assert_true (clutter_color_transform_requires_highlight_mapping (cll_above, blending));
+ 
++  /* PQ's 10000 cd/m² is the encoding's capacity, not the content's peak:
++   * without MaxCLL or a mastering maximum the peak is unknown, and nothing
++   * is mapped. */
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, blending));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, linear_blending));
++  g_assert_false (clutter_color_transform_requires_mapping (pq, blending));
++
+   /* At or below the target: no mapping, never expansion. SDR reference
+    * white is 203 cd/m² on this output. */
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (srgb, blending));
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_at, blending));
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_below, blending));
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (cll_below, blending));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (cll_only_below, blending));
+ 
+   /* No declared target: no mapping. */
+-  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, untargeted_blending));
+-  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, output));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                      untargeted_blending));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above, output));
+ 
+   /* Blended content is already mapped: not again to the output. */
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (blending, output));
+@@ -755,7 +766,8 @@ mapping_predicate (void)
+  * An extended-range encoding (linear, as ext_linear or scRGB content) does
+  * not bound its peak by its nominal maximum: only MaxCLL or a mastering
+  * maximum does, and without either the peak is unknown and nothing is
+- * mapped. Bounded encodings keep the encoding maximum as a bound.
++ * mapped. Encodings whose nominal maximum describes the content's peak, such
++ * as SDR ones, keep it as a bound.
+  */
+ static void
+ mapping_extended_range_peak (void)
+@@ -803,7 +815,7 @@ mapping_extended_range_peak (void)
+   g_assert_cmpfloat_with_epsilon (peak_headroom, 400.0 / 80.0, 1e-9);
+   g_assert_true (clutter_color_transform_requires_highlight_mapping (linear_dim, blending));
+ 
+-  /* A bounded encoding keeps its maximum as a bound: SDR never exceeds
++  /* An SDR encoding keeps its maximum as a bound: SDR never exceeds
+    * reference white, whatever MaxCLL says. */
+   g_assert_true (clutter_color_state_params_get_peak_headroom (CLUTTER_COLOR_STATE_PARAMS (srgb_cll),
+                                                                NULL,
+@@ -924,8 +936,10 @@ mapping_identity (void)
+   mastered_below = create_with_target_volume (pq, 400.0f, 0.0f);
+   mastered_at = create_with_target_volume (pq, TARGET_MAX_LUM, 0.0f);
+ 
+-  /* At or below the target, the conversion is the one without a target. */
++  /* At or below the target, or without a known peak, the conversion is the
++   * one without a target. */
+   assert_pipelines_equal (srgb, blending, untargeted_blending);
++  assert_pipelines_equal (pq, blending, untargeted_blending);
+   assert_pipelines_equal (mastered_below, blending, untargeted_blending);
+   assert_pipelines_equal (mastered_at, blending, untargeted_blending);
+ 
+@@ -941,6 +955,101 @@ mapping_identity (void)
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_at, blending));
+ }
+ 
++/*
++ * PQ without declarations: the encoding's 10000 cd/m² is its capacity, not
++ * the content's peak, so the peak is unknown and nothing is mapped. The
++ * conversion is the one without a target, so reference white keeps its
++ * anchoring, and direct scanout is not refused on mapping grounds. With a
++ * declared MaxCLL the peak is known and compared as for any content. HLG's
++ * nominal maximum is a display peak: at the 1000 cd/m² default it exceeds a
++ * 616 cd/m² target.
++ */
++static void
++mapping_undeclared_pq_peak (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) target_616 = NULL;
++  g_autoptr (ClutterColorState) untargeted = NULL;
++  g_autoptr (ClutterColorState) untargeted_gamma = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) pq_cll_above = NULL;
++  g_autoptr (ClutterColorState) pq_cll_below = NULL;
++  g_autoptr (ClutterColorState) hlg = NULL;
++  g_autoptr (ClutterColorState) linear = NULL;
++  const float reference_white[3] = {
++    (float) reference_pq_signal (203.0),
++    (float) reference_pq_signal (203.0),
++    (float) reference_pq_signal (203.0),
++  };
++  double min_headroom, peak_headroom;
++  float output_color[4];
++
++  blending = create_targeted_blending (output, TARGET_MAX_LUM, FALSE);
++  target_616 = create_targeted_blending (output, 616.0f, FALSE);
++  untargeted = clutter_color_state_get_blending (output, TRUE);
++  untargeted_gamma = clutter_color_state_get_blending (output, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  pq_cll_above = create_with_target_volume (pq, 0.0f, 1000.0f);
++  pq_cll_below = create_with_target_volume (pq, 0.0f, 400.0f);
++  hlg = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                        CLUTTER_TRANSFER_FUNCTION_HLG);
++
++  /* Plain PQ, at the protocol defaults. */
++  g_assert_false (clutter_color_state_params_get_peak_headroom (CLUTTER_COLOR_STATE_PARAMS (pq),
++                                                                &min_headroom,
++                                                                &peak_headroom));
++  g_assert_false (clutter_color_state_params_nominal_max_is_content_peak (CLUTTER_COLOR_STATE_PARAMS (pq)));
++  /* The encoding still bounds the signal, for gamut compression. */
++  g_assert_true (clutter_color_state_params_is_signal_range_bounded (CLUTTER_COLOR_STATE_PARAMS (pq)));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, blending));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, target_616));
++  g_assert_false (clutter_color_transform_requires_mapping (pq, blending));
++  g_assert_false (clutter_color_transform_requires_mapping (pq, target_616));
++  assert_pipelines_equal (pq, blending, untargeted_gamma);
++
++  /* Reference white is anchored: PQ 203 cd/m² stays 203 cd/m² on the
++   * display, linear blending keeping the output's units. */
++  {
++    g_autoptr (ClutterColorState) linear_blending =
++      create_targeted_blending (output, TARGET_MAX_LUM, TRUE);
++    const ClutterLuminance *lum = clutter_color_state_get_luminance (linear_blending);
++
++    transform_one (pq, linear_blending, reference_white, output_color);
++    g_assert_cmpfloat_with_epsilon (output_color[0] * lum->max, 203.0, 0.05);
++    transform_one (pq, untargeted, reference_white, output_color);
++    g_assert_cmpfloat_with_epsilon (output_color[0] * lum->max, 203.0, 0.05);
++  }
++
++  /* PQ with MaxCLL above the target: mapped. */
++  g_assert_true (clutter_color_state_params_get_peak_headroom (CLUTTER_COLOR_STATE_PARAMS (pq_cll_above),
++                                                               NULL,
++                                                               &peak_headroom));
++  g_assert_cmpfloat_with_epsilon (peak_headroom, 1000.0 / 203.0, 1e-9);
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq_cll_above, blending));
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq_cll_above, target_616));
++
++  /* PQ with MaxCLL below the target: not mapped. */
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq_cll_below, blending));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq_cll_below, target_616));
++
++  /* HLG at its 1000 cd/m² default, above a 616 cd/m² target: mapped. */
++  g_assert_true (clutter_color_state_params_nominal_max_is_content_peak (CLUTTER_COLOR_STATE_PARAMS (hlg)));
++  g_assert_true (clutter_color_state_params_get_peak_headroom (CLUTTER_COLOR_STATE_PARAMS (hlg),
++                                                               NULL,
++                                                               &peak_headroom));
++  g_assert_cmpfloat_with_epsilon (peak_headroom, 1000.0 / 203.0, 1e-6);
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (hlg, target_616));
++
++  /* Extended-range linear: neither notion holds. */
++  linear = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                           CLUTTER_TRANSFER_FUNCTION_LINEAR);
++  g_assert_false (clutter_color_state_params_nominal_max_is_content_peak (CLUTTER_COLOR_STATE_PARAMS (linear)));
++  g_assert_false (clutter_color_state_params_is_signal_range_bounded (CLUTTER_COLOR_STATE_PARAMS (linear)));
++}
++
+ static void
+ assert_mapped_neutral (ClutterColorState *source,
+                        ClutterColorState *blending,
+@@ -965,10 +1074,15 @@ assert_mapped_neutral (ClutterColorState *source,
+     }
+ }
+ 
++/* The MaxCLL the reference tests declare for PQ content, whose peak is
++ * otherwise unknown. */
++#define SOURCE_MAX_CLL 4000.0
++
+ /*
+- * Neutral PQ through the blending states of an output whose reference white
+- * is at @output_ref cd/m². Reference-white anchoring puts a source luminance
+- * L at L * output ref / source ref on the display.
++ * Neutral PQ, declaring a MaxCLL of SOURCE_MAX_CLL cd/m², through the
++ * blending states of an output whose reference white is at @output_ref
++ * cd/m². Reference-white anchoring puts a source luminance L at
++ * L * output ref / source ref on the display.
+  */
+ static void
+ assert_pq_mapping_matches_reference (float output_ref)
+@@ -980,6 +1094,7 @@ assert_pq_mapping_matches_reference (float output_ref)
+   g_autoptr (ClutterColorState) output = create_pq_output (output_ref);
+   g_autoptr (ClutterColorState) blending = NULL;
+   g_autoptr (ClutterColorState) linear_blending = NULL;
++  g_autoptr (ClutterColorState) undeclared = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
+   const ClutterLuminance *pq_lum, *linear_lum;
+   double anchoring;
+@@ -987,8 +1102,9 @@ assert_pq_mapping_matches_reference (float output_ref)
+ 
+   blending = create_targeted_blending (output, TARGET_MAX_LUM, FALSE);
+   linear_blending = create_targeted_blending (output, TARGET_MAX_LUM, TRUE);
+-  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+-                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  undeclared = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                               CLUTTER_TRANSFER_FUNCTION_PQ);
++  pq = create_with_target_volume (undeclared, 0.0f, SOURCE_MAX_CLL);
+   pq_lum = clutter_color_state_get_luminance (pq);
+   linear_lum = clutter_color_state_get_luminance (linear_blending);
+   anchoring = output_ref / (double) pq_lum->ref;
+@@ -1001,7 +1117,7 @@ assert_pq_mapping_matches_reference (float output_ref)
+         reference_pq_luminance (signal) / 10000.0 * pq_lum->max * anchoring;
+       double mapped = reference_bt2390 (luminance,
+                                         pq_lum->min * anchoring,
+-                                        pq_lum->max * anchoring,
++                                        SOURCE_MAX_CLL * anchoring,
+                                         TARGET_MAX_LUM);
+ 
+       /* Linear blending keeps the output's units. */
+@@ -1021,6 +1137,7 @@ mapping_bt2390_reference (void)
+   ClutterContext *context = clutter_test_get_context ();
+   g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
+   g_autoptr (ClutterColorState) linear_blending = NULL;
++  g_autoptr (ClutterColorState) undeclared = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
+   g_autoptr (ClutterColorState) hlg = NULL;
+   const ClutterLuminance *pq_lum, *linear_lum;
+@@ -1033,8 +1150,9 @@ mapping_bt2390_reference (void)
+   assert_pq_mapping_matches_reference (264.0f);
+ 
+   linear_blending = create_targeted_blending (output, TARGET_MAX_LUM, TRUE);
+-  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+-                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  undeclared = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                               CLUTTER_TRANSFER_FUNCTION_PQ);
++  pq = create_with_target_volume (undeclared, 0.0f, SOURCE_MAX_CLL);
+   hlg = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+                                         CLUTTER_TRANSFER_FUNCTION_HLG);
+   pq_lum = clutter_color_state_get_luminance (pq);
+@@ -1071,7 +1189,7 @@ mapping_bt2390_reference (void)
+         float signal = (float) reference_pq_signal (dark_luminances[i]);
+         double luminance = reference_pq_luminance (signal) / 10000.0 * pq_lum->max;
+         double mapped = reference_bt2390 (luminance,
+-                                          pq_lum->min, pq_lum->max,
++                                          pq_lum->min, SOURCE_MAX_CLL,
+                                           TARGET_MAX_LUM);
+ 
+         const float input[3] = { signal, signal, signal };
+@@ -1099,6 +1217,7 @@ mapping_monotonic (void)
+   g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
+   g_autoptr (ClutterColorState) linear_blending = NULL;
+   g_autoptr (ClutterColorState) untargeted = NULL;
++  g_autoptr (ClutterColorState) undeclared = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
+   const ClutterLuminance *lum;
+   float previous = 0.0f;
+@@ -1106,8 +1225,9 @@ mapping_monotonic (void)
+ 
+   linear_blending = create_targeted_blending (output, TARGET_MAX_LUM, TRUE);
+   untargeted = clutter_color_state_get_blending (output, TRUE);
+-  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+-                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  undeclared = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                               CLUTTER_TRANSFER_FUNCTION_PQ);
++  pq = create_with_target_volume (undeclared, 0.0f, SOURCE_MAX_CLL);
+   lum = clutter_color_state_get_luminance (linear_blending);
+ 
+   for (i = 0; i <= 1024; i++)
+@@ -1128,7 +1248,7 @@ mapping_monotonic (void)
+       previous = mapped[0];
+     }
+ 
+-  /* The source peak reaches the target peak. */
++  /* The source peak, and signal above it, reach the target peak. */
+   g_assert_cmpfloat_with_epsilon (previous * lum->max, TARGET_MAX_LUM,
+                                   1e-3f * TARGET_MAX_LUM);
+ }
+@@ -1209,13 +1329,16 @@ mapping_shader_matches_cpu (void)
+   g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
+   g_autoptr (ClutterColorState) blending = NULL;
+   g_autoptr (ClutterColorState) linear_blending = NULL;
++  g_autoptr (ClutterColorState) undeclared = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
+   g_autoptr (ClutterColorState) hlg = NULL;
+ 
+   blending = create_targeted_blending (output, TARGET_MAX_LUM, FALSE);
+   linear_blending = create_targeted_blending (output, TARGET_MAX_LUM, TRUE);
+-  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+-                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  undeclared = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                               CLUTTER_TRANSFER_FUNCTION_PQ);
++  pq = create_with_target_volume (undeclared, 0.0f, SOURCE_MAX_CLL);
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq, blending));
+   hlg = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+                                         CLUTTER_TRANSFER_FUNCTION_HLG);
+ 
+@@ -1854,6 +1977,7 @@ gamut_predicate (void)
+   g_autoptr (ClutterColorState) srgb_target = NULL;
+   g_autoptr (ClutterColorState) output_with_primaries = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) pq_cll = NULL;
+   g_autoptr (ClutterColorState) srgb = NULL;
+   g_autoptr (ClutterColorState) own = NULL;
+   g_autoptr (ClutterColorState) beyond = NULL;
+@@ -1879,6 +2003,8 @@ gamut_predicate (void)
+ 
+   pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+                                        CLUTTER_TRANSFER_FUNCTION_PQ);
++  /* A declared peak above the target, so that highlights are mapped. */
++  pq_cll = create_with_target_volume (pq, 0.0f, SOURCE_MAX_CLL);
+   srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
+                                          CLUTTER_TRANSFER_FUNCTION_GAMMA22);
+   own = create_pq_with_primaries (&target_gamut);
+@@ -1928,9 +2054,11 @@ gamut_predicate (void)
+   g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, blending));
+   g_assert_true (clutter_color_transform_requires_mapping (pq, blending));
+   g_assert_false (clutter_color_transform_requires_mapping (srgb, blending));
+-  g_assert_true (clutter_color_transform_requires_mapping (pq, peak_only));
+-  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq, both));
+-  g_assert_true (clutter_color_transform_requires_gamut_compression (pq, both));
++  g_assert_false (clutter_color_transform_requires_mapping (pq, peak_only));
++  g_assert_true (clutter_color_transform_requires_mapping (pq_cll, peak_only));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, both));
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (pq_cll, both));
++  g_assert_true (clutter_color_transform_requires_gamut_compression (pq_cll, both));
+ 
+   /* The target primaries and their tolerance are part of the identity. */
+   g_assert_false (clutter_color_state_identical (blending, srgb_target));
+@@ -1939,7 +2067,7 @@ gamut_predicate (void)
+ 
+   /* Highlights are mapped first, then the gamut is compressed, in linear
+    * light. */
+-  transform = clutter_color_transform_from_color_states (context, pq, both, 0);
++  transform = clutter_color_transform_from_color_states (context, pq_cll, both, 0);
+   g_assert_cmpint (find_op_index (transform, "ClutterColorOpBt2390Eetf"), >=, 0);
+   g_assert_cmpint (find_op_index (transform, "ClutterColorOpBt2390Eetf"), <,
+                    find_op_index (transform, "ClutterColorOpGamutCompress"));
+@@ -2657,6 +2785,7 @@ gamut_shader_matches_cpu (void)
+   g_autoptr (ClutterColorState) linear_blending = NULL;
+   g_autoptr (ClutterColorState) both = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) pq_cll = NULL;
+   /* Saturated BT.2020 PQ signals, outside the target gamut, and neutral and
+    * dark ones. */
+   const float signals[][3] = {
+@@ -2676,12 +2805,14 @@ gamut_shader_matches_cpu (void)
+   both = create_gamut_blending (output, &target_gamut, TRUE, FALSE);
+   pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+                                        CLUTTER_TRANSFER_FUNCTION_PQ);
++  /* With a declared peak, so that highlights are mapped too. */
++  pq_cll = create_with_target_volume (pq, 0.0f, SOURCE_MAX_CLL);
+ 
+   assert_shader_matches_cpu (pq, blending, signals, G_N_ELEMENTS (signals),
+                              2e-3f);
+   assert_shader_matches_cpu (pq, linear_blending, signals,
+                              G_N_ELEMENTS (signals), 1e-4f);
+-  assert_shader_matches_cpu (pq, both, signals, G_N_ELEMENTS (signals),
++  assert_shader_matches_cpu (pq_cll, both, signals, G_N_ELEMENTS (signals),
+                              2e-3f);
+ }
+ 
+@@ -2694,6 +2825,7 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/shader-matches-cpu", hlg_shader_matches_cpu)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/predicate", mapping_predicate)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/extended-range-peak", mapping_extended_range_peak)
++  CLUTTER_TEST_UNIT ("/color-hdr/mapping/undeclared-pq-peak", mapping_undeclared_pq_peak)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/cache-parity", mapping_cache_parity)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/identity", mapping_identity)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/bt2390-reference", mapping_bt2390_reference)
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 7f5a5292d..ddc08094d 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -949,17 +949,20 @@ get_window_target_volume (MetaWindow *window)
+   return clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_state));
+ }
+ 
+-/* The effective peak in the state's own luminance units. */
+-static double
+-get_peak_luminance (ClutterColorState *color_state)
++/* The effective peak in the state's own luminance units, when known. */
++static gboolean
++get_peak_luminance (ClutterColorState *color_state,
++                    double            *peak)
+ {
+   ClutterColorStateParams *params = CLUTTER_COLOR_STATE_PARAMS (color_state);
+   double peak_headroom;
+ 
+-  g_assert_true (clutter_color_state_params_get_peak_headroom (params, NULL,
+-                                                               &peak_headroom));
++  if (!clutter_color_state_params_get_peak_headroom (params, NULL,
++                                                     &peak_headroom))
++    return FALSE;
+ 
+-  return peak_headroom * clutter_color_state_params_get_luminance (params)->ref;
++  *peak = peak_headroom * clutter_color_state_params_get_luminance (params)->ref;
++  return TRUE;
+ }
+ 
+ static void
+@@ -987,9 +990,9 @@ mastering_round_trip (void)
+   g_assert_false (target_volume->has_luminance);
+   g_assert_cmpfloat (target_volume->max_cll, ==, 0.0f);
+   g_assert_cmpfloat (target_volume->max_fall, ==, 0.0f);
+-  /* PQ's default range: 10000 cd/m², reference white 203 cd/m². */
+-  peak = get_peak_luminance (plain);
+-  g_assert_cmpfloat_with_epsilon (peak, 10000.0, 0.01);
++  /* PQ's 10000 cd/m² is the encoding's capacity, not the content's peak:
++   * undeclared, the peak is unknown. */
++  g_assert_false (get_peak_luminance (plain, &peak));
+   emit_sync_event (0);
+ 
+   /* The declared values survive, and make a different color state, which
+@@ -1011,7 +1014,7 @@ mastering_round_trip (void)
+   g_assert_cmpfloat (target_volume->max_lum, ==, 1000.0f);
+   g_assert_cmpfloat (target_volume->max_cll, ==, 800.0f);
+   g_assert_cmpfloat (target_volume->max_fall, ==, 300.0f);
+-  peak = get_peak_luminance (color_state);
++  g_assert_true (get_peak_luminance (color_state, &peak));
+   g_assert_cmpfloat_with_epsilon (peak, 800.0, 1e-3);
+   g_assert_false (clutter_color_state_equals (color_state, plain));
+   g_assert_false (clutter_color_pipeline_shader_needs_color_state (color_state, plain, 0));
+@@ -1031,14 +1034,13 @@ mastering_round_trip (void)
+                     clutter_color_state_hash (plain));
+   emit_sync_event (2);
+ 
+-  /* MaxFALL alone is kept but does not lower the peak. */
++  /* MaxFALL alone is kept but, an average, does not make the peak known. */
+   wait_for_sync_point (3);
+   color_state = get_window_color_state (window);
+   target_volume = get_window_target_volume (window);
+   g_assert_cmpfloat (target_volume->max_cll, ==, 0.0f);
+   g_assert_cmpfloat (target_volume->max_fall, ==, 250.0f);
+-  peak = get_peak_luminance (color_state);
+-  g_assert_cmpfloat_with_epsilon (peak, 10000.0, 0.01);
++  g_assert_false (get_peak_luminance (color_state, &peak));
+   g_assert_false (clutter_color_state_equals (color_state, plain));
+   emit_sync_event (3);
+ 
+@@ -1157,7 +1159,7 @@ mapping_blending_target (void)
+                                          CLUTTER_TRANSFER_FUNCTION_GAMMA22);
+ 
+   /* Content in the output's encoding: scanout is refused exactly when the
+-   * renderer maps it. */
++   * renderer maps it. Plain PQ has no known peak and is not mapped. */
+   sources[0] = g_object_ref (pq);
+   sources[1] = create_with_mastering (pq, 4000.0f, 0.0f);
+   sources[2] = create_with_mastering (pq, 600.0f, 0.0f);
+@@ -1178,7 +1180,7 @@ mapping_blending_target (void)
+                        ==, mapped);
+       g_assert_cmpint (renderer_maps_highlights (sources[i], blending, untargeted),
+                        ==, mapped);
+-      g_assert_cmpint (mapped, ==, i == 0 || i == 1 || i == 4);
++      g_assert_cmpint (mapped, ==, i == 1 || i == 4);
+     }
+ 
+   /* A different encoding still prevents scanout without any mapping. */
+@@ -1239,15 +1241,19 @@ mapping_blending_target (void)
+       g_assert_false (renderer_maps_highlights (client_like_mastered, blending,
+                                                 factor_untargeted));
+ 
+-      /* Undeclared PQ content still reaches 10000 cd/m². */
+-      g_assert_true (clutter_color_transform_requires_highlight_mapping (client_like,
+-                                                                         blending));
+-      g_assert_true (renderer_maps_highlights (client_like, blending,
+-                                               factor_untargeted));
+-      g_assert_true (clutter_color_transform_requires_highlight_mapping (pq,
+-                                                                         blending));
+-      g_assert_true (renderer_maps_highlights (pq, blending,
+-                                               factor_untargeted));
++      /* Undeclared PQ content has no known peak: it is not mapped, and may
++       * be scanned out, with any reference white. */
++      g_assert_false (clutter_color_transform_requires_highlight_mapping (client_like,
++                                                                          blending));
++      g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (client_like,
++                                                                                blending,
++                                                                                output_color_state));
++      g_assert_false (renderer_maps_highlights (client_like, blending,
++                                                factor_untargeted));
++      g_assert_false (clutter_color_transform_requires_highlight_mapping (pq,
++                                                                          blending));
++      g_assert_false (renderer_maps_highlights (pq, blending,
++                                                factor_untargeted));
+ 
+       /* Content mastered at the declared peak with the default reference
+        * white has more headroom than the panel only when the output's

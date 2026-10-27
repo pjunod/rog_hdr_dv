@@ -1,0 +1,623 @@
+From c1ca1f6572151f6ba0f7dca32ab432b6d4441d13 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 15:21:42 -0400
+Subject: [PATCH 07/11] tests/native-hdr: Cover native target primaries and
+ Wayland feedback
+
+Parser cases cover complete, duplicate, conflicting, invalid-point and
+luminance-independent declarations, declarations split across DisplayID
+extensions, structural extension failures and unsupported blocks in
+either order. Policy cases cover CIE 1931 and CIE 1976 conversion
+(every coordinate), geometry that only becomes invalid after
+quantization, a white point exactly on a raw primary edge that
+quantization would move inside, degenerate and incomplete primaries,
+and conflicts. Wayland v1 and v2 cases check that target primaries
+change independently of the encoding, that each target-volume change
+emits one notification, and that the PQ encoding state is unchanged.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
+---
+ src/tests/native-hdr-tests.c                  | 219 ++++++++++++++++++
+ src/tests/wayland-color-management-test.c     | 124 ++++++++++
+ .../wayland-test-clients/color-management.c   | 175 +++++++++++++-
+ 3 files changed, 517 insertions(+), 1 deletion(-)
+
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index f3091cb43..32fc0b93a 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -626,6 +626,223 @@ test_target_luminance_policy (void)
+   g_assert_cmpint (target.maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
+ }
+ 
++static void
++chromaticities (uint8_t data[32])
++{
++  const uint16_t points[4][2] = {
++    { 2816, 1280 }, { 1024, 2816 }, { 512, 256 }, { 1280, 1344 },
++  };
++  unsigned int i;
++
++  parameters (data);
++  for (i = 0; i < 4; i++)
++    {
++      unsigned int offset = 0x0c + 3 * i;
++
++      data[offset] = points[i][0] & 0xff;
++      data[offset + 1] = (points[i][0] >> 8) | ((points[i][1] & 15) << 4);
++      data[offset + 2] = points[i][1] >> 4;
++    }
++}
++
++static void
++test_physical_chromaticities (void)
++{
++  uint8_t blocks[76] = { 0 };
++  g_autoptr (MetaOutputInfo) info = NULL;
++  unsigned int reverse;
++
++  memcpy (blocks, native, sizeof (native));
++  chromaticities (blocks + 12);
++  info = parse (blocks, 44, NULL, 0, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED);
++  g_assert_cmpuint (info->edid_info->native_chromaticities.primaries[0].a, ==, 2816);
++  g_assert_cmpuint (info->edid_info->native_chromaticities.white_point.b, ==, 1344);
++  g_assert_cmpint (info->edid_info->native_luminance_status, ==,
++                   META_NATIVE_LUMINANCE_FIRMWARE_DECLARED);
++  g_assert_true (info->edid_info->native_rgb_bt2020_pq);
++  g_clear_pointer (&info, meta_output_info_unref);
++
++  memcpy (blocks + 44, blocks + 12, 32);
++  info = parse (blocks, 76, NULL, 0, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED);
++  g_clear_pointer (&info, meta_output_info_unref);
++  for (reverse = 0; reverse < 2; reverse++)
++    {
++      chromaticities (blocks + 12);
++      chromaticities (blocks + 44);
++      blocks[(reverse ? 12 : 44) + 0x15]++;
++      info = parse (blocks, 76, NULL, 0, FALSE);
++      g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                       META_NATIVE_CHROMATICITIES_CONFLICT);
++      g_assert_cmpint (info->edid_info->native_luminance_status, ==,
++                       META_NATIVE_LUMINANCE_FIRMWARE_DECLARED);
++      g_clear_pointer (&info, meta_output_info_unref);
++
++      chromaticities (blocks + 12);
++      chromaticities (blocks + 44);
++      blocks[(reverse ? 12 : 44) + 0x0b] = 0x40;
++      info = parse (blocks, 76, NULL, 0, FALSE);
++      g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                       META_NATIVE_CHROMATICITIES_CONFLICT);
++      g_clear_pointer (&info, meta_output_info_unref);
++
++      chromaticities (blocks + 12);
++      chromaticities (blocks + 44);
++      blocks[(reverse ? 12 : 44) + 1] = 2;
++      info = parse (blocks, 76, NULL, 0, FALSE);
++      g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                       META_NATIVE_CHROMATICITIES_UNSUPPORTED);
++      g_clear_pointer (&info, meta_output_info_unref);
++
++      /* An uninterpretable block withdraws the declaration in either order. */
++      chromaticities (blocks + 12);
++      chromaticities (blocks + 44);
++      blocks[(reverse ? 12 : 44) + 0x15]++;
++      blocks[(reverse ? 44 : 12) + 0x0b] = 0x20;
++      info = parse (blocks, 76, NULL, 0, FALSE);
++      g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                       META_NATIVE_CHROMATICITIES_UNSUPPORTED);
++      g_clear_pointer (&info, meta_output_info_unref);
++    }
++
++  chromaticities (blocks + 12);
++  memset (blocks + 12 + 0x15, 0, 3);
++  info = parse (blocks, 44, NULL, 0, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_INVALID);
++  g_assert_cmpuint (info->edid_info->native_chromaticities.primaries[0].a, ==, 2816);
++  g_assert_cmpint (info->edid_info->native_luminance_status, ==,
++                   META_NATIVE_LUMINANCE_FIRMWARE_DECLARED);
++  g_clear_pointer (&info, meta_output_info_unref);
++  chromaticities (blocks + 12);
++  blocks[12 + 0x0b] = 0x18; /* Luminance-class support is independent. */
++  info = parse (blocks, 44, NULL, 0, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED);
++  g_assert_cmpint (info->edid_info->native_luminance_status, ==, META_NATIVE_LUMINANCE_INVALID);
++  g_clear_pointer (&info, meta_output_info_unref);
++  g_clear_pointer (&info, meta_output_info_unref);
++  info = parse (native, sizeof (native), NULL, 0, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_UNAVAILABLE);
++  g_clear_pointer (&info, meta_output_info_unref);
++
++  /* Declarations in separate DisplayID extensions agree or conflict. */
++  chromaticities (blocks + 12);
++  info = parse (blocks, 44, blocks + 12, 32, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED);
++  g_clear_pointer (&info, meta_output_info_unref);
++  memcpy (blocks + 44, blocks + 12, 32);
++  blocks[44 + 0x0c]++;
++  info = parse (blocks, 44, blocks + 44, 32, FALSE);
++  g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                   META_NATIVE_CHROMATICITIES_CONFLICT);
++  g_clear_pointer (&info, meta_output_info_unref);
++
++  /* Any structural extension failure withdraws the declaration. */
++  {
++    const uint8_t unsupported[] = { 0x81, 1, 0 };
++    uint8_t edid[384] = { 0 };
++
++    chromaticities (blocks + 12);
++    make_edid (edid, blocks, 44, unsupported, sizeof (unsupported), FALSE, FALSE);
++    info = parse_bytes (edid, sizeof (edid));
++    g_assert_cmpint (info->edid_info->native_chromaticities_status, ==,
++                     META_NATIVE_CHROMATICITIES_INVALID);
++  }
++}
++
++static void
++set_raw_points (MetaEdidInfo   edid[1],
++                const uint16_t points[4][2])
++{
++  unsigned int i;
++
++  for (i = 0; i < 3; i++)
++    edid->native_chromaticities.primaries[i] =
++      (struct di_displayid2_chromaticity_point) { points[i][0], points[i][1], TRUE };
++  edid->native_chromaticities.white_point =
++    (struct di_displayid2_chromaticity_point) { points[3][0], points[3][1], TRUE };
++}
++
++static void
++test_target_primaries_policy (void)
++{
++  const uint16_t xy[4][2] = {
++    { 2816, 1280 }, { 1024, 2816 }, { 512, 256 }, { 1280, 1344 },
++  };
++  const uint16_t uv[4][2] = {
++    { 1024, 2304 }, { 512, 2304 }, { 719, 647 }, { 810, 1918 },
++  };
++  /* Raw white lies exactly on RG; published truncation moves it inside. */
++  const uint16_t raw_edge[4][2] = {
++    { 2138, 1396 }, { 1082, 2994 }, { 453, 232 }, { 1610, 2195 },
++  };
++  /* Raw white is strictly inside; published rounding puts it outside RG. */
++  const uint16_t quantized[4][2] = {
++    { 1, 1000 }, { 1501, 1001 }, { 1301, 1002 }, { 1500, 1001 },
++  };
++  MetaEdidInfo edid = { .native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED };
++  const ClutterPrimaries *encoding = clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020);
++  MetaColorTargetPrimaries target, fallback;
++  unsigned int i;
++
++  set_raw_points (&edid, xy);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  g_assert_cmpint (target.coordinates[0], ==, 687500);
++  g_assert_cmpint (target.coordinates[1], ==, 312500);
++  g_assert_cmpint (target.coordinates[6], ==, 312500);
++  g_assert_cmpint (target.coordinates[7], ==, 328125);
++  meta_color_target_primaries_init (&fallback, &edid, FALSE, encoding);
++  g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (fallback.coordinates[0], ==, 708000);
++  g_assert_cmpfloat (encoding->r_x, ==, 0.708f);
++
++  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1976;
++  set_raw_points (&edid, uv);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_FIRMWARE_DECLARED);
++  for (i = 0; i < 4; i++)
++    {
++      int64_t a = uv[i][0], b = uv[i][1], d = 6 * a - 16 * b + 12 * 4096;
++
++      g_assert_cmpint (target.coordinates[2 * i], ==, (9 * a * 1000000) / d);
++      g_assert_cmpint (target.coordinates[2 * i + 1], ==, (4 * b * 1000000) / d);
++    }
++  g_assert_cmpint (target.coordinates[0], ==, 500000);
++  g_assert_cmpint (target.coordinates[1], ==, 500000);
++  set_raw_points (&edid, quantized);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1931;
++  set_raw_points (&edid, raw_edge);
++  meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++  g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  edid.native_chromaticities.coordinates = DI_DISPLAYID2_CHROMATICITY_CIE1931;
++  for (i = 0; i < 4; i++)
++    {
++      set_raw_points (&edid, xy);
++      if (i == 0)
++        edid.native_chromaticities.primaries[1] = edid.native_chromaticities.primaries[0];
++      else if (i == 1)
++        edid.native_chromaticities.white_point = edid.native_chromaticities.primaries[0];
++      else if (i == 2)
++        edid.native_chromaticities.white_point.valid = FALSE;
++      else
++        edid.native_chromaticities_status = META_NATIVE_CHROMATICITIES_CONFLICT;
++      meta_color_target_primaries_init (&target, &edid, TRUE, encoding);
++      g_assert_cmpint (target.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++      g_assert_cmpint (target.coordinates[6], ==, fallback.coordinates[6]);
++    }
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -640,5 +857,7 @@ main (int    argc,
+                    test_cta_with_extension_failure);
+   g_test_add_func ("/native-hdr/physical-luminance", test_physical_luminance);
+   g_test_add_func ("/native-hdr/target-luminance-policy", test_target_luminance_policy);
++  g_test_add_func ("/native-hdr/physical-chromaticities", test_physical_chromaticities);
++  g_test_add_func ("/native-hdr/target-primaries-policy", test_target_primaries_policy);
+   return g_test_run ();
+ }
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 2e3be0b93..a66efa64b 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -366,6 +366,128 @@ target_luminance (gconstpointer data)
+   g_signal_emit_by_name (monitor_manager, "monitors-changing");
+ }
+ 
++static void
++target_primaries (gconstpointer data)
++{
++  int version = GPOINTER_TO_INT (data);
++  g_autoptr (MetaVirtualMonitor) other = meta_create_test_monitor (test_context, 320, 240, 60);
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaMonitorManager *monitor_manager = meta_backend_get_monitor_manager (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaMonitor *other_monitor = meta_output_get_monitor (meta_virtual_monitor_get_output (other));
++  MetaMonitorMode *other_mode = meta_monitor_get_current_mode (other_monitor);
++  MetaLogicalMonitor *target_logical = meta_monitor_get_logical_monitor (meta_output_get_monitor (output));
++  MetaLogicalMonitor *other_logical = meta_monitor_get_logical_monitor (other_monitor);
++  MetaColorDevice *device = meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  MetaDebugControl *debug = meta_context_get_debug_control (test_context);
++  g_autoptr (ClutterColorState) encoding = NULL;
++  MetaWaylandTestClient *client;
++  unsigned int phase, color_changes = 0, target_changes = 0;
++  gulong color_handler, target_handler;
++
++  /* Synthetic fixed-route policy, not physical monitor reconfiguration. */
++  info->connector_type = META_CONNECTOR_TYPE_eDP;
++  info->supported_hdr_eotfs = 1 << META_OUTPUT_HDR_METADATA_EOTF_PQ;
++  info->supported_color_spaces = 1 << META_OUTPUT_COLORSPACE_BT2020;
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->native_rgb_bt2020_pq = TRUE;
++  info->edid_info->native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
++  info->edid_info->native_luminance = (struct di_displayid2_luminance) {
++    .has_min_luminance = TRUE, .has_max_luminance_10pct = TRUE,
++    .min_luminance = 1049.0f / 2097152.0f, .max_luminance_10pct = 616,
++  };
++  info->edid_info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED;
++  info->edid_info->native_chromaticities = (struct di_displayid2_native_chromaticities) {
++    .primaries = { { 2816, 1280, TRUE }, { 1024, 2816, TRUE }, { 512, 256, TRUE } },
++    .white_point = { 1280, 1344, TRUE },
++  };
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++  encoding = g_object_ref (meta_color_device_get_color_state (device));
++  color_handler = g_signal_connect (device, "color-state-changed", G_CALLBACK (count_color_signal), &color_changes);
++  target_handler = g_signal_connect (device, "target-volume-changed", G_CALLBACK (count_color_signal), &target_changes);
++  meta_wayland_test_driver_set_property (test_driver, "target-output", meta_output_get_name (output));
++  client = meta_wayland_test_client_new_with_args (test_context, "color-management",
++                                                   version == 1 ? "gamut-v1" : "gamut-v2", NULL);
++  for (phase = 0; phase < 10; phase++)
++    {
++      unsigned int before = target_changes;
++
++      wait_for_sync_point (phase);
++      switch (phase)
++        {
++        case 0:
++          info->edid_info->native_chromaticities.white_point.a++;
++          break;
++        case 1:
++          info->edid_info->native_chromaticities.revision = 1;
++          break;
++        case 2:
++          info->edid_info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_INVALID;
++          break;
++        case 3:
++          info->edid_info->native_chromaticities_status = META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED;
++          break;
++        case 4:
++        case 5:
++          set_fixture_force_hdr (debug, monitor_manager, phase == 4);
++          break;
++        case 6:
++          target_logical->is_primary = FALSE;
++          other_logical->is_primary = TRUE;
++          monitor_manager->primary_logical_monitor = other_logical;
++          g_signal_emit_by_name (monitor_manager, "monitors-changing");
++          break;
++        case 7:
++          other_logical->is_primary = FALSE;
++          target_logical->is_primary = TRUE;
++          monitor_manager->primary_logical_monitor = target_logical;
++          meta_monitor_set_current_mode (other_monitor, NULL);
++          g_signal_emit_by_name (monitor_manager, "monitors-changing");
++          break;
++        case 8:
++          info->edid_info->native_rgb_bt2020_pq = FALSE;
++          info->edid_info->hdr_static_metadata.type1 = TRUE;
++          info->edid_info->hdr_static_metadata.pq = TRUE;
++          info->edid_info->colorimetry.bt2020_rgb = TRUE;
++          break;
++        case 9:
++          set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++          break;
++        }
++      meta_color_device_update (device);
++      g_assert_cmpuint (target_changes, ==, before + (phase != 1 && phase != 6 && phase != 7));
++      g_assert_cmpuint (color_changes, ==, phase == 9 ? 1 : 0);
++      if (phase != 9)
++        {
++          const ClutterLuminance *lum = clutter_color_state_get_luminance (encoding);
++
++          g_assert_true (meta_color_device_get_color_state (device) == encoding);
++          g_assert_cmpfloat (lum->ref, ==, 203);
++          g_assert_cmpfloat (lum->max, >, 10000);
++        }
++      emit_sync_event (phase);
++    }
++  wait_for_sync_point (10);
++  if (version == 2)
++    {
++      MetaWaylandCompositor *compositor = meta_context_get_wayland_compositor (test_context);
++      GObject *wayland_manager = g_object_get_data (G_OBJECT (compositor), "-meta-wayland-color-manager");
++
++      g_object_run_dispose (wayland_manager);
++      g_object_run_dispose (wayland_manager);
++    }
++  emit_sync_event (10);
++  meta_wayland_test_client_finish (client);
++  g_signal_handler_disconnect (device, color_handler);
++  g_signal_handler_disconnect (device, target_handler);
++  meta_monitor_set_current_mode (other_monitor, other_mode);
++  g_signal_emit_by_name (monitor_manager, "monitors-changing");
++}
++
+ static void
+ on_before_tests (void)
+ {
+@@ -392,6 +514,8 @@ init_tests (void)
+                    color_management);
+   g_test_add_data_func ("/wayland/target-luminance/v1", GINT_TO_POINTER (1), target_luminance);
+   g_test_add_data_func ("/wayland/target-luminance/v2", GINT_TO_POINTER (2), target_luminance);
++  g_test_add_data_func ("/wayland/target-primaries/v1", GINT_TO_POINTER (1), target_primaries);
++  g_test_add_data_func ("/wayland/target-primaries/v2", GINT_TO_POINTER (2), target_primaries);
+ }
+ 
+ int
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index b448eecd2..1c5b73917 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -271,6 +271,8 @@ typedef struct
+   uint32_t target_min, target_max;
+   uint32_t primaries, tf;
+   unsigned int luminances, targets, content_events;
++  int32_t encoding_primaries[8], target_primaries[8];
++  unsigned int encoding_primary_events, target_primary_events;
+ } TargetInfo;
+ 
+ typedef struct
+@@ -482,6 +484,30 @@ target_info_primaries (void                                *data,
+                        int32_t                              wx,
+                        int32_t                              wy)
+ {
++  TargetInfo *target = data;
++  const int32_t coordinates[8] = { rx, ry, gx, gy, bx, by, wx, wy };
++
++  memcpy (target->encoding_primaries, coordinates, sizeof (coordinates));
++  target->encoding_primary_events++;
++}
++
++static void
++target_info_target_primaries (void                                *data,
++                              struct wp_image_description_info_v1 *info,
++                              int32_t                              rx,
++                              int32_t                              ry,
++                              int32_t                              gx,
++                              int32_t                              gy,
++                              int32_t                              bx,
++                              int32_t                              by,
++                              int32_t                              wx,
++                              int32_t                              wy)
++{
++  TargetInfo *target = data;
++  const int32_t coordinates[8] = { rx, ry, gx, gy, bx, by, wx, wy };
++
++  memcpy (target->target_primaries, coordinates, sizeof (coordinates));
++  target->target_primary_events++;
+ }
+ 
+ static void
+@@ -552,7 +578,7 @@ static const struct wp_image_description_info_v1_listener target_info_listener =
+   .tf_power = target_info_power,
+   .tf_named = target_info_tf,
+   .luminances = target_info_luminances,
+-  .target_primaries = target_info_primaries,
++  .target_primaries = target_info_target_primaries,
+   .target_luminance = target_info_target,
+   .target_max_cll = target_info_content,
+   .target_max_fall = target_info_content,
+@@ -572,6 +598,8 @@ read_target_info (WaylandDisplay *display,
+   g_assert_cmpuint (info.luminances, ==, 1);
+   g_assert_cmpuint (info.targets, ==, 1);
+   g_assert_cmpuint (info.content_events, ==, 0);
++  g_assert_cmpuint (info.encoding_primary_events, ==, 1);
++  g_assert_cmpuint (info.target_primary_events, ==, 1);
+   return info;
+ }
+ 
+@@ -819,6 +847,145 @@ target_luminance_client (WaylandDisplay *display,
+   wl_display_roundtrip (display->display);
+ }
+ 
++static void
++check_gamut (const TargetInfo *info,
++             const int32_t     encoding[8],
++             const int32_t     target[8])
++{
++  unsigned int i;
++
++  for (i = 0; i < 8; i++)
++    {
++      g_assert_cmpint (info->encoding_primaries[i], ==, encoding[i]);
++      g_assert_cmpint (info->target_primaries[i], ==, target[i]);
++    }
++}
++
++static void
++target_primaries_client (WaylandDisplay *display,
++                         int             version)
++{
++  const int32_t bt2020[8] = { 708000, 292000, 170000, 797000, 131000, 46000, 312700, 329000 };
++  const int32_t srgb[8] = { 640000, 330000, 300000, 600000, 150000, 60000, 312700, 329000 };
++  const int32_t initial[8] = { 687500, 312500, 250000, 687500, 125000, 62500, 312500, 328125 };
++  const int32_t changed[8] = { 687500, 312500, 250000, 687500, 125000, 62500, 312744, 328125 };
++  TargetClient client = { .version = version };
++  struct wl_registry *registry = wl_display_get_registry (display->display);
++  struct wl_surface *surface = wl_compositor_create_surface (display->compositor);
++  struct wp_color_management_surface_feedback_v1 *feedback;
++  TargetOutput *target = NULL, *other = NULL;
++  TargetSnapshot snapshots[11] = { 0 }, preferred = { 0 };
++  TargetSnapshot other_snapshot = { 0 }, current_other = { 0 };
++  TargetInfo info;
++  unsigned int i, phase;
++
++  wl_registry_add_listener (registry, &target_registry_listener, &client);
++  wl_display_roundtrip (display->display);
++  wl_display_roundtrip (display->display);
++  g_assert_nonnull (client.manager);
++  g_assert_cmpuint (client.n_outputs, ==, 2);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      TargetOutput *output = &client.outputs[i];
++
++      if (g_strcmp0 (output->name, lookup_property_string (display, "target-output")) == 0)
++        target = output;
++      else
++        other = output;
++      output->color_output = wp_color_manager_v1_get_output (client.manager, output->output);
++      wp_color_management_output_v1_add_listener (output->color_output, &target_color_output_listener, output);
++      output->done = 0;
++    }
++  g_assert_nonnull (target);
++  g_assert_nonnull (other);
++  other_snapshot.description = wp_color_management_output_v1_get_image_description (other->color_output);
++  wait_target_snapshot (display, &other_snapshot);
++  feedback = wp_color_manager_v1_get_surface_feedback (client.manager, surface);
++  wp_color_management_surface_feedback_v1_add_listener (feedback, &target_feedback_listener, &client);
++  wl_display_roundtrip (display->display);
++  g_assert_cmpuint (client.preferred_changes, ==, 1);
++  snapshots[0].description = wp_color_management_output_v1_get_image_description (target->color_output);
++  wait_target_snapshot (display, &snapshots[0]);
++  g_assert_cmpuint (client.preferred, ==, snapshots[0].identity);
++  info = read_target_info (display, &snapshots[0]);
++  check_gamut (&info, bt2020, initial);
++  g_assert_cmpuint (info.target_max, ==, 616);
++  client.preferred_changes = 0;
++
++  for (phase = 0; phase < 10; phase++)
++    {
++      gboolean topology = phase == 6 || phase == 7;
++      gboolean changes = phase != 1 && !topology;
++      const int32_t *expected = phase == 2 || phase == 4 || phase == 8 ? bt2020 : changed;
++
++      if (phase == 6)
++        {
++          current_other.description = wp_color_management_output_v1_get_image_description (other->color_output);
++          wait_target_snapshot (display, &current_other);
++        }
++      test_driver_sync_point (display->test_driver, phase, NULL);
++      wait_for_sync_event (display, phase);
++      wl_display_roundtrip (display->display);
++      if (topology)
++        check_topology_preference (&client);
++      else
++        check_target_events (&client, target, changes, phase == 4 || phase == 5);
++      snapshots[phase + 1].description = wp_color_management_output_v1_get_image_description (target->color_output);
++      wait_target_snapshot (display, &snapshots[phase + 1]);
++      if (changes)
++        g_assert_cmpuint (snapshots[phase + 1].identity, !=, snapshots[phase].identity);
++      else
++        g_assert_cmpuint (snapshots[phase + 1].identity, ==, snapshots[phase].identity);
++      preferred = (TargetSnapshot) {
++        .description = wp_color_management_surface_feedback_v1_get_preferred (feedback),
++      };
++      wait_target_snapshot (display, &preferred);
++      g_assert_cmpuint (preferred.identity, ==, client.preferred);
++      g_assert_cmpuint (preferred.identity, ==, phase == 6 ? current_other.identity : snapshots[phase + 1].identity);
++      info = read_target_info (display, &preferred);
++      if (phase == 6)
++        check_gamut (&info, srgb, srgb);
++      wp_image_description_v1_destroy (preferred.description);
++      info = read_target_info (display, &snapshots[phase + 1]);
++      check_gamut (&info, phase == 9 ? srgb : bt2020, phase == 9 ? srgb : expected);
++      g_assert_cmpuint (info.encoding_max, ==, phase == 9 ? 80 : 10000);
++      g_assert_cmpuint (info.reference, ==, phase == 9 ? 80 : 203);
++      g_assert_cmpuint (info.target_max, ==, phase == 9 ? 80 : phase == 4 || phase == 8 ? 10000 : 616);
++      g_assert_cmpuint (info.target_min, ==, phase == 9 ? 2000 : phase == 4 || phase == 8 ? 50 : 5);
++      if (phase == 3)
++        g_assert_cmpuint (snapshots[4].identity, ==, snapshots[1].identity);
++      info = read_target_info (display, &snapshots[0]);
++      check_gamut (&info, bt2020, initial);
++      g_assert_cmpuint (info.target_max, ==, 616);
++      info = read_target_info (display, &other_snapshot);
++      check_gamut (&info, srgb, srgb);
++      if (phase >= 6)
++        {
++          info = read_target_info (display, &current_other);
++          check_gamut (&info, srgb, srgb);
++        }
++    }
++  test_driver_sync_point (display->test_driver, 10, NULL);
++  wait_for_sync_event (display, 10);
++  info = read_target_info (display, &snapshots[0]);
++  check_gamut (&info, bt2020, initial);
++  for (i = 0; i < G_N_ELEMENTS (snapshots); i++)
++    wp_image_description_v1_destroy (snapshots[i].description);
++  wp_image_description_v1_destroy (other_snapshot.description);
++  wp_image_description_v1_destroy (current_other.description);
++  wp_color_management_surface_feedback_v1_destroy (feedback);
++  wl_surface_destroy (surface);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      wp_color_management_output_v1_destroy (client.outputs[i].color_output);
++      wl_output_release (client.outputs[i].output);
++      g_free (client.outputs[i].name);
++    }
++  wp_color_manager_v1_destroy (client.manager);
++  wl_registry_destroy (registry);
++  wl_display_roundtrip (display->display);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -838,6 +1005,12 @@ main (int    argc,
+       return 0;
+     }
+ 
++  if (argc == 2 && (strcmp (argv[1], "gamut-v1") == 0 || strcmp (argv[1], "gamut-v2") == 0))
++    {
++      target_primaries_client (display, strcmp (argv[1], "gamut-v1") == 0 ? 1 : 2);
++      return 0;
++    }
++
+   surface = wl_compositor_create_surface (display->compositor);
+   xdg_surface = xdg_wm_base_get_xdg_surface (display->xdg_wm_base, surface);
+   xdg_surface_add_listener (xdg_surface, &xdg_surface_listener, display);

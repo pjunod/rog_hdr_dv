@@ -18,6 +18,8 @@
 #   --link URL   replace every "Link: TBD-MR" line with "Link: URL"
 #   --link mr    replace it with the URL of the unit's own MR (opened first as
 #                a draft, then updated)
+#   --issue URL  the series' design-discussion issue, put where a DESCRIPTION.md
+#                says @SERIES_ISSUE@ (defaults to --link when that is an issue URL)
 # Environment: UPSTREAM_SUBMIT_DIR (default ~/.cache/upstream-submit) holds the
 # working clone; ~/.config/upstream/$GL_HOST.token holds a personal access
 # token with the "api" and "write_repository" scopes.
@@ -30,6 +32,7 @@ note() { printf 'submit: %s\n' "$*" >&2; }
 DRY_RUN=0
 DRAFT=0
 LINK=
+ISSUE=
 WHICH=
 while [ $# -gt 0 ]; do
     case $1 in
@@ -37,13 +40,15 @@ while [ $# -gt 0 ]; do
         --draft) DRAFT=1 ;;
         --link) [ $# -ge 2 ] || die '--link needs a URL or "mr"'; LINK=$2; shift ;;
         --link=*) LINK=${1#--link=} ;;
+        --issue) [ $# -ge 2 ] || die '--issue needs a URL'; ISSUE=$2; shift ;;
+        --issue=*) ISSUE=${1#--issue=} ;;
         -h|--help) sed -n '/^# Usage of the caller/,/^# token/p' "$PROJECT_DIR/../lib/gitlab-submit.sh"; exit 0 ;;
         -*) die "unknown option $1" ;;
         *) [ -z "$WHICH" ] || die 'give one unit (NN) or "all"'; WHICH=$1 ;;
     esac
     shift
 done
-[ -n "$WHICH" ] || die "usage: $(basename "$0") <NN|all> [--dry-run] [--draft] [--link URL|mr]"
+[ -n "$WHICH" ] || die "usage: $(basename "$0") <NN|all> [--dry-run] [--draft] [--link URL|mr] [--issue URL]"
 command -v git >/dev/null || die 'git is required'
 command -v python3 >/dev/null || die 'python3 is required'
 command -v curl >/dev/null || die 'curl is required'
@@ -87,14 +92,22 @@ api() { # api METHOD PATH [JSON]; prints the body, fails on HTTP >= 400
 }
 json() { python3 -c 'import json,sys; d=json.load(sys.stdin); print(eval(sys.argv[1], {"d": d}))' "$1"; }
 
+retry() { # the forges sometimes answer 502; try three times
+    local i=1
+    until "$@"; do
+        [ $i -lt 3 ] || die "failed three times: $*"
+        i=$((i + 1)); note "retrying in 10 s: $*"; sleep 10
+    done
+}
+
 prepare_clone() {
     mkdir -p "$(dirname "$WORK")"
     if [ ! -d "$WORK/.git" ]; then
         note "cloning $UPSTREAM_URL into $WORK"
-        git clone -q "$UPSTREAM_URL" "$WORK"
+        retry git clone -q "$UPSTREAM_URL" "$WORK"
     fi
     g am --abort >/dev/null 2>&1 || true
-    g fetch -q origin "$GL_TARGET"
+    retry g fetch -q origin "$GL_TARGET"
     g checkout -q --detach FETCH_HEAD
     g reset -q --hard
     g clean -qfdx
@@ -153,7 +166,7 @@ deps_closure() { # print NN's dependencies, deepest first, without duplicates
 }
 
 submit_unit() {
-    local n status title desc branch stacked own_from mr_title body d user repo fork_enc upstream_id fork fork_id st i askpass existing payload iid url
+    local n status title desc series branch stacked own_from mr_title body d user repo fork_enc upstream_id fork fork_id st i askpass existing payload iid url
     n=$1
     status=$(unit_field "$n" 4); title=$(unit_field "$n" 5)
     [ -n "$status" ] || die "unknown unit $n"
@@ -193,6 +206,12 @@ submit_unit() {
     [ -n "$mr_title" ] || mr_title=$title
     if [ "$DRAFT" -eq 1 ] || [ "$LINK" = mr ]; then mr_title="Draft: $mr_title"; fi
     body=$(sed '1{/^# /d}' "$desc")
+    if printf '%s' "$body" | grep -q '@SERIES_ISSUE@'; then
+        series=$ISSUE
+        case $series:$LINK in :https://*/-/issues/*) series=$LINK ;; esac
+        [ -n "$series" ] || die "DESCRIPTION.md of unit $n refers to the design-discussion issue; pass --issue <URL> (README.md)"
+        body=$(printf '%s\n' "$body" | sed "s#@SERIES_ISSUE@#$series#g")
+    fi
     if [ -n "$stacked" ]; then
         body=$(printf 'This merge request is stacked on the merge request(s) for unit(s)%s; only the last %s commit(s) are new here.\n\n%s' \
             "$stacked" "$(g rev-list --count "$own_from..HEAD")" "$body")

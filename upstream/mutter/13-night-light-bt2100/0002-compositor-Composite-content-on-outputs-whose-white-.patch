@@ -1,0 +1,70 @@
+From 15ab96c1773abbde3ea7b952bed21664edcdfcc7 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 17:24:46 -0400
+Subject: [PATCH 02/11] compositor: Composite content on outputs whose white is
+ adapted
+
+Direct scanout and the hardware cursor plane bypass the conversion of
+an output's blending state to its encoding. When that conversion
+adapts the output's white point, a surface or cursor shown through
+them would miss the adaptation, so they are refused while it applies,
+by the same predicate that refuses them for highlight mapping and
+gamut compression.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ src/backends/native/meta-cursor-renderer-native.c | 10 +++++-----
+ src/compositor/meta-compositor-view-native.c      | 10 +++++-----
+ 2 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/src/backends/native/meta-cursor-renderer-native.c b/src/backends/native/meta-cursor-renderer-native.c
+index 26897e80e..48792493c 100644
+--- a/src/backends/native/meta-cursor-renderer-native.c
++++ b/src/backends/native/meta-cursor-renderer-native.c
+@@ -435,13 +435,13 @@ meta_cursor_renderer_native_update_cursor (MetaCursorRenderer *cursor_renderer,
+           has_hw_cursor = FALSE;
+         }
+       else if (cursor_color_state && blending_color_state &&
+-               clutter_color_transform_requires_mapping (cursor_color_state,
+-                                                         blending_color_state))
++               clutter_color_transform_requires_composition (cursor_color_state,
++                                                             blending_color_state))
+         {
+           /* Like direct scanout, the cursor plane bypasses the blending
+-           * state, whose conversion would map the cursor's highlights or
+-           * gamut toward the output's target: draw the cursor there
+-           * instead. */
++           * state, whose conversions would map the cursor's highlights or
++           * gamut toward the output's target, or adapt the output's white:
++           * draw the cursor there instead. */
+           cursor_stage_view->is_hw_cursor_valid = FALSE;
+           has_hw_cursor = FALSE;
+         }
+diff --git a/src/compositor/meta-compositor-view-native.c b/src/compositor/meta-compositor-view-native.c
+index 0e020404a..c2aa56db2 100644
+--- a/src/compositor/meta-compositor-view-native.c
++++ b/src/compositor/meta-compositor-view-native.c
+@@ -266,9 +266,9 @@ surface_actor_has_overlapping_cursor_overlays (MetaCompositor     *compositor,
+  * Whether a surface in @surface_color_state must be composited rather than
+  * scanned out to an output in @output_color_state, whose content is blended
+  * in @blending_color_state: if rendering it would either convert its encoding
+- * or map it toward the output's target, its highlights or its gamut. The
+- * latter uses the same test as the color transform that would otherwise
+- * apply the mapping.
++ * or map it toward the output's target, its highlights or its gamut, or if
++ * the output's white is adapted, as with Night Light in HDR. The latter use
++ * the same test as the color transforms that would otherwise apply them.
+  */
+ gboolean
+ meta_compositor_view_native_color_state_prevents_scanout (ClutterColorState *surface_color_state,
+@@ -280,8 +280,8 @@ meta_compositor_view_native_color_state_prevents_scanout (ClutterColorState *sur
+     return TRUE;
+ 
+   return surface_color_state && blending_color_state &&
+-         clutter_color_transform_requires_mapping (surface_color_state,
+-                                                   blending_color_state);
++         clutter_color_transform_requires_composition (surface_color_state,
++                                                       blending_color_state);
+ }
+ 
+ static gboolean

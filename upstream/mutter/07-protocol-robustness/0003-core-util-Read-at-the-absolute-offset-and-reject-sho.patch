@@ -1,0 +1,171 @@
+From c146074bf784472effb14853337e12953e75640a Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 17:43:01 -0400
+Subject: [PATCH 3/7] core/util: Read at the absolute offset and reject short
+ reads
+
+meta_read_bytes() is used by wp_image_description_creator_icc_v1 to read
+the client's ICC profile at the offset and length given in
+set_icc_file. It had two defects:
+
+ - It dup()ed the descriptor, which shares the file position with the
+   client's descriptor, and then skipped `offset` bytes from the current
+   position instead of reading at the absolute offset. A client that had
+   just written the profile into a memfd, leaving the position at the
+   end, had its data read from the wrong place, or not at all.
+ - g_input_stream_read_all() returns TRUE at end of file without having
+   filled the buffer, and meta_read_bytes_finish() then reported the
+   requested length anyway. A short read handed an uninitialised buffer
+   to lcms as if it were the profile.
+
+Read with pread() at the absolute offset, in a loop that retries on
+EINTR, so the file position is neither used nor changed. Fail with a
+G_IO_ERROR unless exactly the requested number of bytes arrives
+(G_IO_ERROR_PARTIAL_INPUT at end of file), and make
+meta_read_bytes_finish() report the number of bytes actually read. The
+color management creator reports such failures with the
+'operating_system' cause.
+
+The signature is unchanged. The only in-tree caller passes descriptors
+received from clients; callers that passed a descriptor positioned at 0
+see no difference.
+
+Link: TBD-MR
+---
+ src/core/util.c                             | 72 ++++++++++++++-------
+ src/wayland/meta-wayland-color-management.c |  6 +-
+ 2 files changed, 53 insertions(+), 25 deletions(-)
+
+diff --git a/src/core/util.c b/src/core/util.c
+index 58f656ffe..5695e1110 100644
+--- a/src/core/util.c
++++ b/src/core/util.c
+@@ -24,7 +24,6 @@
+ #include "core/display-private.h"
+ #include "core/util-private.h"
+ 
+-#include <gio/gunixinputstream.h>
+ #include <glib/gstdio.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -263,6 +262,13 @@ meta_read_bytes_context_free (MetaReadBytesContext *context)
+   g_free (context);
+ }
+ 
++/*
++ * Reads exactly @length bytes at the absolute @offset. pread() leaves the
++ * file position alone, which the duplicated descriptor shares with its
++ * owner, so the result does not depend on where anyone left it. Reaching the
++ * end of the file early is an error: a successful result always carries the
++ * requested number of bytes.
++ */
+ static void
+ meta_read_bytes_in_thread (GTask        *task,
+                            gpointer      source_object,
+@@ -270,40 +276,59 @@ meta_read_bytes_in_thread (GTask        *task,
+                            GCancellable *cancellable)
+ {
+   MetaReadBytesContext *context = task_data;
+-  g_autoptr (GInputStream) input_stream = NULL;
+   g_autofree uint8_t *bytes = NULL;
+-  g_autoptr (GError) error = NULL;
+-  int skipped;
++  uint32_t n_read = 0;
+ 
+-  input_stream = G_INPUT_STREAM (g_unix_input_stream_new (context->fd, FALSE));
++  bytes = g_malloc (context->length);
+ 
+-  skipped = g_input_stream_skip (input_stream,
+-                                 context->offset,
+-                                 NULL,
+-                                 &error);
+-  if (skipped < 0)
++  while (n_read < context->length)
+     {
+-      g_task_return_error (task, g_steal_pointer (&error));
+-      return;
+-    }
++      ssize_t ret;
+ 
+-  bytes = g_malloc (context->length);
+-  if (!g_input_stream_read_all (input_stream,
+-                                bytes,
+-                                context->length,
+-                                NULL,
+-                                NULL,
+-                                &error))
+-    {
+-      g_task_return_error (task, g_steal_pointer (&error));
+-      return;
++      ret = pread (context->fd,
++                   bytes + n_read,
++                   context->length - n_read,
++                   (off_t) context->offset + n_read);
++      if (ret < 0)
++        {
++          int errsv = errno;
++
++          if (errsv == EINTR)
++            continue;
++
++          context->length = n_read;
++          g_task_return_new_error (task, G_IO_ERROR,
++                                   g_io_error_from_errno (errsv),
++                                   "Failed to read at offset %" G_GUINT64_FORMAT ": %s",
++                                   (uint64_t) context->offset + n_read,
++                                   g_strerror (errsv));
++          return;
++        }
++      else if (ret == 0)
++        {
++          uint32_t requested = context->length;
++
++          context->length = n_read;
++          g_task_return_new_error (task, G_IO_ERROR, G_IO_ERROR_PARTIAL_INPUT,
++                                   "Only %u of %u bytes at offset %u could be read",
++                                   n_read, requested, context->offset);
++          return;
++        }
++
++      n_read += (uint32_t) ret;
+     }
+ 
+   context->bytes = g_steal_pointer (&bytes);
++  context->length = n_read;
+ 
+   g_task_return_boolean (task, TRUE);
+ }
+ 
++/*
++ * Asynchronously reads @length bytes of @fd at the absolute file @offset,
++ * independently of the file position. Fails unless all @length bytes can be
++ * read.
++ */
+ void
+ meta_read_bytes (int                 fd,
+                  uint32_t            offset,
+@@ -336,6 +361,7 @@ meta_read_bytes_finish (GAsyncResult  *result,
+ 
+   *bytes = g_steal_pointer (&context->bytes);
+ 
++  /* The number of bytes actually read; on success, the requested length. */
+   if (length)
+     *length = context->length;
+ 
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index c7c6aff92..6029c7859 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -1359,8 +1359,10 @@ on_icc_create_bytes_read (GObject      *source_object,
+ 
+   if (!meta_read_bytes_finish (result, &icc_bytes, &icc_length, &error))
+     {
+-      /* The range was validated against the file size when it was set, so
+-       * a failing read is independent of the client. */
++      /* The range was validated against the file size when it was set. A
++       * failed or short read means the file changed or could not be read
++       * afterwards; the protocol reports that as operating_system (the
++       * client is asked to keep the data unchanged while it is read). */
+       meta_wayland_image_description_set_failed (image_desc,
+                                                  WP_IMAGE_DESCRIPTION_V1_CAUSE_OPERATING_SYSTEM,
+                                                  error->message);

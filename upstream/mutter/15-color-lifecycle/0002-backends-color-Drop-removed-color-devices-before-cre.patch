@@ -1,0 +1,112 @@
+From 0c9c7b16619176891117c54b2efe695dc345e151 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 08:46:43 +0000
+Subject: [PATCH 02/11] backends/color: Drop removed color devices before
+ creating new ones
+
+The color manager identifies a monitor's device by vendor, product,
+serial and connector, while the colord device ID has no connector. A
+monitor that moved to another connector therefore got a new device in
+the same update that dropped its old one, but the new device asked
+colord to create its device before the old one was deleted. Creating it
+failed because the ID existed, and the lookup that follows ran after the
+deletion, so the new device failed to set up.
+
+Keep the devices of monitors that are still there, drop the others, and
+only then create the devices of the new monitors.
+
+Link: TBD-MR
+---
+ src/backends/meta-color-manager.c | 58 ++++++++++++++++++++-----------
+ 1 file changed, 37 insertions(+), 21 deletions(-)
+
+diff --git a/src/backends/meta-color-manager.c b/src/backends/meta-color-manager.c
+index 430ebf925..098a1862e 100644
+--- a/src/backends/meta-color-manager.c
++++ b/src/backends/meta-color-manager.c
+@@ -191,6 +191,12 @@ remove_device (MetaColorDevice *color_device)
+   g_object_unref (color_device);
+ }
+ 
++/*
++ * Keeps the device of every monitor that is still there, drops the devices
++ * of those that are gone, and only then creates the devices of the new ones:
++ * a monitor that moved to another connector is a new monitor here, but its
++ * colord device ID is the one of the device it replaces.
++ */
+ static void
+ update_devices (MetaColorManager *color_manager)
+ {
+@@ -198,6 +204,7 @@ update_devices (MetaColorManager *color_manager)
+     meta_color_manager_get_instance_private (color_manager);
+   MetaMonitorManager *monitor_manager =
+     meta_backend_get_monitor_manager (priv->backend);
++  g_autoptr (GList) added = NULL;
+   GList *l;
+   GHashTable *devices;
+ 
+@@ -231,27 +238,7 @@ update_devices (MetaColorManager *color_manager)
+         }
+       else
+         {
+-          color_device = meta_color_device_new (color_manager, monitor);
+-          meta_topic (META_DEBUG_COLOR,
+-                      "Created new color device '%s' for monitor %s",
+-                      meta_color_device_get_id (color_device),
+-                      meta_monitor_get_connector (monitor));
+-          g_hash_table_insert (devices,
+-                               g_steal_pointer (&monitor_id),
+-                               color_device);
+-
+-          g_signal_connect_object (color_device, "ready",
+-                                   G_CALLBACK (on_device_ready),
+-                                   color_manager, 0);
+-          g_signal_connect_object (color_device, "calibration-changed",
+-                                   G_CALLBACK (on_device_calibration_changed),
+-                                   color_manager, 0);
+-          g_signal_connect_object (color_device, "color-state-changed",
+-                                   G_CALLBACK (on_color_state_changed),
+-                                   color_manager, 0);
+-          g_signal_connect_object (color_device, "target-volume-changed",
+-                                   G_CALLBACK (on_target_volume_changed),
+-                                   color_manager, 0);
++          added = g_list_prepend (added, monitor);
+         }
+     }
+ 
+@@ -265,6 +252,35 @@ update_devices (MetaColorManager *color_manager)
+       g_clear_pointer (&priv->devices, g_hash_table_unref);
+     }
+   priv->devices = devices;
++
++  added = g_list_reverse (added);
++  for (l = added; l; l = l->next)
++    {
++      MetaMonitor *monitor = META_MONITOR (l->data);
++      MetaColorDevice *color_device;
++
++      color_device = meta_color_device_new (color_manager, monitor);
++      meta_topic (META_DEBUG_COLOR,
++                  "Created new color device '%s' for monitor %s",
++                  meta_color_device_get_id (color_device),
++                  meta_monitor_get_connector (monitor));
++      g_hash_table_insert (devices,
++                           generate_monitor_id (monitor),
++                           color_device);
++
++      g_signal_connect_object (color_device, "ready",
++                               G_CALLBACK (on_device_ready),
++                               color_manager, 0);
++      g_signal_connect_object (color_device, "calibration-changed",
++                               G_CALLBACK (on_device_calibration_changed),
++                               color_manager, 0);
++      g_signal_connect_object (color_device, "color-state-changed",
++                               G_CALLBACK (on_color_state_changed),
++                               color_manager, 0);
++      g_signal_connect_object (color_device, "target-volume-changed",
++                               G_CALLBACK (on_target_volume_changed),
++                               color_manager, 0);
++    }
+ }
+ 
+ static void

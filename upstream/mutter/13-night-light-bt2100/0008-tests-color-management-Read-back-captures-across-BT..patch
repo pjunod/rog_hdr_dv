@@ -1,0 +1,205 @@
+From 01cdffa0ecd9523e4f247320aea072e296dcdea5 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 03:56:26 +0000
+Subject: [PATCH 08/11] tests/color-management: Read back captures across
+ BT.2100 Night Light
+
+The capture exclusion regression of Night Light in BT.2100 only built
+color states; it would not notice a capture path that started painting
+with the device's adapted rendering state.
+
+Add a separate case that paints fixed content on a PQ output and reads
+pixels back through production boundaries: the view framebuffer, the
+pre-output blending buffer a single-output monitor stream reads in
+shared memory (meta_stream_source_monitor_record_to_buffer()); the
+view's onscreen, the output's encoding; and
+clutter_stage_paint_to_buffer() in the output's encoding, the stage
+paint every other capture to memory goes through. With Night Light on,
+the output's pixels warm (red kept, green not brighter, blue reduced)
+while both captures stay unchanged within one code value; back at the
+default temperature the output is as before. The case changes the
+process wide Night Light temperature and adds an actor to the stage, so
+it runs in its own invocation.
+
+The DMA-buffer monitor stream path (scanout copy, view blit, repaint in
+the stream's own blending state) needs PipeWire, which the headless
+fixture does not provide; it stays covered by the color state checks of
+/wayland/night-light/bt2100-scanout and by reading the code.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ src/tests/meson.build                     |   1 +
+ src/tests/wayland-color-management-test.c | 134 ++++++++++++++++++++++
+ 2 files changed, 135 insertions(+)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 81185c225..27e198360 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -982,6 +982,7 @@ wayland_test_cases = [
+       '/wayland/display-targets/cta',
+       '/wayland/display-targets/sdr-native',
+       '/wayland/night-light/bt2100-scanout',
++      '/wayland/night-light/bt2100-capture',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index b2c93d31c..f0e88e62a 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -27,6 +27,7 @@
+ #include <glib/gstdio.h>
+ #include <math.h>
+ #include <stdint.h>
++#include <string.h>
+ #include <sys/mman.h>
+ #include <sys/stat.h>
+ #include <unistd.h>
+@@ -2150,6 +2151,137 @@ night_light_bt2100_scanout (void)
+   meta_color_device_update (device);
+ }
+ 
++typedef struct
++{
++  uint8_t capture[4];
++  uint8_t output[4];
++  uint8_t paint[4];
++} CapturePixels;
++
++/*
++ * Paints a frame, then reads back, at the center of the output, a pixel
++ * of: the view framebuffer, which is the pre-output blending buffer that a
++ * single-output monitor stream reads in shared memory
++ * (meta_stream_source_monitor_record_to_buffer()); the view's onscreen
++ * framebuffer, which holds the output's encoding after the conversion of
++ * the blending state; and a stage paint to a buffer in @stream_color_state,
++ * the production path of every other capture to memory
++ * (clutter_stage_paint_to_buffer(), and through
++ * clutter_stage_paint_to_framebuffer_clipped() the monitor stream repaint,
++ * area and virtual streams).
++ */
++static void
++read_capture_pixels (ClutterStage      *stage,
++                     ClutterStageView  *view,
++                     ClutterColorState *stream_color_state,
++                     CapturePixels     *pixels)
++{
++  MtkRectangle rect = { .x = 312, .y = 232, .width = 16, .height = 16 };
++  uint8_t buffer[16 * 16 * 4];
++  g_autoptr (GError) error = NULL;
++
++  meta_wait_for_presented (test_context);
++
++  cogl_framebuffer_read_pixels (clutter_stage_view_get_framebuffer (view),
++                                320, 240, 1, 1,
++                                COGL_PIXEL_FORMAT_RGBA_8888_PRE,
++                                pixels->capture);
++  cogl_framebuffer_read_pixels (clutter_stage_view_get_onscreen (view),
++                                320, 240, 1, 1,
++                                COGL_PIXEL_FORMAT_RGBA_8888_PRE,
++                                pixels->output);
++  g_assert_true (clutter_stage_paint_to_buffer (stage, &rect, 1.0f,
++                                                buffer, 16 * 4,
++                                                COGL_PIXEL_FORMAT_RGBA_8888_PRE,
++                                                stream_color_state,
++                                                CLUTTER_PAINT_FLAG_NO_CURSORS,
++                                                &error));
++  g_assert_no_error (error);
++  memcpy (pixels->paint, buffer + (8 * 16 + 8) * 4, 4);
++}
++
++/* Equal within one 8-bit code value. */
++static void
++assert_pixels_close (const uint8_t pixel[4],
++                     const uint8_t other_pixel[4])
++{
++  int c;
++
++  for (c = 0; c < 4; c++)
++    g_assert_cmpint (ABS ((int) pixel[c] - (int) other_pixel[c]), <=, 1);
++}
++
++/*
++ * Captures exclude Night Light in BT.2100, through actual painting and
++ * readback: with fixed content on a PQ output, enabling Night Light warms
++ * the output's encoded pixels (red kept, green and blue reduced, nothing
++ * brighter), while the view framebuffer a shared-memory monitor stream
++ * reads and a stage paint in the output's encoding stay unchanged; back
++ * at the default temperature the output is as before. The DMA-buffer
++ * monitor stream (scanout copy, view blit or repaint in the stream's own
++ * blending state) needs PipeWire and is not executed here; its gating is
++ * covered by the state checks of /wayland/night-light/bt2100-scanout.
++ */
++static void
++night_light_bt2100_capture (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  ClutterActor *stage = meta_backend_get_stage (backend);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  ClutterStageView *view;
++  ClutterColorState *output_color_state;
++  ClutterActor *actor;
++  CoglColor color;
++  CapturePixels day, night, back;
++
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++  view = CLUTTER_STAGE_VIEW (meta_renderer_get_view_for_crtc (renderer,
++                                                              meta_output_get_assigned_crtc (output)));
++  g_assert_nonnull (view);
++  output_color_state = clutter_stage_view_get_output_color_state (view);
++
++  actor = clutter_actor_new ();
++  cogl_color_init_from_4f (&color, 0.8f, 0.5f, 0.25f, 1.0f);
++  clutter_actor_set_background_color (actor, &color);
++  clutter_actor_set_size (actor, 640, 480);
++  clutter_actor_add_child (stage, actor);
++
++  read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &day);
++  g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
++                                                                NULL, NULL));
++
++  set_night_light_temperature (device, 3900);
++  g_assert_true (clutter_stage_view_get_output_color_state (view) == output_color_state);
++  g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
++                                                               NULL, NULL));
++  read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &night);
++
++  /* The output conversion changed. */
++  g_assert_cmpint (ABS ((int) night.output[0] - (int) day.output[0]), <=, 1);
++  g_assert_cmpint (night.output[1], <=, day.output[1]);
++  g_assert_cmpint (night.output[2] + 2, <, day.output[2]);
++  /* The captures did not. */
++  assert_pixels_close (night.capture, day.capture);
++  assert_pixels_close (night.paint, day.paint);
++
++  set_night_light_temperature (device, 6500);
++  g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (clutter_stage_view_get_color_state (view)),
++                                                                NULL, NULL));
++  read_capture_pixels (CLUTTER_STAGE (stage), view, output_color_state, &back);
++  assert_pixels_close (back.output, day.output);
++  assert_pixels_close (back.capture, day.capture);
++  assert_pixels_close (back.paint, day.paint);
++
++  clutter_actor_destroy (actor);
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
+ static void
+ client_mode_case (gconstpointer data)
+ {
+@@ -2386,6 +2518,8 @@ init_tests (void)
+                    published_reference_factor);
+   g_test_add_func ("/wayland/night-light/bt2100-scanout",
+                    night_light_bt2100_scanout);
++  g_test_add_func ("/wayland/night-light/bt2100-capture",
++                   night_light_bt2100_capture);
+   g_test_add_func ("/wayland/display-targets/cta",
+                    display_targets_cta);
+   g_test_add_func ("/wayland/display-targets/sdr-native",

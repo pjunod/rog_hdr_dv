@@ -1,0 +1,273 @@
+From 4439d623e8c4d7ad70debd6153911a4fe053743c Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 22:55:06 +0000
+Subject: [PATCH 3/7] backends/monitor: Keep color settings when copying
+ layouts
+
+Configuration copies made for orientation changes and for amending a
+layout dropped the color mode, RGB range and target override. Keep
+them. When a layout is synthesized, recover each monitor's target
+override by monitor identity from the existing configuration history;
+an explicit replacement over D-Bus stays separate. Mirrored monitors
+each take their own color mode from the history.
+
+Add monitor storage tests for copies, history lookup, that a VERIFY
+request does not change anything, and that applying an override alone
+reapplies the configuration.
+
+Link: TBD-MR
+---
+ src/backends/meta-monitor-config-manager.c |  38 +++++-
+ src/backends/meta-monitor-config-utils.c   |   1 +
+ src/tests/monitor-storage-tests.c          | 133 +++++++++++++++++++++
+ 3 files changed, 166 insertions(+), 6 deletions(-)
+
+diff --git a/src/backends/meta-monitor-config-manager.c b/src/backends/meta-monitor-config-manager.c
+index 27ba4f7ad..82d16afca 100644
+--- a/src/backends/meta-monitor-config-manager.c
++++ b/src/backends/meta-monitor-config-manager.c
+@@ -651,10 +651,15 @@ find_primary_monitor (MetaMonitorManager *monitor_manager,
+   return NULL;
+ }
+ 
++static MetaColorTargetOverride
++get_last_target_override_for_monitor (MetaMonitorConfigManager *config_manager,
++                                      MetaMonitor              *monitor);
++
+ static MetaMonitorConfig *
+-create_monitor_config (MetaMonitor     *monitor,
+-                       MetaMonitorMode *mode,
+-                       MetaColorMode    color_mode)
++create_monitor_config (MetaMonitorConfigManager *config_manager,
++                       MetaMonitor              *monitor,
++                       MetaMonitorMode          *mode,
++                       MetaColorMode             color_mode)
+ {
+   MetaMonitorSpec *monitor_spec;
+   MetaMonitorModeSpec *mode_spec;
+@@ -670,6 +675,7 @@ create_monitor_config (MetaMonitor     *monitor,
+     .enable_underscanning = meta_monitor_is_underscanning (monitor),
+     .rgb_range = meta_monitor_get_rgb_range (monitor),
+     .color_mode = color_mode,
++    .target_override = get_last_target_override_for_monitor (config_manager, monitor),
+   };
+ 
+   monitor_config->has_max_bpc =
+@@ -740,7 +746,8 @@ create_preferred_logical_monitor_config (MetaMonitorManager           *monitor_m
+   scale_logical_monitor_width (layout_mode, scale,
+                                width, height, &width, &height);
+ 
+-  monitor_config = create_monitor_config (monitor, mode, color_mode);
++  monitor_config = create_monitor_config (monitor_manager->config_manager,
++                                           monitor, mode, color_mode);
+ 
+   transform = get_monitor_transform (monitor_manager, monitor);
+   if (mtk_monitor_transform_is_rotated (transform))
+@@ -861,6 +868,24 @@ get_last_color_mode_for_monitor (MetaMonitorConfigManager *config_manager,
+   return FALSE;
+ }
+ 
++static MetaColorTargetOverride
++get_last_target_override_for_monitor (MetaMonitorConfigManager *config_manager,
++                                      MetaMonitor              *monitor)
++{
++  g_autoptr (GList) configs = get_relevant_configs (config_manager);
++  GList *l;
++
++  for (l = configs; l; l = l->next)
++    {
++      MetaMonitorConfig *monitor_config = find_monitor_config (l->data, monitor);
++
++      if (monitor_config)
++        return monitor_config->target_override;
++    }
++
++  return (MetaColorTargetOverride) { 0 };
++}
++
+ typedef enum _MonitorPositioningMode
+ {
+   MONITOR_POSITIONING_LINEAR,
+@@ -1282,13 +1307,14 @@ create_for_switch_config_all_mirror (MetaMonitorConfigManager *config_manager)
+                                          primary_monitor);
+       best_scale = MAX (best_scale, scale);
+ 
+-      if (!get_last_color_mode_for_monitor (config_manager, monitor,
++      if (!get_last_color_mode_for_monitor (config_manager, other_monitor,
+                                             &color_mode))
+         color_mode = META_COLOR_MODE_DEFAULT;
+ 
+       monitor_configs =
+         g_list_prepend (monitor_configs,
+-                        create_monitor_config (other_monitor,
++                        create_monitor_config (config_manager,
++                                               other_monitor,
+                                                mode,
+                                                color_mode));
+     }
+diff --git a/src/backends/meta-monitor-config-utils.c b/src/backends/meta-monitor-config-utils.c
+index b24c5f922..bdc4b8474 100644
+--- a/src/backends/meta-monitor-config-utils.c
++++ b/src/backends/meta-monitor-config-utils.c
+@@ -41,6 +41,7 @@ meta_monitor_config_copy (MetaMonitorConfig *monitor_config)
+     .max_bpc = monitor_config->max_bpc,
+     .rgb_range = monitor_config->rgb_range,
+     .color_mode = monitor_config->color_mode,
++    .target_override = monitor_config->target_override,
+   };
+ 
+   return new_monitor_config;
+diff --git a/src/tests/monitor-storage-tests.c b/src/tests/monitor-storage-tests.c
+index 9c5e874c8..a6ffee66a 100644
+--- a/src/tests/monitor-storage-tests.c
++++ b/src/tests/monitor-storage-tests.c
+@@ -18,6 +18,7 @@
+ #include "config.h"
+ 
+ #include "backends/meta-monitor-config-store.h"
++#include "backends/meta-monitor-config-utils.h"
+ #include "tests/monitor-tests-common.h"
+ 
+ static void
+@@ -366,9 +367,141 @@ meta_test_monitor_config_store_set_current_null (void)
+   g_assert_null (meta_monitor_config_manager_pop_previous (config_manager));
+ }
+ 
++static void
++meta_test_monitor_config_copy_target_override (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *manager = meta_backend_get_monitor_manager (backend);
++  g_autoptr (MetaMonitorsConfig) original = NULL;
++  g_autoptr (MetaMonitorsConfig) copy = NULL;
++  MetaLogicalMonitorConfig *logical;
++  MetaMonitorConfig *monitor_config;
++  MetaMonitorConfig *copied_monitor_config;
++
++  original = meta_monitor_config_manager_create_linear (manager->config_manager);
++  logical = original->logical_monitor_configs->data;
++  monitor_config = logical->monitor_configs->data;
++  monitor_config->color_mode = META_COLOR_MODE_BT2100;
++  monitor_config->rgb_range = META_OUTPUT_RGB_RANGE_FULL;
++  monitor_config->target_override = (MetaColorTargetOverride) {
++    .has_peak = TRUE, .peak = 400,
++    .has_min = TRUE, .min = 0,
++    .gamut_source = META_HDR_GAMUT_SOURCE_BASE_EDID,
++  };
++
++  /* The amendment/orientation copy must retain HDR context and declaration. */
++  copy = meta_monitors_config_copy (original);
++  logical = copy->logical_monitor_configs->data;
++  copied_monitor_config = logical->monitor_configs->data;
++  g_assert_true (copied_monitor_config != monitor_config);
++  g_assert_cmpint (copied_monitor_config->color_mode, ==, META_COLOR_MODE_BT2100);
++  g_assert_cmpint (copied_monitor_config->rgb_range, ==, META_OUTPUT_RGB_RANGE_FULL);
++  g_assert_true (meta_color_target_override_equal (
++                   &copied_monitor_config->target_override,
++                   &monitor_config->target_override));
++}
++
++static void
++meta_test_monitor_config_history_target_override (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *manager = meta_backend_get_monitor_manager (backend);
++  g_autoptr (MetaMonitorsConfig) original = NULL;
++  g_autoptr (MetaMonitorsConfig) regenerated = NULL;
++  MetaLogicalMonitorConfig *logical;
++  MetaMonitorConfig *monitor_config;
++  MetaMonitorConfig *regenerated_monitor_config;
++
++  original = meta_monitor_config_manager_create_linear (manager->config_manager);
++  logical = original->logical_monitor_configs->data;
++  monitor_config = logical->monitor_configs->data;
++  monitor_config->target_override = (MetaColorTargetOverride) {
++    .has_peak = TRUE, .peak = 400,
++    .gamut_source = META_HDR_GAMUT_SOURCE_NONE,
++  };
++  meta_monitor_config_manager_set_current (manager->config_manager, original);
++
++  /* Synthesizing a layout uses configuration history, not new output defaults. */
++  regenerated = meta_monitor_config_manager_create_linear (manager->config_manager);
++  logical = regenerated->logical_monitor_configs->data;
++  regenerated_monitor_config = logical->monitor_configs->data;
++  g_assert_true (meta_color_target_override_equal (
++                   &regenerated_monitor_config->target_override,
++                   &monitor_config->target_override));
++}
++
++static void
++meta_test_monitor_target_override_reapply (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *manager = meta_backend_get_monitor_manager (backend);
++  g_autoptr (MetaMonitorsConfig) config = NULL;
++  g_autoptr (MetaMonitorsConfig) changed = NULL;
++  g_autoptr (MetaMonitorsConfig) cleared = NULL;
++  g_autoptr (GError) error = NULL;
++  MetaLogicalMonitorConfig *logical;
++  MetaMonitorConfig *monitor_config;
++  MetaMonitor *monitor = meta_monitor_manager_get_monitors (manager)->data;
++  const MetaColorTargetOverride *applied;
++
++  config = meta_monitor_config_manager_create_linear (manager->config_manager);
++  logical = config->logical_monitor_configs->data;
++  monitor_config = logical->monitor_configs->data;
++  monitor_config->target_override = (MetaColorTargetOverride) {
++    .has_peak = TRUE, .peak = 400,
++    .gamut_source = META_HDR_GAMUT_SOURCE_NONE,
++  };
++
++  g_assert_true (meta_monitor_manager_apply_monitors_config (
++                   manager, config, META_MONITORS_CONFIG_METHOD_VERIFY, &error));
++  g_assert_no_error (error);
++  g_assert_false (meta_monitor_get_target_override (monitor)->has_peak);
++
++  g_assert_true (meta_monitor_manager_apply_monitors_config (
++                   manager, config, META_MONITORS_CONFIG_METHOD_TEMPORARY, &error));
++  g_assert_no_error (error);
++  applied = meta_monitor_get_target_override (monitor);
++  g_assert_true (meta_color_target_override_equal (applied,
++                                                   &monitor_config->target_override));
++
++  changed = meta_monitors_config_copy (config);
++  logical = changed->logical_monitor_configs->data;
++  monitor_config = logical->monitor_configs->data;
++  monitor_config->target_override.peak = 600;
++  monitor_config->target_override.has_min = TRUE;
++  monitor_config->target_override.min = 0;
++
++  /* An override-only update follows the same applied-state lifecycle. */
++  g_assert_true (meta_monitor_manager_apply_monitors_config (
++                   manager, changed, META_MONITORS_CONFIG_METHOD_TEMPORARY, &error));
++  g_assert_no_error (error);
++  applied = meta_monitor_get_target_override (monitor);
++  g_assert_cmpfloat (applied->peak, ==, 600);
++  g_assert_true (applied->has_min);
++  g_assert_cmpfloat (applied->min, ==, 0);
++
++  cleared = meta_monitors_config_copy (changed);
++  logical = cleared->logical_monitor_configs->data;
++  monitor_config = logical->monitor_configs->data;
++  monitor_config->target_override = (MetaColorTargetOverride) { 0 };
++  g_assert_true (meta_monitor_manager_apply_monitors_config (
++                   manager, cleared, META_MONITORS_CONFIG_METHOD_TEMPORARY, &error));
++  g_assert_no_error (error);
++  applied = meta_monitor_get_target_override (monitor);
++  g_assert_false (applied->has_peak);
++  g_assert_false (applied->has_min);
++  g_assert_cmpint (applied->gamut_source, ==, META_HDR_GAMUT_SOURCE_AUTO);
++}
++
+ static void
+ init_storage_tests (void)
+ {
++  meta_add_monitor_test ("/backends/monitor/config-store/target-override-reapply",
++                         meta_test_monitor_target_override_reapply);
++  meta_add_monitor_test ("/backends/monitor/config-store/copy-target-override",
++                         meta_test_monitor_config_copy_target_override);
++  meta_add_monitor_test ("/backends/monitor/config-store/history-target-override",
++                         meta_test_monitor_config_history_target_override);
+   meta_add_monitor_test ("/backends/monitor/config-store/set-current-on-empty",
+                          meta_test_monitor_config_store_set_current_on_empty);
+   meta_add_monitor_test ("/backends/monitor/config-store/set-current-with-parent-on-empty",

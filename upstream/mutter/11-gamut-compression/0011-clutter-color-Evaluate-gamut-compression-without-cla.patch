@@ -1,0 +1,275 @@
+From 1df2d90cb36643ef2ae7455a73dea32ec63f6936 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 10:25:05 -0400
+Subject: [PATCH 11/12] clutter/color: Evaluate gamut compression without
+ clamping or infinities
+
+The overflow-safe form t + s (1 + x^-p)^(-1/p) kept x at least FLT_MIN
+so that x^-p was defined, but x^-p overflows to infinity for x below
+about 1e-32, and the shader then depended on pow () propagating it,
+which GLSL does not guarantee. Clamping x higher instead, at 1e-6,
+would hold every distance with (d - t) / s below it at t + s 1e-6: never
+within float epsilon of the threshold, since s exceeds 1 - t, and a
+visible flat band for a limit just above 1, whose scale is huge (0.015
+wide at one ulp above 1).
+
+Evaluate x (1 + x^p)^(-1/p) below x = 1 and (1 + x^-p)^(-1/p) from 1
+on, the same function, so that every power stays finite, with
+x = min ((d - t) / s, FLT_MAX), identically on the CPU and in GLSL. The
+FLT_MIN clamp is gone; an infinite distance reaches the asymptote t + s
+without any infinity in the evaluation.
+
+New CPU tests check continuity across x = 1, that limits of 1.0001 and
+one ulp above 1 leave cd strictly increasing in d across (t, t + 0.01],
+and that huge distances, up to an infinite channel, stay finite at the
+asymptote. The op constructor and parameter getter are exported for the
+tests.
+
+Link: TBD-MR
+---
+ clutter/clutter/clutter-color-op-private.h    |   9 +-
+ clutter/clutter/clutter-color-op.c            |  20 ++-
+ .../clutter/clutter-color-pipeline-shader.c   |  11 +-
+ src/tests/clutter/conform/color-hdr.c         | 126 ++++++++++++++++++
+ 4 files changed, 153 insertions(+), 13 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
+index 874e5f696..0074f6d18 100644
+--- a/clutter/clutter/clutter-color-op-private.h
++++ b/clutter/clutter/clutter-color-op-private.h
+@@ -106,8 +106,11 @@ const ClutterBt2390EetfParameters * clutter_color_op_bt2390_eetf_get_parameters
+  *   d' = t + s x / (1 + x^p)^(1/p), x = (d - t) / s
+  *
+  * with the channel's @scale s, and the channel becomes ach - d' ach. The
+- * curve is evaluated as t + s (1 + x^-p)^(-1/p), which is the same and does
+- * not overflow for large x. A channel whose scale is 0 is left untouched, as
++ * curve is evaluated as t + s x (1 + x^p)^(-1/p) for x below 1 and as
++ * t + s (1 + x^-p)^(-1/p) from 1 on, the same function, so that no power
++ * overflows; x is bounded by G_MAXFLOAT, so an infinite distance reaches the
++ * asymptote t + s and nothing relies on infinities. The shader evaluates it
++ * identically. A channel whose scale is 0 is left untouched, as
+  * is every channel of a sample whose achromatic value is not positive or not
+  * finite, and every channel whose distance is not above the threshold: such
+  * values are not rewritten at all. Finite channels never become NaN.
+@@ -130,8 +133,10 @@ typedef struct _ClutterGamutCompressParameters
+   float scale[3];
+ } ClutterGamutCompressParameters;
+ 
++CLUTTER_EXPORT_TEST
+ ClutterColorOp * clutter_color_op_gamut_compress_new (float       threshold,
+                                                       float       power,
+                                                       const float limit[3]);
+ 
++CLUTTER_EXPORT_TEST
+ const ClutterGamutCompressParameters * clutter_color_op_gamut_compress_get_parameters (ClutterColorOp *op);
+diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
+index c366c3425..549d0ed83 100644
+--- a/clutter/clutter/clutter-color-op.c
++++ b/clutter/clutter/clutter-color-op.c
+@@ -930,7 +930,7 @@ clutter_color_op_gamut_compress_do_transform (ClutterColorOp *op,
+           for (int c = 0; c < 3; c++)
+             {
+               float s = parameters->scale[c];
+-              float d, x, compressed;
++              float d, x, r, compressed;
+ 
+               if (s <= 0.0f)
+                 continue;
+@@ -940,12 +940,18 @@ clutter_color_op_gamut_compress_do_transform (ClutterColorOp *op,
+               if (!(d > t))
+                 continue;
+ 
+-              /* x / (1 + x^p)^(1/p) written as (1 + x^-p)^(-1/p), which
+-               * neither overflows for large x nor divides infinity by
+-               * infinity, and approaches 1 as x grows; x is kept positive so
+-               * that x^-p is defined. */
+-              x = MAX ((d - t) / s, G_MINFLOAT);
+-              compressed = t + s * powf (1.0f + powf (x, -p), -1.0f / p);
++              /* x / (1 + x^p)^(1/p), in the form whose powers stay finite:
++               * x (1 + x^p)^(-1/p) below 1 and (1 + x^-p)^(-1/p) from 1 on,
++               * the same function, so the two meet at x = 1. x is positive,
++               * or 0 where (d - t) / s underflows, and is bounded so that an
++               * infinite distance gives the asymptote t + s; nothing relies
++               * on infinities. */
++              x = MIN ((d - t) / s, G_MAXFLOAT);
++              if (x < 1.0f)
++                r = x * powf (1.0f + powf (x, p), -1.0f / p);
++              else
++                r = powf (1.0f + powf (x, -p), -1.0f / p);
++              compressed = t + s * r;
+               data[c] = ach - compressed * ach;
+             }
+         }
+diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
+index 9a43e2a4d..395599d54 100644
+--- a/clutter/clutter/clutter-color-pipeline-shader.c
++++ b/clutter/clutter/clutter-color-pipeline-shader.c
+@@ -329,10 +329,13 @@ static const char gamut_compress_source[] =
+   "  if (!(d > threshold))\n"
+   "    return c;\n"
+   "\n"
+-  "  /* Overflow-safe form of x / (1 + x^p)^(1/p). */\n"
+-  "  float x = max ((d - threshold) / scale, 1.17549435e-38);\n"
+-  "  float compressed = threshold +\n"
+-  "                     scale * pow (1.0 + pow (x, -power), -1.0 / power);\n"
++  "  /* x / (1 + x^p)^(1/p) in the form whose powers stay finite: the\n"
++  "   * same function on both sides of x = 1, without infinities. */\n"
++  "  float x = min ((d - threshold) / scale, 3.40282347e38);\n"
++  "  float r = x < 1.0 ?\n"
++  "            x * pow (1.0 + pow (x, power), -1.0 / power) :\n"
++  "            pow (1.0 + pow (x, -power), -1.0 / power);\n"
++  "  float compressed = threshold + scale * r;\n"
+   "  return ach - compressed * ach;\n"
+   "}\n"
+   "\n"
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index cb9eab1e0..173ecb6c8 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -11,6 +11,7 @@
+ #include <math.h>
+ 
+ #include "clutter-mutter.h"
++#include "clutter/clutter/clutter-color-op-private.h"
+ #include "clutter/clutter/clutter-color-state-params-private.h"
+ #include "clutter/clutter/clutter-color-transform-private.h"
+ #include "clutter/clutter/clutter-color-utils-private.h"
+@@ -2628,6 +2629,130 @@ gamut_non_finite (void)
+     }
+ }
+ 
++/* The compressed distance of distance @d in the green channel, from a
++ * sample whose achromatic value is 1. */
++static double
++compressed_distance (ClutterColorOp *op,
++                     double          d)
++{
++  float data[4] = { 1.0f, (float) (1.0 - d), 1.0f, 1.0f };
++
++  clutter_color_op_do_transform (op, data, 1);
++  g_assert_true (isfinite (data[1]));
++
++  return 1.0 - data[1];
++}
++
++/*
++ * The curve is evaluated as x (1 + x^p)^(-1/p) below x = 1 and as
++ * (1 + x^-p)^(-1/p) from 1 on, without clamping x from below and without
++ * relying on infinities: the two forms meet at x = 1; a limit just above 1,
++ * whose scale is huge, leaves no flat band above the threshold; and huge
++ * distances stay finite at the asymptote t + s.
++ */
++static void
++gamut_curve_form (void)
++{
++  const float t = 0.8f, p = 1.2f;
++  const float limits[] = { 1.0001f, nextafterf (1.0f, 2.0f) };
++  int i, j;
++
++  /* Continuity at x = 1, with a limit of 1.3. */
++  {
++    g_autoptr (ClutterColorOp) op =
++      clutter_color_op_gamut_compress_new (t, p, (const float[3]) { 1.3f, 1.3f, 1.3f });
++    const ClutterGamutCompressParameters *parameters =
++      clutter_color_op_gamut_compress_get_parameters (op);
++    double s = parameters->scale[1];
++    double at_one = t + s * pow (2.0, -1.0 / p);
++    double below, above, previous = 0.0;
++
++    g_assert_cmpfloat (s, >, 0.0);
++
++    below = compressed_distance (op, t + s * (1.0 - 1e-5));
++    above = compressed_distance (op, t + s * (1.0 + 1e-5));
++    g_assert_cmpfloat_with_epsilon (below, at_one, 1e-5 * s + 1e-6);
++    g_assert_cmpfloat_with_epsilon (above, at_one, 1e-5 * s + 1e-6);
++    g_assert_cmpfloat (above, >, below);
++
++    /* Across the switch, no step beyond the curve's own slope, at most 1. */
++    for (j = -64; j <= 64; j++)
++      {
++        double d = t + s * (1.0 + j * 1e-6);
++        double cd = compressed_distance (op, d);
++
++        g_assert_cmpfloat_with_epsilon (cd, at_one, 64e-6 * s + 1e-6);
++        if (j > -64)
++          {
++            g_assert_cmpfloat (cd, >=, previous - 2.4e-7);
++            g_assert_cmpfloat (cd - previous, <=, 1e-6 * s + 2.4e-7);
++          }
++        previous = cd;
++      }
++  }
++
++  /* Limits just above 1: strictly increasing across (t, t + 0.01], close
++   * to the identity there, in steps of 1e-6 near the threshold and of 1e-4
++   * beyond. */
++  for (i = 0; i < G_N_ELEMENTS (limits); i++)
++    {
++      g_autoptr (ClutterColorOp) op =
++        clutter_color_op_gamut_compress_new (t, p,
++                                             (const float[3]) { limits[i], limits[i], limits[i] });
++      const ClutterGamutCompressParameters *parameters =
++        clutter_color_op_gamut_compress_get_parameters (op);
++      double previous = t;
++
++      g_assert_cmpfloat (limits[i], >, 1.0f);
++      /* The compression is active, with a huge scale. */
++      g_assert_cmpfloat (parameters->scale[1], >, 90.0f);
++
++      for (j = 1; j <= 200; j++)
++        {
++          double d = j <= 100 ? t + j * 1e-6 : t + (j - 99) * 1e-4;
++          double cd = compressed_distance (op, d);
++
++          if (!(cd > previous))
++            {
++              g_error ("Compressed distance not increasing for limit %.9g at "
++                       "distance %.9g: %.9g after %.9g",
++                       limits[i], d, cd, previous);
++            }
++          g_assert_cmpfloat_with_epsilon (cd, d, 1e-6);
++          previous = cd;
++        }
++    }
++
++  /* Huge distances, up to an infinite channel, stay finite and approach
++   * the asymptote t + s from below. */
++  {
++    g_autoptr (ClutterColorOp) op =
++      clutter_color_op_gamut_compress_new (t, p, (const float[3]) { 1.3f, 1.3f, 1.3f });
++    const ClutterGamutCompressParameters *parameters =
++      clutter_color_op_gamut_compress_get_parameters (op);
++    double asymptote = t + parameters->scale[1];
++    const float channels[] = { -1e6f, -1e30f, -G_MAXFLOAT, -INFINITY };
++    double previous = 0.0;
++
++    for (j = 0; j < G_N_ELEMENTS (channels); j++)
++      {
++        float data[4] = { 1.0f, channels[j], 1.0f, 1.0f };
++        double cd;
++
++        clutter_color_op_do_transform (op, data, 1);
++        g_assert_true (isfinite (data[0]));
++        g_assert_true (isfinite (data[1]));
++        g_assert_true (isfinite (data[2]));
++        cd = 1.0 - data[1];
++        g_assert_cmpfloat (cd, <=, asymptote + 1e-6);
++        g_assert_cmpfloat (cd, >=, previous - 2.4e-7);
++        if (j > 0)
++          g_assert_cmpfloat_with_epsilon (cd, asymptote, 1e-6);
++        previous = cd;
++      }
++  }
++}
++
+ /*
+  * The limits come from the mastering primaries when they are declared, and
+  * compression needs both the encoding and the mastering gamut to exceed the
+@@ -2997,6 +3122,7 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/reference", gamut_reference)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/monotonic", gamut_monotonic)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/non-finite", gamut_non_finite)
++  CLUTTER_TEST_UNIT ("/color-hdr/gamut/curve-form", gamut_curve_form)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/source-gamut", gamut_source_gamut)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/tolerance", gamut_tolerance)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/shader-matches-cpu", gamut_shader_matches_cpu)

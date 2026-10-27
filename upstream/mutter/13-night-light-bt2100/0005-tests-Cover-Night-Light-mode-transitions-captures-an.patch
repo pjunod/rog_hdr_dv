@@ -1,0 +1,215 @@
+From 4ab7920c6b8c8995587fc2c81538df0374a9a029 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 00:24:44 +0000
+Subject: [PATCH 05/11] tests: Cover Night Light mode transitions, captures and
+ forced HDR
+
+Night Light in BT.2100 relies on the existing white point tracking to
+reset a calibration that SDR programmed: the gamma LUT or CTM holds the
+warm ramp, the color device remembers that a non-identity white point is
+programmed, and in a PQ encoding the identity is programmed to clear it.
+Nothing covered that hand over. Switch an output from warm SDR to
+BT.2100 and back with Night Light active, once with a gamma LUT and once
+with only a CTM: in BT.2100 the calibration is the daylight identity and
+the rendering color state carries the adapted white; back in SDR the
+warm calibration returns and the adaptation is gone. The output is
+never warmed twice.
+
+The contract also excludes captures. Every capture path was inspected:
+the monitor stream paints into a blending state derived from the
+stream's own color state, which never carries an adapted white; its
+scanout copy needs scanout, which is refused while the white is
+adapted; its view blit needs the stream state to equal the view's
+blending state, which an adapted state never does; window, area and
+virtual streams, screenshots and window captures use the caller's or
+the stage's color state. The only adapted-to-unadapted conversion is
+the stage view's own output conversion. No code change is needed; the
+scanout case now asserts the stream side of that reasoning.
+
+Forced HDR is treated as a PQ encoding, so Night Light adapts its
+white, but it has no display target: assert that its rendering state
+carries neither a luminance nor a gamut target.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ src/tests/color-management-tests.c        | 104 ++++++++++++++++++++++
+ src/tests/wayland-color-management-test.c |  37 ++++++++
+ 2 files changed, 141 insertions(+)
+
+diff --git a/src/tests/color-management-tests.c b/src/tests/color-management-tests.c
+index cc7f4dc81..3c47b3593 100644
+--- a/src/tests/color-management-tests.c
++++ b/src/tests/color-management-tests.c
+@@ -1905,6 +1905,106 @@ meta_test_color_management_night_light_bt2100 (void)
+   meta_color_device_update (color_device);
+ }
+ 
++/*
++ * Switching an output from SDR, with Night Light already programmed warm
++ * into the gamma LUT, or the CTM without one, to BT.2100 resets that
++ * calibration to the daylight identity while the rendering color state
++ * takes over the white point: the output is never warmed twice. Switching
++ * back to SDR with Night Light still active programs the warm calibration
++ * again and leaves no adaptation in the rendering color state.
++ */
++static void
++night_light_mode_transition (gboolean     use_ctm,
++                             unsigned int temperature)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *monitor_manager =
++    meta_backend_get_monitor_manager (backend);
++  MetaMonitorManagerTest *monitor_manager_test =
++    META_MONITOR_MANAGER_TEST (monitor_manager);
++  MetaColorManager *color_manager =
++    meta_backend_get_color_manager (backend);
++  MonitorTestCaseSetup test_case_setup = base_monitor_setup;
++  MetaMonitorTestSetup *test_setup;
++  MetaMonitor *monitor;
++  MetaOutput *output;
++  MetaCrtcTest *crtc_test;
++  MetaColorDevice *color_device;
++  ClutterColorState *rendering_color_state;
++  float warm_r, warm_g, warm_b, day_r, day_g, day_b;
++
++  test_case_setup.crtcs[0].enable_ctm = use_ctm;
++  test_case_setup.crtcs[0].disable_gamma_lut = use_ctm;
++  test_case_setup.outputs[0].edid_info = CALTECH_MONITOR_EDID;
++  test_case_setup.outputs[0].has_edid_info = TRUE;
++  test_case_setup.n_outputs = 1;
++  test_case_setup.n_crtcs = 1;
++
++  test_setup = meta_create_monitor_test_setup (backend, &test_case_setup,
++                                               MONITOR_TEST_FLAG_NO_STORED);
++  meta_monitor_manager_test_emulate_hotplug (monitor_manager_test, test_setup);
++
++  monitor = meta_monitor_manager_get_monitors (monitor_manager)->data;
++  color_device = meta_color_manager_get_color_device (color_manager, monitor);
++  g_assert_nonnull (color_device);
++  while (!meta_color_device_is_ready (color_device))
++    g_main_context_iteration (NULL, TRUE);
++
++  output = meta_monitor_get_main_output (monitor);
++  crtc_test = META_CRTC_TEST (meta_output_get_assigned_crtc (output));
++  meta_color_get_temperature_rgb_scales (temperature, &warm_r, &warm_g, &warm_b);
++  meta_color_get_temperature_rgb_scales (6500, &day_r, &day_g, &day_b);
++
++  /* Warm in SDR: the calibration carries the temperature. */
++  apply_night_light_temperature (color_device, temperature, TRUE);
++  if (use_ctm)
++    assert_ctm_scales (meta_crtc_test_peek_ctm (crtc_test), warm_r, warm_g, warm_b);
++  else
++    assert_gamma_lut_scales (crtc_test, warm_r, warm_g, warm_b);
++
++  /* BT.2100 with Night Light still active: the calibration is reset, and
++   * the rendering color state adapts the white instead. */
++  set_output_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (color_device);
++  if (use_ctm)
++    {
++      assert_ctm_scales (meta_crtc_test_peek_ctm (crtc_test), day_r, day_g, day_b);
++    }
++  else
++    {
++      assert_gamma_lut_scales (crtc_test, day_r, day_g, day_b);
++      g_assert_null (meta_crtc_test_peek_ctm (crtc_test));
++    }
++  rendering_color_state = meta_color_device_get_rendering_color_state (color_device);
++  g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (rendering_color_state),
++                                                               NULL, NULL));
++
++  /* Back to SDR, still warm: the calibration again, no adaptation. */
++  set_output_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (color_device);
++  if (use_ctm)
++    assert_ctm_scales (meta_crtc_test_peek_ctm (crtc_test), warm_r, warm_g, warm_b);
++  else
++    assert_gamma_lut_scales (crtc_test, warm_r, warm_g, warm_b);
++  rendering_color_state = meta_color_device_get_rendering_color_state (color_device);
++  g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (rendering_color_state),
++                                                                NULL, NULL));
++
++  apply_night_light_temperature (color_device, 6500, FALSE);
++}
++
++static void
++meta_test_color_management_night_light_bt2100_from_warm_lut (void)
++{
++  night_light_mode_transition (FALSE, 3450);
++}
++
++static void
++meta_test_color_management_night_light_bt2100_from_warm_ctm (void)
++{
++  night_light_mode_transition (TRUE, 4250);
++}
++
+ /*
+  * The Planckian chromaticities Night Light adapts to: at 2856 K, CIE
+  * illuminant A, a Planckian radiator by definition, xy (0.44757, 0.40745),
+@@ -2080,6 +2180,10 @@ init_tests (void)
+                   meta_test_color_management_night_light_calibrated);
+   add_color_test ("/color-management/night-light/bt2100",
+                   meta_test_color_management_night_light_bt2100);
++  add_color_test ("/color-management/night-light/bt2100-from-warm-lut",
++                  meta_test_color_management_night_light_bt2100_from_warm_lut);
++  add_color_test ("/color-management/night-light/bt2100-from-warm-ctm",
++                  meta_test_color_management_night_light_bt2100_from_warm_ctm);
+   add_color_test ("/color-management/night-light/planckian-chromaticity",
+                   meta_test_color_management_planckian_chromaticity);
+   add_color_test ("/color-management/night-light/uncalibrated",
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index a84b05154..b2c93d31c 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1830,6 +1830,17 @@ display_targets_cta (void)
+   g_assert_cmpint (target->maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
+   g_assert_cmpint (meta_color_device_get_target_primaries (device)->source,
+                    ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  /* Forced HDR is treated as a PQ encoding, so Night Light adapts its white
++   * in the rendering color state; that state still carries no luminance or
++   * gamut target. */
++  {
++    ClutterColorState *rendering = meta_color_device_get_rendering_color_state (device);
++    const ClutterColorTargetVolume *forced_volume =
++      clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (rendering));
++
++    g_assert_false (forced_volume->has_luminance);
++    g_assert_false (forced_volume->has_primaries);
++  }
+   set_fixture_force_hdr (meta_context_get_debug_control (test_context),
+                          meta_backend_get_monitor_manager (backend), FALSE);
+   g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
+@@ -2096,6 +2107,32 @@ night_light_bt2100_scanout (void)
+   g_assert_true (clutter_color_transform_requires_mapping (blending,
+                                                            output_color_state));
+ 
++  /* Captures do not carry it. A monitor stream in the output's encoding
++   * blends in a state derived from its own color state, which has no
++   * adapted white (meta-stream-source-monitor.c), and the view's adapted
++   * blending state never equals a stream state, so the stream cannot blit
++   * the view's offscreen either; scanout copies are refused above. */
++  {
++    g_autoptr (ClutterColorState) stream = NULL;
++    g_autoptr (ClutterColorState) stream_blending = NULL;
++
++    stream = clutter_color_state_params_new_full (context,
++                                                  CLUTTER_COLORSPACE_BT2020,
++                                                  CLUTTER_TRANSFER_FUNCTION_PQ,
++                                                  NULL, -1.0f,
++                                                  output_lum->min,
++                                                  output_lum->max,
++                                                  output_lum->ref,
++                                                  0.0f);
++    stream_blending = clutter_color_state_get_blending (stream, FALSE);
++    g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (stream_blending),
++                                                                  NULL, NULL));
++    g_assert_false (clutter_color_transform_requires_mapping (stream_blending,
++                                                              stream));
++    g_assert_false (clutter_color_state_equals (stream, blending));
++    g_assert_false (clutter_color_state_equals (output_color_state, blending));
++  }
++
+   /* A step during the transition is a new value of the same adaptation. */
+   set_night_light_temperature (device, 3880);
+   g_assert_true (meta_compositor_view_native_color_state_prevents_scanout (surface,

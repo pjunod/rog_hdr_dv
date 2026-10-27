@@ -1,0 +1,321 @@
+From 4b71b8eda66156d0298fc4aee6b3d41c9f284e44 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 16:52:15 -0400
+Subject: [PATCH 10/11] backends/color: Publish target primaries with one
+ conversion
+
+Chromaticities were converted to the protocol's 1/1000000 units in two
+places with two different, unsafe expressions:
+
+ - send_primaries() used (uint32_t) (value * 1000000): undefined for the
+   negative coordinates of encoding gamuts with imaginary primaries, and
+   truncating rather than rounding;
+ - meta_color_target_primaries_init() built the encoding-fallback target
+   with (int32_t) (value * 1000000): truncating, and undefined for
+   values outside the int32 range.
+
+In the fallback case the target primaries are defined to be the
+encoding primaries, so the two events must carry identical coordinates.
+
+Add meta_color_chromaticity_to_fixed() and
+meta_color_primaries_to_fixed() to meta-color-device and use them for
+both. The conversion rounds to the nearest unit in double precision. A
+value that is not finite, or whose rounded value lies outside the int32
+range, cannot be represented: the helpers report that and store the
+saturated value (0 for NaN), so the encoding event and the fallback
+target still publish the same coordinate for the same input, and each
+publisher logs a warning instead of staying silent. Producers of color
+states are expected to reject such primaries before they get this far.
+meta_color_chromaticity_from_fixed() provides the matching parse.
+
+No published value of the named color spaces changes (they round and
+truncate to the same integers). The two helpers used by tests are
+exported for tests.
+
+Add /native-hdr/chromaticity-fixed-point covering sign, rounding,
+saturation, NaN, the equality of the fallback target with the published
+encoding primaries for every named color space, and the defined
+behaviour for unrepresentable encoding primaries.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
+---
+ src/backends/meta-color-device.c            | 74 ++++++++++++++++++--
+ src/backends/meta-color-device.h            | 16 +++++
+ src/tests/native-hdr-tests.c                | 75 +++++++++++++++++++++
+ src/wayland/meta-wayland-color-management.c | 33 ++++-----
+ 4 files changed, 176 insertions(+), 22 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 1a046fea6..169ccc6ac 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -846,24 +846,86 @@ target_geometry_valid (const TargetPoint points[4])
+   return TRUE;
+ }
+ 
++/*
++ * Rounds to the nearest 1/1000000 in double precision. A value that is not
++ * finite or whose rounded value lies outside the int32 range cannot be
++ * represented: %FALSE is returned and @fixed receives the saturated value
++ * (0 for NaN), so every publisher still emits the same coordinate for the
++ * same input. Producers of color states reject such primaries up front.
++ */
++gboolean
++meta_color_chromaticity_to_fixed (float    value,
++                                  int32_t *fixed)
++{
++  double scaled;
++
++  if (isnan (value))
++    {
++      *fixed = 0;
++      return FALSE;
++    }
++
++  scaled = round ((double) value * 1000000.0);
++  if (scaled < (double) INT32_MIN)
++    {
++      *fixed = INT32_MIN;
++      return FALSE;
++    }
++  else if (scaled > (double) INT32_MAX)
++    {
++      *fixed = INT32_MAX;
++      return FALSE;
++    }
++
++  *fixed = (int32_t) scaled;
++  return TRUE;
++}
++
++float
++meta_color_chromaticity_from_fixed (int32_t fixed)
++{
++  return (float) (fixed / 1000000.0);
++}
++
++/* Converts R, G, B and white, in that order; see
++ * meta_color_chromaticity_to_fixed(). */
++gboolean
++meta_color_primaries_to_fixed (const ClutterPrimaries *primaries,
++                               int32_t                 coordinates[8])
++{
++  const float values[8] = {
++    primaries->r_x, primaries->r_y, primaries->g_x, primaries->g_y,
++    primaries->b_x, primaries->b_y, primaries->w_x, primaries->w_y,
++  };
++  gboolean representable = TRUE;
++  unsigned int i;
++
++  for (i = 0; i < G_N_ELEMENTS (values); i++)
++    {
++      if (!meta_color_chromaticity_to_fixed (values[i], &coordinates[i]))
++        representable = FALSE;
++    }
++
++  return representable;
++}
++
+ void
+ meta_color_target_primaries_init (MetaColorTargetPrimaries *target,
+                                   const MetaEdidInfo       *edid_info,
+                                   gboolean                  native_hdr,
+                                   const ClutterPrimaries   *encoding)
+ {
+-  const float fallback[8] = {
+-    encoding->r_x, encoding->r_y, encoding->g_x, encoding->g_y,
+-    encoding->b_x, encoding->b_y, encoding->w_x, encoding->w_y,
+-  };
+   const struct di_displayid2_native_chromaticities *native;
+   TargetPoint points[4], published[4];
+   MetaColorTargetPrimaries physical = { .source = META_COLOR_TARGET_FIRMWARE_DECLARED };
+   unsigned int i;
+ 
++  /* The fallback target is the encoding gamut, published exactly as the
++   * encoding primaries themselves are. */
+   *target = (MetaColorTargetPrimaries) { .source = META_COLOR_TARGET_ENCODING_FALLBACK };
+-  for (i = 0; i < 8; i++)
+-    target->coordinates[i] = (int32_t) (fallback[i] * 1000000);
++  if (!meta_color_primaries_to_fixed (encoding, target->coordinates))
++    g_warning ("Encoding primaries cannot be represented in protocol units; "
++               "publishing saturated coordinates");
+ 
+   if (!native_hdr || !edid_info ||
+       edid_info->native_chromaticities_status != META_NATIVE_CHROMATICITIES_FIRMWARE_DECLARED)
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 8ca55741a..63d620ba5 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -52,6 +52,22 @@ typedef struct
+   MetaColorTargetProvenance source;
+ } MetaColorTargetPrimaries;
+ 
++/*
++ * CIE 1931 xy chromaticities in the signed fixed-point units of 1/1000000
++ * used by MetaColorTargetPrimaries and the Wayland color management
++ * protocol. Every path that publishes a chromaticity converts with these, so
++ * equal floats always publish equal coordinates.
++ */
++META_EXPORT_TEST
++gboolean meta_color_chromaticity_to_fixed (float    value,
++                                           int32_t *fixed);
++
++float meta_color_chromaticity_from_fixed (int32_t fixed);
++
++META_EXPORT_TEST
++gboolean meta_color_primaries_to_fixed (const ClutterPrimaries *primaries,
++                                        int32_t                 coordinates[8]);
++
+ META_EXPORT_TEST
+ const MetaColorTargetPrimaries *
+ meta_color_device_get_target_primaries (MetaColorDevice *color_device);
+diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
+index 32fc0b93a..29e5a6347 100644
+--- a/src/tests/native-hdr-tests.c
++++ b/src/tests/native-hdr-tests.c
+@@ -3,6 +3,7 @@
+  */
+ #include "config.h"
+ 
++#include <math.h>
+ #include <string.h>
+ #include <glib.h>
+ 
+@@ -843,6 +844,79 @@ test_target_primaries_policy (void)
+     }
+ }
+ 
++static void
++test_chromaticity_fixed_point (void)
++{
++  const int32_t bt2020[8] = {
++    708000, 292000, 170000, 797000, 131000, 46000, 312700, 329000,
++  };
++  const ClutterColorspace colorspaces[] = {
++    CLUTTER_COLORSPACE_SRGB,
++    CLUTTER_COLORSPACE_BT2020,
++    CLUTTER_COLORSPACE_NTSC,
++    CLUTTER_COLORSPACE_PAL,
++    CLUTTER_COLORSPACE_P3,
++  };
++  ClutterPrimaries unrepresentable =
++    *clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_SRGB);
++  MetaColorTargetPrimaries fallback;
++  int32_t fixed, coordinates[8];
++  unsigned int i, j;
++
++  /* Signed, rounded to the nearest unit rather than truncated. */
++  g_assert_true (meta_color_chromaticity_to_fixed (0.708f, &fixed));
++  g_assert_cmpint (fixed, ==, 708000);
++  g_assert_true (meta_color_chromaticity_to_fixed (-0.077f, &fixed));
++  g_assert_cmpint (fixed, ==, -77000);
++  g_assert_true (meta_color_chromaticity_to_fixed (0.0000004f, &fixed));
++  g_assert_cmpint (fixed, ==, 0);
++  g_assert_true (meta_color_chromaticity_to_fixed (0.0000006f, &fixed));
++  g_assert_cmpint (fixed, ==, 1);
++  g_assert_true (meta_color_chromaticity_to_fixed (-0.0000006f, &fixed));
++  g_assert_cmpint (fixed, ==, -1);
++  g_assert_true (meta_color_chromaticity_to_fixed (2147.0f, &fixed));
++  g_assert_cmpint (fixed, ==, 2147000000);
++
++  /* Unrepresentable values saturate and are reported. */
++  g_assert_false (meta_color_chromaticity_to_fixed (2148.0f, &fixed));
++  g_assert_cmpint (fixed, ==, INT32_MAX);
++  g_assert_false (meta_color_chromaticity_to_fixed (-2148.0f, &fixed));
++  g_assert_cmpint (fixed, ==, INT32_MIN);
++  g_assert_false (meta_color_chromaticity_to_fixed (INFINITY, &fixed));
++  g_assert_cmpint (fixed, ==, INT32_MAX);
++  g_assert_false (meta_color_chromaticity_to_fixed (NAN, &fixed));
++  g_assert_cmpint (fixed, ==, 0);
++
++  /* The encoding fallback target equals the published encoding primaries. */
++  for (i = 0; i < G_N_ELEMENTS (colorspaces); i++)
++    {
++      const ClutterPrimaries *encoding =
++        clutter_colorspace_to_primaries (colorspaces[i]);
++
++      g_assert_true (meta_color_primaries_to_fixed (encoding, coordinates));
++      meta_color_target_primaries_init (&fallback, NULL, FALSE, encoding);
++      g_assert_cmpint (fallback.source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++      for (j = 0; j < 8; j++)
++        {
++          g_assert_cmpint (fallback.coordinates[j], ==, coordinates[j]);
++          if (colorspaces[i] == CLUTTER_COLORSPACE_BT2020)
++            g_assert_cmpint (fallback.coordinates[j], ==, bt2020[j]);
++        }
++    }
++
++  /* Unrepresentable encoding primaries are reported, and the fallback still
++   * equals what the encoding event publishes. */
++  unrepresentable.r_x = 3000.0f;
++  g_assert_false (meta_color_primaries_to_fixed (&unrepresentable, coordinates));
++  g_assert_cmpint (coordinates[0], ==, INT32_MAX);
++  g_test_expect_message ("libmutter", G_LOG_LEVEL_WARNING,
++                         "Encoding primaries cannot be represented*");
++  meta_color_target_primaries_init (&fallback, NULL, FALSE, &unrepresentable);
++  g_test_assert_expected_messages ();
++  for (j = 0; j < 8; j++)
++    g_assert_cmpint (fallback.coordinates[j], ==, coordinates[j]);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -859,5 +933,6 @@ main (int    argc,
+   g_test_add_func ("/native-hdr/target-luminance-policy", test_target_luminance_policy);
+   g_test_add_func ("/native-hdr/physical-chromaticities", test_physical_chromaticities);
+   g_test_add_func ("/native-hdr/target-primaries-policy", test_target_primaries_policy);
++  g_test_add_func ("/native-hdr/chromaticity-fixed-point", test_chromaticity_fixed_point);
+   return g_test_run ();
+ }
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index c216443db..c387241d4 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -213,12 +213,6 @@ scaled_uint32_to_float_chromaticity (uint32_t value)
+   return value * 0.000001f;
+ }
+ 
+-static uint32_t
+-float_to_scaled_uint32_chromaticity (float value)
+-{
+-  return (uint32_t) (value * 1000000);
+-}
+-
+ static float
+ scaled_uint32_to_float (uint32_t value)
+ {
+@@ -702,16 +696,23 @@ static void
+ send_primaries (struct wl_resource     *resource,
+                 const ClutterPrimaries *primaries)
+ {
+-  wp_image_description_info_v1_send_primaries (
+-    resource,
+-    float_to_scaled_uint32_chromaticity (primaries->r_x),
+-    float_to_scaled_uint32_chromaticity (primaries->r_y),
+-    float_to_scaled_uint32_chromaticity (primaries->g_x),
+-    float_to_scaled_uint32_chromaticity (primaries->g_y),
+-    float_to_scaled_uint32_chromaticity (primaries->b_x),
+-    float_to_scaled_uint32_chromaticity (primaries->b_y),
+-    float_to_scaled_uint32_chromaticity (primaries->w_x),
+-    float_to_scaled_uint32_chromaticity (primaries->w_y));
++  int32_t coordinates[8];
++
++  /* The same conversion as the encoding-fallback target primaries, so both
++   * events carry identical coordinates for the same gamut. */
++  if (!meta_color_primaries_to_fixed (primaries, coordinates))
++    g_warning ("Encoding primaries cannot be represented in protocol units; "
++               "sending saturated coordinates");
++
++  wp_image_description_info_v1_send_primaries (resource,
++                                               coordinates[0],
++                                               coordinates[1],
++                                               coordinates[2],
++                                               coordinates[3],
++                                               coordinates[4],
++                                               coordinates[5],
++                                               coordinates[6],
++                                               coordinates[7]);
+ }
+ 
+ static void

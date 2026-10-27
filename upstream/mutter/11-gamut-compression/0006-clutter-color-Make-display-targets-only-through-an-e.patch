@@ -1,0 +1,625 @@
+From 46c63d3541f0d3a112a76af6c93f947101b7f1dc Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 10:15:00 -0400
+Subject: [PATCH 06/12] clutter/color: Make display targets only through an
+ explicit constructor
+
+The blending state of any parametric state with a target luminance or
+target primaries became a display target, the state highlight mapping
+and gamut compression convert toward: a display reference luminance was
+the only mark, and get_blending() set it from any target volume. So the
+blending state of a client state with HDR10 mastering metadata would
+have been a display target, mapping content toward the client's
+mastering display.
+
+Add clutter_color_state_params_new_display_target(), the only way to
+make one, used only by the color device for an output's rendering color
+state; it validates target primaries as a gamut target. A display target
+is marked as such and part of the exact identity, equality and hash; the
+blending states derived from it stay display targets. Any other state,
+including one made with
+clutter_color_state_params_new_with_target_volume(), is not, nor are its
+blending states, which keep its target volume in the units of the state
+they were derived from.
+
+The tests make their sample targets the way the color device does, and
+check that a target volume attached as content metadata, to a client
+state or to the output state, never makes a display target for
+highlight mapping or gamut compression, nor does it in a blending state.
+
+Link: TBD-MR
+---
+ .../clutter-color-state-params-private.h      |  17 +-
+ clutter/clutter/clutter-color-state-params.c  | 193 ++++++++++--------
+ clutter/clutter/clutter-color-transform.c     |  13 +-
+ src/backends/meta-color-device.c              |  23 ++-
+ src/tests/clutter/conform/color-hdr.c         |  89 ++++++--
+ 5 files changed, 214 insertions(+), 121 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index 45dd3aad7..b9d754f04 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -29,11 +29,13 @@
+  * wp_image_description_creator_params_v1 (SMPTE ST 2086, CTA-861-H).
+  *
+  * Luminances are in the units of the state's own ClutterLuminance, except in
+- * a blending state derived from a display's target: it keeps the display's
+- * values, and the display's reference white luminance as its display
+- * reference (see clutter_color_state_params_get_display_reference_luminance()).
+- * Primaries are CIE 1931 xy chromaticities: a client's mastering display
+- * primaries, or, in such a blending state, the display's own primaries.
++ * a blending state derived from a state with a target volume: it keeps the
++ * values, and the reference white luminance of the state it was derived from
++ * as its display reference (see
++ * clutter_color_state_params_get_display_reference_luminance()). Primaries
++ * are CIE 1931 xy chromaticities: a client's mastering display primaries, or,
++ * in a display target (see clutter_color_state_params_new_display_target()),
++ * the display's own primaries.
+  * A value that was not declared is absent: has_primaries and has_luminance are
+  * FALSE, and max_cll and max_fall are 0.
+  *
+@@ -64,6 +66,11 @@ CLUTTER_EXPORT
+ ClutterColorState * clutter_color_state_params_new_with_target_volume (ClutterColorStateParams        *color_state_params,
+                                                                        const ClutterColorTargetVolume *target_volume);
+ 
++/* Exported for libmutter: only the color device of an output makes one. */
++CLUTTER_EXPORT
++ClutterColorState * clutter_color_state_params_new_display_target (ClutterColorStateParams        *color_state_params,
++                                                                   const ClutterColorTargetVolume *target_volume);
++
+ CLUTTER_EXPORT
+ const ClutterColorTargetVolume * clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_state_params);
+ 
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index a230198f7..a8662be56 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -62,8 +62,15 @@ typedef struct _ClutterColorStateParams
+   /* The luminance, in cd/m², at which reference white is reproduced on the
+    * display the target volume describes, or 0 if the state's own luminances
+    * are absolute (its reference luminance is that luminance). Only states
+-   * derived for blending from a display's target carry one. */
++   * derived for blending from a state with a target volume carry one. */
+   float display_reference_lum;
++
++  /* Whether the target volume is a display's: what highlight mapping and
++   * gamut compression convert toward. Only
++   * clutter_color_state_params_new_display_target() mints one, and the
++   * blending states derived from a display target stay one; a client's
++   * mastering metadata never makes one. */
++  gboolean display_target;
+ } ClutterColorStateParams;
+ 
+ G_DEFINE_TYPE (ClutterColorStateParams,
+@@ -333,7 +340,9 @@ clutter_color_state_params_equals (ClutterColorState *color_state,
+          target_volume_equal (&color_state_params->target_volume,
+                               &other_color_state_params->target_volume) &&
+          color_state_params->display_reference_lum ==
+-         other_color_state_params->display_reference_lum;
++         other_color_state_params->display_reference_lum &&
++         color_state_params->display_target ==
++         other_color_state_params->display_target;
+ }
+ 
+ /*
+@@ -418,6 +427,8 @@ clutter_color_state_params_to_string (ClutterColorState *color_state)
+       g_string_append_printf (string, ", display ref lum: %f",
+                               color_state_params->display_reference_lum);
+     }
++  if (color_state_params->display_target)
++    g_string_append (string, ", display target");
+ 
+   g_string_append (string, ")");
+ 
+@@ -470,8 +481,8 @@ has_target_volume (const ClutterColorTargetVolume *target_volume)
+ /*
+  * The luminance, in cd/m², at which the state's reference white is
+  * reproduced on the display its target volume describes: the state's own
+- * reference luminance, unless it was derived for blending from a display's
+- * target, whose reference luminance it keeps.
++ * reference luminance, unless it was derived for blending from a state with
++ * a target volume, whose reference luminance it keeps.
+  */
+ float
+ clutter_color_state_params_get_display_reference_luminance (ClutterColorStateParams *color_state_params)
+@@ -483,11 +494,12 @@ clutter_color_state_params_get_display_reference_luminance (ClutterColorStatePar
+ }
+ 
+ /*
+- * Whether the state is a display target: a blending state derived from an
+- * output whose target luminance is known. Only blending states derived from a
+- * display's target volume carry a display reference; one with a target
+- * luminance is what highlight mapping converts toward. Its target luminance
+- * range is in the display's cd/m².
++ * Whether the state is a display target with a target luminance: what
++ * highlight mapping converts toward. Display targets are minted only by
++ * clutter_color_state_params_new_display_target(), for an output whose target
++ * luminance is known, and are kept by the blending states derived from them.
++ * Its target luminance range is in the display's cd/m², and
++ * @display_reference_lum receives the display's reference white luminance.
+  */
+ gboolean
+ clutter_color_state_params_get_display_target (ClutterColorStateParams *color_state_params,
+@@ -498,8 +510,7 @@ clutter_color_state_params_get_display_target (ClutterColorStateParams *color_st
+   const ClutterColorTargetVolume *target_volume =
+     &color_state_params->target_volume;
+ 
+-  if (!target_volume->has_luminance ||
+-      !(color_state_params->display_reference_lum > 0.0f))
++  if (!color_state_params->display_target || !target_volume->has_luminance)
+     return FALSE;
+ 
+   if (min_lum)
+@@ -507,17 +518,20 @@ clutter_color_state_params_get_display_target (ClutterColorStateParams *color_st
+   if (max_lum)
+     *max_lum = target_volume->max_lum;
+   if (display_reference_lum)
+-    *display_reference_lum = color_state_params->display_reference_lum;
++    {
++      *display_reference_lum =
++        clutter_color_state_params_get_display_reference_luminance (color_state_params);
++    }
+ 
+   return TRUE;
+ }
+ 
+ /*
+- * Whether the state is a display gamut target: a blending state derived from
+- * an output whose target primaries are declared. Like a display target, only
+- * such a state carries a display reference; it is what gamut compression
+- * converts toward. A client's mastering primaries do not make one. Its
+- * primaries have passed clutter_colorimetry_get_absolute_bt2020_matrices().
++ * Whether the state is a display target with target primaries: what gamut
++ * compression converts toward, minted like any display target only for an
++ * output whose target primaries are declared. A client's mastering primaries
++ * do not make one. Its primaries have passed
++ * clutter_colorimetry_get_absolute_bt2020_matrices().
+  * @tolerance receives the resolution of each primary's declaration, see
+  * ClutterColorTargetVolume.
+  */
+@@ -529,8 +543,7 @@ clutter_color_state_params_get_display_gamut (ClutterColorStateParams *color_sta
+   const ClutterColorTargetVolume *target_volume =
+     &color_state_params->target_volume;
+ 
+-  if (!target_volume->has_primaries ||
+-      !(color_state_params->display_reference_lum > 0.0f))
++  if (!color_state_params->display_target || !target_volume->has_primaries)
+     return FALSE;
+ 
+   if (primaries)
+@@ -577,34 +590,36 @@ target_primaries_usable (const ClutterColorTargetVolume *target_volume,
+ }
+ 
+ /*
+- * A copy of @color_state_params blended for the display its target volume
+- * describes, recording the display's reference white luminance. Target
+- * primaries a display target cannot use are a bug in the producer of
+- * @color_state_params, which validates them with the same function: they are
+- * dropped, loudly, so that no display target ever carries them.
++ * A copy of @color_state_params with @target_volume, @display_target and
++ * @display_reference_lum, its other values kept. Callers have validated the
++ * target volume.
+  */
+ static ClutterColorState *
+-new_display_target (ClutterColorStateParams *blending_params,
+-                    ClutterColorStateParams *color_state_params)
++copy_with_target_volume (ClutterColorStateParams        *color_state_params,
++                         const ClutterColorTargetVolume *target_volume,
++                         gboolean                        display_target,
++                         float                           display_reference_lum)
+ {
+-  ClutterColorTargetVolume target_volume = color_state_params->target_volume;
+-  ClutterColorState *blending_color_state;
++  ClutterColorState *color_state = CLUTTER_COLOR_STATE (color_state_params);
++  ClutterColorStateParams *copy;
+ 
+-  if (target_volume.has_primaries &&
+-      !target_primaries_usable (&target_volume, TRUE))
++  copy = g_object_new (CLUTTER_TYPE_COLOR_STATE_PARAMS,
++                       "context", clutter_color_state_get_context (color_state),
++                       NULL);
++  copy->colorimetry = color_state_params->colorimetry;
++  if (copy->colorimetry.type == CLUTTER_COLORIMETRY_TYPE_PRIMARIES)
+     {
+-      g_critical ("Display target primaries cannot be used as a gamut "
+-                  "target; dropping them");
+-      target_volume.has_primaries = FALSE;
++      copy->colorimetry.primaries =
++        g_memdup2 (color_state_params->colorimetry.primaries,
++                   sizeof (ClutterPrimaries));
+     }
++  copy->eotf = color_state_params->eotf;
++  copy->luminance = color_state_params->luminance;
++  copy->target_volume = *target_volume;
++  copy->display_reference_lum = display_reference_lum;
++  copy->display_target = display_target;
+ 
+-  blending_color_state =
+-    clutter_color_state_params_new_with_target_volume (blending_params,
+-                                                       &target_volume);
+-  CLUTTER_COLOR_STATE_PARAMS (blending_color_state)->display_reference_lum =
+-    clutter_color_state_params_get_display_reference_luminance (color_state_params);
+-
+-  return blending_color_state;
++  return CLUTTER_COLOR_STATE (copy);
+ }
+ 
+ /*
+@@ -644,16 +659,7 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+   if (clutter_eotf_equal (&blending_eotf, &color_state_params->eotf) &&
+       clutter_colorimetry_equal (&blending_colorimetry,
+                                  &color_state_params->colorimetry))
+-    {
+-      /* A target luminance or target primaries make the blending state a
+-       * display target. */
+-      if (!(color_state_params->target_volume.has_luminance ||
+-            color_state_params->target_volume.has_primaries) ||
+-          color_state_params->display_reference_lum > 0.0f)
+-        return g_object_ref (color_state);
+-
+-      return new_display_target (color_state_params, color_state_params);
+-    }
++    return g_object_ref (color_state);
+ 
+   luminance = *clutter_color_state_params_get_luminance (color_state_params);
+   if (force_linear)
+@@ -682,12 +688,15 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+   /* The target volume keeps its values: they stay in the units of the
+    * display it describes, whose reference white luminance the blending state
+    * records, since its own luminance units are scaled to a different
+-   * reference white. */
++   * reference white. A display target's blending state is one too; any
++   * other state's is not. */
+   {
+     g_autoptr (ClutterColorState) without_target = blending_color_state;
+ 
+-    return new_display_target (CLUTTER_COLOR_STATE_PARAMS (without_target),
+-                               color_state_params);
++    return copy_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (without_target),
++                                    &color_state_params->target_volume,
++                                    color_state_params->display_target,
++                                    clutter_color_state_params_get_display_reference_luminance (color_state_params));
+   }
+ }
+ 
+@@ -727,6 +736,7 @@ clutter_color_state_params_hash (ClutterColorState *color_state)
+   hash = hash * 31 + float_hash (params->target_volume.max_cll);
+   hash = hash * 31 + float_hash (params->target_volume.max_fall);
+   hash = hash * 31 + float_hash (params->display_reference_lum);
++  hash = hash * 31 + params->display_target;
+ 
+   return hash;
+ }
+@@ -808,7 +818,8 @@ clutter_color_state_identical (ClutterColorState *color_state,
+          lum->mastering_max == other_lum->mastering_max &&
+          target_volume_equal (&params->target_volume,
+                               &other_params->target_volume) &&
+-         params->display_reference_lum == other_params->display_reference_lum;
++         params->display_reference_lum == other_params->display_reference_lum &&
++         params->display_target == other_params->display_target;
+ }
+ 
+ /* A hash consistent with clutter_color_state_identical(). */
+@@ -1019,15 +1030,15 @@ clutter_color_state_params_new_from_primitives (ClutterContext     *context,
+  *   @color_state_params
+  *
+  * Creates a copy of @color_state_params whose target color volume is
+- * @target_volume. The caller validates the target volume from external
+- * input. Target primaries must in any case be usable by
+- * clutter_colorimetry_get_linear_bt2020_matrices(), the shared definition the
+- * Wayland creator checks client primaries with, with finite, non-negative
+- * tolerances; in a copy of a display target, which is a gamut target, they
+- * must also pass clutter_colorimetry_get_absolute_bt2020_matrices(), as the
+- * colour device checks its declared target with. Primaries that do not make
+- * no color state, so gamut compression never has to decide what unusable
+- * target primaries mean.
++ * @target_volume, the volume its content was prepared for, such as a
++ * client's mastering metadata and content light levels. The copy is never a
++ * display target, whatever @color_state_params is: only
++ * clutter_color_state_params_new_display_target() makes one. The caller
++ * validates the target volume from external input. Target primaries must in
++ * any case be usable by clutter_colorimetry_get_linear_bt2020_matrices(), the
++ * shared definition the Wayland creator checks client primaries with, with
++ * finite, non-negative tolerances; primaries that are not make no color
++ * state.
+  *
+  * Returns: (transfer full): a new ClutterColorState
+  */
+@@ -1035,33 +1046,49 @@ ClutterColorState *
+ clutter_color_state_params_new_with_target_volume (ClutterColorStateParams        *color_state_params,
+                                                    const ClutterColorTargetVolume *target_volume)
+ {
+-  ClutterColorState *color_state = CLUTTER_COLOR_STATE (color_state_params);
+-  ClutterColorStateParams *copy;
+-
+   g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
+                         NULL);
+   g_return_val_if_fail (target_volume != NULL, NULL);
+   g_return_val_if_fail (!target_volume->has_primaries ||
+-                        target_primaries_usable (target_volume,
+-                                                 color_state_params->display_reference_lum > 0.0f),
++                        target_primaries_usable (target_volume, FALSE),
+                         NULL);
+ 
+-  copy = g_object_new (CLUTTER_TYPE_COLOR_STATE_PARAMS,
+-                       "context", clutter_color_state_get_context (color_state),
+-                       NULL);
+-  copy->colorimetry = color_state_params->colorimetry;
+-  if (copy->colorimetry.type == CLUTTER_COLORIMETRY_TYPE_PRIMARIES)
+-    {
+-      copy->colorimetry.primaries =
+-        g_memdup2 (color_state_params->colorimetry.primaries,
+-                   sizeof (ClutterPrimaries));
+-    }
+-  copy->eotf = color_state_params->eotf;
+-  copy->luminance = color_state_params->luminance;
+-  copy->target_volume = *target_volume;
+-  copy->display_reference_lum = color_state_params->display_reference_lum;
++  return copy_with_target_volume (color_state_params, target_volume, FALSE,
++                                  color_state_params->display_reference_lum);
++}
+ 
+-  return CLUTTER_COLOR_STATE (copy);
++/*
++ * clutter_color_state_params_new_display_target:
++ * @color_state_params: the color state a display's content is rendered in
++ * @target_volume: the display's target color volume, in the units of the
++ *   luminance of @color_state_params
++ *
++ * Creates a copy of @color_state_params that is a display target: the color
++ * state content is rendered in for a display whose target luminance or
++ * target primaries, @target_volume, are known. Highlight mapping and gamut
++ * compression convert toward a display target, and toward the blending
++ * states derived from it, which stay display targets; this is the only way
++ * one is made, for the color device of an output. Target primaries must
++ * also pass clutter_colorimetry_get_absolute_bt2020_matrices(), with which
++ * gamut compression works; primaries that do not make no color state, so
++ * gamut compression never has to decide what unusable target primaries
++ * mean.
++ *
++ * Returns: (transfer full): a new ClutterColorState
++ */
++ClutterColorState *
++clutter_color_state_params_new_display_target (ClutterColorStateParams        *color_state_params,
++                                               const ClutterColorTargetVolume *target_volume)
++{
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
++                        NULL);
++  g_return_val_if_fail (target_volume != NULL, NULL);
++  g_return_val_if_fail (!target_volume->has_primaries ||
++                        target_primaries_usable (target_volume, TRUE),
++                        NULL);
++
++  return copy_with_target_volume (color_state_params, target_volume, TRUE,
++                                  color_state_params->display_reference_lum);
+ }
+ 
+ static gboolean
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 1286f43ac..5605c4023 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1036,10 +1036,10 @@ get_source_headroom (ClutterColorState *color_state,
+ 
+ /*
+  * Whether converting @source_color_state to @target_color_state maps
+- * highlights: only toward a display target (the blending state of an output
+- * whose target peak is known, the only kind of state carrying a display
+- * reference), and only when the effective peak of the source is known and
+- * exceeds the target's.
++ * highlights: only toward a display target with a target luminance (made by
++ * clutter_color_state_params_new_display_target() for an output whose target
++ * peak is known, or a blending state derived from one), and only when the
++ * effective peak of the source is known and exceeds the target's.
+  *
+  * Every conversion anchors reference white: a luminance L in the source
+  * becomes L * target ref / source ref in the target (see
+@@ -1351,8 +1351,9 @@ compute_gamut_limits (const GamutTarget *target,
+  * clutter_color_transform_requires_gamut_compression() and by the op
+  * builder, so the two cannot disagree.
+  *
+- * Compression applies only toward a display gamut target (the blending state
+- * of an output whose target primaries are declared by its firmware), and only
++ * Compression applies only toward a display target with target primaries
++ * (made for an output whose target primaries are declared by its firmware,
++ * or a blending state derived from one), and only
+  * when the content can actually exceed the target. Every source color is
+  * followed to linear BT.2020 exactly as the renderer converts its pixels:
+  *
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 4eebbdd1b..8bbd6aef9 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1179,9 +1179,9 @@ update_target_volume (MetaColorDevice *color_device)
+  * The firmware-declared target primaries, as published, if they are declared
+  * and usable as a gamut target: by
+  * clutter_colorimetry_get_absolute_bt2020_matrices(), which also requires
+- * the shared colorimetry definition, the check the blending states derived
+- * from them repeat. The encoding fallback is not a physical gamut, and is
+- * never a target.
++ * the shared colorimetry definition, the check
++ * clutter_color_state_params_new_display_target() repeats. The encoding
++ * fallback is not a physical gamut, and is never a target.
+  */
+ static gboolean
+ get_declared_target_primaries (MetaColorDevice  *color_device,
+@@ -1215,12 +1215,13 @@ get_declared_target_primaries (MetaColorDevice  *color_device,
+ 
+ /*
+  * The color state content is rendered for on this device: the output color
+- * state with the firmware-declared target as its target volume: the target
+- * luminance range when the peak is declared, and the target primaries when
+- * they are declared. The blending state derived from it carries that target,
+- * so color transforms map highlights toward the peak and compress gamut
+- * toward the primaries. Without either declaration, nothing is substituted:
+- * it is the output color state.
++ * state made a display target with the firmware-declared target as its
++ * target volume: the target luminance range when the peak is declared, and
++ * the target primaries when they are declared. This is the only place a
++ * display target is made. The blending state derived from it stays one, so
++ * color transforms map highlights toward the peak and compress gamut toward
++ * the primaries. Without either declaration, nothing is substituted: it is
++ * the output color state.
+  *
+  * The output color state itself stays the encoding only, so a change of
+  * target does not change it. The rendering color state is replaced only when
+@@ -1259,8 +1260,8 @@ update_rendering_color_state (MetaColorDevice *color_device)
+   if (target_volume.has_luminance || target_volume.has_primaries)
+     {
+       rendering_color_state =
+-        clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+-                                                           &target_volume);
++        clutter_color_state_params_new_display_target (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
++                                                       &target_volume);
+     }
+   else
+     {
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 3277c1b1f..fbf6a0a79 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -618,7 +618,8 @@ create_pq_output (float ref_lum)
+ }
+ 
+ /* Builds an output's blending state the way the renderer view does, from
+- * the output color state with the display's target luminance attached. */
++ * the output color state made a display target with the display's target
++ * luminance, as the color device makes it. */
+ static ClutterColorState *
+ create_targeted_blending_full (ClutterColorState *output,
+                                float              target_min,
+@@ -633,8 +634,8 @@ create_targeted_blending_full (ClutterColorState *output,
+   g_autoptr (ClutterColorState) targeted = NULL;
+ 
+   targeted =
+-    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (output),
+-                                                       &target_volume);
++    clutter_color_state_params_new_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                   &target_volume);
+ 
+   return clutter_color_state_get_blending (targeted, force_linear);
+ }
+@@ -743,22 +744,60 @@ mapping_predicate (void)
+   /* The target is part of the color state identity. */
+   g_assert_false (clutter_color_state_equals (blending, untargeted_blending));
+ 
+-  /* Only a blending state derived for a display target is one: the output
+-   * color state with a target attached, from which it is derived, is not. */
++  /* Only a display target is one, as the color device makes it, and the
++   * blending states derived from it. A target volume attached as content
++   * metadata never makes one, whether to a client state or to the output
++   * state itself, nor does it in a blending state derived from either. */
+   {
+     ClutterColorTargetVolume target_volume = {
+       .has_luminance = TRUE,
+       .min_lum = TARGET_MIN_LUM,
+       .max_lum = TARGET_MAX_LUM,
+     };
+-    g_autoptr (ClutterColorState) targeted_output = NULL;
+-
+-    targeted_output =
++    g_autoptr (ClutterColorState) display_target = NULL;
++    g_autoptr (ClutterColorState) output_with_volume = NULL;
++    g_autoptr (ClutterColorState) output_with_volume_blending = NULL;
++    g_autoptr (ClutterColorState) client_mastered = NULL;
++    g_autoptr (ClutterColorState) client_blending = NULL;
++    g_autoptr (ClutterColorState) client_linear_blending = NULL;
++
++    display_target =
++      clutter_color_state_params_new_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                     &target_volume);
++    g_assert_true (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                       display_target));
++
++    output_with_volume =
+       clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (output),
+                                                          &target_volume);
+-    g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, targeted_output));
++    output_with_volume_blending =
++      clutter_color_state_get_blending (output_with_volume, FALSE);
++    g_assert_false (clutter_color_state_identical (output_with_volume,
++                                                   display_target));
++    g_assert_false (clutter_color_state_equals (output_with_volume,
++                                                display_target));
++    g_assert_false (clutter_color_state_identical (output_with_volume_blending,
++                                                   blending));
++    g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                        output_with_volume));
++    g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                        output_with_volume_blending));
++
++    /* A client state mastered at the target luminance, a 600 cd/m² HDR10
++     * description: neither it nor its blending states are display
++     * targets. */
++    client_mastered = create_with_target_volume (pq, TARGET_MAX_LUM, 0.0f);
++    client_blending = clutter_color_state_get_blending (client_mastered, FALSE);
++    client_linear_blending = clutter_color_state_get_blending (client_mastered,
++                                                               TRUE);
++    g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                        client_mastered));
+     g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above,
+-                                                                        targeted_output));
++                                                                        client_blending));
++    g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_above,
++                                                                        client_linear_blending));
++    g_assert_false (clutter_color_transform_requires_mapping (hlg, client_blending));
++    g_assert_false (clutter_color_state_identical (client_blending, blending));
+   }
+ }
+ 
+@@ -1784,8 +1823,9 @@ reference_compress (const double rgb[3],
+     out[c] = ach - reference_compress_distance (distances[c], limits[c]) * ach;
+ }
+ 
+-/* The blending state of @output with the target primaries, and optionally
+- * the sample target peak, declared, as the renderer view derives it. */
++/* The blending state of @output made a display target with the target
++ * primaries, and optionally the sample target peak, as the color device
++ * makes it and the renderer view derives it. */
+ static ClutterColorState *
+ create_gamut_blending_full (ClutterColorState      *output,
+                             const ClutterPrimaries *primaries,
+@@ -1804,8 +1844,8 @@ create_gamut_blending_full (ClutterColorState      *output,
+   g_autoptr (ClutterColorState) targeted = NULL;
+ 
+   targeted =
+-    clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (output),
+-                                                       &target_volume);
++    clutter_color_state_params_new_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                   &target_volume);
+ 
+   return clutter_color_state_get_blending (targeted, force_linear);
+ }
+@@ -2038,12 +2078,29 @@ gamut_predicate (void)
+   g_assert_false (clutter_color_transform_requires_gamut_compression (srgb_mastered_bt2020,
+                                                                       blending));
+ 
+-  /* No target primaries, or primaries without a display reference (the
+-   * output state with them attached directly): no display gamut target. */
++  /* No target primaries, or primaries attached as content metadata rather
++   * than by making a display target, to the output state or a client
++   * state, or to their blending states: no display gamut target. */
+   g_assert_false (clutter_color_transform_requires_gamut_compression (pq, peak_only));
+   g_assert_false (clutter_color_transform_requires_gamut_compression (pq, output));
+   g_assert_false (clutter_color_transform_requires_gamut_compression (pq,
+                                                                       output_with_primaries));
++  {
++    g_autoptr (ClutterColorState) output_with_primaries_blending =
++      clutter_color_state_get_blending (output_with_primaries, FALSE);
++    g_autoptr (ClutterColorState) pq_mastered_target = NULL;
++    g_autoptr (ClutterColorState) pq_mastered_target_blending = NULL;
++
++    g_assert_false (clutter_color_transform_requires_gamut_compression (pq,
++                                                                        output_with_primaries_blending));
++    pq_mastered_target = create_with_mastering_primaries (pq, &target_gamut);
++    pq_mastered_target_blending =
++      clutter_color_state_get_blending (pq_mastered_target, FALSE);
++    g_assert_false (clutter_color_transform_requires_gamut_compression (pq,
++                                                                        pq_mastered_target));
++    g_assert_false (clutter_color_transform_requires_gamut_compression (pq,
++                                                                        pq_mastered_target_blending));
++  }
+ 
+   /* Blended content is already compressed: not again to the output, and the
+    * blending state is within its own target. */

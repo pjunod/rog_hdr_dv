@@ -1,0 +1,196 @@
+From faf22347ff5f04f89077e4b2fbe8016ba3afcae1 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 03:47:29 +0000
+Subject: [PATCH 07/11] backends/color: Render without Night Light when its
+ white is unusable
+
+The adapted display target constructor returned NULL through a
+g_return_val_if_fail() critical when the white adaptation could not be
+computed, and the color device stored that NULL as its rendering color
+state, which the renderer cannot use. Planckian whites in a usable
+encoding never take that path, but nothing guaranteed it.
+
+Make the constructor fallible instead: it reports why with a GError and
+returns NULL without a critical, so the caller decides what to render
+with. The color device then warns and renders the unadapted display
+target, or the output color state if a display target cannot be made
+either, so a rendering color state is always set. Add regressions for
+the refused whites.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ .../clutter-color-state-params-private.h      |  3 +-
+ clutter/clutter/clutter-color-state-params.c  | 31 ++++++++++-------
+ src/backends/meta-color-device.c              | 25 ++++++++++----
+ src/tests/clutter/conform/color-hdr.c         | 33 ++++++++++++++++++-
+ 4 files changed, 72 insertions(+), 20 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index b4ef442ce..c48736649 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -78,7 +78,8 @@ ClutterColorState * clutter_color_state_params_new_adapted_display_target (Clutt
+                                                                            float                           white_x,
+                                                                            float                           white_y,
+                                                                            float                           reference_x,
+-                                                                           float                           reference_y);
++                                                                           float                           reference_y,
++                                                                           GError                        **error);
+ 
+ CLUTTER_EXPORT
+ gboolean clutter_color_state_params_get_adapted_white (ClutterColorStateParams *color_state_params,
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index 5ed3b911b..185fa1b06 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -1177,10 +1177,15 @@ clutter_color_state_params_new_display_target (ClutterColorStateParams        *c
+  * The adaptation is applied once, in linear light, when the blending state
+  * derived from the display target is converted to the output's encoding
+  * (see clutter_colorimetry_get_white_adaptation_matrix()); converting
+- * content to the blending state does not apply it. The white point must be
+- * adaptable to from the encoding of @color_state_params.
++ * content to the blending state does not apply it.
+  *
+- * Returns: (transfer full): a new ClutterColorState
++ * The white points must be adaptable to from the encoding of
++ * @color_state_params, see clutter_colorimetry_get_white_adaptation_matrix();
++ * whites that are not make no color state and set @error, so that no
++ * conversion ever has to decide what an unusable adaptation means. The
++ * caller decides what to render with instead.
++ *
++ * Returns: (transfer full) (nullable): a new ClutterColorState, or %NULL
+  */
+ ClutterColorState *
+ clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams        *color_state_params,
+@@ -1188,21 +1193,23 @@ clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams
+                                                        float                           white_x,
+                                                        float                           white_y,
+                                                        float                           reference_x,
+-                                                       float                           reference_y)
++                                                       float                           reference_y,
++                                                       GError                        **error)
+ {
+   ClutterColorStateParams *copy;
+   graphene_matrix_t adaptation;
+ 
+   g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
+                         NULL);
+-  g_return_val_if_fail (clutter_colorimetry_get_white_adaptation_matrix (&color_state_params->colorimetry,
+-                                                                         white_x,
+-                                                                         white_y,
+-                                                                         reference_x,
+-                                                                         reference_y,
+-                                                                         &adaptation,
+-                                                                         NULL),
+-                        NULL);
++
++  if (!clutter_colorimetry_get_white_adaptation_matrix (&color_state_params->colorimetry,
++                                                        white_x,
++                                                        white_y,
++                                                        reference_x,
++                                                        reference_y,
++                                                        &adaptation,
++                                                        error))
++    return NULL;
+ 
+   copy = CLUTTER_COLOR_STATE_PARAMS (clutter_color_state_params_new_display_target (color_state_params,
+                                                                                     target_volume));
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 962c01553..d3204b7ec 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1574,24 +1574,37 @@ update_rendering_color_state (MetaColorDevice *color_device)
+ 
+   if (adapted)
+     {
++      g_autoptr (GError) error = NULL;
++
+       rendering_color_state =
+         clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+                                                                &target_volume,
+                                                                white_x,
+                                                                white_y,
+                                                                reference_x,
+-                                                               reference_y);
++                                                               reference_y,
++                                                               &error);
++      /* Not expected for Planckian whites in a usable encoding; render
++       * without Night Light rather than without a color state. */
++      if (!rendering_color_state)
++        {
++          g_warning ("Color device '%s' cannot adapt its output to the "
++                     "Night Light white (%f, %f): %s",
++                     color_device->cd_device_id, white_x, white_y,
++                     error ? error->message : "unusable display target");
++        }
+     }
+-  else if (target_volume.has_luminance || target_volume.has_primaries)
++
++  if (!rendering_color_state &&
++      (target_volume.has_luminance || target_volume.has_primaries))
+     {
+       rendering_color_state =
+         clutter_color_state_params_new_display_target (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+                                                        &target_volume);
+     }
+-  else
+-    {
+-      rendering_color_state = g_object_ref (color_device->color_state);
+-    }
++
++  if (!rendering_color_state)
++    rendering_color_state = g_object_ref (color_device->color_state);
+ 
+   if (color_device->rendering_color_state &&
+       clutter_color_state_identical (color_device->rendering_color_state,
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index f4c39c304..1caf9fc2b 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -3172,7 +3172,8 @@ create_adapted_output_target_with_reference (ClutterColorState *output,
+                                                                 white[0],
+                                                                 white[1],
+                                                                 reference[0],
+-                                                                reference[1]);
++                                                                reference[1],
++                                                                NULL);
+ }
+ 
+ /* Adapted as the color device adapts: relative to the default
+@@ -3614,6 +3615,36 @@ white_adaptation_factors (void)
+                                                                     factors,
+                                                                     &error));
+   g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_clear_error (&error);
++
++  /* Such whites make no display target, without a critical warning, so the
++   * color device can fall back to the unadapted one. */
++  {
++    g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++    const ClutterColorTargetVolume no_target = { 0 };
++    ClutterColorState *refused;
++
++    refused =
++      clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                             &no_target,
++                                                             night_light_4000k[0],
++                                                             night_light_4000k[1],
++                                                             night_light_1000k[0],
++                                                             night_light_1000k[1],
++                                                             &error);
++    g_assert_null (refused);
++    g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++    g_clear_error (&error);
++
++    refused =
++      clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                             &no_target,
++                                                             0.3f, 0.0f,
++                                                             night_light_6500k[0],
++                                                             night_light_6500k[1],
++                                                             NULL);
++    g_assert_null (refused);
++  }
+ }
+ 
+ /* The output's encoded signal of @input in @source converted to @output, as
