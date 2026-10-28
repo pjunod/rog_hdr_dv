@@ -1,0 +1,88 @@
+From e686e7c867fb194c84662fc282fa6013d6c68e25 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:51:00 -0400
+Subject: [PATCH] Tell if the last E-AC-3 frame had OAMD
+
+The ObjectAudioMetadata of the metadata decoder keeps its values when a frame has no OAMD payload, so its object count can't tell if the current frame carried one. Add HasOAMD, like HasObjects, that is set only when OAMD was decoded from the last frame.
+---
+ .../EnhancedAC3/ExtensibleMetadataDecoder.cs  |  7 ++++
+ .../ExtensibleMetadataDecoder_Tests.cs        | 38 +++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+ create mode 100644 Tests/Test.Cavern.Format/Decoders/ExtensibleMetadataDecoder_Tests.cs
+
+diff --git a/Cavern.Format/Decoders/EnhancedAC3/ExtensibleMetadataDecoder.cs b/Cavern.Format/Decoders/EnhancedAC3/ExtensibleMetadataDecoder.cs
+index 7b107f26..b694644e 100644
+--- a/Cavern.Format/Decoders/EnhancedAC3/ExtensibleMetadataDecoder.cs
++++ b/Cavern.Format/Decoders/EnhancedAC3/ExtensibleMetadataDecoder.cs
+@@ -10,6 +10,11 @@ namespace Cavern.Format.Decoders.EnhancedAC3 {
+         /// </summary>
+         public bool HasObjects { get; private set; }
+ 
++        /// <summary>
++        /// The last EMDF frame contained Object Audio Metadata. <see cref="OAMD"/> keeps the last decoded values even if this is false.
++        /// </summary>
++        public bool HasOAMD { get; private set; }
++
+         /// <summary>
+         /// The Joint Object Coding data in this frame.
+         /// </summary>
+@@ -27,6 +32,7 @@ namespace Cavern.Format.Decoders.EnhancedAC3 {
+         /// </summary>
+         public void Decode(BitExtractor extractor) {
+             HasObjects = false;
++            HasOAMD = false;
+             int syncword = 0;
+             while (extractor.Position < extractor.BackPosition - 32) {
+                 syncword = ((syncword << 8) & 0xFFFF) + extractor.Read(8); // Syncwords are byte-padded
+@@ -106,6 +112,7 @@ namespace Cavern.Format.Decoders.EnhancedAC3 {
+                     HasObjects = true;
+                 } else if (payloadID == oamdPayloadID) {
+                     OAMD.Decode(extractor, sampleOffset);
++                    HasOAMD = true;
+                 }
+                 extractor.Position = payloadEnd;
+             }
+diff --git a/Tests/Test.Cavern.Format/Decoders/ExtensibleMetadataDecoder_Tests.cs b/Tests/Test.Cavern.Format/Decoders/ExtensibleMetadataDecoder_Tests.cs
+new file mode 100644
+index 00000000..fa315b8b
+--- /dev/null
++++ b/Tests/Test.Cavern.Format/Decoders/ExtensibleMetadataDecoder_Tests.cs
+@@ -0,0 +1,38 @@
++﻿using System.Reflection;
++
++using Cavern.Format.Decoders;
++
++namespace Test.Cavern.Format.Decoders;
++
++/// <summary>
++/// Tests the internal ExtensibleMetadataDecoder class through reflection, as it has no public API.
++/// </summary>
++[TestClass]
++public class ExtensibleMetadataDecoder_Tests {
++    const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
++
++    /// <summary>
++    /// <c>HasOAMD</c> tells if the last decoded frame had OAMD, while the OAMD object keeps the values of the last frame that had.
++    /// </summary>
++    [TestMethod, Timeout(1000)]
++    public void HasOAMD_IsFalseForFramesWithoutOAMD() {
++        Assembly format = typeof(EnhancedAC3Decoder).Assembly;
++        Type decoderType = format.GetType("Cavern.Format.Decoders.EnhancedAC3.ExtensibleMetadataDecoder", true);
++        Type oamdType = format.GetType("Cavern.Format.Decoders.EnhancedAC3.ObjectAudioMetadata", true);
++        Type extractorType = format.GetType("Cavern.Format.Utilities.BitExtractor", true);
++        PropertyInfo hasOamd = decoderType.GetProperty("HasOAMD", instance);
++        Assert.IsNotNull(hasOamd, "The decoder has no HasOAMD property.");
++
++        object decoder = Activator.CreateInstance(decoderType, true);
++        object oamd = decoderType.GetProperty("OAMD", instance).GetValue(decoder);
++        oamdType.GetProperty("ObjectCount", instance).SetValue(oamd, 1); // As if an earlier frame had OAMD
++        hasOamd.SetValue(decoder, true);
++
++        // An empty frame
++        object extractor = Activator.CreateInstance(extractorType, instance, null, new object[] { Array.Empty<byte>() }, null);
++        decoderType.GetMethod("Decode", instance).Invoke(decoder, new[] { extractor });
++
++        Assert.IsFalse((bool)hasOamd.GetValue(decoder), "HasOAMD was not reset for a frame without OAMD.");
++        Assert.AreEqual(1, (int)oamdType.GetProperty("ObjectCount", instance).GetValue(oamd), "The last OAMD values were lost.");
++    }
++}

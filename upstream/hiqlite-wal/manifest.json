@@ -1,0 +1,46 @@
+{
+  "repository": "sebadob/hiqlite",
+  "target_branch": "main",
+  "base": "493f980562766f0ce5645e015557bc39501f9a5b",
+  "venue": "github",
+  "draft": true,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-single-file-purge-boundary",
+      "inventory_ids": [
+        "WAL-1"
+      ],
+      "title": "fix(hiqlite-wal): restore the purge boundary for a single WAL file",
+      "patches": [
+        "01-single-file-purge-boundary/0001-01-single-file-purge-boundary.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [
+        "Explicit local human approval before Draft PR"
+      ],
+      "tests": [
+        {
+          "command": "cargo fmt --check; cargo clippy -p hiqlite-wal --features auto-heal,migration -- -D warnings; cargo test -p hiqlite-wal --features auto-heal,migration",
+          "result": "rustc 1.97.1: formatting and library Clippy passed; 15 upstream tests passed; inherited baseline/fixed purge regression also recovered",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "slug": "02-incarnation-layout-design",
+      "inventory_ids": [
+        "WAL-3"
+      ],
+      "title": "WAL incarnation and layout guard follow-up",
+      "patches": [],
+      "status": "design-hold",
+      "blockers": [
+        "Reproduce stale same-path mmap or suffix identity reuse on unmodified upstream",
+        "Split the remaining fix from upstream PR #367"
+      ],
+      "tests": []
+    }
+  ]
+}

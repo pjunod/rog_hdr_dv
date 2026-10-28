@@ -1,0 +1,843 @@
+From 3dede753a87b6ce3c1dd754ffd546b40676c59ca Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 17:24:46 -0400
+Subject: [PATCH 01/11] clutter/color: Adapt a display's output to a white
+ point
+
+Night Light shifts the white point of an output. Its only
+implementation scales the encoded values in the CRTC gamma LUT, which
+for a PQ encoding is neither a white point shift nor a uniform dimming.
+The white point has to be adapted in linear light instead, as part of
+the output's color conversion.
+
+Let a display target carry a white point its output is adapted to, made
+with clutter_color_state_params_new_adapted_display_target() and kept
+by the blending states derived from it. It is applied once, in linear
+BT.2020 just before the conversion from a state that carries it to one
+that does not: the conversion of the blending state to the output's
+encoding. Content converted to the blending state is not adapted.
+
+The adaptation is made in the frame of the colors the display shows:
+linear BT.2020 is taken to CIE XYZ with the encoding's white point,
+adapted with Bradford from that white point to the new one, and brought
+back, so the encoding's white is shown at the new white point. It is
+scaled so that the brightest channel of the adapted white, in linear
+RGB of the encoding, stays that of the unadapted white: the output
+never becomes brighter.
+
+The adaptation is a matrix uniform of the conversion, so a new white
+point keeps its shader. The white point is compared exactly in the
+identity of a color state, so a changed value makes a new state and a
+new transform. Direct scanout and the cursor plane bypass the
+conversion, so clutter_color_transform_requires_composition() tells
+when they cannot show content as the renderer would.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ .../clutter-color-state-params-private.h      |  12 +
+ clutter/clutter/clutter-color-state-params.c  | 134 +++++++++-
+ .../clutter/clutter-color-transform-private.h |   8 +-
+ clutter/clutter/clutter-color-transform.c     | 115 +++++++--
+ clutter/clutter/clutter-color-utils-private.h |   6 +
+ clutter/clutter/clutter-color-utils.c         |  93 +++++++
+ src/tests/clutter/conform/color-hdr.c         | 235 ++++++++++++++++++
+ 7 files changed, 580 insertions(+), 23 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index b9d754f04..aa258bbe6 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -71,6 +71,18 @@ CLUTTER_EXPORT
+ ClutterColorState * clutter_color_state_params_new_display_target (ClutterColorStateParams        *color_state_params,
+                                                                    const ClutterColorTargetVolume *target_volume);
+ 
++/* Exported for libmutter: only the color device of an output makes one. */
++CLUTTER_EXPORT
++ClutterColorState * clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams        *color_state_params,
++                                                                           const ClutterColorTargetVolume *target_volume,
++                                                                           float                           white_x,
++                                                                           float                           white_y);
++
++CLUTTER_EXPORT
++gboolean clutter_color_state_params_get_adapted_white (ClutterColorStateParams *color_state_params,
++                                                       float                   *white_x,
++                                                       float                   *white_y);
++
+ CLUTTER_EXPORT
+ const ClutterColorTargetVolume * clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_state_params);
+ 
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index a8662be56..d2a5a495f 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -71,6 +71,15 @@ typedef struct _ClutterColorStateParams
+    * blending states derived from a display target stay one; a client's
+    * mastering metadata never makes one. */
+   gboolean display_target;
++
++  /* The CIE 1931 xy white point the display's output is adapted to, such as
++   * the Night Light white, when there is one. Only display targets, and the
++   * blending states derived from them, carry one. It applies once, in the
++   * conversion from a state that carries it to a state that does not: the
++   * conversion of the blending state to the output's encoding. */
++  gboolean has_adapted_white;
++  float adapted_white_x;
++  float adapted_white_y;
+ } ClutterColorStateParams;
+ 
+ G_DEFINE_TYPE (ClutterColorStateParams,
+@@ -326,6 +335,22 @@ target_volume_equal (const ClutterColorTargetVolume *target_volume,
+   return TRUE;
+ }
+ 
++/* Exact, like the target volume: a declared value. */
++static gboolean
++adapted_white_equal (ClutterColorStateParams *color_state_params,
++                     ClutterColorStateParams *other_color_state_params)
++{
++  if (color_state_params->has_adapted_white !=
++      other_color_state_params->has_adapted_white)
++    return FALSE;
++
++  return !color_state_params->has_adapted_white ||
++         (color_state_params->adapted_white_x ==
++          other_color_state_params->adapted_white_x &&
++          color_state_params->adapted_white_y ==
++          other_color_state_params->adapted_white_y);
++}
++
+ static gboolean
+ clutter_color_state_params_equals (ClutterColorState *color_state,
+                                    ClutterColorState *other_color_state)
+@@ -342,7 +367,8 @@ clutter_color_state_params_equals (ClutterColorState *color_state,
+          color_state_params->display_reference_lum ==
+          other_color_state_params->display_reference_lum &&
+          color_state_params->display_target ==
+-         other_color_state_params->display_target;
++         other_color_state_params->display_target &&
++         adapted_white_equal (color_state_params, other_color_state_params);
+ }
+ 
+ /*
+@@ -429,6 +455,12 @@ clutter_color_state_params_to_string (ClutterColorState *color_state)
+     }
+   if (color_state_params->display_target)
+     g_string_append (string, ", display target");
++  if (color_state_params->has_adapted_white)
++    {
++      g_string_append_printf (string, ", adapted white: %f, %f",
++                              color_state_params->adapted_white_x,
++                              color_state_params->adapted_white_y);
++    }
+ 
+   g_string_append (string, ")");
+ 
+@@ -622,6 +654,15 @@ copy_with_target_volume (ClutterColorStateParams        *color_state_params,
+   return CLUTTER_COLOR_STATE (copy);
+ }
+ 
++static void
++copy_adapted_white (ClutterColorStateParams *copy,
++                    ClutterColorStateParams *color_state_params)
++{
++  copy->has_adapted_white = color_state_params->has_adapted_white;
++  copy->adapted_white_x = color_state_params->adapted_white_x;
++  copy->adapted_white_y = color_state_params->adapted_white_y;
++}
++
+ /*
+  * Currently all content is blended with gamma transfer characteristics. HDR
+  * signals (PQ and HLG) are blended in extended range gamma 2.2 sRGB.
+@@ -682,21 +723,26 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+                                                     blending_eotf,
+                                                     blending_luminance);
+ 
+-  if (!has_target_volume (&color_state_params->target_volume))
++  if (!has_target_volume (&color_state_params->target_volume) &&
++      !color_state_params->has_adapted_white)
+     return blending_color_state;
+ 
+   /* The target volume keeps its values: they stay in the units of the
+    * display it describes, whose reference white luminance the blending state
+    * records, since its own luminance units are scaled to a different
+-   * reference white. A display target's blending state is one too; any
+-   * other state's is not. */
++   * reference white. A display target's blending state is one too, with the
++   * display's adapted white; any other state's is not. */
+   {
+     g_autoptr (ClutterColorState) without_target = blending_color_state;
++    ClutterColorState *copy;
+ 
+-    return copy_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (without_target),
++    copy = copy_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (without_target),
+                                     &color_state_params->target_volume,
+                                     color_state_params->display_target,
+                                     clutter_color_state_params_get_display_reference_luminance (color_state_params));
++    copy_adapted_white (CLUTTER_COLOR_STATE_PARAMS (copy), color_state_params);
++
++    return copy;
+   }
+ }
+ 
+@@ -737,6 +783,12 @@ clutter_color_state_params_hash (ClutterColorState *color_state)
+   hash = hash * 31 + float_hash (params->target_volume.max_fall);
+   hash = hash * 31 + float_hash (params->display_reference_lum);
+   hash = hash * 31 + params->display_target;
++  hash = hash * 31 + params->has_adapted_white;
++  if (params->has_adapted_white)
++    {
++      hash = hash * 31 + float_hash (params->adapted_white_x);
++      hash = hash * 31 + float_hash (params->adapted_white_y);
++    }
+ 
+   return hash;
+ }
+@@ -819,7 +871,8 @@ clutter_color_state_identical (ClutterColorState *color_state,
+          target_volume_equal (&params->target_volume,
+                               &other_params->target_volume) &&
+          params->display_reference_lum == other_params->display_reference_lum &&
+-         params->display_target == other_params->display_target;
++         params->display_target == other_params->display_target &&
++         adapted_white_equal (params, other_params);
+ }
+ 
+ /* A hash consistent with clutter_color_state_identical(). */
+@@ -1091,6 +1144,75 @@ clutter_color_state_params_new_display_target (ClutterColorStateParams        *c
+                                   color_state_params->display_reference_lum);
+ }
+ 
++/*
++ * clutter_color_state_params_new_adapted_display_target:
++ * @color_state_params: the color state a display's content is rendered in
++ * @target_volume: the display's target color volume, see
++ *   clutter_color_state_params_new_display_target()
++ * @white_x: the CIE 1931 x of the white point the output is adapted to
++ * @white_y: the CIE 1931 y of the white point the output is adapted to
++ *
++ * Like clutter_color_state_params_new_display_target(), and the display's
++ * output is moreover adapted to the white point (@white_x, @white_y), such
++ * as the white of Night Light. The adaptation is applied once, in linear
++ * light, when the blending state derived from the display target is
++ * converted to the output's encoding (see
++ * clutter_colorimetry_get_white_adaptation_matrix()); converting content to
++ * the blending state does not apply it. The white point must be adaptable
++ * to from the encoding of @color_state_params.
++ *
++ * Returns: (transfer full): a new ClutterColorState
++ */
++ClutterColorState *
++clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams        *color_state_params,
++                                                       const ClutterColorTargetVolume *target_volume,
++                                                       float                           white_x,
++                                                       float                           white_y)
++{
++  ClutterColorStateParams *copy;
++  graphene_matrix_t adaptation;
++
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
++                        NULL);
++  g_return_val_if_fail (clutter_colorimetry_get_white_adaptation_matrix (&color_state_params->colorimetry,
++                                                                         white_x,
++                                                                         white_y,
++                                                                         &adaptation,
++                                                                         NULL),
++                        NULL);
++
++  copy = CLUTTER_COLOR_STATE_PARAMS (clutter_color_state_params_new_display_target (color_state_params,
++                                                                                    target_volume));
++  if (!copy)
++    return NULL;
++
++  copy->has_adapted_white = TRUE;
++  copy->adapted_white_x = white_x;
++  copy->adapted_white_y = white_y;
++
++  return CLUTTER_COLOR_STATE (copy);
++}
++
++/*
++ * Whether the state carries a white point its display's output is adapted
++ * to, see clutter_color_state_params_new_adapted_display_target().
++ */
++gboolean
++clutter_color_state_params_get_adapted_white (ClutterColorStateParams *color_state_params,
++                                              float                   *white_x,
++                                              float                   *white_y)
++{
++  if (!color_state_params->has_adapted_white)
++    return FALSE;
++
++  if (white_x)
++    *white_x = color_state_params->adapted_white_x;
++  if (white_y)
++    *white_y = color_state_params->adapted_white_y;
++
++  return TRUE;
++}
++
+ static gboolean
+ cicp_primaries_to_clutter (ClutterCicpPrimaries   primaries,
+                            ClutterColorimetry    *colorimetry,
+diff --git a/clutter/clutter/clutter-color-transform-private.h b/clutter/clutter/clutter-color-transform-private.h
+index 43e752a49..a587edf1d 100644
+--- a/clutter/clutter/clutter-color-transform-private.h
++++ b/clutter/clutter/clutter-color-transform-private.h
+@@ -50,8 +50,12 @@ CLUTTER_EXPORT_TEST
+ gboolean clutter_color_transform_requires_gamut_compression (ClutterColorState *source_color_state,
+                                                              ClutterColorState *target_color_state);
+ 
+-/* Exported for libmutter: direct scanout and the hardware cursor plane are
+- * refused exactly when it holds. */
+ CLUTTER_EXPORT
+ gboolean clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
+                                                    ClutterColorState *target_color_state);
++
++/* Exported for libmutter: direct scanout and the hardware cursor plane are
++ * refused exactly when it holds. */
++CLUTTER_EXPORT
++gboolean clutter_color_transform_requires_composition (ClutterColorState *source_color_state,
++                                                       ClutterColorState *blending_color_state);
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 469c72dfa..d4f82eb6a 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1546,21 +1546,57 @@ get_gamut_compression (ClutterColorState *source_color_state,
+                                compression);
+ }
+ 
++/*
++ * The adaptation of a display's output to its adapted white, when
++ * converting @source_color_state, a state that carries one (the blending
++ * state of an output with Night Light, see
++ * clutter_color_state_params_new_adapted_display_target()), to
++ * @target_color_state, a state that does not: the output's encoding. The
++ * conversion of content to the blending state, which carries it too, does
++ * not adapt it, so that it is applied once.
++ */
++static gboolean
++get_white_adaptation (ClutterColorState *source_color_state,
++                      ClutterColorState *target_color_state,
++                      graphene_matrix_t *adaptation)
++{
++  ClutterColorStateParams *target_params;
++  float white_x, white_y;
++
++  if (!CLUTTER_IS_COLOR_STATE_PARAMS (source_color_state) ||
++      !CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state))
++    return FALSE;
++
++  target_params = CLUTTER_COLOR_STATE_PARAMS (target_color_state);
++  if (!clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (source_color_state),
++                                                     &white_x, &white_y) ||
++      clutter_color_state_params_get_adapted_white (target_params, NULL, NULL))
++    return FALSE;
++
++  return clutter_colorimetry_get_white_adaptation_matrix (clutter_color_state_params_get_colorimetry (target_params),
++                                                          white_x, white_y,
++                                                          adaptation,
++                                                          NULL);
++}
++
+ /*
+  * The mapping decision for a pair of color states: whether converting the
+  * source to the target maps its highlights, compresses its gamut, and, when
+- * it does, with which limits. It is made once per pair, by
+- * compute_highlight_mapping() and get_gamut_compression(), and kept with the
+- * transform cache under the same exact key, so that the per frame and per
+- * pointer motion questions of direct scanout and the hardware cursor plane
+- * cost a lookup, and every reader, the renderer included, gets the same
+- * answer.
++ * it does, with which limits, and whether it adapts the white of the
++ * display's output, with which matrix. It is made once per pair, by
++ * compute_highlight_mapping(), get_gamut_compression() and
++ * get_white_adaptation(), and kept with the transform cache under the same
++ * exact key, so that the per frame and per pointer motion questions of
++ * direct scanout and the hardware cursor plane cost a lookup, and every
++ * reader, the renderer included, gets the same answer.
+  */
+ typedef struct _MappingDecision
+ {
+   GamutCompression compression;
++  graphene_matrix_t white_adaptation;
+   gboolean highlight;
+   gboolean gamut;
++  gboolean white;
+ } MappingDecision;
+ 
+ static const MappingDecision * get_mapping_decision (ClutterColorState *source_color_state,
+@@ -1601,11 +1637,10 @@ clutter_color_transform_requires_gamut_compression (ClutterColorState *source_co
+ 
+ /*
+  * Whether converting @source_color_state to @target_color_state maps it
+- * toward a display's target: its highlights, its gamut, or both. This is the
+- * single "mapping required" predicate: the transform builds a conversion,
+- * even between equal encodings, exactly when it holds, and direct scanout and
+- * the hardware cursor plane, which bypass the conversion, must be refused
+- * when it does.
++ * toward a display's target: its highlights, its gamut, or the white its
++ * output is adapted to. This is the single "mapping required" predicate:
++ * the transform builds a conversion, even between equal encodings, exactly
++ * when it holds.
+  */
+ gboolean
+ clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
+@@ -1618,7 +1653,50 @@ clutter_color_transform_requires_mapping (ClutterColorState *source_color_state,
+ 
+   decision = get_mapping_decision (source_color_state, target_color_state);
+ 
+-  return decision->highlight || decision->gamut;
++  return decision->highlight || decision->gamut || decision->white;
++}
++
++/*
++ * Whether content in @source_color_state, on an output whose content is
++ * blended in @blending_color_state, can only be shown as the renderer shows
++ * it by compositing it: whether its conversion to the blending state maps
++ * it (see clutter_color_transform_requires_mapping()), or the blending
++ * state's conversion to the output's encoding adapts the output's white.
++ * Direct scanout and the hardware cursor plane, which bypass both
++ * conversions, are refused exactly when it holds.
++ */
++gboolean
++clutter_color_transform_requires_composition (ClutterColorState *source_color_state,
++                                              ClutterColorState *blending_color_state)
++{
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (blending_color_state), FALSE);
++
++  if (CLUTTER_IS_COLOR_STATE_PARAMS (blending_color_state) &&
++      clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (blending_color_state),
++                                                    NULL, NULL))
++    return TRUE;
++
++  return clutter_color_transform_requires_mapping (source_color_state,
++                                                   blending_color_state);
++}
++
++/*
++ * The adaptation of the display's output to its adapted white, in linear
++ * BT.2020 just before the conversion to the output's encoding, with the
++ * matrix of get_white_adaptation(). Only its value changes with the white
++ * point, so a new white point updates a uniform of the same shader.
++ */
++static void
++add_white_adaptation_op (ClutterColorPipeline    *pipeline,
++                         const graphene_matrix_t *adaptation)
++{
++  graphene_matrix_t *matrix;
++
++  matrix = graphene_matrix_alloc ();
++  graphene_matrix_init_from_matrix (matrix, adaptation);
++  clutter_color_pipeline_take_op (pipeline,
++                                  clutter_color_op_matrix_4x4_new (matrix));
+ }
+ 
+ /*
+@@ -1677,6 +1755,8 @@ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+         add_highlight_mapping_op (pipeline, source_color_state, target_color_state);
+       if (decision->gamut)
+         add_gamut_compression_op (pipeline, &decision->compression);
++      if (decision->white)
++        add_white_adaptation_op (pipeline, &decision->white_adaptation);
+       add_from_linear_bt2020_ops (pipeline, target_color_state);
+     }
+ 
+@@ -1700,11 +1780,13 @@ clutter_color_transform_new (ClutterColorState               *source_color_state
+   decision = *get_mapping_decision (source_color_state, target_color_state);
+ 
+   /* A target color volume alone does not change how pixels are encoded, but
+-   * a display target below the source's peak maps its highlights, and one
+-   * whose gamut does not contain the source's compresses its gamut. */
++   * a display target below the source's peak maps its highlights, one whose
++   * gamut does not contain the source's compresses its gamut, and the
++   * blending state of a display with an adapted white adapts it on the way
++   * to the display's encoding. */
+   if (!clutter_color_state_encoding_equals (source_color_state,
+                                             target_color_state) ||
+-      decision.highlight || decision.gamut)
++      decision.highlight || decision.gamut || decision.white)
+     {
+       build_transform_pipeline (pipeline, source_color_state,
+                                 target_color_state, &decision, flags);
+@@ -1902,6 +1984,9 @@ get_mapping_decision (ClutterColorState *source_color_state,
+   decision->gamut = get_gamut_compression (source_color_state,
+                                            target_color_state,
+                                            &decision->compression);
++  decision->white = get_white_adaptation (source_color_state,
++                                          target_color_state,
++                                          &decision->white_adaptation);
+ 
+   ensure_color_state_tracking (cache, source_color_state);
+   ensure_color_state_tracking (cache, target_color_state);
+diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
+index 84abd0957..e95a1bd4a 100644
+--- a/clutter/clutter/clutter-color-utils-private.h
++++ b/clutter/clutter/clutter-color-utils-private.h
+@@ -58,6 +58,12 @@ gboolean clutter_colorimetry_get_source_matrices (const ClutterColorimetry  *col
+                                                   graphene_matrix_t         *linear_bt2020_to_XYZ,
+                                                   GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
+ 
++gboolean clutter_colorimetry_get_white_adaptation_matrix (const ClutterColorimetry  *colorimetry,
++                                                          float                      white_x,
++                                                          float                      white_y,
++                                                          graphene_matrix_t         *adaptation,
++                                                          GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
++
+ gboolean clutter_primaries_contain_chromaticity (const ClutterPrimaries *outer,
+                                                  const float             tolerance[3],
+                                                  double                  x,
+diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
+index cb86532bb..fcf8fbda0 100644
+--- a/clutter/clutter/clutter-color-utils.c
++++ b/clutter/clutter/clutter-color-utils.c
+@@ -891,6 +891,99 @@ clutter_colorimetry_get_source_matrices (const ClutterColorimetry  *colorimetry,
+   return TRUE;
+ }
+ 
++/*
++ * Computes the adaptation of a display's output to the white point
++ * (@white_x, @white_y), such as a Night Light white: a matrix on linear
++ * BT.2020, applied just before the conversion to the display's encoding,
++ * @colorimetry.
++ *
++ * That conversion adapts linear BT.2020, whose white is CLUTTER_D65, to the
++ * encoding's white point. The adaptation is therefore made in the frame of
++ * the colors the display shows: linear BT.2020 is taken to CIE XYZ with the
++ * encoding's white (the inverse of the encoding's own adaptation to D65),
++ * adapted with Bradford from the encoding's white point to the new one, and
++ * brought back. The encoding's white is then shown at the new white point,
++ * whatever the encoding's white point is.
++ *
++ * The result is scaled so that the brightest channel of the encoding's
++ * adapted white, in linear RGB of the encoding, is that of the unadapted
++ * white: the adapted output never becomes brighter.
++ *
++ * Returns %FALSE, setting @error, if the white point has no XYZ or a matrix
++ * cannot be computed.
++ */
++gboolean
++clutter_colorimetry_get_white_adaptation_matrix (const ClutterColorimetry  *colorimetry,
++                                                 float                      white_x,
++                                                 float                      white_y,
++                                                 graphene_matrix_t         *adaptation,
++                                                 GError                   **error)
++{
++  const ClutterPrimaries *primaries;
++  graphene_matrix_t to_linear_bt2020, from_linear_bt2020, XYZ_to_D65;
++  graphene_matrix_t XYZ_to_linear_bt2020, linear_bt2020_to_XYZ;
++  graphene_matrix_t D65_to_XYZ, to_white, scale, temp, matrix;
++  graphene_vec3_t encoding_white_XYZ, white_XYZ, white;
++  float brightest;
++
++  if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
++                                                       &to_linear_bt2020,
++                                                       &from_linear_bt2020,
++                                                       error) ||
++      !clutter_colorimetry_get_source_matrices (colorimetry,
++                                                &to_linear_bt2020,
++                                                &XYZ_to_D65,
++                                                &XYZ_to_linear_bt2020,
++                                                &linear_bt2020_to_XYZ,
++                                                error))
++    return FALSE;
++
++  primaries = clutter_colorimetry_get_primaries (colorimetry);
++  /* Checked by clutter_colorimetry_get_source_matrices() above. */
++  if (!white_point_to_XYZ_checked (primaries->w_x, primaries->w_y,
++                                   &encoding_white_XYZ))
++    g_assert_not_reached ();
++
++  if (!white_point_to_XYZ_checked (white_x, white_y, &white_XYZ) ||
++      !clutter_chromatic_adaptation_matrix (&encoding_white_XYZ, &white_XYZ,
++                                            &to_white) ||
++      !graphene_matrix_inverse (&XYZ_to_D65, &D65_to_XYZ))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The white point cannot be adapted to");
++      return FALSE;
++    }
++
++  /* linear BT.2020 → XYZ D65 → XYZ in the encoding's white → XYZ in the new
++   * white, taken by the encoding's adaptation to D65 → linear BT.2020 */
++  graphene_matrix_multiply (&linear_bt2020_to_XYZ, &D65_to_XYZ, &temp);
++  graphene_matrix_multiply (&temp, &to_white, &matrix);
++  graphene_matrix_multiply (&matrix, &XYZ_to_D65, &temp);
++  graphene_matrix_multiply (&temp, &XYZ_to_linear_bt2020, &matrix);
++
++  /* The encoding's white, RGB (1, 1, 1), adapted, in the encoding. */
++  graphene_matrix_multiply (&to_linear_bt2020, &matrix, &temp);
++  graphene_matrix_multiply (&temp, &from_linear_bt2020, &scale);
++  graphene_vec3_init (&white, 1.0f, 1.0f, 1.0f);
++  graphene_matrix_transform_vec3 (&scale, &white, &white);
++  brightest = MAX (graphene_vec3_get_x (&white),
++                   MAX (graphene_vec3_get_y (&white),
++                        graphene_vec3_get_z (&white)));
++  if (!matrix_is_finite (&matrix) || !isfinite (brightest) ||
++      !(brightest > 0.0f))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The white point adaptation is not finite");
++      return FALSE;
++    }
++
++  graphene_matrix_init_scale (&scale, 1.0f / brightest, 1.0f / brightest,
++                              1.0f / brightest);
++  graphene_matrix_multiply (&matrix, &scale, adaptation);
++
++  return TRUE;
++}
++
+ /*
+  * The cross product of @b - @a and @p - @a in the xy plane: positive when the
+  * turn from @a to @b to @p is counterclockwise.
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 440f80fe4..d771b9cfb 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -3141,6 +3141,237 @@ mapping_decision_cache (void)
+     g_object_unref (targets[j]);
+ }
+ 
++/*
++ * Night Light white points: the Planckian chromaticities, in CIE 1931 xy,
++ * that the color device computes for 4000 K and 3990 K.
++ */
++static const float night_light_4000k[2] = { 0.3804111f, 0.3765993f };
++static const float night_light_3990k[2] = { 0.3808537f, 0.3768775f };
++
++static ClutterColorState *
++create_adapted_output_target (ClutterColorState *output,
++                              const float        white[2])
++{
++  const ClutterColorTargetVolume no_target = { 0 };
++
++  return clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
++                                                                &no_target,
++                                                                white[0],
++                                                                white[1]);
++}
++
++/* Whether two pipelines have the same operations, so the same shader. */
++static gboolean
++pipelines_have_same_ops (ClutterColorTransform *transform,
++                         ClutterColorTransform *other_transform)
++{
++  const GList *l = clutter_color_pipeline_get_ops (clutter_color_transform_get_pipeline (transform));
++  const GList *m = clutter_color_pipeline_get_ops (clutter_color_transform_get_pipeline (other_transform));
++
++  for (; l && m; l = l->next, m = m->next)
++    {
++      if (G_OBJECT_TYPE (l->data) != G_OBJECT_TYPE (m->data))
++        return FALSE;
++    }
++
++  return !l && !m;
++}
++
++/*
++ * The output of a display adapted to the Night Light white: converting its
++ * blending state to its PQ encoding shows the encoding's white at the
++ * Planckian white, within the precision of the matrices, and no channel
++ * brighter than without the adaptation.
++ */
++static void
++white_adaptation_white (void)
++{
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) adapted = NULL;
++  double bt2020_to_xyz[3][3];
++  int linear;
++
++  adapted = create_adapted_output_target (output, night_light_4000k);
++  reference_rgb_to_xyz (&bt2020_gamut, bt2020_to_xyz);
++
++  for (linear = 0; linear < 2; linear++)
++    {
++      g_autoptr (ClutterColorState) blending = NULL;
++      g_autoptr (ClutterColorState) plain = NULL;
++      g_autoptr (ClutterColorTransform) transform = NULL;
++      g_autoptr (ClutterColorTransform) plain_transform = NULL;
++      float white[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
++      float plain_white[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
++      double lum[3], plain_lum[3], xyz[3], brightest = 0.0;
++      double plain_brightest = 0.0;
++      int c;
++
++      blending = clutter_color_state_get_blending (adapted, linear);
++      plain = clutter_color_state_get_blending (output, linear);
++      g_assert_true (clutter_color_transform_requires_mapping (blending, output));
++      g_assert_false (clutter_color_transform_requires_mapping (plain, output));
++
++      transform = clutter_color_transform_new (blending, output,
++                                               CLUTTER_COLOR_STATE_TRANSFORM_OPAQUE);
++      plain_transform = clutter_color_transform_new (plain, output,
++                                                     CLUTTER_COLOR_STATE_TRANSFORM_OPAQUE);
++      clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                           white, 1);
++      clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (plain_transform),
++                                           plain_white, 1);
++
++      for (c = 0; c < 3; c++)
++        {
++          lum[c] = reference_pq_luminance (white[c]);
++          plain_lum[c] = reference_pq_luminance (plain_white[c]);
++          g_assert_cmpfloat (lum[c], <=, plain_lum[c] * (1.0 + 1e-4));
++          brightest = MAX (brightest, lum[c]);
++          plain_brightest = MAX (plain_brightest, plain_lum[c]);
++        }
++      g_assert_cmpfloat_with_epsilon (brightest / plain_brightest, 1.0, 1e-3);
++
++      reference_apply (bt2020_to_xyz, lum, xyz);
++      g_assert_cmpfloat_with_epsilon (xyz[0] / (xyz[0] + xyz[1] + xyz[2]),
++                                      night_light_4000k[0], 1e-4);
++      g_assert_cmpfloat_with_epsilon (xyz[1] / (xyz[0] + xyz[1] + xyz[2]),
++                                      night_light_4000k[1], 1e-4);
++    }
++}
++
++/*
++ * The adaptation applies once, converting the blending state to the
++ * output's encoding: converting content to the blending state is the same
++ * as without it. Planes that bypass the blending state cannot show it.
++ */
++static void
++white_adaptation_applied_once (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) adapted = NULL;
++  g_autoptr (ClutterColorState) same = NULL;
++  g_autoptr (ClutterColorState) other = NULL;
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) plain = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) srgb = NULL;
++  ClutterColorState *sources[2];
++  float white_x, white_y;
++  int i;
++
++  adapted = create_adapted_output_target (output, night_light_4000k);
++  same = create_adapted_output_target (output, night_light_4000k);
++  other = create_adapted_output_target (output, night_light_3990k);
++  blending = clutter_color_state_get_blending (adapted, FALSE);
++  plain = clutter_color_state_get_blending (output, FALSE);
++
++  /* A declared value, compared exactly, and kept by the blending state. */
++  g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (blending),
++                                                               &white_x, &white_y));
++  g_assert_cmpfloat (white_x, ==, night_light_4000k[0]);
++  g_assert_cmpfloat (white_y, ==, night_light_4000k[1]);
++  g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (plain),
++                                                                NULL, NULL));
++  g_assert_true (clutter_color_state_identical (adapted, same));
++  g_assert_false (clutter_color_state_identical (adapted, other));
++  g_assert_false (clutter_color_state_equals (adapted, other));
++  g_assert_false (clutter_color_state_equals (adapted, output));
++
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                         CLUTTER_TRANSFER_FUNCTION_SRGB_PIECEWISE);
++  sources[0] = pq;
++  sources[1] = srgb;
++  for (i = 0; i < G_N_ELEMENTS (sources); i++)
++    {
++      ClutterColorTransform *transform, *plain_transform;
++      float color[4] = { 0.6f, 0.3f, 0.2f, 1.0f };
++      float plain_color[4] = { 0.6f, 0.3f, 0.2f, 1.0f };
++
++      g_assert_false (clutter_color_transform_requires_mapping (sources[i], blending));
++      g_assert_true (clutter_color_transform_requires_composition (sources[i], blending));
++      g_assert_false (clutter_color_transform_requires_composition (sources[i], plain));
++
++      transform = clutter_color_transform_from_color_states (context, sources[i],
++                                                             blending, 0);
++      plain_transform = clutter_color_transform_from_color_states (context, sources[i],
++                                                                   plain, 0);
++      g_assert_true (pipelines_have_same_ops (transform, plain_transform));
++      clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                           color, 1);
++      clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (plain_transform),
++                                           plain_color, 1);
++      g_assert_cmpmem (color, sizeof (color), plain_color, sizeof (plain_color));
++    }
++
++  /* Content already in the blending state is not converted at all. */
++  g_assert_false (clutter_color_transform_requires_mapping (blending, blending));
++}
++
++/*
++ * A Night Light step changes the adaptation's value only: the conversion
++ * keeps its operations, so its shader, and the matrix is a uniform.
++ */
++static void
++white_adaptation_uniform (void)
++{
++  ClutterContext *context = clutter_test_get_context ();
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) adapted = NULL;
++  g_autoptr (ClutterColorState) stepped = NULL;
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) stepped_blending = NULL;
++  ClutterColorTransform *transform, *stepped_transform;
++  float color[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
++  float stepped_color[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
++
++  adapted = create_adapted_output_target (output, night_light_4000k);
++  stepped = create_adapted_output_target (output, night_light_3990k);
++  blending = clutter_color_state_get_blending (adapted, FALSE);
++  stepped_blending = clutter_color_state_get_blending (stepped, FALSE);
++
++  transform = clutter_color_transform_from_color_states (context, blending,
++                                                         output, 0);
++  stepped_transform = clutter_color_transform_from_color_states (context,
++                                                                 stepped_blending,
++                                                                 output, 0);
++  g_assert_true (transform != stepped_transform);
++  g_assert_true (pipelines_have_same_ops (transform, stepped_transform));
++
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                       color, 1);
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (stepped_transform),
++                                       stepped_color, 1);
++  g_assert_true (memcmp (color, stepped_color, sizeof (color)) != 0);
++}
++
++static void
++white_adaptation_shader_matches_cpu (void)
++{
++  g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
++  g_autoptr (ClutterColorState) adapted = NULL;
++  g_autoptr (ClutterColorState) blending = NULL;
++  g_autoptr (ClutterColorState) linear_blending = NULL;
++  const float signals[][3] = {
++    { 1.0f, 1.0f, 1.0f },
++    { 0.5f, 0.5f, 0.5f },
++    { 0.8f, 0.2f, 0.1f },
++    { 0.1f, 0.7f, 0.3f },
++    { 0.2f, 0.1f, 0.9f },
++    { 0.0f, 0.0f, 0.0f },
++  };
++
++  adapted = create_adapted_output_target (output, night_light_4000k);
++  blending = clutter_color_state_get_blending (adapted, FALSE);
++  linear_blending = clutter_color_state_get_blending (adapted, TRUE);
++
++  assert_shader_matches_cpu (blending, output, signals, G_N_ELEMENTS (signals),
++                             2e-3f);
++  assert_shader_matches_cpu (linear_blending, output, signals,
++                             G_N_ELEMENTS (signals), 1e-4f);
++}
++
+ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference", hlg_decode_reference)
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/decode-reference-white", hlg_decode_reference_white)
+@@ -3173,4 +3404,8 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/source-gamut", gamut_source_gamut)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/tolerance", gamut_tolerance)
+   CLUTTER_TEST_UNIT ("/color-hdr/gamut/shader-matches-cpu", gamut_shader_matches_cpu)
++  CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/white", white_adaptation_white)
++  CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/applied-once", white_adaptation_applied_once)
++  CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/uniform", white_adaptation_uniform)
++  CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/shader-matches-cpu", white_adaptation_shader_matches_cpu)
+ )

@@ -1,0 +1,1023 @@
+From 961af6f76b067db24608b702487f792f9ed27347 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 20:13:09 -0400
+Subject: [PATCH 1/4] clutter/color: Map highlights toward a declared target
+ luminance
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add the Report ITU-R BT.2390 EETF as a color op, and apply it in a
+color transform whose target state declares a target luminance (the
+blending state of an output whose target peak is known) when the
+source's effective peak exceeds it.
+
+The op, bt2390_eetf, works on max (R, G, B) of linear BT.2020 and
+scales all three channels by the same ratio, so hue and saturation
+ratios are kept, negative components stay negative and a sample with
+no positive component is left unchanged. On that luminance it applies
+the BT.2390 curve in the PQ domain, compressing highlights only: the
+source range [Lsrc_min, Lsrc_peak] and the target peak converted to PQ,
+normalization by the source range, a Hermite spline above
+KS = 1.5 maxLum - 0.5, and denormalization. There is no black level
+lift (b = 0) and the target minimum is not used: a lift would raise
+black, and, applied as a ratio on max (R, G, B), would scale near-black
+samples, negative components included, by large factors. Below the
+knee the curve is the identity, down to and below the source minimum,
+without a PQ round trip or a division; above the source peak it stays
+at the target peak. A knee at or above 1 (the source peak within a
+rounding error of the target) leaves the curve the identity. A sample
+whose max (R, G, B) is not positive is left unchanged before any
+division. The op has a CPU and a GLSL implementation with the same
+maths and is internal, like the HLG ops.
+
+It is placed in the surface to blending-state transform after the
+existing reference-white scaling and before the conversion out of
+linear BT.2020. Whether it is needed is one exported predicate,
+clutter_color_transform_requires_highlight_mapping(), which the
+transform evaluates before its shortcut for equal encodings, both to
+decide that a pipeline is needed although the encodings are equal and
+to add the op, and which libmutter will use to refuse direct scanout.
+The source peak is the single definition,
+clutter_color_state_params_get_peak_headroom(): a source whose peak is
+unknown (extended-range linear content declaring neither MaxCLL nor a
+mastering maximum) is not mapped.
+
+The color transform cache is now keyed by exact identity:
+clutter_color_state_identical(), exported, and a matching hash, defined
+once, compare the resolved luminances bitwise, the target volume and the
+display reference. clutter_color_state_equals() treats luminances within
+10% as equal, so two states whose transforms differ, in whether or how
+they map highlights notably, could otherwise share a cached transform.
+The public equality is unchanged.
+
+Luminance units. Every parametric state normalizes its linear values to
+its own ClutterLuminance.max, and add_luminance_mapping_op() maps a
+luminance L of the source to L * target ref / source ref in the target:
+conversions anchor reference white, so luminances of different states
+are only comparable as multiples of their reference white. The three
+states involved are:
+
+ - the surface state, in the client's units: absolute for PQ (10000
+   at the top, reference white 203 by default); its declared mastering
+   luminance and MaxCLL are in the same units;
+ - the output state, PQ with min 0.005, max 10000.005 and reference
+   white 203 times the device's reference luminance factor; the
+   firmware-declared target is in its units, display cd/m²;
+ - the blending state derived from it: extended range gamma 2.2 sRGB,
+   max 80 and reference white 80, so 80 of its units are the output's
+   reference white (the forced-linear variant keeps the output's
+   luminances).
+
+So the blending state keeps the target in the display's units,
+unscaled, and records the display's reference white luminance (the
+output's reference luminance) as its display reference;
+clutter_color_state_get_blending() now carries a source's target volume
+and display reference into the blending state it derives. A state is a
+display target only when it has both a target luminance and a display
+reference above 0, which only such blending states have; a target
+volume alone, as on a client state or an output state with the target
+attached directly, is not mapped toward. The
+predicate compares headrooms: the source's effective peak over its
+reference white (target-volume values over its display reference,
+which for a client state is its own reference white, the encoding
+maximum over its reference white) against the target peak over the
+display reference. That is the source peak as it lands on the display
+after reference-white anchoring, compared with the target in cd/m²; it
+holds for any reference luminance factor (SDR white at 203 times the
+factor exceeds a target below that, and is then mapped). Computing both
+sides with the same expression makes the comparison exact where it
+matters: content declaring the published target as its own peak is not
+mapped, and a blending state never exceeds its own target. Scaling the
+target into blending units instead would have put a rounding error
+(600 * 80 / 203) into exactly those comparisons.
+
+For the curve, which is defined on absolute luminance, a blending
+sample v is v * max / ref display references in cd/m², the source range
+is its headroom range times the display reference, and the target peak
+is used as declared. The transform from the blending state to
+the output state never maps, because the output state declares no
+target, so content is mapped once.
+
+Link: TBD-MR
+---
+ clutter/clutter/clutter-color-op-private.h    |  35 +++
+ clutter/clutter/clutter-color-op.c            | 130 ++++++++++
+ .../clutter/clutter-color-pipeline-shader.c   | 102 ++++++++
+ .../clutter-color-state-params-private.h      |  24 +-
+ clutter/clutter/clutter-color-state-params.c  | 245 +++++++++++++++++-
+ .../clutter/clutter-color-transform-private.h |   5 +
+ clutter/clutter/clutter-color-transform.c     | 164 +++++++++++-
+ 7 files changed, 682 insertions(+), 23 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-op-private.h b/clutter/clutter/clutter-color-op-private.h
+index 097318be3..a78ef3ef5 100644
+--- a/clutter/clutter/clutter-color-op-private.h
++++ b/clutter/clutter/clutter-color-op-private.h
+@@ -59,3 +59,38 @@ void clutter_color_op_hlg_get_parameters (ClutterColorOp *op,
+                                           float          *gamma,
+                                           float          *beta,
+                                           const float   **coefficients);
++
++/*
++ * The Report ITU-R BT.2390 EETF highlight compression, applied to
++ * max (R, G, B) with all channels scaled by the same ratio, so hue and
++ * saturation ratios are kept and negative components stay negative. Samples
++ * whose largest component is not positive are left unchanged, without any
++ * division.
++ *
++ * Only highlights are compressed: the BT.2390 black level lift is not
++ * applied (b = 0), so black is never raised and near-black samples are not
++ * scaled up.
++ *
++ * @scale converts a sample component to absolute luminance in cd/m². The
++ * curve parameters are those of BT.2390, in the PQ domain: the source range
++ * starts at @source_min and spans @source_range PQ code values, @knee_start is
++ * KS and @max_lum is maxLum, in the normalized source range.
++ */
++#define CLUTTER_TYPE_COLOR_OP_BT2390_EETF (clutter_color_op_bt2390_eetf_get_type ())
++G_DECLARE_FINAL_TYPE (ClutterColorOpBt2390Eetf,
++                      clutter_color_op_bt2390_eetf,
++                      CLUTTER, COLOR_OP_BT2390_EETF,
++                      ClutterColorOp)
++
++typedef struct _ClutterBt2390EetfParameters
++{
++  float scale;
++  float source_min;
++  float source_range;
++  float knee_start;
++  float max_lum;
++} ClutterBt2390EetfParameters;
++
++ClutterColorOp * clutter_color_op_bt2390_eetf_new (const ClutterBt2390EetfParameters *parameters);
++
++const ClutterBt2390EetfParameters * clutter_color_op_bt2390_eetf_get_parameters (ClutterColorOp *op);
+diff --git a/clutter/clutter/clutter-color-op.c b/clutter/clutter/clutter-color-op.c
+index 3f1704232..6616e15fb 100644
+--- a/clutter/clutter/clutter-color-op.c
++++ b/clutter/clutter/clutter-color-op.c
+@@ -769,6 +769,136 @@ clutter_color_op_hlg_get_parameters (ClutterColorOp *op,
+   *coefficients = parameters->coefficients;
+ }
+ 
++/* SMPTE ST 2084 constants, exact. */
++#define PQ_M1 (2610.0f / 16384.0f)
++#define PQ_M2 (2523.0f / 4096.0f * 128.0f)
++#define PQ_C1 (3424.0f / 4096.0f)
++#define PQ_C2 (2413.0f / 4096.0f * 32.0f)
++#define PQ_C3 (2392.0f / 4096.0f * 32.0f)
++
++/* Absolute luminance in cd/m² to a PQ code value; defined above 10000. */
++static float
++pq_signal_from_luminance (float luminance)
++{
++  float p = powf (MAX (luminance, 0.0f) / 10000.0f, PQ_M1);
++
++  return powf ((PQ_C1 + PQ_C2 * p) / (1.0f + PQ_C3 * p), PQ_M2);
++}
++
++static float
++pq_luminance_from_signal (float signal)
++{
++  float p = powf (MAX (signal, 0.0f), 1.0f / PQ_M2);
++
++  return 10000.0f * powf (MAX (p - PQ_C1, 0.0f) / (PQ_C2 - PQ_C3 * p),
++                          1.0f / PQ_M1);
++}
++
++struct _ClutterColorOpBt2390Eetf
++{
++  ClutterColorOp parent;
++
++  ClutterBt2390EetfParameters parameters;
++};
++
++G_DEFINE_FINAL_TYPE (ClutterColorOpBt2390Eetf, clutter_color_op_bt2390_eetf,
++                     CLUTTER_TYPE_COLOR_OP)
++
++static void
++clutter_color_op_bt2390_eetf_do_transform (ClutterColorOp *op,
++                                           float          *data,
++                                           size_t          n_samples)
++{
++  const ClutterBt2390EetfParameters *parameters =
++    &CLUTTER_COLOR_OP_BT2390_EETF (op)->parameters;
++  float ks = parameters->knee_start;
++
++  for (size_t i = 0; i < n_samples; i++)
++    {
++      float peak, luminance, e1, e2, mapped, ratio;
++
++      /* Without a positive component there is nothing to compress, and no
++       * ratio to take. */
++      peak = MAX (data[0], MAX (data[1], data[2]));
++      if (peak > 0.0f)
++        {
++          luminance = peak * parameters->scale;
++
++          e1 = (pq_signal_from_luminance (luminance) - parameters->source_min) /
++               parameters->source_range;
++
++          /* Below the knee the curve is the identity, down to and below the
++           * source minimum: nothing is raised, and there is no black level
++           * lift (b = 0). A knee at 1 or above leaves nothing to compress.
++           * Above the source peak, the curve stays at the target peak. */
++          if (e1 >= ks && ks < 1.0f)
++            {
++              float t = (MIN (e1, 1.0f) - ks) / (1.0f - ks);
++              float t2 = t * t;
++              float t3 = t2 * t;
++
++              e2 = (2.0f * t3 - 3.0f * t2 + 1.0f) * ks +
++                   (t3 - 2.0f * t2 + t) * (1.0f - ks) +
++                   (-2.0f * t3 + 3.0f * t2) * parameters->max_lum;
++
++              mapped = pq_luminance_from_signal (e2 * parameters->source_range +
++                                                 parameters->source_min);
++              ratio = mapped / luminance;
++
++              data[0] *= ratio;
++              data[1] *= ratio;
++              data[2] *= ratio;
++            }
++        }
++
++      data += 4;
++    }
++}
++
++static char *
++clutter_color_op_bt2390_eetf_to_string (ClutterColorOp *op)
++{
++  const ClutterBt2390EetfParameters *parameters =
++    &CLUTTER_COLOR_OP_BT2390_EETF (op)->parameters;
++  char max_lum_str[G_ASCII_DTOSTR_BUF_SIZE];
++
++  g_ascii_formatd (max_lum_str, sizeof (max_lum_str), "%.4f",
++                   parameters->max_lum);
++
++  return g_strdup_printf ("bt2390_eetf(max lum %s)", max_lum_str);
++}
++
++static void
++clutter_color_op_bt2390_eetf_class_init (ClutterColorOpBt2390EetfClass *klass)
++{
++  ClutterColorOpClass *op_class = CLUTTER_COLOR_OP_CLASS (klass);
++
++  op_class->to_string = clutter_color_op_bt2390_eetf_to_string;
++  op_class->do_transform = clutter_color_op_bt2390_eetf_do_transform;
++}
++
++static void
++clutter_color_op_bt2390_eetf_init (ClutterColorOpBt2390Eetf *op)
++{
++}
++
++ClutterColorOp *
++clutter_color_op_bt2390_eetf_new (const ClutterBt2390EetfParameters *parameters)
++{
++  ClutterColorOpBt2390Eetf *op;
++
++  op = g_object_new (CLUTTER_TYPE_COLOR_OP_BT2390_EETF, NULL);
++  op->parameters = *parameters;
++
++  return CLUTTER_COLOR_OP (op);
++}
++
++const ClutterBt2390EetfParameters *
++clutter_color_op_bt2390_eetf_get_parameters (ClutterColorOp *op)
++{
++  return &CLUTTER_COLOR_OP_BT2390_EETF (op)->parameters;
++}
++
+ typedef struct _ClutterColorOp3DLutPrivate
+ {
+   uint32_t size;
+diff --git a/clutter/clutter/clutter-color-pipeline-shader.c b/clutter/clutter/clutter-color-pipeline-shader.c
+index 306b01b8a..534a7d327 100644
+--- a/clutter/clutter/clutter-color-pipeline-shader.c
++++ b/clutter/clutter/clutter-color-pipeline-shader.c
+@@ -257,6 +257,62 @@ static const char hlg_inv_eotf_source[] =
+   "  return clamp ((signal - beta) / (1.0 - beta), 0.0, 1.0);\n"
+   "}\n";
+ 
++/* Report ITU-R BT.2390 EETF; must match ClutterColorOpBt2390Eetf. */
++static const char bt2390_eetf_source[] =
++  "float bt2390_pq_signal (float luminance)\n"
++  "{\n"
++  "  const float m1 = 2610.0 / 16384.0;\n"
++  "  const float m2 = 2523.0 / 4096.0 * 128.0;\n"
++  "  const float c1 = 3424.0 / 4096.0;\n"
++  "  const float c2 = 2413.0 / 4096.0 * 32.0;\n"
++  "  const float c3 = 2392.0 / 4096.0 * 32.0;\n"
++  "\n"
++  "  float p = pow (max (luminance, 0.0) / 10000.0, m1);\n"
++  "  return pow ((c1 + c2 * p) / (1.0 + c3 * p), m2);\n"
++  "}\n"
++  "\n"
++  "float bt2390_pq_luminance (float signal)\n"
++  "{\n"
++  "  const float m1 = 2610.0 / 16384.0;\n"
++  "  const float m2 = 2523.0 / 4096.0 * 128.0;\n"
++  "  const float c1 = 3424.0 / 4096.0;\n"
++  "  const float c2 = 2413.0 / 4096.0 * 32.0;\n"
++  "  const float c3 = 2392.0 / 4096.0 * 32.0;\n"
++  "\n"
++  "  float p = pow (max (signal, 0.0), 1.0 / m2);\n"
++  "  return 10000.0 * pow (max (p - c1, 0.0) / (c2 - c3 * p), 1.0 / m1);\n"
++  "}\n"
++  "\n"
++  "vec3 bt2390_eetf (vec3  color,\n"
++  "                  float scale,\n"
++  "                  float source_min,\n"
++  "                  float source_range,\n"
++  "                  float ks,\n"
++  "                  float max_lum)\n"
++  "{\n"
++  "  float peak = max (color.r, max (color.g, color.b));\n"
++  "\n"
++  "  if (peak <= 0.0)\n"
++  "    return color;\n"
++  "\n"
++  "  float luminance = peak * scale;\n"
++  "  float e1 = (bt2390_pq_signal (luminance) - source_min) / source_range;\n"
++  "\n"
++  "  /* Identity below the knee; no black level lift. */\n"
++  "  if (e1 < ks || ks >= 1.0)\n"
++  "    return color;\n"
++  "\n"
++  "  float t = (min (e1, 1.0) - ks) / (1.0 - ks);\n"
++  "  float t2 = t * t;\n"
++  "  float t3 = t2 * t;\n"
++  "  float e2 = (2.0 * t3 - 3.0 * t2 + 1.0) * ks +\n"
++  "             (t3 - 2.0 * t2 + t) * (1.0 - ks) +\n"
++  "             (-2.0 * t3 + 3.0 * t2) * max_lum;\n"
++  "  float mapped = bt2390_pq_luminance (e2 * source_range + source_min);\n"
++  "\n"
++  "  return color * (mapped / luminance);\n"
++  "}\n";
++
+ static const char lut_3d_source[] =
+   "// Tetrahedral interpolation\n"
+   "vec3 sample_3d_lut_SIZE (vec3 color, sampler2D lut_texture, float lut_size)\n"
+@@ -762,6 +818,45 @@ update_hlg_state (ClutterColorOp *op,
+                                    3, 1, coefficients);
+ }
+ 
++static char *
++get_bt2390_eetf_declarations (ClutterColorOp *op,
++                              size_t          op_id)
++{
++  return g_strdup_printf ("uniform float bt2390_scale_%zu;\n"
++                          "uniform float bt2390_source_min_%zu;\n"
++                          "uniform float bt2390_source_range_%zu;\n"
++                          "uniform float bt2390_knee_start_%zu;\n"
++                          "uniform float bt2390_max_lum_%zu;\n",
++                          op_id, op_id, op_id, op_id, op_id);
++}
++
++static char *
++get_bt2390_eetf_invocation (ClutterColorOp *op,
++                            size_t          op_id)
++{
++  return g_strdup_printf ("vec4 (bt2390_eetf (color.rgb, bt2390_scale_%zu, "
++                          "bt2390_source_min_%zu, bt2390_source_range_%zu, "
++                          "bt2390_knee_start_%zu, bt2390_max_lum_%zu), "
++                          "color.a)",
++                          op_id, op_id, op_id, op_id, op_id);
++}
++
++static void
++update_bt2390_eetf_state (ClutterColorOp *op,
++                          size_t          op_id,
++                          CoglPipeline   *pipeline)
++{
++  const ClutterBt2390EetfParameters *parameters =
++    clutter_color_op_bt2390_eetf_get_parameters (op);
++
++  set_uniform_1f (pipeline, "bt2390_scale", op_id, parameters->scale);
++  set_uniform_1f (pipeline, "bt2390_source_min", op_id, parameters->source_min);
++  set_uniform_1f (pipeline, "bt2390_source_range", op_id,
++                  parameters->source_range);
++  set_uniform_1f (pipeline, "bt2390_knee_start", op_id, parameters->knee_start);
++  set_uniform_1f (pipeline, "bt2390_max_lum", op_id, parameters->max_lum);
++}
++
+ typedef struct _ShaderOpInfo
+ {
+   GType (*get_type) (void);
+@@ -816,6 +911,13 @@ static const ShaderOpInfo shader_op_infos[] = {
+     .get_invocation = get_hlg_inv_eotf_invocation,
+     .update_state = update_hlg_state,
+   },
++  {
++    .get_type = clutter_color_op_bt2390_eetf_get_type,
++    .shader_source = bt2390_eetf_source,
++    .get_declarations = get_bt2390_eetf_declarations,
++    .get_invocation = get_bt2390_eetf_invocation,
++    .update_state = update_bt2390_eetf_state,
++  },
+   {
+     .get_type = clutter_color_op_unpremultiply_get_type,
+     .shader_source = unpremultiply_source,
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index 17ff0fb3d..555688f72 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -28,9 +28,12 @@
+  * luminance range and the maximum content and frame-average light levels of
+  * wp_image_description_creator_params_v1 (SMPTE ST 2086, CTA-861-H).
+  *
+- * Luminances are in the units of the state's own ClutterLuminance. A value
+- * that was not declared is absent: has_primaries and has_luminance are FALSE,
+- * and max_cll and max_fall are 0.
++ * Luminances are in the units of the state's own ClutterLuminance, except in
++ * a blending state derived from a display's target: it keeps the display's
++ * values, and the display's reference white luminance as its display
++ * reference (see clutter_color_state_params_get_display_reference_luminance()).
++ * A value that was not declared is absent: has_primaries and has_luminance are
++ * FALSE, and max_cll and max_fall are 0.
+  *
+  * Not part of the installed API.
+  */
+@@ -60,5 +63,20 @@ gboolean clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *
+                                                        double                  *min_headroom,
+                                                        double                  *peak_headroom);
+ 
++float clutter_color_state_params_get_display_reference_luminance (ClutterColorStateParams *color_state_params);
++
++gboolean clutter_color_state_params_get_display_target (ClutterColorStateParams *color_state_params,
++                                                        float                   *min_lum,
++                                                        float                   *max_lum,
++                                                        float                   *display_reference_lum);
++
++/* Exact identity, for caches whose entries must not be shared by states that
++ * clutter_color_state_equals() deems close enough. */
++CLUTTER_EXPORT
++gboolean clutter_color_state_identical (ClutterColorState *color_state,
++                                        ClutterColorState *other_color_state);
++
++guint clutter_color_state_identity_hash (ClutterColorState *color_state);
++
+ gboolean clutter_color_state_encoding_equals (ClutterColorState *color_state,
+                                               ClutterColorState *other_color_state);
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index 2b61c83bf..cbf12351c 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -58,6 +58,12 @@ typedef struct _ClutterColorStateParams
+   ClutterLuminance luminance;
+ 
+   ClutterColorTargetVolume target_volume;
++
++  /* The luminance, in cd/m², at which reference white is reproduced on the
++   * display the target volume describes, or 0 if the state's own luminances
++   * are absolute (its reference luminance is that luminance). Only states
++   * derived for blending from a display's target carry one. */
++  float display_reference_lum;
+ } ClutterColorStateParams;
+ 
+ G_DEFINE_TYPE (ClutterColorStateParams,
+@@ -136,7 +142,10 @@ encoding_bounds_peak (ClutterColorStateParams *color_state_params)
+  * which every conversion anchors. The effective peak is the smallest of the
+  * declared maximum content light level, the declared target (mastering)
+  * maximum luminance and, for an encoding whose signal range bounds it, the
+- * encoding's own maximum. MaxFALL, an average, never lowers it.
++ * encoding's own maximum. MaxFALL, an average, never lowers it. Target
++ * volume values are divided by the display reference luminance, the
++ * encoding's by the state's reference luminance; for a state whose
++ * luminances are absolute the two are the same.
+  *
+  * Returns: %FALSE if the effective peak is unknown: an extended-range
+  *   encoding with neither MaxCLL nor a target maximum declared.
+@@ -148,7 +157,7 @@ clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_sta
+ {
+   const ClutterColorTargetVolume *target_volume;
+   const ClutterLuminance *lum;
+-  double ref;
++  double display_ref;
+   double peak = INFINITY;
+ 
+   g_return_val_if_fail (CLUTTER_IS_COLOR_STATE_PARAMS (color_state_params),
+@@ -156,21 +165,22 @@ clutter_color_state_params_get_peak_headroom (ClutterColorStateParams *color_sta
+ 
+   target_volume = &color_state_params->target_volume;
+   lum = clutter_color_state_params_get_luminance (color_state_params);
+-  ref = lum->ref;
++  display_ref =
++    clutter_color_state_params_get_display_reference_luminance (color_state_params);
+ 
+   /* Extended range states can exceed their nominal maximum. */
+   if (encoding_bounds_peak (color_state_params))
+-    peak = MAX (lum->max, lum->mastering_max) / ref;
++    peak = (double) MAX (lum->max, lum->mastering_max) / lum->ref;
+   if (target_volume->has_luminance)
+-    peak = MIN (peak, target_volume->max_lum / ref);
++    peak = MIN (peak, target_volume->max_lum / display_ref);
+   if (target_volume->max_cll > 0.0f)
+-    peak = MIN (peak, target_volume->max_cll / ref);
++    peak = MIN (peak, target_volume->max_cll / display_ref);
+ 
+   if (min_headroom)
+     {
+       *min_headroom = target_volume->has_luminance ?
+-                      target_volume->min_lum / ref :
+-                      lum->min / ref;
++                      target_volume->min_lum / display_ref :
++                      lum->min / (double) lum->ref;
+     }
+   if (peak_headroom)
+     *peak_headroom = peak;
+@@ -264,7 +274,9 @@ clutter_color_state_params_equals (ClutterColorState *color_state,
+   return clutter_color_state_params_encoding_equals (color_state_params,
+                                                      other_color_state_params) &&
+          target_volume_equal (&color_state_params->target_volume,
+-                              &other_color_state_params->target_volume);
++                              &other_color_state_params->target_volume) &&
++         color_state_params->display_reference_lum ==
++         other_color_state_params->display_reference_lum;
+ }
+ 
+ /*
+@@ -344,6 +356,11 @@ clutter_color_state_params_to_string (ClutterColorState *color_state)
+     g_string_append_printf (string, ", max cll: %f", target_volume->max_cll);
+   if (target_volume->max_fall > 0.0f)
+     g_string_append_printf (string, ", max fall: %f", target_volume->max_fall);
++  if (color_state_params->display_reference_lum > 0.0f)
++    {
++      g_string_append_printf (string, ", display ref lum: %f",
++                              color_state_params->display_reference_lum);
++    }
+ 
+   g_string_append (string, ")");
+ 
+@@ -384,6 +401,78 @@ clutter_color_state_params_required_format (ClutterColorState *color_state)
+   g_assert_not_reached ();
+ }
+ 
++static gboolean
++has_target_volume (const ClutterColorTargetVolume *target_volume)
++{
++  return target_volume->has_primaries ||
++         target_volume->has_luminance ||
++         target_volume->max_cll > 0.0f ||
++         target_volume->max_fall > 0.0f;
++}
++
++/*
++ * The luminance, in cd/m², at which the state's reference white is
++ * reproduced on the display its target volume describes: the state's own
++ * reference luminance, unless it was derived for blending from a display's
++ * target, whose reference luminance it keeps.
++ */
++float
++clutter_color_state_params_get_display_reference_luminance (ClutterColorStateParams *color_state_params)
++{
++  if (color_state_params->display_reference_lum > 0.0f)
++    return color_state_params->display_reference_lum;
++
++  return clutter_color_state_params_get_luminance (color_state_params)->ref;
++}
++
++/*
++ * Whether the state is a display target: a blending state derived from an
++ * output whose target luminance is known. Only such a state carries a
++ * display reference; it is what highlight mapping converts toward. Its
++ * target luminance range is in the display's cd/m².
++ */
++gboolean
++clutter_color_state_params_get_display_target (ClutterColorStateParams *color_state_params,
++                                               float                   *min_lum,
++                                               float                   *max_lum,
++                                               float                   *display_reference_lum)
++{
++  const ClutterColorTargetVolume *target_volume =
++    &color_state_params->target_volume;
++
++  if (!target_volume->has_luminance ||
++      !(color_state_params->display_reference_lum > 0.0f))
++    return FALSE;
++
++  if (min_lum)
++    *min_lum = target_volume->min_lum;
++  if (max_lum)
++    *max_lum = target_volume->max_lum;
++  if (display_reference_lum)
++    *display_reference_lum = color_state_params->display_reference_lum;
++
++  return TRUE;
++}
++
++/*
++ * A copy of @color_state_params blended for the display its target volume
++ * describes, recording the display's reference white luminance.
++ */
++static ClutterColorState *
++new_display_target (ClutterColorStateParams *blending_params,
++                    ClutterColorStateParams *color_state_params)
++{
++  ClutterColorState *blending_color_state;
++
++  blending_color_state =
++    clutter_color_state_params_new_with_target_volume (blending_params,
++                                                       &color_state_params->target_volume);
++  CLUTTER_COLOR_STATE_PARAMS (blending_color_state)->display_reference_lum =
++    clutter_color_state_params_get_display_reference_luminance (color_state_params);
++
++  return blending_color_state;
++}
++
+ /*
+  * Currently all content is blended with gamma transfer characteristics. HDR
+  * signals (PQ and HLG) are blended in extended range gamma 2.2 sRGB.
+@@ -395,6 +484,7 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+   ClutterColorStateParams *color_state_params =
+     CLUTTER_COLOR_STATE_PARAMS (color_state);
+   g_autoptr (ClutterContext) context = NULL;
++  ClutterColorState *blending_color_state;
+   ClutterColorimetry blending_colorimetry;
+   ClutterEOTF blending_eotf;
+   ClutterLuminance luminance, blending_luminance;
+@@ -420,7 +510,14 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+   if (clutter_eotf_equal (&blending_eotf, &color_state_params->eotf) &&
+       clutter_colorimetry_equal (&blending_colorimetry,
+                                  &color_state_params->colorimetry))
+-    return g_object_ref (color_state);
++    {
++      /* A target luminance makes the blending state a display target. */
++      if (!color_state_params->target_volume.has_luminance ||
++          color_state_params->display_reference_lum > 0.0f)
++        return g_object_ref (color_state);
++
++      return new_display_target (color_state_params, color_state_params);
++    }
+ 
+   luminance = *clutter_color_state_params_get_luminance (color_state_params);
+   if (force_linear)
+@@ -437,10 +534,25 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+ 
+   g_object_get (G_OBJECT (color_state), "context", &context, NULL);
+ 
+-  return clutter_color_state_params_new_from_primitives (context,
+-                                                         blending_colorimetry,
+-                                                         blending_eotf,
+-                                                         blending_luminance);
++  blending_color_state =
++    clutter_color_state_params_new_from_primitives (context,
++                                                    blending_colorimetry,
++                                                    blending_eotf,
++                                                    blending_luminance);
++
++  if (!has_target_volume (&color_state_params->target_volume))
++    return blending_color_state;
++
++  /* The target volume keeps its values: they stay in the units of the
++   * display it describes, whose reference white luminance the blending state
++   * records, since its own luminance units are scaled to a different
++   * reference white. */
++  {
++    g_autoptr (ClutterColorState) without_target = blending_color_state;
++
++    return new_display_target (CLUTTER_COLOR_STATE_PARAMS (without_target),
++                               color_state_params);
++  }
+ }
+ 
+ static guint
+@@ -478,6 +590,110 @@ clutter_color_state_params_hash (ClutterColorState *color_state)
+     hash = hash * 31 + float_hash (params->target_volume.max_lum);
+   hash = hash * 31 + float_hash (params->target_volume.max_cll);
+   hash = hash * 31 + float_hash (params->target_volume.max_fall);
++  hash = hash * 31 + float_hash (params->display_reference_lum);
++
++  return hash;
++}
++
++static gboolean
++colorimetry_identical (const ClutterColorimetry *colorimetry,
++                       const ClutterColorimetry *other_colorimetry)
++{
++  if (colorimetry->type != other_colorimetry->type)
++    return FALSE;
++
++  switch (colorimetry->type)
++    {
++    case CLUTTER_COLORIMETRY_TYPE_COLORSPACE:
++      return colorimetry->colorspace == other_colorimetry->colorspace;
++    case CLUTTER_COLORIMETRY_TYPE_PRIMARIES:
++      return memcmp (colorimetry->primaries, other_colorimetry->primaries,
++                     sizeof (ClutterPrimaries)) == 0;
++    }
++
++  g_assert_not_reached ();
++}
++
++static gboolean
++eotf_identical (const ClutterEOTF *eotf,
++                const ClutterEOTF *other_eotf)
++{
++  if (eotf->type != other_eotf->type)
++    return FALSE;
++
++  switch (eotf->type)
++    {
++    case CLUTTER_EOTF_TYPE_NAMED:
++      return eotf->tf_name == other_eotf->tf_name;
++    case CLUTTER_EOTF_TYPE_GAMMA:
++      return eotf->gamma_exp == other_eotf->gamma_exp;
++    }
++
++  g_assert_not_reached ();
++}
++
++/*
++ * clutter_color_state_identical:
++ *
++ * Exact identity of two color states: unlike clutter_color_state_equals(),
++ * which treats luminances within 10% and chromaticities within 1e-4 as
++ * equal, parametric states must agree exactly in every value that a color
++ * transform, its highlight mapping or direct scanout can depend on. ICC
++ * states compare by profile, as with clutter_color_state_equals().
++ */
++gboolean
++clutter_color_state_identical (ClutterColorState *color_state,
++                               ClutterColorState *other_color_state)
++{
++  ClutterColorStateParams *params, *other_params;
++  const ClutterLuminance *lum, *other_lum;
++
++  if (color_state == other_color_state)
++    return TRUE;
++
++  if (!color_state || !other_color_state ||
++      G_OBJECT_TYPE (color_state) != G_OBJECT_TYPE (other_color_state))
++    return FALSE;
++
++  if (!CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
++    return clutter_color_state_equals (color_state, other_color_state);
++
++  params = CLUTTER_COLOR_STATE_PARAMS (color_state);
++  other_params = CLUTTER_COLOR_STATE_PARAMS (other_color_state);
++  lum = clutter_color_state_params_get_luminance (params);
++  other_lum = clutter_color_state_params_get_luminance (other_params);
++
++  return colorimetry_identical (&params->colorimetry,
++                                &other_params->colorimetry) &&
++         eotf_identical (&params->eotf, &other_params->eotf) &&
++         lum->min == other_lum->min &&
++         lum->max == other_lum->max &&
++         lum->ref == other_lum->ref &&
++         lum->mastering_max == other_lum->mastering_max &&
++         target_volume_equal (&params->target_volume,
++                              &other_params->target_volume) &&
++         params->display_reference_lum == other_params->display_reference_lum;
++}
++
++/* A hash consistent with clutter_color_state_identical(). */
++guint
++clutter_color_state_identity_hash (ClutterColorState *color_state)
++{
++  ClutterColorStateParams *params;
++  const ClutterLuminance *lum;
++  guint hash;
++
++  hash = clutter_color_state_hash (color_state);
++  if (!CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
++    return hash;
++
++  params = CLUTTER_COLOR_STATE_PARAMS (color_state);
++  lum = clutter_color_state_params_get_luminance (params);
++
++  hash = hash * 31 + float_hash (lum->min);
++  hash = hash * 31 + float_hash (lum->max);
++  hash = hash * 31 + float_hash (lum->ref);
++  hash = hash * 31 + float_hash (lum->mastering_max);
+ 
+   return hash;
+ }
+@@ -695,6 +911,7 @@ clutter_color_state_params_new_with_target_volume (ClutterColorStateParams
+   copy->eotf = color_state_params->eotf;
+   copy->luminance = color_state_params->luminance;
+   copy->target_volume = *target_volume;
++  copy->display_reference_lum = color_state_params->display_reference_lum;
+ 
+   return CLUTTER_COLOR_STATE (copy);
+ }
+diff --git a/clutter/clutter/clutter-color-transform-private.h b/clutter/clutter/clutter-color-transform-private.h
+index 6a1854ea9..2ffb19629 100644
+--- a/clutter/clutter/clutter-color-transform-private.h
++++ b/clutter/clutter/clutter-color-transform-private.h
+@@ -40,3 +40,8 @@ ClutterColorTransform * clutter_color_transform_from_color_states (ClutterContex
+ 
+ CLUTTER_EXPORT_TEST
+ ClutterColorPipeline * clutter_color_transform_get_pipeline (ClutterColorTransform *transform);
++
++/* Exported for libmutter, whose direct scanout decision must agree with it. */
++CLUTTER_EXPORT
++gboolean clutter_color_transform_requires_highlight_mapping (ClutterColorState *source_color_state,
++                                                             ClutterColorState *target_color_state);
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 65c03f297..f1f097027 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1008,6 +1008,149 @@ add_luminance_mapping_op (ClutterColorPipeline *pipeline,
+                                   clutter_color_op_multiply_new (lum_factor));
+ }
+ 
++/*
++ * The range of @color_state's content as multiples of its reference white
++ * luminance: the lowest luminance of its range and its effective peak.
++ * Returns %FALSE if the peak is unknown.
++ */
++static gboolean
++get_source_headroom (ClutterColorState *color_state,
++                     double            *min_headroom,
++                     double            *peak_headroom)
++{
++  const ClutterLuminance *lum;
++
++  if (CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
++    {
++      return clutter_color_state_params_get_peak_headroom (CLUTTER_COLOR_STATE_PARAMS (color_state),
++                                                           min_headroom,
++                                                           peak_headroom);
++    }
++
++  lum = clutter_color_state_get_luminance (color_state);
++  *min_headroom = lum->min / (double) lum->ref;
++  *peak_headroom = lum->max / (double) lum->ref;
++
++  return TRUE;
++}
++
++/*
++ * Whether converting @source_color_state to @target_color_state maps
++ * highlights: only toward a display target (the blending state of an output
++ * whose target peak is known, the only kind of state carrying a display
++ * reference), and only when the effective peak of the source is known and
++ * exceeds the target's.
++ *
++ * Every conversion anchors reference white: a luminance L in the source
++ * becomes L * target ref / source ref in the target (see
++ * add_luminance_mapping_op()). The source peak is compared after that
++ * scaling, which is comparing both as multiples of their reference white.
++ * The target's peak is a display luminance, so its multiple is taken of the
++ * display's reference white luminance. Computed the same way on both sides,
++ * a state never exceeds its own target, and content declaring the target as
++ * its own mastering peak is not mapped.
++ *
++ * The renderer adds the mapping exactly when this returns %TRUE, and direct
++ * scanout of a surface must be refused when it does.
++ */
++gboolean
++clutter_color_transform_requires_highlight_mapping (ClutterColorState *source_color_state,
++                                                    ClutterColorState *target_color_state)
++{
++  const ClutterLuminance *source_lum;
++  double source_min, source_peak;
++  float target_max, display_ref;
++
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (source_color_state), FALSE);
++  g_return_val_if_fail (CLUTTER_IS_COLOR_STATE (target_color_state), FALSE);
++
++  if (!CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state) ||
++      !clutter_color_state_params_get_display_target (CLUTTER_COLOR_STATE_PARAMS (target_color_state),
++                                                      NULL, &target_max,
++                                                      &display_ref))
++    return FALSE;
++
++  source_lum = clutter_color_state_get_luminance (source_color_state);
++  if (!(source_lum->ref > 0.0f))
++    return FALSE;
++
++  if (!get_source_headroom (source_color_state, &source_min, &source_peak) ||
++      !(source_peak > source_min))
++    return FALSE;
++
++  return source_peak > target_max / (double) display_ref;
++}
++
++/* SMPTE ST 2084 inverse EOTF of an absolute luminance in cd/m². */
++static double
++pq_signal (double luminance)
++{
++  const double m1 = 2610.0 / 16384.0;
++  const double m2 = 2523.0 / 4096.0 * 128.0;
++  const double c1 = 3424.0 / 4096.0;
++  const double c2 = 2413.0 / 4096.0 * 32.0;
++  const double c3 = 2392.0 / 4096.0 * 32.0;
++  double p = pow (MAX (luminance, 0.0) / 10000.0, m1);
++
++  return pow ((c1 + c2 * p) / (1.0 + c3 * p), m2);
++}
++
++/*
++ * Report ITU-R BT.2390 EETF from the source range to the target's declared
++ * peak, after the reference-white scaling, in linear BT.2020 normalized to
++ * the target's maximum luminance. Only highlights are compressed: the source
++ * minimum normalizes the curve, but the target minimum is not used as a black
++ * level lift, which would raise black (b = 0).
++ *
++ * The curve is defined on absolute luminance, in the PQ domain: the display
++ * luminance. The target declares its luminances in the display's units, with
++ * the display's reference white luminance as its display reference. Every
++ * other luminance is anchored by reference white: a sample v, normalized to
++ * the target's maximum, is v * target max / target ref multiples of
++ * reference white, and so many display references in cd/m², and a source's
++ * range, as multiples of its reference white, likewise.
++ */
++static void
++add_highlight_mapping_op (ClutterColorPipeline *pipeline,
++                          ClutterColorState    *source_color_state,
++                          ClutterColorState    *target_color_state)
++{
++  ClutterColorStateParams *target_params =
++    CLUTTER_COLOR_STATE_PARAMS (target_color_state);
++  const ClutterLuminance *target_lum =
++    clutter_color_state_params_get_luminance (target_params);
++  ClutterBt2390EetfParameters parameters;
++  double source_min, source_peak;
++  double source_min_pq, source_max_pq, source_range;
++  double max_lum;
++  float target_max, display_ref;
++
++  /* clutter_color_transform_requires_highlight_mapping() checked these. */
++  if (!clutter_color_state_params_get_display_target (target_params, NULL,
++                                                      &target_max,
++                                                      &display_ref) ||
++      !get_source_headroom (source_color_state, &source_min, &source_peak))
++    g_return_if_reached ();
++
++  source_min_pq = pq_signal (source_min * display_ref);
++  source_max_pq = pq_signal (source_peak * display_ref);
++  source_range = source_max_pq - source_min_pq;
++  g_return_if_fail (source_range > 0.0);
++
++  max_lum = (pq_signal (target_max) - source_min_pq) / source_range;
++
++  parameters = (ClutterBt2390EetfParameters) {
++    .scale = (float) (target_lum->max * display_ref / target_lum->ref),
++    .source_min = (float) source_min_pq,
++    .source_range = (float) source_range,
++    .knee_start = (float) (1.5 * max_lum - 0.5),
++    .max_lum = (float) max_lum,
++  };
++
++  clutter_color_pipeline_take_op (pipeline,
++                                  clutter_color_op_bt2390_eetf_new (&parameters));
++}
++
+ static void
+ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+                           ClutterColorState               *source_color_state,
+@@ -1029,6 +1172,9 @@ build_transform_pipeline (ClutterColorPipeline            *pipeline,
+       /* source → linear BT.2020 D65 → target */
+       add_to_linear_bt2020_ops (pipeline, source_color_state);
+       add_luminance_mapping_op (pipeline, source_color_state, target_color_state);
++      if (clutter_color_transform_requires_highlight_mapping (source_color_state,
++                                                              target_color_state))
++        add_highlight_mapping_op (pipeline, source_color_state, target_color_state);
+       add_from_linear_bt2020_ops (pipeline, target_color_state);
+     }
+ 
+@@ -1047,9 +1193,12 @@ clutter_color_transform_new (ClutterColorState               *source_color_state
+   transform = g_object_new (CLUTTER_TYPE_COLOR_TRANSFORM, NULL);
+   pipeline = g_object_new (CLUTTER_TYPE_COLOR_PIPELINE, NULL);
+ 
+-  /* A target color volume alone does not change how pixels are encoded. */
++  /* A target color volume alone does not change how pixels are encoded, but
++   * a target luminance below the source's peak maps its highlights. */
+   if (!clutter_color_state_encoding_equals (source_color_state,
+-                                            target_color_state))
++                                            target_color_state) ||
++      clutter_color_transform_requires_highlight_mapping (source_color_state,
++                                                          target_color_state))
+     build_transform_pipeline (pipeline, source_color_state, target_color_state, flags);
+ 
+   clutter_color_pipeline_simplify (pipeline);
+@@ -1088,8 +1237,8 @@ color_transform_cache_key_hash (gconstpointer key)
+   const ColorTransformCacheKey *k = key;
+   unsigned int hash;
+ 
+-  hash = clutter_color_state_hash (k->source);
+-  hash = hash * 40499 + clutter_color_state_hash (k->target);
++  hash = clutter_color_state_identity_hash (k->source);
++  hash = hash * 40499 + clutter_color_state_identity_hash (k->target);
+   hash = hash * 31 + k->flags;
+ 
+   return hash;
+@@ -1102,8 +1251,11 @@ color_transform_cache_key_equal (gconstpointer a,
+   const ColorTransformCacheKey *ka = a;
+   const ColorTransformCacheKey *kb = b;
+ 
+-  return clutter_color_state_equals (ka->source, kb->source) &&
+-         clutter_color_state_equals (ka->target, kb->target) &&
++  /* Exact: transforms of states that clutter_color_state_equals() deems
++   * close enough can differ, in highlight mapping notably, so they must not
++   * share an entry. */
++  return clutter_color_state_identical (ka->source, kb->source) &&
++         clutter_color_state_identical (ka->target, kb->target) &&
+          ka->flags == kb->flags;
+ }
+ 

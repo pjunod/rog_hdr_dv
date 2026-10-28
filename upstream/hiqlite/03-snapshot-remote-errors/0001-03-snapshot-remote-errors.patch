@@ -1,0 +1,196 @@
+From 458aa110b03b4629d61f8e0b976aabdc8908b81e Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:42:43 -0400
+Subject: [PATCH] fix(raft-client): keep snapshot errors from the peer as
+ RemoteError
+
+`install_snapshot` flattened every error the peer answered with into
+`RPCError::Unreachable`. OpenRaft's chunked snapshot transport treats the
+two cases differently (openraft 0.9.25, `network/snapshot_transport.rs`):
+on a remote `InstallSnapshotError::SnapshotMismatch` it restarts the
+transfer at offset 0, while on `Unreachable` it resends the same chunk
+after a backoff and fails the transfer after 5 consecutive failures. A
+follower that lost its partial snapshot, e.g. by restarting, answers the
+resumed chunk with a mismatch, so the leader keeps resending the chunk
+the follower rejects instead of starting over.
+
+Return the peer's error as `RPCError::RemoteError` for the SQLite and
+the cache `install_snapshot`, and leave append_entries and vote as they
+were.
+
+The tests answer a snapshot chunk on the stream with a
+`SnapshotMismatch` and check that the error that reaches OpenRaft is the
+remote mismatch.
+---
+ hiqlite/src/network/raft_client.rs | 133 ++++++++++++++++++++++++++++-
+ 1 file changed, 131 insertions(+), 2 deletions(-)
+
+diff --git a/hiqlite/src/network/raft_client.rs b/hiqlite/src/network/raft_client.rs
+index d8ae381..8ce0c80 100644
+--- a/hiqlite/src/network/raft_client.rs
++++ b/hiqlite/src/network/raft_client.rs
+@@ -10,6 +10,7 @@ use fastwebsockets::{FragmentCollectorRead, Frame, OpCode, Payload, WebSocketWri
+ use hyper::upgrade::Upgraded;
+ use hyper_util::rt::TokioIo;
+ use openraft::error::RPCError;
++use openraft::error::RemoteError;
+ use openraft::error::Unreachable;
+ use std::collections::HashMap;
+ use std::ops::Deref;
+@@ -545,6 +546,20 @@ impl NetworkConnectionStreaming {
+     }
+ }
+ 
++/// Keep an error returned by the peer as a `RemoteError`.
++///
++/// OpenRaft's chunked snapshot transport matches on a remote
++/// `InstallSnapshotError::SnapshotMismatch` to restart the transfer at offset 0. Mapping the
++/// peer's response to `Unreachable` hides that signal, and every retry resends the chunk at the
++/// offset the follower has already rejected.
++#[cfg(any(feature = "cache", feature = "sqlite"))]
++fn remote_raft_error<Err>(node: &Node, error: Err) -> RPCError<NodeId, Node, Err>
++where
++    Err: std::error::Error,
++{
++    RPCError::RemoteError(RemoteError::new_with_node(node.id, node.clone(), error))
++}
++
+ #[cfg(feature = "sqlite")]
+ impl RaftNetwork<TypeConfigSqlite> for NetworkConnectionStreaming {
+     #[tracing::instrument(level = "debug", skip_all, err(Debug))]
+@@ -574,7 +589,7 @@ impl RaftNetwork<TypeConfigSqlite> for NetworkConnectionStreaming {
+         let (ack, rx) = oneshot::channel();
+         match self.send(RaftRequest::SnapshotDB((ack, req)), rx).await? {
+             RaftStreamResponsePayload::SnapshotDB(resp) => {
+-                resp.map_err(|err| RPCError::Unreachable(Unreachable::new(&err)))
++                resp.map_err(|err| remote_raft_error(&self.node, err))
+             }
+             _ => unreachable!(),
+         }
+@@ -628,7 +643,7 @@ impl RaftNetwork<TypeConfigKV> for NetworkConnectionStreaming {
+             .await?
+         {
+             RaftStreamResponsePayload::SnapshotCache(resp) => {
+-                resp.map_err(|err| RPCError::Unreachable(Unreachable::new(&err)))
++                resp.map_err(|err| remote_raft_error(&self.node, err))
+             }
+             _ => unreachable!(),
+         }
+@@ -649,3 +664,117 @@ impl RaftNetwork<TypeConfigKV> for NetworkConnectionStreaming {
+         }
+     }
+ }
++
++#[cfg(all(test, any(feature = "cache", feature = "sqlite")))]
++mod tests {
++    use super::*;
++    use openraft::error::SnapshotMismatch;
++    use openraft::{SnapshotMeta, SnapshotSegmentId, Vote};
++
++    fn test_node() -> Node {
++        Node {
++            id: 7,
++            addr_raft: "127.0.0.1:8100".into(),
++            addr_api: "127.0.0.1:8200".into(),
++        }
++    }
++
++    fn snapshot_request<C: openraft::RaftTypeConfig<NodeId = NodeId, Node = Node>>(
++        offset: u64,
++    ) -> InstallSnapshotRequest<C> {
++        InstallSnapshotRequest {
++            vote: Vote::new_committed(1, 1),
++            meta: SnapshotMeta::default(),
++            offset,
++            data: b"efgh".to_vec(),
++            done: false,
++        }
++    }
++
++    fn mismatch() -> RaftError<NodeId, InstallSnapshotError> {
++        RaftError::APIError(InstallSnapshotError::SnapshotMismatch(SnapshotMismatch {
++            expect: SnapshotSegmentId::from(("snapshot", 0)),
++            got: SnapshotSegmentId::from(("snapshot", 4)),
++        }))
++    }
++
++    /// The error OpenRaft receives must still be the peer's `SnapshotMismatch`, because that is
++    /// what makes it restart the snapshot transfer at offset 0.
++    fn assert_remote_mismatch<T: std::fmt::Debug>(
++        result: Result<T, RPCError<NodeId, Node, RaftError<NodeId, InstallSnapshotError>>>,
++    ) {
++        match result {
++            Err(RPCError::RemoteError(RemoteError {
++                target,
++                target_node,
++                source: RaftError::APIError(InstallSnapshotError::SnapshotMismatch(mismatch)),
++            })) => {
++                assert_eq!(target, 7);
++                assert_eq!(target_node, Some(test_node()));
++                assert_eq!(mismatch.expect, SnapshotSegmentId::from(("snapshot", 0)));
++                assert_eq!(mismatch.got, SnapshotSegmentId::from(("snapshot", 4)));
++            }
++            other => panic!("expected the remote SnapshotMismatch, got {other:?}"),
++        }
++    }
++
++    #[cfg(feature = "sqlite")]
++    #[tokio::test]
++    async fn sqlite_install_snapshot_keeps_remote_mismatch() {
++        let (sender, receiver) = flume::bounded(1);
++        let mut network = NetworkConnectionStreaming {
++            node: test_node(),
++            sender,
++            task: None,
++        };
++        let peer = tokio::spawn(async move {
++            let RaftRequest::SnapshotDB((ack, req)) = receiver.recv_async().await.unwrap() else {
++                panic!("expected a SQLite snapshot request");
++            };
++            assert_eq!(req.offset, 4);
++            ack.send(Ok(RaftStreamResponsePayload::SnapshotDB(Err(mismatch()))))
++                .unwrap();
++        });
++
++        let result =
++            <NetworkConnectionStreaming as RaftNetwork<TypeConfigSqlite>>::install_snapshot(
++                &mut network,
++                snapshot_request(4),
++                RPCOption::new(Duration::from_secs(1)),
++            )
++            .await;
++        peer.await.unwrap();
++        assert_remote_mismatch(result);
++    }
++
++    #[cfg(feature = "cache")]
++    #[tokio::test]
++    async fn cache_install_snapshot_keeps_remote_mismatch() {
++        let (sender, receiver) = flume::bounded(1);
++        let mut network = NetworkConnectionStreaming {
++            node: test_node(),
++            sender,
++            task: None,
++        };
++        let peer = tokio::spawn(async move {
++            let RaftRequest::SnapshotCache((ack, req)) = receiver.recv_async().await.unwrap()
++            else {
++                panic!("expected a cache snapshot request");
++            };
++            assert_eq!(req.offset, 4);
++            ack.send(Ok(RaftStreamResponsePayload::SnapshotCache(
++                Err(mismatch()),
++            )))
++            .unwrap();
++        });
++
++        let result = <NetworkConnectionStreaming as RaftNetwork<TypeConfigKV>>::install_snapshot(
++            &mut network,
++            snapshot_request(4),
++            RPCOption::new(Duration::from_secs(1)),
++        )
++        .await;
++        peer.await.unwrap();
++        assert_remote_mismatch(result);
++    }
++}

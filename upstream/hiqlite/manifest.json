@@ -1,0 +1,137 @@
+{
+  "repository": "sebadob/hiqlite",
+  "target_branch": "main",
+  "base": "493f980562766f0ce5645e015557bc39501f9a5b",
+  "venue": "github",
+  "draft": true,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-duplicate-node-ids",
+      "inventory_ids": [
+        "HQ-1"
+      ],
+      "title": "fix(config): reject duplicate node ids",
+      "patches": [
+        "01-duplicate-node-ids/0001-01-duplicate-node-ids.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [
+        "Explicit local human approval; open Draft and leave Ready for Review to a human",
+        "Complete just verify or document its unrun S3/MSRV/example checks"
+      ],
+      "tests": [
+        {
+          "command": "cargo fmt --check; cargo clippy -- -D warnings; no-S3 test feature suite; 22 feature Clippy configurations",
+          "result": "recovered exact-branch passes from 2026-10-27; not rerun",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "slug": "02-private-triage",
+      "inventory_ids": [
+        "HQ-RP"
+      ],
+      "title": "Private reporting route decision",
+      "patches": [],
+      "status": "security-hold",
+      "blockers": [
+        "Paul must decide the private reporting route before any public patch or reproduction"
+      ],
+      "tests": []
+    },
+    {
+      "id": "03",
+      "slug": "03-snapshot-remote-errors",
+      "inventory_ids": [
+        "HQ-8"
+      ],
+      "title": "fix(raft-client): keep snapshot peer errors as RemoteError",
+      "patches": [
+        "03-snapshot-remote-errors/0001-03-snapshot-remote-errors.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [
+        "Explicit local human approval before Draft PR"
+      ],
+      "tests": [
+        {
+          "command": "cargo fmt --check; cargo clippy -p hiqlite --features cache,counters,dlock,listen_notify,macros,toml,external-state-machine -- -D warnings; TEST_SKIP_S3_RESTORE=true cargo test -p hiqlite --features cache,counters,dlock,listen_notify,macros,toml,external-state-machine",
+          "result": "rustc 1.97.1: formatting/library Clippy passed; no-S3 upstream unit and cluster suites passed",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "04",
+      "slug": "04-optional-s3-provider",
+      "inventory_ids": [
+        "HQ-17",
+        "HQ-19"
+      ],
+      "title": "build: make S3 dependencies optional and initialize the HTTP crypto provider",
+      "patches": [
+        "04-optional-s3-provider/0001-04-optional-s3-provider.patch"
+      ],
+      "status": "design-hold",
+      "blockers": [
+        "Maintainer agreement on the feature topology",
+        "Explicit local human approval before Draft PR"
+      ],
+      "tests": [
+        {
+          "command": "cargo check -p hiqlite --no-default-features --features sqlite; cargo check -p hiqlite --no-default-features --features sqlite,s3; cargo test -p hiqlite --lib --no-default-features --features sqlite client_builds_without_a_preinstalled_crypto_provider",
+          "result": "both feature paths passed for the recovered components; exact final tree unchanged after squash; fresh-provider library regression1passed",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "05",
+      "slug": "05-bounded-websocket-writes-and-flushes",
+      "inventory_ids": [
+        "HQ-9"
+      ],
+      "title": "Bounded WebSocket writes and flushes",
+      "patches": [],
+      "status": "design-hold",
+      "blockers": [
+        "Upstream-only reproduction and focused port; discuss the proposed contract first",
+        "Explicit local human approval"
+      ],
+      "tests": []
+    },
+    {
+      "id": "06",
+      "slug": "06-join-socket-tasks-and-isolate-snapshot-receiv",
+      "inventory_ids": [
+        "HQ-10"
+      ],
+      "title": "Join socket tasks and isolate snapshot receive execution",
+      "patches": [],
+      "status": "design-hold",
+      "blockers": [
+        "Upstream-only reproduction and focused port; discuss the proposed contract first",
+        "Explicit local human approval"
+      ],
+      "tests": []
+    },
+    {
+      "id": "07",
+      "slug": "07-retain-a-shutdown-notification-when-the-reque",
+      "inventory_ids": [
+        "HQ-11"
+      ],
+      "title": "Retain a shutdown notification when the request queue is full",
+      "patches": [],
+      "status": "design-hold",
+      "blockers": [
+        "Upstream-only reproduction and focused port; discuss the proposed contract first",
+        "Explicit local human approval"
+      ],
+      "tests": []
+    }
+  ]
+}

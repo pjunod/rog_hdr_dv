@@ -1,0 +1,51 @@
+From 7ef59458a8787d2906f8aa2b8a5876de7ee2701f Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:12:55 -0400
+Subject: [PATCH] avfilter/bwdif_videotoolbox: bind the parameter buffer at
+ index zero
+
+The Metal kernel declares its parameter block at buffer(0). Texture
+slots and buffer slots are separate namespaces, so binding the parameter
+buffer after texture slot 3 leaves the kernel parameter block unbound.
+Bind it at buffer slot zero.
+
+The complete existing quilt queue applies. Native Mac compilation
+passes, and a synthetic send-field Metal run produces 20 distinct field
+hashes instead of repeating ten fields. CPU comparison improves but is
+not bit-exact.
+---
+ debian/patches/0102-bwdif-buffer-index.patch | 15 +++++++++++++++
+ debian/patches/series                        |  1 +
+ 2 files changed, 16 insertions(+)
+ create mode 100644 debian/patches/0102-bwdif-buffer-index.patch
+
+diff --git a/debian/patches/0102-bwdif-buffer-index.patch b/debian/patches/0102-bwdif-buffer-index.patch
+new file mode 100644
+index 00000000..e6967836
+--- /dev/null
++++ b/debian/patches/0102-bwdif-buffer-index.patch
+@@ -0,0 +1,15 @@
++Index: FFmpeg/libavfilter/vf_bwdif_videotoolbox.m
++===================================================================
++--- FFmpeg.orig/libavfilter/vf_bwdif_videotoolbox.m
+++++ FFmpeg/libavfilter/vf_bwdif_videotoolbox.m
++@@ -92,7 +92,9 @@ static void call_kernel(AVFilterContext *ctx,
++     [encoder setTexture:prev atIndex:1];
++     [encoder setTexture:cur  atIndex:2];
++     [encoder setTexture:next atIndex:3];
++-    [encoder setBuffer:s->mtlParamsBuffer offset:0 atIndex:4];
+++    /* Texture and buffer argument indices are separate Metal namespaces.
+++     * The shader declares its parameter block as [[buffer(0)]]. */
+++    [encoder setBuffer:s->mtlParamsBuffer offset:0 atIndex:0];
++     ff_metal_compute_encoder_dispatch(s->mtlDevice, s->mtlPipeline, encoder, dst.width, dst.height);
++     [encoder endEncoding];
++ 
+diff --git a/debian/patches/series b/debian/patches/series
+index c0c20f61..0fbd7807 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -99,3 +99,4 @@
+ 0099-fix-qsv-av1-decoder-exporting-hdr-side-data.patch
+ 0100-backport-trim-bitstream-filter.patch
+ 0101-fix-videotoolbox-closed-caption-sei.patch
++0102-bwdif-buffer-index.patch

@@ -1,0 +1,395 @@
+{
+  "schema": 1,
+  "date": "2026-10-28",
+  "scope": "Saved libdisplay-info and Mutter upstream kits; no upstream mutations",
+  "bases": {
+    "libdisplay_info": "af382cf311ce60983708a9e664728a61843143e7",
+    "mutter": "b48811767189fb5446bd1b831e98271a21866e09"
+  },
+  "semantic_review": {
+    "libdisplay_info_units": 6,
+    "mutter_units": 15,
+    "mutter_commits_after_fixup_fold": 80,
+    "coverage": [
+      "DisplayID remaining lengths/padding, nested headers, parser failures, binary16/raw chromaticities",
+      "KMS gates, target fallback/conflicts, finite and invertible matrices",
+      "Protocol validation, ICC fd zero/offsets/short reads/ownership, immutable records and disposal",
+      "HLG, highlight/gamut CPU and GLSL, cache keys, scanout/composition/capture/cursors",
+      "CTA/native SDR sources, linear Night Light, XML/DBus/gdctl overrides, cancellation and lifecycle ownership"
+    ],
+    "finding": "Legal UINT32_MAX protocol luminance rounds to 2^32 in float; unchecked uint32 cast has undefined behavior. Corrected with checked saturation in units06/09.",
+    "independent_review": "Another agent approved helper semantics, callers and boundary/protocol tests; lifetime fold review recorded separately in conversation.",
+    "limits": "Production diffs and relevant tests reviewed; not exhaustive verification of every repetitive test line, external standard, hardware behavior or upstream design acceptance."
+  },
+  "fixup_fold": {
+    "before": "First unit06 commit built and native-hdr passed, but Wayland CM exited -11 during teardown after TAP case passed.",
+    "cause": "Manager object-data finalization ran after display/output/backend teardown; existing unit06 commit4 corrected ordering.",
+    "change": "Moved production fix into first owning commit; moved sync-only test edits into topology commit3 and removed redundant commit4.",
+    "final_tip_trees_unchanged": true,
+    "after": "First corrected commit warnings build and both focused test entries pass (2/2)."
+  },
+  "source_archives": {
+    "mutter": [
+      {
+        "unit": "15",
+        "commit": "4d383096d7323113e89eb00ff39650e75a1c8e7a",
+        "tree": "05c66944cbb8cfb2d651d2096e23e70707fca5a0",
+        "archive": "mutter15-final.tar",
+        "archive_sha256": "55f5b109db81625074c20918e59efa915584d1f671221bf845eb2c8f5adf9f4c",
+        "archive_commit": "708e8baa554d1730fdff97e7134a6e2273b9bb53"
+      },
+      {
+        "unit": "06-first",
+        "commit": "ed33b487732da6f1a277a642543579389d7d78f9",
+        "tree": "8230a7b85b036a3de46788aa57f45c0b532d1780",
+        "archive": "mutter06-first-disposal-fixed.tar",
+        "archive_sha256": "af676dbc2f3de8309f07d2a0d6b798ef95b106a3921f59a0fd5f377324d1fa32",
+        "archive_commit": "ed33b487732da6f1a277a642543579389d7d78f9"
+      },
+      {
+        "unit": "06",
+        "commit": "e7b3e89b09b1c4272bb6d80562ce26c91f672cf8",
+        "tree": "bd8ccd1b6cf96af901ebee350e1915409e960687",
+        "archive": "mutter06-final.tar",
+        "archive_sha256": "267249b47fcf23837ebcd90db07e414d398856a6c2398282b3f1452da2344f82",
+        "archive_commit": "9e3c56de39345ed49a166c2e4c10ca0fb21086f0"
+      },
+      {
+        "unit": "09",
+        "commit": "067380de860c442afa8bc30a1550bc761b98b068",
+        "tree": "13eecea62664e661d6e1dd19ab669442586cff50",
+        "archive": "mutter09-final.tar",
+        "archive_sha256": "008d0d787b24efe6db5e60eeeaccf08d866fc12ae8fa6ff7a4f7f5c976807656",
+        "archive_commit": "991d17b94dc4546b56d34352cb013e54512e5a12"
+      },
+      {
+        "unit": "14",
+        "commit": "5db9b435028bd554465922c441e8b6ade508cb83",
+        "tree": "bf05304280b1d4e02c0b015e80e4f07217503443",
+        "archive": "mutter14-final.tar",
+        "archive_sha256": "3c8566caaeca74b5a73d8a07ae697d3c34977129b0e7e414cd96be965a43d76c",
+        "archive_commit": "251f0b77e66fe0a99f42d4b506dc3d9d60c6ea42"
+      }
+    ],
+    "libdisplay_info": {
+      "commit": "1574c1f3cd5ca4f67b156ba145dc68a884be98a9",
+      "tree": "0857f19399820b19791aa6b81aa6ef35eb00c4e8",
+      "archive_sha256": "ffd002378cc39e73793cdd023d45993b18af22561b0ec2658da8fded967e430b"
+    }
+  },
+  "unsigned_actual_apply_previews": [
+    {
+      "unit": "06",
+      "preview_commit": "fa5577a73890d659ce7402f8581e5baf49c81c04",
+      "tree": "bd8ccd1b6cf96af901ebee350e1915409e960687",
+      "exit": 0,
+      "final_serialized_patches": true,
+      "log": "work/review-saved/final-mutter-06-dry-run.txt",
+      "log_sha256": "c34f77d310cc0d77b8a7d1f4bfe50862a10a61975db811885c0f28dbff43ac1d"
+    },
+    {
+      "unit": "09",
+      "preview_commit": "105747a879a7b6d0185a71fabdc0385910642934",
+      "tree": "13eecea62664e661d6e1dd19ab669442586cff50",
+      "exit": 0,
+      "final_serialized_patches": true,
+      "log": "work/review-saved/final-mutter-09-dry-run.txt",
+      "log_sha256": "e32e58ab4436d4a02def842af919146bb6d118936925f014a422009150d1a679"
+    },
+    {
+      "unit": "14",
+      "preview_commit": "b5a71e274f0b71506bd524e3ca2024d8e508677f",
+      "tree": "bf05304280b1d4e02c0b015e80e4f07217503443",
+      "exit": 0,
+      "final_serialized_patches": true,
+      "log": "work/review-saved/final-mutter-14-dry-run.txt",
+      "log_sha256": "29339e2c554ba20d4af7b9a30372071d5cd991afb5f6b28f3dbc402c37499a2d"
+    },
+    {
+      "unit": "15",
+      "preview_commit": "81e32c3abc14321dd494e6267dedcf64421f0e98",
+      "tree": "05c66944cbb8cfb2d651d2096e23e70707fca5a0",
+      "exit": 0,
+      "final_serialized_patches": true,
+      "log": "work/review-saved/final-mutter-15-dry-run.txt",
+      "log_sha256": "f8c0ddd64e2fcdd6bf3b3a3ed064747312d3ceb501abdb97ef66b908cf31bbaf"
+    }
+  ],
+  "qualification": {
+    "libdisplay_info": {
+      "fresh": "Final unchanged six-unit stack: werror build and 80/80 tests. Installed isolated prefix used by Mutter.",
+      "inherited": "Earlier cloud per-unit werror/analyzer/sanitizer/generated-data matrix not rerun; full historical logs not recovered."
+    },
+    "mutter": {
+      "fresh": [
+        {
+          "unit": "06-first",
+          "tests_ok": 2,
+          "tests_fail": 0
+        },
+        {
+          "unit": "06",
+          "tests_ok": 7,
+          "tests_fail": 0
+        },
+        {
+          "unit": "09",
+          "tests_ok": 9,
+          "tests_fail": 0
+        },
+        {
+          "unit": "14",
+          "tests_ok": 17,
+          "tests_fail": 0
+        },
+        {
+          "unit": "15",
+          "tests_ok": 8,
+          "tests_fail": 0
+        }
+      ],
+      "warnings_as_errors": true,
+      "test_command": "meson test -C b --setup mutter:default --no-rebuild --print-errorlogs --num-processes 2 --timeout-multiplier 3 native-hdr \"wayland-color-management*\" (unit15 additionally color-lifecycle)",
+      "build_command": "ninja -C b -j6; configured -Dremote_desktop=true -Dwerror=true",
+      "regressions": [
+        "/native-hdr/luminance-protocol-boundaries",
+        "/wayland/creator-params/extended-target-volume"
+      ],
+      "protocol_limit": "Added raw integer maximum cases prove accepted creation and record lookup, not numeric get_information wire-roundtrip maxima.",
+      "inherited": "Earlier 81-commit per-commit, release, broader-suite and style matrix applies to earlier exports. Not repeated for every corrected descendant.",
+      "not_run": [
+        "Fedora full CI matrix",
+        "native KMS/KVM",
+        "X11/Xwayland CI",
+        "exact current branches on real hardware"
+      ]
+    },
+    "retained_compiler_evidence": {
+      "host": "lab5",
+      "owned_slot": "~/work/upstream-prep/mutter-overflow-review",
+      "image_id": "sha256:11f296ac5c53704b8d0924ffb03dd620c374d59cf34aa09f2a38adeea2759faf",
+      "versions": [
+        "cc (Ubuntu 15.3.0-4ubuntu1) 15.3.0",
+        "1.10.1",
+        "2.90.0",
+        "4.24.1",
+        "1.26.0"
+      ],
+      "logs": [
+        {
+          "path": "baseline-build.log",
+          "bytes": 508699,
+          "sha256": "2e8183c4efe35944489dc95476034a0236ad3d5fd58683d6b1690145f0b9def8",
+          "ok": 80,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "fixed14-build-test.log",
+          "bytes": 133444,
+          "sha256": "7452fb655eb774f5e606194fdeb8e62b4f5f45194c63194c40c4e797ffdea15b",
+          "ok": 17,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "fixed14-testlog.txt",
+          "bytes": 64575,
+          "sha256": "e811ec72d6d6a0f56ff4d578720427ebd073dba0573102f35c5282b53a4073f3",
+          "ok": 17,
+          "fail": 0,
+          "named_regression_passes": [
+            "ok 1 /native-hdr/luminance-protocol-boundaries",
+            "ok 26 /wayland/creator-params/extended-target-volume"
+          ]
+        },
+        {
+          "path": "final-15-build-test.log",
+          "bytes": 186051,
+          "sha256": "f00f86f2bf7d1202c16a08cfaae0d38b37f4b146a84f00783c18bead0966135a",
+          "ok": 8,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "final-15-testlog.txt",
+          "bytes": 32031,
+          "sha256": "6ea6cf43d359d4360f9d1024f5fd3f3d3c812b4340fa66a306ae45e9d5006c43",
+          "ok": 8,
+          "fail": 0,
+          "named_regression_passes": [
+            "ok 1 /native-hdr/luminance-protocol-boundaries"
+          ]
+        },
+        {
+          "path": "final-06-build-test.log",
+          "bytes": 129848,
+          "sha256": "79bebf0a4b90dd47adc724b3f626a887cd01bb58c56f41b01fa36e364ed08568",
+          "ok": 7,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "final-06-testlog.txt",
+          "bytes": 25496,
+          "sha256": "7eef0a84e1cf1f91e7d76ade4ffc61afba645b2dec7ebd0f162ff3e4221e4d0b",
+          "ok": 7,
+          "fail": 0,
+          "named_regression_passes": [
+            "ok 1 /native-hdr/luminance-protocol-boundaries"
+          ]
+        },
+        {
+          "path": "final-09-build-test.log",
+          "bytes": 150894,
+          "sha256": "1ee1b3011e61f3321a6ecbbe761954e854c1b761dc74f8f230c452be903192db",
+          "ok": 9,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "final-09-testlog.txt",
+          "bytes": 34793,
+          "sha256": "3bdde0e7b246ecf693959ff023ff776f2f6d8bdc25ab6329a3c9e2478c737669",
+          "ok": 9,
+          "fail": 0,
+          "named_regression_passes": [
+            "ok 1 /native-hdr/luminance-protocol-boundaries",
+            "ok 26 /wayland/creator-params/extended-target-volume"
+          ]
+        },
+        {
+          "path": "final-06-first-build-test.log",
+          "bytes": 175436,
+          "sha256": "9c575413b798db56366b433291a51fd65627e9e932177f0489860dc6e148d1a9",
+          "ok": 1,
+          "fail": 1,
+          "named_regression_passes": [],
+          "observed_failure": "Wayland color-management process exited -11 during teardown after TAP case passed"
+        },
+        {
+          "path": "final-06-first-testlog.txt",
+          "bytes": 6371,
+          "sha256": "ca0549e401db3c90c0749eb2c9587cb299174b7ecbbee73f901cc6eb1220e029",
+          "ok": 1,
+          "fail": 1,
+          "named_regression_passes": [],
+          "observed_failure": "Wayland color-management process exited -11 during teardown after TAP case passed"
+        },
+        {
+          "path": "final-first-disposal-fixed-build-test.log",
+          "bytes": 148661,
+          "sha256": "1acb2aad2672371e8feefeca0befcf689966847149f015e43acafeb85637a50d",
+          "ok": 2,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "final-first-disposal-fixed-testlog.txt",
+          "bytes": 6426,
+          "sha256": "357ee6745bf2c04a10180aa9d93fb052db141ed69d80431cdb03773c23ddfaa1",
+          "ok": 2,
+          "fail": 0,
+          "named_regression_passes": []
+        },
+        {
+          "path": "b-ldi/meson-logs/testlog.txt",
+          "bytes": 66139,
+          "sha256": "3708f4248b93fea4c9ea52fb0c167192d28f936a3d8fab60df098288edb723e6",
+          "ok": 80,
+          "fail": 0,
+          "named_regression_passes": []
+        }
+      ]
+    }
+  },
+  "upstream_dispositions": "Mutter blocked/hold design and dependency dispositions are preserved. No human review or DCO attestation added by agent.",
+  "final_patch_sha256": {
+    "upstream/libdisplay-info/01-displayid2-padding-bounds/0001-displayid2-bound-section-padding-scans-to-the-remain.patch": "26c65d74fbd30a7438c4733daea406b6060f1f1b67456f575f9613ea94c4d934",
+    "upstream/libdisplay-info/02-displayid2-interface-features/0002-displayid2-parse-Display-Interface-Features-data-blo.patch": "6d23e839657aa39514d28e7ad1cebd6880a5d1fbaf14b42d9328163bac6ec834",
+    "upstream/libdisplay-info/03-displayid2-nested-cta-headers/0003-displayid2-reject-unsupported-nested-CTA-headers.patch": "d0e54ae4d7fbd4cae5a472212a68e4f197e081a7233372414fad0cedc0a56b7a",
+    "upstream/libdisplay-info/04-edid-extension-failures/0004-edid-expose-structured-extension-parsing-failures.patch": "ec0235d985a17625682c69b5341a27bf937f5eb7d2e3d208e1ef30661dcd39b0",
+    "upstream/libdisplay-info/05-displayid2-native-luminance/0005-displayid2-expose-native-luminance-from-Display-Para.patch": "4203ddfc4c920b13980d4ad93b7827fa070b70f38af89e55b69194989147f0e8",
+    "upstream/libdisplay-info/06-displayid2-native-chromaticities/0006-displayid2-expose-native-chromaticities-from-Display.patch": "fd28fdfbd76b456ed5a525264c0bee57a3bd479d5c2b4ca793d7ca70cf08c8a5",
+    "upstream/mutter/01-frames-color-scheme/0001-frames-window-tracker-Use-the-GTK-interface-color-sc.patch": "2142a4cb0cb1790c497fa9b315eb8157933c07b0a8b08194f191b3eb24d3f407",
+    "upstream/mutter/02-stage-view-offscreen-reuse/0001-clutter-stage-view-Reuse-compatible-offscreen-buffer.patch": "66e37a35e88cb9b3c3fd4ffa12440764f8db07fc2c1ebbbd91ac43527e731771",
+    "upstream/mutter/02-stage-view-offscreen-reuse/0002-tests-stage-view-Check-offscreen-reuse-across-color-.patch": "07fd9a11ff8bda0a0cdbe67aabb9e2d05072c2a1e04cc04c94f8f698a50845c0",
+    "upstream/mutter/03-backend-seat-teardown/0001-backend-Destroy-the-owned-Clutter-event-source-on-di.patch": "bccf201e026847e98f3c7e5d941ee8711914d468b5b8244ba4544198b91db9fe",
+    "upstream/mutter/03-backend-seat-teardown/0002-seat-native-Detach-signal-handlers-before-disposal.patch": "d47f731dc7bbe768627fc31649210bd3f34d2dde6be8dc8dd6eb12d0eb1047d3",
+    "upstream/mutter/04-monitor-restore-handle/0001-monitor-manager-Forget-the-restore-handle-once-the-r.patch": "5997ef5c1745bfe449d827635b42ef11ad4a44c0c8014ba887a21e56adc469f8",
+    "upstream/mutter/05-native-displayid-pq/0001-backends-native-Support-native-DisplayID-RGB-BT.2020.patch": "201e0c89bd9265c0f0e49856298e98e6333ae14048d19367874ad434c4df0e19",
+    "upstream/mutter/06-native-target/0001-backends-color-Separate-the-native-target-luminance-.patch": "c050f24bcf03d6dc11eb7e59ebb9f476765cdb1a5a9fe1025022731c798e7d5b",
+    "upstream/mutter/06-native-target/0002-tests-native-hdr-Cover-native-target-policy-and-Wayl.patch": "f93a5855258b838ade9ed55e058b79fcf0c292b63df955009853681ef2a0fb3e",
+    "upstream/mutter/06-native-target/0003-backends-color-Refresh-preferred-targets-after-outpu.patch": "a965a02a47a21a63d1454dca1e34ad8b6b8e836e052527c0433969d963ce45c7",
+    "upstream/mutter/06-native-target/0004-tests-native-hdr-Keep-the-fixture-mode-in-the-forced.patch": "1160f9b80d2050124975ca46a7a64e6524a275b097fb69bf9a90ca27925cc514",
+    "upstream/mutter/06-native-target/0005-backends-color-Publish-target-primaries-apart-from-t.patch": "2e42c016f33b56ab73730c7dcd8c0910e73399c9dbd661ae3f0b2be5c5b7c768",
+    "upstream/mutter/06-native-target/0006-tests-native-hdr-Cover-native-target-primaries-and-W.patch": "a00e0738d3620bf0348013c65b8c6ec295e84cb79f4709ec2b2356910cb4444a",
+    "upstream/mutter/06-native-target/0007-tests-Run-target-volume-cases-in-separate-test-invoc.patch": "e1f11f40f1b8b528ed946629c88650faee8a99590558f8ad3e0a861e21f0190f",
+    "upstream/mutter/06-native-target/0008-clutter-color-Add-a-fallible-definition-of-the-linea.patch": "4ba02222bf2ad69a907271ca730961e74ac674123e114a759b544405c4bc3418",
+    "upstream/mutter/06-native-target/0009-backends-color-Publish-target-primaries-with-one-con.patch": "02e00f1742770e8a0535c17e57a779370348143f7923310b2e44452a3119e2c8",
+    "upstream/mutter/06-native-target/0010-backends-color-Validate-EDID-primaries-before-using-.patch": "3d8e18919c440225b5529ae080a47897d9e44301b6b5ab04de142adf48d6aa97",
+    "upstream/mutter/07-protocol-robustness/0001-wayland-color-management-Accept-signed-custom-primar.patch": "a4426705bd7b62d064da27a73a2674bd6c92c8de857386d18a096025c290dd91",
+    "upstream/mutter/07-protocol-robustness/0002-wayland-color-management-Fix-ICC-file-range-and-desc.patch": "e7d11f812fa35b591f68e9c5ce69253e8ba5dcd97af74f183dd4199d0a478b5a",
+    "upstream/mutter/07-protocol-robustness/0003-core-util-Read-at-the-absolute-offset-and-reject-sho.patch": "7461f7597d4adf22b241fa0866d768246a1dd002369621d98e7ddd6397f02716",
+    "upstream/mutter/07-protocol-robustness/0004-wayland-color-management-Use-the-creator-s-unsupport.patch": "a63cbeba5b83723814c6e6114a7ee950a5df83cbf8b42ba8a91077ca4674fc22",
+    "upstream/mutter/07-protocol-robustness/0005-tests-color-management-Cover-signed-custom-primaries.patch": "02b8132b8c020eddb43217a8ecfe9202d3a7c50a54992f3eae661e106040a366",
+    "upstream/mutter/07-protocol-robustness/0006-tests-color-management-Cover-ICC-file-ranges-descrip.patch": "69c40b7a75af12a38b759e0b75cfdac1e0d2eec7da5968b0d94911d27eb675af",
+    "upstream/mutter/07-protocol-robustness/0007-tests-color-management-Cover-the-creator-unsupported.patch": "9b83fbd724fcefa68013d11791e806feb48e4bacac27563b0aa50e56612a8cb8",
+    "upstream/mutter/08-hlg/0001-clutter-color-Add-the-HLG-transfer-function.patch": "323d8af8e4fc3b53ad391fc2302f0656cbd4782a86c9210a318e187c87b9db75",
+    "upstream/mutter/08-hlg/0002-wayland-color-management-Accept-and-advertise-HLG.patch": "3c0249721ffc658e18d5f491c369ccd5784cb9b23204dcfd6c33e8dc1137289e",
+    "upstream/mutter/08-hlg/0003-tests-color-management-Cover-HLG-decoding-encoding-a.patch": "53efd070e2217e57273469e8b153b56617aff36e5df267d355b3d1c0e7c60fbc",
+    "upstream/mutter/09-target-volume/0001-clutter-color-Give-parametric-color-states-a-target-.patch": "fdbac1e3f2833ab6a17f5fa56f69a167f2835afed299f3e5c7d408cbdf0e9288",
+    "upstream/mutter/09-target-volume/0002-wayland-color-management-Accept-mastering-metadata-a.patch": "0aa7d45c89ee8a0a3dba8c51e00ce0aa628a82ce83273239774ae80732fb549b",
+    "upstream/mutter/09-target-volume/0003-tests-color-management-Cover-mastering-metadata-and-.patch": "1e46a3bbc24d6373524e6d3bbbb77a6b11acdc7fb5f80d4a3a80e98b583f594c",
+    "upstream/mutter/10-highlight-mapping/0001-clutter-color-Map-highlights-toward-a-declared-targe.patch": "ce5b5dba0c6a58517a78ec0b09acab71541240b8b7562c45b7a5e27763727bb3",
+    "upstream/mutter/10-highlight-mapping/0002-backends-color-Blend-for-the-output-s-declared-targe.patch": "281c2781b7107cafd2b4ea6a98ed42dca2c93965a9d7a175ec63024721971ede",
+    "upstream/mutter/10-highlight-mapping/0003-native-Composite-surfaces-and-cursors-whose-highligh.patch": "d707a87fad81385465d8365315df737b16aa02111941422de4369a394c78c59f",
+    "upstream/mutter/10-highlight-mapping/0004-tests-color-management-Cover-highlight-mapping-and-s.patch": "e234b9ee6231c2c6d9c59f0be6bc7965f740a4d9946ef1585a289170e57f06c0",
+    "upstream/mutter/11-gamut-compression/0001-clutter-color-Compress-gamut-toward-a-declared-displ.patch": "12fb7041565c0bd833908e124f7350a317029c56443bb03393a91839f7d87351",
+    "upstream/mutter/11-gamut-compression/0002-native-Composite-surfaces-and-cursors-whose-gamut-is.patch": "e5fbf738c34ff6b72d31b907b2eb187d4b0dd20745e60d832596f92ae0e0a9a8",
+    "upstream/mutter/11-gamut-compression/0003-backends-color-Render-for-the-output-s-declared-targ.patch": "83931d2e984c9d8ca1a301b2004993ca37099aa7b77eafc6dc9534ac83733d07",
+    "upstream/mutter/11-gamut-compression/0004-tests-color-management-Cover-gamut-compression-and-s.patch": "f31c7cebc41c590364daa37deb7408df69e3930ce7e7033c34e9c38dd868866e",
+    "upstream/mutter/11-gamut-compression/0005-clutter-color-Leave-PQ-highlights-unmapped-without-a.patch": "88da492fa06ecfe1410571015205bc602b54cb7fb0e4cf616b71aaf404cf039b",
+    "upstream/mutter/11-gamut-compression/0006-clutter-color-Make-display-targets-only-through-an-e.patch": "c18facfcd616b7ca60632dd7cdaec275d7875fbd5d78ceed2065392df4911527",
+    "upstream/mutter/11-gamut-compression/0007-clutter-color-Decide-mapping-once-per-source-and-tar.patch": "64d09c2fb032bb8144efc9ee6ea9a866b36c2b445299aac70a1135a2e98b330c",
+    "upstream/mutter/11-gamut-compression/0008-clutter-color-Note-the-two-D65-definitions-at-gamut-.patch": "a7c5861242f890c13236009d4bfbf1a03f25b70d9923e7e5b9ed5a0b6b3c1beb",
+    "upstream/mutter/11-gamut-compression/0009-wayland-color-management-Correct-comments-on-masteri.patch": "e2aa65d600db185f7f2c9bd348744f5ebf7528a994f75c5978dafb6848873115",
+    "upstream/mutter/11-gamut-compression/0010-wayland-color-management-Publish-descriptions-on-exa.patch": "07983e8da29bfc9f0724068d303d6493c0947bf7335fcea2cd535b1fe3df94cc",
+    "upstream/mutter/11-gamut-compression/0011-clutter-color-Evaluate-gamut-compression-without-cla.patch": "7585e1fb1786094e3589882127c1a864d3ca364ad7972f351f6513e381b1cc73",
+    "upstream/mutter/11-gamut-compression/0012-clutter-color-Judge-gamut-containment-in-the-frame-o.patch": "e6a7f760239da3a494b8f788b708e14c338d452564062e6d558a9a769f5f0c2e",
+    "upstream/mutter/12-target-sources/0001-backends-color-Treat-every-declared-target-source-as.patch": "e278b98414dbe74c549f7b3d345497cc445b105ca3d75d83aa89012e353b9d19",
+    "upstream/mutter/12-target-sources/0002-backends-color-Take-the-target-peak-from-CTA-HDR-sta.patch": "86201a9a5750646259ee7fc1f222e7b4a76827e35e93744899174d1591d65d72",
+    "upstream/mutter/12-target-sources/0003-backends-color-Take-native-SDR-target-primaries-from.patch": "dd5dffd51ed3749562e107865207b76b6e2e2a033cf1c6453908d00e92d351f8",
+    "upstream/mutter/12-target-sources/0004-tests-native-hdr-Cover-CTA-and-base-EDID-target-sour.patch": "2906490e59b6d75fd6ff22b0ff3ccb03115ca76e35459443b65ca21c2e6b5d29",
+    "upstream/mutter/12-target-sources/0005-tests-color-management-Cover-CTA-and-base-EDID-displ.patch": "e79b154f020ce26c8706082415fdcf8d37be8599d07c0bc30a3dc621963398ec",
+    "upstream/mutter/13-night-light-bt2100/0001-clutter-color-Adapt-a-display-s-output-to-a-white-po.patch": "3a5f94dc3c4f52e7e1e3412f239d9a85818e1edfdf4cf03ac130f3d42ff1abf2",
+    "upstream/mutter/13-night-light-bt2100/0002-compositor-Composite-content-on-outputs-whose-white-.patch": "c87fa02992d32202a35e53b40f15be3b04a5eb6acf245d3eab814e1942ff98c9",
+    "upstream/mutter/13-night-light-bt2100/0003-backends-color-Apply-Night-Light-in-linear-light-in-.patch": "78cf218dbc2dd1ee000026b987e56901c3bdcbd6bdec1d8c6d4891eff5f0866f",
+    "upstream/mutter/13-night-light-bt2100/0004-clutter-color-Bound-the-white-adaptation-with-diagon.patch": "1a6628545c3c98207be1ebe14f2690e0d27d29eb4a2b090623717c55fef69341",
+    "upstream/mutter/13-night-light-bt2100/0005-tests-Cover-Night-Light-mode-transitions-captures-an.patch": "830edc4db4f9def45984c3c907d44fd542be15d8c02820b1ac724d96e7afadef",
+    "upstream/mutter/13-night-light-bt2100/0006-clutter-color-Anchor-the-Night-Light-adaptation-at-t.patch": "86574d5e1de129c39e7efa6e6cf2916285177f8425973488a4758f015bcfeefd",
+    "upstream/mutter/13-night-light-bt2100/0007-backends-color-Render-without-Night-Light-when-its-w.patch": "0f52960f86693860b7833fa407cf5a19afb723cdd2058d3480a1918d2f8e5499",
+    "upstream/mutter/13-night-light-bt2100/0008-tests-color-management-Read-back-captures-across-BT..patch": "1ad2d8813efb7fec599c5ad5561ccd7ee4392596ccad9d7d91edbbc7315d1bd1",
+    "upstream/mutter/13-night-light-bt2100/0009-tests-color-management-Check-that-capture-readbacks-.patch": "ae9c9abff68124ee66636188bb9a6ab372c6ea1408f8883c21d385293996cb20",
+    "upstream/mutter/13-night-light-bt2100/0010-tests-color-hdr-Bound-the-residue-of-single-precisio.patch": "4476d5206d37c26902a32fe8312a809ff3ebc6caae9275c47162b548a49788cf",
+    "upstream/mutter/13-night-light-bt2100/0011-tests-color-management-Check-offscreen-reuse-across-.patch": "5c38a55663cc2f1244a4999c13959158db496f3ec9a950b89fc6b16e9d6b9d46",
+    "upstream/mutter/14-per-monitor-targets/0001-backends-monitor-Carry-per-monitor-target-override-d.patch": "9d5674532f270880d6fcf912603263edb8a2900bae028b502a2cf8a0e2b50c48",
+    "upstream/mutter/14-per-monitor-targets/0002-backends-monitor-Persist-and-validate-target-overrid.patch": "9be78aa80e1e652fd34f9a3ac54d33084b65fa04d89be6aa9505f3d3e75de3cd",
+    "upstream/mutter/14-per-monitor-targets/0003-backends-monitor-Keep-color-settings-when-copying-la.patch": "2b861fe3784e0e7ab7d1adffa198927ecef3dac2f1534503a26996f2ff0030fb",
+    "upstream/mutter/14-per-monitor-targets/0004-backends-monitor-Expose-configured-and-effective-tar.patch": "180e5556b6752c3fe1604da4e03286c38160db1f964ab0432d008836b2b6a180",
+    "upstream/mutter/14-per-monitor-targets/0005-gdctl-Preserve-per-monitor-target-declarations-and-a.patch": "b0fac1efb56088fbac19c836a79129a57b61fea80b3835d26ff9fc61de4c581c",
+    "upstream/mutter/14-per-monitor-targets/0006-backends-monitor-Report-BT.2100-Night-Light-support-.patch": "fef87b1cf68a72b4e9112072439b836852c846aa585ecdc8133d2985cd16b619",
+    "upstream/mutter/14-per-monitor-targets/0007-backends-color-Select-per-monitor-target-overrides-a.patch": "752849d000c1240fedf0b8f6bb67c9987f658cdfee58f83cc41e71ee930a6fab",
+    "upstream/mutter/15-color-lifecycle/0001-backends-color-Leave-colord-when-the-manager-drops-a.patch": "78e4143f1b804fe46c24e05574953563255da47893d7de99919f504b4669a397",
+    "upstream/mutter/15-color-lifecycle/0002-backends-color-Drop-removed-color-devices-before-cre.patch": "ae2e01cc69cc1a952d6d39947b9a1f59cb89e5bb3e245f0196f9a31bdfd3f183",
+    "upstream/mutter/15-color-lifecycle/0003-tests-color-management-Check-colord-devices-across-u.patch": "d9416867b33c62e52855705b63372be91775695e9300592d9d17d2a6543e125d",
+    "upstream/mutter/15-color-lifecycle/0004-backends-color-device-Leave-a-cancelled-device-profi.patch": "093b154dd38f70658d7baa74d533bfa92704f925d5e8478ad2ecb6fad95d3a3c",
+    "upstream/mutter/15-color-lifecycle/0005-backends-color-profile-Leave-a-cancelled-colord-prof.patch": "d5ae0bfd7d4feceb2c0fea31df08948c6847a374a0bb095d98324166b21d8ffd",
+    "upstream/mutter/15-color-lifecycle/0006-tests-color-management-Unplug-a-monitor-while-its-pr.patch": "03863d39ef4e8fcfb5aa08ef8d98cb735c1964c5a84c17ae187d4df4f8c1169a",
+    "upstream/mutter/15-color-lifecycle/0007-backends-color-Shut-down-store-work-before-manager-r.patch": "ec22e05c8454980e7a42622a06d3a7da7cc85d26d18c65cc438a93ec323af649",
+    "upstream/mutter/15-color-lifecycle/0008-tests-color-Add-a-test-hook-at-asynchronous-color-ca.patch": "b99b1dc1bc19a663032e67728de15dc3a73636c22ee7dbb35147fd64a1373d81",
+    "upstream/mutter/15-color-lifecycle/0009-tests-color-Exercise-shutdown-at-asynchronous-delive.patch": "6bbbfa3b426d027beaff9766fe38c1fd83d1089e489ce6bcbca3d565001c9890",
+    "upstream/mutter/15-color-lifecycle/0010-color-store-Return-ineligible-requests-before-creati.patch": "e84a0e0519d647fdebf598f14c6b2bb6375f3396f2d10c0a73fe2ae561c28952",
+    "upstream/mutter/15-color-lifecycle/0011-tests-color-Check-keymap-handler-disconnection-at-ca.patch": "b2d057df69f3ae24897f7286a34ef1b12da201fd39e3c563e52deeb664ea838a"
+  }
+}

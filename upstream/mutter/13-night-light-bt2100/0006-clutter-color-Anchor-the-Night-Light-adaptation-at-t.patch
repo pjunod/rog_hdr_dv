@@ -1,0 +1,1052 @@
+From e573929061efd1e9e80bf66e58dcb0fcd02490c3 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 03:44:34 +0000
+Subject: [PATCH 06/11] clutter/color: Anchor the Night Light adaptation at the
+ default white
+
+The diagonal white adaptation scaled the output's encoding channels by
+the linear RGB of the absolute Planckian white. At the default
+temperature there is no adaptation at all, bit for bit, but the
+Planckian white of 6500 K is not D65 (du'v' about 0.004), so 1 K below
+it the factors were already about (0.993, 0.958, 1): a step of about 4 %
+in green at every Night Light onset and end, and on an output with a DCI
+white a jump of about 0.017 du'v'.
+
+Make the factors relative to a reference white the display target
+carries alongside the adapted white: each is the ratio of the white's
+channel to the reference's, in linear RGB of the encoding, clamped at
+zero and divided by the largest. The color device passes the Planckian
+white of the default temperature, computed by the same function as the
+temperature's, so the adaptation is exactly identity at the reference,
+continuous where it starts, and moves the output's own white by the same
+per-channel ratio as the gamma ramp of Night Light in SDR. A reference
+white outside the encoding's gamut is refused. The reference is part of
+the state's equality, identity, hashes and description. The exact
+default-temperature bypass is kept.
+
+Representable whites are now exact relative to the default temperature's
+Planckian white, not absolute: an output's white keeps its own offset
+from that white. The 1000 K white is still projected. Update the factor,
+white and representable regressions to an independent double precision
+computation of the ratio, check the reference white through the color
+device, and add continuity regressions at 6499 K and 6501 K on BT.2020
+and DCI-white outputs.
+
+Anchoring at the default temperature was chosen over adapting at
+6500 K or following the daylight locus.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ .../clutter-color-state-params-private.h      |   9 +-
+ clutter/clutter/clutter-color-state-params.c  |  69 +++-
+ clutter/clutter/clutter-color-transform.c     |  12 +-
+ clutter/clutter/clutter-color-utils-private.h |   4 +
+ clutter/clutter/clutter-color-utils.c         | 115 +++++--
+ src/backends/meta-color-device.c              |  27 +-
+ src/tests/clutter/conform/color-hdr.c         | 309 ++++++++++++++----
+ src/tests/color-management-tests.c            |  14 +-
+ 8 files changed, 449 insertions(+), 110 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index aa258bbe6..b4ef442ce 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -76,13 +76,20 @@ CLUTTER_EXPORT
+ ClutterColorState * clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams        *color_state_params,
+                                                                            const ClutterColorTargetVolume *target_volume,
+                                                                            float                           white_x,
+-                                                                           float                           white_y);
++                                                                           float                           white_y,
++                                                                           float                           reference_x,
++                                                                           float                           reference_y);
+ 
+ CLUTTER_EXPORT
+ gboolean clutter_color_state_params_get_adapted_white (ClutterColorStateParams *color_state_params,
+                                                        float                   *white_x,
+                                                        float                   *white_y);
+ 
++CLUTTER_EXPORT
++gboolean clutter_color_state_params_get_reference_white (ClutterColorStateParams *color_state_params,
++                                                         float                   *reference_x,
++                                                         float                   *reference_y);
++
+ CLUTTER_EXPORT
+ const ClutterColorTargetVolume * clutter_color_state_params_get_target_volume (ClutterColorStateParams *color_state_params);
+ 
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index d2a5a495f..5ed3b911b 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -76,10 +76,14 @@ typedef struct _ClutterColorStateParams
+    * the Night Light white, when there is one. Only display targets, and the
+    * blending states derived from them, carry one. It applies once, in the
+    * conversion from a state that carries it to a state that does not: the
+-   * conversion of the blending state to the output's encoding. */
++   * conversion of the blending state to the output's encoding. It is
++   * relative to the reference white, the white at which the output is not
++   * adapted, such as the Night Light white of the default temperature. */
+   gboolean has_adapted_white;
+   float adapted_white_x;
+   float adapted_white_y;
++  float reference_white_x;
++  float reference_white_y;
+ } ClutterColorStateParams;
+ 
+ G_DEFINE_TYPE (ClutterColorStateParams,
+@@ -348,7 +352,11 @@ adapted_white_equal (ClutterColorStateParams *color_state_params,
+          (color_state_params->adapted_white_x ==
+           other_color_state_params->adapted_white_x &&
+           color_state_params->adapted_white_y ==
+-          other_color_state_params->adapted_white_y);
++          other_color_state_params->adapted_white_y &&
++          color_state_params->reference_white_x ==
++          other_color_state_params->reference_white_x &&
++          color_state_params->reference_white_y ==
++          other_color_state_params->reference_white_y);
+ }
+ 
+ static gboolean
+@@ -457,9 +465,12 @@ clutter_color_state_params_to_string (ClutterColorState *color_state)
+     g_string_append (string, ", display target");
+   if (color_state_params->has_adapted_white)
+     {
+-      g_string_append_printf (string, ", adapted white: %f, %f",
++      g_string_append_printf (string,
++                              ", adapted white: %f, %f, reference white: %f, %f",
+                               color_state_params->adapted_white_x,
+-                              color_state_params->adapted_white_y);
++                              color_state_params->adapted_white_y,
++                              color_state_params->reference_white_x,
++                              color_state_params->reference_white_y);
+     }
+ 
+   g_string_append (string, ")");
+@@ -661,6 +672,8 @@ copy_adapted_white (ClutterColorStateParams *copy,
+   copy->has_adapted_white = color_state_params->has_adapted_white;
+   copy->adapted_white_x = color_state_params->adapted_white_x;
+   copy->adapted_white_y = color_state_params->adapted_white_y;
++  copy->reference_white_x = color_state_params->reference_white_x;
++  copy->reference_white_y = color_state_params->reference_white_y;
+ }
+ 
+ /*
+@@ -788,6 +801,8 @@ clutter_color_state_params_hash (ClutterColorState *color_state)
+     {
+       hash = hash * 31 + float_hash (params->adapted_white_x);
+       hash = hash * 31 + float_hash (params->adapted_white_y);
++      hash = hash * 31 + float_hash (params->reference_white_x);
++      hash = hash * 31 + float_hash (params->reference_white_y);
+     }
+ 
+   return hash;
+@@ -1151,15 +1166,19 @@ clutter_color_state_params_new_display_target (ClutterColorStateParams        *c
+  *   clutter_color_state_params_new_display_target()
+  * @white_x: the CIE 1931 x of the white point the output is adapted to
+  * @white_y: the CIE 1931 y of the white point the output is adapted to
++ * @reference_x: the CIE 1931 x of the reference white, at which the output
++ *   would not be adapted at all
++ * @reference_y: the CIE 1931 y of the reference white
+  *
+  * Like clutter_color_state_params_new_display_target(), and the display's
+- * output is moreover adapted to the white point (@white_x, @white_y), such
+- * as the white of Night Light. The adaptation is applied once, in linear
+- * light, when the blending state derived from the display target is
+- * converted to the output's encoding (see
+- * clutter_colorimetry_get_white_adaptation_matrix()); converting content to
+- * the blending state does not apply it. The white point must be adaptable
+- * to from the encoding of @color_state_params.
++ * output is moreover adapted to the white point (@white_x, @white_y)
++ * relative to the reference white (@reference_x, @reference_y), such as the
++ * white of Night Light relative to its white at the default temperature.
++ * The adaptation is applied once, in linear light, when the blending state
++ * derived from the display target is converted to the output's encoding
++ * (see clutter_colorimetry_get_white_adaptation_matrix()); converting
++ * content to the blending state does not apply it. The white point must be
++ * adaptable to from the encoding of @color_state_params.
+  *
+  * Returns: (transfer full): a new ClutterColorState
+  */
+@@ -1167,7 +1186,9 @@ ClutterColorState *
+ clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams        *color_state_params,
+                                                        const ClutterColorTargetVolume *target_volume,
+                                                        float                           white_x,
+-                                                       float                           white_y)
++                                                       float                           white_y,
++                                                       float                           reference_x,
++                                                       float                           reference_y)
+ {
+   ClutterColorStateParams *copy;
+   graphene_matrix_t adaptation;
+@@ -1177,6 +1198,8 @@ clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams
+   g_return_val_if_fail (clutter_colorimetry_get_white_adaptation_matrix (&color_state_params->colorimetry,
+                                                                          white_x,
+                                                                          white_y,
++                                                                         reference_x,
++                                                                         reference_y,
+                                                                          &adaptation,
+                                                                          NULL),
+                         NULL);
+@@ -1189,6 +1212,8 @@ clutter_color_state_params_new_adapted_display_target (ClutterColorStateParams
+   copy->has_adapted_white = TRUE;
+   copy->adapted_white_x = white_x;
+   copy->adapted_white_y = white_y;
++  copy->reference_white_x = reference_x;
++  copy->reference_white_y = reference_y;
+ 
+   return CLUTTER_COLOR_STATE (copy);
+ }
+@@ -1213,6 +1238,26 @@ clutter_color_state_params_get_adapted_white (ClutterColorStateParams *color_sta
+   return TRUE;
+ }
+ 
++/*
++ * The reference white the adapted white of the state is relative to, when
++ * it carries one, see clutter_color_state_params_get_adapted_white().
++ */
++gboolean
++clutter_color_state_params_get_reference_white (ClutterColorStateParams *color_state_params,
++                                                float                   *reference_x,
++                                                float                   *reference_y)
++{
++  if (!color_state_params->has_adapted_white)
++    return FALSE;
++
++  if (reference_x)
++    *reference_x = color_state_params->reference_white_x;
++  if (reference_y)
++    *reference_y = color_state_params->reference_white_y;
++
++  return TRUE;
++}
++
+ static gboolean
+ cicp_primaries_to_clutter (ClutterCicpPrimaries   primaries,
+                            ClutterColorimetry    *colorimetry,
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index d4f82eb6a..95ffda9a7 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1560,21 +1560,27 @@ get_white_adaptation (ClutterColorState *source_color_state,
+                       ClutterColorState *target_color_state,
+                       graphene_matrix_t *adaptation)
+ {
+-  ClutterColorStateParams *target_params;
+-  float white_x, white_y;
++  ClutterColorStateParams *source_params, *target_params;
++  float white_x, white_y, reference_x, reference_y;
+ 
+   if (!CLUTTER_IS_COLOR_STATE_PARAMS (source_color_state) ||
+       !CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state))
+     return FALSE;
+ 
++  source_params = CLUTTER_COLOR_STATE_PARAMS (source_color_state);
+   target_params = CLUTTER_COLOR_STATE_PARAMS (target_color_state);
+-  if (!clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (source_color_state),
++  if (!clutter_color_state_params_get_adapted_white (source_params,
+                                                      &white_x, &white_y) ||
+       clutter_color_state_params_get_adapted_white (target_params, NULL, NULL))
+     return FALSE;
+ 
++  clutter_color_state_params_get_reference_white (source_params,
++                                                  &reference_x, &reference_y);
++
+   return clutter_colorimetry_get_white_adaptation_matrix (clutter_color_state_params_get_colorimetry (target_params),
+                                                           white_x, white_y,
++                                                          reference_x,
++                                                          reference_y,
+                                                           adaptation,
+                                                           NULL);
+ }
+diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
+index 9a971f898..2926c916b 100644
+--- a/clutter/clutter/clutter-color-utils-private.h
++++ b/clutter/clutter/clutter-color-utils-private.h
+@@ -62,6 +62,8 @@ CLUTTER_EXPORT_TEST
+ gboolean clutter_colorimetry_get_white_adaptation_factors (const ClutterColorimetry  *colorimetry,
+                                                            float                      white_x,
+                                                            float                      white_y,
++                                                           float                      reference_x,
++                                                           float                      reference_y,
+                                                            float                      factors[3],
+                                                            GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
+ 
+@@ -69,6 +71,8 @@ CLUTTER_EXPORT_TEST
+ gboolean clutter_colorimetry_get_white_adaptation_matrix (const ClutterColorimetry  *colorimetry,
+                                                           float                      white_x,
+                                                           float                      white_y,
++                                                          float                      reference_x,
++                                                          float                      reference_y,
+                                                           graphene_matrix_t         *adaptation,
+                                                           GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
+ 
+diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
+index c945b5ef0..b9ab88a48 100644
+--- a/clutter/clutter/clutter-color-utils.c
++++ b/clutter/clutter/clutter-color-utils.c
+@@ -891,61 +891,111 @@ clutter_colorimetry_get_source_matrices (const ClutterColorimetry  *colorimetry,
+   return TRUE;
+ }
+ 
++/* The white point (@x, @y), with Y = 1, in linear RGB of the encoding whose
++ * XYZ to RGB matrix is @from_XYZ, without chromatic adaptation. */
++static gboolean
++white_point_to_rgb (const graphene_matrix_t  *from_XYZ,
++                    float                     x,
++                    float                     y,
++                    const char               *name,
++                    float                     rgb[3],
++                    GError                  **error)
++{
++  graphene_vec3_t white_XYZ, white_rgb;
++  int i;
++
++  if (!white_point_to_XYZ_checked (x, y, &white_XYZ))
++    {
++      g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                   "The %s must have a positive, finite y chromaticity", name);
++      return FALSE;
++    }
++
++  graphene_matrix_transform_vec3 (from_XYZ, &white_XYZ, &white_rgb);
++  rgb[0] = graphene_vec3_get_x (&white_rgb);
++  rgb[1] = graphene_vec3_get_y (&white_rgb);
++  rgb[2] = graphene_vec3_get_z (&white_rgb);
++
++  for (i = 0; i < 3; i++)
++    {
++      if (!isfinite (rgb[i]))
++        {
++          g_set_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                       "The %s is not finite in the encoding", name);
++          return FALSE;
++        }
++    }
++
++  return TRUE;
++}
++
+ /*
+  * Computes the per-channel factors that adapt a display's output to the
+- * white point (@white_x, @white_y), such as a Night Light white: diagonal
+- * von Kries factors in the linear RGB of the display's encoding,
+- * @colorimetry, the frame of the colors the display shows.
++ * white point (@white_x, @white_y), such as a Night Light white, relative to
++ * the reference white (@reference_x, @reference_y) at which the output is
++ * not adapted at all, such as the Night Light white of the default
++ * temperature: diagonal von Kries factors in the linear RGB of the display's
++ * encoding, @colorimetry, the frame of the colors the display shows.
+  *
+- * The white point, with Y = 1, is converted to linear RGB of the encoding
++ * Both whites, with Y = 1, are converted to linear RGB of the encoding
+  * through CIE XYZ without chromatic adaptation, since that is the RGB the
+- * display shows it with. A white outside the encoding's gamut, such as the
+- * Planckian white at 1000 K in BT.2020, has a negative component there: it
+- * is clamped to zero, which projects the white into the gamut rather than
+- * claiming its exact chromaticity. The factors are then divided by the
+- * largest one. They are therefore finite, within [0, 1], and the largest is
+- * 1: no channel of any nonnegative color is brighter than unadapted, and a
+- * white within the gamut is shown at exactly the requested chromaticity.
++ * display shows them with, and each factor is the ratio of the white's
++ * channel to the reference's. This is the same per-channel family as the
++ * gamma ramp of Night Light in SDR, which is normalized at the default
++ * temperature: at the reference white the factors are exactly 1, so the
++ * adaptation is continuous where it starts, and elsewhere the output's own
++ * white moves by the ratio of the two Planckian whites. A white outside the
++ * encoding's gamut, such as the Planckian white at 1000 K in BT.2020, has a
++ * negative ratio there: it is clamped to zero, which projects the white into
++ * the gamut rather than claiming its exact ratio. The factors are then
++ * divided by the largest one. They are therefore finite, within [0, 1], and
++ * the largest is 1: no channel of any nonnegative color is brighter than
++ * unadapted.
+  *
+- * Returns %FALSE, setting @error, if the white point has no XYZ, the
+- * colorimetry has no usable matrices, or no factor is positive.
++ * Returns %FALSE, setting @error, if a white point has no XYZ, the
++ * colorimetry has no usable matrices, a channel of the reference white is
++ * not positive in the encoding, or no factor is positive.
+  */
+ gboolean
+ clutter_colorimetry_get_white_adaptation_factors (const ClutterColorimetry  *colorimetry,
+                                                   float                      white_x,
+                                                   float                      white_y,
++                                                  float                      reference_x,
++                                                  float                      reference_y,
+                                                   float                      factors[3],
+                                                   GError                   **error)
+ {
+   graphene_matrix_t to_XYZ, from_XYZ;
+-  graphene_vec3_t white_XYZ, white_rgb;
+-  float rgb[3], largest;
++  float rgb[3], reference_rgb[3], largest;
+   int i;
+ 
+   if (!colorimetry_to_XYZ_checked (colorimetry, &to_XYZ, error) ||
+       !invert_to_XYZ (&to_XYZ, &from_XYZ, error))
+     return FALSE;
+ 
+-  if (!white_point_to_XYZ_checked (white_x, white_y, &white_XYZ))
+-    {
+-      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+-                           "The white point must have a positive, finite y "
+-                           "chromaticity");
+-      return FALSE;
+-    }
+-
+-  graphene_matrix_transform_vec3 (&from_XYZ, &white_XYZ, &white_rgb);
+-  rgb[0] = graphene_vec3_get_x (&white_rgb);
+-  rgb[1] = graphene_vec3_get_y (&white_rgb);
+-  rgb[2] = graphene_vec3_get_z (&white_rgb);
++  if (!white_point_to_rgb (&from_XYZ, white_x, white_y, "white point",
++                           rgb, error) ||
++      !white_point_to_rgb (&from_XYZ, reference_x, reference_y,
++                           "reference white", reference_rgb, error))
++    return FALSE;
+ 
+   largest = 0.0f;
+   for (i = 0; i < 3; i++)
+     {
++      if (!(reference_rgb[i] > 0.0f))
++        {
++          g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                               "The reference white must lie within the "
++                               "encoding's gamut");
++          return FALSE;
++        }
++
++      /* Equal channels give exactly 1. */
++      rgb[i] = rgb[i] / reference_rgb[i];
+       if (!isfinite (rgb[i]))
+         {
+           g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
+-                               "The white point is not finite in the encoding");
++                               "The white point adaptation is not finite");
+           return FALSE;
+         }
+ 
+@@ -972,8 +1022,9 @@ clutter_colorimetry_get_white_adaptation_factors (const ClutterColorimetry  *col
+ 
+ /*
+  * Computes the adaptation of a display's output to the white point
+- * (@white_x, @white_y) as a matrix on linear BT.2020, applied just before
+- * the conversion to the display's encoding, @colorimetry: the conversion of
++ * (@white_x, @white_y), relative to the reference white (@reference_x,
++ * @reference_y), as a matrix on linear BT.2020, applied just before the
++ * conversion to the display's encoding, @colorimetry: the conversion of
+  * linear BT.2020 to linear RGB of the encoding, the diagonal factors of
+  * clutter_colorimetry_get_white_adaptation_factors() there, and the
+  * conversion back. Followed by the conversion to the encoding, it scales
+@@ -987,6 +1038,8 @@ gboolean
+ clutter_colorimetry_get_white_adaptation_matrix (const ClutterColorimetry  *colorimetry,
+                                                  float                      white_x,
+                                                  float                      white_y,
++                                                 float                      reference_x,
++                                                 float                      reference_y,
+                                                  graphene_matrix_t         *adaptation,
+                                                  GError                   **error)
+ {
+@@ -999,6 +1052,8 @@ clutter_colorimetry_get_white_adaptation_matrix (const ClutterColorimetry  *colo
+                                                        error) ||
+       !clutter_colorimetry_get_white_adaptation_factors (colorimetry,
+                                                          white_x, white_y,
++                                                         reference_x,
++                                                         reference_y,
+                                                          factors, error))
+     return FALSE;
+ 
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index 7be961d15..962c01553 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1490,19 +1490,31 @@ get_temperature (MetaColorDevice *color_device)
+  * identity (see update_white_point()), at any temperature but the default.
+  * At the default temperature there is no adaptation at all, so the
+  * rendering color state is exactly what it is without Night Light.
++ *
++ * The adaptation is relative to the Planckian white of the default
++ * temperature, @reference_x and @reference_y, like the gamma ramp of Night
++ * Light in SDR: it is continuous where it starts, and moves the output's
++ * own white by the ratio of the two Planckian whites, rather than snapping
++ * it to the absolute Planckian white, which the default temperature's white
++ * is not (6500 K is not D65).
+  */
+ static gboolean
+ get_adapted_white (MetaColorDevice *color_device,
+                    float           *white_x,
+-                   float           *white_y)
++                   float           *white_y,
++                   float           *reference_x,
++                   float           *reference_y)
+ {
+   unsigned int temperature = get_temperature (color_device);
++  unsigned int default_temperature =
++    meta_color_manager_get_default_temperature (color_device->color_manager);
+ 
+-  if (!encodes_pq (color_device) ||
+-      temperature == meta_color_manager_get_default_temperature (color_device->color_manager))
++  if (!encodes_pq (color_device) || temperature == default_temperature)
+     return FALSE;
+ 
+   meta_color_get_planckian_chromaticity (temperature, white_x, white_y);
++  meta_color_get_planckian_chromaticity (default_temperature,
++                                         reference_x, reference_y);
+   return TRUE;
+ }
+ 
+@@ -1532,7 +1544,7 @@ update_rendering_color_state (MetaColorDevice *color_device)
+   g_autoptr (ClutterColorState) rendering_color_state = NULL;
+   ClutterColorTargetVolume target_volume = { 0 };
+   gboolean adapted = FALSE;
+-  float white_x, white_y;
++  float white_x, white_y, reference_x, reference_y;
+ 
+   if (!color_device->color_state)
+     return 0;
+@@ -1556,7 +1568,8 @@ update_rendering_color_state (MetaColorDevice *color_device)
+                   sizeof (target_volume.primaries_tolerance));
+         }
+ 
+-      adapted = get_adapted_white (color_device, &white_x, &white_y);
++      adapted = get_adapted_white (color_device, &white_x, &white_y,
++                                   &reference_x, &reference_y);
+     }
+ 
+   if (adapted)
+@@ -1565,7 +1578,9 @@ update_rendering_color_state (MetaColorDevice *color_device)
+         clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+                                                                &target_volume,
+                                                                white_x,
+-                                                               white_y);
++                                                               white_y,
++                                                               reference_x,
++                                                               reference_y);
+     }
+   else if (target_volume.has_luminance || target_volume.has_primaries)
+     {
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 7b95a7e53..f4c39c304 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -3146,8 +3146,13 @@ mapping_decision_cache (void)
+  * that the color device computes, with Krystek's rational approximation in
+  * meta_color_get_planckian_chromaticity(), rounded to float. libmutter is
+  * not linked here, so the values are copied; the color management tests
+- * check that function itself against CIE illuminant A.
++ * check that function itself against CIE illuminant A. The color device
++ * adapts relative to the white of the default temperature, 6500 K, which
++ * is not D65.
+  */
++static const float night_light_6500k[2] = { 0.313534170f, 0.323523313f };
++static const float night_light_6499k[2] = { 0.313549727f, 0.323538303f };
++static const float night_light_6501k[2] = { 0.313518643f, 0.323508292f };
+ static const float night_light_4000k[2] = { 0.3804111f, 0.3765993f };
+ static const float night_light_3990k[2] = { 0.3808537f, 0.3768775f };
+ static const float night_light_1000k[2] = { 0.6530877f, 0.3446811f };
+@@ -3156,15 +3161,77 @@ static const float night_light_4700k[2] = { 0.3540330f, 0.3583077f };
+ static const float night_light_10000k[2] = { 0.2806694f, 0.2885335f };
+ 
+ static ClutterColorState *
+-create_adapted_output_target (ClutterColorState *output,
+-                              const float        white[2])
++create_adapted_output_target_with_reference (ClutterColorState *output,
++                                             const float        white[2],
++                                             const float        reference[2])
+ {
+   const ClutterColorTargetVolume no_target = { 0 };
+ 
+   return clutter_color_state_params_new_adapted_display_target (CLUTTER_COLOR_STATE_PARAMS (output),
+                                                                 &no_target,
+                                                                 white[0],
+-                                                                white[1]);
++                                                                white[1],
++                                                                reference[0],
++                                                                reference[1]);
++}
++
++/* Adapted as the color device adapts: relative to the default
++ * temperature's white. */
++static ClutterColorState *
++create_adapted_output_target (ClutterColorState *output,
++                              const float        white[2])
++{
++  return create_adapted_output_target_with_reference (output, white,
++                                                      night_light_6500k);
++}
++
++/*
++ * The reference diagonal factors: the white point's XYZ and the reference
++ * white's, Y = 1, in linear RGB of @gamut through absolute colorimetry; the
++ * ratio of each channel, negative ratios set to zero, divided by the
++ * largest; computed in double precision.
++ */
++static void
++reference_white_factors (const ClutterPrimaries *gamut,
++                         const float             white[2],
++                         const float             reference[2],
++                         double                  factors[3])
++{
++  double to_xyz[3][3], from_xyz[3][3], xyz[3], reference_rgb[3];
++  double largest = 0.0;
++  int c;
++
++  reference_rgb_to_xyz (gamut, to_xyz);
++  reference_invert (to_xyz, from_xyz);
++  reference_white_xyz (white[0], white[1], xyz);
++  reference_apply (from_xyz, xyz, factors);
++  reference_white_xyz (reference[0], reference[1], xyz);
++  reference_apply (from_xyz, xyz, reference_rgb);
++  for (c = 0; c < 3; c++)
++    {
++      g_assert_cmpfloat (reference_rgb[c], >, 0.0);
++      factors[c] = MAX (factors[c] / reference_rgb[c], 0.0);
++      largest = MAX (largest, factors[c]);
++    }
++  for (c = 0; c < 3; c++)
++    factors[c] /= largest;
++}
++
++/* The CIE 1931 xy the output's white, scaled per channel by @factors,
++ * shows on a display with @gamut. */
++static void
++reference_shown_white (const ClutterPrimaries *gamut,
++                       const double            factors[3],
++                       double                 *x,
++                       double                 *y)
++{
++  double to_xyz[3][3], xyz[3], sum;
++
++  reference_rgb_to_xyz (gamut, to_xyz);
++  reference_apply (to_xyz, factors, xyz);
++  sum = xyz[0] + xyz[1] + xyz[2];
++  *x = xyz[0] / sum;
++  *y = xyz[1] / sum;
+ }
+ 
+ /* Whether two pipelines have the same operations, so the same shader. */
+@@ -3186,20 +3253,24 @@ pipelines_have_same_ops (ClutterColorTransform *transform,
+ 
+ /*
+  * The output of a display adapted to the Night Light white: converting its
+- * blending state to its PQ encoding shows the encoding's white at the
+- * Planckian white, within the precision of the matrices, and no channel
+- * brighter than without the adaptation.
++ * blending state to its PQ encoding moves the encoding's white by the ratio
++ * of the Planckian white to the default temperature's, within the precision
++ * of the matrices, as an independent double precision computation shows,
++ * and no channel brighter than without the adaptation.
+  */
+ static void
+ white_adaptation_white (void)
+ {
+   g_autoptr (ClutterColorState) output = create_pq_output (203.0f);
+   g_autoptr (ClutterColorState) adapted = NULL;
+-  double bt2020_to_xyz[3][3];
++  double bt2020_to_xyz[3][3], reference[3], expected_x, expected_y;
+   int linear;
+ 
+   adapted = create_adapted_output_target (output, night_light_4000k);
+   reference_rgb_to_xyz (&bt2020_gamut, bt2020_to_xyz);
++  reference_white_factors (&bt2020_gamut, night_light_4000k,
++                           night_light_6500k, reference);
++  reference_shown_white (&bt2020_gamut, reference, &expected_x, &expected_y);
+ 
+   for (linear = 0; linear < 2; linear++)
+     {
+@@ -3239,9 +3310,9 @@ white_adaptation_white (void)
+ 
+       reference_apply (bt2020_to_xyz, lum, xyz);
+       g_assert_cmpfloat_with_epsilon (xyz[0] / (xyz[0] + xyz[1] + xyz[2]),
+-                                      night_light_4000k[0], 1e-4);
++                                      expected_x, 1e-4);
+       g_assert_cmpfloat_with_epsilon (xyz[1] / (xyz[0] + xyz[1] + xyz[2]),
+-                                      night_light_4000k[1], 1e-4);
++                                      expected_y, 1e-4);
+     }
+ }
+ 
+@@ -3258,6 +3329,7 @@ white_adaptation_applied_once (void)
+   g_autoptr (ClutterColorState) adapted = NULL;
+   g_autoptr (ClutterColorState) same = NULL;
+   g_autoptr (ClutterColorState) other = NULL;
++  g_autoptr (ClutterColorState) other_reference = NULL;
+   g_autoptr (ClutterColorState) blending = NULL;
+   g_autoptr (ClutterColorState) plain = NULL;
+   g_autoptr (ClutterColorState) pq = NULL;
+@@ -3269,20 +3341,32 @@ white_adaptation_applied_once (void)
+   adapted = create_adapted_output_target (output, night_light_4000k);
+   same = create_adapted_output_target (output, night_light_4000k);
+   other = create_adapted_output_target (output, night_light_3990k);
++  other_reference =
++    create_adapted_output_target_with_reference (output, night_light_4000k,
++                                                 night_light_6499k);
+   blending = clutter_color_state_get_blending (adapted, FALSE);
+   plain = clutter_color_state_get_blending (output, FALSE);
+ 
+-  /* A declared value, compared exactly, and kept by the blending state. */
++  /* Declared values, compared exactly, and kept by the blending state. */
+   g_assert_true (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (blending),
+                                                                &white_x, &white_y));
+   g_assert_cmpfloat (white_x, ==, night_light_4000k[0]);
+   g_assert_cmpfloat (white_y, ==, night_light_4000k[1]);
++  g_assert_true (clutter_color_state_params_get_reference_white (CLUTTER_COLOR_STATE_PARAMS (blending),
++                                                                 &white_x, &white_y));
++  g_assert_cmpfloat (white_x, ==, night_light_6500k[0]);
++  g_assert_cmpfloat (white_y, ==, night_light_6500k[1]);
+   g_assert_false (clutter_color_state_params_get_adapted_white (CLUTTER_COLOR_STATE_PARAMS (plain),
+                                                                 NULL, NULL));
++  g_assert_false (clutter_color_state_params_get_reference_white (CLUTTER_COLOR_STATE_PARAMS (plain),
++                                                                  NULL, NULL));
+   g_assert_true (clutter_color_state_identical (adapted, same));
+   g_assert_false (clutter_color_state_identical (adapted, other));
+   g_assert_false (clutter_color_state_equals (adapted, other));
+   g_assert_false (clutter_color_state_equals (adapted, output));
++  /* The reference white is part of the state's identity too. */
++  g_assert_false (clutter_color_state_identical (adapted, other_reference));
++  g_assert_false (clutter_color_state_equals (adapted, other_reference));
+ 
+   pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
+                                        CLUTTER_TRANSFER_FUNCTION_PQ);
+@@ -3379,32 +3463,6 @@ white_adaptation_shader_matches_cpu (void)
+                              G_N_ELEMENTS (signals), 1e-4f);
+ }
+ 
+-/*
+- * The reference diagonal factors: the white point's XYZ, Y = 1, in linear
+- * RGB of @gamut through absolute colorimetry, negative components set to
+- * zero, divided by the largest; computed in double precision.
+- */
+-static void
+-reference_white_factors (const ClutterPrimaries *gamut,
+-                         const float             white[2],
+-                         double                  factors[3])
+-{
+-  double to_xyz[3][3], from_xyz[3][3], xyz[3], largest = 0.0;
+-  int c;
+-
+-  reference_rgb_to_xyz (gamut, to_xyz);
+-  reference_invert (to_xyz, from_xyz);
+-  reference_white_xyz (white[0], white[1], xyz);
+-  reference_apply (from_xyz, xyz, factors);
+-  for (c = 0; c < 3; c++)
+-    {
+-      factors[c] = MAX (factors[c], 0.0);
+-      largest = MAX (largest, factors[c]);
+-    }
+-  for (c = 0; c < 3; c++)
+-    factors[c] /= largest;
+-}
+-
+ static ClutterColorState *
+ create_pq_output_with_gamut (const ClutterPrimaries *gamut)
+ {
+@@ -3419,12 +3477,15 @@ create_pq_output_with_gamut (const ClutterPrimaries *gamut)
+ }
+ 
+ /*
+- * The adaptation is diagonal in the output's linear RGB: finite factors in
+- * [0, 1], the largest exactly 1, from the Settings range (1700 K to 4700 K)
+- * to the endpoints of the gsd-color schema (1000 K and 10000 K), and equal to
+- * an independent double precision computation. At 1000 K the Planckian white
+- * lies outside BT.2020, with a negative blue: it is projected, its blue
+- * factor zero, rather than claimed exactly.
++ * The adaptation is diagonal in the output's linear RGB, relative to the
++ * default temperature's white: finite factors in [0, 1], the largest
++ * exactly 1, from the Settings range (1700 K to 4700 K) to the endpoints of
++ * the gsd-color schema (1000 K and 10000 K), and equal to an independent
++ * double precision computation. At 1000 K the Planckian white lies outside
++ * BT.2020, with a negative blue: it is projected, its blue factor zero,
++ * rather than claimed exactly. At the reference white itself every factor
++ * is exactly 1. A reference white outside the encoding's gamut, or without
++ * XYZ, is refused.
+  */
+ static void
+ white_adaptation_factors (void)
+@@ -3441,6 +3502,7 @@ white_adaptation_factors (void)
+   const float *whites[] = {
+     night_light_1000k, night_light_1700k, night_light_3990k,
+     night_light_4000k, night_light_4700k, night_light_10000k,
++    night_light_6499k, night_light_6501k,
+   };
+   const ClutterColorimetry *colorimetries[] = { &bt2020, &dci_p3_colorimetry };
+   const ClutterPrimaries *gamuts[] = { &bt2020_gamut, &dci_p3_gamut };
+@@ -3458,10 +3520,13 @@ white_adaptation_factors (void)
+           g_assert_true (clutter_colorimetry_get_white_adaptation_factors (colorimetries[j],
+                                                                            whites[i][0],
+                                                                            whites[i][1],
++                                                                           night_light_6500k[0],
++                                                                           night_light_6500k[1],
+                                                                            factors,
+                                                                            &error));
+           g_assert_no_error (error);
+-          reference_white_factors (gamuts[j], whites[i], reference);
++          reference_white_factors (gamuts[j], whites[i], night_light_6500k,
++                                   reference);
+           for (c = 0; c < 3; c++)
+             {
+               g_assert_true (isfinite (factors[c]));
+@@ -3472,36 +3537,80 @@ white_adaptation_factors (void)
+             }
+           g_assert_cmpfloat (largest, ==, 1.0f);
+         }
++
++      /* The reference white itself is exactly identity. */
++      g_assert_true (clutter_colorimetry_get_white_adaptation_factors (colorimetries[j],
++                                                                       night_light_6500k[0],
++                                                                       night_light_6500k[1],
++                                                                       night_light_6500k[0],
++                                                                       night_light_6500k[1],
++                                                                       factors,
++                                                                       NULL));
++      for (c = 0; c < 3; c++)
++        g_assert_cmpfloat (factors[c], ==, 1.0f);
+     }
+ 
+-  /* 1000 K is projected into BT.2020: red is the largest, blue clamped. */
++  /* Anchored values, from an independent double precision computation of
++   * the ratio of Krystek's Planckian whites in linear BT.2020. 1000 K is
++   * projected into BT.2020: red is the largest, blue clamped. */
+   g_assert_true (clutter_colorimetry_get_white_adaptation_factors (&bt2020,
+                                                                    night_light_1000k[0],
+                                                                    night_light_1000k[1],
++                                                                   night_light_6500k[0],
++                                                                   night_light_6500k[1],
+                                                                    factors, NULL));
+   g_assert_cmpfloat (factors[0], ==, 1.0f);
+-  g_assert_cmpfloat_with_epsilon (factors[1], 0.122051, 1e-4);
++  g_assert_cmpfloat_with_epsilon (factors[1], 0.126457, 1e-4);
+   g_assert_cmpfloat (factors[2], ==, 0.0f);
+ 
+   /* 4000 K, the acceptance point, is representable: every factor is
+-   * positive. 10000 K is bluer than D65: blue is the largest. */
++   * positive. 10000 K is bluer than 6500 K: blue is the largest. */
+   g_assert_true (clutter_colorimetry_get_white_adaptation_factors (&bt2020,
+                                                                    night_light_4000k[0],
+                                                                    night_light_4000k[1],
++                                                                   night_light_6500k[0],
++                                                                   night_light_6500k[1],
+                                                                    factors, NULL));
+   g_assert_cmpfloat (factors[0], ==, 1.0f);
+-  g_assert_cmpfloat_with_epsilon (factors[1], 0.784624, 1e-4);
+-  g_assert_cmpfloat_with_epsilon (factors[2], 0.479811, 1e-4);
++  g_assert_cmpfloat_with_epsilon (factors[1], 0.812948, 1e-4);
++  g_assert_cmpfloat_with_epsilon (factors[2], 0.476332, 1e-4);
+   g_assert_true (clutter_colorimetry_get_white_adaptation_factors (&bt2020,
+                                                                    night_light_10000k[0],
+                                                                    night_light_10000k[1],
++                                                                   night_light_6500k[0],
++                                                                   night_light_6500k[1],
+                                                                    factors, NULL));
+   g_assert_cmpfloat (factors[2], ==, 1.0f);
+-  g_assert_cmpfloat (factors[0], <, factors[1]);
++  g_assert_cmpfloat_with_epsilon (factors[0], 0.682647, 1e-4);
++  g_assert_cmpfloat_with_epsilon (factors[1], 0.749315, 1e-4);
+ 
+   /* A white point without a positive y has no XYZ. */
+   g_assert_false (clutter_colorimetry_get_white_adaptation_factors (&bt2020,
+                                                                     0.3f, 0.0f,
++                                                                    night_light_6500k[0],
++                                                                    night_light_6500k[1],
++                                                                    factors,
++                                                                    &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_clear_error (&error);
++
++  /* Neither has a reference white without one. */
++  g_assert_false (clutter_colorimetry_get_white_adaptation_factors (&bt2020,
++                                                                    night_light_4000k[0],
++                                                                    night_light_4000k[1],
++                                                                    0.3f, 0.0f,
++                                                                    factors,
++                                                                    &error));
++  g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
++  g_clear_error (&error);
++
++  /* A reference white outside the gamut, with a negative blue in BT.2020,
++   * would turn the ratio over: it is refused, not projected. */
++  g_assert_false (clutter_colorimetry_get_white_adaptation_factors (&bt2020,
++                                                                    night_light_4000k[0],
++                                                                    night_light_4000k[1],
++                                                                    night_light_1000k[0],
++                                                                    night_light_1000k[1],
+                                                                     factors,
+                                                                     &error));
+   g_assert_error (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA);
+@@ -3527,6 +3636,70 @@ transform_to_luminance (ClutterColorState *source,
+     luminance[c] = reference_pq_luminance (color[c]);
+ }
+ 
++/*
++ * Night Light is continuous where it starts: 1 K either side of the
++ * default temperature, the factors are within 1e-3 of identity, and the
++ * output shows white within the same bound of the unadapted output, on a
++ * BT.2020 output and on an output with a DCI white, which is neither D65
++ * nor the default temperature's Planckian white. Anchoring at the encoding
++ * white instead would step green by about 4 % on BT.2020 at 6499 K.
++ */
++static void
++white_adaptation_continuity (void)
++{
++  const ClutterPrimaries *gamuts[] = { &bt2020_gamut, &dci_p3_gamut };
++  const float *whites[] = { night_light_6499k, night_light_6501k };
++  const float white_signal[3] = { 0.5f, 0.5f, 0.5f };
++  int g, i, c;
++
++  for (g = 0; g < G_N_ELEMENTS (gamuts); g++)
++    {
++      g_autoptr (ClutterColorState) output = create_pq_output_with_gamut (gamuts[g]);
++      g_autoptr (ClutterColorState) plain = NULL;
++      ClutterPrimaries gamut = *gamuts[g];
++      const ClutterColorimetry colorimetry = {
++        .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++        .primaries = &gamut,
++      };
++      double plain_lum[3];
++
++      plain = clutter_color_state_get_blending (output, FALSE);
++      transform_to_luminance (plain, output, white_signal, plain_lum);
++
++      for (i = 0; i < G_N_ELEMENTS (whites); i++)
++        {
++          g_autoptr (ClutterColorState) adapted = NULL;
++          g_autoptr (ClutterColorState) blending = NULL;
++          double reference[3], lum[3];
++          float factors[3];
++
++          g_assert_true (clutter_colorimetry_get_white_adaptation_factors (&colorimetry,
++                                                                           whites[i][0],
++                                                                           whites[i][1],
++                                                                           night_light_6500k[0],
++                                                                           night_light_6500k[1],
++                                                                           factors,
++                                                                           NULL));
++          reference_white_factors (gamuts[g], whites[i], night_light_6500k,
++                                   reference);
++          for (c = 0; c < 3; c++)
++            {
++              g_assert_cmpfloat_with_epsilon (factors[c], 1.0f, 1e-3);
++              g_assert_cmpfloat_with_epsilon (reference[c], 1.0, 1e-3);
++            }
++
++          adapted = create_adapted_output_target (output, whites[i]);
++          blending = clutter_color_state_get_blending (adapted, FALSE);
++          transform_to_luminance (blending, output, white_signal, lum);
++          for (c = 0; c < 3; c++)
++            {
++              g_assert_cmpfloat_with_epsilon (lum[c], plain_lum[c],
++                                              plain_lum[c] * 2e-3);
++            }
++        }
++    }
++}
++
+ /*
+  * No output channel of any nonnegative color exceeds its unadapted value:
+  * the primaries and secondaries of linear blending, which a white-only
+@@ -3573,6 +3746,8 @@ white_adaptation_channel_bound (void)
+           g_assert_true (clutter_colorimetry_get_white_adaptation_factors (&colorimetry,
+                                                                            whites[i][0],
+                                                                            whites[i][1],
++                                                                           night_light_6500k[0],
++                                                                           night_light_6500k[1],
+                                                                            factors,
+                                                                            NULL));
+ 
+@@ -3595,10 +3770,16 @@ white_adaptation_channel_bound (void)
+ }
+ 
+ /*
+- * Representable whites land on the Planckian chromaticity, also on an
+- * output whose own white is not D65: with an encoding white of DCI, the
+- * output's white still shows the requested white, in absolute XYZ. The
+- * projected 1000 K white does not, and shows no blue at all.
++ * Representable whites move the output's own white by exactly the ratio of
++ * the Planckian white to the default temperature's, also on an output whose
++ * own white is not D65: with an encoding white of DCI, the output's white
++ * shows the white an independent double precision computation of that
++ * ratio predicts, in absolute XYZ. The output's white is offset from the
++ * absolute Planckian white by its own offset from the default
++ * temperature's Planckian white, as in SDR; with a reference white equal
++ * to the encoding's own white, the absolute Planckian white is shown
++ * instead, which checks the ratio itself. The projected 1000 K white shows
++ * no blue at all.
+  */
+ static void
+ white_adaptation_representable (void)
+@@ -3614,6 +3795,7 @@ white_adaptation_representable (void)
+   for (g = 0; g < G_N_ELEMENTS (gamuts); g++)
+     {
+       g_autoptr (ClutterColorState) output = create_pq_output_with_gamut (gamuts[g]);
++      const float encoding_white[2] = { gamuts[g]->w_x, gamuts[g]->w_y };
+       double to_xyz[3][3];
+ 
+       reference_rgb_to_xyz (gamuts[g], to_xyz);
+@@ -3622,13 +3804,29 @@ white_adaptation_representable (void)
+         {
+           g_autoptr (ClutterColorState) adapted = NULL;
+           g_autoptr (ClutterColorState) blending = NULL;
+-          double lum[3], xyz[3], sum;
++          g_autoptr (ClutterColorState) absolute = NULL;
++          g_autoptr (ClutterColorState) absolute_blending = NULL;
++          double lum[3], xyz[3], sum, reference[3], expected_x, expected_y;
++
++          reference_white_factors (gamuts[g], whites[i], night_light_6500k,
++                                   reference);
++          reference_shown_white (gamuts[g], reference, &expected_x, &expected_y);
+ 
+           adapted = create_adapted_output_target (output, whites[i]);
+           blending = clutter_color_state_get_blending (adapted, FALSE);
+           transform_to_luminance (blending, output, white_signal, lum);
+           reference_apply (to_xyz, lum, xyz);
+           sum = xyz[0] + xyz[1] + xyz[2];
++          g_assert_cmpfloat_with_epsilon (xyz[0] / sum, expected_x, 1e-4);
++          g_assert_cmpfloat_with_epsilon (xyz[1] / sum, expected_y, 1e-4);
++
++          absolute =
++            create_adapted_output_target_with_reference (output, whites[i],
++                                                         encoding_white);
++          absolute_blending = clutter_color_state_get_blending (absolute, FALSE);
++          transform_to_luminance (absolute_blending, output, white_signal, lum);
++          reference_apply (to_xyz, lum, xyz);
++          sum = xyz[0] + xyz[1] + xyz[2];
+           g_assert_cmpfloat_with_epsilon (xyz[0] / sum, whites[i][0], 1e-4);
+           g_assert_cmpfloat_with_epsilon (xyz[1] / sum, whites[i][1], 1e-4);
+         }
+@@ -3685,6 +3883,7 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/uniform", white_adaptation_uniform)
+   CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/shader-matches-cpu", white_adaptation_shader_matches_cpu)
+   CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/factors", white_adaptation_factors)
++  CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/continuity", white_adaptation_continuity)
+   CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/channel-bound", white_adaptation_channel_bound)
+   CLUTTER_TEST_UNIT ("/color-hdr/white-adaptation/representable", white_adaptation_representable)
+ )
+diff --git a/src/tests/color-management-tests.c b/src/tests/color-management-tests.c
+index 3c47b3593..b61b151b8 100644
+--- a/src/tests/color-management-tests.c
++++ b/src/tests/color-management-tests.c
+@@ -1812,9 +1812,9 @@ set_output_color_mode (MetaOutput    *output,
+ /*
+  * In BT.2100 the output carries PQ code values: Night Light programs
+  * neither the gamma LUT nor the CTM, and adapts the white in the rendering
+- * color state instead, to the Planckian white of the temperature. At the
+- * default temperature the rendering color state is exactly the one without
+- * Night Light.
++ * color state instead, to the Planckian white of the temperature relative to
++ * the default temperature's. At the default temperature the rendering color
++ * state is exactly the one without Night Light.
+  */
+ static void
+ meta_test_color_management_night_light_bt2100 (void)
+@@ -1891,6 +1891,14 @@ meta_test_color_management_night_light_bt2100 (void)
+                                                                &white_x, &white_y));
+   g_assert_cmpfloat (white_x, ==, expected_x);
+   g_assert_cmpfloat (white_y, ==, expected_y);
++  /* Relative to the Planckian white of the default temperature, 6500 K,
++   * not to the encoding's white, so that the adaptation starts
++   * continuously. */
++  meta_color_get_planckian_chromaticity (6500, &expected_x, &expected_y);
++  g_assert_true (clutter_color_state_params_get_reference_white (CLUTTER_COLOR_STATE_PARAMS (rendering_color_state),
++                                                                 &white_x, &white_y));
++  g_assert_cmpfloat (white_x, ==, expected_x);
++  g_assert_cmpfloat (white_y, ==, expected_y);
+   /* The output's encoding is not changed. */
+   g_assert_true (meta_color_device_get_color_state (color_device) == encoding);
+ 

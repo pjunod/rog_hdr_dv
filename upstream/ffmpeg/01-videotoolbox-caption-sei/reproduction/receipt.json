@@ -1,0 +1,697 @@
+{
+  "schema": 1,
+  "checked_at": "2026-10-28",
+  "repository": "FFmpeg/FFmpeg",
+  "baseline": "16efe6927d850d23766aee15820abedcb1219121",
+  "candidate": "0012dcc5818027a640485f4ea953d409f57a1031",
+  "candidate_tree": "315e453770b30dbcc62f45627179b3e3f6c859f4",
+  "patch_sha256": "d8ad689264983f9cb89cac08e63123b912189e7482068e2a0dccbce30d5e1c01",
+  "harness_sha256": "796f124ba0b2d821a8c68e992096e654c7143e269171f45e96773ece3a6c4d06",
+  "production_source_path": "libavcodec/videotoolboxenc.c",
+  "extraction": "Verbatim static find_sei_end definitions; candidate also verbatim read_sei_byte. Each compiled separately with only AVCodecContext/av_log/constants stubbed; no production body rewriting.",
+  "fixtures": [
+    {
+      "name": "unregistered_plain",
+      "category": "well-formed SEI syntax",
+      "hex": "060510000102030405060708090a0b0c0d0e0f80",
+      "expected_result": 20,
+      "expected_offset": 19
+    },
+    {
+      "name": "unregistered_escaped_uuid",
+      "category": "well-formed SEI syntax",
+      "hex": "06051000000301030405060708090a0b0c0d0e0f80",
+      "expected_result": 21,
+      "expected_offset": 20
+    },
+    {
+      "name": "unregistered_escaped_zero_uuid",
+      "category": "well-formed SEI syntax",
+      "hex": "060510000003000003000003000003000003000003000003000080",
+      "expected_result": 27,
+      "expected_offset": 26
+    },
+    {
+      "name": "unregistered_escaped_payload_00",
+      "category": "well-formed SEI syntax",
+      "hex": "060513000102030405060708090a0b0c0d0e0f0000030080",
+      "expected_result": 24,
+      "expected_offset": 23
+    },
+    {
+      "name": "unregistered_escaped_payload_01",
+      "category": "well-formed SEI syntax",
+      "hex": "060513000102030405060708090a0b0c0d0e0f0000030180",
+      "expected_result": 24,
+      "expected_offset": 23
+    },
+    {
+      "name": "unregistered_escaped_payload_02",
+      "category": "well-formed SEI syntax",
+      "hex": "060513000102030405060708090a0b0c0d0e0f0000030280",
+      "expected_result": 24,
+      "expected_offset": 23
+    },
+    {
+      "name": "unregistered_escaped_payload_03",
+      "category": "well-formed SEI syntax",
+      "hex": "060513000102030405060708090a0b0c0d0e0f0000030380",
+      "expected_result": 24,
+      "expected_offset": 23
+    },
+    {
+      "name": "unregistered_size_255",
+      "category": "well-formed SEI syntax",
+      "hex": "0605ff0000030102030405060708090a0b0c0d0e0f555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555580",
+      "expected_result": 261,
+      "expected_offset": 260
+    },
+    {
+      "name": "unregistered_size_256",
+      "category": "well-formed SEI syntax",
+      "hex": "0605ff01000102030405060708090a0b0c0d0e0f55555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555555580",
+      "expected_result": 261,
+      "expected_offset": 260
+    },
+    {
+      "name": "two_escaped_messages",
+      "category": "well-formed SEI syntax",
+      "hex": "06051000000300000300000300000300000300000300000300000513000102030405060708090a0b0c0d0e0f0000030280",
+      "expected_result": 49,
+      "expected_offset": 48
+    },
+    {
+      "name": "extended_unknown_payload_type",
+      "category": "well-formed SEI syntax",
+      "hex": "06ff0510000102030405060708090a0b0c0d0e0f80",
+      "expected_result": 21,
+      "expected_offset": 20
+    },
+    {
+      "name": "header_only",
+      "category": "malformed/truncated syntax",
+      "hex": "06",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "truncated_payload",
+      "category": "malformed/truncated syntax",
+      "hex": "060510010203",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "missing_trailing_byte",
+      "category": "malformed/truncated syntax",
+      "hex": "060510000102030405060708090a0b0c0d0e0f",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "truncated_type_extension",
+      "category": "malformed/truncated syntax",
+      "hex": "06ff",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "truncated_size_extension",
+      "category": "malformed/truncated syntax",
+      "hex": "0605ff",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "invalid_emulation_prevention",
+      "category": "malformed/truncated syntax",
+      "hex": "0605040000030480",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "truncated_emulation_prevention",
+      "category": "malformed/truncated syntax",
+      "hex": "060504000003",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "missing_emulation_prevention",
+      "category": "malformed/truncated syntax",
+      "hex": "06050300000180",
+      "expected_result": -1094995529,
+      "expected_offset": -1
+    },
+    {
+      "name": "empty",
+      "category": "not SEI",
+      "hex": "",
+      "expected_result": 0,
+      "expected_offset": -1
+    },
+    {
+      "name": "non_sei",
+      "category": "not SEI",
+      "hex": "6580",
+      "expected_result": 0,
+      "expected_offset": -1
+    }
+  ],
+  "standalone": {
+    "command": "python3 upstream/ffmpeg/01-videotoolbox-caption-sei/reproduction/run.py --source work/cinema/ffmpeg --output work/review-saved/ffmpeg-sei-reproduction-final",
+    "compiler": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "flags": [
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-O1",
+      "-g",
+      "-fsanitize=address,undefined"
+    ],
+    "raw_results_path": "work/review-saved/ffmpeg-sei-reproduction-final/results.json",
+    "raw_results_sha256": "8454fd9d7a2ae6959685e95227e7ee8b9c269b63906e8299157a50276c297df0",
+    "variants": {
+      "baseline": {
+        "commit": "16efe6927d850d23766aee15820abedcb1219121",
+        "source_sha256": "2ff1f0aa23bdc0e5294b74624cb97b80437bc645b2c354a3912ff98189ef5796",
+        "function_sha256": {
+          "find_sei_end": "a0e7bede61736ee1d14b20313e9a013ed50c5d1327e72ed2bc187291a80b2db5"
+        },
+        "generated_c_sha256": "a83a41c6e7db41350ad492bb281d5410d9dd8ac0f6ac30cb718b1445ff74811e",
+        "passed": 8,
+        "failed": 13,
+        "results": [
+          {
+            "name": "unregistered_plain",
+            "expected_result": 20,
+            "expected_offset": 19,
+            "observed": {
+              "result": 20,
+              "offset": 19
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_uuid",
+            "expected_result": 21,
+            "expected_offset": 20,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_escaped_zero_uuid",
+            "expected_result": 27,
+            "expected_offset": 26,
+            "observed": {
+              "result": 20,
+              "offset": 19
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_escaped_payload_00",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": 23,
+              "offset": 22
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_escaped_payload_01",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_escaped_payload_02",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_escaped_payload_03",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_size_255",
+            "expected_result": 261,
+            "expected_offset": 260,
+            "observed": {
+              "result": 5,
+              "offset": 4
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "unregistered_size_256",
+            "expected_result": 261,
+            "expected_offset": 260,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "two_escaped_messages",
+            "expected_result": 49,
+            "expected_offset": 48,
+            "observed": {
+              "result": 20,
+              "offset": 19
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "extended_unknown_payload_type",
+            "expected_result": 21,
+            "expected_offset": 20,
+            "observed": {
+              "result": 21,
+              "offset": 20
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "header_only",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": null,
+            "process_exit": -6,
+            "passed": false,
+            "diagnostic": "UBSan reports unsigned pointer-offset overflow in header-only baseline NAL"
+          },
+          {
+            "name": "truncated_payload",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "missing_trailing_byte",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": 20,
+              "offset": 19
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "truncated_type_extension",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "truncated_size_extension",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "invalid_emulation_prevention",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": 8,
+              "offset": 7
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "truncated_emulation_prevention",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "missing_emulation_prevention",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": 7,
+              "offset": 6
+            },
+            "process_exit": 0,
+            "passed": false
+          },
+          {
+            "name": "empty",
+            "expected_result": 0,
+            "expected_offset": -1,
+            "observed": {
+              "result": 0,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "non_sei",
+            "expected_result": 0,
+            "expected_offset": -1,
+            "observed": {
+              "result": 0,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          }
+        ]
+      },
+      "candidate": {
+        "commit": "0012dcc5818027a640485f4ea953d409f57a1031",
+        "source_sha256": "108cd4a7913507311a2072f667cb5af67b8bf0f2743b71fe7e749ed838844790",
+        "function_sha256": {
+          "read_sei_byte": "564bcffdc662272930c592e837f071a51efae248199b356a065254ae98916f28",
+          "find_sei_end": "3f734df52fcb6676781b2ec370cd5f9486f0cdce31f2228aee3df9d5e9faa48e"
+        },
+        "generated_c_sha256": "6a590317dec748223d77d99aca7f9e65338d7ef4ddf0f98b470a36662284b481",
+        "passed": 21,
+        "failed": 0,
+        "results": [
+          {
+            "name": "unregistered_plain",
+            "expected_result": 20,
+            "expected_offset": 19,
+            "observed": {
+              "result": 20,
+              "offset": 19
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_uuid",
+            "expected_result": 21,
+            "expected_offset": 20,
+            "observed": {
+              "result": 21,
+              "offset": 20
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_zero_uuid",
+            "expected_result": 27,
+            "expected_offset": 26,
+            "observed": {
+              "result": 27,
+              "offset": 26
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_payload_00",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": 24,
+              "offset": 23
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_payload_01",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": 24,
+              "offset": 23
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_payload_02",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": 24,
+              "offset": 23
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_escaped_payload_03",
+            "expected_result": 24,
+            "expected_offset": 23,
+            "observed": {
+              "result": 24,
+              "offset": 23
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_size_255",
+            "expected_result": 261,
+            "expected_offset": 260,
+            "observed": {
+              "result": 261,
+              "offset": 260
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "unregistered_size_256",
+            "expected_result": 261,
+            "expected_offset": 260,
+            "observed": {
+              "result": 261,
+              "offset": 260
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "two_escaped_messages",
+            "expected_result": 49,
+            "expected_offset": 48,
+            "observed": {
+              "result": 49,
+              "offset": 48
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "extended_unknown_payload_type",
+            "expected_result": 21,
+            "expected_offset": 20,
+            "observed": {
+              "result": 21,
+              "offset": 20
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "header_only",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "truncated_payload",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "missing_trailing_byte",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "truncated_type_extension",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "truncated_size_extension",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "invalid_emulation_prevention",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "truncated_emulation_prevention",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "missing_emulation_prevention",
+            "expected_result": -1094995529,
+            "expected_offset": -1,
+            "observed": {
+              "result": -1094995529,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "empty",
+            "expected_result": 0,
+            "expected_offset": -1,
+            "observed": {
+              "result": 0,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          },
+          {
+            "name": "non_sei",
+            "expected_result": 0,
+            "expected_offset": -1,
+            "observed": {
+              "result": 0,
+              "offset": -1
+            },
+            "process_exit": 0,
+            "passed": true
+          }
+        ]
+      }
+    }
+  },
+  "native_object_compile": {
+    "source_archive_sha256": "60355701c661bc0fcde806ec753606c60a202771395353efa70b59ef711b5f62",
+    "source_sha256": "108cd4a7913507311a2072f667cb5af67b8bf0f2743b71fe7e749ed838844790",
+    "source_matches_standalone_candidate": true,
+    "sdk_version": "27.0",
+    "architecture": "arm64",
+    "configure_command": "../source/configure --disable-everything --disable-programs --disable-doc --disable-autodetect --disable-x86asm --enable-videotoolbox --enable-encoder=h264_videotoolbox",
+    "compile_command": "make -j4 libavcodec/videotoolboxenc.o",
+    "result": "exit0; actual candidate translation unit compiled with H.264 VideoToolbox encoder enabled",
+    "object_sha256": "a9c71755c8dfec7b469ee4b9914c6e9aa509f71040369c09d428aa948201ec08",
+    "logs": {
+      "work/final-proof/ffmpeg-sei-native/configure.log": "545e5a1e757d043e36ccb3e3d1cf007a3cae3f9990ac99a2fbb2f797622f2dc2",
+      "work/final-proof/ffmpeg-sei-native/compile.log": "aae12ccba35ebfb2165a64783854b51e77df2b1b2616fa7206b948947bdb6cea"
+    },
+    "configure_log_redaction": "Retained configure summary redacts the absolute owned source path; raw log remains in work/review-saved/ffmpeg-vt-object/build/configure.log. Full logs stay outside Git.",
+    "raw_configure_log_sha256": "18aaf986fe2e9f7a8e8f6e3684dc86da44331b29258fac46aeded7d69a170435",
+    "compiler_command": "gcc (Apple compiler driver, configure default)",
+    "compiler_version": "Apple clang version 21.0.0 (clang-2100.3.34.2)",
+    "logs_published": false
+  },
+  "jellyfin_alternative": {
+    "commit": "7ef12861e5f832e3cd86dfd8d4d8d77e2fcde442",
+    "patch_path": "debian/patches/0101-fix-videotoolbox-closed-caption-sei.patch",
+    "comparison": "Removes find_sei_end and append-to-existing-SEI block. Existing SEI NAL units remain copied; the existing no-SEI insertion path writes a separate caption SEI before a later post-SEI NAL. Avoids this walker entirely with less code; candidate instead keeps merging and validates/counts RBSP while preserving encoded data. Maintainer should choose whether preserving merging is required.",
+    "validation": "Read source patch only; alternative was not encoder-tested here."
+  },
+  "limits": [
+    "Parser and actual object compile only; no VideoToolbox encode or A/53 caption insertion executed",
+    "No FATE integration or full FFmpeg link/build",
+    "copy_replace_length_codes destination-capacity changes compile but are not executed by standalone fixture",
+    "Well-formed SEI syntax fixtures are not a full decodable H.264 access-unit qualification",
+    "No physical decoder/Apple hardware/runtime validation",
+    "No upstream issue, PR, email or other mutation"
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "repository": "VoidXH/Cavern",
+  "target_branch": "master",
+  "base": "c233ce02bd4f93de43ff94df7609fab611ab870e",
+  "venue": "github",
+  "current_upstream_checked": "2026-10-28",
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-block-buffer",
+      "inventory_ids": [
+        "CAV-1"
+      ],
+      "title": "Defer BlockBuffer frame fetch until samples are requested",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "01-block-buffer/0001-block-buffer.patch"
+      ],
+      "tests": [
+        {
+          "command": "dotnet test Tests/Test.Cavern.Format/Test.Cavern.Format.csproj -c Release --nologo -v q",
+          "result": "inherited: 103 passed, 0 failed at source commit for this sequential tip; independent-base application newly checked separately",
+          "evidence": "evidence.json"
+        }
+      ],
+      "candidate_tree": "967b4e0321f78eff16a2e72ea0584963dee3c3f0"
+    },
+    {
+      "id": "02",
+      "slug": "02-joc-timeslots",
+      "inventory_ids": [
+        "CAV-2"
+      ],
+      "title": "Wrap JOC timeslots at the frame boundary",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "02-joc-timeslots/0001-joc-timeslots.patch"
+      ],
+      "tests": [
+        {
+          "command": "dotnet test Tests/Test.Cavern.Format/Test.Cavern.Format.csproj -c Release --nologo -v q",
+          "result": "inherited: 104 passed, 0 failed at source commit for this sequential tip; independent-base application newly checked separately",
+          "evidence": "evidence.json"
+        },
+        {
+          "command": "dotnet test Tests/Test.Cavern.Format/Test.Cavern.Format.csproj -c Release --no-restore; failed discovery test only retried with inherited bridge network",
+          "result": "new independent-base suite: 98/99; SAPAnnouncer timeout with --network none. Same failing test passed after restoring the inherited bridge network (2/2 matched discovery tests).",
+          "evidence": "evidence.json"
+        }
+      ],
+      "candidate_tree": "4db62763154c8272c20c3390f95c3d4bdc0e5ee3"
+    },
+    {
+      "id": "03",
+      "slug": "03-oamd-presence",
+      "inventory_ids": [
+        "CAV-3"
+      ],
+      "title": "Expose current-frame OAMD presence",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "03-oamd-presence/0001-oamd-presence.patch"
+      ],
+      "tests": [
+        {
+          "command": "dotnet test Tests/Test.Cavern.Format/Test.Cavern.Format.csproj -c Release --nologo -v q",
+          "result": "inherited: 105 passed, 0 failed at source commit for this sequential tip; independent-base application newly checked separately",
+          "evidence": "evidence.json"
+        },
+        {
+          "command": "dotnet test Tests/Test.Cavern.Format/Test.Cavern.Format.csproj -c Release --no-restore",
+          "result": "new independent-base suite: 99/99, zero failed",
+          "evidence": "evidence.json"
+        }
+      ],
+      "candidate_tree": "c4c517a7b6ac32ac5cd771c850b766130bc8ff46"
+    }
+  ]
+}

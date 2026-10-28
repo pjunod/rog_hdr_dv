@@ -1,0 +1,80 @@
+From a3de792bb4fd0a8aabf46261fb061cb1d56e2bf1 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 18:51:12 +0000
+Subject: [PATCH 1/2] clutter/stage-view: Reuse compatible offscreen buffers on
+ state changes
+
+Every color state change of a stage view dropped its offscreen
+framebuffer and allocated a new one, even when the new state needs a
+buffer of the same size and format. Changes that only alter uniforms of
+the output conversion, such as a reference luminance or Night Light
+step, therefore reallocated the buffer on every step.
+
+Keep the current offscreen when its dimensions are unchanged and its
+format is one of the formats acceptable for the new state, checking all
+of them because allocation may have used a fallback format (for
+example an fp16 one). The output pipeline is still invalidated and a
+full redraw is still requested on every change, and the offscreen is
+still released when the view can paint directly again.
+
+Link: TBD-MR
+---
+ clutter/clutter/clutter-stage-view.c | 31 +++++++++++++++++++++-------
+ 1 file changed, 24 insertions(+), 7 deletions(-)
+
+diff --git a/clutter/clutter/clutter-stage-view.c b/clutter/clutter/clutter-stage-view.c
+index f4f2f0416..596523072 100644
+--- a/clutter/clutter/clutter-stage-view.c
++++ b/clutter/clutter/clutter-stage-view.c
+@@ -184,12 +184,6 @@ ensure_stage_view_offscreen (ClutterStageView *view)
+   g_autoptr (CoglOffscreen) offscreen = NULL;
+   g_autoptr (GError) local_error = NULL;
+ 
+-  if (priv->offscreen)
+-    return;
+-
+-  clutter_stage_view_invalidate_projection (view);
+-  clutter_stage_view_invalidate_viewport (view);
+-
+   required_format = clutter_color_state_required_format (priv->color_state);
+ 
+   if (required_format <= CLUTTER_ENCODING_REQUIRED_FORMAT_UINT8)
+@@ -223,6 +217,30 @@ ensure_stage_view_offscreen (ClutterStageView *view)
+       offscreen_height = onscreen_height;
+     }
+ 
++  if (priv->offscreen)
++    {
++      CoglFramebuffer *framebuffer = COGL_FRAMEBUFFER (priv->offscreen);
++      CoglPixelFormat format = cogl_framebuffer_get_internal_format (framebuffer);
++      size_t i;
++
++      /* State changes still refresh the output pipeline, but need not
++       * replace a buffer with the same dimensions and a usable format.
++       * Check all candidates: allocation may have used a fallback format.
++       */
++      if (cogl_framebuffer_get_width (framebuffer) == offscreen_width &&
++          cogl_framebuffer_get_height (framebuffer) == offscreen_height)
++        {
++          for (i = 0; i < n_formats; i++)
++            {
++              if (format == formats[i])
++                return;
++            }
++        }
++    }
++
++  clutter_stage_view_invalidate_projection (view);
++  clutter_stage_view_invalidate_viewport (view);
++
+   offscreen = cogl_offscreen_new_from_formats (cogl_context,
+                                                formats,
+                                                n_formats,
+@@ -313,7 +331,6 @@ clutter_stage_view_invalidate_offscreen (ClutterStageView *view)
+     }
+ 
+   g_clear_object (&priv->offscreen_pipeline);
+-  g_clear_object (&priv->offscreen);
+ 
+   if (priv->ensure_offscreen_idle_id != 0)
+     return;

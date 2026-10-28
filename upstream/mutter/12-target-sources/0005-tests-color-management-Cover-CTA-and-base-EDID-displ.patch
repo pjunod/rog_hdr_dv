@@ -1,0 +1,512 @@
+From 3ec252ec9b9bca81f165f6156d90eaea8d9729ca Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 14:54:31 -0400
+Subject: [PATCH 5/5] tests/color-management: Cover CTA and base EDID display
+ targets
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Cover the declared targets of outputs off the native DisplayID route
+end to end, each in its own invocation since both rewrite the fixture
+output:
+
+ - an external monitor declaring only CTA-861 HDR static metadata, a
+   desired maximum of 600 and a desired minimum of 0.05 cd/m², and base
+   EDID primaries, in BT.2100: its luminance target carries CTA
+   provenance, is published as 0.05 to 600 cd/m², and is carried by the
+   blending state, while its target gamut stays the BT.2020 fallback;
+   PQ content mastered at 1000 cd/m² is highlight mapped toward 600 and
+   refused direct scanout. Without a desired maximum, with one at the
+   reference white, and with HDR forced, the luminance target is the
+   fallback;
+ - a wide gamut panel whose white point is not D65, in the native SDR
+   mode: its target primaries equal its encoding primaries with EDID
+   provenance; its own encoding and content in its published
+   colorimetry are not mapped and may be scanned out; BT.2020 content
+   is compressed toward the panel's gamut while sRGB content is not;
+   the default SDR mode and unusable base primaries keep the fallback in
+   both modes.
+
+A new client mode compares the published output description with the
+values the compositor expects.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
+---
+ src/tests/meson.build                         |   2 +
+ src/tests/wayland-color-management-test.c     | 355 ++++++++++++++++++
+ .../wayland-test-clients/color-management.c   |  68 ++++
+ 3 files changed, 425 insertions(+)
+
+diff --git a/src/tests/meson.build b/src/tests/meson.build
+index 4d4684e87..c1a8e3616 100644
+--- a/src/tests/meson.build
++++ b/src/tests/meson.build
+@@ -978,6 +978,8 @@ wayland_test_cases = [
+       '/wayland/mapping/blending-target',
+       '/wayland/mapping/target-gamut',
+       '/wayland/published/reference-factor',
++      '/wayland/display-targets/cta',
++      '/wayland/display-targets/sdr-native',
+     ],
+     'depends': [
+       test_client_executables.get('color-management'),
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 4aad7176b..97f76118e 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -1636,6 +1636,357 @@ mapping_target_gamut (void)
+   meta_color_device_update (device);
+ }
+ 
++/* A synthetic wide gamut panel, in exact 10-bit EDID steps. */
++static const uint16_t wide_gamut_codes[8] = {
++  697, 327, 271, 706, 154, 61, 321, 337,
++};
++
++static void
++set_wide_gamut_base_primaries (MetaEdidInfo *edid_info)
++{
++  unsigned int i;
++
++  edid_info->default_color_primaries = (struct di_color_primaries) {
++    .has_primaries = TRUE,
++    .has_default_white_point = TRUE,
++  };
++  for (i = 0; i < 3; i++)
++    {
++      edid_info->default_color_primaries.primary[i] = (struct di_chromaticity_cie1931) {
++        wide_gamut_codes[2 * i] / 1024.0f, wide_gamut_codes[2 * i + 1] / 1024.0f,
++      };
++    }
++  edid_info->default_color_primaries.default_white = (struct di_chromaticity_cie1931) {
++    wide_gamut_codes[6] / 1024.0f, wide_gamut_codes[7] / 1024.0f,
++  };
++}
++
++/* The base primaries as published, rounded to protocol units here rather
++ * than by the code under test. */
++static void
++get_wide_gamut_coordinates (int32_t coordinates[8])
++{
++  unsigned int i;
++
++  for (i = 0; i < 8; i++)
++    coordinates[i] = (int32_t) round (wide_gamut_codes[i] * 1000000.0 / 1024.0);
++}
++
++/* Runs a client that compares the target output's published description
++ * with these values. */
++static void
++check_published_target (MetaOutput    *output,
++                        uint32_t       target_min,
++                        uint32_t       target_max,
++                        const int32_t  target_primaries[8],
++                        const int32_t  encoding_primaries[8])
++{
++  g_autoptr (GString) expected = g_string_new (NULL);
++  MetaWaylandTestClient *client;
++  unsigned int i;
++
++  g_string_append_printf (expected, "%u %u", target_min, target_max);
++  for (i = 0; i < 8; i++)
++    g_string_append_printf (expected, " %d", target_primaries[i]);
++  for (i = 0; i < 8; i++)
++    g_string_append_printf (expected, " %d", encoding_primaries[i]);
++
++  meta_wayland_test_driver_set_property (test_driver, "target-output",
++                                         meta_output_get_name (output));
++  meta_wayland_test_driver_set_property (test_driver, "expected-target",
++                                         expected->str);
++  client = meta_wayland_test_client_new_with_args (test_context,
++                                                   "color-management",
++                                                   "published-target",
++                                                   NULL);
++  meta_wayland_test_client_finish (client);
++}
++
++/*
++ * An external HDR monitor declaring its capability only through CTA-861 HDR
++ * static metadata and its gamut only through the base EDID color
++ * characteristics, as most do, in BT.2100: its CTA peak is its target, with
++ * its own provenance, published, carried by the blending state, and mapped
++ * toward. The base EDID primaries describe its default SDR colorimetry, and
++ * are no HDR target: the target gamut stays the encoding fallback.
++ */
++static void
++display_targets_cta (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  ClutterContext *context = meta_backend_get_clutter_context (backend);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  const int32_t bt2020[8] = {
++    708000, 292000, 170000, 797000, 131000, 46000, 312700, 329000,
++  };
++  const MetaColorTargetLuminance *target;
++  const MetaColorTargetPrimaries *target_primaries;
++  const ClutterColorTargetVolume *target_volume;
++  ClutterStageView *view;
++  ClutterColorState *blending, *output_color_state;
++  g_autoptr (ClutterColorState) untargeted = NULL;
++  g_autoptr (ClutterColorState) pq = NULL;
++  g_autoptr (ClutterColorState) mastered_1000 = NULL;
++  g_autoptr (ClutterColorState) mastered_600 = NULL;
++  unsigned int i;
++
++  info->connector_type = META_CONNECTOR_TYPE_DisplayPort;
++  info->supported_hdr_eotfs = 1 << META_OUTPUT_HDR_METADATA_EOTF_PQ;
++  info->supported_color_spaces = 1 << META_OUTPUT_COLORSPACE_BT2020;
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->hdr_static_metadata = (struct di_hdr_static_metadata) {
++    .desired_content_max_luminance = 600,
++    .desired_content_min_luminance = 0.05f,
++    .type1 = TRUE,
++    .traditional_sdr = TRUE,
++    .pq = TRUE,
++  };
++  info->edid_info->colorimetry.bt2020_rgb = TRUE;
++  set_wide_gamut_base_primaries (info->edid_info);
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++
++  target = meta_color_device_get_target_luminance (device);
++  g_assert_cmpfloat (target->minimum, ==, 0.05f);
++  g_assert_cmpfloat (target->maximum, ==, 600.0f);
++  g_assert_cmpint (target->minimum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  g_assert_cmpint (target->maximum_source, ==, META_COLOR_TARGET_CTA_DECLARED);
++  target_primaries = meta_color_device_get_target_primaries (device);
++  g_assert_cmpint (target_primaries->source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  for (i = 0; i < 8; i++)
++    g_assert_cmpint (target_primaries->coordinates[i], ==, bt2020[i]);
++
++  /* Published as 0.05 to 600 cd/m², with BT.2020 as the encoding and the
++   * target gamut. */
++  check_published_target (output, 500, 600, bt2020, bt2020);
++
++  view = CLUTTER_STAGE_VIEW (meta_renderer_get_view_for_crtc (renderer,
++                                                              meta_output_get_assigned_crtc (output)));
++  g_assert_nonnull (view);
++
++  /* The output color state stays the encoding; the blending state carries
++   * the peak, and no gamut. */
++  output_color_state = clutter_stage_view_get_output_color_state (view);
++  g_assert_true (output_color_state == meta_color_device_get_color_state (device));
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (output_color_state));
++  g_assert_false (target_volume->has_luminance);
++  g_assert_false (target_volume->has_primaries);
++  blending = clutter_stage_view_get_color_state (view);
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending));
++  g_assert_true (target_volume->has_luminance);
++  g_assert_cmpfloat (target_volume->max_lum, ==, 600.0f);
++  g_assert_cmpfloat (target_volume->min_lum, ==, 0.05f);
++  g_assert_false (target_volume->has_primaries);
++
++  /* PQ content mastered at 1000 cd/m² is mapped toward the 600 cd/m² peak;
++   * content mastered at the peak is not highlight mapped, and undeclared
++   * PQ content, with no known peak, is not either. */
++  untargeted = clutter_color_state_get_blending (output_color_state, FALSE);
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  mastered_1000 = create_with_mastering (pq, 1000.0f, 0.0f);
++  mastered_600 = create_with_mastering (pq, 600.0f, 0.0f);
++  g_assert_true (clutter_color_transform_requires_highlight_mapping (mastered_1000, blending));
++  g_assert_true (renderer_maps_highlights (mastered_1000, blending, untargeted));
++  g_assert_true (meta_compositor_view_native_color_state_prevents_scanout (mastered_1000,
++                                                                           blending,
++                                                                           output_color_state));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_600, blending));
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (pq, blending));
++
++  /* Without a desired maximum, there is no luminance target. */
++  info->edid_info->hdr_static_metadata.desired_content_max_luminance = 0;
++  meta_color_device_update (device);
++  target = meta_color_device_get_target_luminance (device);
++  g_assert_cmpint (target->minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (target->maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  blending = clutter_stage_view_get_color_state (view);
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending));
++  g_assert_false (target_volume->has_luminance);
++  g_assert_false (target_volume->has_primaries);
++  g_assert_false (clutter_color_transform_requires_highlight_mapping (mastered_1000, blending));
++  check_published_target (output, 50, 10000, bt2020, bt2020);
++
++  /* Nor with a desired maximum at the reference white. */
++  info->edid_info->hdr_static_metadata.desired_content_max_luminance = 203;
++  meta_color_device_update (device);
++  g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
++                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* Forced HDR keeps the fallback targets. */
++  info->edid_info->hdr_static_metadata.desired_content_max_luminance = 600;
++  set_fixture_force_hdr (meta_context_get_debug_control (test_context),
++                         meta_backend_get_monitor_manager (backend), TRUE);
++  target = meta_color_device_get_target_luminance (device);
++  g_assert_cmpint (target->maximum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpint (meta_color_device_get_target_primaries (device)->source,
++                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  set_fixture_force_hdr (meta_context_get_debug_control (test_context),
++                         meta_backend_get_monitor_manager (backend), FALSE);
++  g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
++                   ==, META_COLOR_TARGET_CTA_DECLARED);
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
++/*
++ * A wide gamut panel in the native SDR mode renders in its base EDID gamut,
++ * which is also its target: content from wider encodings is compressed
++ * toward it rather than clipped. The default SDR mode keeps the fallback,
++ * and so do base primaries the native SDR mode rejects.
++ */
++static void
++display_targets_sdr_native (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  ClutterContext *context = meta_backend_get_clutter_context (backend);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaRenderer *renderer = meta_backend_get_renderer (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device =
++    meta_color_manager_get_color_device (manager, meta_output_get_monitor (output));
++  const int32_t bt2020[8] = {
++    708000, 292000, 170000, 797000, 131000, 46000, 312700, 329000,
++  };
++  const int32_t srgb[8] = {
++    640000, 330000, 300000, 600000, 150000, 60000, 312700, 329000,
++  };
++  const MetaColorTargetPrimaries *target_primaries;
++  const ClutterColorTargetVolume *target_volume;
++  const ClutterColorimetry *colorimetry;
++  ClutterStageView *view;
++  ClutterColorState *blending, *output_color_state;
++  g_autoptr (ClutterColorState) untargeted = NULL;
++  g_autoptr (ClutterColorState) bt2020_content = NULL;
++  g_autoptr (ClutterColorState) srgb_content = NULL;
++  g_autoptr (ClutterColorState) client = NULL;
++  /* Saturated BT.2020 green: outside the panel gamut. */
++  const float bt2020_green[3] = { 0.1f, 0.75f, 0.1f };
++  int32_t wide_gamut[8], encoding[8];
++  unsigned int i;
++
++  get_wide_gamut_coordinates (wide_gamut);
++  info->connector_type = META_CONNECTOR_TYPE_DisplayPort;
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->default_gamma = 2.2;
++  set_wide_gamut_base_primaries (info->edid_info);
++  set_test_color_mode (output, META_COLOR_MODE_SDR_NATIVE);
++  meta_color_device_update (device);
++
++  /* The target primaries equal the encoding primaries, with EDID
++   * provenance; there is no luminance target outside BT.2100. */
++  colorimetry =
++    clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (meta_color_device_get_color_state (device)));
++  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_PRIMARIES);
++  g_assert_true (meta_color_primaries_to_fixed (colorimetry->primaries, encoding));
++  target_primaries = meta_color_device_get_target_primaries (device);
++  g_assert_cmpint (target_primaries->source, ==, META_COLOR_TARGET_EDID_DECLARED);
++  for (i = 0; i < 8; i++)
++    {
++      g_assert_cmpint (encoding[i], ==, wide_gamut[i]);
++      g_assert_cmpint (target_primaries->coordinates[i], ==, encoding[i]);
++    }
++  g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
++                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  check_published_target (output, 2000, 80, wide_gamut, wide_gamut);
++
++  view = CLUTTER_STAGE_VIEW (meta_renderer_get_view_for_crtc (renderer,
++                                                              meta_output_get_assigned_crtc (output)));
++  g_assert_nonnull (view);
++  output_color_state = clutter_stage_view_get_output_color_state (view);
++  g_assert_true (output_color_state == meta_color_device_get_color_state (device));
++  blending = clutter_stage_view_get_color_state (view);
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending));
++  g_assert_true (target_volume->has_primaries);
++  g_assert_false (target_volume->has_luminance);
++
++  /* The panel's white point is not D65. Its own encoding, and content in
++   * the colorimetry of the published description, lie within the target:
++   * they are not mapped, and may be scanned out. */
++  {
++    ClutterPrimaries primaries = *colorimetry->primaries;
++
++    g_assert_cmpfloat (primaries.w_x, !=, 0.3127f);
++    client = clutter_color_state_params_new_full (context,
++                                                  CLUTTER_COLORSPACE_BT2020,
++                                                  CLUTTER_TRANSFER_FUNCTION_GAMMA22,
++                                                  &primaries, -1.0f,
++                                                  -1.0f, -1.0f, -1.0f, -1.0f);
++  }
++  g_assert_false (clutter_color_transform_requires_mapping (output_color_state, blending));
++  g_assert_false (clutter_color_transform_requires_mapping (client, blending));
++  g_assert_false (meta_compositor_view_native_color_state_prevents_scanout (client,
++                                                                            blending,
++                                                                            output_color_state));
++
++  /* BT.2020 content is compressed toward the panel's gamut; sRGB content,
++   * within it, is not. */
++  untargeted = clutter_color_state_get_blending (output_color_state, FALSE);
++  bt2020_content = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                                   CLUTTER_TRANSFER_FUNCTION_PQ);
++  srgb_content = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_SRGB,
++                                                 CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  g_assert_true (clutter_color_transform_requires_gamut_compression (bt2020_content, blending));
++  g_assert_true (renderer_changes_color (bt2020_content, blending, untargeted, bt2020_green));
++  g_assert_false (clutter_color_transform_requires_mapping (srgb_content, blending));
++
++  /* The default SDR mode keeps the fallback. */
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++  target_primaries = meta_color_device_get_target_primaries (device);
++  g_assert_cmpint (target_primaries->source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  for (i = 0; i < 8; i++)
++    g_assert_cmpint (target_primaries->coordinates[i], ==, srgb[i]);
++  blending = clutter_stage_view_get_color_state (view);
++  target_volume =
++    clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending));
++  g_assert_false (target_volume->has_primaries);
++  g_assert_false (clutter_color_transform_requires_mapping (bt2020_content, blending));
++  check_published_target (output, 2000, 80, srgb, srgb);
++
++  /* Base primaries the native SDR mode rejects keep the fallback in both
++   * modes. */
++  info->edid_info->default_color_primaries.primary[0] = (struct di_chromaticity_cie1931) { 0.6f, 0.6f };
++  info->edid_info->default_color_primaries.primary[1] = (struct di_chromaticity_cie1931) { 0.3f, 0.3f };
++  info->edid_info->default_color_primaries.primary[2] = (struct di_chromaticity_cie1931) { 0.1f, 0.1f };
++  set_test_color_mode (output, META_COLOR_MODE_SDR_NATIVE);
++  g_test_expect_message ("libmutter", G_LOG_LEVEL_WARNING,
++                         "Ignoring unusable EDID color primaries of *");
++  meta_color_device_update (device);
++  g_test_assert_expected_messages ();
++  target_primaries = meta_color_device_get_target_primaries (device);
++  g_assert_cmpint (target_primaries->source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  for (i = 0; i < 8; i++)
++    g_assert_cmpint (target_primaries->coordinates[i], ==, srgb[i]);
++  blending = clutter_stage_view_get_color_state (view);
++  g_assert_false (clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (blending))->has_primaries);
++
++  info->supported_hdr_eotfs = 1 << META_OUTPUT_HDR_METADATA_EOTF_PQ;
++  info->supported_color_spaces = 1 << META_OUTPUT_COLORSPACE_BT2020;
++  set_test_color_mode (output, META_COLOR_MODE_BT2100);
++  meta_color_device_update (device);
++  target_primaries = meta_color_device_get_target_primaries (device);
++  g_assert_cmpint (target_primaries->source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  for (i = 0; i < 8; i++)
++    g_assert_cmpint (target_primaries->coordinates[i], ==, bt2020[i]);
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
+ static void
+ client_mode_case (gconstpointer data)
+ {
+@@ -1870,6 +2221,10 @@ init_tests (void)
+                    mapping_blending_target);
+   g_test_add_func ("/wayland/published/reference-factor",
+                    published_reference_factor);
++  g_test_add_func ("/wayland/display-targets/cta",
++                   display_targets_cta);
++  g_test_add_func ("/wayland/display-targets/sdr-native",
++                   display_targets_sdr_native);
+   g_test_add_func ("/wayland/mapping/target-gamut",
+                    mapping_target_gamut);
+ }
+diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
+index 27469debe..3ed751ba4 100644
+--- a/src/tests/wayland-test-clients/color-management.c
++++ b/src/tests/wayland-test-clients/color-management.c
+@@ -2163,6 +2163,72 @@ published_reference_client (WaylandDisplay *display)
+   wl_display_roundtrip (display->display);
+ }
+ 
++/*
++ * Reads the target output's published description and compares it with the
++ * expected values the compositor sets as "expected-target": the target
++ * minimum and maximum luminance in protocol units, then the eight target
++ * primary coordinates and the eight encoding primary coordinates.
++ */
++static void
++published_target_client (WaylandDisplay *display)
++{
++  TargetClient client = { .version = 1 };
++  struct wl_registry *registry = wl_display_get_registry (display->display);
++  const char *target_name = lookup_property_string (display, "target-output");
++  const char *expected_string = lookup_property_string (display, "expected-target");
++  g_auto (GStrv) expected = NULL;
++  TargetOutput *target = NULL;
++  TargetSnapshot snapshot = { 0 };
++  TargetInfo info;
++  unsigned int i;
++
++  g_assert_nonnull (expected_string);
++  expected = g_strsplit (expected_string, " ", -1);
++  g_assert_cmpuint (g_strv_length (expected), ==, 18);
++
++  wl_registry_add_listener (registry, &target_registry_listener, &client);
++  wl_display_roundtrip (display->display);
++  wl_display_roundtrip (display->display);
++  g_assert_nonnull (client.manager);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      if (g_strcmp0 (client.outputs[i].name, target_name) == 0)
++        target = &client.outputs[i];
++    }
++  g_assert_nonnull (target);
++
++  target->color_output = wp_color_manager_v1_get_output (client.manager,
++                                                         target->output);
++  wp_color_management_output_v1_add_listener (target->color_output,
++                                              &target_color_output_listener,
++                                              target);
++  snapshot.description =
++    wp_color_management_output_v1_get_image_description (target->color_output);
++  wait_target_snapshot (display, &snapshot);
++
++  info = read_target_info (display, &snapshot);
++  g_assert_cmpint (info.target_min, ==, g_ascii_strtoll (expected[0], NULL, 10));
++  g_assert_cmpint (info.target_max, ==, g_ascii_strtoll (expected[1], NULL, 10));
++  for (i = 0; i < 8; i++)
++    {
++      g_assert_cmpint (info.target_primaries[i], ==,
++                       g_ascii_strtoll (expected[2 + i], NULL, 10));
++      g_assert_cmpint (info.encoding_primaries[i], ==,
++                       g_ascii_strtoll (expected[10 + i], NULL, 10));
++    }
++
++  wp_image_description_v1_destroy (snapshot.description);
++  wp_color_management_output_v1_destroy (target->color_output);
++  for (i = 0; i < client.n_outputs; i++)
++    {
++      wl_output_release (client.outputs[i].output);
++      g_free (client.outputs[i].name);
++    }
++  wp_color_manager_v1_destroy (client.manager);
++  wl_registry_destroy (registry);
++  wl_display_roundtrip (display->display);
++}
++
+ int
+ main (int    argc,
+       char **argv)
+@@ -2232,6 +2298,8 @@ main (int    argc,
+         mastering_round_trip_client (display);
+       else if (strcmp (argv[1], "published-reference") == 0)
+         published_reference_client (display);
++      else if (strcmp (argv[1], "published-target") == 0)
++        published_target_client (display);
+       else
+         g_error ("Unknown color-management test mode '%s'", argv[1]);
+       return EXIT_SUCCESS;

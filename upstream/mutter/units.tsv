@@ -1,0 +1,16 @@
+# NN	slug	deps	status	title
+01	frames-color-scheme	-	ready	frames: Use the GTK interface color scheme property
+02	stage-view-offscreen-reuse	-	ready	clutter/stage-view: Reuse compatible offscreen buffers on state changes
+03	backend-seat-teardown	-	ready	backend, seat/native: Release event sources and signal handlers on dispose
+04	monitor-restore-handle	-	ready	monitor-manager: Forget the restore handle once the restore runs
+05	native-displayid-pq	-	blocked	backends/native: Support native DisplayID RGB BT.2020 PQ on eDP
+06	native-target	05	blocked	backends/color: Publish native target luminance and primaries apart from the encoding
+07	protocol-robustness	06	blocked	wayland/color-management: Protocol input robustness
+08	hlg	07	blocked	clutter/color: Add the HLG transfer function
+09	target-volume	08	blocked	color: Target colour volume, mastering metadata and light levels
+10	highlight-mapping	09	blocked	color: Map highlights toward the output's declared target luminance
+11	gamut-compression	10	blocked	color: Compress gamut toward the output's declared target gamut
+12	target-sources	11	blocked	backends/color: Take display targets from CTA-861 and base EDID declarations
+13	night-light-bt2100	12,02	hold	color: Apply Night Light in linear light in BT.2100
+14	per-monitor-targets	13,04	hold	backends/monitor: Per-monitor display target overrides
+15	color-lifecycle	06,03	hold	backends/color: Colour device, colord and store lifecycle robustness

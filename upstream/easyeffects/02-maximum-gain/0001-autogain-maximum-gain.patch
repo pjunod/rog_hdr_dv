@@ -1,0 +1,383 @@
+From e8494d150289f5b17880616a21a3b171a261ce95 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:14:58 -0400
+Subject: [PATCH] Autogain: add a maximum gain setting
+
+The autogain plugin raises the level of quiet material by as much as it
+takes to reach the target, limited only by the peak of the signal, so a
+quiet passage or an input that is just above the silence threshold can be
+amplified by several tens of dB. There was no way to bound that.
+
+Add the Maximum Gain setting, in dB, which limits the amplification only.
+Reducing the level is not limited. The default of 100 dB is the largest
+difference there can be between the target and the silence threshold, so
+the default leaves the behavior unchanged.
+
+The smoothing moves into autogain::smooth_gain(), which clamps the gain that
+was applied to the last block to the limit before it smooths it, so lowering
+the limit takes effect at once instead of decaying from the old gain. The
+peak ceiling is unchanged.
+
+The setting is saved in presets as maximum-gain. Presets without it get the
+default, and the property list of the local server is updated.
+
+autogain_gain_test checks that the default gives the same result as the
+smoothing of c5dcd37a, and covers the limit, the peak ceiling, lowering the
+limit and out of range values.
+---
+ CMakeLists.txt                                |   4 +
+ src/autogain.cpp                              |  13 +-
+ src/autogain_gain.hpp                         |  73 +++++++++++
+ src/autogain_preset.cpp                       |   3 +
+ .../docs/database/plugins_properties.md       |   1 +
+ src/contents/docs/plugins/autogain.md         |   3 +
+ .../kcfg/easyeffects_db_autogain.kcfg         |   6 +
+ src/contents/ui/Autogain.qml                  |  16 +++
+ util/tests/autogain_gain.cpp                  | 123 ++++++++++++++++++
+ 9 files changed, 232 insertions(+), 10 deletions(-)
+ create mode 100644 src/autogain_gain.hpp
+ create mode 100644 util/tests/autogain_gain.cpp
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 57aa90ccd..41c3e4a4c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -116,4 +116,8 @@ if(BUILD_TESTING)
+     target_include_directories(autogain_analyser_test PRIVATE src)
+     target_link_libraries(autogain_analyser_test PRIVATE Threads::Threads)
+     add_test(NAME autogain-analyser COMMAND autogain_analyser_test)
++
++    add_executable(autogain_gain_test util/tests/autogain_gain.cpp)
++    target_include_directories(autogain_gain_test PRIVATE src)
++    add_test(NAME autogain-gain COMMAND autogain_gain_test)
+ endif()
+diff --git a/src/autogain.cpp b/src/autogain.cpp
+index d78bf2bbc..920cfa226 100644
+--- a/src/autogain.cpp
++++ b/src/autogain.cpp
+@@ -30,6 +30,7 @@
+ #include <numbers>
+ #include <span>
+ #include <string>
++#include "autogain_gain.hpp"
+ #include "db_manager.hpp"
+ #include "easyeffects_db_autogain.h"
+ #include "pipeline_type.hpp"
+@@ -303,16 +304,8 @@ void Autogain::process(std::span<float>& left_in,
+       const auto db_peak = util::linear_to_db(peak);
+ 
+       if (db_peak > util::minimum_db_level) {
+-        const double max_gain = 1.0 / peak;  // safe ceiling
+-        const double target_gain = std::min(gain, max_gain);
+-
+-        // Smoothing the gain correction through a leaky integrator:
+-        // g[n]=α⋅g[n−1]+(1−α)⋅gtarget​[n]
+-
+-        // choose based on whether gain is rising or falling
+-        double alpha = (target_gain < prev_gain) ? attack_coeff : release_coeff;
+-
+-        internal_output_gain = (alpha * prev_gain) + ((1.0 - alpha) * target_gain);
++        internal_output_gain =
++            autogain::smooth_gain(prev_gain, gain, peak, settings->maximumGain(), attack_coeff, release_coeff);
+ 
+         prev_gain = internal_output_gain;
+       }
+diff --git a/src/autogain_gain.hpp b/src/autogain_gain.hpp
+new file mode 100644
+index 000000000..759227b4b
+--- /dev/null
++++ b/src/autogain_gain.hpp
+@@ -0,0 +1,73 @@
++/**
++ * Copyright © 2026 Paul Junod
++ *
++ * This file is part of Easy Effects.
++ *
++ * Easy Effects is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * Easy Effects is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with Easy Effects. If not, see <https://www.gnu.org/licenses/>.
++ */
++
++#pragma once
++
++#include <algorithm>
++#include <cmath>
++#include <numbers>
++
++namespace autogain {
++
++// Largest value of the maximum gain setting. It is the largest difference between the target and the silence
++// threshold, so with this value the gain is limited only by the signal peak.
++inline constexpr double maximum_gain_db_limit = 100.0;
++
++// Linear gain that corresponds to the maximum gain setting. A value that is not a number gives no gain at all.
++inline auto makeup_limit(double maximum_gain_db) -> double {
++  if (!std::isfinite(maximum_gain_db)) {
++    return 1.0;
++  }
++
++  // 10^(db/20). The way below should be faster than using pow
++  return std::exp((std::clamp(maximum_gain_db, 0.0, maximum_gain_db_limit) / 20.0) * std::numbers::ln10);
++}
++
++/**
++ * Next value of the correction gain.
++ *
++ * previous: gain applied to the last block
++ * wanted: gain that brings the loudness to the target
++ * peak: largest sample peak of the last block (linear, greater than zero)
++ * maximum_gain_db: upper limit of the gain. Reducing the level is never limited.
++ * attack, release: coefficients of the leaky integrator
++ *
++ * The gain is smoothed with g[n]=α⋅g[n−1]+(1−α)⋅gtarget[n], using the attack coefficient when it is falling and the
++ * release coefficient when it is rising. It never goes above the limit, nor above what the peak allows without
++ * clipping. A gain that was above a limit that was just lowered does not decay from the old value, it is capped
++ * before the smoothing.
++ */
++inline auto smooth_gain(double previous,
++                        double wanted,
++                        double peak,
++                        double maximum_gain_db,
++                        double attack,
++                        double release) -> double {
++  const double limit = makeup_limit(maximum_gain_db);
++
++  previous = std::min(previous, limit);
++
++  const double target_gain = std::min({wanted, 1.0 / peak, limit});
++
++  const double alpha = (target_gain < previous) ? attack : release;
++
++  return (alpha * previous) + ((1.0 - alpha) * target_gain);
++}
++
++}  // namespace autogain
+diff --git a/src/autogain_preset.cpp b/src/autogain_preset.cpp
+index 730a592a6..e0e5252bf 100644
+--- a/src/autogain_preset.cpp
++++ b/src/autogain_preset.cpp
+@@ -39,6 +39,8 @@ void AutoGainPreset::save(nlohmann::json& json) {
+ 
+   json[section][instance_name]["target"] = settings->target();
+ 
++  json[section][instance_name]["maximum-gain"] = settings->maximumGain();
++
+   json[section][instance_name]["silence-threshold"] = settings->silenceThreshold();
+ 
+   json[section][instance_name]["maximum-history"] = settings->maximumHistory();
+@@ -54,6 +56,7 @@ void AutoGainPreset::load(const nlohmann::json& json) {
+   UPDATE_PROPERTY("input-gain", InputGain);
+   UPDATE_PROPERTY("output-gain", OutputGain);
+   UPDATE_PROPERTY("target", Target);
++  UPDATE_PROPERTY("maximum-gain", MaximumGain);
+   UPDATE_PROPERTY("silence-threshold", SilenceThreshold);
+   UPDATE_PROPERTY("maximum-history", MaximumHistory);
+   UPDATE_PROPERTY("force-silence", ForceSilence);
+diff --git a/src/contents/docs/database/plugins_properties.md b/src/contents/docs/database/plugins_properties.md
+index e4fa55504..28523ff9e 100644
+--- a/src/contents/docs/database/plugins_properties.md
++++ b/src/contents/docs/database/plugins_properties.md
+@@ -13,6 +13,7 @@ The following properties can be modified or queried via the [local server](../us
+ | **autogain** | `inputGain` | Double | `0` |
+ | **autogain** | `outputGain` | Double | `0` |
+ | **autogain** | `target` | Double | `-23` |
++| **autogain** | `maximumGain` | Double | `100` |
+ | **autogain** | `reference` | Enum | `3` <br><small>(Choices: 0: `Momentary`, 1: `Shortterm`, 2: `Integrated`, 3: `Geometric Mean (MSI)`, 4: `Geometric Mean (MS)`, 5: `Geometric Mean (MI)`, 6: `Geometric Mean (SI)`)</small> |
+ | **autogain** | `maximumHistory` | Int | `15` |
+ | **autogain** | `silenceThreshold` | Double | `-70` |
+diff --git a/src/contents/docs/plugins/autogain.md b/src/contents/docs/plugins/autogain.md
+index 142c1d04d..446091880 100644
+--- a/src/contents/docs/plugins/autogain.md
++++ b/src/contents/docs/plugins/autogain.md
+@@ -5,6 +5,9 @@ Easy Effects Autogain is based on the library libebur128 which implements the EB
+ **Target**  
+ Loudness level.
+ 
++**Maximum Gain**  
++Upper limit of the gain that autogain applies to bring the loudness to the target. It limits the amplification only, the level can always be reduced. With the default value the gain is limited only by the peak level of the signal.
++
+ **Silence**  
+ Silence threshold. While the momentary loudness is below this value the autogain won't make any changes to the current gain being applied to the signal level.
+ 
+diff --git a/src/contents/kcfg/easyeffects_db_autogain.kcfg b/src/contents/kcfg/easyeffects_db_autogain.kcfg
+index 20305c322..58222744f 100644
+--- a/src/contents/kcfg/easyeffects_db_autogain.kcfg
++++ b/src/contents/kcfg/easyeffects_db_autogain.kcfg
+@@ -29,6 +29,12 @@
+             <max>0</max>
+             <default>-23</default>
+         </entry>
++        <entry name="maximumGain" type="Double">
++            <label></label>
++            <min>0</min>
++            <max>100</max>
++            <default>100</default>
++        </entry>
+         <entry name="referenceLabels" type="StringList">
+             <default>Momentary,Shortterm,Integrated,Geometric Mean (MSI),Geometric Mean (MS),Geometric Mean (MI),Geometric Mean (SI)</default>
+         </entry>
+diff --git a/src/contents/ui/Autogain.qml b/src/contents/ui/Autogain.qml
+index 3590e57d1..5f210b6ab 100644
+--- a/src/contents/ui/Autogain.qml
++++ b/src/contents/ui/Autogain.qml
+@@ -98,6 +98,22 @@ Kirigami.ScrollablePage {
+                     }
+                 }
+ 
++                EeSpinBox {
++                    id: maximumGain
++
++                    label: i18n("Maximum gain") // qmllint disable
++                    spinboxMaximumWidth: Kirigami.Units.gridUnit * 7
++                    from: autogainPage.pluginDB.getMinValue("maximumGain")
++                    to: autogainPage.pluginDB.getMaxValue("maximumGain")
++                    value: autogainPage.pluginDB.maximumGain
++                    decimals: 2
++                    stepSize: 0.1
++                    unit: Units.dB
++                    onValueModified: v => {
++                        autogainPage.pluginDB.maximumGain = v;
++                    }
++                }
++
+                 EeSpinBox {
+                     id: silenceThreshold
+ 
+diff --git a/util/tests/autogain_gain.cpp b/util/tests/autogain_gain.cpp
+new file mode 100644
+index 000000000..b043341e2
+--- /dev/null
++++ b/util/tests/autogain_gain.cpp
+@@ -0,0 +1,123 @@
++#include "autogain_gain.hpp"
++#include <algorithm>
++#include <cmath>
++#include <iostream>
++#include <limits>
++
++namespace {
++
++auto near(double a, double b) -> bool {
++  return std::fabs(a - b) <= 1e-9 * std::max(1.0, std::fabs(b));
++}
++
++auto db_to_linear(double db) -> double {
++  return std::pow(10.0, db / 20.0);
++}
++
++// The smoothing as it was before the maximum gain existed
++auto reference_gain(double previous, double wanted, double peak, double attack, double release) -> double {
++  const double target_gain = std::min(wanted, 1.0 / peak);
++  const double alpha = (target_gain < previous) ? attack : release;
++
++  return (alpha * previous) + ((1.0 - alpha) * target_gain);
++}
++
++}  // namespace
++
++auto main() -> int {
++  constexpr double attack = 0.8;
++  constexpr double release = 0.95;
++
++  // Without a limit that matters the result is the one of the plugin before the setting was added
++
++  for (const double previous : {0.01, 0.5, 1.0, 3.0, 40.0}) {
++    for (const double wanted : {0.001, 0.4, 1.0, 2.0, 50.0}) {
++      for (const double peak : {0.001, 0.05, 0.5, 1.0}) {
++        const double got =
++            autogain::smooth_gain(previous, wanted, peak, autogain::maximum_gain_db_limit, attack, release);
++
++        if (!near(got, reference_gain(std::min(previous, db_to_linear(100.0)), wanted, peak, attack, release))) {
++          std::cerr << "The default limit must not change the gain\n";
++          return 1;
++        }
++      }
++    }
++  }
++
++  // The gain converges to the limit and does not go above it
++
++  double gain = 1.0;
++
++  for (int i = 0; i < 2000; ++i) {
++    gain = autogain::smooth_gain(gain, db_to_linear(20.0), 0.01, 6.0, attack, release);
++
++    if (gain > db_to_linear(6.0) * (1.0 + 1e-12)) {
++      std::cerr << "The gain must not go above the maximum gain\n";
++      return 1;
++    }
++  }
++
++  if (!near(gain, db_to_linear(6.0))) {
++    std::cerr << "The gain must reach the maximum gain when more is wanted\n";
++    return 1;
++  }
++
++  // The peak still decides when it is lower than the limit
++
++  gain = 1.0;
++
++  for (int i = 0; i < 2000; ++i) {
++    gain = autogain::smooth_gain(gain, db_to_linear(20.0), 0.5, 12.0, attack, release);
++  }
++
++  if (!near(gain, 2.0)) {
++    std::cerr << "The peak must still limit the gain\n";
++    return 1;
++  }
++
++  // Lowering the limit takes effect at once, without waiting for the smoothing
++
++  if (autogain::smooth_gain(db_to_linear(30.0), db_to_linear(30.0), 0.001, 6.0, attack, release) >
++      db_to_linear(6.0) * (1.0 + 1e-12)) {
++    std::cerr << "A gain above a new limit must be capped immediately\n";
++    return 1;
++  }
++
++  // Reducing the level is never limited, not even by a limit of zero
++
++  gain = 1.0;
++
++  for (int i = 0; i < 2000; ++i) {
++    gain = autogain::smooth_gain(gain, 0.1, 1.0, 0.0, attack, release);
++  }
++
++  if (!near(gain, 0.1)) {
++    std::cerr << "The gain must be able to reduce the level with a limit of zero\n";
++    return 1;
++  }
++
++  // The coefficient follows the direction of the change
++
++  if (!near(autogain::smooth_gain(1.0, 0.5, 1.0, 100.0, attack, release), (attack * 1.0) + ((1.0 - attack) * 0.5)) ||
++      !near(autogain::smooth_gain(1.0, 2.0, 0.1, 100.0, attack, release), (release * 1.0) + ((1.0 - release) * 2.0))) {
++    std::cerr << "The attack and the release coefficients must follow the direction of the gain\n";
++    return 1;
++  }
++
++  // A setting out of range or not a number never gives more gain than the largest one allowed
++
++  for (const double invalid : {-5.0, 1000.0, std::numeric_limits<double>::quiet_NaN(),
++                               std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity()}) {
++    const double limit = autogain::makeup_limit(invalid);
++
++    if (!(limit >= 1.0) || limit > db_to_linear(100.0) * (1.0 + 1e-12)) {
++      std::cerr << "An invalid limit must be clamped\n";
++      return 1;
++    }
++  }
++
++  if (autogain::makeup_limit(std::numeric_limits<double>::quiet_NaN()) != 1.0) {
++    std::cerr << "A limit that is not a number must give no gain\n";
++    return 1;
++  }
++}

@@ -8,7 +8,7 @@ on:
         type: boolean
         default: true
       test_target:
-        description: "all, none, or a failed unittest module.Class.method"
+        description: "all, upstream, none, or a failed unittest module.Class.method"
         type: string
         default: all
 
@@ -40,6 +40,10 @@ jobs:
           target = os.environ['TEST_TARGET']
           if target == 'all':
               args = ['discover', '-s', 'tests', '-v']
+          elif target == 'upstream':
+              args = ['-v', 'test_check_repository', 'test_upstream_catalog',
+                      'test_upstream_gitlab_submit', 'test_upstream_cinema_submit',
+                      'test_upstream_forgejo_submit', 'test_upstream_linux_prepare']
           elif re.fullmatch(r'test_[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+){0,2}', target):
               args = ['-v', target]
           else:

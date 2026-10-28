@@ -1,0 +1,85 @@
+From b9dcd41d8065e9a69720ce4c7067281b1cfc0d3c Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:50:49 -0400
+Subject: [PATCH] JOC timeslots wrap at the end of the frame
+
+The mixing matrices of a JOC frame have frameSize / 64 timeslots, but the timeslot counter of the applier wrapped after the number of input channels (7), so the matrices were requested again, and the first timeslots reused, several times during a frame.
+---
+ .../EnhancedAC3/JointObjectCodingApplier.cs   |  2 +-
+ .../JointObjectCodingApplier_Tests.cs         | 54 +++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+ create mode 100644 Tests/Test.Cavern.Format/Decoders/JointObjectCodingApplier_Tests.cs
+
+diff --git a/Cavern.Format/Decoders/EnhancedAC3/JointObjectCodingApplier.cs b/Cavern.Format/Decoders/EnhancedAC3/JointObjectCodingApplier.cs
+index a7a537d7..2b252958 100644
+--- a/Cavern.Format/Decoders/EnhancedAC3/JointObjectCodingApplier.cs
++++ b/Cavern.Format/Decoders/EnhancedAC3/JointObjectCodingApplier.cs
+@@ -127,7 +127,7 @@ namespace Cavern.Format.Decoders.EnhancedAC3 {
+             }
+             taskWaiter.Wait();
+ 
+-            if (++timeslot == input.Length) {
++            if (++timeslot == frameSize / QuadratureMirrorFilterBank.subbands) {
+                 timeslot = 0;
+             }
+             return timeslotCache;
+diff --git a/Tests/Test.Cavern.Format/Decoders/JointObjectCodingApplier_Tests.cs b/Tests/Test.Cavern.Format/Decoders/JointObjectCodingApplier_Tests.cs
+new file mode 100644
+index 00000000..d364952e
+--- /dev/null
++++ b/Tests/Test.Cavern.Format/Decoders/JointObjectCodingApplier_Tests.cs
+@@ -0,0 +1,54 @@
++﻿using System.Reflection;
++
++using Cavern.Format.Decoders;
++
++namespace Test.Cavern.Format.Decoders;
++
++/// <summary>
++/// Tests the internal JointObjectCodingApplier class through reflection, as it has no public API.
++/// </summary>
++[TestClass]
++public class JointObjectCodingApplier_Tests {
++    const BindingFlags instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
++
++    /// <summary>
++    /// The mixing matrices are valid for a whole frame, so the timeslot, which selects the part of them to use, has to wrap after
++    /// the number of QMF timeslots in the frame, not after the number of input channels.
++    /// </summary>
++    [TestMethod, Timeout(10000)]
++    public void TimeslotWrapsAtTheEndOfTheFrame() {
++        Assembly format = typeof(EnhancedAC3Decoder).Assembly;
++        Type jocType = format.GetType("Cavern.Format.Decoders.EnhancedAC3.JointObjectCoding", true);
++        Type applierType = format.GetType("Cavern.Format.Decoders.EnhancedAC3.JointObjectCodingApplier", true);
++        FieldInfo timeslotField = applierType.GetField("timeslot", instance);
++        MethodInfo apply = applierType.GetMethod("Apply", instance);
++
++        foreach (int frameSize in new[] { 256, 512, 768, 1536 }) {
++            // A JOC with a single inactive object, which has all zero matrices
++            object joc = Activator.CreateInstance(jocType, true);
++            jocType.GetProperty("ObjectCount", instance).SetValue(joc, 1);
++            jocType.GetProperty("ChannelCount", instance).SetValue(joc, 5);
++            jocType.GetProperty("Gain", instance).SetValue(joc, 1f);
++            jocType.GetMethod("UpdateCache", instance).Invoke(joc, null);
++
++            // The input of a timeslot is a block of each of the 7 channels that JOC can use
++            float[][] input = new float[7][];
++            for (int i = 0; i < input.Length; i++) {
++                input[i] = new float[64];
++            }
++
++            int timeslots = frameSize / 64;
++            using IDisposable disposableJoc = (IDisposable)joc;
++            using IDisposable applier = (IDisposable)Activator.CreateInstance(applierType, instance, null, new[] { joc, frameSize }, null);
++            for (int frame = 0; frame < 3; frame++) {
++                for (int slot = 0; slot < timeslots; slot++) {
++                    float[][] output = (float[][])apply.Invoke(applier, new[] { input, joc });
++                    Assert.AreEqual((slot + 1) % timeslots, (int)timeslotField.GetValue(applier),
++                        $"Wrong timeslot after {slot + 1} timeslots of a {frameSize} sample frame.");
++                    Assert.AreEqual(1, output.Length);
++                    Assert.AreEqual(64, output[0].Length);
++                }
++            }
++        }
++    }
++}

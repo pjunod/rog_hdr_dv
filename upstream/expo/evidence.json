@@ -1,0 +1,65 @@
+{
+  "checked_at": "2026-10-28",
+  "repository": "expo/expo",
+  "base": "a66d72b9b679ae90b370a97136ad826f6254c2a9",
+  "candidate_commit": "cb892aba82a6f00a7566bfd7829030bd3cd2da1c",
+  "candidate_tree": "4468f6b9a31766054e98498bf264ed003ad10b13",
+  "source_before_sha256": "729ac22012cafce503c5f80ef75b9d777c76f447cd41e6f519ab3c208ae7d2c9",
+  "source_after_sha256": "7f565437f12b430eeefb01f42cf2acb1dec29109e3f89113ac12e6759be8411c",
+  "patch_sha256": "ae1f7fe24647c2cdd62da35fca6930a818821abffec13e2dd56b07f4d44a8fb7",
+  "tools": {
+    "node": "24.22.1",
+    "jest": "30.2.0",
+    "babel": "7.29.7",
+    "gradle": "9.7.1",
+    "android_gradle_plugin": "9.3.3",
+    "jdk": "21.0.11",
+    "compile_sdk": 36,
+    "target_sdk": 36,
+    "min_sdk": 24
+  },
+  "new_results": [
+    {
+      "log": "expo-plugin-before.txt",
+      "sha256": "409f18d27e31b1d6360e2a2a810cb0643db232fadeec9b6f793d7b46fca6fdd9",
+      "result": "3 expected assertion failures on unchanged upstream"
+    },
+    {
+      "log": "expo-plugin-after.txt",
+      "sha256": "ace0d82e6b62dd23f7c62ee726f865258c2b5eea625a4e63b57448222b3ffaae",
+      "result": "3 passed after fix"
+    },
+    {
+      "log": "expo-lint-before.txt",
+      "sha256": "490a22b25d253e8de948b7f4031efeee9f6bf232f71183e9d3395087a89fa0bf",
+      "result": "Expected NewApi failure, minSdk24"
+    },
+    {
+      "log": "expo-lint-after.txt",
+      "sha256": "88d10d00fa187bcdb9972dcc926b863cee6a7a6e372fce982d12eb3f400da3f3",
+      "result": "lintDebug pass with annotation only"
+    },
+    {
+      "log": "expo-reproduce.txt",
+      "sha256": "37b25b6e3e067852f33dd52476f10aec068553666f5a99e934545ad8453b2159",
+      "result": "Delivered standalone before/after reproducer passes"
+    },
+    {
+      "log": "expo-delivered-harness.txt",
+      "sha256": "a39e541b196ba8b3e4a444c028620cad36a446d7eb5a802cc8f8a23557831b9f",
+      "result": "Delivered focused harness 3/3 pass"
+    },
+    {
+      "log": "expo-submit-dry-run.txt",
+      "sha256": "cdb581def4baa36756db212706f968d3f1b93a3ea83b2d8873afb4d564eac81d",
+      "result": "Actual current-upstream unsigned apply passes; prefix retained"
+    }
+  ],
+  "review": "Independent source/test/changeset review approved; missing-attributes case added as suggested",
+  "limitations": [
+    "Focused Jest harness is not the full Expo package check or a TypeScript check",
+    "Full monorepo checks, prebuild and EAS Build remain; submission stays draft",
+    "No device, simulator or runtime UI test",
+    "Nothing submitted upstream"
+  ]
+}

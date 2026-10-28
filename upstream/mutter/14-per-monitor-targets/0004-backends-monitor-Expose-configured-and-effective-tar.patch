@@ -1,0 +1,683 @@
+From af5cc7198da65caaffbbac56518f6bfa4c27bfab Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 23:22:27 +0000
+Subject: [PATCH 4/7] backends/monitor: Expose configured and effective targets
+ on D-Bus
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add per-monitor properties to org.gnome.Mutter.DisplayConfig:
+GetCurrentState reports the configured "target-peak-luminance",
+"target-min-luminance" and "hdr-gamut-source" when set, and the
+effective "target-luminance" and "target-primaries" with the provenance
+of each, taken from the applied color device and its shared provenance
+table. Effective values are only present for active monitors with an
+initialized color state.
+
+ApplyMonitorsConfig accepts the same three configured properties. They
+replace the previous declaration; omitted fields reset it. Types,
+duplicates, enums and ranges are checked before anything changes, so
+an invalid request is rejected as a whole, and VERIFY only validates.
+
+Add D-Bus tests for VERIFY, invalid input, a 400 cd/m² user target at a
+scaled reference white, and the rejection of a persistent configuration
+and its restore. The restore test holds the confirmation the way a
+user who has not answered yet would (the test shell otherwise accepts
+the configuration immediately), rejects it, waits for the restored peak
+with a 10 second bound instead of looping on restore_config_id, and
+checks that no restore handle is left behind.
+
+Link: TBD-MR
+---
+ .../org.gnome.Mutter.DisplayConfig.xml        |  29 ++
+ src/backends/meta-color-device.c              |  10 +-
+ src/backends/meta-color-device.h              |   4 +
+ src/backends/meta-monitor-manager-private.h   |   1 +
+ src/backends/meta-monitor-manager.c           | 136 ++++++++
+ src/tests/monitor-dbus-tests.c                | 316 ++++++++++++++++++
+ 6 files changed, 491 insertions(+), 5 deletions(-)
+
+diff --git a/data/dbus-interfaces/org.gnome.Mutter.DisplayConfig.xml b/data/dbus-interfaces/org.gnome.Mutter.DisplayConfig.xml
+index 1fdc2ef4e..f435eb81f 100644
+--- a/data/dbus-interfaces/org.gnome.Mutter.DisplayConfig.xml
++++ b/data/dbus-interfaces/org.gnome.Mutter.DisplayConfig.xml
+@@ -398,6 +398,22 @@
+ 	    - "color-mode" (u): current color mode
+ 	    - "supported-color-modes" (au): list of supported color modes
+ 	    - "rgb-range" (u): current RGB quantization range
++	    - "target-peak-luminance" (d): configured target peak in cd/m²,
++	      present only when explicitly set
++	    - "target-min-luminance" (d): configured target black in cd/m²,
++	      present only when explicitly set (zero is a valid black level)
++	    - "hdr-gamut-source" (s): configured HDR gamut policy, "base-edid"
++	      or "none"; absence means "auto"
++	    - "target-luminance" (dd): effective minimum and maximum in cd/m²
++	    - "target-min-luminance-source" (s): effective minimum provenance
++	    - "target-max-luminance-source" (s): effective maximum provenance
++	    - "target-primaries" (dddddddd): effective CIE1931 xy, R, G, B, W
++	    - "target-primaries-source" (s): effective gamut provenance
++
++        Effective targets are read from the applied color device and are
++        present only for active monitors with an initialized color state.
++        Sources are "encoding-fallback", "firmware-declared", "cta-declared",
++        "edid-declared" or "user-declared". None is a measurement.
+ 
+         Possible mode flags:
+           1 : preferred mode
+@@ -510,6 +526,19 @@
+ 					      is supported (see GetCurrentState).
+ 		- "color-mode" (u): selected color mode. Defaults to
+ 				    "default". See GetCurrentState().
++		- "target-peak-luminance" (d): finite target peak in cd/m²,
++		  greater than nominal PQ reference white (203), at most 4294967295
++		- "target-min-luminance" (d): optional finite nonnegative black
++		  in cd/m²; requires a peak, must be below its integer part and
++		  at most 429496.7295
++		- "hdr-gamut-source" (s): "auto", "base-edid" or "none"
++
++        Target fields replace the previous declaration: omitted fields reset
++        to encoding black, no peak override and automatic gamut respectively.
++        A minimum without a peak, wrong types, duplicate fields, invalid
++        enums or invalid ranges reject the whole request before mutation.
++        Overrides do not force a color mode; they affect BT.2100 targets only.
++        VERIFY validates but does not change the applied output or its target.
+ 
+ 	@properties may effect the global monitor configuration state. Possible
+ 	properties are:
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index d3204b7ec..e0680f8b2 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1311,8 +1311,8 @@ target_primaries_equal (const MetaColorTargetPrimaries *a,
+   return TRUE;
+ }
+ 
+-static const char *
+-target_provenance_to_string (MetaColorTargetProvenance provenance)
++const char *
++meta_color_target_provenance_to_string (MetaColorTargetProvenance provenance)
+ {
+   switch (provenance)
+     {
+@@ -1401,9 +1401,9 @@ update_target_volume (MetaColorDevice *color_device)
+               meta_color_device_get_id (color_device),
+               meta_monitor_get_connector (monitor),
+               target.minimum,
+-              target_provenance_to_string (target.minimum_source),
++              meta_color_target_provenance_to_string (target.minimum_source),
+               target.maximum,
+-              target_provenance_to_string (target.maximum_source),
++              meta_color_target_provenance_to_string (target.maximum_source),
+               meta_color_chromaticity_from_fixed (target_primaries.coordinates[0]),
+               meta_color_chromaticity_from_fixed (target_primaries.coordinates[1]),
+               meta_color_chromaticity_from_fixed (target_primaries.coordinates[2]),
+@@ -1412,7 +1412,7 @@ update_target_volume (MetaColorDevice *color_device)
+               meta_color_chromaticity_from_fixed (target_primaries.coordinates[5]),
+               meta_color_chromaticity_from_fixed (target_primaries.coordinates[6]),
+               meta_color_chromaticity_from_fixed (target_primaries.coordinates[7]),
+-              target_provenance_to_string (target_primaries.source));
++              meta_color_target_provenance_to_string (target_primaries.source));
+ 
+   return UPDATE_RESULT_TARGET_VOLUME;
+ }
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index 49d753c5d..2a953616f 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -48,6 +48,9 @@ typedef enum
+   META_COLOR_TARGET_EDID_DECLARED,
+ } MetaColorTargetProvenance;
+ 
++META_EXPORT_TEST
++const char * meta_color_target_provenance_to_string (MetaColorTargetProvenance provenance);
++
+ typedef struct
+ {
+   struct di_displayid2_luminance physical;
+@@ -91,6 +94,7 @@ META_EXPORT_TEST
+ gboolean meta_color_chromaticity_to_fixed (float    value,
+                                            int32_t *fixed);
+ 
++META_EXPORT_TEST
+ float meta_color_chromaticity_from_fixed (int32_t fixed);
+ 
+ META_EXPORT_TEST
+diff --git a/src/backends/meta-monitor-manager-private.h b/src/backends/meta-monitor-manager-private.h
+index caa1f4c89..260c44154 100644
+--- a/src/backends/meta-monitor-manager-private.h
++++ b/src/backends/meta-monitor-manager-private.h
+@@ -302,6 +302,7 @@ void                meta_monitor_manager_power_save_mode_changed (MetaMonitorMan
+                                                                   MetaPowerSave              mode,
+                                                                   MetaPowerSaveChangeReason  reason);
+ 
++META_EXPORT_TEST
+ void                meta_monitor_manager_confirm_configuration (MetaMonitorManager *manager,
+                                                                 gboolean            ok);
+ 
+diff --git a/src/backends/meta-monitor-manager.c b/src/backends/meta-monitor-manager.c
+index 792cd56da..820ada1e7 100644
+--- a/src/backends/meta-monitor-manager.c
++++ b/src/backends/meta-monitor-manager.c
+@@ -47,6 +47,7 @@
+ #include <stdlib.h>
+ 
+ #include "backends/meta-backend-private.h"
++#include "backends/meta-color-device.h"
+ #include "backends/meta-color-manager-private.h"
+ #include "backends/meta-crtc.h"
+ #include "backends/meta-logical-monitor-private.h"
+@@ -2172,6 +2173,69 @@ generate_color_modes_variant (MetaMonitor *monitor)
+   return g_variant_builder_end (&builder);
+ }
+ 
++static const char *
++hdr_gamut_source_to_string (MetaHdrGamutSource source)
++{
++  switch (source)
++    {
++    case META_HDR_GAMUT_SOURCE_AUTO:
++      return "auto";
++    case META_HDR_GAMUT_SOURCE_BASE_EDID:
++      return "base-edid";
++    case META_HDR_GAMUT_SOURCE_NONE:
++      return "none";
++    }
++
++  g_assert_not_reached ();
++}
++
++static void
++append_monitor_target_properties (MetaMonitorManager *manager,
++                                  MetaMonitor        *monitor,
++                                  GVariantBuilder    *properties)
++{
++  const MetaColorTargetOverride *override = meta_monitor_get_target_override (monitor);
++  MetaColorManager *color_manager = meta_backend_get_color_manager (manager->backend);
++  MetaColorDevice *device = meta_color_manager_get_color_device (color_manager, monitor);
++  const MetaColorTargetLuminance *luminance;
++  const MetaColorTargetPrimaries *primaries;
++  double xy[8];
++  unsigned int i;
++
++  if (override->has_peak)
++    g_variant_builder_add (properties, "{sv}", "target-peak-luminance",
++                           g_variant_new_double (override->peak));
++  if (override->has_min)
++    g_variant_builder_add (properties, "{sv}", "target-min-luminance",
++                           g_variant_new_double (override->min));
++  if (override->gamut_source != META_HDR_GAMUT_SOURCE_AUTO)
++    g_variant_builder_add (properties, "{sv}", "hdr-gamut-source",
++                           g_variant_new_string (hdr_gamut_source_to_string (override->gamut_source)));
++
++  /* Do not reconstruct selection from EDID or the requested configuration:
++   * report the state actually used by the applied color device. */
++  if (!meta_monitor_is_active (monitor) || !device ||
++      !meta_color_device_get_color_state (device))
++    return;
++
++  luminance = meta_color_device_get_target_luminance (device);
++  primaries = meta_color_device_get_target_primaries (device);
++  g_variant_builder_add (properties, "{sv}", "target-luminance",
++                         g_variant_new ("(dd)", (double) luminance->minimum,
++                                               (double) luminance->maximum));
++  g_variant_builder_add (properties, "{sv}", "target-min-luminance-source",
++                         g_variant_new_string (meta_color_target_provenance_to_string (luminance->minimum_source)));
++  g_variant_builder_add (properties, "{sv}", "target-max-luminance-source",
++                         g_variant_new_string (meta_color_target_provenance_to_string (luminance->maximum_source)));
++  for (i = 0; i < G_N_ELEMENTS (xy); i++)
++    xy[i] = meta_color_chromaticity_from_fixed (primaries->coordinates[i]);
++  g_variant_builder_add (properties, "{sv}", "target-primaries",
++                         g_variant_new ("(dddddddd)", xy[0], xy[1], xy[2], xy[3],
++                                                     xy[4], xy[5], xy[6], xy[7]));
++  g_variant_builder_add (properties, "{sv}", "target-primaries-source",
++                         g_variant_new_string (meta_color_target_provenance_to_string (primaries->source)));
++}
++
+ static gboolean
+ meta_monitor_manager_handle_get_current_state (MetaDBusDisplayConfig *skeleton,
+                                                GDBusMethodInvocation *invocation,
+@@ -2345,6 +2409,9 @@ meta_monitor_manager_handle_get_current_state (MetaDBusDisplayConfig *skeleton,
+                              "rgb-range",
+                              g_variant_new_uint32 (rgb_range));
+ 
++      append_monitor_target_properties (manager, monitor,
++                                        &monitor_properties_builder);
++
+       g_variant_builder_add (&monitors_builder, MONITOR_FORMAT,
+                              monitor_spec->connector,
+                              monitor_spec->vendor,
+@@ -2622,6 +2689,70 @@ find_monitor_from_connector (MetaMonitorManager *manager,
+ 
+ #define LOGICAL_MONITOR_CONFIG_FORMAT "(iidub" MONITOR_CONFIGS_FORMAT ")"
+ 
++static gboolean
++target_override_from_variant (GVariant                *properties,
++                              MetaColorTargetOverride *override,
++                              GError                 **error)
++{
++  GVariantIter iter;
++  const char *name;
++  GVariant *value;
++  gboolean seen_gamut = FALSE;
++
++  g_variant_iter_init (&iter, properties);
++  while (g_variant_iter_next (&iter, "{&sv}", &name, &value))
++    {
++      g_autoptr (GVariant) property = value;
++
++      if (g_str_equal (name, "target-peak-luminance") ||
++          g_str_equal (name, "target-min-luminance"))
++        {
++          gboolean is_peak = g_str_equal (name, "target-peak-luminance");
++          gboolean *present = is_peak ? &override->has_peak : &override->has_min;
++          double number;
++
++          if (*present || !g_variant_is_of_type (value, G_VARIANT_TYPE_DOUBLE))
++            goto invalid_property;
++          number = g_variant_get_double (value);
++          if (!isfinite (number) || number < 0 ||
++              (is_peak && number > G_MAXUINT32) ||
++              (!is_peak && number * 10000 > G_MAXUINT32))
++            goto invalid_property;
++
++          *present = TRUE;
++          if (is_peak)
++            override->peak = (float) number;
++          else
++            override->min = (float) number;
++        }
++      else if (g_str_equal (name, "hdr-gamut-source"))
++        {
++          const char *source;
++
++          if (seen_gamut || !g_variant_is_of_type (value, G_VARIANT_TYPE_STRING))
++            goto invalid_property;
++          seen_gamut = TRUE;
++          source = g_variant_get_string (value, NULL);
++          if (g_str_equal (source, "auto"))
++            override->gamut_source = META_HDR_GAMUT_SOURCE_AUTO;
++          else if (g_str_equal (source, "base-edid"))
++            override->gamut_source = META_HDR_GAMUT_SOURCE_BASE_EDID;
++          else if (g_str_equal (source, "none"))
++            override->gamut_source = META_HDR_GAMUT_SOURCE_NONE;
++          else
++            goto invalid_property;
++        }
++      continue;
++
++invalid_property:
++      g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
++                   "Invalid or duplicate target property '%s'", name);
++      return FALSE;
++    }
++
++  return meta_verify_target_override (override, error);
++}
++
+ static MetaMonitorConfig *
+ create_monitor_config_from_variant (MetaMonitorManager *manager,
+                                     GVariant           *monitor_config_variant,
+@@ -2642,6 +2773,7 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
+   uint32_t color_mode_value;
+   MetaOutputRGBRange rgb_range = META_OUTPUT_RGB_RANGE_UNKNOWN;
+   uint32_t rgb_range_value;
++  MetaColorTargetOverride target_override = { 0 };
+ 
+   g_variant_get (monitor_config_variant, "(ss@a{sv})",
+                  &connector,
+@@ -2685,6 +2817,9 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
+                         &rgb_range_value))
+     rgb_range = rgb_range_value;
+ 
++  if (!target_override_from_variant (properties_variant, &target_override, error))
++    return NULL;
++
+   monitor_spec = meta_monitor_spec_clone (meta_monitor_get_spec (monitor));
+ 
+   monitor_mode_spec = g_new0 (MetaMonitorModeSpec, 1);
+@@ -2697,6 +2832,7 @@ create_monitor_config_from_variant (MetaMonitorManager *manager,
+     .enable_underscanning = enable_underscanning,
+     .color_mode = color_mode,
+     .rgb_range = rgb_range,
++    .target_override = target_override,
+   };
+ 
+   return monitor_config;
+diff --git a/src/tests/monitor-dbus-tests.c b/src/tests/monitor-dbus-tests.c
+index 8c2e07b2f..f1bc7c8eb 100644
+--- a/src/tests/monitor-dbus-tests.c
++++ b/src/tests/monitor-dbus-tests.c
+@@ -17,6 +17,9 @@
+ 
+ #include "config.h"
+ 
++#include "backends/meta-color-device.h"
++#include "backends/meta-color-manager.h"
++#include "backends/meta-monitor-config-manager.h"
+ #include "tests/monitor-tests-common.h"
+ 
+ static void
+@@ -204,9 +207,322 @@ meta_test_monitor_has_external_monitor (void)
+                              FALSE);
+ }
+ 
++typedef struct
++{
++  gboolean done;
++  GVariant *reply;
++  GError *error;
++} TargetCall;
++
++static void
++target_call_done (GObject      *source,
++                  GAsyncResult *result,
++                  gpointer      user_data)
++{
++  TargetCall *call = user_data;
++
++  call->reply = g_dbus_proxy_call_finish (G_DBUS_PROXY (source), result, &call->error);
++  call->done = TRUE;
++}
++
++static GVariant *
++target_call (GDBusProxy  *proxy,
++             const char  *method,
++             GVariant    *parameters,
++             GError     **error)
++{
++  TargetCall call = { 0 };
++
++  g_dbus_proxy_call (proxy, method, parameters, G_DBUS_CALL_FLAGS_NONE,
++                     5000, NULL, target_call_done, &call);
++  while (!call.done)
++    g_main_context_iteration (NULL, TRUE);
++  if (call.error)
++    g_propagate_error (error, call.error);
++  return call.reply;
++}
++
++static GDBusProxy *
++create_target_proxy (void)
++{
++  GDBusProxy *proxy = NULL;
++
++  g_dbus_proxy_new_for_bus (G_BUS_TYPE_SESSION,
++                            G_DBUS_PROXY_FLAGS_DO_NOT_AUTO_START,
++                            NULL, "org.gnome.Mutter.DisplayConfig",
++                            "/org/gnome/Mutter/DisplayConfig",
++                            "org.gnome.Mutter.DisplayConfig", NULL,
++                            proxy_ready_cb, &proxy);
++  while (!proxy)
++    g_main_context_iteration (NULL, TRUE);
++  return proxy;
++}
++
++static GVariant *
++apply_target_properties (GDBusProxy                *proxy,
++                         MetaMonitorManager        *manager,
++                         MetaMonitor               *monitor,
++                         MetaMonitorsConfigMethod   method,
++                         GVariant                  *properties,
++                         GError                   **error)
++{
++  GVariantBuilder monitors;
++  GVariantBuilder logical;
++
++  g_variant_builder_init (&monitors, G_VARIANT_TYPE ("a(ssa{sv})"));
++  g_variant_builder_add (&monitors, "(ss@a{sv})",
++                         meta_monitor_get_connector (monitor),
++                         meta_monitor_mode_get_id (meta_monitor_get_preferred_mode (monitor)),
++                         g_variant_ref (properties));
++  g_variant_builder_init (&logical, G_VARIANT_TYPE ("a(iiduba(ssa{sv}))"));
++  g_variant_builder_add (&logical, "(iiduba(ssa{sv}))",
++                         0, 0, 1.0, 0, TRUE, &monitors);
++  return target_call (proxy, "ApplyMonitorsConfig",
++                      g_variant_new ("(uua(iiduba(ssa{sv}))a{sv})",
++                                     manager->serial, method, &logical, NULL), error);
++}
++
++static GVariant *
++read_target_properties (GDBusProxy *proxy)
++{
++  g_autoptr (GError) error = NULL;
++  g_autoptr (GVariant) state = target_call (proxy, "GetCurrentState", NULL, &error);
++  g_autoptr (GVariant) monitors = NULL;
++  g_autoptr (GVariant) monitor = NULL;
++
++  g_assert_no_error (error);
++  g_assert_nonnull (state);
++  monitors = g_variant_get_child_value (state, 1);
++  monitor = g_variant_get_child_value (monitors, 0);
++  return g_variant_get_child_value (monitor, 2);
++}
++
++static void
++assert_effective_target (GVariant        *properties,
++                         MetaColorDevice *device)
++{
++  const MetaColorTargetLuminance *luminance = meta_color_device_get_target_luminance (device);
++  const MetaColorTargetPrimaries *primaries = meta_color_device_get_target_primaries (device);
++  g_autoptr (GVariant) xy = NULL;
++  const char *source;
++  double minimum, maximum;
++  unsigned int i;
++
++  g_assert_true (g_variant_lookup (properties, "target-luminance", "(dd)",
++                                   &minimum, &maximum));
++  g_assert_cmpfloat (minimum, ==, luminance->minimum);
++  g_assert_cmpfloat (maximum, ==, luminance->maximum);
++  g_assert_true (g_variant_lookup (properties, "target-min-luminance-source", "&s", &source));
++  g_assert_cmpstr (source, ==, meta_color_target_provenance_to_string (luminance->minimum_source));
++  g_assert_true (g_variant_lookup (properties, "target-max-luminance-source", "&s", &source));
++  g_assert_cmpstr (source, ==, meta_color_target_provenance_to_string (luminance->maximum_source));
++  g_assert_true (g_variant_lookup (properties, "target-primaries-source", "&s", &source));
++  g_assert_cmpstr (source, ==, meta_color_target_provenance_to_string (primaries->source));
++  xy = g_variant_lookup_value (properties, "target-primaries", G_VARIANT_TYPE ("(dddddddd)"));
++  g_assert_nonnull (xy);
++  for (i = 0; i < 8; i++)
++    {
++      g_autoptr (GVariant) coordinate = g_variant_get_child_value (xy, i);
++
++      g_assert_cmpfloat (g_variant_get_double (coordinate), ==,
++                         meta_color_chromaticity_from_fixed (primaries->coordinates[i]));
++    }
++}
++
++static void
++on_target_wait_timeout (gpointer user_data)
++{
++  gboolean *timed_out = user_data;
++
++  *timed_out = TRUE;
++}
++
++/*
++ * Waits, at most 10 s, until the monitor's configured target peak is @peak:
++ * an observable result of the restore that rejecting a persistent
++ * configuration schedules, rather than the manager's private idle handle.
++ */
++static void
++wait_for_target_override_peak (MetaMonitor *monitor,
++                               float        peak)
++{
++  gboolean timed_out = FALSE;
++  unsigned int timeout_id;
++
++  timeout_id = g_timeout_add_seconds_once (10, on_target_wait_timeout,
++                                           &timed_out);
++  while (meta_monitor_get_target_override (monitor)->peak != peak &&
++         !timed_out)
++    g_main_context_iteration (NULL, TRUE);
++
++  if (!timed_out)
++    g_source_remove (timeout_id);
++  g_assert_false (timed_out);
++  g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, peak);
++}
++
++static void
++meta_test_monitor_target_dbus (void)
++{
++  MonitorTestCaseSetup setup = {
++    .modes = { { .width = 800, .height = 600, .refresh_rate = 60 } },
++    .n_modes = 1,
++    .outputs = { {
++      .crtc = 0, .modes = { 0 }, .n_modes = 1, .preferred_mode = 0,
++      .possible_crtcs = { 0 }, .n_possible_crtcs = 1,
++      .width_mm = 222, .height_mm = 125,
++      .supported_color_spaces = 1 << META_OUTPUT_COLORSPACE_BT2020,
++      .supported_hdr_eotfs = 1 << META_OUTPUT_HDR_METADATA_EOTF_PQ,
++    } },
++    .n_outputs = 1,
++    .crtcs = { { .current_mode = 0, .disable_gamma_lut = TRUE } },
++    .n_crtcs = 1,
++  };
++  const char *invalid[] = {
++    "{'target-peak-luminance': <'400'>}",
++    "{'target-peak-luminance': <uint32 400>}",
++    "{'target-min-luminance': <false>}",
++    "{'hdr-gamut-source': <uint32 0>}",
++    "{'hdr-gamut-source': <'unknown'>}",
++    "{'target-peak-luminance': <double nan>}",
++    "{'target-peak-luminance': <double inf>}",
++    "{'target-peak-luminance': <double 203>}",
++    "{'target-peak-luminance': <double 0>}",
++    "{'target-peak-luminance': <double 4294967296>}",
++    "{'target-min-luminance': <double 0>}",
++    "{'target-peak-luminance': <double 400>, 'target-min-luminance': <double -1>}",
++    "{'target-peak-luminance': <double 400.5>, 'target-min-luminance': <double 400>}",
++    "{'target-peak-luminance': <double 500000>, 'target-min-luminance': <double 429496.75>}",
++    "{'target-peak-luminance': <double 400>, 'target-peak-luminance': <double 600>}",
++    "{'hdr-gamut-source': <'auto'>, 'hdr-gamut-source': <'none'>}",
++  };
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaMonitorManager *manager = meta_backend_get_monitor_manager (backend);
++  MetaColorManager *color_manager = meta_backend_get_color_manager (backend);
++  MetaMonitor *monitor;
++  MetaColorDevice *device;
++  MetaMonitorsConfig *before;
++  g_autoptr (GDBusProxy) proxy = create_target_proxy ();
++  g_autoptr (GVariant) valid = NULL;
++  g_autoptr (GVariant) reply = NULL;
++  g_autoptr (GVariant) properties = NULL;
++  g_autoptr (GError) error = NULL;
++  double peak, minimum;
++  const char *source;
++  unsigned int confirm_signal_id;
++  size_t i;
++
++  meta_emulate_hotplug (meta_create_monitor_test_setup (backend, &setup,
++                                                       MONITOR_TEST_FLAG_NO_STORED));
++  monitor = meta_monitor_manager_get_monitors (manager)->data;
++  device = meta_color_manager_get_color_device (color_manager, monitor);
++  g_assert_nonnull (device);
++  valid = g_variant_parse (G_VARIANT_TYPE_VARDICT,
++    "{'color-mode': <uint32 1>, 'target-peak-luminance': <double 400>, "
++    "'target-min-luminance': <double 0>, 'hdr-gamut-source': <'none'>}",
++    NULL, NULL, &error);
++  g_assert_no_error (error);
++  before = meta_monitor_config_manager_get_current (manager->config_manager);
++  reply = apply_target_properties (proxy, manager, monitor,
++                                   META_MONITORS_CONFIG_METHOD_VERIFY, valid, &error);
++  g_assert_no_error (error);
++  g_assert_nonnull (reply);
++  g_clear_pointer (&reply, g_variant_unref);
++  g_assert_true (before == meta_monitor_config_manager_get_current (manager->config_manager));
++  g_assert_false (meta_monitor_get_target_override (monitor)->has_peak);
++
++  reply = apply_target_properties (proxy, manager, monitor,
++                                   META_MONITORS_CONFIG_METHOD_TEMPORARY, valid, &error);
++  g_assert_no_error (error);
++  g_assert_nonnull (reply);
++  g_clear_pointer (&reply, g_variant_unref);
++  meta_color_device_set_reference_luminance_factor (device, 2.1f);
++  properties = read_target_properties (proxy);
++  g_assert_true (g_variant_lookup (properties, "target-peak-luminance", "d", &peak));
++  g_assert_true (g_variant_lookup (properties, "target-min-luminance", "d", &minimum));
++  g_assert_cmpfloat (peak, ==, 400);
++  g_assert_cmpfloat (minimum, ==, 0);
++  g_assert_true (g_variant_lookup (properties, "hdr-gamut-source", "&s", &source));
++  g_assert_cmpstr (source, ==, "none");
++  assert_effective_target (properties, device);
++  /* The integrated selector must honor 400 even at ~426 cd/m² scaled white. */
++  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 400);
++  g_assert_true (g_variant_lookup (properties, "target-max-luminance-source", "&s", &source));
++  g_assert_cmpstr (source, ==, "user-declared");
++
++  before = meta_monitor_config_manager_get_current (manager->config_manager);
++  for (i = 0; i < G_N_ELEMENTS (invalid); i++)
++    {
++      g_autoptr (GVariant) malformed = g_variant_parse (G_VARIANT_TYPE_VARDICT,
++                                                      invalid[i], NULL, NULL, &error);
++
++      g_assert_no_error (error);
++      reply = apply_target_properties (proxy, manager, monitor,
++                                       META_MONITORS_CONFIG_METHOD_TEMPORARY,
++                                       malformed, &error);
++      g_assert_null (reply);
++      g_assert_nonnull (error);
++      g_clear_error (&error);
++      g_assert_true (before == meta_monitor_config_manager_get_current (manager->config_manager));
++      g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, 400);
++    }
++
++  /* Persistent proposals use the ordinary rejection/restore lifecycle. The
++   * test shell, like any plugin without a confirmation dialog, accepts a
++   * persistent configuration while it is being applied, which would leave
++   * nothing to reject: hold its confirmation, as a user would. */
++  confirm_signal_id = g_signal_lookup ("confirm-display-change",
++                                       G_OBJECT_TYPE (manager));
++  g_assert_cmpuint (g_signal_handlers_block_matched (manager,
++                                                     G_SIGNAL_MATCH_ID,
++                                                     confirm_signal_id, 0,
++                                                     NULL, NULL, NULL),
++                    ==, 1);
++  g_clear_pointer (&valid, g_variant_unref);
++  valid = g_variant_parse (G_VARIANT_TYPE_VARDICT,
++    "{'color-mode': <uint32 1>, 'target-peak-luminance': <double 600>}",
++    NULL, NULL, &error);
++  g_assert_no_error (error);
++  reply = apply_target_properties (proxy, manager, monitor,
++                                   META_MONITORS_CONFIG_METHOD_PERSISTENT, valid, &error);
++  g_assert_no_error (error);
++  g_clear_pointer (&reply, g_variant_unref);
++  g_assert_cmpfloat (meta_monitor_get_target_override (monitor)->peak, ==, 600);
++  g_assert_cmpuint (manager->persistent_timeout_id, !=, 0);
++  meta_monitor_manager_confirm_configuration (manager, FALSE);
++  g_assert_cmpuint (manager->persistent_timeout_id, ==, 0);
++  wait_for_target_override_peak (monitor, 400);
++  /* The restore has run: no stale handle is left for the next
++   * configuration to remove. */
++  g_assert_cmpuint (manager->restore_config_id, ==, 0);
++  g_assert_cmpuint (g_signal_handlers_unblock_matched (manager,
++                                                       G_SIGNAL_MATCH_ID,
++                                                       confirm_signal_id, 0,
++                                                       NULL, NULL, NULL),
++                    ==, 1);
++
++  /* Omission replaces the declaration, rather than silently retaining it. */
++  g_clear_pointer (&valid, g_variant_unref);
++  valid = g_variant_parse (G_VARIANT_TYPE_VARDICT, "{}", NULL, NULL, &error);
++  g_assert_no_error (error);
++  reply = apply_target_properties (proxy, manager, monitor,
++                                   META_MONITORS_CONFIG_METHOD_TEMPORARY, valid, &error);
++  g_assert_no_error (error);
++  g_assert_false (meta_monitor_get_target_override (monitor)->has_peak);
++  g_assert_false (meta_monitor_get_target_override (monitor)->has_min);
++  g_assert_cmpint (meta_monitor_get_target_override (monitor)->gamut_source, ==,
++                   META_HDR_GAMUT_SOURCE_AUTO);
++  g_clear_pointer (&properties, g_variant_unref);
++  properties = read_target_properties (proxy);
++  assert_effective_target (properties, device);
++  g_assert_null (g_variant_lookup_value (properties, "target-peak-luminance", NULL));
++}
++
+ static void
+ init_dbus_tests (void)
+ {
++  meta_add_monitor_test ("/backends/monitor/target-overrides-dbus",
++                         meta_test_monitor_target_dbus);
+   meta_add_monitor_test ("/backends/monitor/has-external-monitor",
+                          meta_test_monitor_has_external_monitor);
+ }

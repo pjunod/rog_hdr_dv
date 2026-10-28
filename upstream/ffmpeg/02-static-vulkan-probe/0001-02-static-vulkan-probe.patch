@@ -1,0 +1,32 @@
+From de192395d11c61b491f70fc145a0bfd47eff03d8 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:12:51 -0400
+Subject: [PATCH] configure: probe a symbol when linking static Vulkan
+
+check_pkg_config performs a function-address link test. A defined
+preprocessor expression is not a function symbol in that test, so the
+static Vulkan pkg-config path falls through and can lose its package-
+provided link flags. Probe vkGetInstanceProcAddr, as the fallback
+already does.
+
+Real configure fails on the original code and passes with the change
+using an isolated static library and official Vulkan headers. The
+fixture isolates pkg-config linking; it does not exercise MoltenVK
+rendering.
+---
+ configure | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure b/configure
+index df80cf5fa1..dfd385fdb3 100755
+--- a/configure
++++ b/configure
+@@ -7711,7 +7711,7 @@ enabled vdpau &&
+ 
+ # Check for the Vulkan headers
+ if enabled_all vulkan vulkan_static; then
+-    check_pkg_config vulkan "vulkan >= 1.3.277" "vulkan/vulkan.h" "defined VK_VERSION_1_3" ||
++    check_pkg_config vulkan "vulkan >= 1.3.277" "vulkan/vulkan.h" vkGetInstanceProcAddr ||
+         check_lib vulkan "vulkan/vulkan.h" vkGetInstanceProcAddr -lvulkan
+ elif enabled vulkan; then
+     check_pkg_config_header_only vulkan "vulkan >= 1.3.277" "vulkan/vulkan.h" "defined VK_VERSION_1_3" ||

@@ -1,0 +1,86 @@
+{
+  "repository": "jellyfin/jellyfin-ffmpeg",
+  "target_branch": "jellyfin",
+  "base": "e965dc63b4642af56f1d48b0a8b5d5f103440bfa",
+  "venue": "github",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-bwdif-buffer-index",
+      "inventory_ids": [
+        "JF-1"
+      ],
+      "title": "avfilter/bwdif_videotoolbox: bind parameters at buffer index zero",
+      "patches": [
+        "01-bwdif-buffer-index/0001-01-bwdif-buffer-index.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "quilt queue apply; native Mac filter build; synthetic 128x64 10fps NV12 Metal bwdif send_field/tff/all versus same-source CPU bwdif",
+          "result": "baseline and fixed compile and emit 20 frames; baseline 10 unique hashes, fixed 20; CPU mean absolute byte error drops from 1.9980 to 0.1384 (not bit-exact)",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "02",
+      "slug": "02-hable-reference-white",
+      "inventory_ids": [
+        "JF-2"
+      ],
+      "title": "avfilter/tonemap_videotoolbox: expose Hable reference white",
+      "patches": [
+        "02-hable-reference-white/0001-02-hable-reference-white.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "quilt queue apply; make libavfilter/vf_tonemap_videotoolbox.o",
+          "result": "baseline and fixed compile on Xcode 27 SDK; render/default-compatibility comparison not run",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ],
+      "draft": true
+    },
+    {
+      "id": "04",
+      "slug": "04-apple-libtool",
+      "inventory_ids": [
+        "JF-4"
+      ],
+      "title": "builder: use Apple libtool when merging x265 archives on macOS",
+      "patches": [
+        "04-apple-libtool/0001-04-apple-libtool.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "native Apple libtool merge with conflicting PATH tool and three synthetic static archives",
+          "result": "PATH-selected fixture exits 72; /usr/bin/libtool exits 0 and nm finds all three depth markers; full x265 build not rerun",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "slug": "03-subtitle-filter-design",
+      "inventory_ids": [
+        "JF-3"
+      ],
+      "title": "VideoToolbox subtitle images and overlay design",
+      "patches": [],
+      "status": "design-hold",
+      "blockers": [
+        "Maintainer agreement on filter and overlay API",
+        "Split the command protocol from generic filter plumbing",
+        "Mac render and lifetime tests"
+      ],
+      "tests": []
+    }
+  ]
+}

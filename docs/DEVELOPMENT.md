@@ -172,6 +172,33 @@ record these local checks because GitHub dispatch needs the workflow on the
 default branch first. Display experiments have their own receipts and never
 run automatically on the owner's laptop from public CI.
 
+### Submission-kit validation
+
+For changes confined to `upstream/`, its catalog/checker, descriptions and
+submission helpers, use the affected submission lane after independent
+review. Stage intended additions, deletions and renames first: the repository
+mutation tests copy `git ls-files` using the current working bytes.
+
+```bash
+python3 scripts/check_repository.py
+PYTHONPATH=tests python3 -m unittest -v \
+  test_check_repository test_upstream_catalog test_upstream_gitlab_submit \
+  test_upstream_cinema_submit test_upstream_forgejo_submit test_upstream_linux_prepare
+```
+
+The manual workflow accepts `test_target=upstream` for this same selection.
+This lane checks repository mutation cases, inventory integrity and submission
+transport behavior. Each source proposal separately needs its recorded
+upstream compiler/tests; these Python tests do not grant those results.
+
+Full discovery also includes display-mapping acceptance tests that require
+retained private corpora, approved result fixtures and compiled native tools.
+Run those through their documented qualification environment when their
+source or acceptance inputs change. Do not replace their inputs, add skips,
+or claim a full-suite pass from the submission lane. Keep any attempted full
+discovery result distinct from affected checks. The workflow's `all` option
+and the private acceptance definitions remain unchanged.
+
 ### Remotes, branches and the public mirror
 
 Since 2026-10-18 the primary remote is the owner's private LAN Forgejo

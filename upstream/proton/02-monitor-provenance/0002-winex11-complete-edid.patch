@@ -1,0 +1,56 @@
+From 8cb6b153bf47fd6e50565d1720e851117f7c0eb4 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:04:13 -0400
+Subject: [PATCH] winex11.drv: Only use complete EDID properties.
+
+Request the whole EDID output property in one go, instead of only the first
+512 bytes, and use it only if it is 8-bit INTEGER data with nothing left
+unread. An EDID with more extension blocks than the first read covered was
+silently cut short, and so was handed on as a complete descriptor.
+
+An unusable property now falls through to the existing Gamescope and
+generated EDID fallbacks, as if the property was absent, and a warning
+names the output. Also free the buffer returned by the server on every path.
+---
+ dlls/winex11.drv/xrandr.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/dlls/winex11.drv/xrandr.c b/dlls/winex11.drv/xrandr.c
+index 11510a90a79..6764a6dce9c 100644
+--- a/dlls/winex11.drv/xrandr.c
++++ b/dlls/winex11.drv/xrandr.c
+@@ -582,21 +582,26 @@ static unsigned int get_edid( RROutput output, unsigned char **prop, BOOL *synth
+     Atom actual_type;
+     char *edid_path;
+ 
++    /* Read the complete property (up to 256 EDID blocks) in one request and
++     * accept it only as 8-bit INTEGER data with nothing left unread, so a
++     * truncated extension list is never presented as a whole descriptor. */
+     *prop = NULL;
+     *synthesized = FALSE;
+-    result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 128, FALSE, FALSE,
++    edid = NULL;
++    result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 256 * 128 / 4, FALSE, FALSE,
+                                     AnyPropertyType, &actual_type, &actual_format, &len,
+                                     &bytes_after, &edid );
+-    if (result == Success && len)
++    if (result == Success && actual_type == XA_INTEGER && actual_format == 8 && !bytes_after &&
++        len && len <= 256 * 128)
+     {
+-        if (!(*prop = malloc( len )))
+-        {
+-            XFree( edid );
+-            return 0;
+-        }
+-        memcpy( *prop, edid, len );
++        if ((*prop = malloc( len ))) memcpy( *prop, edid, len );
++        else len = 0;
++        XFree( edid );
+         return len;
+     }
++    if (result == Success && actual_type != None)
++        WARN( "Ignoring malformed or incomplete EDID property for output %#lx.\n", output );
++    if (result == Success && edid) XFree( edid );
+ 
+     edid_path = NULL;
+     if ((result = XGetWindowProperty( gdi_display, DefaultRootWindow(gdi_display), x11drv_atom(GAMESCOPE_DISPLAY_EDID_PATH), 0,

@@ -1,0 +1,85 @@
+From 66c9743db123e2e88f53839128a74df19b7e3546 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 11:25:23 -0400
+Subject: [PATCH] build: make S3 dependencies optional without losing the HTTP
+ provider
+
+Enable cryptr/s3 only through the S3 feature. Initialize the ring crypto provider before constructing a rustls-no-provider HTTP client so remote clients do not depend on provider installation through the incidental S3 dependency graph.
+---
+ Cargo.toml                 |  3 ++-
+ hiqlite/Cargo.toml         |  2 +-
+ hiqlite/src/http_client.rs | 26 ++++++++++++++++++++++++++
+ 3 files changed, 29 insertions(+), 2 deletions(-)
+
+diff --git a/Cargo.toml b/Cargo.toml
+index 66bf8bd..bb12c37 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -54,7 +54,8 @@ crc = "3.3.0"
+ criterion = "0.8"
+ cron = { version = "0.17" }
+ crossbeam = "0.8.4"
+-cryptr = { version = "0.12", features = ["s3"] }
++# the `s3` feature is enabled by the `s3` feature of `hiqlite`
++cryptr = "0.12"
+ ctrlc = { version = "3.4.4", features = ["termination"] }
+ deadpool = { version = "0.13", features = ["rt_tokio_1"] }
+ dotenvy = "0.15.7"
+diff --git a/hiqlite/Cargo.toml b/hiqlite/Cargo.toml
+index 3ae1993..d37b5c3 100644
+--- a/hiqlite/Cargo.toml
++++ b/hiqlite/Cargo.toml
+@@ -79,7 +79,7 @@ listen_notify = [
+ ]
+ macros = ["dep:hiqlite-derive"]
+ toml = ["dep:toml"]
+-s3 = ["backup"]
++s3 = ["backup", "cryptr/s3"]
+ server = [
+     "dep:clap",
+     "dep:home",
+diff --git a/hiqlite/src/http_client.rs b/hiqlite/src/http_client.rs
+index 2ff5b2c..afa16e7 100644
+--- a/hiqlite/src/http_client.rs
++++ b/hiqlite/src/http_client.rs
+@@ -1,10 +1,24 @@
++use std::sync::Once;
+ use std::time::Duration;
+ 
++/// `reqwest` is built with `rustls-no-provider`, so `ClientBuilder::build()` panics unless a
++/// process-wide rustls `CryptoProvider` was installed before. Install `ring`, which is what the
++/// rest of this crate uses, unless the embedding application has already chosen one.
++pub(crate) fn ensure_rustls_crypto_provider() {
++    static INSTALL: Once = Once::new();
++    INSTALL.call_once(|| {
++        // `Err` means a provider is already installed, which is fine.
++        let _ = rustls::crypto::ring::default_provider().install_default();
++    });
++}
++
+ // not really dead code
+ // It will be used in any (real) scenario. This is only to get rid of a warning during some
+ // `clippy` checks.
+ #[allow(dead_code)]
+ pub fn build_http_client(tls_no_verify: bool) -> reqwest::Client {
++    ensure_rustls_crypto_provider();
++
+     #[allow(unused_mut)]
+     let mut builder = reqwest::Client::builder()
+         .http2_prior_knowledge()
+@@ -23,3 +37,15 @@ pub fn build_http_client(tls_no_verify: bool) -> reqwest::Client {
+ 
+     builder.build().unwrap()
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    /// Run on its own (`cargo test --lib http_client::tests::`) so no other test has installed
++    /// a provider first: building a client must not depend on the caller having done so.
++    #[test]
++    fn client_builds_without_a_preinstalled_crypto_provider() {
++        let _client = build_http_client(false);
++    }
++}

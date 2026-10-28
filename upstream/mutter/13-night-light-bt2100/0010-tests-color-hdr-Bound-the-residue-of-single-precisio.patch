@@ -1,0 +1,75 @@
+From 282711bacc93ccf7949bae3956f4c4ffebf558d6 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 06:53:17 +0000
+Subject: [PATCH 10/11] tests/color-hdr: Bound the residue of single precision
+ transforms
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The channel bound compared a channel that is 0 in the input with a fixed
+allowance of 1e-4 cd/m². Both conversions run in single precision with
+their matrices combined into one, gamut to linear BT.2020, the white
+adaptation, and back, so such a channel comes out as the rounding
+residue of the other channels: about one unit in the last place of the
+brightest input channel, of either sign. Linear 0.5 is 5000 cd/m², so
+one such unit is about 6e-4 cd/m², six times the allowance. The DCI-P3
+output showed 4.03e-4 cd/m² where the unadapted conversion's residue was
+negative and clamped to 0.
+
+Allow 8 FLT_EPSILON of the brightest input channel in absolute
+luminance, 4.8e-3 cd/m² for linear 0.5, in both comparisons, and nothing
+else. The relative bounds are unchanged. A white-normalized Bradford
+adaptation, which the bound exists to reject, brightens a channel by
+about 0.5 %, some 24 cd/m² there.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/3687
+---
+ src/tests/clutter/conform/color-hdr.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 1caf9fc2b..ee6c252df 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -3737,6 +3737,16 @@ white_adaptation_continuity (void)
+  * normalization of a Bradford adaptation brightens, and white, at every
+  * temperature from 1000 K to 10000 K, on a BT.2020 and a DCI-P3 output. Each
+  * channel is exactly the unadapted channel scaled by its factor.
++ *
++ * Both conversions run in single precision with their matrices combined
++ * into one, so a channel that is 0 in the input comes out as the rounding
++ * residue of the other channels, adapted or not: about one unit in the last
++ * place of the brightest input channel, of either sign, which the encoding
++ * clamps at 0. Beyond the relative bound, both comparisons allow 8
++ * FLT_EPSILON of the brightest input channel in absolute luminance and
++ * nothing else: 4.8e-3 cd/m² for a linear 0.5, which is 5000 cd/m². A
++ * white-normalized Bradford adaptation brightens a channel by about 0.5 %,
++ * some 24 cd/m² there, and its cross-talk lights channels that are 0.
+  */
+ static void
+ white_adaptation_channel_bound (void)
+@@ -3784,16 +3794,20 @@ white_adaptation_channel_bound (void)
+ 
+           for (k = 0; k < G_N_ELEMENTS (inputs); k++)
+             {
+-              double lum[3], plain_lum[3];
++              double lum[3], plain_lum[3], residue;
+ 
++              /* Linear 1.0 is the PQ peak, 10000 cd/m². */
++              residue = 8.0 * FLT_EPSILON * 10000.0 *
++                        MAX (inputs[k][0], MAX (inputs[k][1], inputs[k][2]));
+               transform_to_luminance (blending, output, inputs[k], lum);
+               transform_to_luminance (plain, output, inputs[k], plain_lum);
+               for (c = 0; c < 3; c++)
+                 {
+-                  g_assert_cmpfloat (lum[c], <=, plain_lum[c] * (1.0 + 1e-4) + 1e-4);
++                  g_assert_cmpfloat (lum[c], <=,
++                                     plain_lum[c] * (1.0 + 1e-4) + residue);
+                   g_assert_cmpfloat_with_epsilon (lum[c],
+                                                   plain_lum[c] * factors[c],
+-                                                  plain_lum[c] * 2e-3 + 1e-3);
++                                                  plain_lum[c] * 2e-3 + residue);
+                 }
+             }
+         }

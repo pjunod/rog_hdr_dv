@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "project": "cavern",
+  "checked": "2026-10-28",
+  "source_and_log_receipts": {
+    "revisions": {
+      "master": {
+        "commit": "c233ce02bd4f93de43ff94df7609fab611ab870e",
+        "tree": "cd62e4472a219b5a19d1764bfd4f02972abff17f"
+      },
+      "817be9a1": {
+        "commit": "817be9a1f0882d0959cd9a25869f44ebd2fc3164",
+        "tree": "967b4e0321f78eff16a2e72ea0584963dee3c3f0"
+      },
+      "prep/independent-02": {
+        "commit": "c45257b98252d86550be742d0ba0e64c5e048ce6",
+        "tree": "4db62763154c8272c20c3390f95c3d4bdc0e5ee3"
+      },
+      "prep/independent-03": {
+        "commit": "01d83a0277911333905ab318a8065835a0bffd41",
+        "tree": "c4c517a7b6ac32ac5cd771c850b766130bc8ff46"
+      },
+      "prep/cav-1": {
+        "commit": "e686e7c867fb194c84662fc282fa6013d6c68e25",
+        "tree": "095182464913ea47246a5c29f00c038707bd56a6"
+      }
+    },
+    "logs": {
+      "log-prep_cav-1.txt": {
+        "bytes": 6079,
+        "sha256": "cabda49129a8beab1ead0b76607433a12a29295cd8b57f2c62642423ee3a23bb"
+      },
+      "log-prep_cav-1_1.txt": {
+        "bytes": 6026,
+        "sha256": "4c01536148907faa39828cfd5b1436ae0e04089cbf57589926fc714d274166f6"
+      },
+      "log-prep_cav-1_2.txt": {
+        "bytes": 5978,
+        "sha256": "0b5ad90473636fa895a5ba546faad50a2acc6c9d83b6be0099676d0caa044e6c"
+      },
+      "log-reverted-fixes.txt": {
+        "bytes": 8108,
+        "sha256": "d03cfd92c57d5e1472bfe2eb906cdb38760f3e784a07960658e7df18fa6f0857"
+      },
+      "run2.log": {
+        "bytes": 478,
+        "sha256": "9c373d869d8d9076e5bab5e12090cec934ddf60f0836532edb435f93cc078408"
+      },
+      "independent.log": {
+        "bytes": 5960,
+        "sha256": "ed2773887cc2bae9bf00e63d6237f2fdbe76bcb206d37bd1eee6ba93e1d88ced"
+      },
+      "independent-followup.log": {
+        "bytes": 458,
+        "sha256": "65b1b214ae9e83cb9e8a9773bceb556353fc2dcded9ef1806b4b967b047848fc"
+      },
+      "independent-network-followup.log": {
+        "bytes": 6216,
+        "sha256": "d9771a50928506edabd12d00b6957ebb3ce52ee2c28d3490d9d7dd60b3fd2049"
+      }
+    }
+  },
+  "qualification": {
+    "new": "Independent-base unit02 suite98/99 with multicast announcer timeout under --network none; failed-only retry with inherited bridge network passes2/2 matched Start_CanOnlyBeCalledOnce methods. Independent-base unit03 full99/99 passes.",
+    "inherited": "Unit01 source817be9a1 suite103/103, stacked unit02 b9dcd41d104/104, stacked unit03 e686e7c105/105. Negative control reproduced exact-read metadata fetch defect; removing EOSguard fails1/5 BlockBuffer tests.",
+    "compiler": ".NET SDK8.0.427",
+    "limits": [
+      "Existing CS0649 upstream warnings are retained.",
+      "No JOC/Atmos reference fidelity or listening qualification; custom upstream licence remains.",
+      "Independent unit02 is reported with its initial network-constrained failure and scoped retry, not as a clean first-attempt full-suite pass."
+    ]
+  },
+  "log_storage": "Task-owned Linux builder slot ~/work/upstream-prep/cavern",
+  "patches": {
+    "01-block-buffer/0001-block-buffer.patch": "151702acc864f29517430f1241b67f8c72547622e7d12fa39dd05ca2ab1f33c5",
+    "02-joc-timeslots/0001-joc-timeslots.patch": "ea2f213ba18dc4be77eec46555a384eb0efe1368ca2cc6a201e6670fdaf8628f",
+    "03-oamd-presence/0001-oamd-presence.patch": "027c78bfc6455bc765e83a1d732351d185d7e1b189a608c696f7f4827f3bf671"
+  },
+  "new_source_application": {
+    "01": {
+      "tree": "967b4e0321f78eff16a2e72ea0584963dee3c3f0",
+      "unsigned": true,
+      "result": "PASS"
+    },
+    "02": {
+      "tree": "4db62763154c8272c20c3390f95c3d4bdc0e5ee3",
+      "unsigned": true,
+      "result": "PASS"
+    },
+    "03": {
+      "tree": "c4c517a7b6ac32ac5cd771c850b766130bc8ff46",
+      "unsigned": true,
+      "result": "PASS"
+    }
+  }
+}

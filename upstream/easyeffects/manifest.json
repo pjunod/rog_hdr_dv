@@ -1,0 +1,70 @@
+{
+  "repository": "wwmm/easyeffects",
+  "target_branch": "master",
+  "base": "7e314dc536481aa0426dbe68a603b30e65164e50",
+  "venue": "github",
+  "current_upstream_checked": "2026-10-28",
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-analyser-ownership",
+      "inventory_ids": [
+        "EE-3"
+      ],
+      "title": "Autogain: make analyser ownership safe across threads",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "01-analyser-ownership/0001-autogain-analyser-ownership.patch"
+      ],
+      "tests": [
+        {
+          "command": "cmake --build b -j8 && ctest --test-dir b --output-on-failure",
+          "result": "new 2026-10-28: full build passes; 2/2 tests pass on current base",
+          "evidence": "evidence.json"
+        }
+      ],
+      "candidate_tree": "904131ba74f712cdba6e072d2d9531fa3ffcb70a"
+    },
+    {
+      "id": "02",
+      "slug": "02-maximum-gain",
+      "inventory_ids": [
+        "EE-3"
+      ],
+      "title": "Autogain: add a maximum gain setting",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "01-analyser-ownership/0001-autogain-analyser-ownership.patch",
+        "02-maximum-gain/0001-autogain-maximum-gain.patch"
+      ],
+      "tests": [
+        {
+          "command": "cmake --build b -j8 && ctest --test-dir b --output-on-failure",
+          "result": "new 2026-10-28: full build passes; 3/3 tests pass on current base",
+          "evidence": "evidence.json"
+        }
+      ],
+      "candidate_tree": "b240a56e2712793d239d84ecbb34fc90d49dff0e"
+    },
+    {
+      "id": "03",
+      "slug": "03-device-route-discussion",
+      "inventory_ids": [
+        "EE-1",
+        "EE-2"
+      ],
+      "title": "Discuss device-route persistence without product rebranding",
+      "type": "issue",
+      "status": "needs-upstream-design",
+      "blockers": [
+        "Downstream patch combines product rebranding with routing policy; current upstream autoload/device-exclusion work must be compared on real device transitions before proposing a port."
+      ],
+      "patches": [],
+      "tests": []
+    }
+  ]
+}

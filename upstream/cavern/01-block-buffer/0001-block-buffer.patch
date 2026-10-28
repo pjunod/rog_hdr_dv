@@ -1,0 +1,151 @@
+From 817be9a1f0882d0959cd9a25869f44ebd2fc3164 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:49:59 -0400
+Subject: [PATCH] Exact reads don't fetch the next block of a BlockBuffer
+
+BlockBuffer.Read fetched the next block as soon as the last element of the current one was returned, so a frame-based decoder had already decoded the next frame when the samples of the previous frame were handed out, and the metadata that belongs to them (like the objects of an E-AC-3 frame) was already replaced. Fetch only when an element of the next block is actually requested, and keep returning null for a read after the last block, as before.
+---
+ Cavern.Format/Utilities/BlockBuffer.cs        |   7 +-
+ .../Utilities/BlockBuffer_Tests.cs            | 113 ++++++++++++++++++
+ 2 files changed, 119 insertions(+), 1 deletion(-)
+ create mode 100644 Tests/Test.Cavern.Format/Utilities/BlockBuffer_Tests.cs
+
+diff --git a/Cavern.Format/Utilities/BlockBuffer.cs b/Cavern.Format/Utilities/BlockBuffer.cs
+index 565bac06..0cb4d4bd 100644
+--- a/Cavern.Format/Utilities/BlockBuffer.cs
++++ b/Cavern.Format/Utilities/BlockBuffer.cs
+@@ -157,9 +157,14 @@ namespace Cavern.Format.Utilities {
+ 
+                 pointer += next;
+                 lastFetchPosition += next;
+-                if (lastFetchPosition == LastFetch.Length) {
++                // Fetching the next block is only needed when more elements are requested. When the read ends exactly at the end
++                // of a block, fetching ahead would make the fetcher's state belong to data that wasn't returned yet.
++                if (lastFetchPosition == LastFetch.Length && pointer < elements) {
+                     LastFetch = Fetcher();
+                     if (LastFetch == null || LastFetch.Length == 0) {
++                        if (pointer == 0) {
++                            return null; // The previous read already used the last block
++                        }
+                         Array.Clear(result, pointer, result.Length - pointer);
+                         return result;
+                     }
+diff --git a/Tests/Test.Cavern.Format/Utilities/BlockBuffer_Tests.cs b/Tests/Test.Cavern.Format/Utilities/BlockBuffer_Tests.cs
+new file mode 100644
+index 00000000..bb850bf2
+--- /dev/null
++++ b/Tests/Test.Cavern.Format/Utilities/BlockBuffer_Tests.cs
+@@ -0,0 +1,113 @@
++﻿using Cavern.Format.Utilities;
++
++namespace Test.Cavern.Format.Utilities;
++
++/// <summary>
++/// Tests the <see cref="BlockBuffer{T}"/> class.
++/// </summary>
++[TestClass]
++public class BlockBuffer_Tests {
++    /// <summary>
++    /// Counts the fetched blocks, and gives <paramref name="blocks"/> blocks of <paramref name="blockSize"/> consecutive numbers, then
++    /// an empty fetch.
++    /// </summary>
++    sealed class CountingSource {
++        readonly int blockSize;
++        readonly int blocks;
++
++        /// <summary>
++        /// Number of times the fetcher was called, including the first fetch of the <see cref="BlockBuffer{T}"/> constructor.
++        /// </summary>
++        public int Fetches { get; private set; }
++
++        public CountingSource(int blockSize, int blocks) {
++            this.blockSize = blockSize;
++            this.blocks = blocks;
++        }
++
++        public int[] Fetch() {
++            int block = Fetches++;
++            if (block >= blocks) {
++                return null;
++            }
++            int[] result = new int[blockSize];
++            for (int i = 0; i < blockSize; i++) {
++                result[i] = block * blockSize + i;
++            }
++            return result;
++        }
++    }
++
++    /// <summary>
++    /// Reading exactly the elements of a block must not fetch the next one, because the fetcher can have a state (like the metadata of
++    /// a decoded frame) that has to stay with the returned elements until they are consumed.
++    /// </summary>
++    [TestMethod, Timeout(1000)]
++    public void ExactBlockRead_DoesNotFetchAhead() {
++        CountingSource source = new(4, 3);
++        BlockBuffer<int> buffer = new(source.Fetch);
++        Assert.AreEqual(1, source.Fetches);
++
++        CollectionAssert.AreEqual(new[] { 0, 1, 2, 3 }, buffer.Read(4));
++        Assert.AreEqual(1, source.Fetches, "The next block was fetched before it was needed.");
++
++        CollectionAssert.AreEqual(new[] { 4, 5, 6, 7 }, buffer.Read(4));
++        Assert.AreEqual(2, source.Fetches);
++        Assert.AreEqual(0, buffer.LastFetchStart, "The returned elements start at the beginning of the block.");
++    }
++
++    /// <summary>
++    /// Reads that don't line up with the blocks give a continuous series.
++    /// </summary>
++    [TestMethod, Timeout(1000)]
++    public void UnalignedReads_AreContinuous() {
++        CountingSource source = new(4, 3);
++        BlockBuffer<int> buffer = new(source.Fetch);
++
++        CollectionAssert.AreEqual(new[] { 0, 1, 2 }, buffer.Read(3));
++        CollectionAssert.AreEqual(new[] { 3, 4, 5 }, buffer.Read(3));
++        CollectionAssert.AreEqual(new[] { 6, 7, 8 }, buffer.Read(3));
++        CollectionAssert.AreEqual(new[] { 9, 10, 11 }, buffer.Read(3));
++        Assert.AreEqual(3, source.Fetches);
++    }
++
++    /// <summary>
++    /// A read that is longer than a block spans multiple blocks.
++    /// </summary>
++    [TestMethod, Timeout(1000)]
++    public void LongRead_SpansBlocks() {
++        CountingSource source = new(4, 3);
++        BlockBuffer<int> buffer = new(source.Fetch);
++
++        CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5, 6 }, buffer.Read(7));
++        Assert.AreEqual(2, source.Fetches);
++        CollectionAssert.AreEqual(new[] { 7 }, buffer.Read(1));
++    }
++
++    /// <summary>
++    /// When the stream ends exactly at the end of a block, the read after the last block has no data.
++    /// </summary>
++    [TestMethod, Timeout(1000)]
++    public void EndOfStream_AfterExactRead_ReturnsNull() {
++        CountingSource source = new(4, 2);
++        BlockBuffer<int> buffer = new(source.Fetch);
++
++        CollectionAssert.AreEqual(new[] { 0, 1, 2, 3 }, buffer.Read(4));
++        CollectionAssert.AreEqual(new[] { 4, 5, 6, 7 }, buffer.Read(4));
++        Assert.IsNull(buffer.Read(4));
++        Assert.IsNull(buffer.Read(4));
++    }
++
++    /// <summary>
++    /// When the stream ends in the middle of a read, the rest of the result is zero.
++    /// </summary>
++    [TestMethod, Timeout(1000)]
++    public void EndOfStream_InsideRead_IsZeroPadded() {
++        CountingSource source = new(4, 2);
++        BlockBuffer<int> buffer = new(source.Fetch);
++
++        CollectionAssert.AreEqual(new[] { 0, 1, 2, 3, 4, 5 }, buffer.Read(6));
++        CollectionAssert.AreEqual(new[] { 6, 7, 0, 0, 0, 0 }, buffer.Read(6));
++        Assert.IsNull(buffer.Read(6));
++    }
++}

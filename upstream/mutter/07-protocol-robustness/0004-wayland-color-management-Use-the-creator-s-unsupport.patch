@@ -1,0 +1,44 @@
+From 28876c42b096de875ef53601fad4033f8de912ee Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 16:53:54 -0400
+Subject: [PATCH 4/7] wayland/color-management: Use the creator's
+ unsupported_feature error
+
+set_mastering_display_primaries and set_mastering_luminance on a
+wp_image_description_creator_params_v1 raised
+WP_COLOR_MANAGER_V1_ERROR_UNSUPPORTED_FEATURE. Protocol error codes are
+scoped to the interface of the object the error is posted on; that
+enum belongs to wp_color_manager_v1 and has the value 0, which on the
+creator-params interface means incomplete_set. Clients were told they
+had sent an incomplete parameter set.
+
+Post WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE
+(2), the creator-params interface's own code for an unsupported request.
+
+Link: TBD-MR
+---
+ src/wayland/meta-wayland-color-management.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 6029c7859..ac20f449a 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -1805,7 +1805,7 @@ creator_params_set_mastering_display_primaries (struct wl_client   *client,
+                                                 int32_t             w_y)
+ {
+   wl_resource_post_error (resource,
+-                          WP_COLOR_MANAGER_V1_ERROR_UNSUPPORTED_FEATURE,
++                          WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE,
+                           "Setting mastering display primaries is not supported");
+ }
+ 
+@@ -1816,7 +1816,7 @@ creator_params_set_mastering_luminance (struct wl_client   *client,
+                                         uint32_t            max_lum)
+ {
+   wl_resource_post_error (resource,
+-                          WP_COLOR_MANAGER_V1_ERROR_UNSUPPORTED_FEATURE,
++                          WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE,
+                           "Setting mastering display luminances is not supported");
+ }
+ 

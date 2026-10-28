@@ -33,6 +33,36 @@ plays through plurx Player with the closed-form display mapping.
 - Panel measurement and calibration (needs a colourimeter); the Windows
   trace of the OEM pipeline (needs a Windows boot).
 
+## Upstream preparation — 2026-10-28
+
+The [submission ledger](UPSTREAM_SUBMISSIONS.md) accounts for all 85 handoff
+entries and four mobile/converter observations omitted from that snapshot.
+[Per-project commands](../upstream/README.md) and the
+[catalog](../upstream/catalog.json) separate review-ready material, design
+questions, missing evidence, superseded fixes and excluded local work.
+These are preparation states; nothing has been submitted to a third-party
+upstream.
+
+Independent review corrected a protocol luminance overflow in the Mutter
+kit and moved teardown cleanup into the first commit that needs it. The
+[fresh receipt](../evidence/upstream-saved-review.json) records exact source
+trees, builds, tests and inherited limits. Runner's saved rqbit kit also
+received an atomic peer-cleanup race fix with a failing-before regression,
+177 passing upstream tests, formatting and Clippy; its source stays in
+[Runner PR #257](https://github.com/pjunod/runner/pull/257).
+
+Other kits retain their exact upstream bases and scoped evidence. Existing
+gemm proposals receive a validation reply rather than a duplicate patch;
+the old FFmpeg RASL issue is already fixed upstream. The converter's
+normalization observations match its documented default and existing
+`--enable level-restore` option. Private display-management code, physical
+captures and credentials remain outside the submission material.
+
+The owner still reviews and edits descriptions, supplies project account
+tokens and a kernel mail route, and resolves the explicitly held design or
+physical-evidence items. Preparation does not change the installed display
+stack or establish new hardware acceptance.
+
 ## Snapshot — 2026-10-18
 
 **Updated:** 2026-10-18 (America/New_York) · **Current:** frozen ABI368 mapping

@@ -1,0 +1,105 @@
+From 0f7d71aa457c0babdc18641d788edf629cf3a3e0 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 11 Oct 2026 23:26:29 +0000
+Subject: [PATCH 6/7] backends/monitor: Report BT.2100 Night Light support on
+ mode changes
+
+Night Light support was derived only from CRTC gamma LUT and CTM
+support. In BT.2100 the temperature is applied in the renderer's linear
+output conversion instead, which does not depend on either, so a
+monitor in BT.2100 supports Night Light even without them.
+
+Count active BT.2100 monitors as supporting Night Light, and refresh
+the support after applied monitor mode changes, including
+initialization and disabling. Extend the D-Bus test without LUT or CTM
+through VERIFY, PQ and SDR, and check that inactive monitors do not
+report effective target properties.
+
+Link: TBD-MR
+---
+ src/backends/meta-monitor-manager.c | 13 +++++++++++++
+ src/tests/monitor-dbus-tests.c      | 14 ++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/src/backends/meta-monitor-manager.c b/src/backends/meta-monitor-manager.c
+index 820ada1e7..3a9d124ef 100644
+--- a/src/backends/meta-monitor-manager.c
++++ b/src/backends/meta-monitor-manager.c
+@@ -1271,6 +1271,17 @@ update_night_light_supported (MetaMonitorManager *manager)
+         }
+     }
+ 
++  /* BT.2100 applies temperature in the renderer's linear output transform,
++   * independently of the CRTC gamma LUT and CTM capabilities. */
++  for (l = manager->monitors; !night_light_supported && l; l = l->next)
++    {
++      MetaMonitor *monitor = l->data;
++
++      if (meta_monitor_is_active (monitor) &&
++          meta_monitor_get_color_mode (monitor) == META_COLOR_MODE_BT2100)
++        night_light_supported = TRUE;
++    }
++
+   if (priv->night_light_supported == night_light_supported)
+     return;
+ 
+@@ -4320,6 +4331,8 @@ meta_monitor_manager_rebuild (MetaMonitorManager *manager,
+ 
+   meta_monitor_manager_update_monitor_modes (manager, config);
+ 
++  update_night_light_supported (manager);
++
+   ensure_privacy_screen_settings (manager);
+ 
+   if (manager->in_init)
+diff --git a/src/tests/monitor-dbus-tests.c b/src/tests/monitor-dbus-tests.c
+index f1bc7c8eb..a560f429d 100644
+--- a/src/tests/monitor-dbus-tests.c
++++ b/src/tests/monitor-dbus-tests.c
+@@ -417,6 +417,7 @@ meta_test_monitor_target_dbus (void)
+   monitor = meta_monitor_manager_get_monitors (manager)->data;
+   device = meta_color_manager_get_color_device (color_manager, monitor);
+   g_assert_nonnull (device);
++  wait_for_boolean_property (proxy, "NightLightSupported", FALSE);
+   valid = g_variant_parse (G_VARIANT_TYPE_VARDICT,
+     "{'color-mode': <uint32 1>, 'target-peak-luminance': <double 400>, "
+     "'target-min-luminance': <double 0>, 'hdr-gamut-source': <'none'>}",
+@@ -431,11 +432,14 @@ meta_test_monitor_target_dbus (void)
+   g_assert_true (before == meta_monitor_config_manager_get_current (manager->config_manager));
+   g_assert_false (meta_monitor_get_target_override (monitor)->has_peak);
+ 
++  wait_for_boolean_property (proxy, "NightLightSupported", FALSE);
++
+   reply = apply_target_properties (proxy, manager, monitor,
+                                    META_MONITORS_CONFIG_METHOD_TEMPORARY, valid, &error);
+   g_assert_no_error (error);
+   g_assert_nonnull (reply);
+   g_clear_pointer (&reply, g_variant_unref);
++  wait_for_boolean_property (proxy, "NightLightSupported", TRUE);
+   meta_color_device_set_reference_luminance_factor (device, 2.1f);
+   properties = read_target_properties (proxy);
+   g_assert_true (g_variant_lookup (properties, "target-peak-luminance", "d", &peak));
+@@ -509,6 +513,7 @@ meta_test_monitor_target_dbus (void)
+                                    META_MONITORS_CONFIG_METHOD_TEMPORARY, valid, &error);
+   g_assert_no_error (error);
+   g_assert_false (meta_monitor_get_target_override (monitor)->has_peak);
++  wait_for_boolean_property (proxy, "NightLightSupported", FALSE);
+   g_assert_false (meta_monitor_get_target_override (monitor)->has_min);
+   g_assert_cmpint (meta_monitor_get_target_override (monitor)->gamut_source, ==,
+                    META_HDR_GAMUT_SOURCE_AUTO);
+@@ -516,6 +521,15 @@ meta_test_monitor_target_dbus (void)
+   properties = read_target_properties (proxy);
+   assert_effective_target (properties, device);
+   g_assert_null (g_variant_lookup_value (properties, "target-peak-luminance", NULL));
++
++  /* An inactive color device must not advertise an effective target. */
++  g_assert_true (meta_monitor_manager_apply_monitors_config (
++                   manager, NULL, META_MONITORS_CONFIG_METHOD_TEMPORARY, &error));
++  g_assert_no_error (error);
++  g_clear_pointer (&properties, g_variant_unref);
++  properties = read_target_properties (proxy);
++  g_assert_null (g_variant_lookup_value (properties, "target-luminance", NULL));
++  g_assert_null (g_variant_lookup_value (properties, "target-primaries", NULL));
+ }
+ 
+ static void

@@ -1,0 +1,75 @@
+{
+  "repository": "torvalds/linux",
+  "source_url": "https://github.com/torvalds/linux.git",
+  "target_branch": "master",
+  "base": "65ba8f34ec886ec72b2c07ddc8cf3d815c32869d",
+  "venue": "email",
+  "current_upstream_checked": "2026-10-28",
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-tested-reply",
+      "inventory_ids": [
+        "LNX-1"
+      ],
+      "title": "DisplayID luminance: qualification report for the posted series",
+      "type": "tested-reply",
+      "status": "needs-human-hardware-evidence",
+      "blockers": [
+        "Fresh hardware scope/reproduction and latest-thread verification are not established."
+      ],
+      "patches": [],
+      "tests": []
+    },
+    {
+      "id": "02",
+      "slug": "02-luminance-validation",
+      "inventory_ids": [
+        "LNX-2"
+      ],
+      "title": "drm/edid: validate DisplayID luminance limits and test EDID updates",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [
+        "Confirm latest original-thread Message-ID and owner DCO/mail setup before email delivery."
+      ],
+      "patches": [
+        "prerequisites/0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch",
+        "prerequisites/0002-drm-i915-display-accept-a-luminance-range-from-any-s.patch",
+        "02-luminance-validation/0003-drm-edid-validate-DisplayID-2.0-luminance-limits.patch",
+        "02-luminance-validation/0004-drm-tests-add-KUnit-tests-for-DisplayID-2.0-luminanc.patch"
+      ],
+      "tests": [
+        {
+          "command": "make ARCH=x86_64 O=../b-x86 W=1 <affected objects>; kunit.py run --kunitconfig=drivers/gpu/drm/tests --build_dir=../b-dmn --jobs=8 drm_displayid_luminance",
+          "result": "new 2026-10-28: affected objects build; 4 KUnit tests pass",
+          "evidence": "evidence.json"
+        }
+      ],
+      "candidate_tree": "464087238de05a9f34b4e8d759aec82e3af0fc93",
+      "prerequisite_patches": [
+        "prerequisites/0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch",
+        "prerequisites/0002-drm-i915-display-accept-a-luminance-range-from-any-s.patch"
+      ],
+      "outgoing_patches": [
+        "02-luminance-validation/0003-drm-edid-validate-DisplayID-2.0-luminance-limits.patch",
+        "02-luminance-validation/0004-drm-tests-add-KUnit-tests-for-DisplayID-2.0-luminanc.patch"
+      ]
+    },
+    {
+      "id": "03",
+      "slug": "03-vrr-psr-report",
+      "inventory_ids": [
+        "LNX-3"
+      ],
+      "title": "i915: VRR page flip loses PSR set-context latency on display 13/14",
+      "type": "issue",
+      "status": "needs-human-hardware-evidence",
+      "blockers": [
+        "Fresh hardware scope/reproduction and latest-thread verification are not established."
+      ],
+      "patches": [],
+      "tests": []
+    }
+  ]
+}

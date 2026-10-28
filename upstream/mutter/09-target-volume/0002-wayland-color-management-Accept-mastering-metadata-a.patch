@@ -1,0 +1,563 @@
+From e6cd9dd6015997c060af8a7fff72b1fbb8523640 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 20:11:39 -0400
+Subject: [PATCH 2/3] wayland/color-management: Accept mastering metadata and light
+ levels
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+set_mastering_display_primaries and set_mastering_luminance raised
+unsupported_feature, and set_max_cll and set_max_fall were ignored.
+Accept all four, validate them as the protocol requires, store them as
+the color state's target volume, and advertise
+feature.set_mastering_display_primaries and
+feature.extended_target_volume.
+
+Protocol errors, as documented by
+wp_image_description_creator_params_v1:
+
+ - Each of the four requests raises already_set when repeated.
+ - set_mastering_luminance raises invalid_luminance unless the maximum
+   is greater than the minimum, compared exactly in the protocol's
+   units (max_lum * 10000 against min_lum).
+ - create raises invalid_luminance when MaxFALL exceeds MaxCLL, and,
+   for version 1 objects only, when MaxCLL or MaxFALL is not greater
+   than the minimum or exceeds the maximum of the target luminance
+   range (the mastering luminance if set, else the primary volume's).
+
+A MaxCLL or MaxFALL of 0 means unknown in CTA-861-H, which the protocol
+references. It counts as set but declares nothing and takes part in no
+comparison, so content passing through an unknown level is not
+disconnected.
+
+Target volumes beyond the primary volume are supported as declared,
+and extended_target_volume is advertised: target primaries are stored
+and take part in identity, but no gamut is mapped with them, and the
+target luminance only bounds the effective peak, so a target exceeding
+the primary volume cannot cause artifacts. In particular:
+
+ - Mastering display primaries go through the same checks as encoding
+   primaries, and nothing more: coordinates within [-16, 16] and
+   stored exactly (the conversion is now one helper for both
+   requests), and a usable colorimetry by
+   clutter_colorimetry_get_linear_bt2020_matrices(); anything else
+   fails the image description with the 'unsupported' cause. They may
+   lie outside the encoding primaries: DCI-P3, which most HDR10
+   metadata declares, has its red primary just outside BT.2020.
+ - The mastering luminance may exceed the primary volume's luminance
+   range: HDR10 commonly declares a 0.0001 cd/m² minimum for PQ. The
+   effective peak is bounded by both.
+ - Reference white may exceed the primary volume's maximum luminance:
+   set_luminances documents reaching it as requiring
+   extended_target_volume. It raised invalid_luminance citing the
+   missing feature, which no protocol version documents as an error;
+   now that the feature is advertised it is accepted. The
+   reference-white scaling of color transforms handles a reference
+   above the maximum.
+
+The values reach the color state through
+clutter_color_state_params_new_with_target_volume(), in the units of
+the encoding luminances (cd/m², as the protocol gives both). For an
+image description created this way, the description record's target
+luminance and primaries are now the declared target volume rather
+than the encoding's, so the declaration takes part in record identity
+as well as in color state equality.
+
+Link: TBD-MR
+---
+ src/wayland/meta-wayland-color-management.c | 357 ++++++++++++++++----
+ 1 file changed, 299 insertions(+), 58 deletions(-)
+
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index 92ae6992a..6c4b950dd 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -30,6 +30,7 @@
+ 
+ #include "backends/meta-color-device.h"
+ #include "backends/meta-color-manager.h"
++#include "clutter/clutter-color-state-params-private.h"
+ #include "clutter/clutter-color-utils-private.h"
+ #include "compositor/meta-surface-actor-wayland.h"
+ #include "wayland/meta-wayland-client-private.h"
+@@ -167,6 +168,12 @@ typedef struct _MetaWaylandCreatorParams
+   gboolean is_eotf_set;
+   gboolean is_luminance_set;
+ 
++  /* The declared target color volume; MaxCLL and MaxFALL of 0 mean unknown
++   * (CTA-861-H) and leave them undeclared, but still count as set. */
++  ClutterColorTargetVolume target_volume;
++  gboolean is_max_cll_set;
++  gboolean is_max_fall_set;
++
+   /* Set when the parameters are well-formed but cannot be supported; the
+    * created image description then fails with the 'unsupported' cause. */
+   const char *unsupported_reason;
+@@ -468,15 +475,40 @@ description_record_get (MetaWaylandDescriptionIds      *ids,
+                         const MetaColorTargetPrimaries *target_primaries)
+ {
+   const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
+-  MetaWaylandDescriptionRecord lookup = {
+-    .color_state = color_state,
+-    .target_minimum = meta_color_luminance_to_uint32 ((target ? target->minimum : encoding->min) * 10000.0f),
+-    .target_maximum = meta_color_luminance_to_uint32 (target ? target->maximum : encoding->max),
+-  };
++  const ClutterColorTargetVolume *target_volume = NULL;
++  float target_minimum = encoding->min;
++  float target_maximum = encoding->max;
++  MetaWaylandDescriptionRecord lookup = { .color_state = color_state };
+   MetaWaylandDescriptionRecord *record;
+   MetaColorTargetPrimaries fallback;
+ 
+-  if (!target_primaries && CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
++  /* Without an output target, the target is the content's declared target
++   * volume, or else the encoding's primary volume. */
++  if (CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
++    target_volume =
++      clutter_color_state_params_get_target_volume (CLUTTER_COLOR_STATE_PARAMS (color_state));
++
++  if (target)
++    {
++      target_minimum = target->minimum;
++      target_maximum = target->maximum;
++    }
++  else if (target_volume && target_volume->has_luminance)
++    {
++      target_minimum = target_volume->min_lum;
++      target_maximum = target_volume->max_lum;
++    }
++  /* Scaled in single precision, so published minimums keep their values. */
++  lookup.target_minimum = meta_color_luminance_to_uint32 (target_minimum * 10000.0f);
++  lookup.target_maximum = meta_color_luminance_to_uint32 (target_maximum);
++
++  if (!target_primaries && target_volume && target_volume->has_primaries)
++    {
++      meta_color_target_primaries_init (&fallback, NULL, FALSE,
++                                        &target_volume->primaries);
++      target_primaries = &fallback;
++    }
++  else if (!target_primaries && CLUTTER_IS_COLOR_STATE_PARAMS (color_state))
+     {
+       const ClutterColorimetry *colorimetry =
+         clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
+@@ -1501,11 +1533,20 @@ creator_params_destructor (struct wl_resource *resource)
+  * imaginary. Whether they are supported is decided by the renderer's own
+  * matrices, computed by the same function that builds the color transform, so
+  * acceptance and rendering cannot disagree about supported colorimetry.
++ *
++ * Mastering display primaries are validated the same way. They may lie
++ * outside the primary color volume (extended_target_volume is advertised):
++ * they are kept and take part in identity, but no gamut is mapped with them,
++ * so a target beyond the primary volume cannot cause artifacts. Likewise the
++ * mastering luminance may exceed the primary volume's range; only the smaller
++ * of the two bounds the content.
+  */
+ static gboolean
+ creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
+                                 GError                   **error)
+ {
++  const ClutterColorTargetVolume *target_volume = &creator_params->target_volume;
++
+   if (creator_params->unsupported_reason)
+     {
+       g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+@@ -1534,9 +1575,113 @@ creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
+         return FALSE;
+     }
+ 
++  if (target_volume->has_primaries)
++    {
++      ClutterColorimetry target_colorimetry = {
++        .type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES,
++        .primaries = (ClutterPrimaries *) &target_volume->primaries,
++      };
++
++      if (!clutter_colorimetry_get_linear_bt2020_matrices (&target_colorimetry,
++                                                           NULL, NULL,
++                                                           error))
++        {
++          g_prefix_error_literal (error, "Mastering display primaries: ");
++          return FALSE;
++        }
++    }
++
+   return TRUE;
+ }
+ 
++/*
++ * The luminance range of the target color volume: the mastering luminance if
++ * set, otherwise that of the primary color volume.
++ */
++static void
++creator_params_get_target_luminance (MetaWaylandCreatorParams *creator_params,
++                                     float                    *min_lum,
++                                     float                    *max_lum)
++{
++  const ClutterColorTargetVolume *target_volume = &creator_params->target_volume;
++  const ClutterLuminance *lum;
++  gboolean is_pq;
++
++  if (target_volume->has_luminance)
++    {
++      *min_lum = target_volume->min_lum;
++      *max_lum = target_volume->max_lum;
++      return;
++    }
++
++  is_pq = creator_params->eotf.type == CLUTTER_EOTF_TYPE_NAMED &&
++          creator_params->eotf.tf_name == CLUTTER_TRANSFER_FUNCTION_PQ;
++
++  if (creator_params->is_luminance_set)
++    {
++      lum = &creator_params->lum;
++      *min_lum = lum->min;
++      *max_lum = is_pq ? lum->min + 10000.0f : lum->max;
++    }
++  else
++    {
++      lum = clutter_eotf_get_default_luminance (creator_params->eotf);
++      *min_lum = lum->min;
++      *max_lum = lum->max;
++    }
++}
++
++/*
++ * Protocol errors of the create request for the content light levels. A
++ * level of 0 is unknown and takes part in no comparison.
++ */
++static gboolean
++creator_params_check_light_levels (MetaWaylandCreatorParams  *creator_params,
++                                   const char               **message)
++{
++  const ClutterColorTargetVolume *target_volume = &creator_params->target_volume;
++  float max_cll = target_volume->max_cll;
++  float max_fall = target_volume->max_fall;
++  float min_lum, max_lum;
++
++  if (max_cll > 0.0f && max_fall > max_cll)
++    {
++      *message = "max_fall must be less than or equal to max_cll";
++      return FALSE;
++    }
++
++  /* Version 1 also bounds them by the target luminance range. */
++  if (wl_resource_get_version (creator_params->resource) >= 2)
++    return TRUE;
++
++  creator_params_get_target_luminance (creator_params, &min_lum, &max_lum);
++
++  if (max_cll > 0.0f && (max_cll <= min_lum || max_cll > max_lum))
++    {
++      *message = "max_cll must lie within the mastering luminance range";
++      return FALSE;
++    }
++
++  if (max_fall > 0.0f && (max_fall <= min_lum || max_fall > max_lum))
++    {
++      *message = "max_fall must lie within the mastering luminance range";
++      return FALSE;
++    }
++
++  return TRUE;
++}
++
++static gboolean
++creator_params_has_target_volume (MetaWaylandCreatorParams *creator_params)
++{
++  const ClutterColorTargetVolume *target_volume = &creator_params->target_volume;
++
++  return target_volume->has_primaries ||
++         target_volume->has_luminance ||
++         target_volume->max_cll > 0.0f ||
++         target_volume->max_fall > 0.0f;
++}
++
+ static void
+ creator_params_create (struct wl_client   *client,
+                        struct wl_resource *resource,
+@@ -1550,6 +1695,7 @@ creator_params_create (struct wl_client   *client,
+   g_autoptr (ClutterColorState) color_state = NULL;
+   g_autoptr (MetaWaylandImageDescription) image_desc = NULL;
+   g_autoptr (GError) error = NULL;
++  const char *message;
+ 
+   if (!creator_params->is_colorimetry_set || !creator_params->is_eotf_set)
+     {
+@@ -1559,6 +1705,14 @@ creator_params_create (struct wl_client   *client,
+       return;
+     }
+ 
++  if (!creator_params_check_light_levels (creator_params, &message))
++    {
++      wl_resource_post_error (resource,
++                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_INVALID_LUMINANCE,
++                              "%s", message);
++      return;
++    }
++
+   image_desc_resource =
+     wl_resource_create (client,
+                         &wp_image_description_v1_interface,
+@@ -1575,6 +1729,15 @@ creator_params_create (struct wl_client   *client,
+                                                         creator_params->colorimetry,
+                                                         creator_params->eotf,
+                                                         creator_params->lum);
++      if (creator_params_has_target_volume (creator_params))
++        {
++          g_autoptr (ClutterColorState) encoding = g_steal_pointer (&color_state);
++
++          color_state =
++            clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (encoding),
++                                                               &creator_params->target_volume);
++        }
++
+       meta_wayland_image_description_set_ready (image_desc,
+                                                 color_state,
+                                                 META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
+@@ -1692,6 +1855,55 @@ creator_params_set_primaries_named (struct wl_client   *client,
+   creator_params->is_colorimetry_set = TRUE;
+ }
+ 
++/*
++ * Converts chromaticity coordinates in the protocol's signed units of
++ * 1/1000000 to @primaries. Returns %NULL if they are stored exactly, otherwise
++ * why they cannot be supported.
++ */
++static const char *
++primaries_from_protocol (const int32_t     requested[8],
++                         ClutterPrimaries *primaries)
++{
++  int32_t published[8];
++  unsigned int i;
++
++  primaries->r_x = meta_color_chromaticity_from_fixed (requested[0]);
++  primaries->r_y = meta_color_chromaticity_from_fixed (requested[1]);
++  primaries->g_x = meta_color_chromaticity_from_fixed (requested[2]);
++  primaries->g_y = meta_color_chromaticity_from_fixed (requested[3]);
++  primaries->b_x = meta_color_chromaticity_from_fixed (requested[4]);
++  primaries->b_y = meta_color_chromaticity_from_fixed (requested[5]);
++  primaries->w_x = meta_color_chromaticity_from_fixed (requested[6]);
++  primaries->w_y = meta_color_chromaticity_from_fixed (requested[7]);
++
++  /* Coordinates are not clamped: an encoding gamut may lie outside the
++   * spectral locus. They are limited to [-16, 16], the range in which every
++   * protocol value is stored exactly by the single precision representation,
++   * so an accepted coordinate always describes the requested space. Beyond
++   * that, exactness would depend on the bit pattern of each value. The exact
++   * round trip is still verified. (Custom primaries within the color state
++   * equality tolerance of sRGB are subsequently stored as named sRGB.) */
++  for (i = 0; i < 8; i++)
++    {
++      if (ABS ((int64_t) requested[i]) > MAX_CHROMATICITY_COORDINATE)
++        return "Chromaticity coordinates must lie within [-16, 16]";
++    }
++
++  if (!meta_color_primaries_to_fixed (primaries, published) ||
++      memcmp (published, requested, sizeof (published)) != 0)
++    return "A chromaticity coordinate cannot be represented exactly";
++
++  return NULL;
++}
++
++static void
++creator_params_set_unsupported (MetaWaylandCreatorParams *creator_params,
++                                const char               *reason)
++{
++  if (reason && !creator_params->unsupported_reason)
++    creator_params->unsupported_reason = reason;
++}
++
+ static void
+ creator_params_set_primaries (struct wl_client   *client,
+                               struct wl_resource *resource,
+@@ -1707,9 +1919,7 @@ creator_params_set_primaries (struct wl_client   *client,
+   MetaWaylandCreatorParams *creator_params =
+     wl_resource_get_user_data (resource);
+   const int32_t requested[8] = { r_x, r_y, g_x, g_y, b_x, b_y, w_x, w_y };
+-  int32_t published[8];
+   ClutterPrimaries *primaries;
+-  unsigned int i;
+ 
+   if (creator_params->is_colorimetry_set)
+     {
+@@ -1720,38 +1930,8 @@ creator_params_set_primaries (struct wl_client   *client,
+     }
+ 
+   primaries = g_new0 (ClutterPrimaries, 1);
+-  primaries->r_x = meta_color_chromaticity_from_fixed (r_x);
+-  primaries->r_y = meta_color_chromaticity_from_fixed (r_y);
+-  primaries->g_x = meta_color_chromaticity_from_fixed (g_x);
+-  primaries->g_y = meta_color_chromaticity_from_fixed (g_y);
+-  primaries->b_x = meta_color_chromaticity_from_fixed (b_x);
+-  primaries->b_y = meta_color_chromaticity_from_fixed (b_y);
+-  primaries->w_x = meta_color_chromaticity_from_fixed (w_x);
+-  primaries->w_y = meta_color_chromaticity_from_fixed (w_y);
+-
+-  /* Coordinates are not clamped: an encoding gamut may lie outside the
+-   * spectral locus. They are limited to [-16, 16], the range in which every
+-   * protocol value is stored exactly by the single precision representation,
+-   * so an accepted coordinate always describes the requested space. Beyond
+-   * that, exactness would depend on the bit pattern of each value. The exact
+-   * round trip is still verified. (Custom primaries within the color state
+-   * equality tolerance of sRGB are subsequently stored as named sRGB.) */
+-  for (i = 0; i < G_N_ELEMENTS (requested); i++)
+-    {
+-      if (ABS ((int64_t) requested[i]) > MAX_CHROMATICITY_COORDINATE)
+-        {
+-          creator_params->unsupported_reason =
+-            "Chromaticity coordinates must lie within [-16, 16]";
+-        }
+-    }
+-
+-  if (!creator_params->unsupported_reason &&
+-      (!meta_color_primaries_to_fixed (primaries, published) ||
+-       memcmp (published, requested, sizeof (published)) != 0))
+-    {
+-      creator_params->unsupported_reason =
+-        "A chromaticity coordinate cannot be represented exactly";
+-    }
++  creator_params_set_unsupported (creator_params,
++                                  primaries_from_protocol (requested, primaries));
+ 
+   creator_params->colorimetry.type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES;
+   creator_params->colorimetry.primaries = primaries;
+@@ -1797,14 +1977,7 @@ creator_params_set_luminance (struct wl_client   *client,
+       return;
+     }
+ 
+-  if (ref > max)
+-    {
+-      wl_resource_post_error (resource,
+-                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_INVALID_LUMINANCE,
+-                              "The reference luminance is bigger than the maximum luminance, "
+-                              "extended target volume unsupported");
+-      return;
+-    }
++  /* With extended_target_volume, reference white may exceed max_lum. */
+ 
+   creator_params->lum.type = CLUTTER_LUMINANCE_TYPE_EXPLICIT;
+   creator_params->lum.min = min;
+@@ -1825,9 +1998,25 @@ creator_params_set_mastering_display_primaries (struct wl_client   *client,
+                                                 int32_t             w_x,
+                                                 int32_t             w_y)
+ {
+-  wl_resource_post_error (resource,
+-                          WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE,
+-                          "Setting mastering display primaries is not supported");
++  MetaWaylandCreatorParams *creator_params =
++    wl_resource_get_user_data (resource);
++  ClutterColorTargetVolume *target_volume = &creator_params->target_volume;
++  const int32_t requested[8] = { r_x, r_y, g_x, g_y, b_x, b_y, w_x, w_y };
++
++  if (target_volume->has_primaries)
++    {
++      wl_resource_post_error (resource,
++                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_ALREADY_SET,
++                              "The mastering display primaries were already set");
++      return;
++    }
++
++  /* Validated like the encoding primaries; whether they are usable is
++   * decided when creating. They may exceed the primary color volume. */
++  creator_params_set_unsupported (creator_params,
++                                  primaries_from_protocol (requested,
++                                                           &target_volume->primaries));
++  target_volume->has_primaries = TRUE;
+ }
+ 
+ static void
+@@ -1836,9 +2025,31 @@ creator_params_set_mastering_luminance (struct wl_client   *client,
+                                         uint32_t            min_lum,
+                                         uint32_t            max_lum)
+ {
+-  wl_resource_post_error (resource,
+-                          WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_UNSUPPORTED_FEATURE,
+-                          "Setting mastering display luminances is not supported");
++  MetaWaylandCreatorParams *creator_params =
++    wl_resource_get_user_data (resource);
++  ClutterColorTargetVolume *target_volume = &creator_params->target_volume;
++
++  if (target_volume->has_luminance)
++    {
++      wl_resource_post_error (resource,
++                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_ALREADY_SET,
++                              "The mastering luminance was already set");
++      return;
++    }
++
++  /* min_lum is in units of 1/10000 cd/m², max_lum in cd/m². */
++  if ((uint64_t) max_lum * 10000 <= min_lum)
++    {
++      wl_resource_post_error (resource,
++                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_INVALID_LUMINANCE,
++                              "The maximum mastering luminance must be greater "
++                              "than the minimum mastering luminance");
++      return;
++    }
++
++  target_volume->min_lum = scaled_uint32_to_float (min_lum);
++  target_volume->max_lum = (float) max_lum;
++  target_volume->has_luminance = TRUE;
+ }
+ 
+ static void
+@@ -1846,8 +2057,20 @@ creator_params_set_max_cll (struct wl_client   *client,
+                             struct wl_resource *resource,
+                             uint32_t            max_cll)
+ {
+-  /* ignoring for now */
+-  /* FIXME: technically we must send errors in some cases */
++  MetaWaylandCreatorParams *creator_params =
++    wl_resource_get_user_data (resource);
++
++  if (creator_params->is_max_cll_set)
++    {
++      wl_resource_post_error (resource,
++                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_ALREADY_SET,
++                              "The maximum content light level was already set");
++      return;
++    }
++
++  /* CTA-861-H: 0 means unknown, which leaves it undeclared. */
++  creator_params->target_volume.max_cll = (float) max_cll;
++  creator_params->is_max_cll_set = TRUE;
+ }
+ 
+ static void
+@@ -1855,8 +2078,20 @@ creator_params_set_max_fall (struct wl_client   *client,
+                              struct wl_resource *resource,
+                              uint32_t            max_fall)
+ {
+-  /* ignoring for now */
+-  /* FIXME: technically we must send errors in some cases */
++  MetaWaylandCreatorParams *creator_params =
++    wl_resource_get_user_data (resource);
++
++  if (creator_params->is_max_fall_set)
++    {
++      wl_resource_post_error (resource,
++                              WP_IMAGE_DESCRIPTION_CREATOR_PARAMS_V1_ERROR_ALREADY_SET,
++                              "The maximum frame-average light level was already set");
++      return;
++    }
++
++  /* CTA-861-H: 0 means unknown, which leaves it undeclared. */
++  creator_params->target_volume.max_fall = (float) max_fall;
++  creator_params->is_max_fall_set = TRUE;
+ }
+ 
+ static const struct wp_image_description_creator_params_v1_interface
+@@ -2151,6 +2386,12 @@ color_manager_send_supported_events (struct wl_resource *resource)
+                                               WP_COLOR_MANAGER_V1_FEATURE_SET_TF_POWER);
+   wp_color_manager_v1_send_supported_feature (resource,
+                                               WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES);
++  wp_color_manager_v1_send_supported_feature (resource,
++                                              WP_COLOR_MANAGER_V1_FEATURE_SET_MASTERING_DISPLAY_PRIMARIES);
++  /* Target volumes are only used for their peak luminance, never to map
++   * gamut, so one exceeding the primary volume is supported as declared. */
++  wp_color_manager_v1_send_supported_feature (resource,
++                                              WP_COLOR_MANAGER_V1_FEATURE_EXTENDED_TARGET_VOLUME);
+   wp_color_manager_v1_send_supported_tf_named (resource,
+                                                WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22);
+   wp_color_manager_v1_send_supported_tf_named (resource,

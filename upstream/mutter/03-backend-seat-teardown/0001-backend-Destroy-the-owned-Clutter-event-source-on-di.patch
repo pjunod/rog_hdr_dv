@@ -1,0 +1,54 @@
+From 83b1c5e7c296303d4b98467797863ef9146905cf Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Mon, 12 Oct 2026 21:45:02 +0000
+Subject: [PATCH 1/2] backend: Destroy the owned Clutter event source on
+ dispose
+
+init_clutter() attaches the Clutter event source to the main context
+and drops its reference, so the source outlives the backend and can
+dispatch events into a disposed backend if the main context keeps
+running, as it does when startup is cancelled or a test tears the
+backend down.
+
+Keep the reference and destroy the source when the backend is
+disposed.
+
+Link: TBD-MR
+---
+ src/backends/meta-backend.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/src/backends/meta-backend.c b/src/backends/meta-backend.c
+index e6571aef9..6f0daa3d2 100644
+--- a/src/backends/meta-backend.c
++++ b/src/backends/meta-backend.c
+@@ -167,6 +167,7 @@ struct _MetaBackendPrivate
+ #endif
+ 
+   ClutterContext *clutter_context;
++  GSource *clutter_source;
+   ClutterSeat *default_seat;
+   ClutterActor *stage;
+ 
+@@ -223,6 +224,12 @@ meta_backend_dispose (GObject *object)
+   MetaBackend *backend = META_BACKEND (object);
+   MetaBackendPrivate *priv = meta_backend_get_instance_private (backend);
+ 
++  if (priv->clutter_source)
++    {
++      g_source_destroy (priv->clutter_source);
++      g_clear_pointer (&priv->clutter_source, g_source_unref);
++    }
++
+   g_clear_pointer (&priv->cursor_tracker, meta_cursor_tracker_destroy);
+   g_clear_object (&priv->current_device);
+   g_clear_object (&priv->monitor_manager);
+@@ -1212,7 +1219,7 @@ init_clutter (MetaBackend  *backend,
+   backend_source = (MetaBackendSource *) source;
+   backend_source->backend = backend;
+   g_source_attach (source, main_context);
+-  g_source_unref (source);
++  priv->clutter_source = source;
+ 
+   return TRUE;
+ }

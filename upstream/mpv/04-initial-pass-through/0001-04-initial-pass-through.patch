@@ -1,0 +1,71 @@
+From 66ed56b27892e42877583bf1960beb0959e055d4 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:12:50 -0400
+Subject: [PATCH] vulkan/context: start Wayland swapchains pass-through
+
+A Wayland surface can have only one wp_color_management_surface_v1. When
+mpv describes the surface itself (set_color() on waylandvk), it switches
+the swapchain to VK_COLOR_SPACE_PASS_THROUGH_EXT and has libplacebo
+destroy the retired swapchain at once, because the driver may hold a
+colour surface for it. That is not enough on NVIDIA 615: its WSI creates
+a colour surface for an sRGB swapchain and keeps it after the swapchain
+is destroyed. The first swapchain is sRGB until the first video frame
+gives a hint, so with --idle --force-window, or any window shown before
+the video, mpv's own get_surface then fails with "surface already
+requested", the compositor ends the connection (VK_ERROR_SURFACE_LOST_KHR,
+"Error occurred on the display fd") and mpv quits.
+
+Hint pass-through as soon as the swapchain exists, so the first one is
+already pass-through and the only description is mpv's. Until mpv sets
+one, the surface has none, which the compositor treats as sRGB, as it
+treated the driver's sRGB swapchain.
+
+Runtime toggling of target-colorspace-hint still requires separate validation.
+---
+ video/out/vulkan/context.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/video/out/vulkan/context.c b/video/out/vulkan/context.c
+index 892396f7d..5f696d312 100644
+--- a/video/out/vulkan/context.c
++++ b/video/out/vulkan/context.c
+@@ -500,6 +500,19 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
+ 
+ }
+ 
++static bool is_waylandvk(struct ra_swapchain *sw)
++{
++    return strcmp(sw->ctx->fns->name, "waylandvk") == 0;
++}
++
++// Whether set_color() describes the Wayland surface itself, on a
++// VK_COLOR_SPACE_PASS_THROUGH_EXT swapchain.
++static bool owns_wayland_color(struct ra_swapchain *sw)
++{
++    struct priv *p = sw->priv;
++    return PL_API_VER >= 361 && p->params.set_color && is_waylandvk(sw);
++}
++
+ bool ra_vk_ctx_init(struct ra_ctx *ctx, struct mpvk_ctx *vk,
+                     struct ra_ctx_params params,
+                     VkPresentModeKHR preferred_mode)
+@@ -538,6 +551,10 @@ bool ra_vk_ctx_init(struct ra_ctx *ctx, struct mpvk_ctx *vk,
+     if (!vk->swapchain)
+         goto error;
+ 
++    // Start without a driver-owned Wayland colour-management surface.
++    if (owns_wayland_color(sw))
++        pl_swapchain_colorspace_hint(vk->swapchain, &(struct pl_color_space){0});
++
+     return true;
+ 
+ error:
+@@ -632,7 +649,7 @@ static bool set_color(struct ra_swapchain *sw, struct mp_image_params *params)
+     struct priv *p = sw->priv;
+ 
+     // Vulkan Wayland needs special handling to avoid duplicated color surface.
+-    bool waylandvk = strcmp(sw->ctx->fns->name, "waylandvk") == 0;
++    bool waylandvk = is_waylandvk(sw);
+     if (p->params.set_color) {
+         if (waylandvk && params) {
+           // Request VK_COLOR_SPACE_PASS_THROUGH_EXT, and also force immediate
