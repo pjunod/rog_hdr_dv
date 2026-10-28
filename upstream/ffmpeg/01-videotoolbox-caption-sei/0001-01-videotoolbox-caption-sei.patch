@@ -1,0 +1,167 @@
+From 0012dcc5818027a640485f4ea953d409f57a1031 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:12:51 -0400
+Subject: [PATCH] avcodec/videotoolboxenc: count RBSP bytes in SEI payloads
+
+SEI payload lengths count RBSP bytes, not emulation-prevention bytes in
+the encoded NAL. Skip those inserted bytes when locating payload
+boundaries, and locate the trailing byte without rewriting existing
+messages.
+
+This is a current-base source proposal. A VideoToolbox H.264 encode
+carrying A/53 captions and a FATE regression remain unrun; the
+alternative of removing SEI merging also needs maintainer discussion.
+---
+ libavcodec/videotoolboxenc.c | 103 +++++++++++++++++++++++------------
+ 1 file changed, 68 insertions(+), 35 deletions(-)
+
+diff --git a/libavcodec/videotoolboxenc.c b/libavcodec/videotoolboxenc.c
+index d01a091728..ad7b3e7c7c 100644
+--- a/libavcodec/videotoolboxenc.c
++++ b/libavcodec/videotoolboxenc.c
+@@ -1851,62 +1851,87 @@ static int is_post_sei_nal_type(int nal_type){
+            nal_type != H264_NAL_AUD;
+ }
+ 
+-/*
+- * Finds the sei message start/size of type find_sei_type.
+- * If more than one of that type exists, the last one is returned.
+- */
++/* SEI payload sizes count RBSP bytes, not the encoded emulation-prevention
++ * bytes. Keep the encoded cursor so insertion preserves the existing NAL. */
++static int read_sei_byte(uint8_t **data, size_t *size, unsigned *zeros)
++{
++    int byte;
++
++    if (!*size)
++        return AVERROR_INVALIDDATA;
++    byte = *(*data)++;
++    (*size)--;
++    if (*zeros == 2) {
++        if (byte == 3) {
++            if (!*size || **data > 3)
++                return AVERROR_INVALIDDATA;
++            byte = *(*data)++;
++            (*size)--;
++            *zeros = 0;
++        } else if (byte <= 2) {
++            return AVERROR_INVALIDDATA;
++        }
++    }
++    *zeros = byte == 0 ? *zeros + 1 : 0;
++    return byte;
++}
++
++/* Locate the trailing byte without rewriting any existing encoded SEI. */
+ static int find_sei_end(AVCodecContext *avctx,
+                         uint8_t        *nal_data,
+                         size_t          nal_size,
+                         uint8_t       **sei_end)
+ {
+-    int nal_type;
+-    size_t sei_payload_size = 0;
+     uint8_t *nal_start = nal_data;
++    unsigned zeros = 0;
++    int byte;
+     *sei_end = NULL;
+ 
+     if (!nal_size)
+         return 0;
+-
+-    nal_type = *nal_data & 0x1F;
+-    if (nal_type != H264_NAL_SEI)
++    if ((*nal_data & 0x1F) != H264_NAL_SEI)
+         return 0;
+-
++    if (nal_size < 2 || nal_size > INT_MAX)
++        return AVERROR_INVALIDDATA;
+     nal_data++;
+     nal_size--;
+ 
+-    if (nal_data[nal_size - 1] == 0x80)
+-        nal_size--;
+-
+-    while (nal_size > 0 && *nal_data > 0) {
+-        do{
+-            nal_data++;
+-            nal_size--;
+-        } while (nal_size > 0 && *nal_data == 0xFF);
++    for (;;) {
++        size_t sei_payload_size = 0;
+ 
+-        if (!nal_size) {
+-            av_log(avctx, AV_LOG_ERROR, "Unexpected end of SEI NAL Unit parsing type.\n");
+-            return AVERROR_INVALIDDATA;
++        if (nal_size == 1 && *nal_data == 0x80) {
++            *sei_end = nal_data;
++            return nal_data - nal_start + 1;
+         }
++        /* payloadType may be zero and may contain extension bytes. */
++        do {
++            byte = read_sei_byte(&nal_data, &nal_size, &zeros);
++            if (byte < 0) {
++                av_log(avctx, AV_LOG_ERROR, "Unexpected end of SEI NAL Unit parsing type.\n");
++                return AVERROR_INVALIDDATA;
++            }
++        } while (byte == 0xFF);
+ 
+-        do{
+-            sei_payload_size += *nal_data;
+-            nal_data++;
+-            nal_size--;
+-        } while (nal_size > 0 && *nal_data == 0xFF);
++        do {
++            byte = read_sei_byte(&nal_data, &nal_size, &zeros);
++            if (byte < 0 || sei_payload_size > SIZE_MAX - byte) {
++                av_log(avctx, AV_LOG_ERROR, "Unexpected end of SEI NAL Unit parsing size.\n");
++                return AVERROR_INVALIDDATA;
++            }
++            sei_payload_size += byte;
++        } while (byte == 0xFF);
+ 
+-        if (nal_size < sei_payload_size) {
++        /* At least the trailing byte must remain after the payload. */
++        if (sei_payload_size >= nal_size) {
+             av_log(avctx, AV_LOG_ERROR, "Unexpected end of SEI NAL Unit parsing size.\n");
+             return AVERROR_INVALIDDATA;
+         }
+-
+-        nal_data += sei_payload_size;
+-        nal_size -= sei_payload_size;
++        while (sei_payload_size) {
++            if (read_sei_byte(&nal_data, &nal_size, &zeros) < 0)
++                return AVERROR_INVALIDDATA;
++            sei_payload_size--;
++        }
+     }
+-
+-    *sei_end = nal_data;
+-
+-    return nal_data - nal_start + 1;
+ }
+ 
+ /**
+@@ -2161,14 +2186,22 @@ static int copy_replace_length_codes(
+             int old_sei_length;
+             int extra_bytes;
+             uint8_t *new_sei;
++            size_t sei_capacity;
+             old_sei_length = find_sei_end(avctx, dst_box, box_len, &new_sei);
+             if (old_sei_length < 0)
+                 return old_sei_length;
+ 
++            if (!new_sei || new_sei < dst_box || new_sei >= dst_box + box_len)
++                return AVERROR_INVALIDDATA;
++            /* Capacity starts at the insertion cursor, after the start code
++             * and existing encoded SEI. Reserve the new RBSP trailing byte. */
++            sei_capacity = remaining_dst_size - (new_sei - dst_data);
++            if (sei_capacity <= 1)
++                return AVERROR_BUFFER_TOO_SMALL;
+             wrote_bytes = write_sei(sei,
+                                     SEI_TYPE_USER_DATA_REGISTERED_ITU_T_T35,
+                                     new_sei,
+-                                    remaining_dst_size - old_sei_length);
++                                    sei_capacity - 1);
+             if (wrote_bytes < 0)
+                 return wrote_bytes;
+ 

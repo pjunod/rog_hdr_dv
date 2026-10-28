@@ -1,8 +1,8 @@
-From e3fc5e5ada577c5f04a9ccdc9a195c50117a1b5a Mon Sep 17 00:00:00 2001
+From ed33b487732da6f1a277a642543579389d7d78f9 Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Fri, 9 Oct 2026 00:36:26 -0400
-Subject: [PATCH 01/11] backends/color: Separate the native target luminance
- from the encoding
+Subject: [PATCH 01/10] backends/color: Separate the native target luminance from the
+ encoding
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -37,15 +37,23 @@ target_luminance, and are re-sent when it changes.
 meson.build now also probes for the luminance API.
 
 Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
+
+Saturate protocol luminance conversions before the integer cast: values
+near UINT32_MAX can round upward to 2^32 in single precision.
+
+Release the color manager during compositor teardown while its display,
+outputs and backend still exist, and destroy its global on disposal.
 ---
  meson.build                                 |  12 +-
  src/backends/edid-parse.c                   |  92 +++++
  src/backends/edid.h                         |  13 +
- src/backends/meta-color-device.c            | 118 +++++-
- src/backends/meta-color-device.h            |  27 ++
+ src/backends/meta-color-device.c            | 131 +++++-
+ src/backends/meta-color-device.h            |  30 ++
  src/backends/meta-color-manager.c           |  19 +
- src/wayland/meta-wayland-color-management.c | 397 ++++++++++++++------
- 7 files changed, 561 insertions(+), 117 deletions(-)
+ src/wayland/meta-wayland-color-management.c | 423 ++++++++++++++------
+ src/wayland/meta-wayland-color-management.h |   2 +
+ src/wayland/meta-wayland.c                  |   1 +
+ 9 files changed, 598 insertions(+), 125 deletions(-)
 
 diff --git a/meson.build b/meson.build
 index b2013a83b..123edb6e5 100644
@@ -224,7 +232,7 @@ index 96583b8b6..9a3b1ce06 100644
  
  META_EXPORT_TEST
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 2006fddcd..79230ad93 100644
+index 2006fddcd..9231bd561 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -23,6 +23,7 @@
@@ -414,8 +422,25 @@ index 2006fddcd..79230ad93 100644
  }
  
  void
+@@ -1663,3 +1771,16 @@ meta_color_device_set_calibration_lut (MetaColorDevice    *color_device,
+ {
+   meta_monitor_set_gamma_lut (color_device->monitor, lut);
+ }
++
++/* Protocol values may round upward when stored in single precision, notably
++ * UINT32_MAX to 2^32. Clamp in double before converting back to uint32_t.
++ * Non-positive and NaN values serialize as zero; positive overflow saturates.
++ */
++uint32_t
++meta_color_luminance_to_uint32 (double value)
++{
++  if (!(value > 0.0))
++    return 0;
++
++  return (uint32_t) MIN (value, (double) G_MAXUINT32);
++}
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 4288508e8..222bb741e 100644
+index 4288508e8..6509cfdff 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -21,6 +21,8 @@
@@ -459,6 +484,13 @@ index 4288508e8..222bb741e 100644
  MetaColorDevice * meta_color_device_new (MetaColorManager *color_manager,
                                           MetaMonitor      *monitor);
  
+@@ -80,3 +107,6 @@ size_t meta_color_device_get_calibration_lut_size (MetaColorDevice *color_device
+
+ void meta_color_device_set_calibration_lut (MetaColorDevice    *color_device,
+                                             const MetaGammaLut *lut);
++
++META_EXPORT_TEST
++uint32_t meta_color_luminance_to_uint32 (double value);
 diff --git a/src/backends/meta-color-manager.c b/src/backends/meta-color-manager.c
 index 6962ce0aa..be0e2a026 100644
 --- a/src/backends/meta-color-manager.c
@@ -511,7 +543,7 @@ index 6962ce0aa..be0e2a026 100644
      g_signal_new ("ready",
                    G_TYPE_FROM_CLASS (klass),
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 555881369..efaa9dcaf 100644
+index 555881369..1efefa380 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -37,7 +37,17 @@
@@ -533,12 +565,13 @@ index 555881369..efaa9dcaf 100644
  
  struct _MetaWaylandColorManager
  {
-@@ -46,12 +56,10 @@ struct _MetaWaylandColorManager
+@@ -46,12 +56,11 @@ struct _MetaWaylandColorManager
    MetaWaylandCompositor *compositor;
  
    gulong color_state_changed_handler_id;
 +  gulong target_volume_changed_handler_id;
 +  MetaWaylandDescriptionIds *ids;
++  struct wl_global *global;
  
 -  struct
 -  {
@@ -549,7 +582,7 @@ index 555881369..efaa9dcaf 100644
  
    /* struct wl_resource */
    GList *resources;
-@@ -85,6 +93,7 @@ typedef struct _MetaWaylandColorManagementOutput
+@@ -85,6 +94,7 @@ typedef struct _MetaWaylandColorManagementOutput
    GList *resources;
    MetaWaylandOutput *output;
    gulong output_destroyed_handler_id;
@@ -557,7 +590,7 @@ index 555881369..efaa9dcaf 100644
  } MetaWaylandColorManagementOutput;
  
  typedef struct _MetaWaylandColorManagementSurface
-@@ -98,7 +107,7 @@ typedef struct _MetaWaylandColorManagementSurface
+@@ -98,7 +108,7 @@ typedef struct _MetaWaylandColorManagementSurface
    MetaWaylandSurface *surface;
    gulong surface_destroyed_handler_id;
    gulong surface_main_monitor_handler_id;
@@ -566,7 +599,7 @@ index 555881369..efaa9dcaf 100644
  } MetaWaylandColorManagementSurface;
  
  typedef enum _MetaWaylandImageDescriptionState
-@@ -122,9 +131,20 @@ typedef struct _MetaWaylandImageDescription
+@@ -122,9 +132,20 @@ typedef struct _MetaWaylandImageDescription
    struct wl_resource *resource;
    MetaWaylandImageDescriptionState state;
    gboolean has_info;
@@ -588,7 +621,7 @@ index 555881369..efaa9dcaf 100644
  typedef struct _MetaWaylandCreatorParams
  {
    MetaWaylandColorManager *color_manager;
-@@ -151,6 +171,9 @@ typedef struct _MetaWaylandCreatorIcc
+@@ -151,6 +172,9 @@ typedef struct _MetaWaylandCreatorIcc
  } MetaWaylandCreatorIcc;
  
  static void meta_wayland_color_management_surface_free (MetaWaylandColorManagementSurface *cm_surface);
@@ -598,7 +631,16 @@ index 555881369..efaa9dcaf 100644
  
  static void meta_wayland_color_management_output_free (MetaWaylandColorManagementOutput *cm_output);
  
-@@ -352,6 +375,148 @@ get_output_color_state (MetaWaylandColorManager *color_manager,
+@@ -202,7 +226,7 @@ scaled_uint32_to_float (uint32_t value)
+ static uint32_t
+ float_to_scaled_uint32 (float value)
+ {
+-  return (uint32_t) (value * 10000);
++  return meta_color_luminance_to_uint32 (value * 10000.0f);
+ }
+
+ static gboolean
+@@ -352,6 +376,147 @@ get_output_color_state (MetaWaylandColorManager *color_manager,
    return color_state;
  }
  
@@ -673,9 +715,8 @@ index 555881369..efaa9dcaf 100644
 +  const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
 +  MetaWaylandDescriptionRecord lookup = {
 +    .color_state = color_state,
-+    .target_minimum = (uint32_t) MIN ((double) (target ? target->minimum : encoding->min) * 10000,
-+                                     G_MAXUINT32),
-+    .target_maximum = (uint32_t) (target ? target->maximum : encoding->max),
++    .target_minimum = meta_color_luminance_to_uint32 ((double) (target ? target->minimum : encoding->min) * 10000),
++    .target_maximum = meta_color_luminance_to_uint32 (target ? target->maximum : encoding->max),
 +  };
 +  MetaWaylandDescriptionRecord *record;
 +  MetaWaylandDescriptionIds *ids = color_manager->ids;
@@ -854,13 +895,17 @@ index 555881369..efaa9dcaf 100644
  static void
  image_description_destructor (struct wl_resource *resource)
  {
-@@ -604,19 +733,23 @@ send_information_from_params (struct wl_resource *info_resource,
+@@ -602,21 +731,25 @@ send_information_from_params (struct wl_resource *info_resource,
+   lum = clutter_color_state_params_get_luminance (color_state_params);
+   wp_image_description_info_v1_send_luminances (info_resource,
                                                  float_to_scaled_uint32 (lum->min),
-                                                 (uint32_t) lum->max,
-                                                 (uint32_t) lum->ref);
+-                                                (uint32_t) lum->max,
+-                                                (uint32_t) lum->ref);
 -  wp_image_description_info_v1_send_target_luminance (info_resource,
 -                                                      float_to_scaled_uint32 (lum->min),
 -                                                      (uint32_t) lum->max);
++                                                meta_color_luminance_to_uint32 (lum->max),
++                                                meta_color_luminance_to_uint32 (lum->ref));
  }
  
  static void
@@ -1099,8 +1144,11 @@ index 555881369..efaa9dcaf 100644
      }
  }
  
-@@ -1973,11 +2121,33 @@ meta_wayland_color_manager_dispose (GObject *object)
+@@ -1971,13 +2119,36 @@ meta_wayland_color_manager_dispose (GObject *object)
+   MetaWaylandColorManager *color_manager = META_WAYLAND_COLOR_MANAGER (object);
+   MetaColorManager *meta_color_manager = get_meta_color_manager (color_manager);
  
++  g_clear_pointer (&color_manager->global, wl_global_destroy);
    g_clear_signal_handler (&color_manager->color_state_changed_handler_id,
                            meta_color_manager);
 +  g_clear_signal_handler (&color_manager->target_volume_changed_handler_id,
@@ -1134,7 +1182,7 @@ index 555881369..efaa9dcaf 100644
  
    G_OBJECT_CLASS (meta_wayland_color_manager_parent_class)->dispose (object);
  }
-@@ -1988,7 +2158,11 @@ meta_wayland_color_manager_init (MetaWaylandColorManager *color_manager)
+@@ -1988,7 +2159,11 @@ meta_wayland_color_manager_init (MetaWaylandColorManager *color_manager)
    color_manager->outputs = g_hash_table_new (NULL, NULL);
    color_manager->surfaces = g_hash_table_new (NULL, NULL);
  
@@ -1147,7 +1195,7 @@ index 555881369..efaa9dcaf 100644
  }
  
  static void
-@@ -1998,7 +2172,6 @@ meta_wayland_color_manager_class_init (MetaWaylandColorManagerClass *klass)
+@@ -1998,7 +2173,6 @@ meta_wayland_color_manager_class_init (MetaWaylandColorManagerClass *klass)
  
    object_class->dispose = meta_wayland_color_manager_dispose;
  
@@ -1155,7 +1203,7 @@ index 555881369..efaa9dcaf 100644
  }
  
  static MetaWaylandColorManager *
-@@ -2009,12 +2182,18 @@ meta_wayland_color_manager_new (MetaWaylandCompositor *compositor)
+@@ -2009,12 +2183,18 @@ meta_wayland_color_manager_new (MetaWaylandCompositor *compositor)
  
    color_manager = g_object_new (META_TYPE_WAYLAND_COLOR_MANAGER, NULL);
    color_manager->compositor = compositor;
@@ -1174,3 +1222,54 @@ index 555881369..efaa9dcaf 100644
  
    return color_manager;
  }
+@@ -2026,14 +2206,23 @@ meta_wayland_init_color_management (MetaWaylandCompositor *compositor)
+
+   color_manager = meta_wayland_color_manager_new (compositor);
+
+-  if (wl_global_create (compositor->wayland_display,
+-                        &wp_color_manager_v1_interface,
+-                        META_WP_COLOR_MANAGEMENT_VERSION,
+-                        color_manager,
+-                        color_management_bind) == NULL)
++  color_manager->global = wl_global_create (compositor->wayland_display,
++                                            &wp_color_manager_v1_interface,
++                                            META_WP_COLOR_MANAGEMENT_VERSION,
++                                            color_manager,
++                                            color_management_bind);
++  if (!color_manager->global)
+     g_error ("Failed to register a global wp_color_management object");
+
+   g_object_set_data_full (G_OBJECT (compositor), "-meta-wayland-color-manager",
+                           g_steal_pointer (&color_manager),
+                           g_object_unref);
+ }
++
++void
++meta_wayland_finalize_color_management (MetaWaylandCompositor *compositor)
++{
++  /* Release records and disconnect output/surface handlers while the display,
++   * outputs and backend still exist, rather than during parent GObject finalize. */
++  g_object_set_data (G_OBJECT (compositor), "-meta-wayland-color-manager", NULL);
++}
+diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
+index 07cbbf2ff..f4ea11796 100644
+--- a/src/wayland/meta-wayland-color-management.h
++++ b/src/wayland/meta-wayland-color-management.h
+@@ -23,3 +23,5 @@
+ #include "wayland/meta-wayland-types.h"
+
+ void meta_wayland_init_color_management (MetaWaylandCompositor *compositor);
++
++void meta_wayland_finalize_color_management (MetaWaylandCompositor *compositor);
+diff --git a/src/wayland/meta-wayland.c b/src/wayland/meta-wayland.c
+index e5b82c0b5..fc4b0e453 100644
+--- a/src/wayland/meta-wayland.c
++++ b/src/wayland/meta-wayland.c
+@@ -811,6 +811,7 @@ meta_wayland_compositor_finalize (GObject *object)
+   MetaBackend *backend = meta_context_get_backend (compositor->context);
+   ClutterActor *stage = meta_backend_get_stage (backend);
+
++  meta_wayland_finalize_color_management (compositor);
+   meta_wayland_xdg_foreign_finalize (compositor);
+   meta_wayland_xdg_session_management_finalize (compositor);
+   meta_wayland_activation_finalize (compositor);

@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "project": "linux",
+  "checked": "2026-10-28",
+  "source_and_log_receipts": {
+    "revisions": {
+      "prep/20261028~4": {
+        "commit": "65ba8f34ec886ec72b2c07ddc8cf3d815c32869d",
+        "tree": "a776cc51ebd4091803760e0b46e6a70339b10b60"
+      },
+      "prep/20261028~1": {
+        "commit": "aaec876a818961f2c212c1c70dbd7dbde454c7a0",
+        "tree": "ec956699c09ac1a274b7ae84eef1754747252305"
+      },
+      "prep/20261028": {
+        "commit": "d50550f25ca663c3b63dddfa70e700cbb8d2df79",
+        "tree": "464087238de05a9f34b4e8d759aec82e3af0fc93"
+      }
+    },
+    "logs": {
+      "current.log": {
+        "bytes": 9139,
+        "sha256": "26ae38bf2ae3b1794d7d322f3b714bbead70bf3ae81678d995136f24abf44419"
+      },
+      "kunit2.log": {
+        "bytes": 4269,
+        "sha256": "da0119944d593dccad5b10c642369f542d539c9c3c5b19649ba8b0d1b0903883"
+      },
+      "checkpatch-final.log": {
+        "bytes": 551,
+        "sha256": "d5dae8ca6d983b3bc6b055789fea7c4a1c3ef957d2dbbd83be7f47909418a41f"
+      }
+    }
+  },
+  "qualification": {
+    "new": "2026-10-28: both follow-up commits compile affected x86_64 objects with W=1; final focused UML KUnit 4/4 passes. Validation checkpatch 0/0; tests checkpatch 0 errors/1 new-file MAINTAINERS advisory. SPDX dependency failures were resolved with task-local ply/GitPython and narrow rerun.",
+    "inherited": "2026-10-27 drm-misc-next broader suite675/675; Cristian-only negative control1pass/3fail. No new hardware run.",
+    "compiler": "gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+    "limits": [
+      "Email delivery needs a verified latest-thread Message-ID and owner DCO/mail setup.",
+      "No fresh VRR/PSR hardware reproduction, physical brightness qualification, or kernel installation."
+    ]
+  },
+  "log_storage": "Task-owned Linux builder slot ~/work/upstream-prep/linux",
+  "patches": {
+    "02-luminance-validation/0003-drm-edid-validate-DisplayID-2.0-luminance-limits.patch": "1144f56b58e9b7140f841bcde01f2e09f4c62d6695815365cfa58be0be0cb1fa",
+    "02-luminance-validation/0004-drm-tests-add-KUnit-tests-for-DisplayID-2.0-luminanc.patch": "ba98e5f8199937dc08bd182700ace588ad9928f03113c52532b783485590e526",
+    "prerequisites/0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch": "5f4f867ca4e5b67bb6a3b7e4d4f0571f6fe5f9d9deef83b512e59309a861a479",
+    "prerequisites/0002-drm-i915-display-accept-a-luminance-range-from-any-s.patch": "8bf99036ed61a998f7e4404b98715e3c5330d19c917a6734b8fcabbd8c52eebb"
+  },
+  "new_source_application": {
+    "02": {
+      "tree": "464087238de05a9f34b4e8d759aec82e3af0fc93",
+      "unsigned": true,
+      "result": "PASS"
+    }
+  },
+  "new_unsigned_mail_preparation": {
+    "base": "65ba8f34ec886ec72b2c07ddc8cf3d815c32869d",
+    "candidate_tree": "464087238de05a9f34b4e8d759aec82e3af0fc93",
+    "thread": "20260802170647.206880-1-cristian.laspina@kernel.srl",
+    "dco_added_by_explicit_prepare": false,
+    "mail_sent": false,
+    "recipients": [
+      "airlied@gmail.com",
+      "dri-devel@lists.freedesktop.org",
+      "linux-kernel@vger.kernel.org",
+      "maarten.lankhorst@linux.intel.com",
+      "mripard@kernel.org",
+      "simona@ffwll.ch",
+      "tzimmermann@suse.de"
+    ],
+    "patches": {
+      "0000-cover-letter.patch": "742558a5225f69aa76aaa198333929a289dfb79af7aa649972c513802dbd815e",
+      "0001-drm-edid-validate-DisplayID-2.0-luminance-limits.patch": "a92ab78f95210716ad441c0e754ec2d515707a5ef4aa54d4e332a9b65909a9cc",
+      "0002-drm-tests-add-KUnit-tests-for-DisplayID-2.0-luminanc.patch": "068a17556a84467ebcdbde750879d267d8f57cacd959745ace581e3aea6f1c8e"
+    },
+    "log": {
+      "name": "linux-mail-dryrun.log",
+      "bytes": 1158,
+      "sha256": "6bfb040fc8d0528302e428d621b77644f42cfee92af9998a3ce2e3a87fed5209"
+    }
+  },
+  "helper_tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_upstream_linux_prepare.py'",
+    "result": "12 passed; Git/network operations fully mocked; no actual sign-off or mail send. Covers shallow public clone, shared cached clone, explicit committer and sender identity, disabled GPG signing, unsigned range, third-party author refusal, thread validation and source-tree identity.",
+    "source": "tests/test_upstream_linux_prepare.py",
+    "helper_sha256": "fcc5b52cc19de6bc1915fd88bc8f29dc4ec2ee9ed054fa04e2e7dbce8a62714c"
+  }
+}

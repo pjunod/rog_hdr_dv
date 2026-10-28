@@ -12,7 +12,7 @@ Two teardown fixes found while testing cancelled startup and colour manager shut
 Neither has a dedicated test in this MR; the test that showed them (a cancelled-startup case in
 a colour lifecycle test) depends on test infrastructure that is not part of this MR.
 
-## How it was tested
+## Inherited validation (2026-10-27)
 
 On lab5 (Ubuntu 26.10 container: GCC 15.3, meson 1.10.1, GLib 2.90, GTK 4.24.1, Mesa 26.2.4
 llvmpipe), on `main` b48811767 with the stacked units below this one, against libdisplay-info
@@ -35,4 +35,4 @@ jobs) and any test on real hardware with this exact series.
 
 ## AI assistance
 
-Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code). I reviewed the changes and take responsibility for them.
+Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code).

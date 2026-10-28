@@ -1,0 +1,29 @@
+{
+  "repository": "quietvoid/bitvec_helpers",
+  "target_branch": "main",
+  "base": "cb698c8364ec72a02cb78b3e45fbcad92b220809",
+  "venue": "github",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-exp-golomb-overflow",
+      "inventory_ids": [
+        "BV-1"
+      ],
+      "title": "reader: bound Exp-Golomb codes and preserve integer precision",
+      "patches": [
+        "01-exp-golomb-overflow/0001-01-exp-golomb-overflow.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "cargo test; cargo test --all-features; cargo test --no-default-features --features bitstream-io",
+          "result": "default8/allfeatures16/bitstream-only8passed;3defaultand9combinednewregressionsfailoriginalupstream",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    }
+  ]
+}

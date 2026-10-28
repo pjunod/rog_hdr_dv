@@ -18,7 +18,7 @@ every commit).
 | NN | Commit | Depends on | Status | Notes |
 |---|---|---|---|---|
 | 01 | displayid2: bound section padding scans to the remaining payload | - | ready | Applies alone. ASan out-of-bounds read fix plus test. Best first MR. |
-| 02 | displayid2: parse Display Interface Features data block | 01 (test/meson.build context) | ready (opened as a **draft** MR) | Overlaps open MR !210 (Sean Paul), same block. DESCRIPTION.md offers it as review input or an alternative and explains the differences. Decided 2026-10-27 by Claude, for Paul to look over: `submit.sh` opens it as a draft so the code is visible, and Paul links it from a short comment on !210 rather than presenting a competing MR. Units 03-06 build on it. |
+| 02 | displayid2: parse Display Interface Features data block | 01 (test/meson.build context) | ready for a **draft** MR | Overlaps open MR !210 (Sean Paul), same block. DESCRIPTION.md offers it as review input or an alternative and explains the differences. Decided 2026-10-27 by Claude, for Paul to look over: `submit.sh` opens it as a draft so the code is visible, and Paul links it from a short comment on !210 rather than presenting a competing MR. Units 03-06 build on it. |
 | 03 | displayid2: reject unsupported nested CTA headers | 02 (context only) | ready | Builds on merged !202 and !212. |
 | 04 | edid: expose structured extension parsing failures | 03 | ready | New public API (`di_edid_has_extension_failures()`); asks for a design nod. |
 | 05 | displayid2: expose native luminance from Display Parameters | 04 | ready | Uses the data block plumbing of 02. Asks whether one Display Parameters struct is preferred. |
@@ -31,7 +31,7 @@ generic data block plumbing).
 
 Mutter depends on 02 to 06 being released (libdisplay-info 0.5): see `../mutter/README.md`.
 
-## Verification (2026-10-27, cloud container)
+## Inherited verification (2026-10-27, cloud container)
 
 For each commit, stacked in order on the base, in the four `.gitlab-ci.yml` configurations:
 
@@ -52,14 +52,15 @@ the Mutter builds.
 One command per unit, from this directory:
 
     ./submit.sh 01            # or: ./submit.sh all (units in order, up to the first not marked ready)
-    ./submit.sh 01 --dry-run  # everything except fork, push and MR
+    ./submit.sh 01 --dry-run  # unsigned application preview; no remote changes
 
 It clones upstream into `~/.cache/upstream-submit/` (override with `UPSTREAM_SUBMIT_DIR`), puts
 the unit (and any unit it is stacked on that is not merged yet) on a fresh branch of current
-`main` with `git am --signoff`, stops with a clear message if it no longer applies, creates
+`main` with `git am --signoff` during real submission, stops with a clear message if it no longer applies, creates
 Paul's fork if it is missing, pushes the branch `ldi-NN-slug` and opens the MR with
-`DESCRIPTION.md` (title from its first line). Running it again force-pushes the branch and
-updates the existing MR. `--draft` opens it as a draft.
+`DESCRIPTION.md` (title from its first line). Running it again updates an open MR only when the remote tip matches the
+last tip recorded as published by this cache; the push also uses a lease. An
+unexpected remote tip or closed MR refuses; a merged MR returns its URL. `--draft` opens it as a draft.
 
 Before the first run:
 
@@ -69,8 +70,31 @@ Before the first run:
 - Put a personal access token with the `api` and `write_repository` scopes in
   `~/.config/upstream/gitlab.freedesktop.org.token` (mode 600).
 - Read each DESCRIPTION.md: they are written in Paul's voice and end with the AI-assistance
-  statement ("I reviewed the changes and take responsibility for them"), which is his to make.
+  disclosure. Review and edit the text yourself before submitting; it makes no
+  claim that human review has already occurred.
 
 `submit.sh` was tested with `--dry-run` for every unit and for `all` (the resulting tree equals
-the verified stack, and every commit gets exactly one `Signed-off-by: Paul Junod`). The real
+the verified stack, and preview commits stay unsigned; the real submission path adds the sign-off). The real
 fork, push and MR path has not been run.
+
+## Preparation review (2026-10-28)
+
+The upstream head still equals the recorded base. The compilation table above
+is inherited evidence from 2026-10-27. The unchanged final six-unit stack
+was freshly built with `-Dwerror=true` and passed 80/80 tests in the isolated
+Ubuntu 26.10 image used for the Mutter correction. This repeats only the
+werror configuration on the final stack; the analyzer, sanitizer, per-unit and
+generated-data results above remain inherited. See
+[the fresh preparation receipt](../../evidence/upstream-saved-review.json). The shared submitter has
+network-free integration coverage in
+[`tests/test_upstream_gitlab_submit.py`](../../tests/test_upstream_gitlab_submit.py):
+real Git application, unsigned previews, stacked links, cache preservation,
+lease pushes, HTTP failures and issue previews. Its real API path is simulated;
+no upstream submission has occurred. Existing caches from the earlier script
+are unowned and refused. Choose a new `UPSTREAM_SUBMIT_DIR`; do not discard
+source, ignored files or unfinished work in an old cache.
+
+A real submission also requires upstream `main` to equal the qualified base
+above. A clean apply on a newer tree can be previewed, but that tree must be
+rebuilt and tested before updating the pin and sending it. Prior generated
+local branch tips are retained under `refs/upstream-submit/archive/`.

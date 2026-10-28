@@ -1,0 +1,112 @@
+From c9f18619c3f5a67e1d2bc32f29bedcf4ea85591c Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:42:02 -0400
+Subject: [PATCH] fix(hiqlite-wal): restore the purge boundary for a single WAL
+ file
+
+On startup the writer restores a missing `last_purged_log_id` from the
+first retained log, but only if that log lives in a WAL file with
+`wal_no > 1`. If there is a single WAL file numbered 1 whose first
+entry is far above index 2 (the log was purged before it got here, e.g.
+by installing a snapshot), the boundary is never restored, so OpenRaft
+sees no purged logs while the oldest retained one is, say, 10000.
+
+The `id_from > 2` check already tells a fresh log from a purged one, so
+drop the file number condition.
+
+The new test appends a single entry with index 10000 to an empty WAL,
+shuts the writer down and checks that after the restart the metadata
+holds a purge boundary of 9999.
+---
+ hiqlite-wal/src/writer.rs | 71 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 70 insertions(+), 1 deletion(-)
+
+diff --git a/hiqlite-wal/src/writer.rs b/hiqlite-wal/src/writer.rs
+index 58a41f6..e932e09 100644
+--- a/hiqlite-wal/src/writer.rs
++++ b/hiqlite-wal/src/writer.rs
+@@ -104,9 +104,12 @@ pub fn spawn(
+     // TODO remove with version > 0.14
+     // This is a fix for a bug from previous versions. Can be removed in later ones,
+     // it would be safe to do probably around version >= 0.13.
++    //
++    // The first retained log index is what shows that earlier logs were purged, not the WAL file
++    // number: after a snapshot install the only WAL file can be number 1 and still start far
++    // above index 2. Without `last_purged_log_id`, OpenRaft would then look for logs below it.
+     if meta.read()?.last_purged_log_id.is_none()
+         && let Some(front) = set.files.front_mut()
+-        && front.wal_no > 1
+         && front.id_from > 2
+     {
+         warn!("Trying to fix bad LogState for `last_purged_logid`");
+@@ -567,4 +570,70 @@ mod tests {
+         }
+         false
+     }
++
++    #[test]
++    fn missing_purge_boundary_is_restored_for_a_single_wal_file() {
++        // A snapshot install can leave the first retained entry far above index 0 while
++        // the only WAL file still has number 1.
++        let base = "test_data/purge_boundary_single_file".to_string();
++        let _ = std::fs::remove_dir_all(&base);
++        std::fs::create_dir_all(&base).unwrap();
++
++        let start = |base: &str| {
++            let lockfile = LockFile::create(base).unwrap();
++            lockfile.lock().unwrap();
++            let meta = Arc::new(RwLock::new(Metadata::read_or_create(base).unwrap()));
++            let (tx, _wal) = spawn(
++                base.to_string(),
++                lockfile,
++                LogSync::Immediate,
++                64 * 1024,
++                false,
++                meta.clone(),
++            )
++            .unwrap();
++            (tx, meta)
++        };
++        let stop = |tx: flume::Sender<Action>| {
++            let (ack_tx, ack_rx) = oneshot::channel();
++            tx.send(Action::Shutdown(ack_tx)).unwrap();
++            ack_rx.blocking_recv().unwrap();
++        };
++
++        let (tx, meta) = start(&base);
++        let first = LogId {
++            leader_id: LeaderId {
++                term: 1,
++                node_id: 1_u64,
++            },
++            index: 10_000,
++        };
++        let (ack_tx, ack_rx) = oneshot::channel();
++        let (entry_tx, entry_rx) = flume::bounded(2);
++        tx.send(Action::Append {
++            rx: entry_rx,
++            callback: Box::new(|_| {}),
++            ack: ack_tx,
++        })
++        .unwrap();
++        entry_tx
++            .send(Some((first.index, serialize(&first).unwrap())))
++            .unwrap();
++        entry_tx.send(None).unwrap();
++        ack_rx.blocking_recv().unwrap().unwrap();
++        assert!(meta.read().unwrap().last_purged_log_id.is_none());
++        stop(tx);
++
++        let (tx, meta) = start(&base);
++        let bytes = meta
++            .read()
++            .unwrap()
++            .last_purged_log_id
++            .clone()
++            .expect("the retained index must restore the purge boundary");
++        let restored: LogId<u64> = deserialize(&bytes).unwrap();
++        assert_eq!(restored.index, 9_999);
++        stop(tx);
++        let _ = std::fs::remove_dir_all(&base);
++    }
+ }

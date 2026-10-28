@@ -1,0 +1,94 @@
+{
+  "repository": "mpv-player/mpv",
+  "target_branch": "master",
+  "base": "ad5877edabdb05c0c62aad444722938d37666e2d",
+  "venue": "github",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-unknown-light-levels",
+      "inventory_ids": [
+        "MPV-1"
+      ],
+      "title": "wayland: don't send an unknown MaxCLL or MaxFALL",
+      "patches": [
+        "01-unknown-light-levels/0001-01-unknown-light-levels.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "meson setup -Dlibmpv=true -Dtests=true -Dwayland=enabled -Dvulkan=enabled; meson compile; meson test --print-errorlogs",
+          "result": "current-base Linux x86_64 Wayland/Vulkan build; 17 tests passed per independent unit",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ],
+      "draft": false
+    },
+    {
+      "id": "02",
+      "slug": "02-enhancement-layer-fallback",
+      "inventory_ids": [
+        "MPV-2"
+      ],
+      "title": "demux/dovi_split: split the enhancement layer without the FFmpeg BSF",
+      "patches": [
+        "02-enhancement-layer-fallback/0001-02-enhancement-layer-fallback.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "meson setup -Dlibmpv=true -Dtests=true -Dwayland=enabled -Dvulkan=enabled; meson compile; meson test --print-errorlogs",
+          "result": "current-base Linux x86_64 Wayland/Vulkan build; 17 tests passed per independent unit",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ],
+      "draft": true
+    },
+    {
+      "id": "04",
+      "slug": "04-initial-pass-through",
+      "inventory_ids": [
+        "MPV-4"
+      ],
+      "title": "vulkan/context: start Wayland swapchains pass-through",
+      "patches": [
+        "04-initial-pass-through/0001-04-initial-pass-through.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "meson setup -Dlibmpv=true -Dtests=true -Dwayland=enabled -Dvulkan=enabled; meson compile; meson test --print-errorlogs",
+          "result": "current-base Linux x86_64 Wayland/Vulkan build; 17 tests passed per independent unit",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ],
+      "draft": true
+    },
+    {
+      "id": "05",
+      "slug": "05-film-timeline",
+      "inventory_ids": [
+        "MPV-5"
+      ],
+      "title": "osc: draw a film timeline the application provides",
+      "patches": [
+        "05-film-timeline/0001-05-film-timeline.patch"
+      ],
+      "status": "design-hold",
+      "blockers": [
+        "Maintainer agreement on the embedding interface; propose the design before a merge request"
+      ],
+      "tests": [
+        {
+          "command": "meson compile; meson test --print-errorlogs; luac -p player/lua/osc.lua",
+          "result": "17 passed; Lua 5.2 syntax passed",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    }
+  ]
+}

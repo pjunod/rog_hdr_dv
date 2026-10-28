@@ -1,0 +1,31 @@
+From faa83c44ac247d6cbc75c5965e915560010745f5 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:12:55 -0400
+Subject: [PATCH] builder: use Apple libtool when merging x265 archives on
+ macOS
+
+The macOS archive merge requires Apple libtool. Selecting a different
+libtool from PATH can run the GNU tool with incompatible behavior. Use
+the system tool explicitly when combining the main, main10 and main12
+archives.
+
+A native static-archive fixture bypasses a conflicting PATH command and
+preserves all three component markers. The complete x265 build recipe
+was not rerun.
+---
+ builder/scripts.d/50-x265.sh | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/builder/scripts.d/50-x265.sh b/builder/scripts.d/50-x265.sh
+index f1cb7f5a..4e833a68 100755
+--- a/builder/scripts.d/50-x265.sh
++++ b/builder/scripts.d/50-x265.sh
+@@ -57,7 +57,7 @@ EOF
+         mv libx265.a libx265_main.a
+ 
+         if [[ $TARGET == mac* ]]; then
+-            libtool -static -o libx265.a libx265_main.a libx265_main10.a libx265_main12.a 2>/dev/null
++            /usr/bin/libtool -static -o libx265.a libx265_main.a libx265_main10.a libx265_main12.a 2>/dev/null
+         else
+         ${FFBUILD_CROSS_PREFIX}ar -M <<EOF
+ CREATE libx265.a

@@ -1,0 +1,764 @@
+{
+  "schema_version": 1,
+  "prepared_on": "2026-10-28",
+  "timezone": "America/New_York",
+  "upstream_actions": "No upstream fork, push, pull request, issue, advisory, email or maintainer message was sent.",
+  "human_review": "Pending. No Paul sign-off is stored in exported patches.",
+  "projects": {
+    "bitvec_helpers": {
+      "repository": "quietvoid/bitvec_helpers",
+      "target_branch": "main",
+      "base": "cb698c8364ec72a02cb78b3e45fbcad92b220809",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "BV-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "cargo test; cargo test --all-features; cargo test --no-default-features --features bitstream-io",
+              "result": "default8/allfeatures16/bitstream-only8passed;3defaultand9combinednewregressionsfailoriginalupstream",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/bitvec_helpers/01-exp-golomb-overflow/0001-01-exp-golomb-overflow.patch",
+              "sha256": "0eff675253abce38588c226a8225ec3b12c676f8e1b7f932e4e73cefc121727a"
+            }
+          ],
+          "candidate_commit": "50b9b41b3da6852f26d9472a0dcf587d4c7fbf51",
+          "candidate_tree": "9db08e616386116dc9d127519a8af78ca880a234"
+        }
+      ]
+    },
+    "dovi_tool": {
+      "repository": "quietvoid/dovi_tool",
+      "target_branch": "main",
+      "base": "41dae646193c12de152333ff5dbc33579cb9ef4a",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "DV-5"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "cargo test --manifest-path dolby_vision/Cargo.toml",
+              "result": "10 passed, 0 failed (macOS aarch64, rustc 1.98.0)",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/dovi_tool/01-mixed-mapping-methods/0001-01-mixed-mapping-methods.patch",
+              "sha256": "8cb3e658c6f496ae4abfb94b134f37eeaecd2c374ab11d4929abc69de173a8a9"
+            }
+          ],
+          "candidate_commit": "036f1ba093cc18a715b46fe9668dbdf24df8313a",
+          "candidate_tree": "c2e2be5b3fef785c4646caa2203f8f575712873f"
+        }
+      ]
+    },
+    "gemm": {
+      "repository": "sarah-quinones/gemm",
+      "target_branch": "main",
+      "base": "86102c5b712737978371ac9ef7a11982f686d7bc",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "GM-1"
+          ],
+          "status": "upstream-overlap-hold",
+          "tests": [
+            {
+              "command": "CARGO_PROFILE_DEV_OPT_LEVEL=0 cargo build --target aarch64-unknown-linux-gnu -p gemm-f16; cargo test -p gemm-f16 --lib",
+              "result": "rustc 1.97.1: unmodified baseline fails with 8 fullfp16 assembler errors; fixed build passes; lib test binary succeeds with 0 tests",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            },
+            {
+              "command": "CARGO_PROFILE_DEV_OPT_LEVEL=0 cargo build --target aarch64-unknown-linux-gnu -p gemm-f16 at upstream PR47 head e4a7df8fa20fb155b3fb28563c1dc6b6a81b45ee",
+              "result": "rustc1.97.1 exact third-party PR47 source build passed; no runtime arithmetic test claimed",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [],
+          "candidate_commit": "e4a7df8fa20fb155b3fb28563c1dc6b6a81b45ee",
+          "candidate_tree": "f70096c499635b00df878ab55721c298eca234aa",
+          "target_pr": "https://github.com/sarah-quinones/gemm/pull/47",
+          "target_head": "e4a7df8fa20fb155b3fb28563c1dc6b6a81b45ee"
+        }
+      ]
+    },
+    "ksni": {
+      "repository": "iovxw/ksni",
+      "target_branch": "master",
+      "base": "2397cc2ce535ba4e7ed77fecd94731c5239923e7",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "KS-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "dbus-run-session -- cargo test --lib",
+              "result": "rustc 1.97.1: 38 passed, 0 failed with unchanged GTK dev dependency; new regression fails on unmodified source",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/ksni/01-menu-property-ids/0001-01-menu-property-ids.patch",
+              "sha256": "336215ac0068c26e3730f8ff0dfff34c18c3205fef821bfa398a97e73c505e8f"
+            }
+          ],
+          "candidate_commit": "3917ff7bbfe7018879dba2e70b596c15b9e3ae72",
+          "candidate_tree": "76829752b80e7618451a7a319779dc0afad7ff41"
+        }
+      ]
+    },
+    "hiqlite": {
+      "repository": "sebadob/hiqlite",
+      "target_branch": "main",
+      "base": "493f980562766f0ce5645e015557bc39501f9a5b",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "HQ-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "cargo fmt --check; cargo clippy -- -D warnings; no-S3 test feature suite; 22 feature Clippy configurations",
+              "result": "recovered exact-branch passes from 2026-10-27; not rerun",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/hiqlite/01-duplicate-node-ids/0001-01-duplicate-node-ids.patch",
+              "sha256": "43a393b7fe9ccdc8b8dd77a60138a4aef9891297bf9a145c28d49d11f85aed5e"
+            }
+          ],
+          "candidate_commit": "1d75f6f99223cbc496861ede817ab2dc8eb53a76",
+          "candidate_tree": "0c1783c30784b9f80da3ae19a85fce395dd97a44"
+        },
+        {
+          "id": "02",
+          "inventory_ids": [
+            "HQ-RP"
+          ],
+          "status": "security-hold",
+          "tests": [],
+          "patches": []
+        },
+        {
+          "id": "03",
+          "inventory_ids": [
+            "HQ-8"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "cargo fmt --check; cargo clippy -p hiqlite --features cache,counters,dlock,listen_notify,macros,toml,external-state-machine -- -D warnings; TEST_SKIP_S3_RESTORE=true cargo test -p hiqlite --features cache,counters,dlock,listen_notify,macros,toml,external-state-machine",
+              "result": "rustc 1.97.1: formatting/library Clippy passed; no-S3 upstream unit and cluster suites passed",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/hiqlite/03-snapshot-remote-errors/0001-03-snapshot-remote-errors.patch",
+              "sha256": "14f5dee3651e9bc23a12447cf64e377a329cb85687c6d773c470d6fed6cdb5b0"
+            }
+          ],
+          "candidate_commit": "458aa110b03b4629d61f8e0b976aabdc8908b81e",
+          "candidate_tree": "ea64a8d21cf21e21b5fb205c2844befb58998e87"
+        },
+        {
+          "id": "04",
+          "inventory_ids": [
+            "HQ-17",
+            "HQ-19"
+          ],
+          "status": "design-hold",
+          "tests": [
+            {
+              "command": "cargo check -p hiqlite --no-default-features --features sqlite; cargo check -p hiqlite --no-default-features --features sqlite,s3; cargo test -p hiqlite --lib --no-default-features --features sqlite client_builds_without_a_preinstalled_crypto_provider",
+              "result": "both feature paths passed for the recovered components; exact final tree unchanged after squash; fresh-provider library regression1passed",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/hiqlite/04-optional-s3-provider/0001-04-optional-s3-provider.patch",
+              "sha256": "d9763be0c0c7794f324847b1767b8172bee3a107a2887d31318cf59ea388d0e8"
+            }
+          ],
+          "candidate_commit": "66c9743db123e2e88f53839128a74df19b7e3546",
+          "candidate_tree": "95cbdbd617e5f7a7b492a781e97656d7d8417414"
+        },
+        {
+          "id": "05",
+          "inventory_ids": [
+            "HQ-9"
+          ],
+          "status": "design-hold",
+          "tests": [],
+          "patches": []
+        },
+        {
+          "id": "06",
+          "inventory_ids": [
+            "HQ-10"
+          ],
+          "status": "design-hold",
+          "tests": [],
+          "patches": []
+        },
+        {
+          "id": "07",
+          "inventory_ids": [
+            "HQ-11"
+          ],
+          "status": "design-hold",
+          "tests": [],
+          "patches": []
+        }
+      ]
+    },
+    "hiqlite-wal": {
+      "repository": "sebadob/hiqlite",
+      "target_branch": "main",
+      "base": "493f980562766f0ce5645e015557bc39501f9a5b",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "WAL-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "cargo fmt --check; cargo clippy -p hiqlite-wal --features auto-heal,migration -- -D warnings; cargo test -p hiqlite-wal --features auto-heal,migration",
+              "result": "rustc 1.97.1: formatting and library Clippy passed; 15 upstream tests passed; inherited baseline/fixed purge regression also recovered",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/hiqlite-wal/01-single-file-purge-boundary/0001-01-single-file-purge-boundary.patch",
+              "sha256": "7f232352c5a01b160d9f29d6fc2104f197057babe46c93ddd5a016e6c9b5ed35"
+            }
+          ],
+          "candidate_commit": "c9f18619c3f5a67e1d2bc32f29bedcf4ea85591c",
+          "candidate_tree": "9a52b729d205d4fc5aa0fbfa5ae6e5575b2cadc8"
+        },
+        {
+          "id": "02",
+          "inventory_ids": [
+            "WAL-3"
+          ],
+          "status": "design-hold",
+          "tests": [],
+          "patches": []
+        }
+      ]
+    },
+    "mpv": {
+      "repository": "mpv-player/mpv",
+      "target_branch": "master",
+      "base": "ad5877edabdb05c0c62aad444722938d37666e2d",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "MPV-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "meson setup -Dlibmpv=true -Dtests=true -Dwayland=enabled -Dvulkan=enabled; meson compile; meson test --print-errorlogs",
+              "result": "current-base Linux x86_64 Wayland/Vulkan build; 17 tests passed per independent unit",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/mpv/01-unknown-light-levels/0001-01-unknown-light-levels.patch",
+              "sha256": "969baac22999735c233a80a90458e41381e4b3fd962126c7a8bd32dca9063fa0"
+            }
+          ],
+          "candidate_commit": "754eae787b49c172ec1d064662ef146344167577",
+          "candidate_tree": "36ef2dd2d037513db7e7d17135582e688ad04f41"
+        },
+        {
+          "id": "02",
+          "inventory_ids": [
+            "MPV-2"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "meson setup -Dlibmpv=true -Dtests=true -Dwayland=enabled -Dvulkan=enabled; meson compile; meson test --print-errorlogs",
+              "result": "current-base Linux x86_64 Wayland/Vulkan build; 17 tests passed per independent unit",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/mpv/02-enhancement-layer-fallback/0001-02-enhancement-layer-fallback.patch",
+              "sha256": "1d1e703f831fd652806e4d5ae88386ddd4ec4d10e827a0a1001fd8e800f329b1"
+            }
+          ],
+          "candidate_commit": "069a164060d4407431532cef66627e6b19740f16",
+          "candidate_tree": "068f166c26f180757327817569bf1e8383b94450"
+        },
+        {
+          "id": "04",
+          "inventory_ids": [
+            "MPV-4"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "meson setup -Dlibmpv=true -Dtests=true -Dwayland=enabled -Dvulkan=enabled; meson compile; meson test --print-errorlogs",
+              "result": "current-base Linux x86_64 Wayland/Vulkan build; 17 tests passed per independent unit",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/mpv/04-initial-pass-through/0001-04-initial-pass-through.patch",
+              "sha256": "55eee08f4d99bed40f4b9476acc3350afd62c59e4864c5044e4c29fe29b49b9f"
+            }
+          ],
+          "candidate_commit": "66ed56b27892e42877583bf1960beb0959e055d4",
+          "candidate_tree": "8676b22af11f803cb60f7a24bccef0007c5cc6f8"
+        },
+        {
+          "id": "05",
+          "inventory_ids": [
+            "MPV-5"
+          ],
+          "status": "design-hold",
+          "tests": [
+            {
+              "command": "meson compile; meson test --print-errorlogs; luac -p player/lua/osc.lua",
+              "result": "17 passed; Lua 5.2 syntax passed",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/mpv/05-film-timeline/0001-05-film-timeline.patch",
+              "sha256": "7725e6ace3dec7e21d46788c67f05f4a6110651cd021438e166a4a41ddf99d39"
+            }
+          ],
+          "candidate_commit": "5b7931b813b416ea1aced0f4b5d0d4326e5045f1",
+          "candidate_tree": "6b5886caaac4d6501027f30263ae3c251c80f0d8"
+        }
+      ]
+    },
+    "ffmpeg": {
+      "repository": "FFmpeg/FFmpeg",
+      "target_branch": "master",
+      "base": "16efe6927d850d23766aee15820abedcb1219121",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "FF-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "python3 reproduction/run.py --source owned-FFmpeg --candidate HEAD --baseline 16efe6927d850d23766aee15820abedcb1219121; make libavcodec/videotoolboxenc.o with H264 VideoToolbox enabled",
+              "result": "actual extracted functions: baseline8/21 expectations, candidate21/21 underASan/UBSan; actualnative translationunitcompiled; nofullencode/A53/FATE",
+              "evidence": "01-videotoolbox-caption-sei/reproduction/receipt.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/ffmpeg/01-videotoolbox-caption-sei/0001-01-videotoolbox-caption-sei.patch",
+              "sha256": "d8ad689264983f9cb89cac08e63123b912189e7482068e2a0dccbce30d5e1c01"
+            }
+          ],
+          "candidate_commit": "0012dcc5818027a640485f4ea953d409f57a1031",
+          "candidate_tree": "315e453770b30dbcc62f45627179b3e3f6c859f4"
+        },
+        {
+          "id": "02",
+          "inventory_ids": [
+            "FF-2"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "configure --enable-vulkan --enable-vulkan-static with isolated static Vulkan fixture",
+              "result": "macOS: baseline exit 1; fixed exit 0; official Vulkan headers and real static-library symbol; MoltenVK not exercised",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/ffmpeg/02-static-vulkan-probe/0001-02-static-vulkan-probe.patch",
+              "sha256": "b86f8b192052850fb795750b6a19c0f85085200cb95db19a5ab6ff1de075894b"
+            }
+          ],
+          "candidate_commit": "de192395d11c61b491f70fc145a0bfd47eff03d8",
+          "candidate_tree": "9ff5133f6ba4017044c04183c1f8fa7b27c5db1b"
+        },
+        {
+          "id": "03",
+          "inventory_ids": [
+            "FF-3"
+          ],
+          "status": "superseded",
+          "tests": [
+            {
+              "command": "inspect upstream e5eb7581dd and current decode_slice/hevc_update_thread_context",
+              "result": "source-confirmed exact old seek/RASL/PPS failure addressed; current state copies skipping_frame across workers; no upstream submission needed",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [],
+          "superseded_by": "e5eb7581ddc511a46892b5501b26fb831161b5da"
+        }
+      ]
+    },
+    "jellyfin-ffmpeg": {
+      "repository": "jellyfin/jellyfin-ffmpeg",
+      "target_branch": "jellyfin",
+      "base": "e965dc63b4642af56f1d48b0a8b5d5f103440bfa",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "JF-1"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "quilt queue apply; native Mac filter build; synthetic 128x64 10fps NV12 Metal bwdif send_field/tff/all versus same-source CPU bwdif",
+              "result": "baseline and fixed compile and emit 20 frames; baseline 10 unique hashes, fixed 20; CPU mean absolute byte error drops from 1.9980 to 0.1384 (not bit-exact)",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/jellyfin-ffmpeg/01-bwdif-buffer-index/0001-01-bwdif-buffer-index.patch",
+              "sha256": "2f03b37919a656c6c91e7b71b9f0e4bff1a1d30823b311ad2a661cc5caea3c98"
+            }
+          ],
+          "candidate_commit": "7ef59458a8787d2906f8aa2b8a5876de7ee2701f",
+          "candidate_tree": "d0f404a32c5fe12163df83a92241db1f3c7f9cdd"
+        },
+        {
+          "id": "02",
+          "inventory_ids": [
+            "JF-2"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "quilt queue apply; make libavfilter/vf_tonemap_videotoolbox.o",
+              "result": "baseline and fixed compile on Xcode 27 SDK; render/default-compatibility comparison not run",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/jellyfin-ffmpeg/02-hable-reference-white/0001-02-hable-reference-white.patch",
+              "sha256": "abc405aa42f7dad5b048a82d351b60f755e8833159ad2a305bf2434a05861a2a"
+            }
+          ],
+          "candidate_commit": "5981c0750b4cea23f056435242b96c8905f09182",
+          "candidate_tree": "8792f8d58e5289e786f9215f3661ba809403197b"
+        },
+        {
+          "id": "04",
+          "inventory_ids": [
+            "JF-4"
+          ],
+          "status": "ready-for-human-review",
+          "tests": [
+            {
+              "command": "native Apple libtool merge with conflicting PATH tool and three synthetic static archives",
+              "result": "PATH-selected fixture exits 72; /usr/bin/libtool exits 0 and nm finds all three depth markers; full x265 build not rerun",
+              "evidence": "../../evidence/upstream-cinema/validation.json"
+            }
+          ],
+          "patches": [
+            {
+              "path": "upstream/jellyfin-ffmpeg/04-apple-libtool/0001-04-apple-libtool.patch",
+              "sha256": "bf69c4ca4eaa26d7dcfaa6e91eb6176eb5ee9c4b4577de7ba4c0cd9b36d8bde0"
+            }
+          ],
+          "candidate_commit": "faa83c44ac247d6cbc75c5965e915560010745f5",
+          "candidate_tree": "4094d04b1bb182b45d78398e4ee62872adc8ff3c"
+        },
+        {
+          "id": "03",
+          "inventory_ids": [
+            "JF-3"
+          ],
+          "status": "design-hold",
+          "tests": [],
+          "patches": []
+        }
+      ]
+    },
+    "rpi-ffmpeg": {
+      "repository": "jc-kynesim/rpi-ffmpeg",
+      "target_branch": "test/8.1.2/main",
+      "base": "f60aae17021abae85b1ba9759e8b2da33f723902",
+      "units": [
+        {
+          "id": "01",
+          "inventory_ids": [
+            "PI-1"
+          ],
+          "status": "validation-pending",
+          "tests": [],
+          "patches": []
+        }
+      ]
+    }
+  },
+  "logs": [
+    {
+      "id": "dovi-final.log",
+      "sha256": "3f8b0a23a96ce2b943f8e9fb8f9f40d225b9f6d49d00393c9ba238df26d98fc6",
+      "bytes": 1163,
+      "summary": "new final source, 10 tests passed"
+    },
+    {
+      "id": "dovi_tool-red.log",
+      "sha256": "8e13b26c53e2636cc8faa29b98d2ef334eb42b75d6c4bd463cbcd7bf2a2e7e55",
+      "bytes": 2186,
+      "summary": "new, upstream accepts mixed mapping component and regression fails"
+    },
+    {
+      "id": "gemm-linux-test.log",
+      "sha256": "e8222774d9962ea18a5d31cbf03b29cd2bfec9616c5b7a192cd8d64249fd8e70",
+      "bytes": 4603,
+      "summary": "new rustc1.97.1 aarch64 Linux baseline 8 assembler errors, fixed build passed; library test target contains 0 tests"
+    },
+    {
+      "id": "ksni-full.log",
+      "sha256": "cfc055aae08c75023f0f7deb4cfa725c4af2f47b4a6a2e27322db30966b992c9",
+      "bytes": 3126,
+      "summary": "new rustc1.97.1 unchanged GTK+session-bus library suite38passed"
+    },
+    {
+      "id": "ksni-baseline.log",
+      "sha256": "1666ad5ba6d382c15ee7afe80e3ea4c6c59dc05cd778da20668355934163a743",
+      "bytes": 1162,
+      "summary": "new baseline menu-offset regression fails; initial absent-DBus setup is not a pass"
+    },
+    {
+      "id": "mpv-qualified.log",
+      "sha256": "1fa32f2f72fa2cfe794845df35812f895a53381de52da9901a08caf8105c4262",
+      "bytes": 126671,
+      "summary": "new current-base builds; unit01 failed-fixture retries completed, units02/04/05 each17passed; Lua syntax passed"
+    },
+    {
+      "id": "gate-hq-duplicate-node-id.log",
+      "sha256": "455ffbeb479908570d34fbdc03fbaa077866ee092a9592e4047a6dcb3c0c5f00",
+      "bytes": 1453359,
+      "summary": "inherited exact-branch 2026-10-27 formatting, defaultClippy,22-featureClippy andno-S3suite passed"
+    },
+    {
+      "id": "ab_hq-duplicate-node-id.log",
+      "sha256": "d8f32e8035f063c1c0e08e1ed680d8d23e1034b86a43528b897cb3ff397c0ef1",
+      "bytes": 1590,
+      "summary": "inherited original/fixed regression comparison"
+    },
+    {
+      "id": "ab_wal-purge-boundary.log",
+      "sha256": "312458abf3732ddce07701b9801eb4292c752cf353966811fa203d4be21b58ed",
+      "bytes": 1656,
+      "summary": "inherited original/fixed regression comparison"
+    },
+    {
+      "id": "ab_hq-snapshot-remote-error.log",
+      "sha256": "8ad0e80fb35c818dda181c8cf0e4b204405745a5d010f3208f7ae49002eeee5e",
+      "bytes": 2641,
+      "summary": "inherited original/fixed2regression comparison"
+    },
+    {
+      "id": "wal-final.log",
+      "sha256": "7d5cebd5a0a235c0b102841daeeae81206bd890c8549b27426908865cac2e577",
+      "bytes": 3579,
+      "summary": "new formatting/libraryClippy/15upstreamtests passed with auto-heal,migration"
+    },
+    {
+      "id": "hq-snapshot-final.log",
+      "sha256": "26355df949479fd84074c75a97604044d75698063dfd3e98a510acaabf16b0db",
+      "bytes": 1449458,
+      "summary": "new formatting/libraryClippy,96unit+3other tests and cluster scenarios passed without externalS3"
+    },
+    {
+      "id": "bitvec-red-final.log",
+      "sha256": "6fed84245ce08f1392530189e5924d9cdde8eb8c9a66f908bf7506580fc74425",
+      "bytes": 3177,
+      "summary": "new final5boundaryregressions fail on original upstream"
+    },
+    {
+      "id": "bitvec-default-red.log",
+      "sha256": "34796e037ac6844985ad63c8ef1e5069c80c6aeb0dfdfa4393cb7413bbf654c1",
+      "bytes": 2916,
+      "summary": "originaldefault production3newregressionsfail"
+    },
+    {
+      "id": "hq-s3-core-checks.log",
+      "sha256": "26aa080d5b5d802a474880d016e948be99734ab5ad72d964742caa9a62820a43",
+      "bytes": 1425,
+      "summary": "inherited firstS3component buildsSQLiteonlyandSQLite+S3"
+    },
+    {
+      "id": "hq-s3-provider-checks.log",
+      "sha256": "88be410c6206bbf18e2b55bb8568a78f44154b22e346e30c2971e9738bdf0bd6",
+      "bytes": 70304,
+      "summary": "finalsource tree builds bothfeaturepaths; unqualifiedSQLiteonlyintegrationtargetfails on existing cacheAPIs"
+    },
+    {
+      "id": "hq-s3-provider-test.log",
+      "sha256": "9022be0dda7620b16fba129ab86ac05812fd76a81936099761513db558ef3e15",
+      "bytes": 351,
+      "summary": "focused finalproviderlibraryregression1passed"
+    },
+    {
+      "id": "ffmpeg-public-probe.log",
+      "sha256": "a209d6e45f2dd61b458b8700ef0a7ac50a49c659ef29f913381fd1f71e172b98",
+      "bytes": 170,
+      "summary": "included public verifier actuallyran: originalconfigure1, fixedconfigure0"
+    },
+    {
+      "id": "bitvec-default.log",
+      "sha256": "72f1e156e42f56f1ef65994acd6a15fe775417ea3b5f3c6bbec15574ec729046",
+      "bytes": 1159,
+      "summary": "new default8tests passed"
+    },
+    {
+      "id": "bitvec-final.log",
+      "sha256": "7f0dd01cf6fb0f425cf807ef3992a7efe8dedcafcb21eb4adccc782fca97f831",
+      "bytes": 1873,
+      "summary": "new allfeatures16tests passed; all3publicreaderimplementations"
+    },
+    {
+      "id": "bitvec-bitstream-only.log",
+      "sha256": "4bcacd4f1c998a70f5afa1da04e5042e9ac6274fd1464ae2f08c3ae21a749181",
+      "bytes": 1306,
+      "summary": "new bitstream-only8tests passed"
+    },
+    {
+      "id": "bitvec-all-red.log",
+      "sha256": "5564bd2dbc8b3a3a735b615f86514aa7cc3ccec70215147953f03055bd000b0f",
+      "bytes": 6234,
+      "summary": "original production7passed/9newregressionsfailed"
+    },
+    {
+      "id": "bitvec-dry-final.log",
+      "sha256": "a05128bb1a9123004590fcb844fb229ef205635b0624fa66c9dca0e15b28cec1",
+      "bytes": 268,
+      "summary": "final unsigned sourcepatchapplies on currentbase"
+    },
+    {
+      "id": "gemm-pr47-checks.log",
+      "sha256": "84752c6bc0093dfec3ad2f36336f7ceb1d8b0d694f2ebc2e11245a79813906a1",
+      "bytes": 1704,
+      "summary": "exact existingPR47headgenericAarch64opt0buildpassed"
+    },
+    {
+      "id": "forgejo-tests.log",
+      "sha256": "52fba1a19130481372d5f9081c225f259ae20732a0493242e5d73533dd7dd0c6",
+      "bytes": 107,
+      "summary": "new9transporttests passed"
+    },
+    {
+      "id": "helper-tests.log",
+      "sha256": "80ff7651a33e6549a7480a94640d1d1cce097b212cbf770a31ade657473ad2d3",
+      "bytes": 240,
+      "summary": "new18sharedhelpertests passed"
+    }
+  ],
+  "limitations": [
+    "Scoped builds and tests are not physical HDR, Dolby Vision, colour calibration, resume or upstream acceptance receipts.",
+    "Real publication endpoints and authenticated FFmpeg transport were not exercised; publishing transport validation uses local fixtures.",
+    "External S3, examples and MSRV steps in hiqlite just verify were not run. Extra all-targets Clippy and oversized-entry-error WAL checks expose unchanged upstream baseline errors; they are not counted as passing.",
+    "The hiqlite management-client candidate remains private pending a reporting-route decision.",
+    "FF-3 was already fixed upstream in e5eb7581ddc511a46892b5501b26fb831161b5da; the provisional port is excluded.",
+    "GM-1 is existing upstream work (#47/#39/#43), not a new submission. Exact #47 head was tested; no reply or Tested-by was posted."
+  ],
+  "mac_synthetic_bwdif": {
+    "comparison": {
+      "baseline": {
+        "bytes": 245760,
+        "mean_absolute_error": 1.99803466796875,
+        "maximum_error": 153,
+        "equal_fraction": 0.8177449544270833
+      },
+      "fixed": {
+        "bytes": 245760,
+        "mean_absolute_error": 0.13844401041666668,
+        "maximum_error": 151,
+        "equal_fraction": 0.9253702799479167
+      }
+    },
+    "frames": 20,
+    "source_size": "128x64 NV12 synthetic testsrc2, 10 fps, send_field/tff/all",
+    "baseline_unique_frame_hashes": 10,
+    "fixed_unique_frame_hashes": 20,
+    "scope": "Improves comparison against same-source CPU output; not bit-exact or a general image-quality claim."
+  },
+  "mac_static_vulkan_probe": [
+    {
+      "label": "baseline",
+      "returncode": 1,
+      "command": [
+        "--disable-everything",
+        "--disable-programs",
+        "--disable-doc",
+        "--disable-autodetect",
+        "--disable-x86asm",
+        "--enable-vulkan",
+        "--enable-vulkan-static"
+      ]
+    },
+    {
+      "label": "fixed",
+      "returncode": 0,
+      "command": [
+        "--disable-everything",
+        "--disable-programs",
+        "--disable-doc",
+        "--disable-autodetect",
+        "--disable-x86asm",
+        "--enable-vulkan",
+        "--enable-vulkan-static"
+      ]
+    }
+  ],
+  "mac_libtool_fixture": {
+    "baseline": 72,
+    "fixed": 0,
+    "all_three_depth_markers_present": true
+  },
+  "mpv_dependency_pins": {
+    "libplacebo": "275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
+    "wayland": "93c04ad3670633aea6f2435059378b75843b8e70",
+    "wayland-protocols": "b9edf66597586c914b5b1ff3d964d7ed201adab9",
+    "vulkan-loader": "698de0e7386ab699f14319846c60a4ad2cfdf987",
+    "vulkan-headers": "73814d006638aa00bd553215b054f0f02e457e22"
+  },
+  "duplicate_search_receipt": "evidence/upstream-cinema/duplicate-search.json",
+  "ffmpeg_sei_independent_receipt": "upstream/ffmpeg/01-videotoolbox-caption-sei/reproduction/receipt.json"
+}

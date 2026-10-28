@@ -1,8 +1,8 @@
-From b5f9bd44e82cce32384d1aa69cf43bbb9c85de32 Mon Sep 17 00:00:00 2001
+From d67c8028729de31bc4f7ed4d5d7ee7ee7ce41853 Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Fri, 9 Oct 2026 00:48:12 -0400
-Subject: [PATCH 02/11] tests/native-hdr: Cover native target policy and
- Wayland feedback
+Subject: [PATCH 02/10] tests/native-hdr: Cover native target policy and Wayland
+ feedback
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -29,14 +29,14 @@ Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
 ---
  src/backends/meta-color-device.c              |   1 +
  src/backends/meta-color-device.h              |   2 +
- src/tests/native-hdr-tests.c                  | 141 +++++
+ src/tests/native-hdr-tests.c                  | 160 ++++++
  src/tests/wayland-color-management-test.c     | 135 +++++
  .../wayland-test-clients/color-management.c   | 507 ++++++++++++++++++
- src/wayland/meta-wayland-color-management.c   |  64 +--
- 6 files changed, 820 insertions(+), 30 deletions(-)
+ src/wayland/meta-wayland-color-management.c   |  62 ++-
+ 6 files changed, 838 insertions(+), 29 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 79230ad93..5aee553fc 100644
+index 9231bd561..c640128e8 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -783,6 +783,7 @@ meta_color_target_luminance_init (MetaColorTargetLuminance *target,
@@ -48,7 +48,7 @@ index 79230ad93..5aee553fc 100644
        (double) target->maximum > G_MAXUINT32)
      {
 diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
-index 222bb741e..563967bd6 100644
+index 6509cfdff..440fb4a9c 100644
 --- a/src/backends/meta-color-device.h
 +++ b/src/backends/meta-color-device.h
 @@ -67,6 +67,7 @@ const char * meta_color_device_get_id (MetaColorDevice *color_device);
@@ -68,18 +68,37 @@ index 222bb741e..563967bd6 100644
  
  float meta_color_device_get_reference_luminance_factor (MetaColorDevice *color_device);
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index 5e9c5afbc..d21a0032f 100644
+index 5e9c5afbc..d39caa686 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
-@@ -7,6 +7,7 @@
+@@ -7,8 +7,26 @@
  #include <glib.h>
  
  #include "backends/meta-output.h"
 +#include "backends/meta-color-device.h"
  #include "backends/native/meta-output-kms.h"
  
++static void
++test_luminance_protocol_boundaries (void)
++{
++  g_assert_cmpuint (meta_color_luminance_to_uint32 (0.0), ==, 0);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 (-1.0), ==, 0);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 (NAN), ==, 0);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 (616.75), ==, 616);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 ((double) UINT32_MAX),
++                   ==, UINT32_MAX);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 ((float) UINT32_MAX),
++                   ==, UINT32_MAX);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 (4294967296.0),
++                   ==, UINT32_MAX);
++  g_assert_cmpuint (meta_color_luminance_to_uint32 (INFINITY),
++                   ==, UINT32_MAX);
++}
++
  static const uint8_t native[] = {
-@@ -480,6 +481,144 @@ test_fatal_base (void)
+   0x26, 0, 9, 4, 0, 0, 0, 0, 0, 0x40, 0, 0
+ };
+@@ -480,11 +498,151 @@ test_fatal_base (void)
      }
  }
  
@@ -224,7 +243,14 @@ index 5e9c5afbc..d21a0032f 100644
  int
  main (int    argc,
        char **argv)
-@@ -492,5 +631,7 @@ main (int    argc,
+ {
+   g_test_init (&argc, &argv, NULL);
++  g_test_add_func ("/native-hdr/luminance-protocol-boundaries",
++                   test_luminance_protocol_boundaries);
+   g_test_add_func ("/native-hdr/complete-tuple-and-kms-gates", test_native);
+   g_test_add_func ("/native-hdr/cta-authority", test_cta_authority);
+   g_test_add_func ("/native-hdr/diagnostics", test_diagnostics);
+@@ -492,5 +650,7 @@ main (int    argc,
    g_test_add_func ("/native-hdr/fatal-base", test_fatal_base);
    g_test_add_func ("/native-hdr/cta-preserved-with-extension-failure",
                     test_cta_with_extension_failure);
@@ -925,10 +951,10 @@ index 98f76e9d5..ce8f4098a 100644
    surface = wl_compositor_create_surface (display->compositor);
    xdg_surface = xdg_wm_base_get_xdg_surface (display->xdg_wm_base, surface);
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index efaa9dcaf..05d898886 100644
+index 1efefa380..61ee0730b 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
-@@ -127,8 +127,9 @@ typedef struct _MetaWaylandImageDescription
+@@ -128,8 +128,9 @@ typedef struct _MetaWaylandImageDescription
  {
    grefcount ref_count;
  
@@ -939,7 +965,7 @@ index efaa9dcaf..05d898886 100644
    MetaWaylandImageDescriptionState state;
    gboolean has_info;
    MetaWaylandDescriptionRecord *record;
-@@ -439,19 +440,18 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MetaWaylandDescriptionRecord,
+@@ -440,18 +441,17 @@ G_DEFINE_AUTOPTR_CLEANUP_FUNC (MetaWaylandDescriptionRecord,
                                 description_record_unref)
  
  static MetaWaylandDescriptionRecord *
@@ -953,11 +979,9 @@ index efaa9dcaf..05d898886 100644
    const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
    MetaWaylandDescriptionRecord lookup = {
      .color_state = color_state,
--    .target_minimum = (uint32_t) MIN ((double) (target ? target->minimum : encoding->min) * 10000,
--                                     G_MAXUINT32),
-+    .target_minimum = (uint32_t) MIN ((double) ((target ? target->minimum : encoding->min) * 10000.0f),
-+                                      G_MAXUINT32),
-     .target_maximum = (uint32_t) (target ? target->maximum : encoding->max),
+-    .target_minimum = meta_color_luminance_to_uint32 ((double) (target ? target->minimum : encoding->min) * 10000),
++    .target_minimum = meta_color_luminance_to_uint32 ((target ? target->minimum : encoding->min) * 10000.0f),
+     .target_maximum = meta_color_luminance_to_uint32 (target ? target->maximum : encoding->max),
    };
    MetaWaylandDescriptionRecord *record;
 -  MetaWaylandDescriptionIds *ids = color_manager->ids;
@@ -1100,7 +1124,7 @@ index efaa9dcaf..05d898886 100644
  
    wl_resource_set_implementation (image_desc_resource,
                                    &meta_wayland_image_description_interface,
-@@ -2124,7 +2128,7 @@ meta_wayland_color_manager_dispose (GObject *object)
+@@ -2125,7 +2129,7 @@ meta_wayland_color_manager_dispose (GObject *object)
    g_clear_signal_handler (&color_manager->target_volume_changed_handler_id,
                            meta_color_manager);
  
@@ -1109,7 +1133,7 @@ index efaa9dcaf..05d898886 100644
      {
        GHashTableIter iter;
        gpointer value;
-@@ -2133,7 +2137,7 @@ meta_wayland_color_manager_dispose (GObject *object)
+@@ -2134,7 +2138,7 @@ meta_wayland_color_manager_dispose (GObject *object)
        g_hash_table_iter_next (&iter, NULL, &value);
        meta_wayland_color_management_output_free (value);
      }
@@ -1118,7 +1142,7 @@ index efaa9dcaf..05d898886 100644
      {
        GHashTableIter iter;
        gpointer value;
-@@ -2183,7 +2187,7 @@ meta_wayland_color_manager_new (MetaWaylandCompositor *compositor)
+@@ -2184,7 +2188,7 @@ meta_wayland_color_manager_new (MetaWaylandCompositor *compositor)
    color_manager = g_object_new (META_TYPE_WAYLAND_COLOR_MANAGER, NULL);
    color_manager->compositor = compositor;
    color_manager->default_record =

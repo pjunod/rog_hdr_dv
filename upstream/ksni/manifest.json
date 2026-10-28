@@ -1,0 +1,29 @@
+{
+  "repository": "iovxw/ksni",
+  "target_branch": "master",
+  "base": "2397cc2ce535ba4e7ed77fecd94731c5239923e7",
+  "venue": "github",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-menu-property-ids",
+      "inventory_ids": [
+        "KS-1"
+      ],
+      "title": "Fix menu property IDs after a menu refresh",
+      "patches": [
+        "01-menu-property-ids/0001-01-menu-property-ids.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "dbus-run-session -- cargo test --lib",
+          "result": "rustc 1.97.1: 38 passed, 0 failed with unchanged GTK dev dependency; new regression fails on unmodified source",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    }
+  ]
+}

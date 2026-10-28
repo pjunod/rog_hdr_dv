@@ -1,0 +1,37 @@
+{
+  "repository": "sarah-quinones/gemm",
+  "target_branch": "main",
+  "base": "86102c5b712737978371ac9ef7a11982f686d7bc",
+  "venue": "github",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-fp16-target-features",
+      "inventory_ids": [
+        "GM-1"
+      ],
+      "title": "gemm-common: declare FP16 features on inline assembly helpers",
+      "patches": [],
+      "status": "upstream-overlap-hold",
+      "blockers": [
+        "Review the existing upstream PRs and post validation to #47 or coordinate with #39; do not open a duplicate PR"
+      ],
+      "tests": [
+        {
+          "command": "CARGO_PROFILE_DEV_OPT_LEVEL=0 cargo build --target aarch64-unknown-linux-gnu -p gemm-f16; cargo test -p gemm-f16 --lib",
+          "result": "rustc 1.97.1: unmodified baseline fails with 8 fullfp16 assembler errors; fixed build passes; lib test binary succeeds with 0 tests",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        },
+        {
+          "command": "CARGO_PROFILE_DEV_OPT_LEVEL=0 cargo build --target aarch64-unknown-linux-gnu -p gemm-f16 at upstream PR47 head e4a7df8fa20fb155b3fb28563c1dc6b6a81b45ee",
+          "result": "rustc1.97.1 exact third-party PR47 source build passed; no runtime arithmetic test claimed",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ],
+      "kind": "existing-pr-validation",
+      "target_pr": "https://github.com/sarah-quinones/gemm/pull/47",
+      "target_head": "e4a7df8fa20fb155b3fb28563c1dc6b6a81b45ee"
+    }
+  ]
+}

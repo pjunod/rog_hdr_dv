@@ -1,0 +1,107 @@
+From cb892aba82a6f00a7566bfd7829030bd3cd2da1c Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:35:08 -0400
+Subject: [PATCH] [android][splash-screen] Annotate splash behavior with its
+ API level
+
+Android lint reports NewApi for windowSplashScreenBehavior in the base resource directory when minSdk is below 33. Declare the tools namespace and annotate that item with its API level, preserving other resource attributes.
+
+Add regression coverage for the registered styles action, existing XML attributes and repeated application. A standalone minSdk 24 app fails lint without the annotation and passes with it.
+---
+ .changeset/splash-screen-api-level.md         |  6 +++
+ .../withAndroidSplashStylesApi-test.ts        | 50 +++++++++++++++++++
+ .../plugin/src/withAndroidSplashStyles.ts     |  4 +-
+ 3 files changed, 59 insertions(+), 1 deletion(-)
+ create mode 100644 .changeset/splash-screen-api-level.md
+ create mode 100644 packages/expo-splash-screen/plugin/src/__tests__/withAndroidSplashStylesApi-test.ts
+
+diff --git a/.changeset/splash-screen-api-level.md b/.changeset/splash-screen-api-level.md
+new file mode 100644
+index 0000000..c609a60
+--- /dev/null
++++ b/.changeset/splash-screen-api-level.md
+@@ -0,0 +1,6 @@
++---
++'expo-splash-screen': patch
++---
++
++Mark the Android 13 splash-screen behavior attribute with its API level so
++Android lint accepts generated splash styles in apps with an older minimum SDK.
+diff --git a/packages/expo-splash-screen/plugin/src/__tests__/withAndroidSplashStylesApi-test.ts b/packages/expo-splash-screen/plugin/src/__tests__/withAndroidSplashStylesApi-test.ts
+new file mode 100644
+index 0000000..f7a3c3b
+--- /dev/null
++++ b/packages/expo-splash-screen/plugin/src/__tests__/withAndroidSplashStylesApi-test.ts
+@@ -0,0 +1,50 @@
++import { AndroidConfig, withAndroidStyles } from 'expo/config-plugins';
++
++import { withAndroidSplashStyles } from '../withAndroidSplashStyles';
++
++jest.mock(
++  'expo/config-plugins',
++  () => ({
++    withAndroidColors: jest.fn((config) => config),
++    withAndroidColorsNight: jest.fn((config) => config),
++    withAndroidStyles: jest.fn((config) => config),
++  }),
++  { virtual: true }
++);
++
++it.each([undefined, {}, { 'xmlns:custom': 'https://example.com/custom' }])(
++  'marks the API 33 splash item and preserves XML namespaces: %j',
++  async (attributes) => {
++    jest.clearAllMocks();
++    withAndroidSplashStyles(
++      { name: 'test', slug: 'test' },
++      { backgroundColor: '#000000', imageWidth: 100, resizeMode: 'contain' }
++    );
++    const action = jest.mocked(withAndroidStyles).mock.calls[0][1];
++    const resources: AndroidConfig.Resources.ResourceXML = {
++      resources: { $: attributes },
++    };
++    const config = { modResults: resources } as Parameters<typeof action>[0];
++    const result = await action(config);
++
++    expect(result.modResults.resources.$).toEqual({
++      ...attributes,
++      'xmlns:tools': 'http://schemas.android.com/tools',
++    });
++    const splash = result.modResults.resources.style?.find(
++      (style) => style.$.name === 'Theme.App.SplashScreen'
++    );
++    expect(
++      splash?.item?.find((item) => item.$.name === 'android:windowSplashScreenBehavior')
++    ).toEqual({
++      $: { name: 'android:windowSplashScreenBehavior', 'tools:targetApi': '33' },
++      _: 'icon_preferred',
++    });
++    const repeated = await action(result);
++    expect(
++      repeated.modResults.resources.style?.filter(
++        (style) => style.$.name === 'Theme.App.SplashScreen'
++      )
++    ).toHaveLength(1);
++  }
++);
+diff --git a/packages/expo-splash-screen/plugin/src/withAndroidSplashStyles.ts b/packages/expo-splash-screen/plugin/src/withAndroidSplashStyles.ts
+index 8b044d7..22c77c4 100644
+--- a/packages/expo-splash-screen/plugin/src/withAndroidSplashStyles.ts
++++ b/packages/expo-splash-screen/plugin/src/withAndroidSplashStyles.ts
+@@ -40,6 +40,8 @@ export const withAndroidSplashStyles: ConfigPlugin<AndroidSplashConfig> = (confi
+ function addSplashScreenStyle(styles: AndroidConfig.Resources.ResourceXML) {
+   const { resources } = styles;
+   const { style = [] } = resources;
++  resources.$ ??= {};
++  resources.$['xmlns:tools'] ??= 'http://schemas.android.com/tools';
+ 
+   const item = [
+     {
+@@ -55,7 +57,7 @@ function addSplashScreenStyle(styles: AndroidConfig.Resources.ResourceXML) {
+       _: '@style/AppTheme',
+     },
+     {
+-      $: { name: 'android:windowSplashScreenBehavior' },
++      $: { name: 'android:windowSplashScreenBehavior', 'tools:targetApi': '33' },
+       _: 'icon_preferred',
+     },
+   ];

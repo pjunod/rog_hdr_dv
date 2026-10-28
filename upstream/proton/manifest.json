@@ -1,0 +1,102 @@
+{
+  "repository": "ValveSoftware/wine",
+  "target_branch": "proton_11.0",
+  "base": "e60892cc2398b0a83c332a2078c7b85e47bdb42b",
+  "venue": "github",
+  "current_upstream_checked": "2026-10-28",
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-createfile-fromapp",
+      "inventory_ids": [
+        "PR-1"
+      ],
+      "title": "kernelbase: Implement CreateFileFromAppW().",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "01-createfile-fromapp/0001-kernelbase-createfilefromapp.patch"
+      ],
+      "tests": [
+        {
+          "command": "./autogen.sh; configure --enable-win64 --without-opencl; make -j14",
+          "result": "inherited 2026-10-27: full build passes, zero warnings in touched files at saved tip",
+          "evidence": "evidence.json"
+        },
+        {
+          "command": "xvfb-run -a wine wineboot -u; runtest -M kernelbase.dll -p kernelbase_test.exe file_fromapp (fresh prefix; C.UTF-8; explicit TEMP)",
+          "result": "new 2026-10-28: 123 checks, 0 failures, 0 skipped",
+          "evidence": "evidence.json"
+        }
+      ],
+      "limitations": [
+        "No AppContainer, real Windows reference, or physical display-backend qualification is claimed."
+      ],
+      "candidate_tree": "094ce14485bee84f255f576a784e68c944b92f2a"
+    },
+    {
+      "id": "02",
+      "slug": "02-monitor-provenance",
+      "inventory_ids": [
+        "PR-2"
+      ],
+      "title": "win32u: Report monitor connector technology.",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "02-monitor-provenance/0001-win32u-monitor-provenance.patch",
+        "02-monitor-provenance/0002-winex11-complete-edid.patch"
+      ],
+      "tests": [
+        {
+          "command": "./autogen.sh; configure --enable-win64 --without-opencl; make -j14",
+          "result": "inherited 2026-10-27: full build passes, zero warnings in touched files at saved tip",
+          "evidence": "evidence.json"
+        },
+        {
+          "command": "autogen.sh; configure --enable-win64 --without-opencl; make -j8; wineboot -u; runtest user32.dll displayconfig (exact provenance+EDID follow-up tip8cb6b153bf4)",
+          "result": "new2026-10-28: full build succeeds,13checks/0failures/0skips",
+          "evidence": "evidence.json"
+        }
+      ],
+      "limitations": [
+        "No AppContainer, real Windows reference, or physical display-backend qualification is claimed."
+      ],
+      "candidate_tree": "81003e715f3b2101ce1530cb93e120e1485c97ed"
+    },
+    {
+      "id": "03",
+      "slug": "03-displaymonitor",
+      "inventory_ids": [
+        "PR-3"
+      ],
+      "title": "windows.devices.display: Add DisplayMonitor statics.",
+      "type": "patch",
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "patches": [
+        "02-monitor-provenance/0001-win32u-monitor-provenance.patch",
+        "02-monitor-provenance/0002-winex11-complete-edid.patch",
+        "03-displaymonitor/0001-displaymonitor-statics.patch"
+      ],
+      "tests": [
+        {
+          "command": "./autogen.sh; configure --enable-win64 --without-opencl; make -j14",
+          "result": "inherited 2026-10-27: full build passes, zero warnings in touched files at saved tip",
+          "evidence": "evidence.json"
+        },
+        {
+          "command": "xvfb-run -a wine wineboot -u; runtest -M windows.devices.display.dll -p windows.devices.display_test.exe displaymonitor (fresh prefix)",
+          "result": "new 2026-10-28: 355 checks, 0 failures, 0 skipped",
+          "evidence": "evidence.json"
+        }
+      ],
+      "limitations": [
+        "No AppContainer, real Windows reference, or physical display-backend qualification is claimed."
+      ],
+      "candidate_tree": "604375c10f6b9aefc0d9fd459d420420a82c1b94"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+From 036f1ba093cc18a715b46fe9668dbdf24df8313a Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:06:31 -0400
+Subject: [PATCH] dovi/rpu: reject mixed mapping methods within one component
+
+A reshaping component stores one mapping method, and its writer indexes
+the coefficient vectors using that method for every piece. Accepting
+mixed polynomial and MMR pieces leaves inconsistent vectors and can
+panic while writing. Reject a change of method after the first piece.
+
+The bitstream-built regression is accepted by the original parser and
+rejected by this change. All ten dolby_vision crate tests pass; end-to-
+end Profile 7 conversion was not rerun.
+---
+ dolby_vision/src/rpu/rpu_data_mapping.rs | 54 +++++++++++++++++++++++-
+ 1 file changed, 53 insertions(+), 1 deletion(-)
+
+diff --git a/dolby_vision/src/rpu/rpu_data_mapping.rs b/dolby_vision/src/rpu/rpu_data_mapping.rs
+index 2dabc34..2d05e6e 100644
+--- a/dolby_vision/src/rpu/rpu_data_mapping.rs
++++ b/dolby_vision/src/rpu/rpu_data_mapping.rs
+@@ -151,8 +151,12 @@ impl RpuDataMapping {
+             let curve = &mut mapping.curves[cmp];
+             let num_pieces = (curve.num_pivots_minus2 + 1) as usize;
+ 
+-            for _ in 0..num_pieces {
++            for piece in 0..num_pieces {
+                 let mapping_idc = DoviMappingMethod::try_from(reader.read_ue()?)?;
++                ensure!(
++                    piece == 0 || curve.mapping_idc == mapping_idc,
++                    "inconsistent mapping methods within component {cmp}"
++                );
+                 curve.mapping_idc = mapping_idc;
+ 
+                 // MAPPING_POLYNOMIAL
+@@ -566,3 +570,51 @@ impl TryFrom<u8> for DoviNlqMethod {
+         }
+     }
+ }
++
++#[cfg(test)]
++mod mapping_method_tests {
++    use super::*;
++
++    #[test]
++    fn mixed_mapping_methods_in_one_component_are_rejected() -> Result<()> {
++        let header = RpuDataHeader {
++            disable_residual_flag: true,
++            coefficient_data_type: 1,
++            coefficient_log2_denom_length: 0,
++            ..Default::default()
++        };
++        let mut writer = BitstreamIoWriter::with_capacity(64);
++        for _ in 0..3 {
++            writer.write_ue(0)?;
++        }
++        for component in 0..3 {
++            let num_pivots_minus2 = if component == 0 { 1 } else { 0 };
++            writer.write_ue(num_pivots_minus2)?;
++            for _ in 0..num_pivots_minus2 + 2 {
++                writer.write::<8, u8>(0)?;
++            }
++        }
++        writer.write_ue(0)?;
++        writer.write_ue(0)?;
++        writer.write_ue(0)?; // Polynomial, first piece.
++        writer.write_ue(0)?; // Linear polynomial.
++        writer.write_bit(false)?;
++        writer.write_ue(1)?; // MMR, second piece of the same component.
++        // Supply enough MMR data and following components for the unfixed parser.
++        writer.write::<2, u8>(0)?;
++        for _ in 0..2 {
++            writer.write_ue(0)?;
++            writer.write_ue(0)?;
++            writer.write_bit(false)?;
++        }
++        writer.byte_align()?;
++        let data = writer.into_inner();
++        let mut reader = BsIoSliceReader::from_slice(&data);
++        let error = RpuDataMapping::parse(&mut reader, &header).unwrap_err();
++        assert!(
++            error.to_string().contains("inconsistent mapping methods"),
++            "{error}"
++        );
++        Ok(())
++    }
++}

@@ -1,0 +1,423 @@
+From 50b9b41b3da6852f26d9472a0dcf587d4c7fbf51 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:06:31 -0400
+Subject: [PATCH] reader: bound Exp-Golomb codes and preserve integer precision
+
+Both reader backends shifted by the untrusted unary prefix length and
+decoded signed magnitudes through f64. A 64-zero prefix could panic and
+large signed values lost precision. Share private checked integer
+decoding, preserve the full u64 and i64 endpoints, and stop prefix
+scanning after 65 zero bits. Public reader APIs and writer arithmetic
+remain unchanged.
+
+Default, all-feature and bitstream-only reader suites pass. Backend
+regressions cover endpoints, numeric overflow, truncated payloads,
+cursor preservation and a prefix with no marker.
+---
+ src/bitstream_io_impl/bitstream_io_reader.rs | 153 +++++++++++++++++--
+ src/bitvec_impl/reads.rs                     | 150 +++++++++++++-----
+ src/exp_golomb.rs                            |  27 ++++
+ src/lib.rs                                   |   3 +
+ 4 files changed, 277 insertions(+), 56 deletions(-)
+ create mode 100644 src/exp_golomb.rs
+
+diff --git a/src/bitstream_io_impl/bitstream_io_reader.rs b/src/bitstream_io_impl/bitstream_io_reader.rs
+index a132e07..4472c11 100644
+--- a/src/bitstream_io_impl/bitstream_io_reader.rs
++++ b/src/bitstream_io_impl/bitstream_io_reader.rs
+@@ -1,3 +1,4 @@
++use crate::exp_golomb::ExpGolomb;
+ use std::io;
+ 
+ use bitstream_io::{BigEndian, BitRead, BitReader, Integer};
+@@ -40,28 +41,42 @@ where
+     }
+ 
+     #[inline(always)]
+-    pub fn read_ue(&mut self) -> io::Result<u64> {
+-        self.bs.read_unary::<1>().and_then(|leading_zeroes| {
+-            if leading_zeroes > 0 {
+-                self.bs
+-                    .read_var::<u64>(leading_zeroes)
+-                    .map(|v| v + (1 << leading_zeroes) - 1)
+-            } else {
+-                Ok(0)
++    fn read_exp_golomb_parts(&mut self) -> io::Result<ExpGolomb> {
++        let mut leading_zeroes = 0;
++        while !self.bs.read_bit()? {
++            leading_zeroes += 1;
++            if leading_zeroes > 64 {
++                return Err(io::Error::new(
++                    io::ErrorKind::InvalidData,
++                    "Exp-Golomb code exceeds the supported integer range",
++                ));
+             }
++        }
++        let suffix = if leading_zeroes == 0 {
++            0
++        } else {
++            self.bs.read_var::<u64>(leading_zeroes)?
++        };
++        Ok(ExpGolomb {
++            leading_zeroes,
++            suffix,
+         })
+     }
+ 
+     #[inline(always)]
+-    pub fn read_se(&mut self) -> io::Result<i64> {
+-        self.read_ue().map(|code_num| {
+-            let m = ((code_num + 1) as f64 / 2.0).floor() as u64;
++    pub fn read_ue(&mut self) -> io::Result<u64> {
++        self.read_exp_golomb_parts()?.unsigned().ok_or_else(|| {
++            io::Error::new(io::ErrorKind::InvalidData, "Exp-Golomb value exceeds u64")
++        })
++    }
+ 
+-            if code_num % 2 == 0 {
+-                -(m as i64)
+-            } else {
+-                m as i64
+-            }
++    #[inline(always)]
++    pub fn read_se(&mut self) -> io::Result<i64> {
++        self.read_exp_golomb_parts()?.signed().ok_or_else(|| {
++            io::Error::new(
++                io::ErrorKind::InvalidData,
++                "signed Exp-Golomb value exceeds i64",
++            )
+         })
+     }
+ 
+@@ -165,3 +180,109 @@ fn skip_n_validations() {
+     assert!(reader.read_bit().is_ok());
+     assert!(reader.read_bit().is_err());
+ }
++
++#[test]
++fn exp_golomb_codes_wider_than_64_bits_are_errors() {
++    let mut data = [0; 17];
++    data[8] = 0x40;
++    let mut reader = BsIoSliceReader::from_slice(&data);
++    assert_eq!(
++        reader.read_ue().unwrap_err().kind(),
++        io::ErrorKind::InvalidData
++    );
++}
++
++#[test]
++fn signed_exp_golomb_preserves_large_integer_magnitudes() {
++    // 63 leading zeros, marker, then 63 one bits: code_num = u64::MAX - 1.
++    let mut data = [0xff; 16];
++    data[..7].fill(0);
++    data[7] = 1;
++    let mut reader = BsIoSliceReader::from_slice(&data);
++    assert_eq!(reader.read_se().unwrap(), -i64::MAX);
++}
++
++#[test]
++fn largest_unsigned_exp_golomb_value_is_supported() {
++    let mut data = [0; 17];
++    data[8] = 0x80;
++    assert_eq!(
++        BsIoSliceReader::from_slice(&data).read_ue().unwrap(),
++        u64::MAX
++    );
++    data[16] = 0x80;
++    assert_eq!(
++        BsIoSliceReader::from_slice(&data)
++            .read_ue()
++            .unwrap_err()
++            .kind(),
++        io::ErrorKind::InvalidData
++    );
++}
++
++#[test]
++fn signed_exp_golomb_positive_overflow_is_an_error() {
++    let mut data = [0; 17];
++    data[8] = 0x80;
++    assert_eq!(
++        BsIoSliceReader::from_slice(&data)
++            .read_se()
++            .unwrap_err()
++            .kind(),
++        io::ErrorKind::InvalidData
++    );
++}
++
++#[test]
++fn signed_exp_golomb_endpoints_are_supported() {
++    let mut positive = [0xff; 16];
++    positive[..7].fill(0);
++    positive[7] = 1;
++    positive[15] &= !2;
++    assert_eq!(
++        BsIoSliceReader::from_slice(&positive).read_se().unwrap(),
++        i64::MAX
++    );
++
++    let mut negative = [0; 17];
++    negative[8] = 0x80;
++    negative[16] = 0x80;
++    assert_eq!(
++        BsIoSliceReader::from_slice(&negative).read_se().unwrap(),
++        i64::MIN
++    );
++    assert_eq!(
++        BsIoSliceReader::from_slice(&negative)
++            .read_ue()
++            .unwrap_err()
++            .kind(),
++        io::ErrorKind::InvalidData
++    );
++
++    negative[15] = 1;
++    negative[16] = 0;
++    assert_eq!(
++        BsIoSliceReader::from_slice(&negative)
++            .read_se()
++            .unwrap_err()
++            .kind(),
++        io::ErrorKind::InvalidData
++    );
++}
++
++#[test]
++fn exp_golomb_prefix_without_a_marker_is_bounded() {
++    let data = [0; 9];
++    let mut unsigned = BsIoSliceReader::from_slice(&data);
++    assert_eq!(
++        unsigned.read_ue().unwrap_err().kind(),
++        io::ErrorKind::InvalidData
++    );
++    assert_eq!(unsigned.position_in_bits().unwrap(), 65);
++    let mut signed = BsIoSliceReader::from_slice(&data);
++    assert_eq!(
++        signed.read_se().unwrap_err().kind(),
++        io::ErrorKind::InvalidData
++    );
++    assert_eq!(signed.position_in_bits().unwrap(), 65);
++}
+diff --git a/src/bitvec_impl/reads.rs b/src/bitvec_impl/reads.rs
+index 63e5d71..7592da6 100644
+--- a/src/bitvec_impl/reads.rs
++++ b/src/bitvec_impl/reads.rs
+@@ -1,4 +1,5 @@
+-use anyhow::{Result, anyhow, bail, ensure};
++use crate::exp_golomb::ExpGolomb;
++use anyhow::{Result, anyhow, ensure};
+ use bitvec::{field::BitField, prelude::Msb0, slice::BitSlice};
+ use funty::Integral;
+ 
+@@ -35,58 +36,127 @@ impl BitSliceReadExt {
+         Ok(val)
+     }
+ 
+-    // bitstring.py implementation: https://github.com/scott-griffiths/bitstring/blob/master/bitstring.py#L1706
+     #[inline(always)]
+-    pub fn get_ue(slice: &BitSlice<u8, Msb0>, offset: &mut usize) -> Result<u64> {
+-        let oldpos = *offset;
+-        let mut pos = oldpos;
+-
+-        loop {
+-            match slice.get(pos) {
+-                Some(val) => {
+-                    if !val {
+-                        pos += 1;
+-                    } else {
+-                        break;
+-                    }
+-                }
+-                None => bail!("get_ue: out of bounds index: {}", pos),
+-            }
++    fn exp_golomb_parts(slice: &BitSlice<u8, Msb0>, offset: usize) -> Result<(ExpGolomb, usize)> {
++        let mut pos = offset;
++        while !*slice
++            .get(pos)
++            .ok_or_else(|| anyhow!("Exp-Golomb prefix is truncated"))?
++        {
++            pos += 1;
++            ensure!(
++                pos - offset <= 64,
++                "Exp-Golomb prefix exceeds the integer range"
++            );
+         }
+-
+-        let leading_zeroes = pos - oldpos;
+-        let endpos = pos + leading_zeroes + 1;
+-
+-        let code_num = if leading_zeroes > 0 {
+-            if endpos > slice.len() {
+-                bail!("get_ue: out of bounds attempt");
+-            }
+-
+-            let code_num = (1 << leading_zeroes) - 1;
+-
+-            code_num + slice[pos + 1..endpos].load_be::<u64>()
+-        } else {
++        let leading_zeroes = pos - offset;
++        let endpos = pos
++            .checked_add(leading_zeroes + 1)
++            .ok_or_else(|| anyhow!("Exp-Golomb position overflow"))?;
++        ensure!(endpos <= slice.len(), "Exp-Golomb payload is truncated");
++        let suffix = if leading_zeroes == 0 {
+             0
++        } else {
++            slice[pos + 1..endpos].load_be::<u64>()
+         };
++        Ok((
++            ExpGolomb {
++                leading_zeroes: leading_zeroes as u32,
++                suffix,
++            },
++            endpos,
++        ))
++    }
+ 
++    // bitstring.py implementation: https://github.com/scott-griffiths/bitstring/blob/master/bitstring.py#L1706
++    #[inline(always)]
++    pub fn get_ue(slice: &BitSlice<u8, Msb0>, offset: &mut usize) -> Result<u64> {
++        let (parts, endpos) = Self::exp_golomb_parts(slice, *offset)?;
++        let value = parts
++            .unsigned()
++            .ok_or_else(|| anyhow!("Exp-Golomb value exceeds u64"))?;
+         *offset = endpos;
+-
+-        Ok(code_num)
++        Ok(value)
+     }
+ 
+     // bitstring.py implementation: https://github.com/scott-griffiths/bitstring/blob/master/bitstring.py#L1767
+     #[inline(always)]
+     pub fn get_se(slice: &BitSlice<u8, Msb0>, offset: &mut usize) -> Result<i64> {
+-        let code_num = Self::get_ue(slice, offset)?;
++        let (parts, endpos) = Self::exp_golomb_parts(slice, *offset)?;
++        let value = parts
++            .signed()
++            .ok_or_else(|| anyhow!("signed Exp-Golomb value exceeds i64"))?;
++        *offset = endpos;
++        Ok(value)
++    }
++}
+ 
+-        let m = ((code_num + 1) as f64 / 2.0).floor() as u64;
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use crate::{bitslice_reader::BitSliceReader, bitvec_reader::BitVecReader};
++    use bitvec::view::BitView;
++
++    fn encode_code_num(value: u128) -> Vec<u8> {
++        let code = value + 1;
++        let width = (128 - code.leading_zeros()) as usize;
++        let bits = width * 2 - 1;
++        let mut data = vec![0; bits.div_ceil(8)];
++        for bit in 0..width {
++            if code & (1u128 << bit) != 0 {
++                let position = bits - 1 - bit;
++                data[position / 8] |= 1 << (7 - position % 8);
++            }
++        }
++        data
++    }
+ 
+-        let val = if code_num % 2 == 0 {
+-            -(m as i64)
+-        } else {
+-            m as i64
+-        };
++    #[test]
++    fn bitvec_readers_support_unsigned_exp_golomb_endpoints() {
++        for expected in [0, 1, u64::MAX] {
++            let data = encode_code_num(expected as u128);
++            assert_eq!(BitVecReader::new(data.clone()).get_ue().unwrap(), expected);
++            assert_eq!(BitSliceReader::new(&data).get_ue().unwrap(), expected);
++        }
++    }
+ 
+-        Ok(val)
++    #[test]
++    fn bitvec_readers_support_signed_exp_golomb_endpoints() {
++        for (code, expected) in [
++            (0, 0),
++            (1, 1),
++            (2, -1),
++            (u64::MAX as u128 - 2, i64::MAX),
++            (u64::MAX as u128 - 1, -i64::MAX),
++            (1u128 << 64, i64::MIN),
++        ] {
++            let data = encode_code_num(code);
++            assert_eq!(BitVecReader::new(data.clone()).get_se().unwrap(), expected);
++            assert_eq!(BitSliceReader::new(&data).get_se().unwrap(), expected);
++        }
++    }
++
++    #[test]
++    fn bitvec_readers_reject_exp_golomb_overflow() {
++        for code in [1u128 << 64, (1u128 << 65) - 1] {
++            let data = encode_code_num(code);
++            assert!(BitVecReader::new(data.clone()).get_ue().is_err());
++            assert!(BitSliceReader::new(&data).get_ue().is_err());
++        }
++        for code in [u64::MAX as u128, (1u128 << 64) + 1] {
++            let data = encode_code_num(code);
++            assert!(BitVecReader::new(data.clone()).get_se().is_err());
++            assert!(BitSliceReader::new(&data).get_se().is_err());
++        }
++    }
++
++    #[test]
++    fn truncated_exp_golomb_does_not_advance_bitvec_cursor() {
++        let data = [0, 0x80];
++        let mut offset = 0;
++        assert!(BitSliceReadExt::get_ue(data.view_bits::<Msb0>(), &mut offset).is_err());
++        assert_eq!(offset, 0);
++        assert!(BitSliceReadExt::get_se(data.view_bits::<Msb0>(), &mut offset).is_err());
++        assert_eq!(offset, 0);
+     }
+ }
+diff --git a/src/exp_golomb.rs b/src/exp_golomb.rs
+new file mode 100644
+index 0000000..7ed5579
+--- /dev/null
++++ b/src/exp_golomb.rs
+@@ -0,0 +1,27 @@
++pub(crate) struct ExpGolomb {
++    pub leading_zeroes: u32,
++    pub suffix: u64,
++}
++
++impl ExpGolomb {
++    pub fn unsigned(self) -> Option<u64> {
++        match self.leading_zeroes {
++            64 if self.suffix == 0 => Some(u64::MAX),
++            0..=63 => ((1u64 << self.leading_zeroes) - 1).checked_add(self.suffix),
++            _ => None,
++        }
++    }
++
++    pub fn signed(self) -> Option<i64> {
++        if self.leading_zeroes == 64 {
++            return (self.suffix == 1).then_some(i64::MIN);
++        }
++        let code_num = self.unsigned()?;
++        let magnitude = i64::try_from(code_num / 2 + code_num % 2).ok()?;
++        Some(if code_num % 2 == 0 {
++            -magnitude
++        } else {
++            magnitude
++        })
++    }
++}
+diff --git a/src/lib.rs b/src/lib.rs
+index 8b5c5e8..44f06d7 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,3 +1,6 @@
++#[cfg(any(feature = "bitvec", feature = "bitstream-io"))]
++mod exp_golomb;
++
+ #[cfg(feature = "bitvec")]
+ mod bitvec_impl;
+ 

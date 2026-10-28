@@ -1,0 +1,29 @@
+{
+  "repository": "quietvoid/dovi_tool",
+  "target_branch": "main",
+  "base": "41dae646193c12de152333ff5dbc33579cb9ef4a",
+  "venue": "github",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-mixed-mapping-methods",
+      "inventory_ids": [
+        "DV-5"
+      ],
+      "title": "dovi/rpu: reject mixed mapping methods within one component",
+      "patches": [
+        "01-mixed-mapping-methods/0001-01-mixed-mapping-methods.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "cargo test --manifest-path dolby_vision/Cargo.toml",
+          "result": "10 passed, 0 failed (macOS aarch64, rustc 1.98.0)",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    }
+  ]
+}

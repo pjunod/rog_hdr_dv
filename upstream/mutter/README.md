@@ -8,7 +8,7 @@ Start with [00-ISSUE.md](00-ISSUE.md): the design-discussion issue `./submit.sh 
 describes the series and its hardware evidence and asks how to coordinate with !5068 and
 !5177. Its URL is also the natural value for the commits' `Link:` lines (below).
 
-The 90 patches of `patches/mutter/` became 81 commits in 15 units. Every commit is authored by
+The 90 patches of `patches/mutter/` became 80 commits in 15 units. Every commit is authored by
 Paul Junod, has a body, a capitalised subject of at most 72 characters after its prefix, and an
 issue or MR URL line; none has a `Signed-off-by` (added by `submit.sh` when Paul runs it).
 
@@ -21,7 +21,7 @@ issue or MR URL line; none has a `Signed-off-by` (added by `submit.sh` when Paul
 | 03 | MUT-K (0084, 0085) | backend, seat/native teardown | 2 | - | ready | No dedicated test (the one that found them is in 15) |
 | 04 | from MUT-J (0070) | monitor-manager: restore handle | 1 | - | ready | Applies alone; its test is in 14 |
 | 05 | MUT-B | native DisplayID RGB BT.2020 PQ on eDP | 1 | - | blocked on libdisplay-info 02-04 release | Related #4847 (#5093) |
-| 06 | MUT-C | native target luminance and primaries | 11 | 05 | blocked on libdisplay-info 05-06 release; design questions in the issue | !5068; Related #5001 |
+| 06 | MUT-C | native target luminance and primaries | 10 | 05 | blocked on libdisplay-info 05-06 release; design questions in the issue | !5068; Related #5001 |
 | 07 | MUT-A | protocol input robustness | 7 | 06 | blocked (textually stacked on 06) | !4604 (opposite on clamping), !5313 |
 | 08 | MUT-D | HLG | 3 | 07 | blocked (stack) | none found |
 | 09 | MUT-E | target colour volume and mastering metadata | 3 | 08 | blocked (stack) | !5068 |
@@ -42,10 +42,11 @@ follow-up work if upstream wants it first (the issue asks).
 
 ## What changed compared with `patches/mutter/`
 
-The final tree of unit 14 equals `main` with the original patches 0001-0071, 0088 and 0089
-applied, except for three intended edits (the copyright line of meta-color-target-override.h, the
-0104 fix and the reworded 0035 comment), and unit 15's equals `main` with 0001-0012, 0017 and 0072-0087 applied,
-except for the copyright lines (both checked with `git diff`). Changes:
+The original preparation compared unit 14 against the legacy patches 0001-0071,
+0088 and 0089, and unit 15 against 0001-0012, 0017 and 0072-0087.
+The current exports additionally fix a float-to-integer overflow found during
+preparation review, with focused regression coverage in units 06 and 09.
+The root `patches/mutter/` payload remains unchanged. Changes:
 
 - **Authorship and metadata** (every commit): author and committer Paul Junod; `Co-Authored-By`
   and `Claude-Session` trailers removed; process wording removed from messages ("Review
@@ -62,6 +63,10 @@ except for the copyright lines (both checked with `git diff`). Changes:
 - **URL line in every commit** (`doc/git-conventions.md`): MUT-B `Related: …/issues/4847`;
   MUT-C and MUT-H `Related: …/issues/5001`; MUT-I `Related: …/issues/3687`; every other commit
   `Link: TBD-MR` (see "Link lines").
+- **Record lifetime fix folded**: unit 06's compositor teardown fix now lives in
+  its first record-ownership commit. Its sync-point test adjustments live with
+  the topology test in commit 3. Final unit source trees are unchanged by this
+  fold; the first commit's reproduced teardown crash is corrected.
 - **Fixups squashed**: 0005 into 0004; 0021 split between 0019 and 0020 (the disconnect-warning
   expectation for each one's protocol-error cases); 0037 split into 0022 (code) and 0024 (tests),
   with both messages describing the Table 5 system gamma; 0064 and 0071 into 0058 (the D-Bus
@@ -95,14 +100,19 @@ Mutter wants an issue or MR URL in each commit and adds `Part-of:` itself at mer
 no fitting existing issue carry `Link: TBD-MR`, which `submit.sh` fills in automatically:
 
 - a unit with no dependencies (01-05) gets its own MR's URL: the script opens the MR as a draft,
-  rewrites the lines with its URL, force-pushes and un-drafts it;
+  rewrites the lines with its URL, pushes with a lease and un-drafts it;
 - a stacked unit (06-15) gets the URL of the design-discussion issue opened with `./submit.sh 00`.
 
 `--link URL` overrides either default. (Decided 2026-10-27 by Claude, for Paul to look over: the
 commit rules only reject a bare own-MR URL line, which a `Link:` trailer is not; if maintainers
 prefer the issue URL everywhere, use `--link <issue URL>`.)
 
-## Verification on lab5 (2026-10-27)
+## Inherited verification on lab5 (2026-10-27)
+
+The following table records the handoff's earlier branches, before the
+2026-10-28 overflow correction. It is not a build matrix for the revised
+exports. Historical per-commit logs were not recovered; the newly reproduced
+checks and their source identities are recorded below.
 
 Environment: lab5, in a disposable Ubuntu 26.10 container (GCC 15.3, meson 1.10.1, GLib 2.90,
 GTK 4.24.1, Mesa 26.2.4 llvmpipe), with libdisplay-info `main` + its units 01-06 installed in a
@@ -138,7 +148,7 @@ prefix (built with `-Dwerror=true`, 80/80 tests there too). Commands, in one sha
 monitor-config-tests, edid, color-management, color-management-profile-conflict, native-hdr,
 wayland-color-management, wayland-color-representation, plus each separate
 wayland-color-management case present at that unit (the exact list is in each DESCRIPTION.md).
-In total 86 commit builds (81 commits plus the replayed dependency commits of 13-15), 0
+The handoff reported 86 commit builds (81 earlier commits plus the replayed dependency commits of 13-15), 0
 failures. "Chunk artefacts": uncrustify re-indenting isolated chunks against the surrounding
 upstream style (the CI job is allow-failure); not applied.
 
@@ -154,21 +164,45 @@ From this directory:
     ./submit.sh 00            # open the design-discussion issue (00-ISSUE.md); its URL is saved
     ./submit.sh all           # units in order, stopping at the first one not marked ready (01-04 today)
     ./submit.sh 07            # one unit; stacked units bring their unmerged dependencies along
-    ./submit.sh all --dry-run # everything except fork, push and MR
+    ./submit.sh all --dry-run # unsigned application preview; no remote changes
 
 It clones upstream into `~/.cache/upstream-submit/` (override with `UPSTREAM_SUBMIT_DIR`), puts
 the unit and any unmerged units below it on a fresh branch of current `main` with
-`git am --signoff`, stops with a clear message if they no longer apply, creates Paul's fork if
+`git am --signoff` during real submission, stops with a clear message if they no longer apply, creates Paul's fork if
 missing, pushes `hdr-NN-slug` and opens (or, on a rerun, updates) the MR with DESCRIPTION.md.
-A unit marked blocked or hold is only submitted when asked for by number, with a warning.
+A unit marked blocked or hold refuses live submission. An explicit number can
+produce an unsigned preview while its dependency or design question remains open.
 
 Before the first run: put a personal access token with `api` and `write_repository` in
 `~/.config/upstream/gitlab.gnome.org.token` (mode 600), and read
-the descriptions; they are in Paul's voice and end with the AI-assistance statement, which is
-his to make. Units 05-12 also need a libdisplay-info release with units 02-06 (see
+the descriptions; they disclose AI assistance without claiming human review.
+Review and edit their final wording yourself before submitting. Units 05-12 also need a libdisplay-info release with units 02-06 (see
 `../libdisplay-info/README.md`) before Mutter's CI can build them.
 
 `submit.sh` was tested with `--dry-run` (refusal without `--link`, `--link mr` refusal for a
 stacked unit, `all`, and stacked unit 07 with an issue URL: the resulting tree equals the
-verified branch and every commit has one `Signed-off-by: Paul Junod`). The real fork, push and
+verified branch and preview commits remain unsigned). The real fork, push and
 MR path has not been run.
+
+## Preparation review (2026-10-28)
+
+The upstream head still equals the recorded base. Production changes across
+all 80 exported commits were reviewed for parser bounds, validation, numerical
+conversions, ICC descriptors, immutable protocol records and teardown lifetime.
+A float-to-`uint32_t` conversion could receive `2^32` after a legal protocol
+maximum rounded upward in single precision. Units 06 and 09 now use a checked,
+saturating conversion and include boundary and protocol-creation regressions.
+See [PREPARATION-REVIEW.md](PREPARATION-REVIEW.md) for the reviewed scope, exact
+fresh build/test evidence and remaining qualification limits.
+
+[`The shared helper tests`](../../tests/test_upstream_gitlab_submit.py)
+exercise unsigned previews, dependency links supplied by `--issue`, literal
+URL replacement, HTTP failures, cache preservation and lease pushes with local
+Git and a fake GitLab transport. These tests are not a live GitLab submission.
+New caches receive an ownership marker; old unmarked caches are refused.
+Choose an empty `UPSTREAM_SUBMIT_DIR` and preserve any existing local work.
+
+A real submission also requires upstream `main` to equal the qualified base
+above. A clean apply on a newer tree can be previewed, but that tree must be
+rebuilt and tested before updating the pin and sending it. Prior generated
+local branch tips are retained under `refs/upstream-submit/archive/`.

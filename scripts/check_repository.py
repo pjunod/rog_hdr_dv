@@ -315,6 +315,9 @@ def main():
     components = checker.sources(patches)
     checker.documentation()
     checker.ubuntu_revision(lock="--lock-ubuntu-series" in sys.argv[1:])
+    if (checker.root / "upstream").is_dir():
+        from check_upstream import check
+        checker.errors.extend(check(checker.root))
     if checker.errors:
         print("\n".join(checker.errors), file=sys.stderr)
         return 1

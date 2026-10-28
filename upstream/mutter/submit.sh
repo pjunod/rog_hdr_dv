@@ -8,6 +8,7 @@ PROJECT_DIR=$(cd "$(dirname "$0")" && pwd)
 GL_HOST=gitlab.gnome.org
 GL_UPSTREAM=GNOME/mutter
 GL_TARGET=main
+GL_BASE=b48811767189fb5446bd1b831e98271a21866e09
 BRANCH_PREFIX=hdr-
 LINK_POLICY=tbd
 SERIES_ISSUE_FILE=$HOME/.config/upstream/gnome-mutter-series-issue

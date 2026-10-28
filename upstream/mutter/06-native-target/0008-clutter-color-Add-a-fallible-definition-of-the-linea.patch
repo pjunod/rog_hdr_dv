@@ -1,0 +1,813 @@
+From b1b21023e8862ae0306127c0791742baa2901ce7 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sat, 10 Oct 2026 16:50:20 -0400
+Subject: [PATCH 08/10] clutter/color: Add a fallible definition of the linear
+ BT.2020 matrices
+
+ClutterColorTransform built the matrices for a parametric color state
+from clutter_colorimetry_to_XYZ(), clutter_colorimetry_from_XYZ() and a
+private Bradford adaptation, none of which can report failure:
+
+ - collinear primaries make the primaries matrix singular, and
+   clutter_colorimetry_to_XYZ() then returns the identity matrix, so the
+   content is silently rendered as if it were XYZ;
+ - a white point with y = 0 is patched to y = FLT_EPSILON by
+   clutter_xyY_to_XYZ(), producing enormous but "valid" numbers;
+ - a non-finite adaptation (a white point with a zero cone response)
+   propagates Inf/NaN into the pipeline unnoticed.
+
+There was also no way for a producer of color states to ask whether a
+colorimetry is usable without re-implementing this math, so validation
+and rendering could not share one definition of supported colorimetry.
+
+Add clutter_colorimetry_get_linear_bt2020_matrices() in a new,
+uninstalled clutter-color-utils-private.h. It computes both directions
+of the chain the transform uses (RGB -> XYZ -> Bradford adaptation to
+D65 -> BT.2020, and the reverse) and accepts the colorimetry only if:
+
+ - the primaries span a color space;
+ - the white point has a positive, finite y, and is a positive
+   combination of the three primaries, so every primary gets a positive
+   scale (a white point on or outside their triangle does not);
+ - both white points of each Bradford adaptation have positive cone
+   responses, so every gain is positive and finite;
+ - the two resulting single precision matrices are each other's inverse
+   within 1e-4 in every element, evaluated in double precision.
+
+The last criterion is needed because graphene_matrix_inverse() accepts
+any matrix with |det| >= FLT_EPSILON, a threshold that does not scale
+with the matrix: nearly collinear primaries pass it and get inverses
+that are far from exact (a round trip off by 0.1). Well-conditioned
+spaces stay below 2e-6, including the named color spaces, ACES AP0 and
+AP1, ProPhoto, XYZ with an E or D65 white point, and large imaginary
+gamuts; their matrices are bit-identical to those the transform used
+before. Imaginary primaries (coordinates outside [0, 1]) remain valid
+input.
+
+The transform now takes its matrices from that function only. The
+Bradford adaptation moved from clutter-color-transform.c as the
+library-internal clutter_chromatic_adaptation_matrix(); the ICC path,
+which adapts between the fixed D50 and D65 white points, keeps calling
+it through a local wrapper.
+
+clutter_colorimetry_get_linear_bt2020_matrices() is exported for
+libmutter's validation of client and EDID colorimetry. The installed
+clutter-color-utils.h is unchanged, and clutter_xyY_to_XYZ(),
+clutter_colorimetry_to_XYZ() and clutter_colorimetry_from_XYZ() keep
+their signatures and their historical warning-and-identity behaviour for
+external callers; the latter two now share the primaries matrix
+construction with the checked path.
+
+If an unusable color state that bypassed validation still reaches the
+transform, it is reported with a warning naming the state, once per
+color state, and no matrix is substituted.
+
+Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
+---
+ clutter/clutter/clutter-color-transform.c     | 178 +++-----
+ clutter/clutter/clutter-color-utils-private.h |  41 ++
+ clutter/clutter/clutter-color-utils.c         | 396 +++++++++++++++++-
+ clutter/clutter/meson.build                   |   1 +
+ 4 files changed, 472 insertions(+), 144 deletions(-)
+ create mode 100644 clutter/clutter/clutter-color-utils-private.h
+
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index c95a5af16..2b756d3e2 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -54,6 +54,7 @@
+ #include "config.h"
+ 
+ #include "clutter/clutter-color-transform-private.h"
++#include "clutter/clutter-color-utils-private.h"
+ #include "clutter/clutter-color-state-params.h"
+ #include "clutter/clutter-color-state-icc.h"
+ #include "clutter/clutter-color-state.h"
+@@ -111,132 +112,16 @@ clutter_color_transform_init (ClutterColorTransform *transform)
+ {
+ }
+ 
++/* Only used with the fixed D50 and D65 white points, which always adapt. */
+ static void
+ compute_chromatic_adaptation (graphene_vec3_t   *src_white_point_XYZ,
+                               graphene_vec3_t   *dst_white_point_XYZ,
+                               graphene_matrix_t *chromatic_adaptation)
+ {
+-  graphene_matrix_t coefficients_mat;
+-  graphene_matrix_t bradford_mat, inv_bradford_mat;
+-  graphene_vec3_t src_white_point_LMS, dst_white_point_LMS;
+-  graphene_vec3_t coefficients;
+-
+-  graphene_matrix_init_from_float (
+-    &bradford_mat,
+-    (float [16]) {
+-       0.89510f, -0.7502f,  0.0389f, 0.0f,
+-       0.26640f,  1.7135f, -0.0685f, 0.0f,
+-      -0.16140f,  0.0367f,  1.0296f, 0.0f,
+-       0.00000f,  0.0000f,  0.0000f, 1.0f,
+-    });
+-
+-  graphene_matrix_init_from_float (
+-    &inv_bradford_mat,
+-    (float [16]) {
+-       0.9869929f, 0.4323053f, -0.0085287f, 0.0f,
+-      -0.1470543f, 0.5183603f,  0.0400428f, 0.0f,
+-       0.1599627f, 0.0492912f,  0.9684867f, 0.0f,
+-       0.0000000f, 0.0000000f,  0.0000000f, 1.0f,
+-    });
+-
+-  graphene_matrix_transform_vec3 (&bradford_mat,
+-                                  src_white_point_XYZ,
+-                                  &src_white_point_LMS);
+-  graphene_matrix_transform_vec3 (&bradford_mat,
+-                                  dst_white_point_XYZ,
+-                                  &dst_white_point_LMS);
+-
+-  graphene_vec3_divide (&dst_white_point_LMS,
+-                        &src_white_point_LMS,
+-                        &coefficients);
+-
+-  graphene_matrix_init_scale (&coefficients_mat,
+-                              graphene_vec3_get_x (&coefficients),
+-                              graphene_vec3_get_y (&coefficients),
+-                              graphene_vec3_get_z (&coefficients));
+-
+-  graphene_matrix_multiply (&bradford_mat,
+-                            &coefficients_mat,
+-                            chromatic_adaptation);
+-  graphene_matrix_multiply (chromatic_adaptation,
+-                            &inv_bradford_mat,
+-                            chromatic_adaptation);
+-}
+-
+-static void
+-get_to_D65 (const ClutterColorimetry *colorimetry,
+-            graphene_matrix_t        *to_D65)
+-{
+-  const ClutterPrimaries *primaries;
+-  graphene_vec3_t D65_XYZ;
+-  graphene_vec3_t white_point_XYZ;
+-
+-  primaries = clutter_colorimetry_get_primaries (colorimetry);
+-  clutter_xyY_to_XYZ (primaries->w_x, primaries->w_y, 1.0f, &white_point_XYZ);
+-  graphene_vec3_init (&D65_XYZ, CLUTTER_D65_X, CLUTTER_D65_Y, CLUTTER_D65_Z);
+-
+-  compute_chromatic_adaptation (&white_point_XYZ, &D65_XYZ, to_D65);
+-}
+-
+-static void
+-get_from_D65 (const ClutterColorimetry *colorimetry,
+-              graphene_matrix_t        *from_D65)
+-{
+-  const ClutterPrimaries *primaries;
+-  graphene_vec3_t D65_XYZ;
+-  graphene_vec3_t white_point_XYZ;
+-
+-  primaries = clutter_colorimetry_get_primaries (colorimetry);
+-  graphene_vec3_init (&D65_XYZ, CLUTTER_D65_X, CLUTTER_D65_Y, CLUTTER_D65_Z);
+-  clutter_xyY_to_XYZ (primaries->w_x, primaries->w_y, 1.0f, &white_point_XYZ);
+-
+-  compute_chromatic_adaptation (&D65_XYZ, &white_point_XYZ, from_D65);
+-}
+-
+-static void
+-get_params_to_linear_bt2020 (ClutterColorStateParams *params,
+-                             graphene_matrix_t       *out_matrix)
+-{
+-  const ClutterColorimetry *colorimetry;
+-  ClutterColorimetry bt2020_colorimetry = {
+-    .type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE,
+-    .colorspace = CLUTTER_COLORSPACE_BT2020,
+-  };
+-  graphene_matrix_t to_XYZ, to_D65, from_XYZ_bt2020;
+-  graphene_matrix_t temp;
+-
+-  colorimetry = clutter_color_state_params_get_colorimetry (params);
+-
+-  clutter_colorimetry_to_XYZ (colorimetry, &to_XYZ);
+-  get_to_D65 (colorimetry, &to_D65);
+-  clutter_colorimetry_from_XYZ (&bt2020_colorimetry, &from_XYZ_bt2020);
+-
+-  /* source → XYZ → XYZ D65 → BT.2020 */
+-  graphene_matrix_multiply (&to_XYZ, &to_D65, &temp);
+-  graphene_matrix_multiply (&temp, &from_XYZ_bt2020, out_matrix);
+-}
+-
+-static void
+-get_params_from_linear_bt2020 (ClutterColorStateParams *params,
+-                               graphene_matrix_t       *out_matrix)
+-{
+-  const ClutterColorimetry *colorimetry;
+-  ClutterColorimetry bt2020_colorimetry = {
+-    .type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE,
+-    .colorspace = CLUTTER_COLORSPACE_BT2020,
+-  };
+-  graphene_matrix_t to_XYZ_bt2020, from_D65, from_XYZ;
+-  graphene_matrix_t temp;
+-
+-  colorimetry = clutter_color_state_params_get_colorimetry (params);
+-
+-  clutter_colorimetry_to_XYZ (&bt2020_colorimetry, &to_XYZ_bt2020);
+-  get_from_D65 (colorimetry, &from_D65);
+-  clutter_colorimetry_from_XYZ (colorimetry, &from_XYZ);
+-
+-  /* BT.2020 → XYZ D65 → XYZ → target */
+-  graphene_matrix_multiply (&to_XYZ_bt2020, &from_D65, &temp);
+-  graphene_matrix_multiply (&temp, &from_XYZ, out_matrix);
++  if (!clutter_chromatic_adaptation_matrix (src_white_point_XYZ,
++                                            dst_white_point_XYZ,
++                                            chromatic_adaptation))
++    g_assert_not_reached ();
+ }
+ 
+ static ClutterColorOp *
+@@ -295,10 +180,38 @@ create_inv_eotf_op (const ClutterEOTF *eotf)
+   g_assert_not_reached ();
+ }
+ 
++/*
++ * Every producer of a parametric color state from external input validates its
++ * colorimetry with clutter_colorimetry_get_linear_bt2020_matrices(), the same
++ * function used here, so reaching this is a bug in the producer. There is no
++ * matrix that would represent the requested space, so the transform is left
++ * incomplete and the producer is named loudly instead of substituting one.
++ */
++static void
++warn_unusable_colorimetry (ClutterColorStateParams *params,
++                           const GError            *error)
++{
++  static GQuark warned_quark = 0;
++  g_autofree char *description = NULL;
++
++  /* Transforms are rebuilt for every pairing; name the state only once. */
++  if (G_UNLIKELY (!warned_quark))
++    warned_quark = g_quark_from_static_string ("-clutter-unusable-colorimetry-warned");
++  if (g_object_get_qdata (G_OBJECT (params), warned_quark))
++    return;
++  g_object_set_qdata (G_OBJECT (params), warned_quark, GINT_TO_POINTER (TRUE));
++
++  description = clutter_color_state_to_string (CLUTTER_COLOR_STATE (params));
++  g_warning ("Color state %s has no usable linear BT.2020 conversion: %s",
++             description, error->message);
++}
++
+ static void
+ add_params_to_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+                                  ClutterColorStateParams *params)
+ {
++  const ClutterColorimetry *colorimetry;
++  g_autoptr (GError) error = NULL;
+   const ClutterEOTF *eotf;
+   graphene_matrix_t to_linear_bt2020_stack;
+   graphene_matrix_t *to_linear_bt2020;
+@@ -314,7 +227,15 @@ add_params_to_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+   }
+ 
+   /* 2. Transform to linear BT.2020 D65 (via XYZ) */
+-  get_params_to_linear_bt2020 (params, &to_linear_bt2020_stack);
++  colorimetry = clutter_color_state_params_get_colorimetry (params);
++  if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
++                                                       &to_linear_bt2020_stack,
++                                                       NULL,
++                                                       &error))
++    {
++      warn_unusable_colorimetry (params, error);
++      return;
++    }
+ 
+   to_linear_bt2020 = graphene_matrix_alloc ();
+   graphene_matrix_init_from_matrix (to_linear_bt2020,
+@@ -327,6 +248,8 @@ static void
+ add_params_from_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+                                    ClutterColorStateParams *params)
+ {
++  const ClutterColorimetry *colorimetry;
++  g_autoptr (GError) error = NULL;
+   const ClutterEOTF *eotf;
+   graphene_matrix_t from_linear_bt2020_stack;
+   graphene_matrix_t *from_linear_bt2020;
+@@ -334,7 +257,16 @@ add_params_from_linear_bt2020_ops (ClutterColorPipeline    *pipeline,
+   eotf = clutter_color_state_params_get_eotf (params);
+ 
+   /* 1. Transform from linear BT.2020 D65 to target colorspace (via XYZ) */
+-  get_params_from_linear_bt2020 (params, &from_linear_bt2020_stack);
++  colorimetry = clutter_color_state_params_get_colorimetry (params);
++  if (!clutter_colorimetry_get_linear_bt2020_matrices (colorimetry,
++                                                       NULL,
++                                                       &from_linear_bt2020_stack,
++                                                       &error))
++    {
++      warn_unusable_colorimetry (params, error);
++      return;
++    }
++
+   from_linear_bt2020 = graphene_matrix_alloc ();
+   graphene_matrix_init_from_matrix (from_linear_bt2020,
+                                     &from_linear_bt2020_stack);
+diff --git a/clutter/clutter/clutter-color-utils-private.h b/clutter/clutter/clutter-color-utils-private.h
+new file mode 100644
+index 000000000..1fb8b8c89
+--- /dev/null
++++ b/clutter/clutter/clutter-color-utils-private.h
+@@ -0,0 +1,41 @@
++/*
++ * Clutter.
++ *
++ * An OpenGL based 'interactive canvas' library.
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with this library. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#pragma once
++
++#include "clutter/clutter-color-utils.h"
++
++/*
++ * Fallible color matrix math. The public clutter_colorimetry_to_XYZ() and
++ * clutter_colorimetry_from_XYZ() keep their historical warning-and-identity
++ * contract; everything that must know whether a colorimetry is usable uses
++ * clutter_colorimetry_get_linear_bt2020_matrices() instead. Not part of the
++ * installed API.
++ */
++
++gboolean clutter_chromatic_adaptation_matrix (const graphene_vec3_t *src_white_point_XYZ,
++                                              const graphene_vec3_t *dst_white_point_XYZ,
++                                              graphene_matrix_t     *chromatic_adaptation) G_GNUC_WARN_UNUSED_RESULT;
++
++/* Exported for libmutter, which validates client and EDID colorimetry. */
++CLUTTER_EXPORT
++gboolean clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *colorimetry,
++                                                         graphene_matrix_t         *to_linear_bt2020,
++                                                         graphene_matrix_t         *from_linear_bt2020,
++                                                         GError                   **error) G_GNUC_WARN_UNUSED_RESULT;
+diff --git a/clutter/clutter/clutter-color-utils.c b/clutter/clutter/clutter-color-utils.c
+index e27114154..d5feb29d4 100644
+--- a/clutter/clutter/clutter-color-utils.c
++++ b/clutter/clutter/clutter-color-utils.c
+@@ -22,10 +22,12 @@
+ 
+ #include "config.h"
+ 
+-#include "clutter/clutter-color-utils.h"
++#include "clutter/clutter-color-utils-private.h"
+ 
+ #include <float.h>
++#include <gio/gio.h>
+ #include <glib.h>
++#include <math.h>
+ 
+ const char *
+ clutter_colorspace_to_string (ClutterColorspace colorspace)
+@@ -342,27 +344,58 @@ clutter_xyY_to_XYZ (float            x,
+                       ((1 - x - y) * Y) / y);
+ }
+ 
++static void
++init_primaries_matrix (const ClutterPrimaries *primaries,
++                       graphene_matrix_t      *primaries_mat)
++{
++  graphene_matrix_init_from_float (
++    primaries_mat,
++    (float [16]) {
++    primaries->r_x, primaries->r_y, 1 - primaries->r_x - primaries->r_y, 0.0f,
++    primaries->g_x, primaries->g_y, 1 - primaries->g_x - primaries->g_y, 0.0f,
++    primaries->b_x, primaries->b_y, 1 - primaries->b_x - primaries->b_y, 0.0f,
++    0.0f, 0.0f, 0.0f, 1.0f,
++  });
++}
++
++/* Scales the primaries so that RGB (1, 1, 1) maps to @white_point_XYZ. */
++static void
++scale_primaries_to_white_point (const graphene_matrix_t *primaries_mat,
++                                const graphene_matrix_t *inv_primaries_mat,
++                                const graphene_vec3_t   *white_point_XYZ,
++                                graphene_matrix_t       *to_XYZ)
++{
++  graphene_matrix_t coefficients_mat;
++  graphene_vec3_t coefficients;
++
++  graphene_matrix_transform_vec3 (inv_primaries_mat,
++                                  white_point_XYZ,
++                                  &coefficients);
++
++  graphene_matrix_init_scale (&coefficients_mat,
++                              graphene_vec3_get_x (&coefficients),
++                              graphene_vec3_get_y (&coefficients),
++                              graphene_vec3_get_z (&coefficients));
++
++  graphene_matrix_multiply (&coefficients_mat, primaries_mat, to_XYZ);
++}
++
++/*
++ * Public API with a historical contract: failures are reported with a warning
++ * and an identity matrix. Internal users that need to know whether the
++ * colorimetry is usable use clutter_colorimetry_get_linear_bt2020_matrices().
++ */
+ void
+ clutter_colorimetry_to_XYZ (const ClutterColorimetry *colorimetry,
+                             graphene_matrix_t        *to_XYZ)
+ {
+   const ClutterPrimaries *primaries;
+-  graphene_matrix_t coefficients_mat;
+   graphene_matrix_t inv_primaries_mat;
+   graphene_matrix_t primaries_mat;
+   graphene_vec3_t white_point_XYZ;
+-  graphene_vec3_t coefficients;
+ 
+   primaries = clutter_colorimetry_get_primaries (colorimetry);
+-
+-  graphene_matrix_init_from_float (
+-    &primaries_mat,
+-    (float [16]) {
+-    primaries->r_x, primaries->r_y, 1 - primaries->r_x - primaries->r_y, 0.0f,
+-    primaries->g_x, primaries->g_y, 1 - primaries->g_x - primaries->g_y, 0.0f,
+-    primaries->b_x, primaries->b_y, 1 - primaries->b_x - primaries->b_y, 0.0f,
+-    0.0f, 0.0f, 0.0f, 1.0f,
+-  });
++  init_primaries_matrix (primaries, &primaries_mat);
+ 
+   if (!graphene_matrix_inverse (&primaries_mat, &inv_primaries_mat))
+     {
+@@ -374,29 +407,350 @@ clutter_colorimetry_to_XYZ (const ClutterColorimetry *colorimetry,
+   clutter_xyY_to_XYZ (primaries->w_x, primaries->w_y, 1.0f,
+                       &white_point_XYZ);
+ 
++  scale_primaries_to_white_point (&primaries_mat, &inv_primaries_mat,
++                                  &white_point_XYZ, to_XYZ);
++}
++
++void
++clutter_colorimetry_from_XYZ (const ClutterColorimetry *colorimetry,
++                              graphene_matrix_t        *from_XYZ)
++{
++  graphene_matrix_t to_XYZ;
++
++  clutter_colorimetry_to_XYZ (colorimetry, &to_XYZ);
++
++  if (!graphene_matrix_inverse (&to_XYZ, from_XYZ))
++    {
++      g_warning ("Failed computing color space mapping matrix from XYZ");
++      graphene_matrix_init_identity (from_XYZ);
++    }
++}
++
++static gboolean
++matrix_is_finite (const graphene_matrix_t *matrix)
++{
++  float values[16];
++  int i;
++
++  graphene_matrix_to_float (matrix, values);
++  for (i = 0; i < 16; i++)
++    {
++      if (!isfinite (values[i]))
++        return FALSE;
++    }
++
++  return TRUE;
++}
++
++static gboolean
++vec3_is_finite (const graphene_vec3_t *vec)
++{
++  return isfinite (graphene_vec3_get_x (vec)) &&
++         isfinite (graphene_vec3_get_y (vec)) &&
++         isfinite (graphene_vec3_get_z (vec));
++}
++
++/*
++ * Like clutter_xyY_to_XYZ() for a white point, but fails instead of patching
++ * y = 0. A white point is a physical stimulus: its y chromaticity must be
++ * positive, even when the primaries around it are imaginary.
++ */
++static gboolean
++white_point_to_XYZ_checked (float            x,
++                            float            y,
++                            graphene_vec3_t *XYZ)
++{
++  if (!(y > 0.0f))
++    return FALSE;
++
++  graphene_vec3_init (XYZ, x / y, 1.0f, (1 - x - y) / y);
++
++  return vec3_is_finite (XYZ);
++}
++
++static gboolean
++vec3_is_positive (const graphene_vec3_t *vec)
++{
++  return graphene_vec3_get_x (vec) > 0.0f &&
++         graphene_vec3_get_y (vec) > 0.0f &&
++         graphene_vec3_get_z (vec) > 0.0f;
++}
++
++/*
++ * Computes the matrix mapping linear RGB in @colorimetry to CIE XYZ, scaled
++ * so that RGB (1, 1, 1) maps to the white point with Y = 1. Imaginary
++ * primaries (coordinates outside [0, 1]) are valid input.
++ *
++ * Returns %FALSE, setting @error, if the primaries do not span a color space
++ * (collinear primaries), the white point does not have a positive y, the
++ * white point is not a positive combination of the three primaries (it lies
++ * on or outside their triangle, which would give a primary a zero or negative
++ * scale), or the resulting matrix is not finite. @to_XYZ is undefined in that
++ * case.
++ */
++static gboolean
++colorimetry_to_XYZ_checked (const ClutterColorimetry  *colorimetry,
++                            graphene_matrix_t         *to_XYZ,
++                            GError                   **error)
++{
++  const ClutterPrimaries *primaries;
++  graphene_matrix_t inv_primaries_mat;
++  graphene_matrix_t primaries_mat;
++  graphene_vec3_t white_point_XYZ;
++  graphene_vec3_t coefficients;
++
++  primaries = clutter_colorimetry_get_primaries (colorimetry);
++  init_primaries_matrix (primaries, &primaries_mat);
++
++  if (!matrix_is_finite (&primaries_mat) ||
++      !graphene_matrix_inverse (&primaries_mat, &inv_primaries_mat))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The RGB primaries are collinear and do not span "
++                           "a color space");
++      return FALSE;
++    }
++
++  if (!white_point_to_XYZ_checked (primaries->w_x, primaries->w_y,
++                                   &white_point_XYZ))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The white point must have a positive, finite y "
++                           "chromaticity");
++      return FALSE;
++    }
++
+   graphene_matrix_transform_vec3 (&inv_primaries_mat,
+                                   &white_point_XYZ,
+                                   &coefficients);
++  if (!vec3_is_positive (&coefficients))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The white point is not a positive combination of "
++                           "the RGB primaries");
++      return FALSE;
++    }
++
++  scale_primaries_to_white_point (&primaries_mat, &inv_primaries_mat,
++                                  &white_point_XYZ, to_XYZ);
++
++  if (!matrix_is_finite (to_XYZ))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The RGB to XYZ matrix is not finite");
++      return FALSE;
++    }
++
++  return TRUE;
++}
++
++static gboolean
++invert_to_XYZ (const graphene_matrix_t  *to_XYZ,
++               graphene_matrix_t        *from_XYZ,
++               GError                  **error)
++{
++  if (!graphene_matrix_inverse (to_XYZ, from_XYZ) ||
++      !matrix_is_finite (from_XYZ))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The RGB to XYZ matrix cannot be inverted");
++      return FALSE;
++    }
++
++  return TRUE;
++}
++
++/*
++ * Computes the Bradford chromatic adaptation from @src_white_point_XYZ to
++ * @dst_white_point_XYZ.
++ *
++ * Returns %FALSE unless both white points have positive cone responses
++ * (otherwise the per-cone gains would be zero, negative or infinite), and
++ * the adaptation is finite and invertible. @chromatic_adaptation is undefined
++ * in that case.
++ */
++gboolean
++clutter_chromatic_adaptation_matrix (const graphene_vec3_t *src_white_point_XYZ,
++                                     const graphene_vec3_t *dst_white_point_XYZ,
++                                     graphene_matrix_t     *chromatic_adaptation)
++{
++  graphene_matrix_t coefficients_mat;
++  graphene_matrix_t bradford_mat, inv_bradford_mat;
++  graphene_matrix_t inverse;
++  graphene_vec3_t src_white_point_LMS, dst_white_point_LMS;
++  graphene_vec3_t coefficients;
++
++  graphene_matrix_init_from_float (
++    &bradford_mat,
++    (float [16]) {
++    0.89510f, -0.7502f,  0.0389f, 0.0f,
++    0.26640f,  1.7135f, -0.0685f, 0.0f,
++    -0.16140f,  0.0367f,  1.0296f, 0.0f,
++    0.00000f,  0.0000f,  0.0000f, 1.0f,
++  });
++
++  graphene_matrix_init_from_float (
++    &inv_bradford_mat,
++    (float [16]) {
++    0.9869929f, 0.4323053f, -0.0085287f, 0.0f,
++    -0.1470543f, 0.5183603f,  0.0400428f, 0.0f,
++    0.1599627f, 0.0492912f,  0.9684867f, 0.0f,
++    0.0000000f, 0.0000000f,  0.0000000f, 1.0f,
++  });
++
++  graphene_matrix_transform_vec3 (&bradford_mat,
++                                  src_white_point_XYZ,
++                                  &src_white_point_LMS);
++  graphene_matrix_transform_vec3 (&bradford_mat,
++                                  dst_white_point_XYZ,
++                                  &dst_white_point_LMS);
++
++  if (!vec3_is_positive (&src_white_point_LMS) ||
++      !vec3_is_positive (&dst_white_point_LMS))
++    return FALSE;
++
++  graphene_vec3_divide (&dst_white_point_LMS,
++                        &src_white_point_LMS,
++                        &coefficients);
++  if (!vec3_is_finite (&coefficients))
++    return FALSE;
+ 
+   graphene_matrix_init_scale (&coefficients_mat,
+                               graphene_vec3_get_x (&coefficients),
+                               graphene_vec3_get_y (&coefficients),
+                               graphene_vec3_get_z (&coefficients));
+ 
+-  graphene_matrix_multiply (&coefficients_mat, &primaries_mat, to_XYZ);
++  graphene_matrix_multiply (&bradford_mat,
++                            &coefficients_mat,
++                            chromatic_adaptation);
++  graphene_matrix_multiply (chromatic_adaptation,
++                            &inv_bradford_mat,
++                            chromatic_adaptation);
++
++  return matrix_is_finite (chromatic_adaptation) &&
++         graphene_matrix_inverse (chromatic_adaptation, &inverse);
+ }
+ 
+-void
+-clutter_colorimetry_from_XYZ (const ClutterColorimetry *colorimetry,
+-                              graphene_matrix_t        *from_XYZ)
++/*
++ * graphene_matrix_inverse() accepts any matrix whose determinant is at least
++ * FLT_EPSILON in absolute value, a threshold that does not scale with the
++ * matrix. Nearly singular colorimetries pass it, and their single precision
++ * inverses are then far from exact. The matrices used for rendering are
++ * therefore accepted only if their round trip, evaluated in double
++ * precision, is within this distance of identity in every element.
++ * Well-conditioned spaces, including large imaginary gamuts, stay below
++ * 2e-6.
++ */
++#define LINEAR_BT2020_ROUND_TRIP_TOLERANCE 1e-4
++
++static double
++round_trip_error (const graphene_matrix_t *a,
++                  const graphene_matrix_t *b)
+ {
+-  graphene_matrix_t to_XYZ;
++  float a_values[16], b_values[16];
++  double max_error = 0.0;
++  int row, column, i;
+ 
+-  clutter_colorimetry_to_XYZ (colorimetry, &to_XYZ);
++  graphene_matrix_to_float (a, a_values);
++  graphene_matrix_to_float (b, b_values);
+ 
+-  if (!graphene_matrix_inverse (&to_XYZ, from_XYZ))
++  for (row = 0; row < 3; row++)
+     {
+-      g_warning ("Failed computing color space mapping matrix from XYZ");
+-      graphene_matrix_init_identity (from_XYZ);
++      for (column = 0; column < 3; column++)
++        {
++          double sum = 0.0;
++
++          for (i = 0; i < 3; i++)
++            sum += (double) a_values[row * 4 + i] * b_values[i * 4 + column];
++
++          sum -= row == column ? 1.0 : 0.0;
++          max_error = MAX (max_error, fabs (sum));
++        }
++    }
++
++  return max_error;
++}
++
++/*
++ * Computes the two matrices a ClutterColorTransform uses for a parametric
++ * color state with @colorimetry: RGB to XYZ, Bradford adaptation of the white
++ * point to D65, then XYZ to BT.2020 (@to_linear_bt2020, optional), and the
++ * reverse chain (@from_linear_bt2020, optional).
++ *
++ * Both directions are always computed and checked, so %TRUE means the
++ * colorimetry can be used both as a source and as a target. Producers of
++ * color states from untrusted input use this to decide whether the
++ * colorimetry is supported, so that acceptance and rendering share one
++ * definition.
++ *
++ * Returns %TRUE if both matrices are finite and are each other's inverse
++ * within LINEAR_BT2020_ROUND_TRIP_TOLERANCE; otherwise sets @error.
++ */
++gboolean
++clutter_colorimetry_get_linear_bt2020_matrices (const ClutterColorimetry  *colorimetry,
++                                                graphene_matrix_t         *to_linear_bt2020,
++                                                graphene_matrix_t         *from_linear_bt2020,
++                                                GError                   **error)
++{
++  const ClutterColorimetry bt2020_colorimetry = {
++    .type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE,
++    .colorspace = CLUTTER_COLORSPACE_BT2020,
++  };
++  const ClutterPrimaries *primaries;
++  graphene_matrix_t to_XYZ, from_XYZ, to_XYZ_bt2020, from_XYZ_bt2020;
++  graphene_matrix_t to_D65, from_D65;
++  graphene_matrix_t to_bt2020, from_bt2020, temp;
++  graphene_vec3_t white_point_XYZ, D65_XYZ;
++
++  if (!colorimetry_to_XYZ_checked (colorimetry, &to_XYZ, error) ||
++      !invert_to_XYZ (&to_XYZ, &from_XYZ, error))
++    return FALSE;
++
++  if (!colorimetry_to_XYZ_checked (&bt2020_colorimetry,
++                                   &to_XYZ_bt2020, error) ||
++      !invert_to_XYZ (&to_XYZ_bt2020, &from_XYZ_bt2020, error))
++    return FALSE;
++
++  primaries = clutter_colorimetry_get_primaries (colorimetry);
++  /* Checked by colorimetry_to_XYZ_checked() above. */
++  if (!white_point_to_XYZ_checked (primaries->w_x, primaries->w_y,
++                                   &white_point_XYZ))
++    g_assert_not_reached ();
++  graphene_vec3_init (&D65_XYZ, CLUTTER_D65_X, CLUTTER_D65_Y, CLUTTER_D65_Z);
++
++  if (!clutter_chromatic_adaptation_matrix (&white_point_XYZ, &D65_XYZ,
++                                            &to_D65) ||
++      !clutter_chromatic_adaptation_matrix (&D65_XYZ, &white_point_XYZ,
++                                            &from_D65))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The white point cannot be adapted to D65");
++      return FALSE;
++    }
++
++  /* source → XYZ → XYZ D65 → BT.2020 */
++  graphene_matrix_multiply (&to_XYZ, &to_D65, &temp);
++  graphene_matrix_multiply (&temp, &from_XYZ_bt2020, &to_bt2020);
++
++  /* BT.2020 → XYZ D65 → XYZ → target */
++  graphene_matrix_multiply (&to_XYZ_bt2020, &from_D65, &temp);
++  graphene_matrix_multiply (&temp, &from_XYZ, &from_bt2020);
++
++  if (!matrix_is_finite (&to_bt2020) ||
++      !matrix_is_finite (&from_bt2020) ||
++      round_trip_error (&to_bt2020, &from_bt2020) > LINEAR_BT2020_ROUND_TRIP_TOLERANCE ||
++      round_trip_error (&from_bt2020, &to_bt2020) > LINEAR_BT2020_ROUND_TRIP_TOLERANCE)
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "The colorimetry is too close to degenerate for an "
++                           "accurate conversion to and from linear BT.2020");
++      return FALSE;
+     }
++
++  if (to_linear_bt2020)
++    *to_linear_bt2020 = to_bt2020;
++  if (from_linear_bt2020)
++    *from_linear_bt2020 = from_bt2020;
++
++  return TRUE;
+ }
+diff --git a/clutter/clutter/meson.build b/clutter/clutter/meson.build
+index 98dd2b22a..f30b15ab9 100644
+--- a/clutter/clutter/meson.build
++++ b/clutter/clutter/meson.build
+@@ -195,6 +195,7 @@ clutter_private_headers = [
+   'clutter-constraint-private.h',
+   'clutter-content-private.h',
+   'clutter-context-private.h',
++  'clutter-color-utils-private.h',
+   'clutter-cursor-private.h',
+   'clutter-damage-history.h',
+   'clutter-debug.h',

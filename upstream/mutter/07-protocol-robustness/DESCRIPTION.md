@@ -20,7 +20,7 @@ objects; this is rebased on it. These are bug fixes against current main in subs
 textually the series is stacked on the native target MR (unit 06); I can rebase them onto main
 separately if you would rather take them first.
 
-## How it was tested
+## Inherited validation (2026-10-27)
 
 On lab5 (Ubuntu 26.10 container: GCC 15.3, meson 1.10.1, GLib 2.90, GTK 4.24.1, Mesa 26.2.4
 llvmpipe), on `main` b48811767 with the stacked units below this one, against libdisplay-info
@@ -41,10 +41,18 @@ LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe META_DBUS_RUNNER_DISABLE_LOGIND_
 Not run here: Mutter's full CI matrix (Fedora image, KVM and native KMS tests, X11 and Xwayland
 jobs) and any test on real hardware with this exact series.
 
+
+The commands and results above are inherited from the handoff's original
+branches. Preparation review subsequently fixed a luminance conversion in
+unit 06 and its unit 09 caller; dependent branch identities therefore changed.
+Fresh checks and exact source identities are recorded in
+[Mutter preparation review](../PREPARATION-REVIEW.md). The earlier per-commit
+and release results have not been repeated for every revised descendant.
+
 ## The series
 
 Overview of the whole series, its hardware evidence and the coordination questions with !5068 and !5177: @SERIES_ISSUE@.
 
 ## AI assistance
 
-Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code). I reviewed the changes and take responsibility for them.
+Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code).

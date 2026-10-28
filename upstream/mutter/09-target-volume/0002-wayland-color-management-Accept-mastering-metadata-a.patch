@@ -1,8 +1,8 @@
-From 92953711c9088dbbd9bed9bb0c91fab043c9e548 Mon Sep 17 00:00:00 2001
+From e6cd9dd6015997c060af8a7fff72b1fbb8523640 Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Sat, 10 Oct 2026 20:11:39 -0400
-Subject: [PATCH 2/3] wayland/color-management: Accept mastering metadata and
- light levels
+Subject: [PATCH 2/3] wayland/color-management: Accept mastering metadata and light
+ levels
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -66,11 +66,11 @@ as well as in color state equality.
 
 Link: TBD-MR
 ---
- src/wayland/meta-wayland-color-management.c | 359 ++++++++++++++++----
- 1 file changed, 300 insertions(+), 59 deletions(-)
+ src/wayland/meta-wayland-color-management.c | 357 ++++++++++++++++----
+ 1 file changed, 299 insertions(+), 58 deletions(-)
 
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index d02c095fb..e7d34e7f1 100644
+index 92ae6992a..6c4b950dd 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -30,6 +30,7 @@
@@ -94,15 +94,14 @@ index d02c095fb..e7d34e7f1 100644
    /* Set when the parameters are well-formed but cannot be supported; the
     * created image description then fails with the 'unsupported' cause. */
    const char *unsupported_reason;
-@@ -468,16 +475,41 @@ description_record_get (MetaWaylandDescriptionIds      *ids,
+@@ -468,15 +475,40 @@ description_record_get (MetaWaylandDescriptionIds      *ids,
                          const MetaColorTargetPrimaries *target_primaries)
  {
    const ClutterLuminance *encoding = clutter_color_state_get_luminance (color_state);
 -  MetaWaylandDescriptionRecord lookup = {
 -    .color_state = color_state,
--    .target_minimum = (uint32_t) MIN ((double) ((target ? target->minimum : encoding->min) * 10000.0f),
--                                      G_MAXUINT32),
--    .target_maximum = (uint32_t) (target ? target->maximum : encoding->max),
+-    .target_minimum = meta_color_luminance_to_uint32 ((target ? target->minimum : encoding->min) * 10000.0f),
+-    .target_maximum = meta_color_luminance_to_uint32 (target ? target->maximum : encoding->max),
 -  };
 +  const ClutterColorTargetVolume *target_volume = NULL;
 +  float target_minimum = encoding->min;
@@ -129,9 +128,8 @@ index d02c095fb..e7d34e7f1 100644
 +      target_maximum = target_volume->max_lum;
 +    }
 +  /* Scaled in single precision, so published minimums keep their values. */
-+  lookup.target_minimum = (uint32_t) MIN ((double) (target_minimum * 10000.0f),
-+                                          G_MAXUINT32);
-+  lookup.target_maximum = (uint32_t) target_maximum;
++  lookup.target_minimum = meta_color_luminance_to_uint32 (target_minimum * 10000.0f);
++  lookup.target_maximum = meta_color_luminance_to_uint32 (target_maximum);
 +
 +  if (!target_primaries && target_volume && target_volume->has_primaries)
 +    {
@@ -143,7 +141,7 @@ index d02c095fb..e7d34e7f1 100644
      {
        const ClutterColorimetry *colorimetry =
          clutter_color_state_params_get_colorimetry (CLUTTER_COLOR_STATE_PARAMS (color_state));
-@@ -1502,11 +1534,20 @@ creator_params_destructor (struct wl_resource *resource)
+@@ -1501,11 +1533,20 @@ creator_params_destructor (struct wl_resource *resource)
   * imaginary. Whether they are supported is decided by the renderer's own
   * matrices, computed by the same function that builds the color transform, so
   * acceptance and rendering cannot disagree about supported colorimetry.
@@ -164,7 +162,7 @@ index d02c095fb..e7d34e7f1 100644
    if (creator_params->unsupported_reason)
      {
        g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
-@@ -1535,9 +1576,113 @@ creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
+@@ -1534,9 +1575,113 @@ creator_params_check_supported (MetaWaylandCreatorParams  *creator_params,
          return FALSE;
      }
  
@@ -278,7 +276,7 @@ index d02c095fb..e7d34e7f1 100644
  static void
  creator_params_create (struct wl_client   *client,
                         struct wl_resource *resource,
-@@ -1551,6 +1696,7 @@ creator_params_create (struct wl_client   *client,
+@@ -1550,6 +1695,7 @@ creator_params_create (struct wl_client   *client,
    g_autoptr (ClutterColorState) color_state = NULL;
    g_autoptr (MetaWaylandImageDescription) image_desc = NULL;
    g_autoptr (GError) error = NULL;
@@ -286,7 +284,7 @@ index d02c095fb..e7d34e7f1 100644
  
    if (!creator_params->is_colorimetry_set || !creator_params->is_eotf_set)
      {
-@@ -1560,6 +1706,14 @@ creator_params_create (struct wl_client   *client,
+@@ -1559,6 +1705,14 @@ creator_params_create (struct wl_client   *client,
        return;
      }
  
@@ -301,7 +299,7 @@ index d02c095fb..e7d34e7f1 100644
    image_desc_resource =
      wl_resource_create (client,
                          &wp_image_description_v1_interface,
-@@ -1576,6 +1730,15 @@ creator_params_create (struct wl_client   *client,
+@@ -1575,6 +1729,15 @@ creator_params_create (struct wl_client   *client,
                                                          creator_params->colorimetry,
                                                          creator_params->eotf,
                                                          creator_params->lum);
@@ -317,7 +315,7 @@ index d02c095fb..e7d34e7f1 100644
        meta_wayland_image_description_set_ready (image_desc,
                                                  color_state,
                                                  META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
-@@ -1693,6 +1856,55 @@ creator_params_set_primaries_named (struct wl_client   *client,
+@@ -1692,6 +1855,55 @@ creator_params_set_primaries_named (struct wl_client   *client,
    creator_params->is_colorimetry_set = TRUE;
  }
  
@@ -373,7 +371,7 @@ index d02c095fb..e7d34e7f1 100644
  static void
  creator_params_set_primaries (struct wl_client   *client,
                                struct wl_resource *resource,
-@@ -1708,9 +1920,7 @@ creator_params_set_primaries (struct wl_client   *client,
+@@ -1707,9 +1919,7 @@ creator_params_set_primaries (struct wl_client   *client,
    MetaWaylandCreatorParams *creator_params =
      wl_resource_get_user_data (resource);
    const int32_t requested[8] = { r_x, r_y, g_x, g_y, b_x, b_y, w_x, w_y };
@@ -383,7 +381,7 @@ index d02c095fb..e7d34e7f1 100644
  
    if (creator_params->is_colorimetry_set)
      {
-@@ -1721,38 +1931,8 @@ creator_params_set_primaries (struct wl_client   *client,
+@@ -1720,38 +1930,8 @@ creator_params_set_primaries (struct wl_client   *client,
      }
  
    primaries = g_new0 (ClutterPrimaries, 1);
@@ -424,7 +422,7 @@ index d02c095fb..e7d34e7f1 100644
  
    creator_params->colorimetry.type = CLUTTER_COLORIMETRY_TYPE_PRIMARIES;
    creator_params->colorimetry.primaries = primaries;
-@@ -1798,14 +1978,7 @@ creator_params_set_luminance (struct wl_client   *client,
+@@ -1797,14 +1977,7 @@ creator_params_set_luminance (struct wl_client   *client,
        return;
      }
  
@@ -440,7 +438,7 @@ index d02c095fb..e7d34e7f1 100644
  
    creator_params->lum.type = CLUTTER_LUMINANCE_TYPE_EXPLICIT;
    creator_params->lum.min = min;
-@@ -1826,9 +1999,25 @@ creator_params_set_mastering_display_primaries (struct wl_client   *client,
+@@ -1825,9 +1998,25 @@ creator_params_set_mastering_display_primaries (struct wl_client   *client,
                                                  int32_t             w_x,
                                                  int32_t             w_y)
  {
@@ -469,7 +467,7 @@ index d02c095fb..e7d34e7f1 100644
  }
  
  static void
-@@ -1837,9 +2026,31 @@ creator_params_set_mastering_luminance (struct wl_client   *client,
+@@ -1836,9 +2025,31 @@ creator_params_set_mastering_luminance (struct wl_client   *client,
                                          uint32_t            min_lum,
                                          uint32_t            max_lum)
  {
@@ -504,7 +502,7 @@ index d02c095fb..e7d34e7f1 100644
  }
  
  static void
-@@ -1847,8 +2058,20 @@ creator_params_set_max_cll (struct wl_client   *client,
+@@ -1846,8 +2057,20 @@ creator_params_set_max_cll (struct wl_client   *client,
                              struct wl_resource *resource,
                              uint32_t            max_cll)
  {
@@ -527,7 +525,7 @@ index d02c095fb..e7d34e7f1 100644
  }
  
  static void
-@@ -1856,8 +2079,20 @@ creator_params_set_max_fall (struct wl_client   *client,
+@@ -1855,8 +2078,20 @@ creator_params_set_max_fall (struct wl_client   *client,
                               struct wl_resource *resource,
                               uint32_t            max_fall)
  {
@@ -550,7 +548,7 @@ index d02c095fb..e7d34e7f1 100644
  }
  
  static const struct wp_image_description_creator_params_v1_interface
-@@ -2152,6 +2387,12 @@ color_manager_send_supported_events (struct wl_resource *resource)
+@@ -2151,6 +2386,12 @@ color_manager_send_supported_events (struct wl_resource *resource)
                                                WP_COLOR_MANAGER_V1_FEATURE_SET_TF_POWER);
    wp_color_manager_v1_send_supported_feature (resource,
                                                WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES);

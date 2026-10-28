@@ -1,0 +1,71 @@
+{
+  "repository": "FFmpeg/FFmpeg",
+  "target_branch": "master",
+  "base": "16efe6927d850d23766aee15820abedcb1219121",
+  "venue": "forgejo",
+  "draft": false,
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-videotoolbox-caption-sei",
+      "inventory_ids": [
+        "FF-1"
+      ],
+      "title": "avcodec/videotoolboxenc: count RBSP bytes in SEI payloads",
+      "patches": [
+        "01-videotoolbox-caption-sei/0001-01-videotoolbox-caption-sei.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "python3 reproduction/run.py --source owned-FFmpeg --candidate HEAD --baseline 16efe6927d850d23766aee15820abedcb1219121; make libavcodec/videotoolboxenc.o with H264 VideoToolbox enabled",
+          "result": "actual extracted functions: baseline8/21 expectations, candidate21/21 underASan/UBSan; actualnative translationunitcompiled; nofullencode/A53/FATE",
+          "evidence": "01-videotoolbox-caption-sei/reproduction/receipt.json"
+        }
+      ],
+      "draft": true
+    },
+    {
+      "id": "02",
+      "slug": "02-static-vulkan-probe",
+      "inventory_ids": [
+        "FF-2"
+      ],
+      "title": "configure: probe a symbol when linking static Vulkan",
+      "patches": [
+        "02-static-vulkan-probe/0001-02-static-vulkan-probe.patch"
+      ],
+      "status": "ready-for-human-review",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "configure --enable-vulkan --enable-vulkan-static with isolated static Vulkan fixture",
+          "result": "macOS: baseline exit 1; fixed exit 0; official Vulkan headers and real static-library symbol; MoltenVK not exercised",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ]
+    },
+    {
+      "id": "03",
+      "slug": "03-rasl-frame-thread-report",
+      "inventory_ids": [
+        "FF-3"
+      ],
+      "title": "HEVC skipped-picture continuation already fixed upstream",
+      "patches": [],
+      "status": "superseded",
+      "blockers": [],
+      "tests": [
+        {
+          "command": "inspect upstream e5eb7581dd and current decode_slice/hevc_update_thread_context",
+          "result": "source-confirmed exact old seek/RASL/PPS failure addressed; current state copies skipping_frame across workers; no upstream submission needed",
+          "evidence": "../../evidence/upstream-cinema/validation.json"
+        }
+      ],
+      "superseded_by": "e5eb7581ddc511a46892b5501b26fb831161b5da"
+    }
+  ],
+  "source_url": "https://git.ffmpeg.org/ffmpeg.git",
+  "api_host": "code.ffmpeg.org"
+}

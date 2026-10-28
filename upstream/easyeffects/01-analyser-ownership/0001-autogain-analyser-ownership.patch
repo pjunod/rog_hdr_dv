@@ -1,0 +1,829 @@
+From e9dbf12cd6670050d16d2e5df80f54ad46447370 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 14:13:56 -0400
+Subject: [PATCH] Autogain: make the libebur128 state safe to use from several
+ threads
+
+The libebur128 state of the autogain plugin is created on the plugin worker
+thread, used by the realtime thread in process(), and changed from the user
+interface thread when the maximum history is edited. Only the last two held
+the plugin mutex. The worker destroyed and replaced the state, and read
+ebur128_ready and wrote old_rate, without it, so changing the maximum
+history while the state was being rebuilt could use a state that was being
+freed. Two rebuilds queued by two quick sample rate changes could also end
+with the first one publishing its state and the second one returning early
+on ebur128_ready, leaving a state for the old rate in use.
+
+Move the state into autogain::AnalyserState, which is the only way to get at
+it. The mutex of that class covers the creation, the history length and the
+use of the state, and process() holds a lease on it for the whole call. A
+rebuild is requested with a generation number and is published only if it is
+still the latest one, so a state built for an old rate, or before the history
+was reset, can no longer replace a newer one. The state is allocated by the
+worker outside of the lock, and old states are freed outside of it.
+
+Also:
+
+- check the return values of ebur128_init(), ebur128_set_channel(),
+  ebur128_set_max_history() and ebur128_add_frames_float(). A failed
+  initialization used to be dereferenced, and the plugin was marked ready
+  even if the channel setup failed;
+- make resetHistory() hold the plugin mutex, and reset prev_gain together
+  with the output gain. Only the latter was reset, so the first block after
+  a reset smoothed from the gain of the history that had just been discarded.
+
+The new autogain_analyser_test covers the ownership rules with a fake state
+type, so it does not need libebur128.
+---
+ CMakeLists.txt                   |   5 +
+ src/autogain.cpp                 | 108 ++++------
+ src/autogain.hpp                 |  24 ++-
+ src/autogain_analyser.hpp        | 163 ++++++++++++++
+ util/tests/autogain_analyser.cpp | 354 +++++++++++++++++++++++++++++++
+ 5 files changed, 585 insertions(+), 69 deletions(-)
+ create mode 100644 src/autogain_analyser.hpp
+ create mode 100644 util/tests/autogain_analyser.cpp
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 38ef5e4e6..57aa90ccd 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -111,4 +111,9 @@ if(BUILD_TESTING)
+     add_executable(hearing_profile_test util/tests/hearing_profile.cpp)
+     target_include_directories(hearing_profile_test PRIVATE src)
+     add_test(NAME hearing-profile COMMAND hearing_profile_test)
++
++    add_executable(autogain_analyser_test util/tests/autogain_analyser.cpp)
++    target_include_directories(autogain_analyser_test PRIVATE src)
++    target_link_libraries(autogain_analyser_test PRIVATE Threads::Threads)
++    add_test(NAME autogain-analyser COMMAND autogain_analyser_test)
+ endif()
+diff --git a/src/autogain.cpp b/src/autogain.cpp
+index 9d77e3938..d78bf2bbc 100644
+--- a/src/autogain.cpp
++++ b/src/autogain.cpp
+@@ -54,11 +54,10 @@ Autogain::Autogain(const std::string& tag, pw::Manager* pipe_manager, PipelineTy
+ 
+   // specific plugin controls
+ 
+-  connect(settings, &DbAutogain::maximumHistoryChanged, [&]() {
+-    std::scoped_lock<std::mutex> lock(data_mutex);
++  analyser.set_history(settings->maximumHistory(), configure_history);
+ 
+-    set_maximum_history(settings->maximumHistory());
+-  });
++  connect(settings, &DbAutogain::maximumHistoryChanged,
++          [&]() { analyser.set_history(settings->maximumHistory(), configure_history); });
+ }
+ 
+ Autogain::~Autogain() {
+@@ -66,17 +65,13 @@ Autogain::~Autogain() {
+ 
+   std::scoped_lock<std::mutex> lock(data_mutex);
+ 
+-  ebur128_ready = false;
+-
+   if (connected_to_pw) {
+     disconnect_from_pw();
+   }
+ 
+   settings->disconnect();
+ 
+-  if (ebur_state != nullptr) {
+-    ebur128_destroy(&ebur_state);
+-  }
++  analyser.clear();
+ 
+   util::debug(std::format("{}{} destroyed", log_tag, name.toStdString()));
+ }
+@@ -89,35 +84,40 @@ void Autogain::clear_data() {
+   setup();
+ }
+ 
+-auto Autogain::init_ebur128() -> bool {
+-  if (n_samples == 0U || rate == 0U) {
+-    return false;
++auto Autogain::init_ebur128(uint sample_rate) -> ebur128_state* {
++  if (sample_rate == 0U) {
++    return nullptr;
+   }
+ 
+-  if (ebur_state != nullptr) {
+-    ebur128_destroy(&ebur_state);
++  auto* state =
++      ebur128_init(2U, sample_rate, EBUR128_MODE_S | EBUR128_MODE_I | EBUR128_MODE_LRA | EBUR128_MODE_SAMPLE_PEAK);
+ 
+-    ebur_state = nullptr;
++  if (state == nullptr) {
++    return nullptr;
+   }
+ 
+-  ebur_state = ebur128_init(2U, rate, EBUR128_MODE_S | EBUR128_MODE_I | EBUR128_MODE_LRA | EBUR128_MODE_SAMPLE_PEAK);
+-
+-  ebur128_set_channel(ebur_state, 0U, EBUR128_LEFT);
+-  ebur128_set_channel(ebur_state, 1U, EBUR128_RIGHT);
++  if (EBUR128_SUCCESS != ebur128_set_channel(state, 0U, EBUR128_LEFT) ||
++      EBUR128_SUCCESS != ebur128_set_channel(state, 1U, EBUR128_RIGHT)) {
++    ebur128_destroy(&state);
+ 
+-  set_maximum_history(settings->maximumHistory());
++    return nullptr;
++  }
+ 
+-  return ebur_state != nullptr;
++  return state;
+ }
+ 
+-void Autogain::set_maximum_history(const int& seconds) {
+-  if (ebur_state == nullptr) {
+-    return;
+-  }
+-
++auto Autogain::configure_history(ebur128_state* state, int seconds) -> bool {
+   // The value given to ebur128_set_max_history must be in milliseconds
+ 
+-  ebur128_set_max_history(ebur_state, static_cast<ulong>(seconds) * 1000UL);
++  return EBUR128_SUCCESS == ebur128_set_max_history(state, static_cast<ulong>(seconds) * 1000UL);
++}
++
++void Autogain::queue_rebuild(uint sample_rate) {
++  const auto request = analyser.request(sample_rate);
++
++  QMetaObject::invokeMethod(
++      baseWorker, [this, request] { analyser.replace(request, init_ebur128, configure_history); },
++      Qt::QueuedConnection);
+ }
+ 
+ void Autogain::setup() {
+@@ -140,32 +140,11 @@ void Autogain::setup() {
+   // There is no need to reset libebur128 when n_samples change.
+   // Only rate changes matter for it.
+ 
+-  if (ebur128_ready && rate == old_rate) {
+-    return;
+-  }
+-
+-  ebur128_ready = false;
+-
+-  // NOLINTBEGIN(clang-analyzer-cplusplus.NewDeleteLeaks)
+-  QMetaObject::invokeMethod(
+-      baseWorker,
+-      [this] {
+-        if (ebur128_ready) {
+-          return;
+-        }
+-
+-        auto status = true;
+-
+-        old_rate = rate;
+-
+-        status = init_ebur128();
++  configured_rate = rate;
+ 
+-        std::scoped_lock<std::mutex> lock(data_mutex);
+-
+-        ebur128_ready = status;
+-      },
+-      Qt::QueuedConnection);
+-  // NOLINTEND(clang-analyzer-cplusplus.NewDeleteLeaks)
++  if (!analyser.ready_for(configured_rate)) {
++    queue_rebuild(configured_rate);
++  }
+ }
+ 
+ void Autogain::process(std::span<float>& left_in,
+@@ -174,6 +153,10 @@ void Autogain::process(std::span<float>& left_in,
+                        std::span<float>& right_out) {
+   std::scoped_lock<std::mutex> lock(data_mutex);
+ 
++  // The state cannot be replaced or reconfigured until the end of this function
++  const auto analyser_lease = analyser.lease();
++  auto* ebur_state = analyser_lease.get();
++
+   if (bypass) {
+     std::ranges::copy(left_in, left_out.begin());
+     std::ranges::copy(right_in, right_out.begin());
+@@ -185,7 +168,7 @@ void Autogain::process(std::span<float>& left_in,
+     apply_gain(left_in, right_in, input_gain);
+   }
+ 
+-  if (!ebur128_ready) {
++  if (ebur_state == nullptr) {
+     std::ranges::copy(left_in, left_out.begin());
+     std::ranges::copy(right_in, right_out.begin());
+ 
+@@ -211,11 +194,9 @@ void Autogain::process(std::span<float>& left_in,
+     }
+   }
+ 
+-  ebur128_add_frames_float(ebur_state, data.data(), n_samples);
+-
+-  auto failed = false;
++  auto failed = EBUR128_SUCCESS != ebur128_add_frames_float(ebur_state, data.data(), n_samples);
+ 
+-  failed = (EBUR128_SUCCESS != ebur128_loudness_momentary(ebur_state, &momentary)) ||
++  failed = failed || (EBUR128_SUCCESS != ebur128_loudness_momentary(ebur_state, &momentary)) ||
+            (EBUR128_SUCCESS != ebur128_loudness_shortterm(ebur_state, &shortterm)) ||
+            (EBUR128_SUCCESS != ebur128_loudness_global(ebur_state, &global)) ||
+            (EBUR128_SUCCESS != ebur128_relative_threshold(ebur_state, &relative)) ||
+@@ -394,13 +375,14 @@ float Autogain::getOutputGainLevel() const {
+ }
+ 
+ void Autogain::resetHistory() {
+-  internal_output_gain = 1.0;
+-
+-  data_mutex.lock();
++  std::scoped_lock<std::mutex> lock(data_mutex);
+ 
+-  ebur128_ready = false;
++  internal_output_gain = 1.0;
++  prev_gain = 1.0;
+ 
+-  data_mutex.unlock();
++  analyser.invalidate();
+ 
+-  setup();
++  if (configured_rate != 0U) {
++    queue_rebuild(configured_rate);
++  }
+ }
+diff --git a/src/autogain.hpp b/src/autogain.hpp
+index 14faed905..057eb3db7 100644
+--- a/src/autogain.hpp
++++ b/src/autogain.hpp
+@@ -27,6 +27,7 @@
+ #include <span>
+ #include <string>
+ #include <vector>
++#include "autogain_analyser.hpp"
+ #include "easyeffects_db_autogain.h"
+ #include "pipeline_type.hpp"
+ #include "plugin_base.hpp"
+@@ -82,9 +83,20 @@ class Autogain : public PluginBase {
+   Q_INVOKABLE void resetHistory();
+ 
+  private:
+-  bool ebur128_ready = false;
++  struct Ebur128Deleter {
++    void operator()(ebur128_state* state) const {
++      if (state != nullptr) {
++        ebur128_destroy(&state);
++      }
++    }
++  };
+ 
+-  uint old_rate = 0U;
++  // The libebur128 state is created on the worker thread but used by process(). It is only reachable through the
++  // analyser, which serializes the access and refuses a state built for an outdated rate.
++  autogain::AnalyserState<ebur128_state, Ebur128Deleter> analyser;
++
++  // Sample rate of the last setup(). Protected by data_mutex.
++  uint configured_rate = 0U;
+ 
+   double momentary = 0.0;
+   double shortterm = 0.0;
+@@ -102,11 +114,11 @@ class Autogain : public PluginBase {
+ 
+   std::vector<float> data;
+ 
+-  ebur128_state* ebur_state = nullptr;
+-
+   DbAutogain* settings = nullptr;
+ 
+-  auto init_ebur128() -> bool;
++  static auto init_ebur128(uint sample_rate) -> ebur128_state*;
++
++  static auto configure_history(ebur128_state* state, int seconds) -> bool;
+ 
+-  void set_maximum_history(const int& seconds);
++  void queue_rebuild(uint sample_rate);
+ };
+diff --git a/src/autogain_analyser.hpp b/src/autogain_analyser.hpp
+new file mode 100644
+index 000000000..9d0762600
+--- /dev/null
++++ b/src/autogain_analyser.hpp
+@@ -0,0 +1,163 @@
++/**
++ * Copyright © 2026 Paul Junod
++ *
++ * This file is part of Easy Effects.
++ *
++ * Easy Effects is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * Easy Effects is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with Easy Effects. If not, see <https://www.gnu.org/licenses/>.
++ */
++
++#pragma once
++
++#include <cstdint>
++#include <memory>
++#include <mutex>
++#include <utility>
++
++/**
++ * Owner of the analyser (libebur128) state used by the autogain plugin.
++ *
++ * The state is created on the plugin worker thread, used on the realtime
++ * thread and configured from the user interface thread. All of them go
++ * through the mutex of this class, so the state is never replaced or
++ * reconfigured while it is being used. A build that was requested before the
++ * sample rate changed, or before the history was reset, is discarded instead
++ * of being published over the newer request.
++ */
++namespace autogain {
++
++template <typename State, typename Deleter>
++class AnalyserState {
++ public:
++  struct Request {
++    std::uint64_t generation;
++    unsigned int rate;
++  };
++
++  /**
++   * Borrow of the state. Others wait until it is destroyed. The pointer is
++   * null while there is no state to use, and must not be kept after the lease.
++   */
++  class Lease {
++   public:
++    explicit Lease(AnalyserState& owner) : lock(owner.mutex), state(owner.ready ? owner.state.get() : nullptr) {}
++
++    [[nodiscard]] auto get() const -> State* { return state; }
++
++   private:
++    std::unique_lock<std::mutex> lock;
++    State* state;
++  };
++
++  [[nodiscard]] auto ready_for(unsigned int rate) const -> bool {
++    std::scoped_lock<std::mutex> lock(mutex);
++
++    return ready && current_rate == rate;
++  }
++
++  /**
++   * Drop the current state, because it is not valid for this rate, and get
++   * the request to give to replace().
++   */
++  auto request(unsigned int rate) -> Request {
++    std::scoped_lock<std::mutex> lock(mutex);
++
++    ready = false;
++    current_rate = rate;
++
++    return {++generation, rate};
++  }
++
++  /**
++   * Stop using the current state and cancel the builds that are on the way.
++   */
++  void invalidate() {
++    std::scoped_lock<std::mutex> lock(mutex);
++
++    ready = false;
++
++    ++generation;
++  }
++
++  /**
++   * Remember the history length and apply it to the current state, if any.
++   * configure(State*, int seconds) -> bool
++   */
++  template <typename Configure>
++  auto set_history(int seconds, Configure&& configure) -> bool {
++    std::scoped_lock<std::mutex> lock(mutex);
++
++    history = seconds;
++
++    return !state || configure(state.get(), history);
++  }
++
++  /**
++   * Publish a new state for the request, unless the request is outdated.
++   * build(unsigned int rate) -> State*, configure as in set_history().
++   * The state is allocated by the caller's thread and an old or rejected one
++   * is destroyed outside of the lock.
++   */
++  template <typename Build, typename Configure>
++  auto replace(Request wanted, Build&& build, Configure&& configure) -> bool {
++    Pointer candidate(build(wanted.rate));
++    Pointer retired;
++
++    {
++      std::scoped_lock<std::mutex> lock(mutex);
++
++      if (wanted.generation != generation || !candidate || !configure(candidate.get(), history)) {
++        return false;
++      }
++
++      retired = std::move(state);
++      state = std::move(candidate);
++      ready = true;
++    }
++
++    return true;
++  }
++
++  [[nodiscard]] auto lease() -> Lease { return Lease(*this); }
++
++  void clear() {
++    Pointer retired;
++
++    {
++      std::scoped_lock<std::mutex> lock(mutex);
++
++      ready = false;
++
++      ++generation;
++
++      retired = std::move(state);
++    }
++  }
++
++ private:
++  using Pointer = std::unique_ptr<State, Deleter>;
++
++  mutable std::mutex mutex;
++
++  Pointer state;
++
++  std::uint64_t generation = 0;
++
++  unsigned int current_rate = 0U;
++
++  int history = 15;
++
++  bool ready = false;
++};
++
++}  // namespace autogain
+diff --git a/util/tests/autogain_analyser.cpp b/util/tests/autogain_analyser.cpp
+new file mode 100644
+index 000000000..e9c3ef902
+--- /dev/null
++++ b/util/tests/autogain_analyser.cpp
+@@ -0,0 +1,354 @@
++#include "autogain_analyser.hpp"
++#include <array>
++#include <atomic>
++#include <chrono>
++#include <future>
++#include <iostream>
++#include <string>
++#include <utility>
++
++using namespace std::chrono_literals;
++
++namespace {
++
++struct State {
++  explicit State(int identifier) : id(identifier) { ++alive[id]; }
++
++  State(const State&) = delete;
++  auto operator=(const State&) -> State& = delete;
++
++  ~State() {
++    --alive[id];
++    ++destroyed[id];
++  }
++
++  int id;
++  int history = 0;
++
++  static inline std::array<std::atomic<int>, 4> alive{};
++  static inline std::array<std::atomic<int>, 4> destroyed{};
++};
++
++struct Deleter {
++  void operator()(State* state) const { delete state; }
++};
++
++using Analyser = autogain::AnalyserState<State, Deleter>;
++
++auto configure(State* state, int history) -> bool {
++  state->history = history;
++
++  return true;
++}
++
++auto fail(const std::string& message) -> bool {
++  std::cerr << message << '\n';
++
++  return false;
++}
++
++auto finished(std::future<void>& future) -> bool {
++  return future.wait_for(5s) == std::future_status::ready;
++}
++
++// The lease is released at the end of this function, not at the end of the caller's expression
++auto leased_id(Analyser& analyser) -> int {
++  const auto lease = analyser.lease();
++
++  return lease.get() == nullptr ? -1 : lease.get()->id;
++}
++
++auto leased_history(Analyser& analyser) -> int {
++  const auto lease = analyser.lease();
++
++  return lease.get() == nullptr ? -1 : lease.get()->history;
++}
++
++auto make_first(Analyser& analyser) -> bool {
++  return analyser.replace(analyser.request(48000), [](unsigned int) { return new State(1); }, configure);
++}
++
++auto reset_counters() -> void {
++  for (auto& count : State::alive) {
++    count = 0;
++  }
++
++  for (auto& count : State::destroyed) {
++    count = 0;
++  }
++}
++
++auto no_state_until_published() -> bool {
++  Analyser analyser;
++
++  if (analyser.ready_for(48000) || leased_id(analyser) != -1) {
++    return fail("A new analyser must not be ready");
++  }
++
++  if (!make_first(analyser) || !analyser.ready_for(48000) || analyser.ready_for(44100)) {
++    return fail("A published state must be ready for its rate only");
++  }
++
++  if (leased_id(analyser) != 1) {
++    return fail("The published state must be leased");
++  }
++
++  (void)analyser.request(44100);
++
++  if (analyser.ready_for(48000) || leased_id(analyser) != -1) {
++    return fail("A rate change must stop the use of the old state");
++  }
++
++  return true;
++}
++
++auto history_is_applied_to_new_states() -> bool {
++  Analyser analyser;
++
++  if (!analyser.set_history(42, configure) || !make_first(analyser) || leased_history(analyser) != 42) {
++    return fail("The history set before the state exists must be applied to it");
++  }
++
++  if (!analyser.set_history(7, configure) || leased_history(analyser) != 7) {
++    return fail("The history must be applied to the current state");
++  }
++
++  if (analyser.set_history(9, [](State*, int) { return false; })) {
++    return fail("A rejected history must be reported");
++  }
++
++  if (!analyser.ready_for(48000)) {
++    return fail("A rejected history must not drop the state");
++  }
++
++  return true;
++}
++
++auto stale_request_is_refused() -> bool {
++  Analyser analyser;
++
++  if (!make_first(analyser)) {
++    return fail("The first state was not published");
++  }
++
++  const auto old_request = analyser.request(48000);
++
++  std::promise<void> entered;
++  std::promise<void> release;
++
++  auto started = entered.get_future();
++  auto resume = release.get_future().share();
++
++  std::atomic<bool> refused = false;
++
++  auto worker = std::async(std::launch::async, [&] {
++    refused = !analyser.replace(
++        old_request,
++        [&](unsigned int) {
++          entered.set_value();
++          resume.wait_for(5s);
++
++          return new State(2);
++        },
++        configure);
++  });
++
++  if (started.wait_for(5s) != std::future_status::ready) {
++    release.set_value();
++
++    return fail("The build did not start");
++  }
++
++  // A newer request arrives while the old build is still running
++
++  const auto current = analyser.request(96000);
++
++  if (!analyser.replace(current, [](unsigned int rate) { return rate == 96000 ? new State(3) : nullptr; }, configure)) {
++    release.set_value();
++
++    return fail("The current request was refused");
++  }
++
++  release.set_value();
++
++  if (!finished(worker) || !refused) {
++    return fail("The outdated build must be refused");
++  }
++
++  if (!analyser.ready_for(96000) || leased_id(analyser) != 3) {
++    return fail("The outdated build must not replace the newer state");
++  }
++
++  if (State::destroyed[2] != 1 || State::alive[2] != 0) {
++    return fail("The refused state must be destroyed");
++  }
++
++  return true;
++}
++
++auto invalidate_cancels_the_build() -> bool {
++  Analyser analyser;
++
++  const auto request = analyser.request(48000);
++
++  analyser.invalidate();
++
++  if (analyser.replace(request, [](unsigned int) { return new State(1); }, configure) || analyser.ready_for(48000)) {
++    return fail("A build requested before invalidate() must be refused");
++  }
++
++  if (State::alive[1] != 0) {
++    return fail("The refused state must not leak");
++  }
++
++  return true;
++}
++
++auto failed_build_is_never_ready() -> bool {
++  Analyser analyser;
++
++  if (analyser.replace(
++          analyser.request(48000), [](unsigned int) -> State* { return nullptr; }, configure) ||
++      analyser.ready_for(48000)) {
++    return fail("A build that returned no state must not be ready");
++  }
++
++  if (analyser.replace(
++          analyser.request(48000), [](unsigned int) { return new State(2); }, [](State*, int) { return false; }) ||
++      analyser.ready_for(48000) || State::destroyed[2] != 1) {
++    return fail("A state that could not be configured must be destroyed and not be ready");
++  }
++
++  return true;
++}
++
++auto lease_blocks_history_and_replacement() -> bool {
++  Analyser analyser;
++
++  if (!make_first(analyser)) {
++    return fail("The first state was not published");
++  }
++
++  std::promise<void> entered;
++  std::promise<void> release;
++  std::promise<void> history_applied;
++
++  auto started = entered.get_future();
++  auto resume = release.get_future().share();
++  auto applied = history_applied.get_future();
++
++  std::atomic<bool> intact = false;
++
++  auto user = std::async(std::launch::async, [&] {
++    const auto lease = analyser.lease();
++
++    entered.set_value();
++
++    resume.wait_for(5s);
++
++    intact = lease.get() != nullptr && lease.get()->id == 1 && State::alive[1] == 1 && State::destroyed[1] == 0 &&
++             lease.get()->history != 42;
++  });
++
++  if (started.wait_for(5s) != std::future_status::ready) {
++    release.set_value();
++
++    return fail("The lease was not taken");
++  }
++
++  auto replacing = std::async(std::launch::async, [&] {
++    return analyser.replace(analyser.request(48000), [](unsigned int) { return new State(2); }, configure);
++  });
++
++  auto setting = std::async(std::launch::async, [&] {
++    return analyser.set_history(42, [&](State* state, int history) {
++      history_applied.set_value();
++
++      return configure(state, history);
++    });
++  });
++
++  // Neither of them can make progress while the lease is held. Waiting this long cannot make the check fail on a
++  // slow machine, only fail to notice a broken lock.
++
++  if (applied.wait_for(100ms) != std::future_status::timeout || State::alive[2] != 0) {
++    release.set_value();
++
++    return fail("The state was reconfigured or replaced during a lease");
++  }
++
++  release.set_value();
++
++  if (!finished(user) || replacing.wait_for(5s) != std::future_status::ready || !replacing.get() ||
++      setting.wait_for(5s) != std::future_status::ready || !setting.get()) {
++    return fail("The waiting calls did not complete after the lease ended");
++  }
++
++  if (!intact) {
++    return fail("The leased state changed during the lease");
++  }
++
++  if (leased_id(analyser) != 2 || State::destroyed[1] != 1) {
++    return fail("The replacement must be published and the old state destroyed");
++  }
++
++  return true;
++}
++
++auto clear_destroys_the_state() -> bool {
++  Analyser analyser;
++
++  if (!make_first(analyser)) {
++    return fail("The first state was not published");
++  }
++
++  const auto request = analyser.request(48000);
++
++  analyser.clear();
++
++  if (State::destroyed[1] != 1 || analyser.ready_for(48000) || leased_id(analyser) != -1) {
++    return fail("clear() must destroy the state");
++  }
++
++  if (analyser.replace(request, [](unsigned int) { return new State(2); }, configure) || State::alive[2] != 0) {
++    return fail("clear() must cancel the builds in progress");
++  }
++
++  return true;
++}
++
++}  // namespace
++
++auto main() -> int {
++  using Case = bool (*)();
++
++  const std::array<std::pair<const char*, Case>, 7> cases{{
++      {"no state until published", no_state_until_published},
++      {"history is applied to new states", history_is_applied_to_new_states},
++      {"stale request is refused", stale_request_is_refused},
++      {"invalidate cancels the build", invalidate_cancels_the_build},
++      {"failed build is never ready", failed_build_is_never_ready},
++      {"lease blocks history and replacement", lease_blocks_history_and_replacement},
++      {"clear destroys the state", clear_destroys_the_state},
++  }};
++
++  for (const auto& [name, test] : cases) {
++    reset_counters();
++
++    if (!test()) {
++      std::cerr << "FAILED: " << name << '\n';
++
++      return 1;
++    }
++
++    for (const auto& count : State::alive) {
++      if (count != 0) {
++        std::cerr << "FAILED: " << name << ": a state was leaked\n";
++
++        return 1;
++      }
++    }
++  }
++
++  return 0;
++}

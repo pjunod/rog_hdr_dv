@@ -8,7 +8,7 @@ existed, which is a critical warning. The ID is now cleared in the idle callback
 I found this with a D-Bus test that rejects a configuration and waits for the restore; that test
 is part of a larger, not yet proposed change, so this MR has no new test.
 
-## How it was tested
+## Inherited validation (2026-10-27)
 
 On lab5 (Ubuntu 26.10 container: GCC 15.3, meson 1.10.1, GLib 2.90, GTK 4.24.1, Mesa 26.2.4
 llvmpipe), on `main` b48811767 with the stacked units below this one, against libdisplay-info
@@ -31,4 +31,4 @@ jobs) and any test on real hardware with this exact series.
 
 ## AI assistance
 
-Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code). I reviewed the changes and take responsibility for them.
+Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code).

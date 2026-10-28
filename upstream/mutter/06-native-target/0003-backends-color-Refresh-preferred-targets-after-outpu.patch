@@ -1,7 +1,7 @@
-From d07b6a49452a9ffc0b45ff1c1651c9b0dcc89a35 Mon Sep 17 00:00:00 2001
+From 277235d959a7b77d419c52a3e67533c0d9e38f4f Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Fri, 9 Oct 2026 01:04:12 -0400
-Subject: [PATCH 03/11] backends/color: Refresh preferred targets after output
+Subject: [PATCH 03/10] backends/color: Refresh preferred targets after output
  topology changes
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -29,15 +29,15 @@ Related: https://gitlab.gnome.org/GNOME/mutter/-/issues/5001
 ---
  src/backends/meta-color-device.c              |  2 +-
  src/tests/native-hdr-tests.c                  |  9 +-
- src/tests/wayland-color-management-test.c     | 47 ++++++++-
- .../wayland-test-clients/color-management.c   | 73 +++++++++++++-
+ src/tests/wayland-color-management-test.c     | 81 ++++++++++++----
+ .../wayland-test-clients/color-management.c   | 83 ++++++++++++++--
  src/wayland/meta-wayland-color-management.c   | 96 +++++++++++++------
  src/wayland/meta-wayland-color-management.h   |  2 +
  src/wayland/meta-wayland-outputs.c            |  3 +
- 7 files changed, 194 insertions(+), 38 deletions(-)
+ 7 files changed, 217 insertions(+), 59 deletions(-)
 
 diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
-index 5aee553fc..b2931e905 100644
+index c640128e8..0ca825e6d 100644
 --- a/src/backends/meta-color-device.c
 +++ b/src/backends/meta-color-device.c
 @@ -783,7 +783,7 @@ meta_color_target_luminance_init (MetaColorTargetLuminance *target,
@@ -50,10 +50,10 @@ index 5aee553fc..b2931e905 100644
        (double) target->maximum > G_MAXUINT32)
      {
 diff --git a/src/tests/native-hdr-tests.c b/src/tests/native-hdr-tests.c
-index d21a0032f..f3091cb43 100644
+index d39caa686..f366260f2 100644
 --- a/src/tests/native-hdr-tests.c
 +++ b/src/tests/native-hdr-tests.c
-@@ -609,7 +609,7 @@ test_target_luminance_policy (void)
+@@ -626,7 +626,7 @@ test_target_luminance_policy (void)
    meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
    g_assert_cmpfloat (target.maximum, ==, encoding.max);
  
@@ -62,7 +62,7 @@ index d21a0032f..f3091cb43 100644
    edid.native_luminance_status = META_NATIVE_LUMINANCE_FIRMWARE_DECLARED;
    edid.native_luminance.has_max_luminance_10pct = TRUE;
    edid.native_luminance.min_luminance = 1.5f;
-@@ -617,6 +617,13 @@ test_target_luminance_policy (void)
+@@ -634,6 +634,13 @@ test_target_luminance_policy (void)
    meta_color_target_luminance_init (&target, &edid, TRUE, &encoding);
    g_assert_cmpfloat (target.minimum, ==, encoding.min);
    g_assert_cmpfloat (target.maximum, ==, encoding.max);
@@ -77,7 +77,7 @@ index d21a0032f..f3091cb43 100644
  
  int
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
-index c676e1da4..6b6583155 100644
+index c676e1da4..1ee1ca09b 100644
 --- a/src/tests/wayland-color-management-test.c
 +++ b/src/tests/wayland-color-management-test.c
 @@ -30,6 +30,7 @@
@@ -113,16 +113,49 @@ index c676e1da4..6b6583155 100644
    g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 616);
    color_handler = g_signal_connect (device, "color-state-changed", G_CALLBACK (count_color_signal), &color_changes);
    target_handler = g_signal_connect (device, "target-volume-changed", G_CALLBACK (count_color_signal), &target_changes);
-@@ -250,7 +256,7 @@ target_luminance (gconstpointer data)
+@@ -233,55 +239,90 @@ target_luminance (gconstpointer data)
+   meta_wayland_test_driver_set_property (test_driver, "target-output", meta_output_get_name (output));
+   client = meta_wayland_test_client_new_with_args (test_context, "color-management",
+                                                    version == 1 ? "target-v1" : "target-v2", NULL);
+-  wait_for_sync_point (10);
++  wait_for_sync_point (0);
+   info->edid_info->native_luminance.max_luminance_10pct = 700;
+   meta_color_device_update (device);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+   g_assert_cmpuint (color_changes, ==, 0);
+   g_assert_cmpuint (target_changes, ==, 1);
+-  emit_sync_event (10);
++  emit_sync_event (0);
  
-   wait_for_sync_point (12);
+-  wait_for_sync_point (11);
++  wait_for_sync_point (1);
+   info->edid_info->native_luminance.max_luminance_full = 500;
+   meta_color_device_update (device);
+   g_assert_cmpuint (target_changes, ==, 2);
+   g_assert_true (meta_color_device_get_color_state (device) == encoding);
+-  emit_sync_event (11);
++  emit_sync_event (1);
+
+-  wait_for_sync_point (12);
++  wait_for_sync_point (2);
    g_object_set (debug, "force-hdr", TRUE, NULL);
 -  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 10000);
 +  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, encoding_luminance->max);
    g_assert_true (meta_color_device_get_color_state (device) == encoding);
-   emit_sync_event (12);
+-  emit_sync_event (12);
++  emit_sync_event (2);
  
-@@ -265,7 +271,7 @@ target_luminance (gconstpointer data)
+-  wait_for_sync_point (13);
++  wait_for_sync_point (3);
+   g_object_set (debug, "force-hdr", FALSE, NULL);
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 700);
+-  emit_sync_event (13);
++  emit_sync_event (3);
+
+-  wait_for_sync_point (14);
++  wait_for_sync_point (4);
+   info->edid_info->native_rgb_bt2020_pq = FALSE;
+   info->edid_info->hdr_static_metadata.type1 = TRUE;
    info->edid_info->hdr_static_metadata.pq = TRUE;
    info->edid_info->colorimetry.bt2020_rgb = TRUE;
    meta_color_device_update (device);
@@ -130,15 +163,21 @@ index c676e1da4..6b6583155 100644
 +  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, encoding_luminance->max);
    g_assert_true (meta_color_device_get_color_state (device) == encoding);
    g_assert_cmpuint (color_changes, ==, 0);
-   emit_sync_event (14);
-@@ -274,6 +280,41 @@ target_luminance (gconstpointer data)
+-  emit_sync_event (14);
++  emit_sync_event (4);
+
+-  wait_for_sync_point (15);
++  wait_for_sync_point (5);
    meta_color_device_update (device);
-   emit_sync_event (15);
- 
+-  emit_sync_event (15);
+-
+-  wait_for_sync_point (16);
++  emit_sync_event (5);
++
 +  /* Topology-only changes must update a role-less surface's primary fallback,
 +   * even when no device emits a color/target change. Emit the canonical output
 +   * lifecycle signal after changing this isolated monitor fixture's topology. */
-+  wait_for_sync_point (18);
++  wait_for_sync_point (6);
 +  {
 +    MetaLogicalMonitor *target_logical =
 +      meta_monitor_get_logical_monitor (meta_output_get_monitor (output));
@@ -155,9 +194,9 @@ index c676e1da4..6b6583155 100644
 +    g_assert_true (meta_color_device_get_color_state (device) == encoding);
 +    g_assert_cmpuint (color_changes, ==, 0);
 +    g_assert_cmpuint (target_changes, ==, old_target_changes);
-+    emit_sync_event (18);
++    emit_sync_event (6);
 +
-+    wait_for_sync_point (19);
++    wait_for_sync_point (7);
 +    other_logical->is_primary = FALSE;
 +    target_logical->is_primary = TRUE;
 +    monitor_manager->primary_logical_monitor = target_logical;
@@ -167,13 +206,28 @@ index c676e1da4..6b6583155 100644
 +    g_assert_true (meta_color_device_get_color_state (device) == encoding);
 +    g_assert_cmpuint (color_changes, ==, 0);
 +    g_assert_cmpuint (target_changes, ==, old_target_changes);
-+    emit_sync_event (19);
++    emit_sync_event (7);
 +  }
 +
-   wait_for_sync_point (16);
++  wait_for_sync_point (8);
    set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
    meta_color_device_update (device);
-@@ -295,6 +336,8 @@ target_luminance (gconstpointer data)
+   g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 80);
+   g_assert_cmpuint (color_changes, ==, 1);
+-  emit_sync_event (16);
++  emit_sync_event (8);
+
+-  wait_for_sync_point (17);
++  wait_for_sync_point (9);
+   if (version == 2)
+     {
+       MetaWaylandCompositor *compositor = meta_context_get_wayland_compositor (test_context);
+@@ -291,10 +332,12 @@ target_luminance (gconstpointer data)
+       g_object_run_dispose (wayland_manager);
+       g_object_run_dispose (wayland_manager);
+     }
+-  emit_sync_event (17);
++  emit_sync_event (9);
    meta_wayland_test_client_finish (client);
    g_signal_handler_disconnect (device, color_handler);
    g_signal_handler_disconnect (device, target_handler);
@@ -183,7 +237,7 @@ index c676e1da4..6b6583155 100644
  
  static void
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index ce8f4098a..8cc2c2c73 100644
+index ce8f4098a..b448eecd2 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -630,7 +630,8 @@ static const struct wp_color_management_surface_feedback_v1_listener target_feed
@@ -255,9 +309,12 @@ index ce8f4098a..8cc2c2c73 100644
    /* An unmapped surface has no main/output membership: use primary fallback. */
    feedback = wp_color_manager_v1_get_surface_feedback (client.manager, surface);
    wp_color_management_surface_feedback_v1_add_listener (feedback, &target_feedback_listener, &client);
-@@ -707,11 +733,43 @@ target_luminance_client (WaylandDisplay *display,
+@@ -706,12 +732,46 @@ target_luminance_client (WaylandDisplay *display,
+
    for (phase = 0; phase < G_N_ELEMENTS (maxima); phase++)
      {
++      /* Device phases0..5, topology6/7, SDR8, then lifetime9. */
++      unsigned int serial = phase < 6 ? phase : 8;
        unsigned int changed = phase == 1 || phase == 5 ? 0 : 1;
 +      /* Force-HDR is global; native-only updates still leave this output quiet. */
 +      unsigned int other_changed = phase == 2 || phase == 3 ? 1 : 0;
@@ -273,8 +330,8 @@ index ce8f4098a..8cc2c2c73 100644
 +              uint64_t expected_identity = topology_phase == 0 ?
 +                                           current_other.identity : snapshots[phase].identity;
 +
-+              test_driver_sync_point (display->test_driver, 18 + topology_phase, NULL);
-+              wait_for_sync_event (display, 18 + topology_phase);
++              test_driver_sync_point (display->test_driver, 6 + topology_phase, NULL);
++              wait_for_sync_event (display, 6 + topology_phase);
 +              wl_display_roundtrip (display->display);
 +              check_topology_preference (&client);
 +              preferred = (TargetSnapshot) {
@@ -292,15 +349,17 @@ index ce8f4098a..8cc2c2c73 100644
 +            }
 +        }
  
-       test_driver_sync_point (display->test_driver, 10 + phase, NULL);
-       wait_for_sync_event (display, 10 + phase);
+-      test_driver_sync_point (display->test_driver, 10 + phase, NULL);
+-      wait_for_sync_event (display, 10 + phase);
++      test_driver_sync_point (display->test_driver, serial, NULL);
++      wait_for_sync_event (display, serial);
        wl_display_roundtrip (display->display);
 -      check_target_events (&client, target, changed);
 +      check_target_events (&client, target, changed, other_changed);
        snapshots[phase + 1].description = wp_color_management_output_v1_get_image_description (target->color_output);
        wait_target_snapshot (display, &snapshots[phase + 1]);
        preferred = (TargetSnapshot) {
-@@ -732,6 +790,9 @@ target_luminance_client (WaylandDisplay *display,
+@@ -732,15 +792,20 @@ target_luminance_client (WaylandDisplay *display,
        info = read_target_info (display, &snapshots[0]);
        g_assert_cmpuint (info.target_min, ==, 5);
        g_assert_cmpuint (info.target_max, ==, 616);
@@ -309,8 +368,12 @@ index ce8f4098a..8cc2c2c73 100644
 +      g_assert_cmpuint (info.target_max, ==, 80);
      }
  
-   test_driver_sync_point (display->test_driver, 17, NULL);
-@@ -741,6 +802,8 @@ target_luminance_client (WaylandDisplay *display,
+-  test_driver_sync_point (display->test_driver, 17, NULL);
+-  wait_for_sync_event (display, 17);
++  test_driver_sync_point (display->test_driver, 9, NULL);
++  wait_for_sync_event (display, 9);
+   /* Version 2 has just disposed the manager twice with these objects alive. */
+   info = read_target_info (display, &snapshots[0]);
    g_assert_cmpuint (info.target_max, ==, 616);
    for (i = 0; i < G_N_ELEMENTS (snapshots); i++)
      wp_image_description_v1_destroy (snapshots[i].description);
@@ -320,7 +383,7 @@ index ce8f4098a..8cc2c2c73 100644
    wl_surface_destroy (surface);
    for (i = 0; i < client.n_outputs; i++)
 diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
-index 05d898886..89b923c74 100644
+index 61ee0730b..facf5b3a5 100644
 --- a/src/wayland/meta-wayland-color-management.c
 +++ b/src/wayland/meta-wayland-color-management.c
 @@ -2064,47 +2064,85 @@ color_management_bind (struct wl_client *client,
@@ -439,13 +502,13 @@ index 05d898886..89b923c74 100644
  
  static void
 diff --git a/src/wayland/meta-wayland-color-management.h b/src/wayland/meta-wayland-color-management.h
-index 07cbbf2ff..ec3348f8d 100644
+index f4ea11796..a26d234ac 100644
 --- a/src/wayland/meta-wayland-color-management.h
 +++ b/src/wayland/meta-wayland-color-management.h
-@@ -23,3 +23,5 @@
- #include "wayland/meta-wayland-types.h"
- 
+@@ -25,3 +25,5 @@
  void meta_wayland_init_color_management (MetaWaylandCompositor *compositor);
+
+ void meta_wayland_finalize_color_management (MetaWaylandCompositor *compositor);
 +
 +void meta_wayland_color_management_outputs_changed (MetaWaylandCompositor *compositor);
 diff --git a/src/wayland/meta-wayland-outputs.c b/src/wayland/meta-wayland-outputs.c

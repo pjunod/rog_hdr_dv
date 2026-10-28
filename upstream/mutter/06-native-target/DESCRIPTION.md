@@ -11,7 +11,8 @@ primary output changes. Encoding, reference white and rendering are unchanged in
 
 It also adds `meta_color_colorimetry_from_edid_primaries()` so the native SDR mode no longer
 renders with unusable EDID primaries, a fallible definition of the linear BT.2020 matrices
-shared by validation and rendering, a single rounding conversion to protocol units, and the
+shared by validation and rendering, a single rounding conversion to protocol units, a saturating luminance
+conversion that prevents a rounded protocol maximum from overflowing `uint32_t`, and the
 ability to run Wayland test cases as separate invocations (`separate_cases` in
 src/tests/meson.build).
 
@@ -23,7 +24,7 @@ Hardware: the ASUS ROG Zephyrus G16 (GU605MZ, Samsung ATNA60DL01-0 OLED eDP, Int
 and the firmware primaries while the encoding stays BT.2020/PQ (Mutter 51 build of the same
 change).
 
-## How it was tested
+## Inherited validation (2026-10-27)
 
 On lab5 (Ubuntu 26.10 container: GCC 15.3, meson 1.10.1, GLib 2.90, GTK 4.24.1, Mesa 26.2.4
 llvmpipe), on `main` b48811767 with the stacked units below this one, against libdisplay-info
@@ -37,12 +38,20 @@ LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe META_DBUS_RUNNER_DISABLE_LOGIND_
   meson test -C b --setup mutter:default --no-rebuild --num-processes 4 --timeout-multiplier 3 <tests>
 ```
 
-- Warnings-as-errors build of every commit: 11/11 OK. Release (`-O2`) `-Werror` build of the tip: OK.
+- Warnings-as-errors build of every commit: 11/11 OK on the earlier 11-commit branch (now 10 commits after folding its disposal fix). Release (`-O2`) `-Werror` build of the tip: OK.
 - Tests on the tip (16 invocations): `actor-color-state`, `color-pipeline`, `color-state-transform`, `monitor-color-tests`, `monitor-config-tests`, `edid`, `color-management`, `color-management-profile-conflict`, `native-hdr`, `wayland-color-management`, `wayland-color-representation`; separate `wayland-color-management` cases: `target-luminance-v1`, `target-luminance-v2`, `target-primaries-v1`, `target-primaries-v2`, `sdr-native-unusable-edid-primaries`: 16/16 OK.
 - `./check-style.py --dry-run` (allow-failure in CI): only suggestions from uncrustify re-indenting isolated chunks (parameter alignment of unchanged continuation lines, the closing parenthesis of `CLUTTER_TEST_SUITE`, a label), which contradict the surrounding upstream style; not applied.
 
 Not run here: Mutter's full CI matrix (Fedora image, KVM and native KMS tests, X11 and Xwayland
 jobs) and any test on real hardware with this exact series.
+
+
+The commands and results above are inherited from the handoff's original
+branches. Preparation review subsequently fixed a luminance conversion in
+unit 06 and its unit 09 caller; dependent branch identities therefore changed.
+Fresh checks and exact source identities are recorded in
+[Mutter preparation review](../PREPARATION-REVIEW.md). The earlier per-commit
+and release results have not been repeated for every revised descendant.
 
 ## The series
 
@@ -50,4 +59,4 @@ Overview of the whole series, its hardware evidence and the coordination questio
 
 ## AI assistance
 
-Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code). I reviewed the changes and take responsibility for them.
+Prepared with AI coding assistants (OpenAI Codex; Anthropic Claude Opus 5.5 and Fable 5.1 via Claude Code).

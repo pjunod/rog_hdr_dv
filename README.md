@@ -181,6 +181,7 @@ has the remote and branch rules.
 | Document | Answers |
 |---|---|
 | [Development](docs/DEVELOPMENT.md) | Reconstructing source, proving changes, remotes and branches |
+| [Upstream submissions](docs/UPSTREAM_SUBMISSIONS.md) · [submission kits](upstream/README.md) | Every upstream item's disposition, evidence, submission order and remaining prerequisites |
 | [Operations](docs/OPERATIONS.md) | Inspecting the laptop safely and keeping recovery possible |
 | [Review](docs/REVIEW.md) | Adversarial review findings and their dispositions |
 | [Provenance](docs/PROVENANCE.md) | Where imported work came from and how to read its evidence |
@@ -201,6 +202,8 @@ has the remote and branch rules.
   installation side effects.
 - `evidence/` — small validation receipts. Large or private captures, OEM
   binaries, vendor outputs and signing keys never go in Git.
+- `upstream/` — reviewed submission material, descriptions and per-project
+  preparation commands; actual submissions and sign-offs belong to the owner.
 - `docs/` — the documentation indexed above.
 
 Audio (speakers, latency, Dolby Atmos) lives in

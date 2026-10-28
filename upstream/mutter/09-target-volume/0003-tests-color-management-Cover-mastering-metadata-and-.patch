@@ -1,8 +1,8 @@
-From e53b42b27459646437d33bed8bd5bc708d4ecf70 Mon Sep 17 00:00:00 2001
+From 991d17b94dc4546b56d34352cb013e54512e5a12 Mon Sep 17 00:00:00 2001
 From: Paul Junod <donujp@gmail.com>
 Date: Sat, 10 Oct 2026 20:12:11 -0400
-Subject: [PATCH 3/3] tests/color-management: Cover mastering metadata and
- light levels
+Subject: [PATCH 3/3] tests/color-management: Cover mastering metadata and light
+ levels
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -46,8 +46,8 @@ ones do.
 Link: TBD-MR
 ---
  src/tests/wayland-color-management-test.c     | 131 ++++-
- .../wayland-test-clients/color-management.c   | 467 ++++++++++++++++--
- 2 files changed, 556 insertions(+), 42 deletions(-)
+ .../wayland-test-clients/color-management.c   | 494 ++++++++++++++++--
+ 2 files changed, 583 insertions(+), 42 deletions(-)
 
 diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
 index 0053775e3..c282d3c55 100644
@@ -206,7 +206,7 @@ index 0053775e3..c282d3c55 100644
  
  int
 diff --git a/src/tests/wayland-test-clients/color-management.c b/src/tests/wayland-test-clients/color-management.c
-index ed0ba65e5..6f63efcc9 100644
+index ed0ba65e5..f8c247adf 100644
 --- a/src/tests/wayland-test-clients/color-management.c
 +++ b/src/tests/wayland-test-clients/color-management.c
 @@ -133,9 +133,22 @@ handle_image_description_ready (void                           *data,
@@ -273,7 +273,7 @@ index ed0ba65e5..6f63efcc9 100644
  typedef struct
  {
    uint32_t features;
-@@ -904,6 +885,400 @@ hlg_invalid_black_level_client (WaylandDisplay *display)
+@@ -904,6 +885,427 @@ hlg_invalid_black_level_client (WaylandDisplay *display)
    g_assert_false (create_hlg_with_luminances (display, 110 * 10000, 4000, 203));
  }
  
@@ -498,6 +498,8 @@ index ed0ba65e5..6f63efcc9 100644
 +    16000001, 330000, 300000, 600000, 150000, 60000, 312700, 329000,
 +  };
 +  struct wp_image_description_v1 *image_description;
++  struct wp_image_description_creator_params_v1 *creator_params;
++  ImageDescriptionContext context;
 +
 +  /* Mastering primaries are validated like encoding primaries: unusable or
 +   * unrepresentable ones fail the image description. */
@@ -528,6 +530,31 @@ index ed0ba65e5..6f63efcc9 100644
 +                                        80.0f,
 +                                        100.0f);
 +  wp_image_description_v1_destroy (image_description);
++  /* Wire values near UINT32_MAX may round up to 2^32 in the compositor's
++   * float storage. Exercise both the encoding and mastering-volume paths.
++   * They must remain valid descriptions without an out-of-range cast. */
++  for (unsigned int i = 0; i < 2; i++)
++    {
++      uint32_t maximum = i == 0 ? UINT32_MAX - 128 : UINT32_MAX;
++
++      creator_params = wp_color_manager_v1_create_parametric_creator (display->color_management_mgr);
++      wp_image_description_creator_params_v1_set_primaries_named (creator_params,
++                                                                   WP_COLOR_MANAGER_V1_PRIMARIES_SRGB);
++      wp_image_description_creator_params_v1_set_tf_named (creator_params,
++                                                            WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB);
++      wp_image_description_creator_params_v1_set_luminances (creator_params,
++                                                              0, maximum, 203);
++      image_description = create_from_creator (display, creator_params, &context);
++      g_assert_false (context.creation_failed);
++      wp_image_description_v1_destroy (image_description);
++
++      creator_params = create_pq_creator (display->color_management_mgr);
++      wp_image_description_creator_params_v1_set_mastering_luminance (creator_params,
++                                                                      0, maximum);
++      image_description = create_from_creator (display, creator_params, &context);
++      g_assert_false (context.creation_failed);
++      wp_image_description_v1_destroy (image_description);
++    }
 +  g_assert_cmpint (wl_display_roundtrip (display->display), !=, -1);
 +}
 +
@@ -674,7 +701,7 @@ index ed0ba65e5..6f63efcc9 100644
  typedef struct
  {
    struct wl_output *output;
-@@ -1732,10 +2107,26 @@ main (int    argc,
+@@ -1732,10 +2134,26 @@ main (int    argc,
          hlg_client (display);
        else if (strcmp (argv[1], "hlg-invalid-black-level") == 0)
          hlg_invalid_black_level_client (display);

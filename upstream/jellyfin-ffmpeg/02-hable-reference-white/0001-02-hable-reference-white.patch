@@ -1,0 +1,80 @@
+From 5981c0750b4cea23f056435242b96c8905f09182 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Wed, 28 Oct 2026 10:12:55 -0400
+Subject: [PATCH] avfilter/tonemap_videotoolbox: make Hable reference white
+ explicit
+
+Allow the caller to provide the Hable reference white instead of
+treating it as a fixed shader constant. Retain the 203-nit default and
+pass the value through the existing parameter buffer.
+
+The quilt proposal applies after the full current queue, and the
+affected Objective-C filter compiles on the native Mac SDK. A
+render/default-output compatibility comparison has not run; this remains
+a draft feature proposal.
+---
+ .../patches/0102-hable-reference-white.patch  | 45 +++++++++++++++++++
+ debian/patches/series                         |  1 +
+ 2 files changed, 46 insertions(+)
+ create mode 100644 debian/patches/0102-hable-reference-white.patch
+
+diff --git a/debian/patches/0102-hable-reference-white.patch b/debian/patches/0102-hable-reference-white.patch
+new file mode 100644
+index 00000000..ad92bca0
+--- /dev/null
++++ b/debian/patches/0102-hable-reference-white.patch
+@@ -0,0 +1,45 @@
++Index: FFmpeg/libavfilter/metal/vf_tonemap_videotoolbox.metal
++===================================================================
++--- FFmpeg.orig/libavfilter/metal/vf_tonemap_videotoolbox.metal
+++++ FFmpeg/libavfilter/metal/vf_tonemap_videotoolbox.metal
++@@ -450,7 +450,7 @@ float reinhard(float s, float peak, float target_peak) {
++ }
++ 
++ float hable(float s, float peak, float target_peak) {
++-    return hable_f(s) / hable_f(peak);
+++    return hable_f(s * tone_param) / hable_f(peak * tone_param);
++ }
++ 
++ float mobius(float s, float peak, float target_peak) {
++Index: FFmpeg/libavfilter/vf_tonemap_videotoolbox.m
++===================================================================
++--- FFmpeg.orig/libavfilter/vf_tonemap_videotoolbox.m
+++++ FFmpeg/libavfilter/vf_tonemap_videotoolbox.m
++@@ -104,6 +104,7 @@
++     double                      target_peak;
++     double                      param;
++     double                      final_param;
+++    double                      reference_white;
++     double                      desat_param;
++     double                      scene_threshold;
++     int                         initialised;
++@@ -383,6 +384,11 @@ static int tonemap_videotoolbox_init(AVFilterContext *avctx)
++         if (isnan(ctx->param))
++             ctx->final_param = 0.3f;
++         break;
+++    case TONEMAP_HABLE:
+++        // Hable is nonlinear: normalize signal and peak to the caller's
+++        // reference white, leaving the 203-nit default unchanged.
+++        ctx->final_param = REFERENCE_WHITE_ALT / ctx->reference_white;
+++        break;
++     case TONEMAP_BT2390:
++         if (isnan(ctx->param))
++             ctx->final_param = 1.0f; // diff from the spec-defined 0.5f
++@@ -1193,6 +1199,7 @@ static int tonemap_videotoolbox_query_formats(AVFilterContext *avctx)
++     { "peak",        "Signal peak override", OFFSET(peak), AV_OPT_TYPE_DOUBLE, { .dbl = 0 }, 0, DBL_MAX, FLAGS },
++     { "param",       "Tonemap parameter",   OFFSET(param), AV_OPT_TYPE_DOUBLE, { .dbl = NAN }, DBL_MIN, DBL_MAX, FLAGS },
++     { "desat",       "Desaturation parameter",   OFFSET(desat_param), AV_OPT_TYPE_DOUBLE, { .dbl = 0 }, 0, DBL_MAX, FLAGS },
+++    { "reference_white", "Reference white in nits for Hable", OFFSET(reference_white), AV_OPT_TYPE_DOUBLE, { .dbl = REFERENCE_WHITE_ALT }, 1.0, 10000.0, FLAGS },
++     { "threshold",   "Scene detection threshold",   OFFSET(scene_threshold), AV_OPT_TYPE_DOUBLE, { .dbl = 0.2 }, 0, DBL_MAX, FLAGS },
++     { NULL }
++ };
+diff --git a/debian/patches/series b/debian/patches/series
+index c0c20f61..86b39f56 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -99,3 +99,4 @@
+ 0099-fix-qsv-av1-decoder-exporting-hdr-side-data.patch
+ 0100-backport-trim-bitstream-filter.patch
+ 0101-fix-videotoolbox-closed-caption-sei.patch
++0102-hable-reference-white.patch

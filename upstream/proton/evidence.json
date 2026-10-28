@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "project": "proton",
+  "checked": "2026-10-28",
+  "source_and_log_receipts": {
+    "revisions": {
+      "proton_11.0": {
+        "commit": "e60892cc2398b0a83c332a2078c7b85e47bdb42b",
+        "tree": "4acfb87c00522be010b093fa7da7477c1e353b94"
+      },
+      "up/pr-a": {
+        "commit": "082ed6d42c830a40ed0b35f5057fab408a6571fa",
+        "tree": "094ce14485bee84f255f576a784e68c944b92f2a"
+      },
+      "up/pr-b": {
+        "commit": "da19f93e26606de2c7ee14980c8454aa00d96267",
+        "tree": "1d3c34ca048ee77cb21c4e1c6d9a4c24a4f8d4e7"
+      },
+      "up/pr-c~1": {
+        "commit": "8cb6b153bf47fd6e50565d1720e851117f7c0eb4",
+        "tree": "81003e715f3b2101ce1530cb93e120e1485c97ed"
+      },
+      "up/pr-c": {
+        "commit": "e514092bc7c5aad75e82d30a8fa18a50ef8d82cc",
+        "tree": "604375c10f6b9aefc0d9fd459d420420a82c1b94"
+      }
+    },
+    "logs": {
+      "all.log": {
+        "bytes": 5614,
+        "sha256": "a5be1426dacc0e91da1bb8ee9706db43a56a167baf4208ef8785e102d0fb9318"
+      },
+      "runtime-setup.log": {
+        "bytes": 440,
+        "sha256": "ce3c4ac98c230c15cfcddfd1a5e636cee7f3aafbd6262653f21df062af0cc335"
+      },
+      "runtime-createfile.log": {
+        "bytes": 556,
+        "sha256": "f12f000218be2c76dfadb568474159f000040266a9b9a6a1c3f3bf0f5eb54465"
+      },
+      "runtime-provenance.log": {
+        "bytes": 602,
+        "sha256": "c403de4e02424195648ca560bb10be9a21465490e42638d1d3768ddd4dcf8bb9"
+      },
+      "current-pr-a-build.log": {
+        "bytes": 19050,
+        "sha256": "6fcf89a0f4020a05dc2d4ae5f6ff4ee1353827ebe6669e48b32d01a9252e9fb6"
+      },
+      "current-pr-b-build.log": {
+        "bytes": 3704214,
+        "sha256": "067e47b3fa4fe2501f98a879b93e2cc187fc632a863b78ffbfdc6994cfe4d9b4"
+      }
+    }
+  },
+  "qualification": {
+    "new": "2026-10-28 fresh candidate-specific prefix: CreateFileFromAppW123/123 and DisplayMonitor355/355 pass; monitor-provenance+EDID-completeness exact tip8cb6b153bf4 full build succeeds, displayconfig13/13 passes. Zero failures/skips/todos/flaky markers in all three focused runtime checks. Prefix setup, Unicode locale and TEMP fixed earlier environment failures without changing source.",
+    "inherited": "All three candidate tips built on2026-10-27 with --enable-win64 --without-opencl, zero warnings in touched files. Old prefix tests were invalid setup: file fixture errors and unregistered DisplayMonitor class; these failures remain in all.log and were not hidden.",
+    "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "limits": [
+      "No AppContainer, real Windows-reference or physical display-backend qualification.",
+      "Owner selected ValveSoftware/wine, not WineHQ. Tool use is disclosed; upstream acceptance is not asserted."
+    ]
+  },
+  "log_storage": "Task-owned Linux builder slot ~/work/upstream-prep/proton",
+  "patches": {
+    "01-createfile-fromapp/0001-kernelbase-createfilefromapp.patch": "0bbfb8cec1c2747595ac4a45a8ac166dfdd28b9cc4df7b30d8d0a39ca0fbfe4f",
+    "02-monitor-provenance/0001-win32u-monitor-provenance.patch": "ddd28466ed1512ad81c556ff7c5e3e18b867e397516783ad40b50b9ae9ff8957",
+    "02-monitor-provenance/0002-winex11-complete-edid.patch": "0083f1584715e68ff2da83618c532ca0e4467dcc31c8f1a5f976de3506943a6a",
+    "03-displaymonitor/0001-displaymonitor-statics.patch": "328713d6b39d8bea2931cdc3cb82bfcd2a488108dd2dd6460019c29771b734cf"
+  },
+  "new_source_application": {
+    "01": {
+      "tree": "094ce14485bee84f255f576a784e68c944b92f2a",
+      "unsigned": true,
+      "result": "PASS"
+    },
+    "02": {
+      "tree": "81003e715f3b2101ce1530cb93e120e1485c97ed",
+      "unsigned": true,
+      "result": "PASS"
+    },
+    "03": {
+      "tree": "604375c10f6b9aefc0d9fd459d420420a82c1b94",
+      "unsigned": true,
+      "result": "PASS"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "upstream": "antoinecellerier/speaker-tuning-to-easyeffects",
+  "base": "711e2d8673f170114fc6cdd08bb948bc0faa5b64",
+  "checked": "2026-10-28",
+  "numpy": "2.5.2",
+  "method": "Actual make_fir plus unchanged AST statements from emit.py325,329-335 and build.py184-185, isolated from profile/CLI IO. Four synthetic flat-gain cases; no OEM files.",
+  "source_sha256": {
+    "lib/preset/fir.py": "f7ef395b77e042e3248abe0f977dc090ecc4a859cc2de51524e43d84c11c4826",
+    "lib/preset/bands.py": "62ea69f9806c79cbc82818848ac8ecd1d61383a58556fd1d3e0a870db8f55b8e",
+    "lib/preset/emit.py": "109337c6a50835f03fa86a6d330b8f01973f8cd59a1cdf9aaa4b94a505a1bf28",
+    "lib/preset/build.py": "5047c0753b5e0b94a4b88fc904d3783858c9b472b17a40d758531072c5591dfd"
+  },
+  "cases": [
+    {
+      "input_flat_channel_db": [
+        -6.0,
+        -12.0
+      ],
+      "level_restore": false,
+      "output_channel_db": [
+        0.0,
+        0.0
+      ],
+      "expected_channel_db": [
+        0.0,
+        0.0
+      ],
+      "result": "PASS"
+    },
+    {
+      "input_flat_channel_db": [
+        -6.0,
+        -12.0
+      ],
+      "level_restore": true,
+      "output_channel_db": [
+        -5.99999999998267,
+        -11.999999999965421
+      ],
+      "expected_channel_db": [
+        -6.0,
+        -12.0
+      ],
+      "result": "PASS"
+    },
+    {
+      "input_flat_channel_db": [
+        -6.0,
+        -6.0
+      ],
+      "level_restore": false,
+      "output_channel_db": [
+        0.0,
+        0.0
+      ],
+      "expected_channel_db": [
+        0.0,
+        0.0
+      ],
+      "result": "PASS"
+    },
+    {
+      "input_flat_channel_db": [
+        -6.0,
+        -6.0
+      ],
+      "level_restore": true,
+      "output_channel_db": [
+        -5.99999999998267,
+        -5.99999999998267
+      ],
+      "expected_channel_db": [
+        -6.0,
+        -6.0
+      ],
+      "result": "PASS"
+    }
+  ],
+  "dispositions": {
+    "ST-1": "excluded: default independent channel normalization is intentional; existing --enable level-restore uses a common channel reference and restores the requested stereo level difference.",
+    "ST-2": "excluded: all-cut peak normalization is explicitly documented in current source; existing --enable level-restore adds the negative inverse gain, preserving requested attenuation."
+  },
+  "limits": [
+    "Arithmetic/FIR checks only; no end-to-end CLI, acoustic, corpus or OEM-profile qualification.",
+    "The default compatibility behavior still peak-normalizes each channel; this is not claimed to preserve input level without the opt-in."
+  ],
+  "upstream_tree": "4559b2b4ff9868395ed10c955d85451b325a826a"
+}

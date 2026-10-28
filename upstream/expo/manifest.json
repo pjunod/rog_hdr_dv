@@ -1,0 +1,34 @@
+{
+  "repository": "expo/expo",
+  "target_branch": "main",
+  "base": "a66d72b9b679ae90b370a97136ad826f6254c2a9",
+  "sparse_paths": ["packages/expo-splash-screen/plugin", ".changeset"],
+  "units": [
+    {
+      "id": "01",
+      "slug": "01-splash-api-guard",
+      "inventory_ids": ["EX-1"],
+      "type": "patch",
+      "title": "[expo-splash-screen] Mark splash behavior with its API level",
+      "patches": ["01-splash-api-guard/0001-annotate-splash-behavior-api.patch"],
+      "status": "ready-for-human-review",
+      "draft": true,
+      "blockers": ["Full Expo package checks, TypeScript check, prebuild and EAS Build remain before undrafting", "Human review and editing remain"],
+      "tests": [
+        {"command": "Standalone Android lintDebug, minSdk 24 / compileSdk 36", "result": "Unannotated NewApi failure; annotation-only pass", "evidence": "evidence.json"},
+        {"command": "Jest 30.2.0 focused real styles-action regression", "result": "3 fail before; 3 pass after", "evidence": "evidence.json"}
+      ]
+    },
+    {
+      "id": "03",
+      "slug": "03-optional-camera",
+      "inventory_ids": ["EX-3"],
+      "type": "issue",
+      "title": "Optional-camera Android manifest setting",
+      "patches": [],
+      "status": "held-feature-decision",
+      "blockers": ["Contributor must choose whether to propose the plugin option", "Need merged-manifest reproduction and plugin tests"],
+      "tests": []
+    }
+  ]
+}
