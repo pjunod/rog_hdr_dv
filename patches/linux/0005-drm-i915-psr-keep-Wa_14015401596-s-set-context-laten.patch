@@ -1,0 +1,106 @@
+From bcb66b157687e8f6d60e6e08b66adf2412eda762 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Tue, 27 Oct 2026 16:39:04 +0000
+Subject: [PATCH 5/5] drm/i915/psr: keep Wa_14015401596's set context latency
+ across VRR toggles
+
+On display versions 13 and 14, a pipe that can use PSR with VRR gets one
+line of set context latency (Wa_14015401596). Enabling VRR disables PSR
+("PSR doesn't work reliably with VRR enabled"), so the workaround
+stopped applying and the set context latency dropped from 1 to 0. That
+moves crtc_vblank_start, which fastset cannot change:
+
+  fastset requirement not met in hw.adjusted_mode.crtc_vblank_start
+  (expected 1601, found 1600)
+  fastset requirement not met in set_context_latency (expected 1, found 0)
+
+A compositor enabling VRR for a fullscreen client then gets -EINVAL from
+its page flip, which may not request a modeset, and VRR never engages on
+a PSR-capable eDP panel.
+
+Keep the line while PSR is off only because VRR is enabled. One line of
+set context latency without PSR costs nothing and makes VRR toggling
+fast-settable again.
+
+During the Linux 7.3 rebase review, move the VRR veto after successful
+PSR setup timing validation. A panel which cannot satisfy the setup
+frames must not gain the workaround only when VRR is enabled: that
+would change the set context latency from zero to one and recreate the
+fastset mismatch. PSR remains disabled whenever VRR is enabled.
+
+The rebase review correction was prepared with OpenAI Codex assistance.
+No new human sign-off or hardware acceptance is asserted.
+---
+ .../drm/i915/display/intel_display_types.h    |  2 ++
+ drivers/gpu/drm/i915/display/intel_psr.c      | 28 ++++++++++++-------
+ 2 files changed, 20 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpu/drm/i915/display/intel_display_types.h b/drivers/gpu/drm/i915/display/intel_display_types.h
+index f6a9b0de1..95ebd1750 100644
+--- a/drivers/gpu/drm/i915/display/intel_display_types.h
++++ b/drivers/gpu/drm/i915/display/intel_display_types.h
+@@ -1184,6 +1184,8 @@ struct intel_crtc_state {
+ 
+ 	/* PSR is supported but might not be enabled due the lack of enabled planes */
+ 	bool has_psr;
++	/* PSR would be possible but VRR is enabled (Wa_14015401596) */
++	bool psr_vetoed_by_vrr;
+ 	bool has_sel_update;
+ 	bool enable_psr2_sel_fetch;
+ 	bool enable_psr2_su_region_et;
+diff --git a/drivers/gpu/drm/i915/display/intel_psr.c b/drivers/gpu/drm/i915/display/intel_psr.c
+index c28bcb1a0..1b7078dd0 100644
+--- a/drivers/gpu/drm/i915/display/intel_psr.c
++++ b/drivers/gpu/drm/i915/display/intel_psr.c
+@@ -1368,13 +1368,19 @@ int _intel_psr_min_set_context_latency(const struct intel_crtc_state *crtc_state
+ {
+ 	struct intel_display *display = to_intel_display(crtc_state);
+ 
++	/*
++	 * Wa_14015401596. Keep the line also when PSR is off only because VRR
++	 * is enabled: enabling VRR disables PSR, and dropping the line then
++	 * moves the vblank start, which turns every VRR toggle into a full
++	 * modeset that a page flip cannot request.
++	 */
++	if ((crtc_state->has_psr || crtc_state->psr_vetoed_by_vrr) &&
++	    intel_vrr_possible(crtc_state) && IS_DISPLAY_VER(display, 13, 14))
++		return 1;
++
+ 	if (!crtc_state->has_psr)
+ 		return 0;
+ 
+-	/* Wa_14015401596 */
+-	if (intel_vrr_possible(crtc_state) && IS_DISPLAY_VER(display, 13, 14))
+-		return 1;
+-
+ 	/* Rest is for SRD_STATUS needed on LunarLake and onwards */
+ 	if (DISPLAY_VER(display) < 20)
+ 		return 0;
+@@ -1660,12 +1666,6 @@ static bool _psr_compute_config(struct intel_dp *intel_dp,
+ 	if (!CAN_PSR(intel_dp) || !display->params.enable_psr)
+ 		return false;
+ 
+-	/*
+-	 * Currently PSR doesn't work reliably with VRR enabled.
+-	 */
+-	if (crtc_state->vrr.enable)
+-		return false;
+-
+ 	entry_setup_frames = intel_psr_entry_setup_frames(intel_dp, conn_state, adjusted_mode);
+ 
+ 	if (entry_setup_frames >= 0) {
+@@ -1677,6 +1677,14 @@ static bool _psr_compute_config(struct intel_dp *intel_dp,
+ 		return false;
+ 	}
+ 
++	/*
++	 * Currently PSR doesn't work reliably with VRR enabled.
++	 */
++	if (crtc_state->vrr.enable) {
++		crtc_state->psr_vetoed_by_vrr = true;
++		return false;
++	}
++
+ 	return true;
+ }
+ 

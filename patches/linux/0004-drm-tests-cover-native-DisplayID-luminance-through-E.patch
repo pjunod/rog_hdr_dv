@@ -1,7 +1,7 @@
-From cd001a94d0689c828653aa2544d19283addb3caa Mon Sep 17 00:00:00 2001
+From 0170e54932da92bce897404dbdb8d96e994a653e Mon Sep 17 00:00:00 2001
 From: Codex <codex@invalid>
 Date: Thu, 8 Oct 2026 01:17:39 -0400
-Subject: [PATCH 4/4] drm/tests: cover native DisplayID luminance through EDID
+Subject: [PATCH 4/5] drm/tests: cover native DisplayID luminance through EDID
  updates
 
 Use real DRM connector updates instead of a second decoder
@@ -32,7 +32,7 @@ Assisted-by: LLM
  create mode 100644 drivers/gpu/drm/tests/drm_displayid_luminance_test.c
 
 diff --git a/drivers/gpu/drm/tests/Makefile b/drivers/gpu/drm/tests/Makefile
-index e7193b4..ac92374 100644
+index e7193b49c..ac923749e 100644
 --- a/drivers/gpu/drm/tests/Makefile
 +++ b/drivers/gpu/drm/tests/Makefile
 @@ -10,6 +10,7 @@ obj-$(CONFIG_DRM_KUNIT_TEST) += \
@@ -45,7 +45,7 @@ index e7193b4..ac92374 100644
  	drm_format_helper_test.o \
 diff --git a/drivers/gpu/drm/tests/drm_displayid_luminance_test.c b/drivers/gpu/drm/tests/drm_displayid_luminance_test.c
 new file mode 100644
-index 0000000..194ec77
+index 000000000..194ec77e5
 --- /dev/null
 +++ b/drivers/gpu/drm/tests/drm_displayid_luminance_test.c
 @@ -0,0 +1,275 @@

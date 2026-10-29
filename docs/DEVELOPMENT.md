@@ -48,7 +48,7 @@ under `patches/` has a `series` file. Apply files in that order.
 | ubuntu-libdisplay-info | Authenticated Ubuntu `0.3.0-1` source import | Delivered hdr6 prefix, hdr7 luminance and hdr8 chromaticity API, hdr9 packaging (installed 2026-10-11) |
 | ubuntu-mutter | Authenticated Ubuntu `51.0-1ubuntu3` source import | Delivered nativehdr2 prefix, then target feedback, colour input, HLG, highlight mapping, gamut compression and review fixes through nativehdr8 (installed 2026-10-11) |
 | wine | Wine `wine-11.0`, peeled `db11d0fe6a169c457e23d007e20404643d067aa8` | Desktop CreateFileFromAppW compatibility and the DisplayMonitor runtime class (source; test fixtures only) |
-| linux | Ubuntu tag `Ubuntu-7.3.0-8.8`, peeled `d03cf7a92919b0e6ab4e4a756dec41542eb2040f` | Native luminance, Intel selection and KUnit tests |
+| linux | Authenticated `linux-source-7.3.0` package `7.3.0-10.10` (released Linux 7.3); full import tree pinned in sources.json | Native luminance, Intel selection, KUnit tests and i915 VRR; [kernel build](KERNEL_REBASE.md) |
 
 The upstream and Ubuntu series are alternatives, not patches to stack atop
 one another. Ubuntu import/candidate commit IDs are local preparation IDs;
@@ -77,12 +77,14 @@ library extraction explicitly reported a missing acceptable maintainer key.
 Pinned hashes establish equality with the imported bytes, not a fresh
 signature-verification claim. Do not suppress or relabel authentication errors.
 
-The Linux `upstream` URL follows Ubuntu's official per-series Git layout.
-Fetch the recorded tag and require its peeled commit to equal `base_commit`.
-There is no full kernel `candidate_tree` claim: the saved candidate identity
-belongs to a source-subset repository. Reapply and compile against full source
-before a new kernel change, rather than treating the partial import receipt
-as a complete reconstruction test.
+The Linux series uses the hash-pinned Ubuntu source `.deb` and its inner
+source archive recorded in `sources.json`. Its base and candidate commits
+are local full-source preparation identities, not official Ubuntu Git
+revisions. The complete base and candidate trees must match. Follow the
+[kernel rebase](KERNEL_REBASE.md) for the archive extraction/import recipe;
+the generic reconstruction helper does not implement Linux imports.
+The previous Ubuntu source-subset and superseded vanilla-upstream candidate
+remain separate provenance; their test receipts do not qualify this source.
 
 For example, from this repository, with network access and Git available:
 

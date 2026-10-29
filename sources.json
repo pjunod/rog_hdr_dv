@@ -350,23 +350,83 @@
     },
     {
       "component": "linux",
-      "base_commit": "d03cf7a92919b0e6ab4e4a756dec41542eb2040f",
-      "base_tag": "Ubuntu-7.3.0-8.8",
-      "candidate_commit": "cd001a94d0689c828653aa2544d19283addb3caa",
-      "candidate_identity_scope": "local source-subset preparation repository",
-      "patch_count": 4,
+      "base_commit": "0edb54d9220da4f863845a1d1cfdfcf652db51e1",
+      "candidate_commit": "bcb66b157687e8f6d60e6e08b66adf2412eda762",
+      "candidate_identity_scope": "full local Git import of the authenticated Ubuntu source-package payload, then five display patches; import commit IDs are not official Ubuntu Git revisions",
+      "patch_count": 5,
       "patch_order": [
         "0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch",
         "0002-drm-i915-display-accept-a-luminance-range-from-any-s.patch",
         "0003-drm-edid-validate-native-DisplayID-physical-luminanc.patch",
-        "0004-drm-tests-cover-native-DisplayID-luminance-through-E.patch"
+        "0004-drm-tests-cover-native-DisplayID-luminance-through-E.patch",
+        "0005-drm-i915-psr-keep-Wa_14015401596-s-set-context-laten.patch"
       ],
       "upstream": "https://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/stonking",
       "source_origin": {
-        "kind": "ubuntu-kernel-git",
-        "documentation": "https://ubuntu.com/kernel/docs/how-to/source-code/obtain-kernel-source-git/",
-        "qualification": "Resolve base_tag and require exact base_commit before applying; repository URL follows official per-series naming. A fresh full-source fetch has not been requalified in this repository."
-      }
+        "kind": "ubuntu-linux-source-deb",
+        "package": "linux-source-7.3.0",
+        "version": "7.3.0-10.10",
+        "source_package": "linux",
+        "underlying_release": "7.3",
+        "artifacts": [
+          {
+            "file": "linux-source-7.3.0_7.3.0-10.10_all.deb",
+            "url": "http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-source-7.3.0_7.3.0-10.10_all.deb",
+            "bytes": 198900518,
+            "sha256": "becefccd4560e96bcf9e7f0aba9ef830e2734a8db601c0a3f5c921582e1c726a",
+            "apt_metadata_sha512": "d489e22008ea2a0fdf3de577a4ff036f29134790cae8f95576e2530fcf4a8a95e6486eb23383f949ef096868caa79be944f56adf942822874179df5cd021d26e"
+          }
+        ],
+        "source_tar": "usr/src/linux-source-7.3.0/linux-source-7.3.0.tar.bz2",
+        "source_tar_sha256": "8dd4719d6c6ec541d15c3d2ec706796a29112476c3cb1dd2a6fec8f6a67c57cd",
+        "strip_components": 1,
+        "authentication": "Downloaded using configured Ubuntu APT metadata; complete archive SHA-512 matches authenticated package metadata. SHA-256 and inner archive hash are recorded for byte equality. No independent source-maintainer signature or official Git-tag verification is claimed.",
+        "import": "Extract the pinned .deb and inner tar into fresh owned directories; git add -f -- . captures the complete archive payload. Require base_tree before applying the ordered series. Local import commit IDs differ with committer metadata; exact trees must match.",
+        "qualification": "Makefile is released Linux 7.3, not an rc. Ubuntu perf level-4, AppArmor user-namespace restrictions and automatic Secure Boot lockdown are retained. Both IPv4 CVE fixes exist in the unmodified base. Five reviewed display patches apply without conflicts; full source application is separate from build and boot qualification."
+      },
+      "previous_base_commit": "d03cf7a92919b0e6ab4e4a756dec41542eb2040f",
+      "previous_base_tag": "Ubuntu-7.3.0-8.8",
+      "previous_candidate_commit": "cd001a94d0689c828653aa2544d19283addb3caa",
+      "previous_candidate_identity_scope": "local source-subset preparation repository",
+      "base_tree": "656fd3abd8a685548a736e87278390f63ff8c7e3",
+      "candidate_tree": "b76fb4d9e81f5b44a840810ffbb341929b765c8d",
+      "rebase": {
+        "date": "2026-10-29",
+        "previous_displayid_series_count": 4,
+        "vrr_patch_import": {
+          "repository_commit": "a83638cff3c8e23a5265f65969f65f4475359ec8",
+          "branch": "claude/i915-vrr-fastset",
+          "patch": "0005-drm-i915-psr-keep-Wa_14015401596-s-set-context-laten.patch"
+        },
+        "conflicts": [],
+        "review_adjustments": [
+          {
+            "patch": "0005-drm-i915-psr-keep-Wa_14015401596-s-set-context-laten.patch",
+            "finding": "P2: setting psr_vetoed_by_vrr before PSR setup timing validation incorrectly retained the latency line for panels ineligible for PSR timing, creating a VRR-off/on fastset mismatch.",
+            "correction": "Evaluate the existing setup-frame timing check before vetoing PSR for enabled VRR; only timing-eligible PSR can set psr_vetoed_by_vrr. PSR remains disabled under VRR.",
+            "authorship": "Original author and author date retained; Codex rebase review correction disclosed in the patch message; no new sign-off added."
+          }
+        ],
+        "selected_base_reason": "Newest Ubuntu source offered by the configured authenticated archive is released Linux 7.3 and includes the CVE fix while retaining existing Ubuntu security policies and modular Binder configuration.",
+        "superseded_upstream_preparation": {
+          "base_tag": "v7.3",
+          "base_commit": "c03c1a14507dfaf8b856c2608f9ac216021fc222",
+          "candidate_commit": "f9635bcab42a7209a3cff4948dc74ec973c73dc0",
+          "candidate_tree": "b0e339a3e2ed9be1150b4ccd5381f46c70333434",
+          "disposition": "Preserved privately; superseded before deployment because the Ubuntu base retains existing downstream security behavior. Its earlier compiler/KUnit results do not qualify the selected Ubuntu source."
+        }
+      },
+      "included_upstream_fixes": [
+        {
+          "cve": "CVE-2026-98432",
+          "commit": "e3f33b0a1d89d738e2b913dab519226eaf76e15b",
+          "url": "https://github.com/torvalds/linux/commit/e3f33b0a1d89d738e2b913dab519226eaf76e15b",
+          "verification": "Both inet_sock_destruct() and tcp_v4_reqsk_destructor() use kfree_rcu() in the authenticated Ubuntu 7.3.0-10.10 base. The display series changes neither IPv4 file. This is source verification, not a running-kernel claim."
+        }
+      ],
+      "base_package": "linux-source-7.3.0",
+      "base_version": "7.3.0-10.10",
+      "candidate_status": "Ubuntu 7.3.0-10.10 plus five reviewed display patches. Fresh full-source replay, affected W=1 compilation (zero warnings), four parser KUnit tests, complete packages, packaged binary-CVE verification and five NVIDIA615.71.09 modules built against delivered headers all PASS. Urgent target config retains Intel/proprietary-NVIDIA and omits unused AMD/Radeon/Nouveau. Signing, installation and boot remain pending."
     },
     {
       "component": "wine",

@@ -1,8 +1,33 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-27 (America/New_York) · **Current:** the HDR desktop
+**Updated:** 2026-10-29 (America/New_York) · **Current:** the HDR desktop
 packages are in an APT repository that follows Ubuntu's updates; Dolby Vision
 plays through plurx Player with the closed-form display mapping.
+
+## Kernel security rebase — 2026-10-29
+
+The running `7.3.0-rc6-nativehdr2+` was built October 27 and booted October
+28. A build-ID-matched inspection of its installed image confirms both
+IPv4 teardown functions still call `kfree()`, so CVE-2026-98432 is unfixed;
+no livepatch is active.
+
+All five deployed display patches now apply to Ubuntu `7.3.0-10.10`, whose
+Makefile is released Linux 7.3. Both CVE corrections are already in that
+base. It retains Ubuntu's perf level-4 enforcement, AppArmor restrictions
+on unprivileged user namespaces, automatic Secure Boot lockdown and modular
+Binder. The urgent target build retains Intel i915/xe and proprietary
+NVIDIA, omitting unused AMD/Radeon/Nouveau stacks; the original full config
+is preserved. Independent configuration review approved the derived changes.
+
+Fresh export replay matches the complete pinned source tree, and independent
+re-review approved the Ubuntu candidate. All five affected display objects
+compiled with warnings enabled and zero warnings; all four focused parser
+KUnit cases passed. The image/header packages built successfully; the actual
+packaged image has both RCU corrections, and all five NVIDIA 615.71.09
+modules compile/link against its delivered headers. Signing, installation
+and a coordinated boot remain pending. The [kernel rebase ledger](KERNEL_REBASE.md) records
+source, build and eventual boot evidence separately. No kernel installation
+or boot selection has changed.
 
 ## Where it stands (2026-10-27)
 
