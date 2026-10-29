@@ -1,33 +1,48 @@
-# Kernel rebase — retain the display fixes on released Linux 7.3
+# Kernel rebase — retain the display fixes on Ubuntu’s released Linux 7.3
 
 Companion to [status](STATUS.md) (the running stack),
 [development](DEVELOPMENT.md) (source and review rules), and
 [operations](OPERATIONS.md) (deliberate installation and recovery).
 
-**Status:** source replay, affected compilation and parser tests passed;
-complete package build and boot acceptance pending.
-**Written:** 2026-10-29 (America/New_York).
+**Status:** Ubuntu source replay, independent review, affected compilation
+and four parser tests passed; complete packaging and boot acceptance pending. **Written:** 2026-10-29.
 
 ## Release and security evidence
 
-[Kernel.org's release feed](https://www.kernel.org/releases.json) listed
-Linux 7.3 as `latest_stable` on October 29. The series targets the released
-`v7.3` tag, not a release candidate or linux-next. The exact base, full
-candidate tree, ordered patches and hashes are in [sources.json](../sources.json)
-and [SHA256SUMS](../SHA256SUMS).
+The selected base is Ubuntu’s authenticated `linux-source-7.3.0` package
+`7.3.0-10.10`, the newest offered by the configured archive at inspection.
+Its Makefile is released Linux 7.3: `EXTRAVERSION` is empty. Kernel.org’s
+[release feed](https://www.kernel.org/releases.json) also lists 7.3 as the
+latest release. The complete source payload, base/candidate trees and
+ordered patch hashes are pinned in [sources.json](../sources.json) and
+[SHA256SUMS](../SHA256SUMS).
 
 The [upstream CVE-2026-98432 fix](https://github.com/torvalds/linux/commit/e3f33b0a1d89d738e2b913dab519226eaf76e15b)
-changes IPv4 socket-option teardown to defer freeing until RCU readers
-finish. Both corrected statements exist in pristine 7.3 and remain unchanged
-after applying the display patches:
+defers IPv4 socket-option freeing until RCU readers finish. Both corrected
+statements are present in the unmodified Ubuntu source and unchanged by
+the display patches:
 
 - `inet_sock_destruct()` in `net/ipv4/af_inet.c` uses `kfree_rcu()`.
 - `tcp_v4_reqsk_destructor()` in `net/ipv4/tcp_ipv4.c` uses `kfree_rcu()`.
 
-The inspected running `7.3.0-rc6-nativehdr2+` lacks both changes. Its GNU
-build ID from `/sys/kernel/notes` equals the installed image's extracted
-ELF ID, so that conclusion refers to the actual running build. No livepatch
-overrides the functions. Raw machine captures stay outside this public repo.
+The inspected running `7.3.0-rc6-nativehdr2+` lacks both corrections. Its
+running GNU build ID matches the installed image’s extracted ELF ID. No
+livepatch overrides those functions. Raw device captures remain private.
+
+## Why this uses Ubuntu’s source
+
+A vanilla 7.3 preparation was superseded before deployment. It omitted
+Ubuntu’s additional deny-all-unprivileged perf gate and its AppArmor
+restriction on unconfined user-namespace creation. Writing a larger value
+to the upstream perf sysctl does not recreate Ubuntu’s extra permission
+check. Disabling namespaces globally would also change unrelated behavior.
+
+The Ubuntu base retains those implementations naturally, as well as its
+automatic Secure Boot lockdown and modular Binder support. The running
+system’s persistent AppArmor configuration remains applicable. No new
+policy workaround or hand-ported security patch is introduced. Postboot
+checks must still confirm `perf_event_paranoid=4`,
+`apparmor_restrict_unprivileged_userns=1`, and integrity lockdown.
 
 ## Display changes retained
 
@@ -41,79 +56,78 @@ overrides the functions. Raw machine captures stay outside this public repo.
 
 The first four come from the recorded main series. Patch 0005 comes from
 `claude/i915-vrr-fastset`, repository commit `a83638c`. Authors and author
-dates are retained; no human signoff or upstream acceptance was added.
-All five applied without conflicts to full 7.3 source. Independent review
-then corrected patch 0005 to validate PSR setup timing before recording VRR
-as the reason PSR is disabled. Without that ordering, an ineligible mode
-could change set-context latency when VRR toggles and reproduce the original
-page-flip failure. Re-review approved the corrected source for compilation.
-The first four retain their original stable patch IDs; patch 0005 differs
-by this disclosed correction. The upstream submission kit remains a separate
-proposal with its own base and receipts.
+dates are preserved; no human signoff or upstream acceptance was added.
+All five apply without conflicts to the selected Ubuntu source.
+
+Independent review corrected patch 0005 to validate PSR setup timing before
+recording VRR as the reason PSR is disabled. Otherwise, a timing-ineligible
+mode could change set-context latency on a VRR toggle and reproduce the
+original page-flip failure. The corrected series passed re-review on the
+Ubuntu base. The first four retain their original stable patch IDs; the
+fifth differs from the deployed patch only by that disclosed correction.
+
+## Reconstruct the complete source
+
+Use a fresh owned Linux workspace. Download the exact `.deb` from the
+manifest or the configured Ubuntu archive. Before extraction, require its
+SHA-256 and the APT metadata SHA-512 to match the pins. Extract its payload
+with `dpkg-deb -x`; the inner archive is
+`usr/src/linux-source-7.3.0/linux-source-7.3.0.tar.bz2`. Verify its pinned
+SHA-256, then extract it with one leading directory removed.
+
+Initialise Git in that fresh source tree and use `git add -f -- .` to retain
+the complete source-archive payload, including ignored source files.
+Require `git write-tree` to equal `base_tree` before creating a neutral
+local import commit. Apply all files from `patches/linux/series` with
+`git am`, then require `HEAD^{tree}` to equal `candidate_tree`.
+
+The import commit IDs are local preparation identities, not fetchable
+Ubuntu Git revisions. Different committer metadata changes commits but must
+not change either tree. Authentication here is the configured Ubuntu APT
+archive and matching package metadata; no independent source-maintainer
+signature or official Git-tag verification is claimed.
 
 ## Build configuration and acceptance
 
-The replacement release is `7.3.0-nativehdr3`. Configuration starts from
-the running kernel's `/boot/config-*` and uses `olddefconfig` against 7.3.
-Existing upstream hardware options are retained; `localmodconfig` is not used.
+The replacement release is `7.3.0-nativehdr3`, package version
+`7.3.0-10.10+nativehdr3`. Start with the running kernel’s configuration and
+run `olddefconfig`. The complete resulting diff changes only
+`LOCALVERSION` and `VERSION_SIGNATURE`; `localmodconfig` is not used.
+No hardware or security option is dropped for this selected base.
 
-Two upstream/Ubuntu differences need deliberate choices:
+Use the fixed unprivileged native x86_64 wrapper with Ubuntu 26.10 and
+GCC 15.3. Source, logs, HOME/XDG/TMPDIR and output slots are task-owned.
+The earlier upstream attempt is preserved separately. The Ubuntu output
+slot is fresh; the shared compiler cache may reuse identical compiler
+inputs, rather than reusing stale objects across source replacements.
 
-- Upstream lacks Ubuntu's automatic Secure Boot lockdown option. Select
-  `LOCK_DOWN_KERNEL_FORCE_INTEGRITY=y` to retain the running integrity
-  policy. This also enforces integrity if that kernel boots without Secure
-  Boot. Leave early lockdown and module signature support enabled.
-- Upstream Binder IPC and binderfs are booleans rather than Ubuntu's
-  tristates. Select both as built-ins, keeping the empty default device
-  list, rather than silently losing their support at `olddefconfig`.
-
-Ubuntu-only AAEON, EtherCAT, Ubuntu-host and version-signature settings have
-no upstream counterpart. Their removal is recorded in the private config
-diff. The core ASUS WMI, ASUS Armoury, Intel and NVIDIA compatibility checks
-remain part of qualification; a source replay alone does not prove them.
-
-Compile in a fresh owned output slot with the fixed unprivileged native
-x86_64 wrapper. The compiler environment is Ubuntu 26.10 with GCC 15.3;
-task-local HOME/XDG/TMPDIR and the shared compiler cache keep generated
-files separate from source and recovery material. The source tree must
-match the manifest before building.
-
-The package build retains DWARF and BTF configuration but excludes the large
+The package build retains DWARF/BTF configuration and omits only the large
 debug-symbol package through the upstream packaging profile:
 
 ```bash
 make -C "$KERNEL_SOURCE" O="$KERNEL_BUILD" -j12 \
-  CC='ccache gcc' LOCALVERSION= KDEB_PKGVERSION=7.3.0-1+nativehdr3 \
+  CC='ccache gcc' LOCALVERSION= KDEB_PKGVERSION=7.3.0-10.10+nativehdr3 \
   DEB_BUILD_PROFILES=pkg.linux-upstream.nokerneldbg bindeb-pkg
 ```
 
-**How to read the evidence:** patch replay proves source application;
-warnings-enabled DRM/i915/xe compilation checks the changed display paths;
-the focused `drm_displayid_luminance` KUnit suite checks parser behavior.
-A complete package build plus an NVIDIA build against the delivered headers
-is required before installation. Verify the two IPv4 destructor functions
-in the resulting binary as well as the source. Record actual results and
-limitations in a source-bound receipt; do not inherit the rc5/rc6 build pass.
-
-## Qualification receipt
-
-The [source-bound receipt](../evidence/kernel-7.3-rebase.json) records
-the exact candidate and private-log hashes. Fresh export replay reproduced
-the recorded tree. All five affected DRM/i915/shared-xe objects compiled
-with `W=1` and zero warnings. All four focused parser KUnit tests passed.
-Complete package, binary CVE and delivered-header NVIDIA checks are still
-pending; installation and physical boot acceptance are separate.
+**How to read the evidence:** the [receipt](../evidence/kernel-7.3-rebase.json)
+binds results to the selected Ubuntu tree. Require warnings-enabled
+DRM/i915/shared-xe compilation, the four `drm_displayid_luminance` KUnit
+cases, complete packages, the two RCU calls in the resulting image, and
+NVIDIA compilation against the delivered headers. Results from the
+superseded upstream tree do not qualify this candidate.
 
 ## Installation and recovery
 
-Keep the current signed test kernel and a stock kernel available. Before
-installing, verify `/boot` space, the enrolled signing certificate, image
-signature, module trust, NVIDIA modules, initramfs and the saved boot entry.
-Build-time autogenerated signing material stays private and never replaces
-the enrolled machine key.
+Install only the versioned image and kernel-header packages. The generated
+`linux-libc-dev` package is not part of this kernel deployment. Keep the
+current signed test kernel and a stock kernel available. Verify boot space,
+the enrolled public certificate, image signature, module trust, NVIDIA
+modules, initramfs and a recoverable boot entry before selecting the new
+kernel. Signing material stays private and out of Git.
 
-Installation and a reboot require the coordinated window described in
-[operations](OPERATIONS.md). After boot, confirm `uname -r`, the running
-build ID, integrity lockdown, NVIDIA loading and HDR/VRR behavior. A new
-image sitting in a package or under `/boot` does not fix the running kernel.
-No compositor or display-library update is part of this kernel rebase.
+Installation and reboot use the coordinated window in
+[operations](OPERATIONS.md). After boot, confirm the release and running
+build ID, Ubuntu security controls, NVIDIA loading and HDR/VRR transitions.
+An image on disk does not fix the kernel still running. No compositor or
+display-library update is part of this rebase.

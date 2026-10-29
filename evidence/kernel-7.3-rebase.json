@@ -3,13 +3,12 @@
   "checked": "2026-10-29",
   "component": "linux",
   "release": "7.3.0-nativehdr3",
-  "base_tag": "v7.3",
-  "base_commit": "c03c1a14507dfaf8b856c2608f9ac216021fc222",
-  "candidate_commit": "f9635bcab42a7209a3cff4948dc74ec973c73dc0",
-  "candidate_tree": "b0e339a3e2ed9be1150b4ccd5381f46c70333434",
+  "base_commit": "0edb54d9220da4f863845a1d1cfdfcf652db51e1",
+  "candidate_commit": "bcb66b157687e8f6d60e6e08b66adf2412eda762",
+  "candidate_tree": "b76fb4d9e81f5b44a840810ffbb341929b765c8d",
   "cve": "CVE-2026-98432",
   "upstream_fix": "e3f33b0a1d89d738e2b913dab519226eaf76e15b",
-  "source_verification": "Both IPv4 destructor functions use kfree_rcu in pristine v7.3; display patches leave both IPv4 files unchanged.",
+  "source_verification": "Both CVE corrections exist in the authenticated Ubuntu 7.3.0-10.10 base and remain unchanged by the display series.",
   "patch_equivalence": [
     {
       "patch": "0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch",
@@ -52,44 +51,42 @@
   "independent_review": {
     "initial_result": "P2: VRR veto preceded PSR setup timing validation, allowing latency mismatch for timing-ineligible modes.",
     "correction": "Evaluate setup-frame timing first; only a timing-eligible PSR mode may set psr_vetoed_by_vrr.",
-    "rereview": "Approved for compilation and focused validation; no further actionable source or manifest findings."
+    "rereview": "Approved for compilation and focused validation; no further actionable source or manifest findings.",
+    "ubuntu_rereview": "Approved for the Ubuntu compiler fast lane: source archive and clean candidate verified, all five stable patch IDs match the reviewed series, both CVE fixes and Ubuntu security controls are present."
   },
   "fresh_export_replay": {
     "result": "PASS",
-    "tree": "b0e339a3e2ed9be1150b4ccd5381f46c70333434"
+    "tree": "b76fb4d9e81f5b44a840810ffbb341929b765c8d"
   },
   "compiler": {
     "architecture": "native x86_64, unprivileged",
     "os": "Ubuntu 26.10",
     "gcc": "15.3.0-4ubuntu1",
-    "image_id": "sha256:c229414add27658f7b069e27ec0d23488ed68348f5a144bab29f6a9113657353"
+    "image_id": "sha256:748e8d00fe9b4a50069e054c2e32a364ac87c077bbddf152b4e458ce15c1d650"
   },
   "configuration": {
-    "sha256": "7ef69f48b1a66535ca6a45ead3cad54907aa72727eae891356b938664f5f3005",
-    "origin": "Running nativehdr2 configuration, olddefconfig on v7.3; no localmodconfig.",
+    "origin": "Running nativehdr2 configuration with olddefconfig on Ubuntu 7.3.0-10.10.",
     "intentional_changes": [
       "LOCALVERSION=-nativehdr3",
-      "Upstream integrity lockdown enabled by default to preserve the running Secure Boot lockdown level.",
-      "Binder IPC and binderfs converted from Ubuntu modules to upstream built-ins; empty device list retained.",
-      "Ubuntu-only AAEON/EtherCAT/Ubuntu host/version metadata options have no upstream counterpart."
-    ]
+      "VERSION_SIGNATURE=Local native HDR based on Ubuntu 7.3.0-10.10"
+    ],
+    "policy": "Modular Binder, Ubuntu perf level-4 enforcement, AppArmor user-namespace restriction and automatic Secure Boot lockdown remain configured as before; runtime confirmation requires the new boot.",
+    "sha256": "8f5e018ccbd2215667055e8df0fdc4bf7eefc2a80886ba6c59f3ad7553f37d00"
   },
   "validation": {
     "warnings_enabled_objects": {
       "result": "PASS",
-      "warnings": 0,
       "targets": [
         "drivers/gpu/drm/drm_edid.o",
         "drivers/gpu/drm/i915/display/intel_dp_aux_backlight.o",
         "drivers/gpu/drm/i915/display/intel_psr.o",
         "drivers/gpu/drm/xe/i915-display/intel_dp_aux_backlight.o",
         "drivers/gpu/drm/xe/i915-display/intel_psr.o"
-      ]
+      ],
+      "warnings": 0
     },
     "parser_kunit": {
       "result": "PASS",
-      "passed": 4,
-      "failed": 0,
       "architecture": "native x86_64 User-Mode Linux",
       "suite": "drm_displayid_luminance",
       "cases": [
@@ -97,28 +94,30 @@
         "luminance_headers",
         "luminance_duplicates_reset",
         "luminance_cta_authority"
-      ]
+      ],
+      "passed": 4,
+      "failed": 0
     },
-    "complete_packages": "BUILDING",
+    "complete_packages": "BUILDING ON UBUNTU BASE",
     "binary_cve_verification": "PENDING",
     "nvidia_delivered_headers": "PENDING"
   },
   "logs": {
     "replay.log": {
-      "bytes": 3252,
-      "sha256": "57f3c8d0253dad953896fe99c165bced12b6cbda0f7c7fd318f698ac059af6c0"
+      "bytes": 3120,
+      "sha256": "8f9ee42510ed689ae0f191441d2e384946550ce9a0068f6ed19ac0b2c72a4eda"
     },
     "affected-build.log": {
-      "bytes": 10262,
-      "sha256": "8d90293eb52ce0dd0229f9d4af9e335854775fbac93da0133462c3196b8c0a31"
+      "bytes": 10227,
+      "sha256": "2989aae5f603cc820e85b70c81b53c5a9980f22d6f13017263985ea4245bd08b"
     },
     "kunit.log": {
       "bytes": 1127,
-      "sha256": "1e7d2c61bab33d4643278dc7d53185fb6e88539cd8c739b10fc84463f7e1b89f"
+      "sha256": "53334dd6d5a4390be0efe3ecfd0181d66f7970a975768be959e2cb0bfbae129f"
     },
-    "config-final.log": {
-      "bytes": 745,
-      "sha256": "49c6b0f3fce00c8271ca27c47beac5b625b3b0446c0bda0d401c2e3c98193b33"
+    "config-ubuntu.log": {
+      "bytes": 875,
+      "sha256": "4d7429e01770fc4425dd3ce9c304fab1de49ee5c1afe4669b1d4b1961c820334"
     }
   },
   "deployment": {
@@ -132,5 +131,37 @@
     "No new HDR/VRR optical or physical transition acceptance.",
     "Build and installation states are separate; the old running kernel stays vulnerable until a signed replacement is booted."
   ],
-  "private_log_storage": "Task-owned native Linux kernel builder workspace; raw device captures, binaries and signing material excluded from Git."
+  "private_log_storage": "Task-owned native Linux kernel builder workspace; raw device captures, binaries and signing material excluded from Git.",
+  "base_package": "linux-source-7.3.0",
+  "base_version": "7.3.0-10.10",
+  "base_tree": "656fd3abd8a685548a736e87278390f63ff8c7e3",
+  "source_origin": {
+    "kind": "ubuntu-linux-source-deb",
+    "package": "linux-source-7.3.0",
+    "version": "7.3.0-10.10",
+    "source_package": "linux",
+    "underlying_release": "7.3",
+    "artifacts": [
+      {
+        "file": "linux-source-7.3.0_7.3.0-10.10_all.deb",
+        "url": "http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-source-7.3.0_7.3.0-10.10_all.deb",
+        "bytes": 198900518,
+        "sha256": "becefccd4560e96bcf9e7f0aba9ef830e2734a8db601c0a3f5c921582e1c726a",
+        "apt_metadata_sha512": "d489e22008ea2a0fdf3de577a4ff036f29134790cae8f95576e2530fcf4a8a95e6486eb23383f949ef096868caa79be944f56adf942822874179df5cd021d26e"
+      }
+    ],
+    "source_tar": "usr/src/linux-source-7.3.0/linux-source-7.3.0.tar.bz2",
+    "source_tar_sha256": "8dd4719d6c6ec541d15c3d2ec706796a29112476c3cb1dd2a6fec8f6a67c57cd",
+    "strip_components": 1,
+    "authentication": "Downloaded using configured Ubuntu APT metadata; complete archive SHA-512 matches authenticated package metadata. SHA-256 and inner archive hash are recorded for byte equality. No independent source-maintainer signature or official Git-tag verification is claimed.",
+    "import": "Extract the pinned .deb and inner tar into fresh owned directories; git add -f -- . captures the complete archive payload. Require base_tree before applying the ordered series. Local import commit IDs differ with committer metadata; exact trees must match.",
+    "qualification": "Makefile is released Linux 7.3, not an rc. Ubuntu perf level-4, AppArmor user-namespace restrictions and automatic Secure Boot lockdown are retained. Both IPv4 CVE fixes exist in the unmodified base. Five reviewed display patches apply without conflicts; full source application is separate from build and boot qualification."
+  },
+  "superseded_upstream_preparation": {
+    "base_tag": "v7.3",
+    "base_commit": "c03c1a14507dfaf8b856c2608f9ac216021fc222",
+    "candidate_commit": "f9635bcab42a7209a3cff4948dc74ec973c73dc0",
+    "candidate_tree": "b0e339a3e2ed9be1150b4ccd5381f46c70333434",
+    "disposition": "Preserved privately; superseded before deployment because the Ubuntu base retains existing downstream security behavior. Its earlier compiler/KUnit results do not qualify the selected Ubuntu source."
+  }
 }

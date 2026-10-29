@@ -11,14 +11,18 @@ The running `7.3.0-rc6-nativehdr2+` was built October 27 and booted October
 IPv4 teardown functions still call `kfree()`, so CVE-2026-98432 is unfixed;
 no livepatch is active.
 
-All five deployed display patches now apply to released Linux `v7.3`,
-including the i915 VRR/PSR change from the separate branch. The base
-already includes the CVE's two `kfree_rcu()` corrections. This is source
-evidence. Fresh export replay, five affected warnings-enabled objects
-(zero warnings), and all four focused parser KUnit tests passed. Complete
-packaging, binary CVE verification, module compatibility and a coordinated
-boot are separate acceptance steps. The [kernel rebase ledger](KERNEL_REBASE.md)
-records them. No kernel installation or boot selection has changed.
+All five deployed display patches now apply to Ubuntu `7.3.0-10.10`, whose
+Makefile is released Linux 7.3. Both CVE corrections are already in that
+base. It retains Ubuntu's perf level-4 enforcement, AppArmor restrictions
+on unprivileged user namespaces, automatic Secure Boot lockdown and modular
+Binder. The new configuration changes only the two version labels.
+
+Fresh export replay matches the complete pinned source tree, and independent
+re-review approved the Ubuntu candidate. All five affected display objects
+compiled with warnings enabled and zero warnings; all four focused parser
+KUnit cases passed. The complete package build is underway. The [kernel rebase ledger](KERNEL_REBASE.md) records
+source, build and eventual boot evidence separately. No kernel installation
+or boot selection has changed.
 
 ## Where it stands (2026-10-27)
 
