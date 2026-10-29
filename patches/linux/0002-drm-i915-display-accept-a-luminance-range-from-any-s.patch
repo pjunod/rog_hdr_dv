@@ -1,7 +1,7 @@
-From 4ed0ebfcdaee2253d754372ccd662e4dd883ef5b Mon Sep 17 00:00:00 2001
+From 6e3711f1d1ffd3215a2c870223b9f62f114d8ef3 Mon Sep 17 00:00:00 2001
 From: Cristian La Spina <cristian.laspina@kernel.srl>
 Date: Sun, 2 Aug 2026 19:06:47 +0200
-Subject: [PATCH 2/4] drm/i915/display: accept a luminance range from any
+Subject: [PATCH 2/5] drm/i915/display: accept a luminance range from any
  source
 
 intel_dp_aux_supports_hdr_backlight() refuses the Intel proprietary eDP
@@ -28,7 +28,7 @@ Signed-off-by: Cristian La Spina <cristian.laspina@kernel.srl>
  1 file changed, 8 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/gpu/drm/i915/display/intel_dp_aux_backlight.c b/drivers/gpu/drm/i915/display/intel_dp_aux_backlight.c
-index 266e042..c452800 100644
+index 266e042e0..c45280064 100644
 --- a/drivers/gpu/drm/i915/display/intel_dp_aux_backlight.c
 +++ b/drivers/gpu/drm/i915/display/intel_dp_aux_backlight.c
 @@ -136,19 +136,18 @@ intel_dp_aux_supports_hdr_backlight(struct intel_connector *connector)

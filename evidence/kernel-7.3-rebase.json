@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "checked": "2026-10-29",
+  "component": "linux",
+  "release": "7.3.0-nativehdr3",
+  "base_tag": "v7.3",
+  "base_commit": "c03c1a14507dfaf8b856c2608f9ac216021fc222",
+  "candidate_commit": "f9635bcab42a7209a3cff4948dc74ec973c73dc0",
+  "candidate_tree": "b0e339a3e2ed9be1150b4ccd5381f46c70333434",
+  "cve": "CVE-2026-98432",
+  "upstream_fix": "e3f33b0a1d89d738e2b913dab519226eaf76e15b",
+  "source_verification": "Both IPv4 destructor functions use kfree_rcu in pristine v7.3; display patches leave both IPv4 files unchanged.",
+  "patch_equivalence": [
+    {
+      "patch": "0001-drm-edid-read-the-luminance-range-from-DisplayID-2.0.patch",
+      "old_patch_id": "fa17df455ef0160a1075c9b03f6a66bc780ece40",
+      "new_patch_id": "fa17df455ef0160a1075c9b03f6a66bc780ece40",
+      "author_preserved": true,
+      "author_date_preserved": true
+    },
+    {
+      "patch": "0002-drm-i915-display-accept-a-luminance-range-from-any-s.patch",
+      "old_patch_id": "ff57e113e0edc614921b6d8e768af63c0f69af06",
+      "new_patch_id": "ff57e113e0edc614921b6d8e768af63c0f69af06",
+      "author_preserved": true,
+      "author_date_preserved": true
+    },
+    {
+      "patch": "0003-drm-edid-validate-native-DisplayID-physical-luminanc.patch",
+      "old_patch_id": "e89668284a754de1372858ffef4de642a02f8483",
+      "new_patch_id": "e89668284a754de1372858ffef4de642a02f8483",
+      "author_preserved": true,
+      "author_date_preserved": true
+    },
+    {
+      "patch": "0004-drm-tests-cover-native-DisplayID-luminance-through-E.patch",
+      "old_patch_id": "9b809b1a1854da2d6e34176aa7b29804457276f1",
+      "new_patch_id": "9b809b1a1854da2d6e34176aa7b29804457276f1",
+      "author_preserved": true,
+      "author_date_preserved": true
+    },
+    {
+      "patch": "0005-drm-i915-psr-keep-Wa_14015401596-s-set-context-laten.patch",
+      "old_patch_id": "054806932c4e775970334504d35b14b5f1b4630c",
+      "new_patch_id": "c0fbf1153931ddb0e1ce1c60921d29c2e285cfa8",
+      "author_preserved": true,
+      "author_date_preserved": true,
+      "review_adjustment": "Evaluate the existing setup-frame timing check before vetoing PSR for enabled VRR; only timing-eligible PSR can set psr_vetoed_by_vrr. PSR remains disabled under VRR.",
+      "equivalence": "Intentionally differs only by reviewed PSR timing-check order correction; first four patches retain stable patch IDs."
+    }
+  ],
+  "independent_review": {
+    "initial_result": "P2: VRR veto preceded PSR setup timing validation, allowing latency mismatch for timing-ineligible modes.",
+    "correction": "Evaluate setup-frame timing first; only a timing-eligible PSR mode may set psr_vetoed_by_vrr.",
+    "rereview": "Approved for compilation and focused validation; no further actionable source or manifest findings."
+  },
+  "fresh_export_replay": {
+    "result": "PASS",
+    "tree": "b0e339a3e2ed9be1150b4ccd5381f46c70333434"
+  },
+  "compiler": {
+    "architecture": "native x86_64, unprivileged",
+    "os": "Ubuntu 26.10",
+    "gcc": "15.3.0-4ubuntu1",
+    "image_id": "sha256:c229414add27658f7b069e27ec0d23488ed68348f5a144bab29f6a9113657353"
+  },
+  "configuration": {
+    "sha256": "7ef69f48b1a66535ca6a45ead3cad54907aa72727eae891356b938664f5f3005",
+    "origin": "Running nativehdr2 configuration, olddefconfig on v7.3; no localmodconfig.",
+    "intentional_changes": [
+      "LOCALVERSION=-nativehdr3",
+      "Upstream integrity lockdown enabled by default to preserve the running Secure Boot lockdown level.",
+      "Binder IPC and binderfs converted from Ubuntu modules to upstream built-ins; empty device list retained.",
+      "Ubuntu-only AAEON/EtherCAT/Ubuntu host/version metadata options have no upstream counterpart."
+    ]
+  },
+  "validation": {
+    "warnings_enabled_objects": {
+      "result": "PASS",
+      "warnings": 0,
+      "targets": [
+        "drivers/gpu/drm/drm_edid.o",
+        "drivers/gpu/drm/i915/display/intel_dp_aux_backlight.o",
+        "drivers/gpu/drm/i915/display/intel_psr.o",
+        "drivers/gpu/drm/xe/i915-display/intel_dp_aux_backlight.o",
+        "drivers/gpu/drm/xe/i915-display/intel_psr.o"
+      ]
+    },
+    "parser_kunit": {
+      "result": "PASS",
+      "passed": 4,
+      "failed": 0,
+      "architecture": "native x86_64 User-Mode Linux",
+      "suite": "drm_displayid_luminance",
+      "cases": [
+        "luminance_values",
+        "luminance_headers",
+        "luminance_duplicates_reset",
+        "luminance_cta_authority"
+      ]
+    },
+    "complete_packages": "BUILDING",
+    "binary_cve_verification": "PENDING",
+    "nvidia_delivered_headers": "PENDING"
+  },
+  "logs": {
+    "replay.log": {
+      "bytes": 3252,
+      "sha256": "57f3c8d0253dad953896fe99c165bced12b6cbda0f7c7fd318f698ac059af6c0"
+    },
+    "affected-build.log": {
+      "bytes": 10262,
+      "sha256": "8d90293eb52ce0dd0229f9d4af9e335854775fbac93da0133462c3196b8c0a31"
+    },
+    "kunit.log": {
+      "bytes": 1127,
+      "sha256": "1e7d2c61bab33d4643278dc7d53185fb6e88539cd8c739b10fc84463f7e1b89f"
+    },
+    "config-final.log": {
+      "bytes": 745,
+      "sha256": "49c6b0f3fce00c8271ca27c47beac5b625b3b0446c0bda0d401c2e3c98193b33"
+    }
+  },
+  "deployment": {
+    "installed": false,
+    "boot_selection_changed": false,
+    "rebooted": false,
+    "running_kernel": "7.3.0-rc6-nativehdr2+",
+    "running_cve_status": "FIX ABSENT"
+  },
+  "limits": [
+    "No new HDR/VRR optical or physical transition acceptance.",
+    "Build and installation states are separate; the old running kernel stays vulnerable until a signed replacement is booted."
+  ],
+  "private_log_storage": "Task-owned native Linux kernel builder workspace; raw device captures, binaries and signing material excluded from Git."
+}

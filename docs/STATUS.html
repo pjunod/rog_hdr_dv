@@ -17,6 +17,13 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
 <p class="muted">Updated October 17, 2026 · merged Ubuntu kit 317 constructed, qualified (14/14 batch, isolated forward/rollback PASS with one labelled limit) and retrieved, not released or installed · HDR foundations/tooling/experimental-launcher source independently reviewed and qualified; three helper findings closed, 29/29 affected methods passed; full Dolby and physical acceptance remain open</p></header>
+<h2>Kernel security rebase — October 29, 2026</h2>
+<div class="callout"><strong>Running kernel still vulnerable:</strong>
+<code>7.3.0-rc6-nativehdr2+</code> lacks CVE-2026-98432's fix. The five display
+patches are rebased onto released Linux 7.3, which contains the upstream fix.
+Source replay passed; build, module compatibility and coordinated boot
+acceptance remain pending. <a href="KERNEL_REBASE.md">Kernel evidence and
+recovery</a>. No kernel installation or boot selection has changed.</div>
 <div class="callout"><strong>Historical physical result (2026-10-11):</strong> the owner reported
 working HDR10 on the earlier patched stack (hdr6/nativehdr2) with Secure Boot
 enabled; hdr9 + nativehdr8 were installed; the HDR session ran on them and the

@@ -18,15 +18,19 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-10-27)
+## What works today (2026-10-29)
 
 Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
 `51.0-1ubuntu3+nativehdr10` (since 2026-10-13), kernel
-`7.3.0-rc5-nativehdr1`, and plurx Player `0.3.2` for Dolby Vision.
+`7.3.0-rc6-nativehdr2+`, and plurx Player `0.3.2` for Dolby Vision.
+The running kernel lacks CVE-2026-98432's fix. The five display patches
+are rebased onto released Linux 7.3, which includes the fix; see the
+[kernel rebase](docs/KERNEL_REBASE.md) for build and deployment evidence.
 
 | Area | State | Where it stands |
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
+| Kernel security rebase | **Source prepared; build pending** (2026-10-29) | Linux 7.3 plus the four HDR patches and the i915 VRR patch; the running `nativehdr2` remains vulnerable until the replacement is signed and booted ([rebase](docs/KERNEL_REBASE.md)) |
 | HDR desktop session | **Installed** | Mutter reports the panel's declared range (0.0004–616 cd/m², firmware values) and primaries separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
@@ -37,6 +41,8 @@ Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
+The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
+page-flip fix and the outstanding hardware checks.
 
 ## How the pieces fit
 
