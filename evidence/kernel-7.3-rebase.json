@@ -52,7 +52,8 @@
     "initial_result": "P2: VRR veto preceded PSR setup timing validation, allowing latency mismatch for timing-ineligible modes.",
     "correction": "Evaluate setup-frame timing first; only a timing-eligible PSR mode may set psr_vetoed_by_vrr.",
     "rereview": "Approved for compilation and focused validation; no further actionable source or manifest findings.",
-    "ubuntu_rereview": "Approved for the Ubuntu compiler fast lane: source archive and clean candidate verified, all five stable patch IDs match the reviewed series, both CVE fixes and Ubuntu security controls are present."
+    "ubuntu_rereview": "Approved for the Ubuntu compiler fast lane: source archive and clean candidate verified, all five stable patch IDs match the reviewed series, both CVE fixes and Ubuntu security controls are present.",
+    "target_gpu_review": "Approved: removed options concern unused AMD/Nouveau hardware. Intel/ASUS do not require hidden genpd selected by AMD providers; NVIDIA genpd paths examined concern Tegra. ACPI power management, PM_SLEEP, security and Binder remain."
   },
   "fresh_export_replay": {
     "result": "PASS",
@@ -68,10 +69,14 @@
     "origin": "Running nativehdr2 configuration with olddefconfig on Ubuntu 7.3.0-10.10.",
     "intentional_changes": [
       "LOCALVERSION=-nativehdr3",
-      "VERSION_SIGNATURE=Local native HDR based on Ubuntu 7.3.0-10.10"
+      "VERSION_SIGNATURE=Local native HDR based on Ubuntu 7.3.0-10.10",
+      "Disable unused DRM_AMDGPU, DRM_RADEON and DRM_NOUVEAU for the requested urgent Intel/proprietary-NVIDIA target build. Kconfig removes their unused dependencies."
     ],
     "policy": "Modular Binder, Ubuntu perf level-4 enforcement, AppArmor user-namespace restriction and automatic Secure Boot lockdown remain configured as before; runtime confirmation requires the new boot.",
-    "sha256": "8f5e018ccbd2215667055e8df0fdc4bf7eefc2a80886ba6c59f3ad7553f37d00"
+    "sha256": "e5549a25597ca95da1ba38f8619a82d602e76162e6313342e78786916faa9f89",
+    "graphics_scope": "Intel i915/xe and proprietary NVIDIA retained; AMD/Radeon/Nouveau excluded from this package. Original full configuration preserved privately.",
+    "full_config_before_gpu_trim_sha256": "8f5e018ccbd2215667055e8df0fdc4bf7eefc2a80886ba6c59f3ad7553f37d00",
+    "package_jobs": 20
   },
   "validation": {
     "warnings_enabled_objects": {
@@ -98,9 +103,72 @@
       "passed": 4,
       "failed": 0
     },
-    "complete_packages": "BUILDING ON UBUNTU BASE",
-    "binary_cve_verification": "PENDING",
-    "nvidia_delivered_headers": "PENDING"
+    "complete_packages": {
+      "result": "PASS",
+      "version": "7.3.0-10.10+nativehdr3",
+      "packages": [
+        {
+          "name": "linux-headers-7.3.0-nativehdr3_7.3.0-10.10+nativehdr3_amd64.deb",
+          "bytes": 11411888,
+          "sha256": "421f379e0120da5fdc2a7f1a646d14a54a4f700a2521a3deeb7854b86610304b"
+        },
+        {
+          "name": "linux-image-7.3.0-nativehdr3_7.3.0-10.10+nativehdr3_amd64.deb",
+          "bytes": 120580024,
+          "sha256": "b1b0c2a1e69db688f323e8ec6c2b55efd0dd5c94125d8678be225b14c0595070"
+        },
+        {
+          "name": "linux-libc-dev_7.3.0-10.10+nativehdr3_amd64.deb",
+          "bytes": 1574260,
+          "sha256": "1b06b1c9a123b7fdec2091c4bc9908a827f60ca480c369a406e7d27d41a2eac4"
+        }
+      ]
+    },
+    "binary_cve_verification": {
+      "result": "PASS",
+      "build_id": "f634b4b72a42b8d78f30aa786a3e8ab9494255a0",
+      "packaged_image_build_id": "f634b4b72a42b8d78f30aa786a3e8ab9494255a0",
+      "unsigned_image_sha256": "3c65e1f123d00a975f66b69abc5fb8e895675097a1fb02eda581fc0edde6b193",
+      "functions": {
+        "inet_sock_destruct": {
+          "deferred_rcu_free": true,
+          "disassembly_sha256": "73c4c770302a8964309df8240c7da6517f22eab0949eff205c8714c0107db753"
+        },
+        "tcp_v4_reqsk_destructor": {
+          "deferred_rcu_free": true,
+          "disassembly_sha256": "aff0e982c1ea9c853121e0470999a0d37ce5108e523e71ebdf1f68b3bd7ec695"
+        }
+      },
+      "scope": "The actual packaged image equals the built bzImage; extracted ELF build ID matches the inspected vmlinux. Both affected functions defer freeing via kvfree_call_rcu."
+    },
+    "nvidia_delivered_headers": {
+      "result": "PASS",
+      "version": "615.71.09",
+      "modules": 5,
+      "vermagic": [
+        "7.3.0-nativehdr3 SMP preempt mod_unload modversions ",
+        "7.3.0-nativehdr3 SMP preempt mod_unload modversions ",
+        "7.3.0-nativehdr3 SMP preempt mod_unload modversions ",
+        "7.3.0-nativehdr3 SMP preempt mod_unload modversions ",
+        "7.3.0-nativehdr3 SMP preempt mod_unload modversions "
+      ],
+      "headers_package_sha256": "421f379e0120da5fdc2a7f1a646d14a54a4f700a2521a3deeb7854b86610304b",
+      "btf": "External-module BTF generation skipped because the delivered headers do not contain vmlinux; compile/link and all five vermagic checks passed."
+    },
+    "packaged_intel_modules": {
+      "i915": {
+        "vermagic": "7.3.0-nativehdr3 SMP preempt mod_unload modversions",
+        "signer": "",
+        "sig_id": "",
+        "signature_trailer_present": false
+      },
+      "xe": {
+        "vermagic": "7.3.0-nativehdr3 SMP preempt mod_unload modversions",
+        "signer": "",
+        "sig_id": "",
+        "signature_trailer_present": false
+      }
+    }
   },
   "logs": {
     "replay.log": {
@@ -108,8 +176,8 @@
       "sha256": "8f9ee42510ed689ae0f191441d2e384946550ce9a0068f6ed19ac0b2c72a4eda"
     },
     "affected-build.log": {
-      "bytes": 10227,
-      "sha256": "2989aae5f603cc820e85b70c81b53c5a9980f22d6f13017263985ea4245bd08b"
+      "bytes": 942,
+      "sha256": "3c4c1651022081a4bef9d96b0f3878adba033d66765de89cf196ed61c2ed2a4f"
     },
     "kunit.log": {
       "bytes": 1127,
@@ -118,6 +186,30 @@
     "config-ubuntu.log": {
       "bytes": 875,
       "sha256": "4d7429e01770fc4425dd3ce9c304fab1de49ee5c1afe4669b1d4b1961c820334"
+    },
+    "config-target-gpu.log": {
+      "bytes": 1009,
+      "sha256": "2fbf637503df9dff18b41775e06e92f2225adf29e356e34555e8f1971672f36d"
+    },
+    "package-build.log": {
+      "bytes": 4196791,
+      "sha256": "521970242cf33ba0d003226da7039cc02c7455a7abe5c5b8c494ac831fe2b3b7"
+    },
+    "binary-cve.log": {
+      "bytes": 1508,
+      "sha256": "48e42905ed85adcfd6be544e1307c1dbfa19c29297d18a4c7ff19979996d37be"
+    },
+    "nvidia-patch.log": {
+      "bytes": 257,
+      "sha256": "bd8732606627e3fd8da96ce62060b7e30057d99057fa1f6181f15a5a2ad4b9a0"
+    },
+    "nvidia-build.log": {
+      "bytes": 1576165,
+      "sha256": "b3fe3c36a17d8d9684374520d575469fb03fcf873104088c1e202d233ea8533d"
+    },
+    "nvidia-vermagic.txt": {
+      "bytes": 265,
+      "sha256": "30f5080ec3a8a68f870a492e59bde90a1d6e6419b05e9e6fb6948614beb299c2"
     }
   },
   "deployment": {
@@ -125,11 +217,13 @@
     "boot_selection_changed": false,
     "rebooted": false,
     "running_kernel": "7.3.0-rc6-nativehdr2+",
-    "running_cve_status": "FIX ABSENT"
+    "running_cve_status": "FIX ABSENT",
+    "secure_boot_image_signing": "Pending coordinated installation; image and packaged modules still require signing before Secure Boot deployment."
   },
   "limits": [
     "No new HDR/VRR optical or physical transition acceptance.",
-    "Build and installation states are separate; the old running kernel stays vulnerable until a signed replacement is booted."
+    "Build and installation states are separate; the old running kernel stays vulnerable until a signed replacement is booted.",
+    "This urgent target package omits AMD/Radeon/Nouveau graphics support; the retained full configuration is available for those targets."
   ],
   "private_log_storage": "Task-owned native Linux kernel builder workspace; raw device captures, binaries and signing material excluded from Git.",
   "base_package": "linux-source-7.3.0",

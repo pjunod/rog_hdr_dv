@@ -4,8 +4,9 @@ Companion to [status](STATUS.md) (the running stack),
 [development](DEVELOPMENT.md) (source and review rules), and
 [operations](OPERATIONS.md) (deliberate installation and recovery).
 
-**Status:** Ubuntu source replay, independent review, affected compilation
-and four parser tests passed; complete packaging and boot acceptance pending. **Written:** 2026-10-29.
+**Status:** source replay, review, affected compilation, four parser tests,
+complete packages, packaged CVE proof and five NVIDIA modules passed.
+Signing, installation and physical boot acceptance remain pending. **Written:** 2026-10-29.
 
 ## Release and security evidence
 
@@ -91,9 +92,18 @@ signature or official Git-tag verification is claimed.
 
 The replacement release is `7.3.0-nativehdr3`, package version
 `7.3.0-10.10+nativehdr3`. Start with the running kernel’s configuration and
-run `olddefconfig`. The complete resulting diff changes only
-`LOCALVERSION` and `VERSION_SIGNATURE`; `localmodconfig` is not used.
-No hardware or security option is dropped for this selected base.
+run `olddefconfig`. The urgent build targets this laptop’s Intel i915/xe
+and proprietary NVIDIA path: `DRM_AMDGPU`, `DRM_RADEON` and `DRM_NOUVEAU`
+are disabled to avoid compiling unused graphics stacks. Kconfig removes
+their unused dependent options. The original full configuration is retained
+privately for broader GPU support; `localmodconfig` is not used.
+
+Independent review confirmed that the derived removal of hidden
+`PM_GENERIC_DOMAINS` is from unused AMD providers, not Intel/ASUS power
+management. ACPI PM and `PM_SLEEP` remain enabled. All Ubuntu security,
+Binder and target-hardware settings remain; the other intentional changes
+are the two version labels. This package does not support AMD/Radeon or
+Nouveau graphics; the generic source patches remain reusable.
 
 Use the fixed unprivileged native x86_64 wrapper with Ubuntu 26.10 and
 GCC 15.3. Source, logs, HOME/XDG/TMPDIR and output slots are task-owned.
@@ -105,7 +115,7 @@ The package build retains DWARF/BTF configuration and omits only the large
 debug-symbol package through the upstream packaging profile:
 
 ```bash
-make -C "$KERNEL_SOURCE" O="$KERNEL_BUILD" -j12 \
+make -C "$KERNEL_SOURCE" O="$KERNEL_BUILD" -j20 \
   CC='ccache gcc' LOCALVERSION= KDEB_PKGVERSION=7.3.0-10.10+nativehdr3 \
   DEB_BUILD_PROFILES=pkg.linux-upstream.nokerneldbg bindeb-pkg
 ```
@@ -116,6 +126,16 @@ DRM/i915/shared-xe compilation, the four `drm_displayid_luminance` KUnit
 cases, complete packages, the two RCU calls in the resulting image, and
 NVIDIA compilation against the delivered headers. Results from the
 superseded upstream tree do not qualify this candidate.
+
+All selected checks passed. The actual packaged image equals the built
+image and its extracted GNU build ID matches the inspected `vmlinux`.
+Both IPv4 functions call `kvfree_call_rcu`. All five NVIDIA 615.71.09 modules
+compile/link against the extracted header package with the expected
+`7.3.0-nativehdr3` vermagic. External-module BTF generation was skipped
+because normal delivered headers omit `vmlinux`; this is not a BTF pass.
+The packaged i915/xe modules have matching vermagic. Their signatures
+are not present; module signing and image signing remain installation
+prerequisites under Secure Boot.
 
 ## Installation and recovery
 

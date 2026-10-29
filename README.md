@@ -31,7 +31,7 @@ the fix and retains Ubuntu security policies; see the
 | Area | State | Where it stands |
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
-| Kernel security rebase | **Source prepared; build pending** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; the running `nativehdr2` remains vulnerable until the replacement is signed and booted ([rebase](docs/KERNEL_REBASE.md)) |
+| Kernel security rebase | **Built and verified; install/boot pending** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; the running `nativehdr2` remains vulnerable until the replacement is signed and booted ([rebase](docs/KERNEL_REBASE.md)) |
 | HDR desktop session | **Installed** | Mutter reports the panel's declared range (0.0004–616 cd/m², firmware values) and primaries separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
