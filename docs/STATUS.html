@@ -16,16 +16,20 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>Linux display<br>quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 29, 2026 · Ubuntu Linux 7.3 kernel rebase built and binary-verified; signing and boot pending · historical display foundations receipts are retained below</p></header>
+<p class="muted">Updated October 29, 2026 · Ubuntu Linux 7.3 kernel installed and running; CVE fix verified · historical display foundations receipts are retained below</p></header>
 <h2>Kernel security rebase — October 29, 2026</h2>
-<div class="callout"><strong>Running kernel still vulnerable:</strong>
-<code>7.3.0-rc6-nativehdr2+</code> lacks CVE-2026-98432's fix. The five display
+<div class="callout"><strong>Running CVE fix verified:</strong>
+<code>7.3.0-nativehdr3</code> has CVE-2026-98432's fix, verified by matching
+the running build ID to the inspected fixed image. The five display
 patches are rebased onto Ubuntu 7.3.0-10.10 (released Linux 7.3), which contains
 the upstream fix and retains Ubuntu security policies.
 Source replay, affected compilation, four parser tests, complete packages,
-packaged binary-CVE verification and five NVIDIA modules passed. Signing,
-installation and coordinated boot acceptance remain pending. <a href="KERNEL_REBASE.md">Kernel evidence and
-recovery</a>. No kernel installation or boot selection has changed.</div>
+packaged binary-CVE verification and five NVIDIA modules passed. The signed
+image and modules were installed and booted in the authorized window. Secure
+Boot, integrity lockdown, Ubuntu security policies, NVIDIA and the display
+manager passed. Existing MOKs were already enrolled. The new kernel is the
+default; old custom and stock recovery kernels remain. Physical HDR/VRR
+transition acceptance is pending. <a href="KERNEL_REBASE.md">Kernel evidence and recovery</a>.</div>
 <div class="callout"><strong>Historical physical result (2026-10-11):</strong> the owner reported
 working HDR10 on the earlier patched stack (hdr6/nativehdr2) with Secure Boot
 enabled; hdr9 + nativehdr8 were installed; the HDR session ran on them and the
