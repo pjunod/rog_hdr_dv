@@ -72,7 +72,7 @@
       "VERSION_SIGNATURE=Local native HDR based on Ubuntu 7.3.0-10.10",
       "Disable unused DRM_AMDGPU, DRM_RADEON and DRM_NOUVEAU for the requested urgent Intel/proprietary-NVIDIA target build. Kconfig removes their unused dependencies."
     ],
-    "policy": "Modular Binder, Ubuntu perf level-4 enforcement, AppArmor user-namespace restriction and automatic Secure Boot lockdown remain configured as before; runtime confirmation requires the new boot.",
+    "policy": "Ubuntu security and Binder settings retained; boot confirmed perf level 4, the AppArmor user-namespace restriction and integrity lockdown.",
     "sha256": "e5549a25597ca95da1ba38f8619a82d602e76162e6313342e78786916faa9f89",
     "graphics_scope": "Intel i915/xe and proprietary NVIDIA retained; AMD/Radeon/Nouveau excluded from this package. Original full configuration preserved privately.",
     "full_config_before_gpu_trim_sha256": "8f5e018ccbd2215667055e8df0fdc4bf7eefc2a80886ba6c59f3ad7553f37d00",
@@ -168,7 +168,8 @@
         "sig_id": "",
         "signature_trailer_present": false
       }
-    }
+    },
+    "packaged_intel_modules_scope": "Original unsigned build artifacts; deployed module signatures are recorded separately under deployment."
   },
   "logs": {
     "replay.log": {
@@ -213,16 +214,41 @@
     }
   },
   "deployment": {
-    "installed": false,
-    "boot_selection_changed": false,
-    "rebooted": false,
-    "running_kernel": "7.3.0-rc6-nativehdr2+",
-    "running_cve_status": "FIX ABSENT",
-    "secure_boot_image_signing": "Pending coordinated installation; image and packaged modules still require signing before Secure Boot deployment."
+    "installed": true,
+    "boot_selection_changed": true,
+    "rebooted": true,
+    "owner_authorized_window": "Immediate install and reboot authorized 2026-10-29.",
+    "verified_at_utc": "2026-10-29T23:53:23.632038+00:00",
+    "running_kernel": "7.3.0-nativehdr3",
+    "running_build_id": "f634b4b72a42b8d78f30aa786a3e8ab9494255a0",
+    "running_cve_status": "FIX PRESENT: running build ID matches the binary with both deferred RCU frees.",
+    "secure_boot": true,
+    "lockdown": "integrity",
+    "perf_event_paranoid": 4,
+    "apparmor_restrict_unprivileged_userns": 1,
+    "display_manager": "active",
+    "nvidia_driver": "615.71.09",
+    "intel_i915_loaded": true,
+    "nvidia_loaded": true,
+    "image_signature": "sbverify PASS using the existing enrolled image MOK.",
+    "signed_in_tree_modules": 6942,
+    "in_tree_module_signing": "Existing enrolled image MOK; all signature trailers checked. i915 loaded under integrity lockdown.",
+    "nvidia_module_signing": "All five DKMS modules signed with the existing enrolled module MOK; driver loaded under integrity lockdown.",
+    "mok_enrollment": "Both public certificates already enrolled; no new enrollment queued or required.",
+    "signed_image_sha256": "531e9a90c86e4a90303e554dd87536986b17b2403ef84d56aaf951475b551623",
+    "signed_image_package_sha256": "ad6412f7cc7f3ffa4f343ca8a5cc7e2da0972ef7f1d7b1804227f7c271a39fdc",
+    "persistent_default": "7.3.0-nativehdr3",
+    "recovery_kernels": [
+      "7.3.0-rc6-nativehdr2+",
+      "7.3.0-9-generic"
+    ],
+    "libc_dev_installed": false,
+    "private_receipt_sha256": "0157ea5c93ee9bb10d3e0492afacb18f7e1efbb9595a8971d366d31c4ebe11a7",
+    "install_log_sha256": "74c7f42a745584c2c195ff470b921a635af67d2e71da83c69515f0b7f15dfbdd",
+    "boot_kernel_log_sha256": "2037c6cadd8842f0d3311c0f5363725915e60ac74514cd3a556e80f48ec604da"
   },
   "limits": [
     "No new HDR/VRR optical or physical transition acceptance.",
-    "Build and installation states are separate; the old running kernel stays vulnerable until a signed replacement is booted.",
     "This urgent target package omits AMD/Radeon/Nouveau graphics support; the retained full configuration is available for those targets."
   ],
   "private_log_storage": "Task-owned native Linux kernel builder workspace; raw device captures, binaries and signing material excluded from Git.",

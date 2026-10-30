@@ -22,8 +22,8 @@ repository owns the operating-system display work.
 
 Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
 `51.0-1ubuntu3+nativehdr10` (since 2026-10-13), kernel
-`7.3.0-rc6-nativehdr2+`, and plurx Player `0.3.2` for Dolby Vision.
-The running kernel lacks CVE-2026-98432's fix. The five display patches
+`7.3.0-nativehdr3`, and plurx Player `0.3.2` for Dolby Vision.
+The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
 the fix and retains Ubuntu security policies; see the
 [kernel rebase](docs/KERNEL_REBASE.md) for build and deployment evidence.
@@ -31,7 +31,7 @@ the fix and retains Ubuntu security policies; see the
 | Area | State | Where it stands |
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
-| Kernel security rebase | **Built and verified; install/boot pending** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; the running `nativehdr2` remains vulnerable until the replacement is signed and booted ([rebase](docs/KERNEL_REBASE.md)) |
+| Kernel security rebase | **Installed and running; CVE fix verified** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; the signed replacement is the persistent boot default, with old custom and stock recovery kernels retained ([rebase](docs/KERNEL_REBASE.md)) |
 | HDR desktop session | **Installed** | Mutter reports the panel's declared range (0.0004–616 cd/m², firmware values) and primaries separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |

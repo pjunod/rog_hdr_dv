@@ -6,7 +6,8 @@ Companion to [status](STATUS.md) (the running stack),
 
 **Status:** source replay, review, affected compilation, four parser tests,
 complete packages, packaged CVE proof and five NVIDIA modules passed.
-Signing, installation and physical boot acceptance remain pending. **Written:** 2026-10-29.
+Signing, installation and postboot security/driver verification passed.
+Physical HDR/VRR transition and optical acceptance remain pending. **Written:** 2026-10-29.
 
 ## Release and security evidence
 
@@ -26,9 +27,10 @@ the display patches:
 - `inet_sock_destruct()` in `net/ipv4/af_inet.c` uses `kfree_rcu()`.
 - `tcp_v4_reqsk_destructor()` in `net/ipv4/tcp_ipv4.c` uses `kfree_rcu()`.
 
-The inspected running `7.3.0-rc6-nativehdr2+` lacks both corrections. Its
-running GNU build ID matches the installed image’s extracted ELF ID. No
-livepatch overrides those functions. Raw device captures remain private.
+The superseded `7.3.0-rc6-nativehdr2+` lacked both corrections; its running
+GNU build ID matched its installed image. The replacement is now running
+and its build ID matches the inspected fixed binary, as recorded below.
+Raw device captures remain private.
 
 ## Why this uses Ubuntu’s source
 
@@ -42,7 +44,7 @@ The Ubuntu base retains those implementations naturally, as well as its
 automatic Secure Boot lockdown and modular Binder support. The running
 system’s persistent AppArmor configuration remains applicable. No new
 policy workaround or hand-ported security patch is introduced. Postboot
-checks must still confirm `perf_event_paranoid=4`,
+checks confirmed `perf_event_paranoid=4`,
 `apparmor_restrict_unprivileged_userns=1`, and integrity lockdown.
 
 ## Display changes retained
@@ -133,9 +135,12 @@ Both IPv4 functions call `kvfree_call_rcu`. All five NVIDIA 615.71.09 modules
 compile/link against the extracted header package with the expected
 `7.3.0-nativehdr3` vermagic. External-module BTF generation was skipped
 because normal delivered headers omit `vmlinux`; this is not a BTF pass.
-The packaged i915/xe modules have matching vermagic. Their signatures
-are not present; module signing and image signing remain installation
-prerequisites under Secure Boot.
+The original unsigned build artifacts remain unchanged. For deployment,
+a separate package was prepared with all 6,942 in-tree modules signed and
+the kernel image signed using the existing enrolled image MOK. All module
+signature trailers were checked; the image signature passed `sbverify`.
+Ubuntu’s module verifier permits the platform keyring, which contains the
+enrolled certificate. Private keys never entered the compiler environment.
 
 ## Installation and recovery
 
@@ -151,3 +156,29 @@ Installation and reboot use the coordinated window in
 build ID, Ubuntu security controls, NVIDIA loading and HDR/VRR transitions.
 An image on disk does not fix the kernel still running. No compositor or
 display-library update is part of this rebase.
+
+
+## Installed and running — October 29
+
+After the owner authorized immediate installation and reboot, only the signed
+versioned image and headers were installed. DKMS built and signed all five
+NVIDIA modules using its existing enrolled module MOK. Both public MOK
+certificates were already enrolled; no new enrollment prompt was needed.
+The initramfs and GRUB configuration were generated and checked before a
+one-time boot. The old custom and stock kernels were retained.
+
+Postboot verification passed at 23:53 UTC:
+
+- Running release: `7.3.0-nativehdr3`.
+- Running GNU build ID: `f634b4b72a42b8d78f30aa786a3e8ab9494255a0`,
+  identical to the inspected image with both deferred RCU frees.
+- Secure Boot enabled; integrity lockdown active; perf level 4 and the
+  AppArmor user-namespace restriction enabled.
+- Intel i915 and NVIDIA modules loaded; NVIDIA 615.71.09 responds to
+  `nvidia-smi`; the display manager is active.
+
+The verified new kernel is now the persistent boot default. Recovery retains
+`7.3.0-rc6-nativehdr2+` and stock `7.3.0-9-generic` with their initramfs files.
+Host recovery files and signed packages remain private. These are boot,
+security and driver checks; they do not establish new HDR/VRR transition,
+resume or optical acceptance.

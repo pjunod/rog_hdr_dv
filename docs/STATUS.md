@@ -6,10 +6,10 @@ plays through plurx Player with the closed-form display mapping.
 
 ## Kernel security rebase — 2026-10-29
 
-The running `7.3.0-rc6-nativehdr2+` was built October 27 and booted October
-28. A build-ID-matched inspection of its installed image confirms both
-IPv4 teardown functions still call `kfree()`, so CVE-2026-98432 is unfixed;
-no livepatch is active.
+The signed `7.3.0-nativehdr3` was installed and booted in the owner-authorized
+window on October 29. Its running GNU build ID matches the image whose two
+IPv4 teardown functions call `kvfree_call_rcu()`: CVE-2026-98432 is fixed in
+the running kernel. The superseded `7.3.0-rc6-nativehdr2+` lacked both fixes.
 
 All five deployed display patches now apply to Ubuntu `7.3.0-10.10`, whose
 Makefile is released Linux 7.3. Both CVE corrections are already in that
@@ -24,10 +24,15 @@ re-review approved the Ubuntu candidate. All five affected display objects
 compiled with warnings enabled and zero warnings; all four focused parser
 KUnit cases passed. The image/header packages built successfully; the actual
 packaged image has both RCU corrections, and all five NVIDIA 615.71.09
-modules compile/link against its delivered headers. Signing, installation
-and a coordinated boot remain pending. The [kernel rebase ledger](KERNEL_REBASE.md) records
-source, build and eventual boot evidence separately. No kernel installation
-or boot selection has changed.
+modules compile/link against its delivered headers. The image and all 6,942
+in-tree modules were signed with the existing enrolled image MOK; DKMS built
+and signed all five NVIDIA modules with its existing enrolled module MOK.
+No new MOK enrollment was needed. Secure Boot, integrity lockdown, perf level
+4, the AppArmor user-namespace restriction, NVIDIA 615.71.09 and the display
+manager passed postboot checks. The new kernel is the persistent boot default;
+the old custom and stock kernels remain available for recovery. The
+[kernel rebase ledger](KERNEL_REBASE.md) separates these checks from pending
+physical HDR/VRR transition and optical acceptance.
 
 ## Where it stands (2026-10-27)
 
