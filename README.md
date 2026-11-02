@@ -39,6 +39,7 @@ the fix and retains Ubuntu security policies; see the
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
 | Night Light in HDR, per-monitor overrides | **Installed** (since `nativehdr10`, now APT `nativehdr13`) | October 15 warm HDR/SDR observations and persistence accepted; no post-update acceptance inferred |
 | Ubuntu packages | **APT repository** (2026-10-27) | Rebuilt from Ubuntu's current source whenever Ubuntu updates it; one command sets a machine up ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)) |
+| Private package output retention | **Repair awaiting review/qualification** | Exclusive durable run directories preserve future source/build/rollback outputs without destructive reuse; existing nativehdr13 original-record recovery is separate ([retention](docs/UBUNTU_APT_REPOSITORY.md#private-source-and-recovery-output-retention)) |
 | Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |

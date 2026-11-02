@@ -51,12 +51,14 @@ executions. No unchanged package or successful unit suite was rebuilt/rerun.
 `build.sh` produces normal source `.dsc`/archives, `.buildinfo`, `.changes` and
 binary packages. **The current registry publishes only `.deb` files**:
 `publish.sh` does not upload the source/build records and no source index was
-available at inspection. Before a future rebuild empties its work directory,
-preserve that build's complete source and provenance output in durable storage.
-The receipt here binds binary bytes to their recorded series commit; it does
-not claim that current source archives or exact build-environment records were
-retrieved. Recovering and durably retaining those original outputs remains a
-packaging-provenance follow-up, not a reason to rebuild already working bytes.
+available at inspection. The [output retention repair](UBUNTU_APT_REPOSITORY.md#private-source-and-recovery-output-retention)
+uses exclusive durable private run directories and verified byte inventories
+for future builds, without deleting previous runs or forcing published versions
+to rebuild. It does not recover the existing nativehdr13 originals. The receipt
+here binds binary bytes to their recorded series commit; it does not claim that
+current source archives or exact build-environment records were retrieved.
+Their bounded runner/artifact/backup discovery remains a separate provenance
+follow-up, not a reason to rebuild already working bytes.
 
 The kernel receipt distinguishes the original unsigned image package from the
 separately signed deployed package. For recovery use the **signed** image

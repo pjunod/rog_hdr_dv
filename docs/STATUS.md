@@ -41,6 +41,7 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
 |---|---|---|
 | Desktop | APT Mutter `51.0-1ubuntu3+nativehdr13`, libdisplay-info `0.3.0-1+nativehdr13` installed (library amd64+i386) | Coordinator read-only inventory and package verification; current effective target about 0.0005–616 cd/m², firmware-declared; no override, Night Light off |
 | Ubuntu packages | Current registry versions equal the installed candidates at priority 1001 | All 15 registry binaries size/hash-checked; changelogs name `479d61de3f78`, unchanged Ubuntu series on current main. [Receipt](../evidence/software-delivery-20261102.json); not a new build/test/transaction |
+| Package output lifecycle | Retention repair implemented; independent review and affected checks pending | Exclusive durable private run directories, no destructive reuse, verified output inventories; [retention and original-record recovery limits](UBUNTU_APT_REPOSITORY.md#private-source-and-recovery-output-retention). No package rebuild or original nativehdr13 recovery claimed |
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
 | Dolby Vision playback | External plurx Player 0.4.1 installed | Exact package version in [handoff](SOFTWARE_DELIVERY.md); October 27 P7 FEL observation is retained history, not a new player acceptance |
 | Fullscreen/VRR | Bounded owner-attended pass on nativehdr3/nativehdr13 | November 2 silent HDR 24 fps stock-mpv fixture: active i915 CRTC VRR 0 → 1 → 0, zero page-flip errors, owner saw normal output; [scope and retained receipt](SOFTWARE_DELIVERY.md#acceptance-ledger-retained-observations-versus-new-requirements) |
@@ -61,8 +62,10 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
   separate coordinator-owned lane (`t_44f637a7`); retain the 35 offline passes
   at private/unpublished delivery `4f71e166`, not a public source pin or
   deployment claim. Do not repeat or blindly reapply it.
-- Recover/retain original current APT source archives and build records durably;
-  the binary-only registry and changelog binding do not supply those artifacts.
+- Review and qualify the package output retention repair; then recover original
+  current APT source archives/build records through the bounded private runner
+  search. New retention does not recover those originals; the binary-only
+  registry and changelog binding do not supply them.
 - Upstream submission of `patches/mutter` and `patches/libdisplay-info`
   (the owner's identity and decision).
 - Panel measurement and calibration (needs a colourimeter); the Windows
