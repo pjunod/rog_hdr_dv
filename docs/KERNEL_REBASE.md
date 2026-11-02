@@ -7,13 +7,20 @@ Companion to [status](STATUS.md) (the running stack),
 **Status:** source replay, review, affected compilation, four parser tests,
 complete packages, packaged CVE proof and five NVIDIA modules passed.
 Signing, installation and postboot security/driver verification passed.
-Physical HDR/VRR transition and optical acceptance remain pending. **Written:** 2026-10-29.
+Bounded fullscreen/VRR acceptance passed November 2; broader physical and optical
+acceptance remain pending. **Written:** 2026-10-29; acceptance updated 2026-11-02.
 
 **November 2 reconciliation:** the coordinator's read-only inventory still
 reports nativehdr3 running; no new kernel installation is needed. APT userspace
-has independently moved to nativehdr13. Neither those package versions nor
-the absence of page-flip errors in a bounded boot-log query establishes a new
-controlled VRR/HDR/resume pass. The [software handoff](SOFTWARE_DELIVERY.md)
+has independently moved to nativehdr13. A later owner-attended silent HDR 24 fps
+stock-mpv fixture passed fullscreen/windowed visible stability, with active
+i915 CRTC VRR 0 → 1 → 0 and zero page-flip errors. Both players exited 0;
+DisplayConfig (except serial) and `monitors.xml` were unchanged. The owner saw
+normal output. Only the missing live VRR-property acquisition was repeated in
+a 16-second follow-up after the first visual run's debugfs samples lacked it.
+This bounded panel-specific result is not optical/calibration, long-duration
+cadence, suspend/resume, DPMS/brightness, other-GPU/mode or external-monitor
+acceptance. The [software handoff](SOFTWARE_DELIVERY.md)
 binds current packages and signed-versus-unsigned recovery artifacts without
 repeating the completed kernel qualification below.
 

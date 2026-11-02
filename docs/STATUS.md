@@ -32,8 +32,8 @@ No new MOK enrollment was needed. Secure Boot, integrity lockdown, perf level
 4, the AppArmor user-namespace restriction, NVIDIA 615.71.09 and the display
 manager passed postboot checks. The new kernel is the persistent boot default;
 the old custom and stock kernels remain available for recovery. The
-[kernel rebase ledger](KERNEL_REBASE.md) separates these checks from pending
-physical HDR/VRR transition and optical acceptance.
+[kernel rebase ledger](KERNEL_REBASE.md) separates these checks from the bounded
+November 2 fullscreen/VRR pass and still-pending broader physical/optical acceptance.
 
 ## Where it stands (2026-11-02)
 
@@ -43,23 +43,24 @@ physical HDR/VRR transition and optical acceptance.
 | Ubuntu packages | Current registry versions equal the installed candidates at priority 1001 | All 15 registry binaries size/hash-checked; changelogs name `479d61de3f78`, unchanged Ubuntu series on current main. [Receipt](../evidence/software-delivery-20261102.json); not a new build/test/transaction |
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
 | Dolby Vision playback | External plurx Player 0.4.1 installed | Exact package version in [handoff](SOFTWARE_DELIVERY.md); October 27 P7 FEL observation is retained history, not a new player acceptance |
+| Fullscreen/VRR | Bounded owner-attended pass on nativehdr3/nativehdr13 | November 2 silent HDR 24 fps stock-mpv fixture: active i915 CRTC VRR 0 → 1 → 0, zero page-flip errors, owner saw normal output; [scope and retained receipt](SOFTWARE_DELIVERY.md#acceptance-ledger-retained-observations-versus-new-requirements) |
 | Tiling animation | Stock `gnome-shell-ubuntu-extensions 51.26.10.6ubuntu` | Current caller hashes match October 15 stock source, not the separately qualified correction; two current-boot accounting warnings remain |
 
 **Remaining.**
 
 - APT setup/qualification on the second test machine; ROG already has the builds.
-- Controlled post-APT/nativehdr3 HDR/SDR/fullscreen/VRR and resume acceptance,
-  relevant Night Light/override visual checks, and plurx Player product acceptance.
+- Broader post-APT/nativehdr3 HDR/SDR transitions, brightness/DPMS and
+  suspend/resume acceptance, Night Light/override visual checks, and plurx Player
+  product acceptance. Fullscreen VRR engagement and visible stability passed
+  in the bounded November 2 attended fixture; no optical, long-duration cadence,
+  other-GPU/mode or external-monitor acceptance is inferred.
   **Do not mark October 15 observations outstanding:** the owner accepted the
   warm roundtrip, decorations, SDR video and HDR10 stability; persistence passed
   across logout/login. These remain bounded prior-stack results, not new-stack passes.
-- Physical verification of the [i915 VRR fix](I915_VRR_FASTSET.md), already
-  implemented and running in nativehdr3. The November 2 bounded boot-log query
-  had zero matching page-flip errors but no controlled stimulus; configured
-  `+vrr` and absence of errors do not prove playback VRR acceptance.
 - Integrate/package the independently qualified animation correction in its
   separate coordinator-owned lane (`t_44f637a7`); retain the 35 offline passes
-  at `4f71e166`, not a deployment claim. Do not repeat or blindly reapply it.
+  at private/unpublished delivery `4f71e166`, not a public source pin or
+  deployment claim. Do not repeat or blindly reapply it.
 - Recover/retain original current APT source archives and build records durably;
   the binary-only registry and changelog binding do not supply those artifacts.
 - Upstream submission of `patches/mutter` and `patches/libdisplay-info`

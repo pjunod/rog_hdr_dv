@@ -26,13 +26,21 @@ Ubuntu series at <code>479d61de3f78</code>. This is not a new build or transacti
 <a href="SOFTWARE_DELIVERY.md">Install, rollback, exact hashes and evidence limits</a>.</div>
 <p>October 15 owner-observed warm HDR/SDR roundtrip, decorations, SDR video and
 HDR10 stability were accepted, and override persistence passed. They are completed
-prior-stack observations, not post-APT/nativehdr3 acceptance. Controlled VRR/HDR
-transitions and resume, external-monitor/second-machine checks, plurx Player
+prior-stack observations, not post-APT/nativehdr3 acceptance. A bounded November 2
+owner-attended silent HDR 24 fps stock-mpv fixture on nativehdr3/nativehdr13 passed
+fullscreen/windowed visible stability and active i915 CRTC VRR 0 → 1 → 0, with
+zero page-flip errors. Both players exited 0; DisplayConfig (except serial) and
+monitors.xml were unchanged. The owner answered “Yes, everything looked normal”.
+Only the missing VRR-property acquisition was repeated in a 16-second follow-up
+after the first visual run's debugfs samples lacked that property; the whole
+fixture was not repeated. Broader HDR/SDR transitions, Night Light/override visual
+checks, brightness/DPMS, suspend/resume, long-duration cadence, other GPUs/modes,
+external-monitor/second-machine checks, plurx Player
 acceptance, Windows/OEM comparison and optical measurement remain separate.
 No colourimeter is available. Current target is about 0.0005–616 cd/m²,
 firmware-declared, not measured.</p>
 <p>A bounded current-boot query found zero matching page-flip errors and two
-size-accounting warnings, without a controlled stimulus. Configured VRR is not
+size-accounting warnings before the attended fixture. That query alone was not
 playback VRR acceptance. The installed extension still matches stock callers;
 the retained 35-case offline animation correction needs separate integration,
 packaging and live acceptance. Original current APT source/build output retention
@@ -48,8 +56,9 @@ packaged binary-CVE verification and five NVIDIA modules passed. The signed
 image and modules were installed and booted in the authorized window. Secure
 Boot, integrity lockdown, Ubuntu security policies, NVIDIA and the display
 manager passed. Existing MOKs were already enrolled. The new kernel is the
-default; old custom and stock recovery kernels remain. Physical HDR/VRR
-transition acceptance is pending. <a href="KERNEL_REBASE.md">Kernel evidence and recovery</a>.</div>
+default; old custom and stock recovery kernels remain. The bounded November 2
+fullscreen/VRR pass is separate from pending broader physical and optical
+acceptance. <a href="KERNEL_REBASE.md">Kernel evidence and recovery</a>.</div>
 <div class="callout"><strong>Historical physical result (2026-10-11):</strong> the owner reported
 working HDR10 on the earlier patched stack (hdr6/nativehdr2) with Secure Boot
 enabled; hdr9 + nativehdr8 were installed; the HDR session ran on them and the

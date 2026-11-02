@@ -22,7 +22,8 @@ libdisplay-info amd64 and extension packages returned no differences. The
 active output reports 2560×1600 at 240 Hz with variable-refresh mode configured,
 scale about 1.3333, BT.2100, no target override and Night Light disabled. Its
 effective range is approximately **0.0005–616 cd/m²**, firmware-declared, not
-measured. Configured VRR is not proof that VRR engages during playback.
+measured. Configured VRR alone is not proof of playback engagement; the later
+owner-attended November 2 fixture below provides that bounded evidence.
 
 **Do not reinstall these builds merely to complete this handoff.** Other
 machines need their own inventory and a coordinated transaction. Installation
@@ -117,22 +118,37 @@ No live install, logout, reboot, display or audio change occurred in this audit.
   to the CVE-fixed binary, security controls and drivers verified. This is not
   a new visual, VRR-transition, resume or optical pass.
 - **November 2 read-only observation:** zero matching page-flip errors and two
-  size-change-accounting warnings in the bounded current-boot query. There
-  was no controlled fullscreen/VRR stimulus. Neither error absence nor a
-  configured `+vrr` mode establishes the i915 fix's physical acceptance.
+  size-change-accounting warnings in the earlier bounded current-boot query.
+  That query had no controlled fullscreen/VRR stimulus; the later attended
+  fixture, not error absence or a configured `+vrr` mode, establishes the
+  bounded acceptance below.
+- **Accepted November 2, on nativehdr3/APT nativehdr13:** an owner-attended,
+  silent HDR 24 fps stock-mpv fixture verified fullscreen/windowed stability
+  on this panel. The active i915 CRTC's `VRR_ENABLED` changed **0 windowed →
+  1 fullscreen → 0 windowed**. Both owned players exited 0, there were zero
+  page-flip errors, and DisplayConfig (except its serial) and `monitors.xml`
+  were unchanged. The owner answered, “Yes, everything looked normal”. The
+  first visual run's debugfs samples did not expose the VRR property, so only
+  the missing live-property acquisition was repeated in a 16-second follow-up,
+  not the whole fixture. The private acceptance receipt and both run-receipt
+  hashes are bound in the [neutral receipt](../evidence/software-delivery-20261102.json).
+  This is a bounded pass on this panel, not optical/calibration or long-duration
+  cadence evidence; suspend/resume, DPMS/brightness, other GPUs/modes and
+  external monitors were not qualified by it.
 - **Animation correction:** `t_5bfea0b5` independently approved 35 distinct
-  offline host-double cases at delivery `4f71e166` (26 retained passes plus
-  nine failed-only retries after a reviewed missing-double-method fix).
-  This applies to extension tree `03613a8236b6f200836df63acafa1e2359d94cb6`,
-  not Mutter or the current installed extension by assumption. Main's current
-  APT recipes package only Mutter/libdisplay-info and carry no extension
+  offline host-double cases at retained private delivery `4f71e166` (26 retained
+  passes plus nine failed-only retries after a reviewed missing-double-method fix).
+  This applies to unpublished extension tree `03613a8236b6f200836df63acafa1e2359d94cb6`;
+  neither identifier is a resolvable public source pin in this repository.
+  It does not apply to Mutter or the current installed extension by assumption.
+  Main's current APT recipes package only Mutter/libdisplay-info and carry no extension
   correction. The coordinator confirmed both installed caller hashes match
   October 15 stock source. Separate card `t_44f637a7` owns source integration
   and a separately versioned recoverable extension package; do not blindly
   reapply old patches or rerun the 35 cases.
   The two warnings do not identify their exact caller without further evidence.
-- **Still unperformed for the new stack:** controlled HDR/SDR/fullscreen/VRR
-  transitions, blanking/resume, and relevant visual/override checks after the
+- **Still unperformed for the new stack:** broader HDR/SDR transitions,
+  brightness/DPMS, suspend/resume, and Night Light/override visual checks after the
   APT/nativehdr3 updates. External-monitor/second-machine qualification,
   plurx Player product acceptance, same-panel Windows/OEM comparison and
   optical characterization remain separately tracked. No colourimeter is

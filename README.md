@@ -33,7 +33,7 @@ the fix and retains Ubuntu security policies; see the
 | Area | State | Where it stands |
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
-| Kernel security rebase | **Installed and running; CVE fix verified** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; the signed replacement is the persistent boot default, with old custom and stock recovery kernels retained ([rebase](docs/KERNEL_REBASE.md)) |
+| Kernel security rebase | **Installed and running; CVE fix verified** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; bounded owner-attended fullscreen/VRR pass on November 2. The signed replacement is the persistent boot default, with old custom and stock recovery kernels retained ([rebase](docs/KERNEL_REBASE.md)) |
 | HDR desktop session | **Installed** | Current effective range about 0.0005–616 cd/m² (firmware values) and primaries are reported separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
@@ -230,7 +230,10 @@ Audio (speakers, latency, Dolby Atmos) lives in
 - [x] Ubuntu packages in an APT repository, rebuilt when Ubuntu updates
 - [x] Open Dolby Vision display mapping — closed-form CM v4.0 and CM v2.9
 - [x] Dolby Vision playback — plurx Player, Profile 5, 8.1 and 7 FEL
-- [ ] Post-APT/nativehdr3 HDR/SDR, fullscreen/VRR, brightness, DPMS and resume qualification
+- [x] Bounded post-APT/nativehdr3 fullscreen/VRR engagement and visible stability
+  on this panel (owner-attended silent HDR 24 fps stock-mpv fixture, November 2)
+- [ ] Broader post-APT/nativehdr3 HDR/SDR, Night Light/override visual checks,
+  brightness, DPMS, suspend/resume and long-duration cadence qualification
 - [ ] Separately packaged tiling-animation correction and live acceptance
 - [ ] Panel measurement and calibration (needs an instrument)
 - [~] Qualification across apps — plurx Player's acceptance on the laptop is
