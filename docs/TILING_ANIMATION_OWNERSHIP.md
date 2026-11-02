@@ -6,10 +6,12 @@ distinct valid offline passes. Astra's final evidence review approved donor
 `4f71e166` on October 15; that frozen receipt's pending-review text is historical.
 The recoverable Ubuntu candidate `51.26.10.6ubuntu+nativehdr2` is built (binary
 SHA256 `43d4b3e1b015ede3aa14757273b5165144638c0d01ac77d6c5694e0ca93d5e74`),
-with authenticated matching stock rollback retained, in draft Forgejo PR14.
-Independent hdr-fable review verified source/package construction and requested
-bounded documentation/provenance corrections; delta approval and the twelve new
-packaging regressions remain pending. Nothing is installed, released to APT or
+with authenticated matching stock rollback retained, in Forgejo PR14.
+Independent hdr-fable reviews approved construction and the corrected integration.
+The twelve packaging regressions and repository integrity passed on `6206b7c` in
+[fast lane 41514650977](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977).
+This documentation-only result update retains those unchanged-code passes.
+Nothing is installed, released to APT or
 live-qualified by this work; PR16 history remains excluded.
 
 ## November 2 source and package delivery

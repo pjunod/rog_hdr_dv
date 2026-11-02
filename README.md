@@ -43,7 +43,7 @@ the fix and retains Ubuntu security policies; see the
 | Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
-| Tiling animation accounting | **Recoverable package candidate built; draft Forgejo PR14** | `51.26.10.6ubuntu+nativehdr2` (deb `43d4b3e1…`), stock rollback retained; 35 inherited offline passes. Not installed/live-qualified; historical warning trigger unproven ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
+| Tiling animation accounting | **Package qualified; target trial pending** | `51.26.10.6ubuntu+nativehdr2` (deb `43d4b3e1…`), stock rollback retained; 35 inherited offline passes. Not installed/live-qualified; historical warning trigger unproven ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
