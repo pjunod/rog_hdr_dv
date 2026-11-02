@@ -1,0 +1,358 @@
+From 4d689a3c7b2b71b95e76e1d6ccaa1751b2645e85 Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 14:29:06 -0400
+Subject: [PATCH] animation: own synthetic tiling transitions outside Shell
+ size effects
+
+Preserve snapshot crossfade and geometry easing with extension-owned records, freeze accounting and transition identities. Observe native signals only to cancel synthetic work and avoid pending effects; never prepare or complete a compositor-owned size effect. Cancel rapid retiles and disable cleanly; leave delayed Wayland clients thawed.
+---
+ .../src/extension/keybindingHandler.js        |   8 +-
+ .../src/extension/tilingWindowManager.js      |  41 ++--
+ .../src/extension/windowAnimation.js          | 208 ++++++++++++++++++
+ 3 files changed, 230 insertions(+), 27 deletions(-)
+ create mode 100644 tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+
+diff --git a/tiling-assistant@leleat-on-github/src/extension/keybindingHandler.js b/tiling-assistant@leleat-on-github/src/extension/keybindingHandler.js
+index 82c5b0e..d0a8dac 100644
+--- a/tiling-assistant@leleat-on-github/src/extension/keybindingHandler.js
++++ b/tiling-assistant@leleat-on-github/src/extension/keybindingHandler.js
+@@ -196,13 +196,7 @@ export default class TilingKeybindingHandler {
+                 if (x === currRect.x && y === currRect.y)
+                     return;
+ 
+-                const wActor = window.get_compositor_private();
+-                wActor && Main.wm._prepareAnimationInfo(
+-                    global.window_manager,
+-                    wActor,
+-                    currRect,
+-                    Meta.SizeChange.UNMAXIMIZE
+-                );
++                Twm.animateWindow(window, { x, y, width: currRect.width, height: currRect.height });
+                 window.move_frame(false, x, y);
+             }
+         // Tile a window but ignore T-A features
+diff --git a/tiling-assistant@leleat-on-github/src/extension/tilingWindowManager.js b/tiling-assistant@leleat-on-github/src/extension/tilingWindowManager.js
+index 98f8fe7..ecdff6c 100644
+--- a/tiling-assistant@leleat-on-github/src/extension/tilingWindowManager.js
++++ b/tiling-assistant@leleat-on-github/src/extension/tilingWindowManager.js
+@@ -4,6 +4,7 @@ import { getWindows } from '../dependencies/unexported/altTab.js';
+ 
+ import { Orientation, Settings } from '../common.js';
+ import { Rect, Util } from './utility.js';
++import { WindowAnimations } from './windowAnimation.js';
+ 
+ /**
+  * Singleton responsible for tiling. Implement the signals in a separate Clutter
+@@ -12,6 +13,7 @@ import { Rect, Util } from './utility.js';
+ export class TilingWindowManager {
+     static initialize() {
+         this._signals = new TilingSignals();
++        this._animations = new WindowAnimations();
+ 
+         /**
+          * @type {Map<number, number[]>} - {
+@@ -64,6 +66,8 @@ export class TilingWindowManager {
+     }
+ 
+     static destroy() {
++        this._animations.destroy();
++        this._animations = null;
+         this._signals.destroy();
+         this._signals = null;
+ 
+@@ -123,6 +127,10 @@ export class TilingWindowManager {
+         });
+     }
+ 
++    static animateWindow(window, targetRect) {
++        this._animations.prepare(window, targetRect);
++    }
++
+     /**
+      * @param {Meta.Window} window a Meta.Window.
+      * @param {Mtk.Rectangle|Rect|null} workArea useful for the grace period
+@@ -161,8 +169,10 @@ export class TilingWindowManager {
+         if (!window || window.is_skip_taskbar())
+             return;
+ 
++        this._animations.cancelWindow(window);
+         const wasTiled = window.isTiled;
+         const wasMaximized = window.maximizedHorizontally || window.maximizedVertically;
++        const wasFullscreen = window.is_fullscreen();
+ 
+         if (wasMaximized && window.unmaximize.length > 0)
+             window.unmaximize(Util.getMaximizedFlags(window));
+@@ -219,22 +229,14 @@ export class TilingWindowManager {
+             !maximize && x === workArea.x && width === workArea.width;
+ 
+         // Animations
+-        const wActor = window.get_compositor_private();
+         if (
+             Settings.getBoolean('enable-tile-animations') &&
+-            wActor &&
+             !wasTiled &&
++            !wasMaximized &&
++            !wasFullscreen &&
+             !skipAnim
+         ) {
+-            wActor.remove_all_transitions();
+-            // HACK => journalctl: 'error in size change accounting'...?
+-            // TODO: no animation if going from maximized -> tiled and back to back multiple times?
+-            Main.wm._prepareAnimationInfo(
+-                global.window_manager,
+-                wActor,
+-                oldRect.meta,
+-                Meta.SizeChange.MAXIMIZE
+-            );
++            this._animations.prepare(window, { x, y, width, height });
+         }
+ 
+         if (!verticalMaximize && !horizontalMaximize && !maximize &&
+@@ -319,6 +321,7 @@ export class TilingWindowManager {
+      * @param {boolean} [params.clampToWorkspace=false]
+      */
+     static untile(window, { restoreFullPos = true, skipAnim = false, clampToWorkspace = false } = {}) {
++        this._animations.cancelWindow(window);
+         const wasMaximized = window.maximizedHorizontally || window.maximizedVertically;
+ 
+         if (wasMaximized && window.unmaximize.length > 0)
+@@ -341,15 +344,13 @@ export class TilingWindowManager {
+ 
+         // Animation
+         const untileAnim = Settings.getBoolean('enable-untile-animations');
+-        const wActor = window.get_compositor_private();
+-        if (untileAnim && !wasMaximized && wActor && !skipAnim) {
+-            wActor.remove_all_transitions();
+-            Main.wm._prepareAnimationInfo(
+-                global.window_manager,
+-                wActor,
+-                window.get_frame_rect(),
+-                Meta.SizeChange.UNMAXIMIZE
+-            );
++        const currentRect = window.get_frame_rect();
++        const targetRect = restoreFullPos ? window.untiledRect : {
++            x: currentRect.x, y: currentRect.y,
++            width: window.untiledRect.width, height: window.untiledRect.height
++        };
++        if (untileAnim && !wasMaximized && !skipAnim) {
++            this._animations.prepare(window, targetRect);
+         }
+ 
+         if (!wasMaximized && window.override_constraints) {
+diff --git a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+new file mode 100644
+index 0000000..a5f9327
+--- /dev/null
++++ b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+@@ -0,0 +1,208 @@
++// SPDX-License-Identifier: GPL-2.0-only
++// Copyright 2026 HDR contributors
++import { Clutter, Meta, St } from '../dependencies/gi.js';
++import { Main } from '../dependencies/shell.js';
++
++const DURATION = 250;
++const TRANSFORMS = new Map([
++    ['scale-x', 1], ['scale-y', 1],
++    ['translation-x', 0], ['translation-y', 0]
++]);
++
++/** Own synthetic geometry effects, never compositor size-effect completions. */
++export class WindowAnimations {
++    constructor() {
++        this._effects = new Map();
++        this._nativePending = new Map();
++        this._signals = [];
++        const connect = (name, callback) => {
++            this._signals.push(global.window_manager.connect(name, callback));
++        };
++        connect('size-change', (_, actor) => {
++            this.cancel(actor);
++            if (!this._nativePending.has(actor)) {
++                const id = actor.connect('destroy', () => this._forgetNative(actor));
++                this._nativePending.set(actor, id);
++            }
++        });
++        connect('size-changed', (_, actor) => this._forgetNative(actor));
++        for (const name of ['kill-window-effects', 'minimize', 'unminimize', 'map', 'destroy']) {
++            connect(name, (_, actor) => {
++                this.cancel(actor);
++                this._forgetNative(actor);
++            });
++        }
++    }
++
++    _forgetNative(actor) {
++        const id = this._nativePending.get(actor);
++        if (id !== undefined) {
++            this._nativePending.delete(actor);
++            actor.disconnect(id);
++        }
++    }
++
++    cancelWindow(window) {
++        const actor = window.get_compositor_private();
++        if (actor)
++            this.cancel(actor);
++    }
++
++    prepare(window, requestedRect) {
++        const actor = window.get_compositor_private();
++        if (!actor)
++            return;
++        this.cancel(actor);
++        // Observe actual native signals, not Shell private pending/resizing sets.
++        // Active foreign effects retain all of their properties and transitions.
++        if (this._nativePending.has(actor) || actor.get_transition('opacity') ||
++                [...TRANSFORMS].some(([name, value]) =>
++                    actor.get_transition(name) || actor[name.replaceAll('-', '_')] !== value))
++            return;
++        const oldRect = window.get_frame_rect();
++        if (oldRect.width <= 0 || oldRect.height <= 0 ||
++                ['x', 'y', 'width', 'height'].every(key => oldRect[key] === requestedRect[key]))
++            return;
++
++        const content = actor.paint_to_content(oldRect);
++        if (!content)
++            return;
++        const clone = new St.Widget({ content });
++        clone.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
++        clone.set_position(oldRect.x, oldRect.y);
++        clone.set_size(oldRect.width, oldRect.height);
++        const effect = { actor, window, clone, oldRect, frozen: false,
++            later: 0, transitions: new Map(), transformed: false,
++            sizeReady: oldRect.width === requestedRect.width && oldRect.height === requestedRect.height };
++        this._effects.set(actor, effect);
++        effect.destroyId = actor.connect('destroy', () => this.cancel(actor));
++        effect.unmanageId = window.connect('unmanaging', () => this.cancel(actor));
++        effect.positionId = window.connect('position-changed', () => this._queue(effect));
++        effect.sizeId = window.connect('size-changed', () => {
++            effect.sizeReady = true;
++            this._queue(effect);
++        });
++        try {
++            actor.freeze();
++            effect.frozen = true;
++            this._queue(effect);
++        } catch (error) {
++            this.cancel(actor);
++            throw error;
++        }
++    }
++
++    _queue(effect) {
++        if (this._effects.get(effect.actor) !== effect || effect.later || effect.transformed)
++            return;
++        effect.later = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
++            effect.later = 0;
++            this._start(effect);
++            return false;
++        });
++    }
++
++    _start(effect) {
++        const { actor, window, clone, oldRect } = effect;
++        if (this._effects.get(actor) !== effect)
++            return;
++        const target = window.get_frame_rect();
++        if (!effect.sizeReady) {
++            // Wayland clients may acknowledge later. Never freeze a client
++            // indefinitely: retain only an unparented snapshot until the actual
++            // Meta.Window size-changed signal queues the eventual animation.
++            if (effect.frozen) {
++                effect.frozen = false;
++                actor.thaw();
++            }
++            return;
++        }
++        if (target.width <= 0 || target.height <= 0 ||
++                (target.x === oldRect.x && target.y === oldRect.y &&
++                 target.width === oldRect.width && target.height === oldRect.height)) {
++            this.cancel(actor);
++            return;
++        }
++        // Recheck after the geometry operation: never overwrite a foreign ease.
++        if ([...TRANSFORMS].some(([name, value]) =>
++            actor.get_transition(name) || actor[name.replaceAll('-', '_')] !== value) ||
++                actor.get_transition('opacity')) {
++            this.cancel(actor);
++            return;
++        }
++        const useMotion = St.Settings.get().reducedMotion !== St.ReducedMotion.REDUCE;
++        const scaleX = useMotion ? target.width / oldRect.width : 1;
++        const scaleY = useMotion ? target.height / oldRect.height : 1;
++        Main.uiGroup.add_child(clone);
++        effect.transformed = true;
++        actor.translation_x = useMotion ? oldRect.x - target.x : 0;
++        actor.translation_y = useMotion ? oldRect.y - target.y : 0;
++        actor.scale_x = 1 / scaleX;
++        actor.scale_y = 1 / scaleY;
++        try {
++            clone.ease({
++                x: useMotion ? target.x : oldRect.x,
++                y: useMotion ? target.y : oldRect.y,
++                scale_x: scaleX, scale_y: scaleY, opacity: 0,
++                duration: DURATION, mode: Clutter.AnimationMode.EASE_OUT_QUAD
++            });
++            actor.ease({
++                scale_x: 1, scale_y: 1, translation_x: 0, translation_y: 0,
++                duration: DURATION, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
++                onStopped: () => {
++                    if (this._effects.get(actor) === effect)
++                        this.cancel(actor);
++                }
++            });
++            if (this._effects.get(actor) !== effect)
++                return; // ease may complete synchronously when motion is disabled.
++            for (const name of TRANSFORMS.keys())
++                effect.transitions.set(name, actor.get_transition(name));
++            if (effect.frozen) {
++                effect.frozen = false;
++                actor.thaw();
++            }
++        } catch (error) {
++            this.cancel(actor);
++            throw error;
++        }
++    }
++
++    cancel(actor) {
++        const effect = this._effects.get(actor);
++        if (!effect)
++            return;
++        // Unlink first: transition removal/destroy/thaw can synchronously reenter.
++        this._effects.delete(actor);
++        actor.disconnect(effect.destroyId);
++        effect.window.disconnect(effect.unmanageId);
++        effect.window.disconnect(effect.positionId);
++        effect.window.disconnect(effect.sizeId);
++        if (effect.later)
++            global.compositor.get_laters().remove(effect.later);
++        effect.clone.destroy();
++        if (effect.transformed) {
++            for (const [name, value] of TRANSFORMS) {
++                const transition = actor.get_transition(name);
++                if (transition && transition === effect.transitions.get(name))
++                    actor.remove_transition(name);
++                if (!actor.get_transition(name))
++                    actor[name.replaceAll('-', '_')] = value;
++            }
++        }
++        if (effect.frozen) {
++            effect.frozen = false;
++            actor.thaw();
++        }
++    }
++
++    destroy() {
++        for (const id of this._signals)
++            global.window_manager.disconnect(id);
++        this._signals = [];
++        for (const actor of this._effects.keys())
++            this.cancel(actor);
++        for (const actor of this._nativePending.keys())
++            this._forgetNative(actor);
++    }
++}
+-- 
+2.54.0 (Apple Git-157)
+

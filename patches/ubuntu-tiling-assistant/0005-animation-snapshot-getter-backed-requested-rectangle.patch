@@ -1,0 +1,37 @@
+From 56448103ba956fb57c59abe40c80b9b9abdf01c2 Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 15:25:05 -0400
+Subject: [PATCH] animation: snapshot getter-backed requested rectangles by
+ value
+
+---
+ .../src/extension/windowAnimation.js                        | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+index b2098d9..cc9a2a6 100644
+--- a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
++++ b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+@@ -55,6 +55,10 @@ export class WindowAnimations {
+     }
+ 
+     prepare(window, requestedRect) {
++        // Rect coordinates may be prototype getters, not enumerable fields.
++        // Snapshot their values, never the caller's mutable backing rectangle.
++        const { x, y, width, height } = requestedRect;
++        requestedRect = { x, y, width, height };
+         const actor = window.get_compositor_private();
+         if (!actor)
+             return;
+@@ -80,7 +84,7 @@ export class WindowAnimations {
+         clone.set_offscreen_redirect(Clutter.OffscreenRedirect.ALWAYS);
+         clone.set_position(oldRect.x, oldRect.y);
+         clone.set_size(oldRect.width, oldRect.height);
+-        const effect = { actor, window, clone, oldRect, requestedRect: { ...requestedRect },
++        const effect = { actor, window, clone, oldRect, requestedRect,
+             later: 0, started: false };
+         this._effects.set(actor, effect);
+         effect.destroyId = actor.connect('destroy', () => this.cancel(actor));
+-- 
+2.54.0 (Apple Git-157)
+
