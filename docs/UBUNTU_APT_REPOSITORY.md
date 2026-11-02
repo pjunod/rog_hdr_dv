@@ -179,6 +179,9 @@ Every night at 07:23 UTC, on any push to `main` that touches the series or
  Mutter against the registry's libdisplay-info)
         │
         ▼
+ verify retained output inventory
+        │
+        ▼
  delete the source's older versions ──▶ publish.sh (rebuilds the indexes)
 ```
 
@@ -198,7 +201,8 @@ exactly what the workflow does, and nothing when the registry is current:
 ```bash
 export FORGEJO_TOKEN=...                      # write:package scope
 export FORGEJO_URL=http://forge.lan:3000      # the default; set it if the name does not resolve
-packaging/ubuntu/rebuild.sh ~/work/ubuntu-packages   # build output goes here; emptied first
+packaging/ubuntu/rebuild.sh ~/.local/state/rog-hdr-dv/ubuntu-packages
+# Retains an exclusive run-* child here when building; never empties the root.
 ```
 
 The steps also run alone, for example to try a refreshed patch without
@@ -229,14 +233,82 @@ personal access token of the registry's owner with the `write:package`
 scope. The scripts hand it to curl through a config on a file descriptor, so
 it never appears in a process list.
 
-**Source/provenance retention.** The build output includes `.dsc`, its source
-archives, `.changes`, `.buildinfo` and a build log, but `publish.sh` uploads
-only `.deb` files. The current workflow uses a runner work directory and
-`rebuild.sh` empties the selected output directory on its next run. Preserve
-complete original outputs durably before that happens; a binary registry
-snapshot is not a source-package archive. Current retrieval/retention limits
-are recorded in the [software handoff](SOFTWARE_DELIVERY.md), without claiming
-new nativehdr13 tests from older package receipts.
+### Private source and recovery output retention
+
+`rebuild.sh WORK` treats WORK as a durable retention root, not a disposable
+build directory. When a build is needed, it atomically reserves a private
+`run-*` child. Manual and concurrent invocations receive distinct children;
+a fully published no-op does not create or change WORK. Existing successful,
+failed, partial and unknown data are never deleted. This does not change
+version detection, paired-architecture checks, registry pruning or publication.
+
+The host-mode workflow resolves the runner account's home from the operating
+system account database, independently of any job-level `HOME` override. It
+retains outputs in `.local/state/rog-hdr-dv/ubuntu-packages` under that home,
+outside checkout and runner temporary-directory cleanup. Each run contains `libdisplay-info-amd64/`,
+`libdisplay-info-i386/` and/or `mutter-amd64/` as needed, plus Mutter's exact
+downloaded dependencies in `with/`. Successful amd64 output includes the
+original `.dsc` and every source archive it lists, binaries, `.changes`,
+`.buildinfo` and the build log. i386 remains a binary-only cross-build.
+Full builder stdout/stderr goes to private `invocation.log`, not public CI
+artifacts. On failure, everything already written to the run survives, even
+if publication fails. Files still inside a failed disposable build container
+are not exported by `build.sh`; its captured invocation log is not a claim to
+recover all container-internal records.
+
+Each successful build has a sibling `<source>-<arch>.manifest.json`: sorted
+relative paths, sizes and SHA256s of every retained output file, with the
+source, Ubuntu version, patched version and architecture. Creation is exclusive
+and immediately reverified before registry mutation. This is a byte inventory,
+not a signature, build attestation or proof that an incomplete build succeeded.
+No manifest is created for a failed build. To verify a retained directory:
+
+```bash
+python3 packaging/ubuntu/outputs.py verify \
+  "$RUN/libdisplay-info-amd64" "$RUN/libdisplay-info-amd64.manifest.json"
+```
+
+Set RUN to the private run directory first. Verification rejects changed,
+missing, additional or nonregular files. Keep manifests beside the outputs;
+they deliberately do not contain their own checksums. A manual archive/copy
+must be separately hash-verified before anyone relies on it or removes its
+producer. This implementation performs no archive copy or automatic cleanup;
+the operator owns capacity planning, backups and deliberate later retention
+decisions. Durable local storage is not an off-host backup or an indefinite
+availability guarantee. Preserve independent rollback packages before upgrades;
+the binary registry still prunes superseded versions.
+
+Raw logs/buildinfo may reveal infrastructure paths. Retrieve them privately
+from that runner-owned path through the coordinator, never commit them or add
+an automatic public GitHub artifact upload. `publish.sh` still uploads only
+`.deb` files. This lifecycle repair **does not recover nativehdr13 originals**
+and does not force a rebuild of published versions. For those existing records:
+
+1. The coordinator's November 2 Forgejo Actions artifact listing was empty.
+   Retrieved logs for run 6106/job 59118 and run 6383/job 61572 both show
+   already-published no-ops, not the original builds. The logs and their hashes
+   are retained privately; no new source-package recovery is claimed.
+2. The coordinator's bounded filename search included hidden and ignored files
+   in owned HDR collaboration and legacy owned team workspaces, excluding
+   `.git`, `node_modules`, `target`, `.venv` and `vendor`. It found no matching
+   nativehdr13 `.dsc`, `.buildinfo` or `.changes` files. Other machines and
+   backups were not searched: this is not global loss proof.
+3. Remaining recovery is coordinator-owned: locate the earlier original build
+   invocation and then-resolved legacy `RUNNER_TEMP/ubuntu-packages` location
+   using existing private runner/job records. The Forgejo read-only routes are
+   `GET /api/v1/repos/pjunod/rog_hdr_dv/actions/runs/{run_id}/jobs` and
+   `GET /api/v1/repos/pjunod/rog_hdr_dv/actions/jobs/{job_id}/logs`.
+   Through authorized read-only runner inspection, check that exact legacy
+   output path and configured private runner backup/snapshot, bounded
+   to `.dsc` plus listed archives, `.buildinfo`, `.changes`, binaries and logs
+   for the two exact nativehdr13 versions above. Do not reset the warm tree,
+   launch builds or dispatch workflows to fill gaps.
+4. If recovered, retain the original bytes privately, verify their source and
+   binary checksum closure, and record provenance separately. If inaccessible
+   or absent at those locations, report those exact limits, not global loss.
+
+The [software handoff](SOFTWARE_DELIVERY.md) keeps the original-record recovery
+gap separate from retained binary hashes and earlier package test receipts.
 
 [`build.sh`](../packaging/ubuntu/build.sh) applies the series with
 `git apply` (it carries binary test fixtures) on top of Ubuntu's source with
