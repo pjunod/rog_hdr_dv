@@ -242,9 +242,10 @@ a fully published no-op does not create or change WORK. Existing successful,
 failed, partial and unknown data are never deleted. This does not change
 version detection, paired-architecture checks, registry pruning or publication.
 
-The workflow retains outputs under the runner account's
-`$HOME/.local/state/rog-hdr-dv/ubuntu-packages`, outside checkout and runner
-temporary-directory cleanup. Each run contains `libdisplay-info-amd64/`,
+The host-mode workflow resolves the runner account's home from the operating
+system account database, independently of any job-level `HOME` override. It
+retains outputs in `.local/state/rog-hdr-dv/ubuntu-packages` under that home,
+outside checkout and runner temporary-directory cleanup. Each run contains `libdisplay-info-amd64/`,
 `libdisplay-info-i386/` and/or `mutter-amd64/` as needed, plus Mutter's exact
 downloaded dependencies in `with/`. Successful amd64 output includes the
 original `.dsc` and every source archive it lists, binaries, `.changes`,

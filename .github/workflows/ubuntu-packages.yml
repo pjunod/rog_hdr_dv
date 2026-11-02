@@ -35,4 +35,7 @@ jobs:
         # Private runner-owned storage, outside checkout and runner temp cleanup.
         # rebuild.sh reserves an exclusive run-* child only if a build is needed.
         # Do not upload raw source/build records to public mirrored CI artifacts.
-        run: packaging/ubuntu/rebuild.sh "$HOME/.local/state/rog-hdr-dv/ubuntu-packages"
+        run: |
+          # Resolve the host account home independently of job-level HOME overrides.
+          retention_home=$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')
+          packaging/ubuntu/rebuild.sh "$retention_home/.local/state/rog-hdr-dv/ubuntu-packages"
