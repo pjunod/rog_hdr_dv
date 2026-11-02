@@ -3,6 +3,7 @@
   "task": "t_44f637a7",
   "implementation_owner": "hdr-sol (Sol 6.1)",
   "integration_base": "f9b33219160c8b2e751f32cdb17cda42c07d4db8",
+  "final_candidate_main_base": "cee5aba658d1dbf09e025658e9636271297f2061",
   "donor": "4f71e166055732f401a80bc3b1c80c1209b4fee9",
   "inherited_qualification": {
     "receipt": "evidence/tiling-animation-qualification.json",
@@ -49,6 +50,7 @@
     "full_base_equality_manifest_sha256": "6c6cc6d263a068ae6133460717b6d0b76b71c7e8b2ce630dd84f5414d2784bcd",
     "full_source_manifest_sha256": "40fd441469be757ce3c26c559ce8ab0b2919232fa4e4e9f3886c50ffa44498b7",
     "package_helper_sha256": "3ba77714607bb9d07f635271a6a1727a55a3886518820bddecdf0bf4082fee9a",
+    "built_helper_retention": "Exact native build helper hash-verified and retained as private kit supplement built-helper/package-tool-r4.py; original published kit archive unchanged.",
     "fresh_replay_syntax_sha256": "fae3e9c6481c7946c5202d9e5264656317e1106dac264e41c760ec535c52cc5e",
     "delivered_package_helper_sha256": "21d82f33cfd98ef91e2541be38a11eaa942e3034dac02683ef1eb0dd1ca22fe8",
     "postbuild_helper_change": "Prefer existing ordinary dpkg-deb.pkgbinarymangler on already-diverted buildd hosts; actual builder had no diversion, so command/path, source and package bytes unchanged. Guard tested only in final packaging lane."
@@ -204,10 +206,13 @@
     "Candidate preparation r1 failed absent Node; packaging no longer repeats already-passing exact-tree syntax checks.",
     "Candidate r2 failed Debian changelog GMT trailer; r3 numeric-zone trailer built successfully.",
     "Initial forward/rollback simulations failed builder baseline missing GNOME dependencies; only failed simulations retried with explicit --fix-broken resolution.",
-    "First nativehdr2 inspection overreached by requiring upstream SVG bytes to survive existing package build transformation; stock/candidate payload equality already held. Corrected check to reviewed runtime JavaScript equality; only inspection retried, no rebuild or units."
+    "First nativehdr2 inspection overreached by requiring upstream SVG bytes to survive existing package build transformation; stock/candidate payload equality already held. Corrected check to reviewed runtime JavaScript equality; only inspection retried, no rebuild or units.",
+    "Independent reviewer diagnostic check_repository.py on 1bfc7de failed: Documentation absent from README: docs/TILING_ANIMATION_OWNERSHIP.md. Index/base corrections prepared; no local repeat. Coordinator owns the first passing post-approval GitHub integrity run."
   ],
   "state": {
-    "independent_integration_review": "pending",
+    "independent_integration_review": "hdr-fable / claude-fable-5-1 REVIEW1921 verified source/package construction; bounded documentation/provenance corrections submitted for delta review",
+    "forgejo_pr": 14,
+    "forgejo_pr_state": "draft; coordinator owns publication, final checks and merge",
     "new_packaging_regressions": "twelve defined, deferred until independent review",
     "repository_integrity": "deferred to coordinator-owned postreview fast lane",
     "published_to_apt": false,
@@ -217,11 +222,23 @@
   },
   "remaining": [
     "Independent nonauthor integration/package review, fixes and one minimal affected fast lane.",
-    "Scoped Forgejo PR and coordinated landing; no held PR16 ancestry.",
+    "Draft Forgejo PR14 delta approval and coordinated landing; no held PR16 ancestry.",
     "Target-specific APT simulation and owner-coordinated install/rollback/session/visible acceptance.",
     "Historical warning attribution still lacks actor stack; i915 VRR cause/fix is separate.",
     "Broader optical/full-project acceptance remains separate."
   ],
+  "publication_scan_disposition": {
+    "candidate": "1bfc7dedb227fe82a3b1055d0f6e9f07408dc9ea",
+    "custom_reachable_blob_commit_objects": 1603,
+    "custom_scan_hits": 0,
+    "gitleaks_findings": 1,
+    "gitleaks_false_positives": 1,
+    "false_positive": "sources.json line 44 at 572b745: public stock keybindingHandler.js SHA256, not a credential",
+    "true_secret_findings": 0,
+    "real_infrastructure_added_text_findings": 0,
+    "private_disposition": "PUBLICATION-SCAN-DISPOSITION.json",
+    "original_gitleaks_report_sha256": "110b5a19b41638b95cc77761ea99cf88c459d2e372c376529f3bfbb53ddf2b36"
+  },
   "superseded_nativehdr1": {
     "version": "51.26.10.6ubuntu+nativehdr1",
     "artifact_manifest": {

@@ -43,7 +43,7 @@ the fix and retains Ubuntu security policies; see the
 | Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
-| Tiling animation accounting | **Separate correction pending** | Current extension still matches stock callers; 35-case offline correction is not deployed or live-qualified |
+| Tiling animation accounting | **Recoverable package candidate built; draft Forgejo PR14** | `51.26.10.6ubuntu+nativehdr2` (deb `43d4b3e1…`), stock rollback retained; 35 inherited offline passes. Not installed/live-qualified; historical warning trigger unproven ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
@@ -180,6 +180,7 @@ has the remote and branch rules.
 |---|---|
 | [APT repository](docs/UBUNTU_APT_REPOSITORY.md) | Installing the HDR desktop packages on a machine, and how they follow Ubuntu's updates |
 | [Software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) | Current package/source hashes, recovery boundaries and retained versus remaining acceptance |
+| [Tiling animation ownership](docs/TILING_ANIMATION_OWNERSHIP.md) | Five unchanged reviewed patches, recoverable Ubuntu candidate and retained 35 offline passes; no installation or live qualification |
 | [Merged Ubuntu packages](docs/MERGED_UBUNTU_PACKAGES.md) | The hand-built 2026-10-17 release and its install/rollback test |
 | [Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) · [validation receipts](docs/NATIVEHDR10_VALIDATION.md) | The nativehdr10 delivery and its scoped validation |
 | [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) | A packaging compatibility correction and its source pins |

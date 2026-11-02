@@ -4,10 +4,13 @@
 Current-main integration preserves the five reviewed patches and their 35
 distinct valid offline passes. Astra's final evidence review approved donor
 `4f71e166` on October 15; that frozen receipt's pending-review text is historical.
-The Ubuntu source and binary package candidate is built, with an authenticated
-matching stock rollback package retained. Independent integration/package review
-and the twelve new packaging regressions remain pending. Nothing is installed,
-released to APT or live-qualified by this work; PR16 history remains excluded.
+The recoverable Ubuntu candidate `51.26.10.6ubuntu+nativehdr2` is built (binary
+SHA256 `43d4b3e1b015ede3aa14757273b5165144638c0d01ac77d6c5694e0ca93d5e74`),
+with authenticated matching stock rollback retained, in draft Forgejo PR14.
+Independent hdr-fable review verified source/package construction and requested
+bounded documentation/provenance corrections; delta approval and the twelve new
+packaging regressions remain pending. Nothing is installed, released to APT or
+live-qualified by this work; PR16 history remains excluded.
 
 ## November 2 source and package delivery
 
@@ -17,6 +20,14 @@ clone starts at current main, not at the donor history. Patch authorship and
 bytes, replay helper, animation harness and historical receipts are retained.
 The full replay again matches tree `03613a8236b6f200836df63acafa1e2359d94cb6`;
 syntax checks passed with Node v26.8.1. No behavioral case was repeated.
+
+Publication checks are distinct: the custom reachable/staged scan inspected
+1,603 blob/commit objects with zero hits on `1bfc7de`; the coordinator's Gitleaks
+new-history scan reported **one verified false positive**, the public stock
+`keybindingHandler.js` SHA256 in `sources.json` line 44 at `572b745`. It is not a
+credential. The private `PUBLICATION-SCAN-DISPOSITION.json` retains that finding
+and the original report hash; this is not a claim that every scanner had zero
+findings. No true secret or added infrastructure finding was identified.
 
 The official enclosing source archive contains all 50 original extension files
 byte-for-byte, including the dependencies used by the retained tests. Of all
@@ -148,7 +159,11 @@ fix is a separate kernel change, not an effect of this extension correction.
 
 ## Retained October source and qualification contract
 
-## Defect and evidence boundary
+The following source/qualification record is retained from October; November 2
+package construction above supersedes its source-only delivery state, not its
+behavioral or live-acceptance evidence limits.
+
+### Defect and evidence boundary
 
 Ubuntu Tiling Assistant metadata version 56, from
 `gnome-shell-ubuntu-extensions 51.26.10.6ubuntu`, invokes Shell's private
@@ -402,8 +417,10 @@ reuse valid successful results rather than trigger a duplicate batch.
    metadata, package contents and solver result before any live change.
 4. Before a coordinated install, retain and hash the exact original extension
    `.deb`, package state and extension enablement/settings. The original source
-   archive is retained, but this phase does not claim a tested binary rollback
-   kit. No installer or profile activation is supplied here.
+   archive is retained; that October source-only phase did not claim a binary
+   rollback kit. November 2 now retains the authenticated stock binary and
+   builder solver simulation, not an executed target rollback. No installer or
+   profile activation is supplied here.
 5. In a separately authorized owner/audio-coordinated session window, verify
    visible tile/untile/center in SDR and HDR, rapid retile, native maximize/
    unmaximize/fullscreen, interrupted effects, application close, reduced
