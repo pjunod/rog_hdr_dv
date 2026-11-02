@@ -18,11 +18,13 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-10-29)
+## What works today (2026-11-02)
 
-Installed on the laptop: libdisplay-info `0.3.0-1ubuntu1~hdr9`, Mutter
-`51.0-1ubuntu3+nativehdr10` (since 2026-10-13), kernel
-`7.3.0-nativehdr3`, and plurx Player `0.3.2` for Dolby Vision.
+Installed on the laptop: APT libdisplay-info `0.3.0-1+nativehdr13` (amd64
+and i386), Mutter `51.0-1ubuntu3+nativehdr13`, kernel
+`7.3.0-nativehdr3`, and external plurx Player `0.4.1` for Dolby Vision.
+The [software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) binds the
+exact versions, package hashes and retained receipts. No reinstall is needed.
 The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
 the fix and retains Ubuntu security policies; see the
@@ -32,14 +34,15 @@ the fix and retains Ubuntu security policies; see the
 |---|---|---|
 | HDR detection on the internal panel | **Working** since 2026-10-08 | The panel's DisplayID HDR description is parsed, so HDR is offered and HDR10 plays |
 | Kernel security rebase | **Installed and running; CVE fix verified** (2026-10-29) | Ubuntu `7.3.0-10.10` (Linux 7.3) plus the four HDR patches and the i915 VRR patch; the signed replacement is the persistent boot default, with old custom and stock recovery kernels retained ([rebase](docs/KERNEL_REBASE.md)) |
-| HDR desktop session | **Installed** | Mutter reports the panel's declared range (0.0004–616 cd/m², firmware values) and primaries separately from the BT.2020/PQ encoding |
+| HDR desktop session | **Installed** | Current effective range about 0.0005–616 cd/m² (firmware values) and primaries are reported separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
-| Night Light in HDR, per-monitor overrides | **Installed** (in `nativehdr10`) | The owner's visual check is outstanding |
+| Night Light in HDR, per-monitor overrides | **Installed** (since `nativehdr10`, now APT `nativehdr13`) | October 15 warm HDR/SDR observations and persistence accepted; no post-update acceptance inferred |
 | Ubuntu packages | **APT repository** (2026-10-27) | Rebuilt from Ubuntu's current source whenever Ubuntu updates it; one command sets a machine up ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)) |
 | Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
+| Tiling animation accounting | **Separate correction pending** | Current extension still matches stock callers; 35-case offline correction is not deployed or live-qualified |
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
@@ -163,11 +166,11 @@ has the remote and branch rules.
 |---|---|
 | [Open display management](docs/OPEN_DV_DISPLAY_MANAGEMENT.md) | The full-fidelity open Dolby Vision target and what it requires |
 | [Measurement-driven development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md) | How the mapping is derived from reference measurements, and the rules |
-| [Current mapping](docs/SQRTSUM_PQ_Y_POST.md) · [ABI368 delivery](docs/MAPPING_ABI368_DELIVERY.md) | The frozen equations, their evidence, and how they are packaged |
+| [Historical mapping](docs/SQRTSUM_PQ_Y_POST.md) · [ABI368 delivery](docs/MAPPING_ABI368_DELIVERY.md) | Earlier frozen candidate and its source-bound evidence; not the current plurx Player product |
 | [Headless harness](docs/DOLBY_HARNESS.md) | How references are rendered and scored, and the private boundary |
 | [HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) | Reproducible test images, and what may leave the private area |
 | [Authored-master transport](docs/AUTHORED_MASTER_BASELINE.md) · [frame-owned mapping](docs/OPEN_XML205_CANDIDATE.md) · [absolute-PQ](docs/OPEN_ABSOLUTE_PQ_SOP.md) · [public RGB/Y](docs/PUBLIC_RGB_MAPPING.md) | Earlier mapping candidates, kept for their evidence |
-| [Native player](tools/native_player/README.md) · [qualification](tools/native_player/QUALIFICATION.md) | The experimental RPU-aware player and its install kit |
+| [Historical native player](tools/native_player/README.md) · [qualification](tools/native_player/QUALIFICATION.md) | Retained experimental work, not the current install path; use external plurx Player |
 | [Activation probe](docs/DOLBY_ACTIVATION_PROBE.md) · [Wine API contract](docs/WINE_API_CONTRACT.md) · [Wine file API](docs/WINE_FILE_FROMAPP.md) · [Wine monitor discovery](docs/WINE_DISPLAY_MONITOR.md) | The Windows-processor-under-Wine route and its prerequisites |
 
 ### Packaging, validation and diagnostics
@@ -175,6 +178,7 @@ has the remote and branch rules.
 | Document | Answers |
 |---|---|
 | [APT repository](docs/UBUNTU_APT_REPOSITORY.md) | Installing the HDR desktop packages on a machine, and how they follow Ubuntu's updates |
+| [Software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) | Current package/source hashes, recovery boundaries and retained versus remaining acceptance |
 | [Merged Ubuntu packages](docs/MERGED_UBUNTU_PACKAGES.md) | The hand-built 2026-10-17 release and its install/rollback test |
 | [Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) · [validation receipts](docs/NATIVEHDR10_VALIDATION.md) | The nativehdr10 delivery and its scoped validation |
 | [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) | A packaging compatibility correction and its source pins |
@@ -221,12 +225,13 @@ Audio (speakers, latency, Dolby Atmos) lives in
 - [x] Native HDR detection on the internal panel (HDR10 working 2026-10-08)
 - [x] Compositor colour pipeline: physical targets, HLG, highlight mapping,
   gamut compression
-- [~] Night Light in HDR and per-monitor overrides — installed
-  (`nativehdr10`); the owner's visual check remains
+- [x] Night Light warm HDR/SDR observations and override persistence on the
+  October 15 stack; retained acceptance, not a pass on later APT/kernel updates
 - [x] Ubuntu packages in an APT repository, rebuilt when Ubuntu updates
 - [x] Open Dolby Vision display mapping — closed-form CM v4.0 and CM v2.9
 - [x] Dolby Vision playback — plurx Player, Profile 5, 8.1 and 7 FEL
-- [ ] HDR/SDR, brightness, DPMS and suspend/resume qualification
+- [ ] Post-APT/nativehdr3 HDR/SDR, fullscreen/VRR, brightness, DPMS and resume qualification
+- [ ] Separately packaged tiling-animation correction and live acceptance
 - [ ] Panel measurement and calibration (needs an instrument)
 - [~] Qualification across apps — plurx Player's acceptance on the laptop is
   next

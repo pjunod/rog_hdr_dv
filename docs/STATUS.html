@@ -16,7 +16,27 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <h1>Linux display<br>quality</h1>
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
-<p class="muted">Updated October 29, 2026 · Ubuntu Linux 7.3 kernel installed and running; CVE fix verified · historical display foundations receipts are retained below</p></header>
+<p class="muted">Updated November 2, 2026 · APT nativehdr13 and kernel nativehdr3 installed · historical receipts retain their original scope</p></header>
+<h2>Current software handoff — November 2</h2>
+<div class="callout">ROG already has Mutter <code>51.0-1ubuntu3+nativehdr13</code>,
+libdisplay-info <code>0.3.0-1+nativehdr13</code> on amd64 and i386, and external
+plurx Player 0.4.1. No reinstall needed. All 15 published desktop binaries
+were size/hash-checked against Release-bound indexes; changelogs bind unchanged
+Ubuntu series at <code>479d61de3f78</code>. This is not a new build or transaction test.
+<a href="SOFTWARE_DELIVERY.md">Install, rollback, exact hashes and evidence limits</a>.</div>
+<p>October 15 owner-observed warm HDR/SDR roundtrip, decorations, SDR video and
+HDR10 stability were accepted, and override persistence passed. They are completed
+prior-stack observations, not post-APT/nativehdr3 acceptance. Controlled VRR/HDR
+transitions and resume, external-monitor/second-machine checks, plurx Player
+acceptance, Windows/OEM comparison and optical measurement remain separate.
+No colourimeter is available. Current target is about 0.0005–616 cd/m²,
+firmware-declared, not measured.</p>
+<p>A bounded current-boot query found zero matching page-flip errors and two
+size-accounting warnings, without a controlled stimulus. Configured VRR is not
+playback VRR acceptance. The installed extension still matches stock callers;
+the retained 35-case offline animation correction needs separate integration,
+packaging and live acceptance. Original current APT source/build output retention
+also remains a packaging follow-up; the registry contains binaries only.</p>
 <h2>Kernel security rebase — October 29, 2026</h2>
 <div class="callout"><strong>Running CVE fix verified:</strong>
 <code>7.3.0-nativehdr3</code> has CVE-2026-98432's fix, verified by matching
@@ -35,7 +55,7 @@ working HDR10 on the earlier patched stack (hdr6/nativehdr2) with Secure Boot
 enabled; hdr9 + nativehdr8 were installed; the HDR session ran on them and the
 owner accepted the picture. Full Dolby Vision
 and measured calibration are not yet qualified.</div>
-<h2>Current ABI368 mapping qualification — October 18, 2026</h2>
+<h2>Historical ABI368 mapping qualification — October 18, 2026</h2>
 <div class="callout">Exact frozen candidate retains full-raster development256/27 and714/27 PASS and independently reserved1200/48 PASS: mean0.535635380895007/p951.1341677325267563,8,847,360pixels,GPUinvalid0. These are historical source-bound observations, not new integration renders or full Dolby/optical identity.</div>
 <p>Done: scoped main-based transplant without held PR16 ancestry, exact library replay/all249 hashes, package-relative native consumer compile, scoped MIT notices and Fable's final independent APPROVE of a6b8dcc/tree60c573e4 after the F1 notice fix. Numerical/native/upstream bytes remain unchanged. The approved once-only supported-baseline fixture is prepared. The single affected batch returned75/76 Python passes (one legacy binary64-PQ black expectation failed, zero skips), four effective native passes and repository-gate PASS249patches/6series/links. The fifth native check exited zero but skipped the CPU device and remains INVALID/UNCOUNTED. Fable's narrow review APPROVES test-only5d6d1e2 and the isolated CPU-enabled Vulkan recipe. Only the failed/invalidated checks were retried: both PASS, with real llvmpipe texture/render shader markers and no skip/FAILED. All76Python and5native checks now have valid passing receipts, with no successful-suite repeats or production changes. <a href="../evidence/abi368-qualification.json">Granular qualification evidence</a>. Current: scoped PR/exact-head CI/merge. Remaining: broader30 new frame/target pairs (pending, not general accuracy evidence), actual source+binary packages and isolated install/rollback. <a href="MAPPING_ABI368_DELIVERY.md">Delivery boundaries</a>; <a href="SQRTSUM_PQ_Y_POST.md">equations, retained observations and limits</a>. No repeated official renders/metrics, package transaction or physical deployment. No complete CM/rawRPU/L8/temporal/playback/optical claim; Apple TV devices untouched; PR16 held/unmerged.</p>
 <h2>Historical foundations workboard</h2>

@@ -10,6 +10,14 @@ Ubuntu `7.3.0-9.9`. The [Linux 7.3 rebase](KERNEL_REBASE.md) retains it in
 `patches/linux/0005`; new source review, build and boot evidence are recorded
 there. The upstream report below remains an unsent historical draft.
 
+As of November 2, nativehdr3 is running and the output reports a configured
+`+vrr` mode. A bounded read-only current-boot query found no matching page-flip
+errors; this was not a controlled playback/VRR transition check. **Physical
+acceptance remains unperformed**, not an unimplemented fix. Two size-change
+accounting warnings remain a separate extension/native-lifecycle issue; they
+are not evidence that this kernel correction failed or fixed that issue.
+See the [software handoff](SOFTWARE_DELIVERY.md) for retained versus new evidence.
+
 ## The symptom
 
 GNOME Shell logs `Page flip failed: drmModeAtomicCommit: Invalid argument`

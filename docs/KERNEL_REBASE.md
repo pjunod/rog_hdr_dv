@@ -9,6 +9,14 @@ complete packages, packaged CVE proof and five NVIDIA modules passed.
 Signing, installation and postboot security/driver verification passed.
 Physical HDR/VRR transition and optical acceptance remain pending. **Written:** 2026-10-29.
 
+**November 2 reconciliation:** the coordinator's read-only inventory still
+reports nativehdr3 running; no new kernel installation is needed. APT userspace
+has independently moved to nativehdr13. Neither those package versions nor
+the absence of page-flip errors in a bounded boot-log query establishes a new
+controlled VRR/HDR/resume pass. The [software handoff](SOFTWARE_DELIVERY.md)
+binds current packages and signed-versus-unsigned recovery artifacts without
+repeating the completed kernel qualification below.
+
 ## Release and security evidence
 
 The selected base is Ubuntu’s authenticated `linux-source-7.3.0` package

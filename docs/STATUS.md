@@ -1,8 +1,9 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-10-29 (America/New_York) · **Current:** the HDR desktop
-packages are in an APT repository that follows Ubuntu's updates; Dolby Vision
-plays through plurx Player with the closed-form display mapping.
+**Updated:** 2026-11-02 (America/New_York) · **Current:** APT `nativehdr13`
+userspace and signed kernel `nativehdr3` are installed. External plurx Player
+owns the playback product. The [software install/rollback handoff](SOFTWARE_DELIVERY.md)
+records exact package hashes and remaining acceptance; no reinstall is needed.
 
 ## Kernel security rebase — 2026-10-29
 
@@ -34,30 +35,33 @@ the old custom and stock kernels remain available for recovery. The
 [kernel rebase ledger](KERNEL_REBASE.md) separates these checks from pending
 physical HDR/VRR transition and optical acceptance.
 
-## Where it stands (2026-10-27)
+## Where it stands (2026-11-02)
 
 | Area | State | Evidence |
 |---|---|---|
-| Desktop (Mutter `nativehdr10`, libdisplay-info `~hdr9`) | Installed on the laptop since 2026-10-13, running | `gdctl show` reports `bt2100`, target 0.0004–616 cd/m², firmware primaries |
-| Ubuntu packages | Mutter `51.0-1ubuntu3+nativehdr13` and libdisplay-info `0.3.0-1+nativehdr13` built from Ubuntu's current source and published | [APT repository](UBUNTU_APT_REPOSITORY.md); exported symbols identical to the installed builds (1,039 and 93) |
+| Desktop | APT Mutter `51.0-1ubuntu3+nativehdr13`, libdisplay-info `0.3.0-1+nativehdr13` installed (library amd64+i386) | Coordinator read-only inventory and package verification; current effective target about 0.0005–616 cd/m², firmware-declared; no override, Night Light off |
+| Ubuntu packages | Current registry versions equal the installed candidates at priority 1001 | All 15 registry binaries size/hash-checked; changelogs name `479d61de3f78`, unchanged Ubuntu series on current main. [Receipt](../evidence/software-delivery-20261102.json); not a new build/test/transaction |
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
-| Dolby Vision playback | plurx Player 0.3.2 on the laptop | A Profile 7 FEL title played 2026-10-27 at 616 nits, P3, enhancement layer composed |
+| Dolby Vision playback | External plurx Player 0.4.1 installed | Exact package version in [handoff](SOFTWARE_DELIVERY.md); October 27 P7 FEL observation is retained history, not a new player acceptance |
+| Tiling animation | Stock `gnome-shell-ubuntu-extensions 51.26.10.6ubuntu` | Current caller hashes match October 15 stock source, not the separately qualified correction; two current-boot accounting warnings remain |
 
 **Remaining.**
 
-- Install the APT repository's builds on the laptop (`setup-apt.sh`, then a
-  new login) and on the second test machine.
-- The owner's visual checks: Night Light and overrides in HDR, transitions,
-  resume, and plurx Player's acceptance (M6).
-- `Page flip failed: drmModeAtomicCommit: Invalid argument` when a video
-  goes full screen, so variable refresh never engages for video. Cause
-  (2026-10-27, `drm.debug=0x14` on 7.3.0-rc5, same code in Linux master):
-  Mutter's flip turns VRR on; i915 then switches PSR off (`_psr_compute_config`:
-  PSR is not used with VRR), which drops the set-context-latency workaround
-  for display 13/14 (`Wa_14015401596`, SCL 1 only while PSR is on) to 0.
-  Vblank start moves from 1601 to 1600, which is not fast-settable, so the
-  commit needs a full modeset that a page flip may not request. The fix
-  belongs in the kernel: keep that SCL while VRR is merely toggled.
+- APT setup/qualification on the second test machine; ROG already has the builds.
+- Controlled post-APT/nativehdr3 HDR/SDR/fullscreen/VRR and resume acceptance,
+  relevant Night Light/override visual checks, and plurx Player product acceptance.
+  **Do not mark October 15 observations outstanding:** the owner accepted the
+  warm roundtrip, decorations, SDR video and HDR10 stability; persistence passed
+  across logout/login. These remain bounded prior-stack results, not new-stack passes.
+- Physical verification of the [i915 VRR fix](I915_VRR_FASTSET.md), already
+  implemented and running in nativehdr3. The November 2 bounded boot-log query
+  had zero matching page-flip errors but no controlled stimulus; configured
+  `+vrr` and absence of errors do not prove playback VRR acceptance.
+- Integrate/package the independently qualified animation correction in its
+  separate coordinator-owned lane (`t_44f637a7`); retain the 35 offline passes
+  at `4f71e166`, not a deployment claim. Do not repeat or blindly reapply it.
+- Recover/retain original current APT source archives and build records durably;
+  the binary-only registry and changelog binding do not supply those artifacts.
 - Upstream submission of `patches/mutter` and `patches/libdisplay-info`
   (the owner's identity and decision).
 - Panel measurement and calibration (needs a colourimeter); the Windows
