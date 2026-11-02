@@ -283,19 +283,26 @@ an automatic public GitHub artifact upload. `publish.sh` still uploads only
 `.deb` files. This lifecycle repair **does not recover nativehdr13 originals**
 and does not force a rebuild of published versions. For those existing records:
 
-1. The coordinator's November 2 Forgejo Actions artifact listing was empty;
-   that is not global absence proof. Target its retained run 6106/job 59118
-   and run 6383/job 61572 metadata/logs, via
+1. The coordinator's November 2 Forgejo Actions artifact listing was empty.
+   Retrieved logs for run 6106/job 59118 and run 6383/job 61572 both show
+   already-published no-ops, not the original builds. The logs and their hashes
+   are retained privately; no new source-package recovery is claimed.
+2. The coordinator's bounded filename search included hidden and ignored files
+   in owned HDR collaboration and legacy owned team workspaces, excluding
+   `.git`, `node_modules`, `target`, `.venv` and `vendor`. It found no matching
+   nativehdr13 `.dsc`, `.buildinfo` or `.changes` files. Other machines and
+   backups were not searched: this is not global loss proof.
+3. Remaining recovery is coordinator-owned: locate the earlier original build
+   invocation and then-resolved legacy `RUNNER_TEMP/ubuntu-packages` location
+   using existing private runner/job records. The Forgejo read-only routes are
    `GET /api/v1/repos/pjunod/rog_hdr_dv/actions/runs/{run_id}/jobs` and
-   `GET /api/v1/repos/pjunod/rog_hdr_dv/actions/jobs/{job_id}/logs`, to establish
-   which invocation produced the current versions and the then-resolved
-   `RUNNER_TEMP/ubuntu-packages` path. Logs alone are not source archives.
-2. Through coordinator-authorized read-only runner inspection, check that exact
-   legacy output path and any configured private runner backup/snapshot, bounded
+   `GET /api/v1/repos/pjunod/rog_hdr_dv/actions/jobs/{job_id}/logs`.
+   Through authorized read-only runner inspection, check that exact legacy
+   output path and configured private runner backup/snapshot, bounded
    to `.dsc` plus listed archives, `.buildinfo`, `.changes`, binaries and logs
    for the two exact nativehdr13 versions above. Do not reset the warm tree,
    launch builds or dispatch workflows to fill gaps.
-3. If recovered, retain the original bytes privately, verify their source and
+4. If recovered, retain the original bytes privately, verify their source and
    binary checksum closure, and record provenance separately. If inaccessible
    or absent at those locations, report those exact limits, not global loss.
 
