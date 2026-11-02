@@ -1,0 +1,168 @@
+{
+  "schema": 1,
+  "task_id": "t_5bfea0b5",
+  "scope": "actual-source helper/caller/native-method host-API-double qualification, not GNOME/Clutter runtime",
+  "outcome": "35 distinct scoped cases have valid passing results: 26 retained initial passes plus 9 failed-only retry passes; final independent evidence review pending",
+  "source_review": {
+    "reviewer": "hdr-astra",
+    "round": 4,
+    "sha256": "fee353ace5da8ef3922dbea9c3516371e0a51a767427d28172bb194528fcb714"
+  },
+  "source_base": "62b43228a8780bd435ec7a94892434e4950dcd41",
+  "source_approved_commit": "56448103ba956fb57c59abe40c80b9b9abdf01c2",
+  "source_executed_replay_commit": "27ffbac3f047eca35bf236663683cc031c2c43fc",
+  "source_tree": "03613a8236b6f200836df63acafa1e2359d94cb6",
+  "patch_sha256": {
+    "0001-animation-own-synthetic-tiling-transitions-outside-S.patch": "2ba812231496c4c1428b529a9777c222e21ca3a57e35442452f891db20392abd",
+    "0002-animation-handle-owned-ease-cancellation-promises-on.patch": "f3a3bb408497c595dea361f1ee458dbab1db04cbfa7b029400010762ae2af6b3",
+    "0003-animation-isolate-overlay-rendering-and-expire-uncor.patch": "ff4ae24cc1efbd253a31d28c613a5551fe2530861dd205e5ff2aa6d47bffc07e",
+    "0004-animation-retain-finite-visual-intent-for-delayed-cl.patch": "68ecc0623977a14c0efe3523c7333babc1ee5dcd32aa625016215686539f67db",
+    "0005-animation-snapshot-getter-backed-requested-rectangle.patch": "2de844f95bc767ef8517a51f8ea1aa1738610a301d48ed69e321d1b39397f710"
+  },
+  "initial_batch": {
+    "node_version": "v26.8.1",
+    "test_sha256": "09a2972de6307aa4fa1ed7420c45367b272e7060b9af20211e1e5f013566f1f6",
+    "shell_sha256": "b7a7e6ea249f77496f5b84f76d1b3ee7f14f2c3d659392513998b3c46827ae47",
+    "started_utc": "2026-10-15T19:33:28.325257+00:00",
+    "finished_utc": "2026-10-15T19:33:28.513711+00:00",
+    "exit_status": 1,
+    "stdout_sha256": "4e564e52e4584147d787c2bcc151a8f291f94ef8ce39e0f7a124ba08905ba14c",
+    "stderr_sha256": "19626f4f8a97f87442206c5c13822d70f6ed9a844762d320954d7dd2d5d0722e",
+    "passed_cases": [
+      "actual untile path: zero native completions and no Shell memberships",
+      "actual center path: zero native completions and no Shell memberships",
+      "actual Shell native start / size-changed / completion is preserved",
+      "actual Shell pending native cancellation completes exactly once",
+      "native resize cancels synthetic pending or active records, then completes once",
+      "Shell-first native MAXIMIZE capture sees pristine live actor during synthetic effect",
+      "Shell-first native FULLSCREEN capture sees pristine live actor during synthetic effect",
+      "rapid overlapping preparation and stale stopped callbacks cannot clear a new record",
+      "kill / minimize / map / unmanage / actor destruction clean pending and active effects",
+      "actual delayed size-only untile: finite motion with matching geometry",
+      "actual delayed size-only untile: finite motion with constrained geometry",
+      "actual delayed size-only untile: finite motion with refused geometry",
+      "actual delayed size-only untile: finite motion with after-completion geometry",
+      "provisional visual destination copies requested geometry and keeps finite motion",
+      "active provisional A superseded by B cannot survive differing late A geometry",
+      "async A/B supersession never binds B snapshot to A or retains stale geometry",
+      "active geometry revisions cancel overlays, including late size after position-only motion",
+      "refused resize followed by ordinary move, resize or public grab has no stale animation",
+      "refused resize followed by unrelated programmatic resize after redraw has no stale snapshot",
+      "public grab cancels active overlay before interactive geometry changes",
+      "constrained dimensions animate actual geometry, duplicate signals do not cancel",
+      "no-op move and asynchronous refusal retain no frozen actor",
+      "synchronous ease completion and reduced motion are balanced",
+      "foreign transitions survive synthetic preparation and cleanup",
+      "extension disable releases pending and active animations without native completion",
+      "Shell 51 ease cancellation is consumed but unexpected errors are reported"
+    ],
+    "failed_cases": [
+      "actual tile path: zero native completions and no Shell memberships",
+      "actual tile then default untile with real Rect: synchronous movement",
+      "actual tile then default untile with real Rect: delayed same-position size",
+      "actual rapid retile skips redundant animation but cancels previous effect",
+      "actual delayed size-only tile: finite motion with matching geometry",
+      "actual delayed size-only tile: finite motion with constrained geometry",
+      "actual delayed size-only tile: finite motion with refused geometry",
+      "actual delayed size-only tile: finite motion with after-completion geometry",
+      "actual tile to untile before async A/B replies does not prepare an ambiguous B"
+    ],
+    "reported_summary": {
+      "cases": 35,
+      "failures": 9
+    },
+    "source_status_before": "",
+    "source_status_after": "",
+    "public_receipt": "evidence/tiling-animation-qualification-initial.json",
+    "public_receipt_sha256": "a4217555052b63379402b7c068207adb92967091d966011d9f57d8869ee7292b",
+    "private_receipt_sha256": "40fea4d34655092497601a6a6f8ac94bbe851e4a2a337f572daddf26a32e0aac",
+    "failure_diagnosis": "All nine failures stop before tile preparation in actual Rect.equal: Mtk.Rectangle.equal was absent from the host double"
+  },
+  "failed_only_retry": {
+    "node_version": "v26.8.1",
+    "test_sha256": "679ff51cbef6794e8191b78b0d553ef6adcc06cffe8f74cc0a2089408c451275",
+    "shell_sha256": "b7a7e6ea249f77496f5b84f76d1b3ee7f14f2c3d659392513998b3c46827ae47",
+    "started_utc": "2026-10-15T19:41:26.932475+00:00",
+    "finished_utc": "2026-10-15T19:41:27.041699+00:00",
+    "exit_status": 0,
+    "stdout_sha256": "502b5360d78d204b39cb88539731b76f809cd9024172b15118bb4ae875d40e92",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "passed_cases": [
+      "actual tile path: zero native completions and no Shell memberships",
+      "actual tile then default untile with real Rect: synchronous movement",
+      "actual tile then default untile with real Rect: delayed same-position size",
+      "actual rapid retile skips redundant animation but cancels previous effect",
+      "actual delayed size-only tile: finite motion with matching geometry",
+      "actual delayed size-only tile: finite motion with constrained geometry",
+      "actual delayed size-only tile: finite motion with refused geometry",
+      "actual delayed size-only tile: finite motion with after-completion geometry",
+      "actual tile to untile before async A/B replies does not prepare an ambiguous B"
+    ],
+    "failed_cases": [],
+    "reported_summary": {
+      "cases": 9,
+      "failures": 0,
+      "skipped": 26
+    },
+    "source_status_before": "",
+    "source_status_after": "",
+    "candidate_commit": "744d13ccde2e65dc746eb0d6240322e6a46af755",
+    "candidate_tree": "ef2be1298fa0c1d22d17573b5f3d770beadadbec",
+    "selected_cases": [
+      "actual tile path: zero native completions and no Shell memberships",
+      "actual tile then default untile with real Rect: synchronous movement",
+      "actual tile then default untile with real Rect: delayed same-position size",
+      "actual rapid retile skips redundant animation but cancels previous effect",
+      "actual delayed size-only tile: finite motion with matching geometry",
+      "actual delayed size-only tile: finite motion with constrained geometry",
+      "actual delayed size-only tile: finite motion with refused geometry",
+      "actual delayed size-only tile: finite motion with after-completion geometry",
+      "actual tile to untile before async A/B replies does not prepare an ambiguous B"
+    ],
+    "harness_review": {
+      "reviewer": "hdr-astra",
+      "sha256": "d5ed7a6d979c6d09f4f92a91e94ad66bed2240a604df52b3aeca1382c5bd81cc"
+    },
+    "command": [
+      "node",
+      "tests/tiling-animation-ownership.mjs",
+      "EXTENSION_ROOT",
+      "EXACT_SHELL_FILE",
+      "actual tile path: zero native completions and no Shell memberships",
+      "actual tile then default untile with real Rect: synchronous movement",
+      "actual tile then default untile with real Rect: delayed same-position size",
+      "actual rapid retile skips redundant animation but cancels previous effect",
+      "actual delayed size-only tile: finite motion with matching geometry",
+      "actual delayed size-only tile: finite motion with constrained geometry",
+      "actual delayed size-only tile: finite motion with refused geometry",
+      "actual delayed size-only tile: finite motion with after-completion geometry",
+      "actual tile to untile before async A/B replies does not prepare an ambiguous B"
+    ],
+    "private_receipt_sha256": "a34b2f4dd2735fc8b8e0b36db49d63649ca73dbf4a0bd707e8946b9216a66038"
+  },
+  "combined": {
+    "distinct_cases_with_valid_passes": 35,
+    "retained_initial_passes": 26,
+    "retried_cases": 9,
+    "retry_passes": 9,
+    "remaining_failures": 0,
+    "successful_behavioral_cases_rerun": 0,
+    "validity_basis": "Independent hdr-astra review confirms added four-coordinate equality is not called by the 26 retained passing paths; no production/test-body/assertion changes; exact case selection only",
+    "production_changes_since_source_approval": false
+  },
+  "integrity": "Inherited PASS169 patches/7series reused during development; one invalidated repository-integrity refresh follows this final tracked documentation/receipt candidate, retained privately with exact checked commit/tree",
+  "private_raw_evidence": "Task-owned evidence/{inputs.json,receipt.json,stdout.txt,stderr.txt} and evidence/retry-r1/{inputs.json,receipt.json,stdout.txt,stderr.txt}; exact argv and review artifacts remain private, not published",
+  "limitations": [
+    "Host-API-double execution of actual source/native methods is not GNOME/Clutter runtime qualification or live smoothness acceptance",
+    "Overlay-only finite visual intent is accepted source architecture, not identical former visual behavior; no configure acknowledgement inferred",
+    "Historical individual warning trigger unproven; separate scanout EINVAL unresolved",
+    "No package, rollback binary kit, installation, device, session, push, PR publication or merge action",
+    "No optical, calibrated accuracy or full HDR/Dolby acceptance claim"
+  ],
+  "remaining": [
+    "Independent final evidence review by hdr-astra without behavioral reruns",
+    "Coordinator-owned serial newer-main registry/status integration and substantial PR, no held PR16 ancestry",
+    "Distinct recoverable Ubuntu extension package and separately coordinated live acceptance",
+    "Existing hardware/OEM/optical and full HDR/Dolby acceptance lanes"
+  ]
+}

@@ -1,0 +1,74 @@
+From 268b3c7fb450e9c187108e7190c1e5492404402c Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 15:16:59 -0400
+Subject: [PATCH] animation: retain finite visual intent for delayed client
+ sizes
+
+---
+ .../src/extension/windowAnimation.js          | 34 ++++++++++++-------
+ 1 file changed, 22 insertions(+), 12 deletions(-)
+
+diff --git a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+index 03208c3..b2098d9 100644
+--- a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
++++ b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+@@ -94,13 +94,21 @@ export class WindowAnimations {
+ 
+     _geometryChanged(effect, resized) {
+         const rect = effect.window.get_frame_rect();
+-        const previous = effect.target ?? effect.oldRect;
++        const previous = effect.observedRect ?? effect.oldRect;
+         if (['x', 'y', 'width', 'height'].every(key => rect[key] === previous[key]))
+             return;
+-        // An active overlay is valid only for its actual destination frame.
+-        // A later configure, move or resize must not leave stale visual state.
+-        if (effect.started || (!resized &&
+-                (rect.x !== effect.requestedRect.x || rect.y !== effect.requestedRect.y))) {
++        // A matching frame can keep the finite visual effect. This comparison
++        // is not an acknowledgement: public geometry carries no request serial.
++        // A different actual destination invalidates the overlay immediately.
++        if (effect.started) {
++            if (['x', 'y', 'width', 'height'].every(key => rect[key] === effect.target[key]))
++                effect.observedRect = rect;
++            else
++                this.cancel(effect.actor);
++            return;
++        }
++        if (!resized &&
++                (rect.x !== effect.requestedRect.x || rect.y !== effect.requestedRect.y)) {
+             this.cancel(effect.actor);
+             return;
+         }
+@@ -121,13 +129,14 @@ export class WindowAnimations {
+         const { actor, window, clone, oldRect } = effect;
+         if (this._effects.get(actor) !== effect)
+             return;
+-        const target = window.get_frame_rect();
+-        // Public geometry signals cannot correlate a delayed configure with
+-        // this operation. Use only geometry present at this first redraw;
+-        // never retain a stale snapshot waiting for an arbitrary future resize.
+-        if (target.width <= 0 || target.height <= 0 ||
+-                (target.x === oldRect.x && target.y === oldRect.y &&
+-                 target.width === oldRect.width && target.height === oldRect.height)) {
++        const actual = window.get_frame_rect();
++        // Animate finite visual intent even if a Wayland size has not arrived.
++        // Prefer an already changed (possibly constrained) actual frame; the
++        // requested fallback is provisional, not proof a configure succeeded.
++        // Completion disposes of the snapshot even if the client refuses it.
++        const unchanged = ['x', 'y', 'width', 'height'].every(key => actual[key] === oldRect[key]);
++        const target = unchanged ? { ...effect.requestedRect } : actual;
++        if (target.width <= 0 || target.height <= 0) {
+             this.cancel(actor);
+             return;
+         }
+@@ -144,6 +153,7 @@ export class WindowAnimations {
+         Main.uiGroup.add_child(clone);
+         effect.started = true;
+         effect.target = target;
++        effect.observedRect = actual;
+         // Animate the old snapshot only. Shell's earlier native size-change
+         // handler captures the live actor BEFORE our cancellation listener.
+         // That capture must see an entirely untouched live actor.
+-- 
+2.54.0 (Apple Git-157)
+

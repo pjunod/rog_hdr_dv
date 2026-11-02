@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "scope": "source revision after adversarial changes requested; not behavioral qualification",
+  "source_commit": "56448103ba956fb57c59abe40c80b9b9abdf01c2",
+  "source_tree": "03613a8236b6f200836df63acafa1e2359d94cb6",
+  "supersedes_candidate": "268b3c7fb450e9c187108e7190c1e5492404402c",
+  "source_replay_receipt": "tiling-animation-source-preparation.json",
+  "test_definitions": "tests/tiling-animation-ownership.mjs",
+  "test_definitions_sha256": "09a2972de6307aa4fa1ed7420c45367b272e7060b9af20211e1e5f013566f1f6",
+  "test_syntax": "node --check: exit 0",
+  "review": {
+    "reviewer": "hdr-astra (quota fallback, not hdr-fable approval)",
+    "first_verdict": "changes requested",
+    "R1_revision": "Only the owned old-content overlay moves/scales/fades. No live actor writes, transitions or freezes; Shell-first capture observes pristine live state.",
+    "round_2_verdict": "R1 closed; overlay-only rendering accepted; delayed size-only motion required correction R3.",
+    "R2_revision": "No indefinite resize acknowledgement waiting. Differing later actual geometry and public user grabs cancel. Ambiguous pending A/B replacement is declined.",
+    "R3_revision": "First redraw uses changed actual geometry, otherwise a copied provisional requested destination. Finite overlay motion starts immediately even for delayed size-only operations and refusal. Matching late geometry can continue; duplicate old-frame signals are ignored; differing geometry cancels. No configure acknowledgement is inferred.",
+    "round_3_verdict": "R1 closed; R2 finite lifecycle retained and R3 provisional visual-intent architecture accepted; R4 found actual default-untile Rect coordinates were omitted by enumerable spread.",
+    "R4_revision": "Snapshot explicit getter values x/y/width/height at prepare boundary. Add actual tile-to-completion then default-untile definitions with real tile-created Rect, synchronous movement and delayed same-position size, mutation independence, finite targets, cleanup and no native bookkeeping changes. Existing restoreFullPos:false cases retained.",
+    "decision_required": "Independent source re-review of R4 and retained R1/R2/R3 invariants before the one affected batch. Source approval has not been granted."
+  },
+  "repository_integrity": {
+    "command": "python3 scripts/check_repository.py",
+    "exit": 0,
+    "output": "PASS: 169 patches, 7 series, documentation links",
+    "reason_for_new_check": "New fifth patch, updated series, checksums, pins and topical documentation invalidate the previous integrity result. Earlier four patch bytes remain unchanged."
+  },
+  "development_syntax_repair": "Initial R3 edit introduced one extra closing parenthesis, caught by automatic syntax check; corrected immediately before source commit. Fresh exported replay syntax and explicit test-definition syntax passed. No behavioral probe executed.",
+  "diff_whitespace": {
+    "delivery_non_patch_files": "git diff --check excluding patches/**: exit 0",
+    "actual_source": "git diff from pinned v56 to candidate HEAD --check: exit 0",
+    "mail_patch_note": "Canonical git format-patch context prefixes and mail trailers are not delivery-source whitespace; patch bytes preserved, actual applied source passes."
+  },
+  "behavioral_tests_executed": 0,
+  "review_approved": false,
+  "package_built": false,
+  "deployment_or_live_actions": 0,
+  "remaining": [
+    "Independent adversarial source re-review of getter-backed Rect value snapshots and any fixes",
+    "One affected actual-source regression batch after source approval",
+    "Serial main integration of additive registry/status hunks",
+    "Distinct recoverable extension package and coordinated live acceptance",
+    "Individual historical warning attribution remains unproven",
+    "Separate atomic EINVAL and broader hardware/Dolby requirements remain open"
+  ]
+}

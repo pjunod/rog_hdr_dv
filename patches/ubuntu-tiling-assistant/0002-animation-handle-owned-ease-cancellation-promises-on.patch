@@ -1,0 +1,59 @@
+From fa02ccc68b830f651e174dacd95859ebd306928d Mon Sep 17 00:00:00 2001
+From: HDR Builder <hdr-builder@users.noreply.github.com>
+Date: Thu, 15 Oct 2026 14:36:27 -0400
+Subject: [PATCH] animation: handle owned ease cancellation promises on Shell
+ 51
+
+The exact Ubuntu 51.0-2ubuntu3 Shell environment returns a Promise from ease and rejects it for interrupted transitions. Consume only the expected Gio cancellation result of our own eases; unexpected errors still reach logError. This does not intercept or silence native compositor diagnostics.
+---
+ .../src/extension/windowAnimation.js             | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+index a5f9327..32c2ee4 100644
+--- a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
++++ b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ // Copyright 2026 HDR contributors
+-import { Clutter, Meta, St } from '../dependencies/gi.js';
++import { Clutter, Gio, Meta, St } from '../dependencies/gi.js';
+ import { Main } from '../dependencies/shell.js';
+ 
+ const DURATION = 250;
+@@ -140,13 +140,13 @@ export class WindowAnimations {
+         actor.scale_x = 1 / scaleX;
+         actor.scale_y = 1 / scaleY;
+         try {
+-            clone.ease({
++            this._ease(clone, {
+                 x: useMotion ? target.x : oldRect.x,
+                 y: useMotion ? target.y : oldRect.y,
+                 scale_x: scaleX, scale_y: scaleY, opacity: 0,
+                 duration: DURATION, mode: Clutter.AnimationMode.EASE_OUT_QUAD
+             });
+-            actor.ease({
++            this._ease(actor, {
+                 scale_x: 1, scale_y: 1, translation_x: 0, translation_y: 0,
+                 duration: DURATION, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                 onStopped: () => {
+@@ -168,6 +168,16 @@ export class WindowAnimations {
+         }
+     }
+ 
++    _ease(actor, params) {
++        // Shell 51 ease() returns a rejecting Promise when a transition stops.
++        // Cancellation is an expected outcome of our lifecycle, not a fault.
++        // Unexpected errors still reach the normal extension error reporter.
++        actor.ease(params).catch(error => {
++            if (!error.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
++                logError(error);
++        });
++    }
++
+     cancel(actor) {
+         const effect = this._effects.get(actor);
+         if (!effect)
+-- 
+2.54.0 (Apple Git-157)
+

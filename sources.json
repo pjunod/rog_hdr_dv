@@ -3,6 +3,58 @@
   "imported": "2026-10-08",
   "series": [
     {
+      "component": "ubuntu-tiling-assistant",
+      "upstream": "https://github.com/ubuntu/Tiling-Assistant.git",
+      "base_tag": "v56",
+      "base_commit": "62b43228a8780bd435ec7a94892434e4950dcd41",
+      "base_tree": "30a323c2894b32fc2c4405bdb419493e795423b7",
+      "candidate_commit": "56448103ba956fb57c59abe40c80b9b9abdf01c2",
+      "candidate_tree": "03613a8236b6f200836df63acafa1e2359d94cb6",
+      "patch_count": 5,
+      "patch_order": [
+        "0001-animation-own-synthetic-tiling-transitions-outside-S.patch",
+        "0002-animation-handle-owned-ease-cancellation-promises-on.patch",
+        "0003-animation-isolate-overlay-rendering-and-expire-uncor.patch",
+        "0004-animation-retain-finite-visual-intent-for-delayed-cl.patch",
+        "0005-animation-snapshot-getter-backed-requested-rectangle.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-packaged-upstream-git",
+        "package": "gnome-shell-ubuntu-extensions",
+        "version": "51.26.10.6ubuntu",
+        "package_page": "https://launchpad.net/ubuntu/+source/gnome-shell-ubuntu-extensions/51.26.10.6ubuntu",
+        "packaging_subdirectory": "subprojects/tiling-assistant",
+        "source_binding": "Package subprojects/tiling-assistant.wrap pins v56 and x_revision_sha 62b43228a8780bd435ec7a94892434e4950dcd41; both changed installed call-site files match that Git base byte-for-byte. Patch paths are relative to the upstream subproject, not the enclosing source package.",
+        "authentication": "HTTPS acquisition and SHA256 comparison with the dsc; the dsc OpenPGP signature was not independently verified.",
+        "artifacts": [
+          {
+            "file": "gnome-shell-ubuntu-extensions_51.26.10.6ubuntu.dsc",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gnome-shell-ubuntu-extensions/gnome-shell-ubuntu-extensions_51.26.10.6ubuntu.dsc",
+            "sha256": "88ea7ffb067cfbe771893d0da27a7589e2ce4bd92ea8f3a181aa8109a6780554"
+          },
+          {
+            "file": "gnome-shell-ubuntu-extensions_51.26.10.6ubuntu.tar.xz",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gnome-shell-ubuntu-extensions/gnome-shell-ubuntu-extensions_51.26.10.6ubuntu.tar.xz",
+            "sha256": "0149e5120d077b27c205289f1297425bd04380693d13ae0fcc3a801c15fac9a9"
+          }
+        ]
+      },
+      "installed_source_sha256": {
+        "src/extension/tilingWindowManager.js": "50fad3570cab25de683208155ead24701526b9a3099bd5aa44937e08227bdda5",
+        "src/extension/keybindingHandler.js": "03753ea2bc69ffa296b3aff5b3f075a0738765baf6f6f28b20b27b919fabe1cf"
+      },
+      "shell_api_reference": {
+        "package": "gnome-shell",
+        "version": "51.0-2ubuntu3",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gnome-shell/gnome-shell_51.0-2ubuntu3_amd64.deb",
+        "sha256": "12ff9581dc4e44cb3e55dc16ffd83c52b7dddcb6c5edfa063c7706813ab325f2",
+        "extraction": "Static ELF .gresource.shell_js_resources section extraction; gresource extract. No target code executed.",
+        "windowManager_js_sha256": "b7a7e6ea249f77496f5b84f76d1b3ee7f14f2c3d659392513998b3c46827ae47",
+        "environment_js_sha256": "357e292f3da019d603f4c52d0c2a19fcce0a15e82d74dd6e726b097a37977b30"
+      },
+      "candidate_status": "Unchanged five-patch source and 35 distinct valid offline host-double passes retained from independently approved 4f71e166. Recoverable Ubuntu candidate 51.26.10.6ubuntu+nativehdr2 built with authenticated stock rollback. Independent corrected-integration review approved; all 12 packaging guards passed on 6206b7c in GitHub run41514650977. Forgejo PR14 records landing. Not installed or live-qualified; historical warning trigger unproven. See docs/TILING_ANIMATION_OWNERSHIP.md."
+    },
+    {
       "component": "ubuntu-libdisplay-info",
       "base_commit": "fc100604841ba8f8a9f88ea4ebfb6a522a9a73fb",
       "candidate_commit": "b25ae1cbe5a98d433450be37d00d69a9979d8ebd",

@@ -14,7 +14,7 @@ experimental player bundles are not the current product install path.
 | libdisplay-info | APT `0.3.0-1+nativehdr13`, installed as amd64 and i386 | Ubuntu `0.3.0-1` plus 23 patches; changelog names the same repository commit; retain matching versions on both architectures |
 | Kernel | Signed `7.3.0-nativehdr3`, installed and running | Ubuntu `7.3.0-10.10` plus five display patches; October 29 build-ID, CVE, Secure Boot and driver checks retained, not repeated |
 | Dolby Vision player | External plurx Player, installed version `0.4.1+lp7.387.0.mpv0.41.0+git20261026.e59d90c-1` | Product source, packaging, upgrades and acceptance belong to plurx; not rebuilt or qualified by this documentation change |
-| Tiling Assistant | Ubuntu extension package `51.26.10.6ubuntu` installed | Current caller hashes match October 15 stock source, not the reviewed correction; separate integration/package work remains below |
+| Tiling Assistant | Stock `51.26.10.6ubuntu` installed; recoverable candidate `51.26.10.6ubuntu+nativehdr2` built, Forgejo PR14 | Deb `43d4b3e1…`, authenticated stock rollback retained and 35 inherited offline passes; [package handoff](TILING_ANIMATION_OWNERSHIP.md). Candidate not installed/live-qualified; historical warning trigger unproven |
 
 November 2 coordinator read-only receipts show the APT installed and candidate
 versions agree at priority 1001. Package verification for the inspected Mutter,
@@ -143,11 +143,16 @@ No live install, logout, reboot, display or audio change occurred in this audit.
   This applies to unpublished extension tree `03613a8236b6f200836df63acafa1e2359d94cb6`;
   neither identifier is a resolvable public source pin in this repository.
   It does not apply to Mutter or the current installed extension by assumption.
-  Main's current APT recipes package only Mutter/libdisplay-info and carry no extension
-  correction. The coordinator confirmed both installed caller hashes match
-  October 15 stock source. Separate card `t_44f637a7` owns source integration
-  and a separately versioned recoverable extension package; do not blindly
-  reapply old patches or rerun the 35 cases.
+  The ordinary APT recipes still package only Mutter/libdisplay-info; the
+  separate extension helper now produces a recoverable candidate
+  `51.26.10.6ubuntu+nativehdr2` (deb SHA256
+  `43d4b3e1b015ede3aa14757273b5165144638c0d01ac77d6c5694e0ca93d5e74`).
+  Forgejo PR14 (`t_44f637a7`) retains its authenticated stock rollback and
+  ordinary source/build records. Independent reviews approved the corrected
+  integration; all twelve packaging guards passed on `6206b7c` in
+  [the fast lane](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977). Both installed callers still match October 15
+  stock source: no target simulation/installation/live qualification is claimed.
+  Do not blindly reapply old patches or rerun the 35 cases.
   The two warnings do not identify their exact caller without further evidence.
 - **Still unperformed for the new stack:** broader HDR/SDR transitions,
   brightness/DPMS, suspend/resume, and Night Light/override visual checks after the

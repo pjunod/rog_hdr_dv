@@ -45,7 +45,7 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
 | Dolby Vision playback | External plurx Player 0.4.1 installed | Exact package version in [handoff](SOFTWARE_DELIVERY.md); October 27 P7 FEL observation is retained history, not a new player acceptance |
 | Fullscreen/VRR | Bounded owner-attended pass on nativehdr3/nativehdr13 | November 2 silent HDR 24 fps stock-mpv fixture: active i915 CRTC VRR 0 → 1 → 0, zero page-flip errors, owner saw normal output; [scope and retained receipt](SOFTWARE_DELIVERY.md#acceptance-ledger-retained-observations-versus-new-requirements) |
-| Tiling animation | Stock `gnome-shell-ubuntu-extensions 51.26.10.6ubuntu` | Current caller hashes match October 15 stock source, not the separately qualified correction; two current-boot accounting warnings remain |
+| Tiling animation | Stock `51.26.10.6ubuntu` remains installed; recoverable `51.26.10.6ubuntu+nativehdr2` candidate built in Forgejo PR14 | Candidate deb `43d4b3e1…`, authenticated stock rollback retained, 35 inherited offline passes; [handoff](TILING_ANIMATION_OWNERSHIP.md). Not installed/live-qualified; two observed warnings have no proven trigger |
 
 **Remaining.**
 
@@ -58,10 +58,11 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
   **Do not mark October 15 observations outstanding:** the owner accepted the
   warm roundtrip, decorations, SDR video and HDR10 stability; persistence passed
   across logout/login. These remain bounded prior-stack results, not new-stack passes.
-- Integrate/package the independently qualified animation correction in its
-  separate coordinator-owned lane (`t_44f637a7`); retain the 35 offline passes
-  at private/unpublished delivery `4f71e166`, not a public source pin or
-  deployment claim. Do not repeat or blindly reapply it.
+- Coordinate the separate target simulation/install/rollback/visible acceptance
+  window for the animation package. Independent review and all twelve packaging
+  guards passed in [the fast lane](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977).
+  Retain its 35 inherited offline passes without rerunning them or treating them
+  as deployment evidence.
 - Recover original current APT source archives/build records from retained
   runner output or backups; bounded searches so far have not found them. New retention does not recover those originals; the binary-only
   registry and changelog binding do not supply them.
