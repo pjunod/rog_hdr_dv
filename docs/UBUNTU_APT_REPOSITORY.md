@@ -53,6 +53,19 @@ scripts/check_repository.py --lock-ubuntu-series   # refuses until REVISION is r
 
 ## Installing on a machine
 
+**November 2:** the ROG already has nativehdr13 from this repository, including
+both libdisplay-info architectures; do not reinstall it to finish paperwork.
+See the [software handoff](SOFTWARE_DELIVERY.md) for exact hashes and current
+versus retained acceptance. The instructions below are for a new setup or a
+deliberate later change, not permission to interrupt an active desktop.
+
+Before running the installer, preserve the complete current package set,
+holds, auto/manual marks, APT configuration and display settings in durable
+private storage. Review `apt-cache policy` and simulate the exact target
+package transaction with `apt-get -s install` first. Keep a verified independent
+recovery route and coordinate logout/login; do not run the setup script as a
+diagnostic. The kernel and plurx Player are separate installations.
+
 ```bash
 git clone http://forge.lan:3000/pjunod/rog_hdr_dv.git   # or any checkout
 sudo rog_hdr_dv/packaging/ubuntu/setup-apt.sh         # key, source, pin, upgrade
@@ -66,6 +79,14 @@ hand install held them), upgrades whatever of them is installed, and keeps
 automatically installed libraries marked automatic. The key comes over plain
 HTTP from the LAN registry; that is the trust the LAN already gives the
 registry, nothing more.
+
+The pin uses `Package: *` and matches the **host**, not just this registry's
+path. If that host also serves other APT repositories, their packages match
+too. Review all affected origins before enabling the pin. The setup script
+changes holds and uses `apt-get install -y`; it is not a simulation and does
+not retain a rollback archive for you. It preserves automatic marks after a
+successful transaction, but recovery must also retain the original marks in
+case an intermediate step fails.
 
 **Why priority 1001.** Above 1000, APT installs the registry's build even
 when Ubuntu has published a newer, unpatched version, and even when the
@@ -86,15 +107,56 @@ installed version ending in `+nativehdrN` and a `1001` priority line for the
 registry. `gdctl show` should report `color-mode ⇒ bt2100` on an HDR panel
 after the next login.
 
-**Going back to Ubuntu's packages.** Remove the pin and source, then
-reinstall each package from Ubuntu:
+## Rollback
+
+The registry deliberately deletes superseded versions; it is **not** a
+rollback archive. Retain all installed packages from both source families,
+not just `mutter` and `libmutter-51-0`: exact-version GIR, development and test
+companions may also be installed. If libdisplay-info3 is installed as amd64
+and i386, both must move together to the same version. Preserve any installed
+multiarch development companions as well. A stock library does not provide
+the native HDR API required by patched Mutter, so replace the pair coherently.
+
+First inventory the actual installed set and holds (read-only):
 
 ```bash
-sudo rm /etc/apt/preferences.d/rog-hdr-dv /etc/apt/sources.list.d/rog-hdr-dv.sources
-sudo apt update
-apt list --installed 2>/dev/null | grep nativehdr     # the packages to revert
-sudo apt install --allow-downgrades mutter=51.0-1ubuntu3 libmutter-51-0=51.0-1ubuntu3   # one name=version per line above
+dpkg-query -W -f '${binary:Package} ${Version} ${db:Status-Abbrev}\n' \
+  'mutter*' 'libmutter-*' 'gir1.2-mutter-*' 'libdisplay-info*'
+apt-mark showhold
+apt-mark showauto
+apt-cache policy mutter libmutter-51-0 libdisplay-info3:amd64 libdisplay-info3:i386
 ```
+
+Keep the installed records, not residual-config/not-installed matches; a
+missing pattern can make `dpkg-query` return nonzero. Save original sources,
+pin and key as well as the package inventory. In a coordinated recovery
+window, disable `/etc/apt/preferences.d/rog-hdr-dv` and
+`/etc/apt/sources.list.d/rog-hdr-dv.sources` (move to the private recovery
+directory, do not destroy the only copy), then `sudo apt-get update`.
+
+For **stock Ubuntu**, identify an available Ubuntu version for every installed
+name/architecture using `apt-cache policy` after disabling the pin/source.
+Construct one explicit `name:arch=version` argument per installed binary, with
+the source family's versions coherent, and inspect
+`apt-get -s install --allow-downgrades <complete exact-version set>`.
+Do not paste the angle-bracket placeholder literally. Stop on unexpected
+removals, missing architectures or changes outside the planned desktop set;
+do not accept removal of GNOME to satisfy the native-HDR API dependency.
+Only then perform that exact reviewed transaction while logged out.
+
+For a **retained patched set**, verify its hashes and use the entire retained
+`.deb` closure in the same simulated-then-deliberate transaction, not whichever
+two runtime files happen to be at hand. The historical isolated rollback
+receipts bind their older packages and baseline, not today's APT binaries.
+After either rollback restore captured auto/manual marks and holds explicitly,
+start a new login, and inspect loaded library identities and display state.
+Do not autoremove recovery kernels or dependencies during this procedure.
+
+Before reverting to a compositor predating target overrides, retain the
+original `monitors.xml` and prepare a compatible copy while logged out: older
+parsers reject unknown target-override children under `<monitor>`. A package
+downgrade alone does not migrate configuration. Kernel rollback remains
+separate; see [operations](OPERATIONS.md) and the [kernel ledger](KERNEL_REBASE.md).
 
 ## Keeping it current — `.github/workflows/ubuntu-packages.yml`
 
@@ -166,6 +228,15 @@ packages, so the workflow uses a repository secret `PACKAGE_TOKEN`: a
 personal access token of the registry's owner with the `write:package`
 scope. The scripts hand it to curl through a config on a file descriptor, so
 it never appears in a process list.
+
+**Source/provenance retention.** The build output includes `.dsc`, its source
+archives, `.changes`, `.buildinfo` and a build log, but `publish.sh` uploads
+only `.deb` files. The current workflow uses a runner work directory and
+`rebuild.sh` empties the selected output directory on its next run. Preserve
+complete original outputs durably before that happens; a binary registry
+snapshot is not a source-package archive. Current retrieval/retention limits
+are recorded in the [software handoff](SOFTWARE_DELIVERY.md), without claiming
+new nativehdr13 tests from older package receipts.
 
 [`build.sh`](../packaging/ubuntu/build.sh) applies the series with
 `git apply` (it carries binary test fixtures) on top of Ubuntu's source with

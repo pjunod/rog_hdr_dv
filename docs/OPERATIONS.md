@@ -1,9 +1,13 @@
 # Operations — inspect the laptop and preserve recovery
 
 Use [status](STATUS.md) to understand the current installation and
-[hardware](HARDWARE.md) to identify the panel. This repository does not contain
-an automatic installer. The current HDR installation predates repository
-creation and was not changed during the migration.
+[hardware](HARDWARE.md) to identify the panel. Userspace has an explicit
+[APT setup script](UBUNTU_APT_REPOSITORY.md); it changes system package state,
+unholds matching packages and upgrades noninteractively. It is never run by a
+repository check. The [current software handoff](SOFTWARE_DELIVERY.md) covers
+the installed APT builds, separately installed kernel and external plurx Player.
+ROG already has nativehdr13 userspace/nativehdr3 kernel; do not reinstall for
+paperwork. Every future install/logout/reboot needs a coordinated window.
 
 ## 1. Read the live state
 
@@ -36,6 +40,19 @@ need the actual desktop user's session-bus environment; do not assume UID
 1000 on another machine. Keep captures in `private/` or user-local state.
 
 ## 2. Protect the working installation
+
+Current recovery: nativehdr3 is the verified persistent default; the old custom
+`7.3.0-rc6-nativehdr2+` and stock `7.3.0-9-generic` were retained at the October 29
+receipt. Reverify availability, signed image/modules and initramfs before use.
+The old custom image lacks the CVE fix and is emergency recovery only.
+Keep an independent recovery route and a hash-verified complete userspace
+rollback set; the APT registry prunes superseded versions. Preserve installed
+architectures, exact-version companion packages, holds and auto/manual marks.
+See [rollback](UBUNTU_APT_REPOSITORY.md#rollback), including paired library
+architectures and older `monitors.xml` compatibility. No automatic rollback
+or live-session replacement is implied by these instructions.
+
+### Historical recovery notes — not a current inventory
 
 The laptop retains `~/native-hdr-test-2026-10-08/RECOVERY.txt` and its staged
 bundle from the coordinated morning installation. Read that exact local
@@ -72,9 +89,9 @@ Use the staged [quality acceptance criteria](DOLBY_VISION_AND_QUALITY.md#5-work-
 for calibration. Do not assign the recovered OEM CMDEF file globally until
 its expected display mode and the Linux transform path are understood.
 
-## 4. Prepared userspace package transaction
+## 4. Historical prepared userspace transaction — October 11
 
-The [current package receipt](../evidence/hdr9-nativehdr8-packages.json)
+The [October 11 package receipt](../evidence/hdr9-nativehdr8-packages.json)
 covers the hdr9 library (the reviewed hdr8 code with packaging fixes) and the
 `nativehdr8` compositor, which contains every earlier compositor batch and
 the independent-review fixes. Both library architectures (i386 cross-built)
@@ -110,9 +127,10 @@ GNOME Shell loads the new library. Retain an independent recovery route; SSH
 is the practical one, because a failing login screen keeps reclaiming the
 console. Do not terminate the desktop automatically.
 
-## 4. Audio operations moved
+## 5. Audio operations moved
 
 Audio inspection, private OEM recovery, offline generation and coordinated
 playback procedures are maintained in
 [rog_audio operations](https://github.com/pjunod/rog_audio/blob/main/docs/OPERATIONS.md).
-Display installation and recovery procedures above remain unchanged.
+Coordinate display installation/recovery with audio ownership; neither lane
+may silently restart the other's active session.

@@ -10,6 +10,20 @@ Ubuntu `7.3.0-9.9`. The [Linux 7.3 rebase](KERNEL_REBASE.md) retains it in
 `patches/linux/0005`; new source review, build and boot evidence are recorded
 there. The upstream report below remains an unsent historical draft.
 
+**Verified on this panel, bounded (November 2):** an owner-attended silent HDR
+24 fps stock-mpv fixture on nativehdr3 and APT Mutter nativehdr13 passed
+fullscreen/windowed stability. The active i915 CRTC's `VRR_ENABLED` changed
+0 windowed → 1 fullscreen → 0 windowed, with zero page-flip errors. Both owned
+players exited 0; DisplayConfig (except serial) and `monitors.xml` were unchanged.
+The owner answered, “Yes, everything looked normal”. The first visual run's
+debugfs samples lacked the VRR property; only that missing live-property
+acquisition was repeated in a 16-second follow-up. No optical/calibration,
+long-duration cadence, suspend/resume, DPMS/brightness, other-GPU/mode or
+external-monitor acceptance follows from this pass. Two size-change
+accounting warnings remain a separate extension/native-lifecycle issue; they
+are not evidence that this kernel correction failed or fixed that issue.
+See the [software handoff](SOFTWARE_DELIVERY.md) for retained versus new evidence.
+
 ## The symptom
 
 GNOME Shell logs `Page flip failed: drmModeAtomicCommit: Invalid argument`
