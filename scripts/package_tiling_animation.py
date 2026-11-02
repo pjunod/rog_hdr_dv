@@ -4,15 +4,25 @@ import argparse
 from email.utils import formatdate
 import hashlib
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTENSION = 'tiling-assistant@leleat-on-github'
 PACKAGE = 'gnome-shell-ubuntu-extensions'
 STOCK_VERSION = '51.26.10.6ubuntu'
-VERSION = STOCK_VERSION + '+nativehdr1'
+VERSION = STOCK_VERSION + '+nativehdr2'
 STOCK_DEB_SHA256 = '6784ab2e51c29e75efb94ac4de224141741d51fe388f95d48f70e32272f35df5'
+UBUNTU_TOOLS = {
+    'pkgbinarymangler_158_all.deb': '02d2a0038c4335e38c62b4ce1442eea403f8896b1deab5fb51d7d82d1af4d4c0',
+    'lockfile-progs_0.2.0build1_amd64.deb': 'ca72b2d34b9cbd908f0bf3bd5fbd2b9d2435913465b5e4382ce3fd872bea36ed',
+    'liblockfile1_1.17-2build2_amd64.deb': '70e8dd7d390a2b65b62cb59e4664729cb89a1196b241dd4e6bce1cb92f5eb735',
+    'liblockfile-bin_1.17-2build2_amd64.deb': '0420cfd9502d22ca16bf4a2fa1374a7decd336de2d4fc56b3c0cd0c4bc701ea4',
+    'advancecomp_2.5-1build2_amd64.deb': 'da38634c899442e7bee301e92fceda790536e002a81d96a062cfeb56a1024eab',
+    'optipng_7.9.1+ds-2build1_amd64.deb': '805ce2239b864943f5ebd097d438644f60af5842ef80970a5752c172b560f52d',
+}
 PACKAGE_ADDITIONS = {
     '.meson-subproject-wrap-hash.txt', 'meson.build', 'translations/LINGUAS',
     'translations/POTFILES.in', 'translations/meson.build',
@@ -25,6 +35,77 @@ def run(*args, cwd=None):
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def verify_tools(inputs):
+    for name, expected in UBUNTU_TOOLS.items():
+        if not (inputs / name).is_file() or digest(inputs / name) != expected:
+            raise ValueError('required Ubuntu packaging tool unavailable or SHA256 mismatch: ' + name)
+
+
+def build_environment(inputs, output):
+    """Use Ubuntu's unmodified dpkg-deb wrapper without host diversions/configuration."""
+    verify_tools(inputs)
+    if run('dpkg', '--print-architecture') != 'amd64':
+        raise ValueError('pinned Ubuntu packaging tools require native amd64')
+    # A configured Ubuntu buildd may already have the distribution diversion.
+    real_dpkg_deb = Path(shutil.which('dpkg-deb.pkgbinarymangler') or
+                         shutil.which('dpkg-deb') or '').resolve()
+    if not real_dpkg_deb.is_file():
+        raise ValueError('ordinary dpkg-deb is required')
+    root = output / 'build-environment'
+    prefix, bin_dir = root / 'prefix', root / 'bin'
+    bin_dir.mkdir(parents=True)
+    for name in UBUNTU_TOOLS:
+        subprocess.run([str(real_dpkg_deb), '-x', str(inputs / name), str(prefix)], check=True)
+    # Do not expose the package's optional dh_builddeb wrapper: it hardcodes /tmp.
+    # Its dpkg-deb wrapper is independent; this package has exactly one binary.
+    for path in (prefix / 'usr/bin').iterdir():
+        if path.name != 'dh_builddeb':
+            (bin_dir / path.name).symlink_to(path)
+    (bin_dir / 'dpkg-deb.pkgbinarymangler').symlink_to(real_dpkg_deb)
+    config = prefix / 'etc/pkgbinarymangler'
+    strip_config = config / 'striptranslations.conf'
+    text = strip_config.read_text()
+    if text.count('enable: false') != 1:
+        raise ValueError('unexpected official translation configuration')
+    strip_config.write_text(text.replace('enable: false', 'enable: true'))
+    build_info = root / 'CurrentlyBuilding'
+    build_info.write_text(f'Package: {PACKAGE}\nComponent: main\nSuite: stonking\n')
+    lock = root / 'binary-packages.lock'
+    lock.write_text(PACKAGE + '\n')
+    scratch = root / 'scratch'
+    scratch.mkdir()
+    env = dict(os.environ)
+    # Caller environment must not silently bypass the declared build policy.
+    for name in ('NO_PKG_MANGLE', 'PKG_IGNORE_CURRENTLY_BUILDING'):
+        env.pop(name, None)
+    env.update({
+        'PATH': os.pathsep.join((str(bin_dir), env.get('PATH', ''))),
+        'LD_LIBRARY_PATH': os.pathsep.join(filter(None, (
+            str(prefix / 'usr/lib/x86_64-linux-gnu'), env.get('LD_LIBRARY_PATH', '')))),
+        'PKGBINARYMANGLER_CONF_DIR': str(config),
+        'PKGBINARYMANGLER_COMMON_PATH': str(prefix / 'usr/share/pkgbinarymangler'),
+        'CURRENTLY_BUILDING_PATH': str(build_info),
+        'PKGBINARYMANGLER_LOCKFILE': str(lock),
+        'PKGBINARYMANGLER_PACKAGES': PACKAGE,
+        'TMPDIR': str(scratch),
+    })
+    receipt = {
+        'tool_deb_sha256': UBUNTU_TOOLS,
+        'config': {p.name: p.read_text() for p in config.glob('*.conf')},
+        'build_info': build_info.read_text(),
+        'environment': {key: env[key] for key in (
+            'PATH', 'LD_LIBRARY_PATH', 'PKGBINARYMANGLER_CONF_DIR',
+            'PKGBINARYMANGLER_COMMON_PATH', 'CURRENTLY_BUILDING_PATH',
+            'PKGBINARYMANGLER_LOCKFILE', 'PKGBINARYMANGLER_PACKAGES', 'TMPDIR')},
+        'real_dpkg_deb': str(real_dpkg_deb),
+        'tool_files': {str(p.relative_to(prefix)): digest(p)
+                       for p in prefix.rglob('*') if p.is_file()},
+        'host_installation_or_diversion': False,
+    }
+    (output / 'build-environment.json').write_text(json.dumps(receipt, indent=2) + '\n')
+    return env
 
 
 def durable(path):
@@ -101,6 +182,8 @@ def prepare(inputs, candidate, output, epoch):
     entry = (f'{PACKAGE} ({VERSION}) stonking; urgency=medium\n\n'
              '  * Retain Ubuntu extensions and packaging; apply the five reviewed\n'
              '    synthetic tiling animation ownership patches from rog_hdr_dv.\n'
+             '  * Build with Ubuntu pkgbinarymangler 158 translation policy; retain\n'
+             '    raw translations separately, matching the stock payload class.\n'
              f'  * Qualified upstream source tree: {component["candidate_tree"]}.\n\n'
              f' -- HDR Builder <hdr-builder@users.noreply.github.com>  {formatdate(epoch)}\n\n')
     changelog.write_text(entry + changelog.read_text())
@@ -137,16 +220,24 @@ def main():
     parser.add_argument('--epoch', type=int, required=True, help='fixed changelog/source date epoch')
     parser.add_argument('--build', action='store_true', help='run ordinary unsigned dpkg-buildpackage; no installation')
     parser.add_argument('--build-admindir', type=Path, help='optional isolated native dpkg build-dependency inventory')
+    parser.add_argument('--ubuntu-packaging-inputs', type=Path,
+                        help='required with --build: six authenticated pinned Ubuntu wrapper/dependency debs')
     args = parser.parse_args()
     inputs, candidate, output = map(durable, (args.inputs, args.candidate_repository, args.output))
     if any(output == p or p in output.parents or output in p.parents for p in (ROOT, inputs, candidate)):
         parser.error('output must be separate from delivery repository, inputs and candidate')
+    tool_inputs = None
+    if args.build:
+        if not args.ubuntu_packaging_inputs:
+            parser.error('--build requires --ubuntu-packaging-inputs (Ubuntu translation packaging policy)')
+        tool_inputs = durable(args.ubuntu_packaging_inputs)
+        verify_tools(tool_inputs)
     source = prepare(inputs, candidate, output, args.epoch)
     if args.build:
         command = ['dpkg-buildpackage', '-us', '-uc', '-Pnocheck']
         if args.build_admindir:
             command.append('--admindir=' + str(durable(args.build_admindir)))
-        subprocess.run(command, cwd=source, check=True)
+        subprocess.run(command, cwd=source, env=build_environment(tool_inputs, output), check=True)
     print(source)
 
 

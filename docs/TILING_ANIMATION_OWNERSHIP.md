@@ -6,7 +6,7 @@ distinct valid offline passes. Astra's final evidence review approved donor
 `4f71e166` on October 15; that frozen receipt's pending-review text is historical.
 The Ubuntu source and binary package candidate is built, with an authenticated
 matching stock rollback package retained. Independent integration/package review
-and the eight new packaging regressions remain pending. Nothing is installed,
+and the twelve new packaging regressions remain pending. Nothing is installed,
 released to APT or live-qualified by this work; PR16 history remains excluded.
 
 ## November 2 source and package delivery
@@ -35,14 +35,19 @@ relabeled as independently verified.
 
 Native x86_64 construction uses the unchanged enclosing Debian rules and
 `dpkg-buildpackage -us -uc -Pnocheck`. The candidate is
-`gnome-shell-ubuntu-extensions 51.26.10.6ubuntu+nativehdr1`, architecture `all`.
+`gnome-shell-ubuntu-extensions 51.26.10.6ubuntu+nativehdr2`, architecture `all`.
 It retains all other extension runtime files, the upstream Debian metadata,
 maintainer scripts, dependencies, conflicts, replaces and provides. The only
 changed existing payload files are the two callers, package changelog and
-copyright; the reviewed helper is added. An ordinary local source build also
-includes 113 compiled translation catalogs absent from the Ubuntu archive binary;
-the full file/mode inventory records them, with no removed files. The exact
-archive build's translation-stripping environment is not attested here.
+copyright; the reviewed helper is added. No other file/mode changes or removed
+files remain. The final package uses Ubuntu's authenticated `pkgbinarymangler
+158` distribution build wrapper with translation stripping enabled, matching
+the stock package's omission of compiled languagepack catalogs. Its normal
+233-entry raw-translations archive is retained privately in the `.changes`
+closure. The earlier `nativehdr1` source-build artifacts, which added 113 `.mo`
+catalogs, remain preserved as superseded evidence; they are not the candidate.
+This reproduces the relevant declared Ubuntu packaging policy, not an attestation
+of the original archive build's complete environment.
 This is not a repack of the stock binary. The corresponding
 native `.dsc`/source tar, `.changes` and `.buildinfo` are retained with the `.deb`.
 
@@ -54,7 +59,14 @@ builds succeeded. The initial candidate preparation failed because Node was not
 installed in the builder; redundant syntax checking was removed from packaging
 only, retaining the exact-tree Mac syntax receipt. A second attempt failed on
 a GMT changelog trailer; the numeric-zone correction produced the first binary.
-Both failed logs remain preserved. `nocheck` defers unrelated package tests; it
+Both failed logs remain preserved. The final `nativehdr2` build succeeds with
+the normal Ubuntu wrapper; all packaged extension JavaScript is byte-identical
+to the reviewed candidate, and the complete stock/candidate diff contains only
+the five paths above. An initial inspection overreached by requiring upstream
+SVG bytes to survive the existing build transformations; the corrected check
+requires reviewed JavaScript equality and full stock payload equality elsewhere.
+The unsuccessful inspection is retained; it did not require rebuilding.
+`nocheck` defers unrelated package tests; it
 does not turn skipped tests into passes.
 
 Forward and rollback APT simulations both resolve against the native builder's
@@ -71,17 +83,46 @@ coordinated acceptance window.
 Use the exact source replay described below. In an owned native Ubuntu build
 environment with the package's declared build dependencies, provide the pinned
 official `.dsc`, source tar and stock `.deb` in `INPUTS`. Keep them separate
-from build outputs. The helper refuses existing output directories and verifies
-every pinned input before extracting source:
+from build outputs. Supply the six hash-pinned Ubuntu tool `.deb`s listed in
+`scripts/package_tiling_animation.py:UBUNTU_TOOLS` in `UBUNTU_TOOLS`. Their exact
+versions are `pkgbinarymangler 158`, `lockfile-progs 0.2.0build1`,
+`liblockfile1` and `liblockfile-bin 1.17-2build2`, `advancecomp 2.5-1build2`, and
+`optipng 7.9.1+ds-2build1`; these were authenticated through the same signed
+archive metadata, not downloaded from an unpinned third-party build. The helper
+refuses existing output directories and verifies every pinned input before
+extracting source. A build without the declared packaging tool inputs fails
+explicitly rather than silently producing the extra translation payload:
 
 ```sh
 DEB_BUILD_OPTIONS='nocheck parallel=4' python3 scripts/package_tiling_animation.py \
   --inputs "$INPUTS" --candidate-repository "$REPLAY" \
-  --output "$OWNED_WORK/package" --epoch 1793646237 --build
+  --output "$OWNED_WORK/package" --epoch 1793646237 --build \
+  --ubuntu-packaging-inputs "$UBUNTU_TOOLS"
 ```
 
 The optional `--build-admindir` is only for an explicitly isolated build-tool
 inventory such as the one above, not the target package database. The script
+extracts the pinned Ubuntu tools under `OUTPUT/build-environment/prefix`,
+without installing them or registering diversions. `OUTPUT/build-environment/bin`
+comes first on `PATH`; it exposes the unmodified `dpkg-deb` wrapper, its commands
+and dependencies, with `dpkg-deb.pkgbinarymangler` pointing to the original tool.
+The optional `dh_builddeb` wrapper is not exposed because it hardcodes `/tmp`;
+the ordinary distro debhelper command remains in use. This source builds one
+binary, whose task-local serialization file supplies the normal mangler lock.
+Only `striptranslations.conf` changes from the authenticated defaults:
+`enable: true` with `components: main`; sanity/file checks retain `enable: true`
+and maintainer rewriting retains `enable: false`. Supported environment variables
+`PKGBINARYMANGLER_CONF_DIR`, `PKGBINARYMANGLER_COMMON_PATH` and
+`CURRENTLY_BUILDING_PATH` bind the local config/common and a local build-info
+file (`Package: gnome-shell-ubuntu-extensions`, `Component: main`,
+`Suite: stonking`). `TMPDIR` is a durable task-owned subdirectory. There is no
+write to `/etc` or `/CurrentlyBuilding`, manual locale deletion, binary overlay,
+or upstream source hook. Inherited mangler-bypass variables are removed.
+`build-environment.json` records the complete tool hashes, configs, environment,
+wrapper order and original tool path; `source-manifest.json` records source
+provenance. The raw translations remain beside `.deb`, `.dsc`, source tar,
+`.buildinfo` and `.changes`, whose entire checksum closure was verified.
+The script
 never installs a package, enables an extension or reloads a session. Existing
 passing animation tests remain inherited; after independent review, the minimal
 new lane is `test_tiling_animation_package` plus repository integrity once.
