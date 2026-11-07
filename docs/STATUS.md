@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-11-02 (America/New_York) · **Current:** APT `nativehdr13`
+**Updated:** 2026-11-07 (America/New_York) · **Current:** APT `nativehdr13`
 userspace and signed kernel `nativehdr3` are installed. External plurx Player
 owns the playback product. The [software install/rollback handoff](SOFTWARE_DELIVERY.md)
 records exact package hashes and remaining acceptance; no reinstall is needed.
@@ -35,7 +35,7 @@ the old custom and stock kernels remain available for recovery. The
 [kernel rebase ledger](KERNEL_REBASE.md) separates these checks from the bounded
 November 2 fullscreen/VRR pass and still-pending broader physical/optical acceptance.
 
-## Where it stands (2026-11-02)
+## Where it stands (2026-11-07)
 
 | Area | State | Evidence |
 |---|---|---|
@@ -45,7 +45,7 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
 | Dolby Vision playback | External plurx Player 0.4.1 installed | Exact package version in [handoff](SOFTWARE_DELIVERY.md); October 27 P7 FEL observation is retained history, not a new player acceptance |
 | Fullscreen/VRR | Bounded owner-attended pass on nativehdr3/nativehdr13 | November 2 silent HDR 24 fps stock-mpv fixture: active i915 CRTC VRR 0 → 1 → 0, zero page-flip errors, owner saw normal output; [scope and retained receipt](SOFTWARE_DELIVERY.md#acceptance-ledger-retained-observations-versus-new-requirements) |
-| Tiling animation | Stock `51.26.10.6ubuntu` remains installed; recoverable `51.26.10.6ubuntu+nativehdr2` candidate built in Forgejo PR14 | Candidate deb `43d4b3e1…`, authenticated stock rollback retained, 35 inherited offline passes; [handoff](TILING_ANIMATION_OWNERSHIP.md). Not installed/live-qualified; two observed warnings have no proven trigger |
+| Tiling animation | Installed November 2; bounded visible pass | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; broader acceptance and historical warning attribution remain open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
 
 **Remaining.**
 
@@ -58,11 +58,11 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
   **Do not mark October 15 observations outstanding:** the owner accepted the
   warm roundtrip, decorations, SDR video and HDR10 stability; persistence passed
   across logout/login. These remain bounded prior-stack results, not new-stack passes.
-- Coordinate the separate target simulation/install/rollback/visible acceptance
-  window for the animation package. Independent review and all twelve packaging
-  guards passed in [the fast lane](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977).
-  Retain its 35 inherited offline passes without rerunning them or treating them
-  as deployment evidence.
+- Complete the remaining animation acceptance: center, reduced motion, lifecycle
+  interruptions and extension disable/re-enable, native unmaximize/fullscreen,
+  and cross-mode SDR/HDR checks. November 2 normal tile/restore/drag/maximize/
+  rapid left-right observations are bounded passes; rollback remains unexecuted.
+  Retain the 35 inherited offline passes and twelve packaging guards separately.
 - Recover original current APT source archives/build records from retained
   runner output or backups; bounded searches so far have not found them. New retention does not recover those originals; the binary-only
   registry and changelog binding do not supply them.

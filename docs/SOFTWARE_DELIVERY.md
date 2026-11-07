@@ -1,6 +1,6 @@
 # Software delivery — current install and rollback handoff
 
-Reconciled 2026-11-02 against repository main `f064e91`. This is a software
+Reconciled 2026-11-07 against repository main `663a0a2`. This is a software
 handoff, not a new display trial, optical measurement or Dolby certification.
 The [APT guide](UBUNTU_APT_REPOSITORY.md), [operations](OPERATIONS.md) and
 [kernel ledger](KERNEL_REBASE.md) own the actual procedures. Historical
@@ -14,7 +14,7 @@ experimental player bundles are not the current product install path.
 | libdisplay-info | APT `0.3.0-1+nativehdr13`, installed as amd64 and i386 | Ubuntu `0.3.0-1` plus 23 patches; changelog names the same repository commit; retain matching versions on both architectures |
 | Kernel | Signed `7.3.0-nativehdr3`, installed and running | Ubuntu `7.3.0-10.10` plus five display patches; October 29 build-ID, CVE, Secure Boot and driver checks retained, not repeated |
 | Dolby Vision player | External plurx Player, installed version `0.4.1+lp7.387.0.mpv0.41.0+git20261026.e59d90c-1` | Product source, packaging, upgrades and acceptance belong to plurx; not rebuilt or qualified by this documentation change |
-| Tiling Assistant | Stock `51.26.10.6ubuntu` installed; recoverable candidate `51.26.10.6ubuntu+nativehdr2` built, Forgejo PR14 | Deb `43d4b3e1…`, authenticated stock rollback retained and 35 inherited offline passes; [package handoff](TILING_ANIMATION_OWNERSHIP.md). Candidate not installed/live-qualified; historical warning trigger unproven |
+| Tiling Assistant | Installed November 2; bounded visible pass; `51.26.10.6ubuntu+nativehdr2` | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; broader acceptance and historical warning attribution remain open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
 
 November 2 coordinator read-only receipts show the APT installed and candidate
 versions agree at priority 1001. Package verification for the inspected Mutter,
@@ -142,7 +142,7 @@ No live install, logout, reboot, display or audio change occurred in this audit.
   passes plus nine failed-only retries after a reviewed missing-double-method fix).
   This applies to unpublished extension tree `03613a8236b6f200836df63acafa1e2359d94cb6`;
   neither identifier is a resolvable public source pin in this repository.
-  It does not apply to Mutter or the current installed extension by assumption.
+  These are offline source results, separate from the bounded target observations below.
   The ordinary APT recipes still package only Mutter/libdisplay-info; the
   separate extension helper now produces a recoverable candidate
   `51.26.10.6ubuntu+nativehdr2` (deb SHA256
@@ -150,8 +150,17 @@ No live install, logout, reboot, display or audio change occurred in this audit.
   Forgejo PR14 (`t_44f637a7`) retains its authenticated stock rollback and
   ordinary source/build records. Independent reviews approved the corrected
   integration; all twelve packaging guards passed on `6206b7c` in
-  [the fast lane](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977). Both installed callers still match October 15
-  stock source: no target simulation/installation/live qualification is claimed.
+  [the fast lane](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977). PR14 merged at `663a0a2`. The November 2 owner-approved local-file
+  install and bounded visible session passed; see the
+  [separate target receipt](../evidence/tiling-animation-target-20261107.json).
+  The first APT `--no-download` attempt failed before unpack; the second
+  local-file transaction upgraded one package successfully. Dpkg verification
+  passed. After normal logout/login the system-path extension was ACTIVE;
+  tile/restore/drag/maximize/rapid left-right looked normal to the owner,
+  with no animation errors in the observed Shell-log interval. November 7
+  reconfirmed the exact package and kernel `7.3.0-nativehdr3`. Stock rollback
+  remains retained, not executed. Center, reduced motion, lifecycle, native
+  unmaximize/fullscreen and cross-mode checks remain pending.
   Do not blindly reapply old patches or rerun the 35 cases.
   The two warnings do not identify their exact caller without further evidence.
 - **Still unperformed for the new stack:** broader HDR/SDR transitions,

@@ -1,6 +1,6 @@
-# Tiling animation ownership — recoverable package candidate
+# Tiling animation ownership — installed package and bounded target acceptance
 
-**Updated:** 2026-11-02 · **Owner:** Sol 6.1, task `t_44f637a7`.
+**Updated:** 2026-11-07 · **Owner:** Sol 6.1, task `t_44f637a7`.
 Current-main integration preserves the five reviewed patches and their 35
 distinct valid offline passes. Astra's final evidence review approved donor
 `4f71e166` on October 15; that frozen receipt's pending-review text is historical.
@@ -11,8 +11,30 @@ Independent hdr-fable reviews approved construction and the corrected integratio
 The twelve packaging regressions and repository integrity passed on `6206b7c` in
 [fast lane 41514650977](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977).
 This documentation-only result update retains those unchanged-code passes.
-Nothing is installed, released to APT or
-live-qualified by this work; PR16 history remains excluded.
+PR14 merged at `663a0a2`. The package is installed with bounded target
+acceptance below; no APT publication or broader live qualification is inferred.
+PR16 history remains excluded.
+
+## November 2 target install; November 7 reconfirmation
+
+The owner approved installation of the local package. The first APT
+`--no-download` attempt failed before unpack. A second local-file transaction
+successfully upgraded one package to `51.26.10.6ubuntu+nativehdr2`; dpkg
+verification passed. Authenticated stock rollback remains retained, not executed.
+
+After normal logout/login, the extension was ACTIVE from the system path.
+The owner saw normal tile, restore, drag, maximize and rapid left-right actions.
+The Shell log over that observed interval contained no animation errors.
+This does not establish the trigger or correction of the two historical warnings.
+On November 7, the exact installed package and running kernel
+`7.3.0-nativehdr3` were reconfirmed. The
+[separate path-neutral target receipt](../evidence/tiling-animation-target-20261107.json)
+records these reported observations without changing historical build receipts.
+
+Center, reduced motion, lifecycle interruptions/close, extension disable/re-enable,
+native unmaximize/fullscreen, and cross-mode SDR/HDR acceptance remain pending.
+There is no optical, calibration, full Dolby Vision or broad display-stack
+acceptance inference from this animation trial.
 
 ## November 2 source and package delivery
 
@@ -403,7 +425,11 @@ changed tracked documentation/receipts require one refreshed integrity check;
 that check is not another behavioral suite. Final evidence review must also
 reuse valid successful results rather than trigger a duplicate batch.
 
-## Safe delivery and remaining acceptance
+## Historical source-phase delivery plan and remaining acceptance
+
+The numbered plan below preserves the source-phase boundaries. Its publication,
+merge, build and install steps have since progressed as recorded above; its
+unperformed target cases and rollback remain open.
 
 1. Independent Astra round-4 source approval preceded the initial batch;
    independent Astra harness correction review preceded the passing nine-case
@@ -432,6 +458,7 @@ reuse valid successful results rather than trigger a duplicate batch.
    and enablement/settings under the same coordination. Reload/login only in
    an explicitly coordinated window. Never blindly edit a running Shell.
 
-No Apple TV, audio, live display, boot, package, session or installation action
-is authorized or performed by this candidate. Broader KMS/OEM/optical and full
+The source-phase candidate itself performed no Apple TV, audio, live display,
+boot, package, session or installation action. The separately approved November 2
+extension install and login observations are recorded above. Broader KMS/OEM/optical and full
 Dolby acceptance remain owned by their existing lanes.
