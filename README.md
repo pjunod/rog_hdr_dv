@@ -18,7 +18,7 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-11-02)
+## What works today (2026-11-07)
 
 Installed on the laptop: APT libdisplay-info `0.3.0-1+nativehdr13` (amd64
 and i386), Mutter `51.0-1ubuntu3+nativehdr13`, kernel
@@ -43,7 +43,12 @@ the fix and retains Ubuntu security policies; see the
 | Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
-| Tiling animation accounting | **Package qualified; target trial pending** | `51.26.10.6ubuntu+nativehdr2` (deb `43d4b3e1…`), stock rollback retained; 35 inherited offline passes. Not installed/live-qualified; historical warning trigger unproven ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
+| Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; nativehdr3 correction built, not activated; fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
+
+[Local video Open With](docs/LOCAL_VIDEO.md) supplies an explicit local-file route
+through the existing packaged mapper. The corrected entry passed a bounded November 7 local-file launch/playback trial
+while preserving all eight implicit mpv defaults; no other-application or optical
+acceptance is inferred.
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
@@ -180,7 +185,7 @@ has the remote and branch rules.
 |---|---|
 | [APT repository](docs/UBUNTU_APT_REPOSITORY.md) | Installing the HDR desktop packages on a machine, and how they follow Ubuntu's updates |
 | [Software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) | Current package/source hashes, recovery boundaries and retained versus remaining acceptance |
-| [Tiling animation ownership](docs/TILING_ANIMATION_OWNERSHIP.md) | Five unchanged reviewed patches, recoverable Ubuntu candidate and retained 35 offline passes; no installation or live qualification |
+| [Tiling animation ownership](docs/TILING_ANIMATION_OWNERSHIP.md) | Installed nativehdr2 target errors; additive nativehdr3 API correction built, target activation pending; historical offline evidence retained |
 | [Merged Ubuntu packages](docs/MERGED_UBUNTU_PACKAGES.md) | The hand-built 2026-10-17 release and its install/rollback test |
 | [Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) · [validation receipts](docs/NATIVEHDR10_VALIDATION.md) | The nativehdr10 delivery and its scoped validation |
 | [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) | A packaging compatibility correction and its source pins |
@@ -236,7 +241,7 @@ Audio (speakers, latency, Dolby Atmos) lives in
   on this panel (owner-attended silent HDR 24 fps stock-mpv fixture, November 2)
 - [ ] Broader post-APT/nativehdr3 HDR/SDR, Night Light/override visual checks,
   brightness, DPMS, suspend/resume and long-duration cadence qualification
-- [ ] Separately packaged tiling-animation correction and live acceptance
+- [~] Tiling-animation nativehdr3 API correction built; target activation and live acceptance remain
 - [ ] Panel measurement and calibration (needs an instrument)
 - [~] Qualification across apps — plurx Player's acceptance on the laptop is
   next
