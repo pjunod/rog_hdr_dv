@@ -1,11 +1,13 @@
 # Local video — open files with the packaged HDR player
 
 Companion to [software delivery](SOFTWARE_DELIVERY.md): this guide adds
-**ROG HDR Video** to a Linux file manager's **Open With** menu. It uses the
+**ROG HDR Video** as an installed application available through a Linux file
+manager's **Open With → Other/All Applications** chooser. It uses the
 installed plurx Player media engine directly, outside the Plurx web app.
 The [desktop entry](../tools/local_video/rog-hdr-video.desktop) is a
-per-user application choice; installation leaves your default applications
-unchanged.
+per-user application choice. It declares no MIME types, so it does not request
+video associations or default selection. Real-target validation of this corrected
+entry remains pending.
 
 ## The installed player supplies Dolby Vision mapping
 
@@ -47,11 +49,12 @@ not refresh immediately, reopen the file manager or log in again.
 ## Choose Open With for a local file
 
 In your file manager, right-click a local video, choose **Open With** (or
-**Open With Other Application**), then select **ROG HDR Video**. Leave any
+**Open With Other Application**), then open **Other/All Applications** and select **ROG HDR Video**. The exact
+chooser labels depend on the desktop. Leave any
 "always use" or "set as default" option unchecked to preserve your existing
-choice. The entry advertises MP4, Matroska, WebM, QuickTime, AVI, MPEG,
-MPEG transport stream and Ogg video; decoder support still depends on the
-packaged player and the file.
+choice. The entry deliberately omits `MimeType`: it is an installed application
+that accepts files through `%f`, rather than a registered recommended handler
+for video types. Decoder support depends on the packaged player and the file.
 
 The file manager passes one local filename through the desktop entry's
 `%f` field. There is no shell wrapper: spaces and shell metacharacters remain
@@ -67,6 +70,21 @@ panel peak, colour profile or display override. Playback support and visual
 acceptance must be assessed on the actual file and display; selecting this
 entry alone does not establish full Dolby Vision fidelity.
 
+## Target trial and remaining validation
+
+The first real GNOME installation declared eight video MIME types. After the
+per-user MIME cache refresh, all eight types that had previously resolved to
+stock mpv through implicit defaults instead resolved to this per-user entry.
+No explicit default assignment was needed for that change. The trial entry was
+removed immediately; recovery material was retained.
+
+The corrected entry removes the MIME declaration while retaining `%f` and its
+visible application categories. No `mimeapps.list` edits or explicit default
+pinning are part of this route. Final validation remains pending: GIO must see
+an installed visible application that supports files, the MPEG4 default must
+remain unchanged, and an actual local file must launch and play. The failed
+trial supplies no playback acceptance.
+
 ## Remove the menu entry
 
 ```bash
@@ -78,4 +96,5 @@ fi
 ```
 
 This removes the per-user menu choice. It leaves the installed player,
-its package configuration and your existing default choices in place.
+its package configuration in place. Refresh the cache after removal as shown
+above; the corrected route still requires the target validation recorded above.
