@@ -1,7 +1,7 @@
-# Tiling animation ownership — installed package and bounded target acceptance
+# Tiling animation ownership — installed target and nativehdr3 API correction
 
 **Updated:** 2026-11-07 · **Owner:** Sol 6.1, task `t_44f637a7`.
-Current-main integration preserves the five reviewed patches and their 35
+The original five-patch integration preserves the prior reviewed patches and 35
 distinct valid offline passes. Astra's final evidence review approved donor
 `4f71e166` on October 15; that frozen receipt's pending-review text is historical.
 The recoverable Ubuntu candidate `51.26.10.6ubuntu+nativehdr2` is built (binary
@@ -10,10 +10,54 @@ with authenticated matching stock rollback retained, in Forgejo PR14.
 Independent hdr-fable reviews approved construction and the corrected integration.
 The twelve packaging regressions and repository integrity passed on `6206b7c` in
 [fast lane 41514650977](https://github.com/pjunod/rog_hdr_dv/actions/runs/41514650977).
-This documentation-only result update retains those unchanged-code passes.
+Those passes describe the historical five-patch source, not nativehdr3.
 PR14 merged at `663a0a2`. The package is installed with bounded target
 acceptance below; no APT publication or broader live qualification is inferred.
 PR16 history remains excluded.
+
+## November 7 nativehdr3 — callback API correction built
+
+The installed nativehdr2 produced two centering TypeErrors because its
+`_ease()` helper calls `.catch` on `actor.ease()`'s undefined return. The exact
+pinned Shell `environment.js` defines `ease()` as a callback API: it already
+attaches `logErrorUnlessCancelled` to its internal Promise and returns void.
+`easeAsync()` is the separate Promise API. Additive patch 0006 calls
+`clone.ease()` directly, retains `onStopped` cleanup on completion and
+cancellation, and removes the redundant Promise adapter. Synchronous engine
+failures still pass through the existing cleanup and rethrow.
+
+The first five patch bytes are unchanged. The six-patch candidate tree is
+`e7a885c42f9470ff49661dbf639216bc687d5cdd`. The coordinator built
+`gnome-shell-ubuntu-extensions 51.26.10.6ubuntu+nativehdr3` from delivery
+commit `4269fac6ae4014740fed8605532b30a23c2163d7`; binary SHA256 is
+`853619f12f60674ae1537d23115ab4ec9aea8486006a752145c19960019402d2`.
+All 28 packaged JavaScript files match replay, the complete stock payload
+delta is exactly five paths, and the source artifact closure was verified.
+The [sanitized build receipt](../evidence/tiling-animation-nativehdr3-build-20261107.json)
+records these coordinator-reported construction facts separately from tests
+and target observations. Nativehdr3 is not installed or activated; nativehdr2
+remains the observed target with its recorded runtime errors.
+
+The host double now runs the exact hash-bound installed Shell `ease()`
+wrapper with an internal Promise model. The focused case covers void return,
+completion, cancellation, unexpected rejection, and synchronous failure cleanup.
+Its resource input must have the matching `environment.js` beside
+`windowManager.js`; both hashes are pinned in `sources.json`. The focused
+bench command, for the separate reviewed validation stage, is:
+
+```bash
+node tests/tiling-animation-ownership.mjs \
+    /path/to/replay/tiling-assistant@leleat-on-github \
+    /path/to/shell-resources/windowManager.js \
+    'actual Shell void ease wrapper preserves completion cancellation and error reporting'
+```
+
+Source replay and JavaScript/Python syntax checks passed during preparation;
+no behavioral tests were executed during source preparation. The changed
+wrapper model also affects the existing animation cases; historical passes
+must not be relabeled as nativehdr3 results. Package construction is distinct
+from independent review, regression execution and target acceptance. Activation
+and the bounded centering/fullscreen/cross-mode window remain future work.
 
 ## November 2 target install; November 7 reconfirmation
 

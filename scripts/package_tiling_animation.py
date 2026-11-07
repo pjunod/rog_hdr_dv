@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXTENSION = 'tiling-assistant@leleat-on-github'
 PACKAGE = 'gnome-shell-ubuntu-extensions'
 STOCK_VERSION = '51.26.10.6ubuntu'
-VERSION = STOCK_VERSION + '+nativehdr2'
+VERSION = STOCK_VERSION + '+nativehdr3'
 STOCK_DEB_SHA256 = '6784ab2e51c29e75efb94ac4de224141741d51fe388f95d48f70e32272f35df5'
 UBUNTU_TOOLS = {
     'pkgbinarymangler_158_all.deb': '02d2a0038c4335e38c62b4ce1442eea403f8896b1deab5fb51d7d82d1af4d4c0',
@@ -180,8 +180,8 @@ def prepare(inputs, candidate, output, epoch):
     # Packaging verifies every source byte; Ubuntu's binary build needs no Node.
     changelog = source / 'debian/changelog'
     entry = (f'{PACKAGE} ({VERSION}) stonking; urgency=medium\n\n'
-             '  * Retain Ubuntu extensions and packaging; apply the five reviewed\n'
-             '    synthetic tiling animation ownership patches from rog_hdr_dv.\n'
+             '  * Retain Ubuntu extensions and packaging; apply six synthetic tiling\n'
+             '    animation ownership patches, including callback-only ease support.\n'
              '  * Build with Ubuntu pkgbinarymangler 158 translation policy; retain\n'
              '    raw translations separately, matching the stock payload class.\n'
              f'  * Qualified upstream source tree: {component["candidate_tree"]}.\n\n'

@@ -1,0 +1,53 @@
+From d1a1db23c9e22a1f8f2f33db77267ec165fc177c Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@users.noreply.local>
+Date: Sat, 7 Nov 2026 17:40:03 -0500
+Subject: [PATCH] animation: use Shell callback ease contract and error
+ handling
+
+---
+ .../src/extension/windowAnimation.js             | 16 ++++------------
+ 1 file changed, 4 insertions(+), 12 deletions(-)
+
+diff --git a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+index cc9a2a6..d4059f5 100644
+--- a/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
++++ b/tiling-assistant@leleat-on-github/src/extension/windowAnimation.js
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0-only
+ // Copyright 2026 HDR contributors
+-import { Clutter, Gio, Meta, St } from '../dependencies/gi.js';
++import { Clutter, Meta, St } from '../dependencies/gi.js';
+ import { Main } from '../dependencies/shell.js';
+ 
+ const DURATION = 250;
+@@ -162,7 +162,9 @@ export class WindowAnimations {
+         // handler captures the live actor BEFORE our cancellation listener.
+         // That capture must see an entirely untouched live actor.
+         try {
+-            this._ease(clone, {
++            // Shell ease() returns void and handles its internal Promise errors.
++            // onStopped owns cleanup for both completion and cancellation.
++            clone.ease({
+                 x: useMotion ? target.x : oldRect.x,
+                 y: useMotion ? target.y : oldRect.y,
+                 scale_x: scaleX, scale_y: scaleY, opacity: 0,
+@@ -178,16 +180,6 @@ export class WindowAnimations {
+         }
+     }
+ 
+-    _ease(actor, params) {
+-        // Shell 51 ease() returns a rejecting Promise when a transition stops.
+-        // Cancellation is an expected outcome of our lifecycle, not a fault.
+-        // Unexpected errors still reach the normal extension error reporter.
+-        actor.ease(params).catch(error => {
+-            if (!error.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.CANCELLED))
+-                logError(error);
+-        });
+-    }
+-
+     cancel(actor) {
+         const effect = this._effects.get(actor);
+         if (!effect)
+-- 
+2.54.0 (Apple Git-157)
+

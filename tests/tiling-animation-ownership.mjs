@@ -18,6 +18,13 @@ assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=no
 const shellText = readFileSync(shellFile, 'utf8');
 assert.equal(createHash('sha256').update(shellText).digest('hex'),
     'b7a7e6ea249f77496f5b84f76d1b3ee7f14f2c3d659392513998b3c46827ae47');
+// The sibling resource is required: the actual ease wrapper is part of the API.
+const environmentText = readFileSync(resolve(shellFile, '..', 'environment.js'), 'utf8');
+assert.equal(createHash('sha256').update(environmentText).digest('hex'),
+    pin.shell_api_reference.environment_js_sha256);
+const easeWrapper = environmentText.match(
+    /^Clutter\.Actor\.prototype\.ease = function \(props\) \{[^]*?^\};/m)?.[0];
+assert(easeWrapper, 'missing actual Shell callback ease wrapper');
 const read = name => readFileSync(resolve(source, 'src/extension', name), 'utf8');
 const withoutImports = text => text.replace(/^import .*;\n/gm, '')
     .replace(/^export default /gm, '').replace(/^export /gm, '');
@@ -75,14 +82,22 @@ function environment({ synchronous = false, reduced = false } = {}) {
         remove_all_transitions() {
             for (const name of [...this.transitions.keys()]) this.remove_transition(name);
         }
-        ease(props) {
+        easeImpl(props) {
             this.lastEase = props;
             this.lastStopped = props.onStopped;
             const keys = Object.keys(props).filter(key =>
                 !['duration', 'mode', 'onStopped', 'onComplete'].includes(key));
+            let resolveEase, rejectEase;
+            const promise = new Promise((resolve, reject) => {
+                resolveEase = resolve; rejectEase = reject;
+            });
             let stopped = false;
-            const stop = () => {
-                if (!stopped) { stopped = true; props.onStopped?.(); }
+            const stop = (finished = false) => {
+                if (stopped) return;
+                stopped = true;
+                props.onStopped?.(finished);
+                if (finished) resolveEase();
+                else rejectEase({ matches: (_domain, code) => code === 1 });
             };
             for (const key of keys) {
                 const name = key.replaceAll('_', '-');
@@ -94,10 +109,10 @@ function environment({ synchronous = false, reduced = false } = {}) {
                     this.transitions.delete(key.replaceAll('_', '-'));
                     this[key] = props[key];
                 }
-                stop(); props.onComplete?.();
+                stop(true); props.onComplete?.();
             };
             if (synchronous) this.finish();
-            return Promise.resolve();
+            return promise;
         }
         destroy() {
             if (this.destroyed) return;
@@ -124,7 +139,7 @@ function environment({ synchronous = false, reduced = false } = {}) {
     const Main = { uiGroup: { add_child() {} }, overview: { visible: false } };
     const context = vm.createContext({
         global: globalObject, Main, log() {}, logError(error) { errors.push(error); },
-        Clutter: { OffscreenRedirect: { ALWAYS: 1 }, AnimationMode: { EASE_OUT_QUAD: 1 } },
+        Clutter: { Actor, OffscreenRedirect: { ALWAYS: 1 }, AnimationMode: { EASE_OUT_QUAD: 1 } },
         Meta: { LaterType: { BEFORE_REDRAW: 1 }, WindowType: { NORMAL: 1 },
             MaximizeFlags: { BOTH: 3, HORIZONTAL: 1, VERTICAL: 2 } },
         St: { Widget, Settings: { get: () => ({ reducedMotion: reduced ? 1 : 0 }) },
@@ -140,6 +155,12 @@ function environment({ synchronous = false, reduced = false } = {}) {
         Gio: { _promisify() {}, File: class {}, IOErrorEnum: { CANCELLED: 1 } }, Config: { PACKAGE_VERSION: '51.0' },
         WINDOW_ANIMATION_TIME: 250
     });
+    context._easeActor = (actor, props) => actor.easeImpl(props);
+    context.logErrorUnlessCancelled = error => {
+        if (!error?.matches?.(context.Gio.IOErrorEnum, context.Gio.IOErrorEnum.CANCELLED))
+            errors.push(error);
+    };
+    vm.runInContext(easeWrapper, context, { filename: 'actual-environment-ease.js' });
     vm.runInContext(withoutImports(read('utility.js')), context, { filename: 'actual-utility.js' });
     vm.runInContext(withoutImports(read('windowAnimation.js')), context, { filename: 'actual-windowAnimation.js' });
     vm.runInContext(withoutImports(read('tilingWindowManager.js')), context, { filename: 'actual-tilingWindowManager.js' });
@@ -539,14 +560,48 @@ test('extension disable releases pending and active animations without native co
     }
 });
 
-test('Shell 51 ease cancellation is consumed but unexpected errors are reported', async () => {
+test('actual Shell void ease wrapper preserves completion cancellation and error reporting', async () => {
+    for (const synchronous of [false, true]) {
+        const e = environment({ synchronous });
+        prepareAndResize(e);
+        if (!synchronous) {
+            assert.equal(e.animations._effects.size, 1);
+            e.finishSynthetic();
+        }
+        assert.equal(e.animations._effects.size, 0);
+        assert.equal(e.wm.completions, 0);
+        await Promise.resolve();
+        e.balanced();
+    }
+    const interrupted = environment();
+    prepareAndResize(interrupted);
+    interrupted.animations.cancel(interrupted.actor);
+    await Promise.resolve();
+    interrupted.balanced();
+
     const e = environment();
+    // The real wrapper returns void even though its internal engine is Promise-based.
+    assert.equal(e.actor.ease({}), undefined);
     const cancelled = { matches: (_domain, code) => code === 1 };
-    e.animations._ease({ ease: () => Promise.reject(cancelled) }, {});
+    e.actor.easeImpl = () => Promise.reject(cancelled);
+    assert.equal(e.actor.ease({}), undefined);
     await Promise.resolve(); assert.equal(e.errors.length, 0);
     const unexpected = new Error('genuine ease failure');
-    e.animations._ease({ ease: () => Promise.reject(unexpected) }, {});
-    await Promise.resolve(); assert.equal(e.errors.pop(), unexpected); e.balanced();
+    e.actor.easeImpl = () => Promise.reject(unexpected);
+    assert.equal(e.actor.ease({}), undefined);
+    await Promise.resolve(); assert.equal(e.errors.pop(), unexpected);
+    e.balanced();
+
+    // A synchronous engine failure still triggers _start's cleanup and rethrow.
+    const failing = environment();
+    failing.animations.prepare(failing.window, target);
+    failing.window.move_resize_frame(true, target.x, target.y, target.width, target.height);
+    const clone = failing.clones.at(-1);
+    const failure = new Error('synchronous ease failure');
+    clone.easeImpl = () => { throw failure; };
+    assert.throws(() => failing.flush(), error => error === failure);
+    assert.equal(failing.animations._effects.size, 0);
+    failing.balanced();
 });
 
 // Explicit validation entry: do not invoke during source preparation/review.
