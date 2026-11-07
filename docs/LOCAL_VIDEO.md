@@ -6,8 +6,7 @@ manager's **Open With → Other/All Applications** chooser. It uses the
 installed plurx Player media engine directly, outside the Plurx web app.
 The [desktop entry](../tools/local_video/rog-hdr-video.desktop) is a
 per-user application choice. It declares no MIME types, so it does not request
-video associations or default selection. Real-target validation of this corrected
-entry remains pending.
+video associations or default selection. The corrected entry passed the bounded real-target validation below.
 
 ## The installed player supplies Dolby Vision mapping
 
@@ -80,10 +79,34 @@ removed immediately; recovery material was retained.
 
 The corrected entry removes the MIME declaration while retaining `%f` and its
 visible application categories. No `mimeapps.list` edits or explicit default
-pinning are part of this route. Final validation remains pending: GIO must see
-an installed visible application that supports files, the MPEG4 default must
-remain unchanged, and an actual local file must launch and play. The failed
-trial supplies no playback acceptance.
+pinning are part of this route. The corrected entry subsequently passed the target validation below. The failed
+trial itself supplies no playback acceptance.
+
+## November 7 corrected-entry target acceptance
+
+The final desktop entry (SHA256
+`0cf10770a381943f56ee1e103356d14005cbcd2f4a6e0265f7f3d63928d9e845`)
+was installed and passed `desktop-file-validate`. GIO reported it installed,
+visible, supporting files and present in All Applications. All eight previously
+implicit video defaults remained `mpv.desktop`. A local filename containing
+spaces reached the player as one operand.
+
+A three-second silent Profile 5 fixture containing RPU reached EOF with exit 0,
+using gpu-next P010 and the packaged GPU closed-form CM v2.9/L2 interpolated,
+P3-D65 mapper. Logs also contained an initial unknown-size swapchain resize
+and a brief `none (no Dolby Vision RPU)` mapper state; active-mapping evidence
+applies only to frames reporting that mapping. The first remux lacked Dolby
+Vision configuration and needed correction. GIO child inspection spans a
+helper → mpv transition; complementary captures bind the actual filename
+argument and packaged executable rather than assuming a single process snapshot.
+
+The mapper reports brightness-relative 880.6 nits at reference white 142;
+DisplayConfig declares effective 616 cd/m². The rendering convention reconciles
+these as `616 × 203 / 142 ≈ 880.6`. Firmware-declared target, renderer convention
+and optical measurements are distinct; no optical measurement or general-title
+acceptance is claimed. This is a bounded, tested local-file Open With route,
+not support in other applications. The separate animation correction is not
+installed: the current on-device `nativehdr2` runtime errors remain open.
 
 ## Remove the menu entry
 
@@ -97,4 +120,4 @@ fi
 
 This removes the per-user menu choice. It leaves the installed player,
 its package configuration in place. Refresh the cache after removal as shown
-above; the corrected route still requires the target validation recorded above.
+above; the corrected route passed the bounded target validation recorded above.

@@ -47,6 +47,16 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
 | Fullscreen/VRR | Bounded owner-attended pass on nativehdr3/nativehdr13 | November 2 silent HDR 24 fps stock-mpv fixture: active i915 CRTC VRR 0 → 1 → 0, zero page-flip errors, owner saw normal output; [scope and retained receipt](SOFTWARE_DELIVERY.md#acceptance-ledger-retained-observations-versus-new-requirements) |
 | Tiling animation | Installed November 2; bounded visible pass | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; correction underway, fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
 
+November 7 [local-video Open With](LOCAL_VIDEO.md) acceptance passed: the corrected
+entry is installed/visible/file-capable in GIO All Applications, all eight implicit
+defaults remain `mpv.desktop`, and a spaced filename reached packaged mpv as one
+operand. A three-second silent P5/RPU fixture reached EOF, exit 0; active GPU
+CM v2.9/L2 mapping is scoped to frames reporting it, with initial resize/no-RPU
+log states retained. Renderer-relative 880.6 nits at reference white 142 corresponds
+to firmware-declared 616 via `616 × 203 / 142`; neither is optical measurement.
+[Target receipt](../evidence/local-video-target-20261107.json). The separate
+animation correction is not installed; nativehdr2 runtime errors remain open.
+
 **Remaining.**
 
 - APT setup/qualification on the second test machine; ROG already has the builds.

@@ -46,8 +46,9 @@ the fix and retains Ubuntu security policies; see the
 | Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; correction underway, fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
 
 [Local video Open With](docs/LOCAL_VIDEO.md) supplies an explicit local-file route
-through the existing packaged mapper. Target launch verification remains pending;
-this does not establish support in other applications.
+through the existing packaged mapper. The corrected entry passed a bounded November 7 local-file launch/playback trial
+while preserving all eight implicit mpv defaults; no other-application or optical
+acceptance is inferred.
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
