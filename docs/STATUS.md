@@ -45,7 +45,7 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
 | Dolby Vision display mapping | Closed form for CM v4.0 and CM v2.9, in plurx main | Mean ΔE_ITP 0.0036–0.0055 from Dolby's reference on four titles at 600 nits (plurx #1289) |
 | Dolby Vision playback | External plurx Player 0.4.1 installed | Exact package version in [handoff](SOFTWARE_DELIVERY.md); October 27 P7 FEL observation is retained history, not a new player acceptance |
 | Fullscreen/VRR | Bounded owner-attended pass on nativehdr3/nativehdr13 | November 2 silent HDR 24 fps stock-mpv fixture: active i915 CRTC VRR 0 → 1 → 0, zero page-flip errors, owner saw normal output; [scope and retained receipt](SOFTWARE_DELIVERY.md#acceptance-ledger-retained-observations-versus-new-requirements) |
-| Tiling animation | Installed November 2; bounded visible pass | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; broader acceptance and historical warning attribution remain open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
+| Tiling animation | Installed November 2; bounded visible pass | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; correction underway, fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
 
 **Remaining.**
 
@@ -58,10 +58,12 @@ November 2 fullscreen/VRR pass and still-pending broader physical/optical accept
   **Do not mark October 15 observations outstanding:** the owner accepted the
   warm roundtrip, decorations, SDR video and HDR10 stability; persistence passed
   across logout/login. These remain bounded prior-stack results, not new-stack passes.
-- Complete the remaining animation acceptance: center, reduced motion, lifecycle
-  interruptions and extension disable/re-enable, native unmaximize/fullscreen,
-  and cross-mode SDR/HDR checks. November 2 normal tile/restore/drag/maximize/
-  rapid left-right observations are bounded passes; rollback remains unexecuted.
+- Animation continuation on November 7: center, reduced motion, extension
+  INACTIVE → ACTIVE, restored enablement/settings and normal application close
+  passed visibly. Two centering JS TypeErrors at `windowAnimation.js:185`
+  (`actor.ease(...)` returned undefined before `.catch`) require a separate fix.
+  Fullscreen transitions and cross-mode SDR/HDR remain unverified; the harness
+  saw no F11 callbacks and only current eDP color-mode 1 was observed mid-run.
   Retain the 35 inherited offline passes and twelve packaging guards separately.
 - Recover original current APT source archives/build records from retained
   runner output or backups; bounded searches so far have not found them. New retention does not recover those originals; the binary-only

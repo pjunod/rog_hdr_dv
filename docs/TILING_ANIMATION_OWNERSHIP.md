@@ -31,8 +31,8 @@ On November 7, the exact installed package and running kernel
 [separate path-neutral target receipt](../evidence/tiling-animation-target-20261107.json)
 records these reported observations without changing historical build receipts.
 
-Center, reduced motion, lifecycle interruptions/close, extension disable/re-enable,
-native unmaximize/fullscreen, and cross-mode SDR/HDR acceptance remain pending.
+November 7 bounded continuation is recorded below; native unmaximize/fullscreen
+and cross-mode SDR/HDR acceptance remain incomplete.
 There is no optical, calibration, full Dolby Vision or broad display-stack
 acceptance inference from this animation trial.
 
@@ -462,3 +462,12 @@ The source-phase candidate itself performed no Apple TV, audio, live display,
 boot, package, session or installation action. The separately approved November 2
 extension install and login observations are recorded above. Broader KMS/OEM/optical and full
 Dolby acceptance remain owned by their existing lanes.
+
+## November 7 animation continuation — visible pass, runtime failure
+
+November 7 owner-visible center and reduced-motion stages passed. Extension CLI reported INACTIVE then ACTIVE, enablement lists were restored exactly, settings read back true and `@as []`, and the application closed normally. Two current gnome-shell JS TypeErrors occurred during centering at `windowAnimation.js:185`: `actor.ease(...)` returned undefined and accessing `.catch` threw. Visible acceptance therefore coexists with a runtime failure; a correction is underway separately. These errors are distinct from the historical animation-counter warning.
+
+Native fullscreen transitions remain unverified: the owner accepted the final composite reactivation/fullscreen prompt, but the harness recorded no F11 callbacks. Only current eDP color-mode 1 was observed mid-run; no SDR/HDR cross-mode pair was established.
+
+No unit tests were repeated. The [target receipt](../evidence/tiling-animation-target-20261107.json)
+keeps these observations separate from inherited offline passes.

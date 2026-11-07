@@ -14,7 +14,7 @@ experimental player bundles are not the current product install path.
 | libdisplay-info | APT `0.3.0-1+nativehdr13`, installed as amd64 and i386 | Ubuntu `0.3.0-1` plus 23 patches; changelog names the same repository commit; retain matching versions on both architectures |
 | Kernel | Signed `7.3.0-nativehdr3`, installed and running | Ubuntu `7.3.0-10.10` plus five display patches; October 29 build-ID, CVE, Secure Boot and driver checks retained, not repeated |
 | Dolby Vision player | External plurx Player, installed version `0.4.1+lp7.387.0.mpv0.41.0+git20261026.e59d90c-1` | Product source, packaging, upgrades and acceptance belong to plurx; not rebuilt or qualified by this documentation change |
-| Tiling Assistant | Installed November 2; bounded visible pass; `51.26.10.6ubuntu+nativehdr2` | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; broader acceptance and historical warning attribution remain open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
+| Tiling Assistant | Installed November 2; bounded visible pass; `51.26.10.6ubuntu+nativehdr2` | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; correction underway, fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](TILING_ANIMATION_OWNERSHIP.md)) |
 
 November 2 coordinator read-only receipts show the APT installed and candidate
 versions agree at priority 1001. Package verification for the inspected Mutter,
@@ -159,8 +159,8 @@ No live install, logout, reboot, display or audio change occurred in this audit.
   tile/restore/drag/maximize/rapid left-right looked normal to the owner,
   with no animation errors in the observed Shell-log interval. November 7
   reconfirmed the exact package and kernel `7.3.0-nativehdr3`. Stock rollback
-  remains retained, not executed. Center, reduced motion, lifecycle, native
-  unmaximize/fullscreen and cross-mode checks remain pending.
+  remains retained, not executed. November 7 visible stages and runtime failures are recorded below;
+  native fullscreen and cross-mode checks remain unverified.
   Do not blindly reapply old patches or rerun the 35 cases.
   The two warnings do not identify their exact caller without further evidence.
 - **Still unperformed for the new stack:** broader HDR/SDR transitions,
@@ -173,3 +173,12 @@ No live install, logout, reboot, display or audio change occurred in this audit.
 Upstream preparation already landed at `a15684b`; preparation is not submission
 or acceptance. Do not duplicate submissions or send messages as part of this
 handoff. PR16 stays held/unmerged. Broader programme acceptance remains open.
+
+## November 7 animation continuation — visible pass, runtime failure
+
+November 7 owner-visible center and reduced-motion stages passed. Extension CLI reported INACTIVE then ACTIVE, enablement lists were restored exactly, settings read back true and `@as []`, and the application closed normally. Two current gnome-shell JS TypeErrors occurred during centering at `windowAnimation.js:185`: `actor.ease(...)` returned undefined and accessing `.catch` threw. Visible acceptance therefore coexists with a runtime failure; a correction is underway separately. These errors are distinct from the historical animation-counter warning.
+
+Native fullscreen transitions remain unverified: the owner accepted the final composite reactivation/fullscreen prompt, but the harness recorded no F11 callbacks. Only current eDP color-mode 1 was observed mid-run; no SDR/HDR cross-mode pair was established.
+
+No unit tests were repeated. The [target receipt](../evidence/tiling-animation-target-20261107.json)
+keeps these observations separate from inherited offline passes.

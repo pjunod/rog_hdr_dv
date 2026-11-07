@@ -43,7 +43,11 @@ the fix and retains Ubuntu security policies; see the
 | Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
-| Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; broader acceptance and historical warning attribution remain open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
+| Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; correction underway, fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
+
+[Local video Open With](docs/LOCAL_VIDEO.md) supplies an explicit local-file route
+through the existing packaged mapper. Target launch verification remains pending;
+this does not establish support in other applications.
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
