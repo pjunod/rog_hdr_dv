@@ -25,9 +25,11 @@ The export contains already display-mapped pixels in BT.2020/PQ encoding. It is 
 
 ## Packages and recovery
 
-The source series start from Ubuntu libplacebo `7.360.1-1`, mpv `0.41.0-2ubuntu5` and FFmpeg `7:8.1.2-2ubuntu2`. The three `ubuntu-*-system-dv` entries in [sources.json](../sources.json) pin the distro source archives, patches and resulting trees. [The provider interface](../packaging/system-dv/include/dv_provider.h) defines the data exchanged with the mapper. Building the consumers requires the matching private SDK, including its namespaced renderer headers. The private provider, SDK and signed or device-specific material are distributed separately from this repository.
+The source series start from Ubuntu libplacebo `7.360.1-1`, mpv `0.41.0-2ubuntu5` and FFmpeg `7:8.1.2-2ubuntu2`. The three `ubuntu-*-system-dv` entries and `ubuntu-mesa-wayland-hdr` (Mesa `26.2.4-1ubuntu1`) in [sources.json](../sources.json) pin the distro source archives, patches and resulting trees. [The provider interface](../packaging/system-dv/include/dv_provider.h) defines the data exchanged with the mapper. Building the consumers requires the matching private SDK, including its namespaced renderer headers. The private provider, SDK and signed or device-specific material are distributed separately from this repository.
 
-The runtime packages are `libplacebo-rog1-360` and `librog-dv-provider1`. The ordinary playback and export entry points use the rebuilt Ubuntu `mpv` and `libavfilter11` packages respectively. Retain the exact stock client packages before deployment. On the tested Ubuntu installation the transaction upgrades mpv and libavfilter11 and adds the renderer, provider and stock libshaderc1. Retain all five local package files. Simulate installation with the files, inspect the changes, then install the same files. The filter pins the exact stock libavcodec62 and libavutil60 versions for the private FFmpeg symbols it calls. Both amd64 and i386 installations can keep those stock libraries. For recovery simulate reinstalling the retained stock mpv and libavfilter11 packages with `--allow-downgrades`, restore them and remove the two added libraries after checking reverse dependencies. No compositor restart is required.
+For Vulkan Wayland output the reviewed Mesa revision is `26.2.4-1ubuntu1+rogwsi1`. The ROG has `mesa-vulkan-drivers` installed for both amd64 and i386. These packages must move together; retain both exact Ubuntu rollback packages.
+
+The media runtime packages are `libplacebo-rog1-360` and `librog-dv-provider1`. The ordinary playback and export entry points use the rebuilt Ubuntu `mpv` and `libavfilter11` packages respectively. Retain the exact stock client packages before deployment. The isolated APT simulation for the media packages upgrades mpv and libavfilter11 and adds the renderer, provider and stock libshaderc1. Retain all five local package files. Simulate installation with the files, inspect the changes, then install the same files. The filter pins the exact stock libavcodec62 and libavutil60 versions for the private FFmpeg symbols it calls. Both amd64 and i386 installations can keep those stock libraries. For recovery simulate reinstalling the retained stock mpv and libavfilter11 packages with `--allow-downgrades`, restore them and remove the two added libraries after checking reverse dependencies. No compositor restart is required.
 
 ## Scope of the evidence
 
@@ -39,13 +41,14 @@ This path requires a reconstructed master. Profile 7 FEL requires a decoded enha
 
 | Check | Result |
 |---|---|
-| Explicit FFmpeg export | A real Profile 5 frame and a synthetic Profile 8.1 frame mapped. SDR and HDR10 controls bypassed the provider. All four exports carried the selected 1,000 cd/m² target metadata. |
+| Explicit FFmpeg export | A real Profile 5 frame and a synthetic Profile 8.1 frame mapped. An SDR control and a second control with unspecified transfer/primaries bypassed the provider. The latter FFV1 fixture lost its intended HDR10 tags before decoding. A replacement HEVC Main 10 clip carried verified PQ/BT.2020 tags, MDCV and CLL on its decoded frames. Normal mpv output matched stock mpv pixel for pixel on that HDR10 control; FFmpeg and mpv differed under their respective render settings. All four exports carried the selected 1,000 cd/m² target metadata. |
+| Ordinary mpv on Wayland Vulkan | A genuine nonblack Profile 5 frame at 30 s rendered to a signalled 100 cd/m² BT.2020/PQ destination. The earlier player confirmed an exact authored Level 2 target at this timestamp. On a 32,400-pixel grid, mpv versus FFmpeg had mean ΔE_ITP 0.067 and p95 0.295. Against the previous private player, mean was 0.396, p95 0.667 and the largest sampled difference was 7.97. |
 | Per-frame creative trims | Two six-frame Profile 8.1 streams used identical decoded base pixels. Changing only the 600 cd/m² trim power on frames 2 and 3 changed exactly those two output frames. Separate CM v2.9 Level 2 and CM v4.0 Level 8 runs both passed. |
 | Intel Vulkan | The ordinary FFmpeg binary rendered a real 1920×1080 Profile 5 frame through the shared provider on the ROG’s integrated Arc GPU, with a 616 cd/m² P3-D65 target and BT.2020/PQ encoding. This was an offscreen digital check. |
 | Source crop and interpolation | Native-size mapping and cropped output pixel checks passed for equal-size and bilinear-scaled output. A deliberately failing non-reference mixer frame propagated a render error. |
 | Export side data | An already-PQ synthetic frame carrying HDR10+ and Dolby side data produced the new 600 cd/m² mastering metadata and removed both obsolete source metadata blocks. |
 
-Clean replay of all three series reproduced the base and candidate source trees pinned in the registry. The second mpv patch omits undefined MaxCLL and MaxFALL requests from Wayland image descriptions. A separate Wayland trace showed that Ubuntu Mesa 26.2.4’s Vulkan WSI submits its own image description and sends an unknown MaxFALL as zero. Weston rejected that description. Both producers matter to normal playback.
+Clean replay of all four series reproduced the base and candidate source trees pinned in the registry. The second mpv patch omits undefined MaxCLL and MaxFALL requests from Wayland image descriptions. A separate Wayland trace showed that Ubuntu Mesa 26.2.4’s Vulkan WSI submits its own image description and sends an unknown MaxFALL as zero. Weston rejected that description. The Ubuntu Mesa patch omits unknown optional values at that second producer and validates the encoded v1 luminance bounds. The corrected driver submitted a PQ/BT.2020 image description accepted by Weston.
 
 The [digital receipt](../evidence/shared-display-management-20261107.json) records the source trees and test scope. The trim fixtures used dovi_tool’s public [metadata generator](https://github.com/quietvoid/dovi_tool/blob/main/docs/generator.md). They test the effect and lifetime of a known input change. Optical panel accuracy and numerical agreement with an independent Dolby reference are separate measurements.
 
@@ -61,6 +64,10 @@ cc -std=c11 packaging/system-dv/export-metadata-regression.c -o export-metadata-
   $(pkg-config --cflags --libs libavfilter libavutil)
 ./export-metadata-regression
 ```
+
+## ROG panel target
+
+A read-only query returned a firmware-derived target of 0.0004–616 cd/m², with a reference white of 142 cd/m². Replaying that exact description on an isolated compositor selected the P3-D65 gamut automatically. mpv normalized the working peak to 880.644 using its 203 cd/m² reference white. Mesa described a rounded 881 cd/m² mastering maximum on the surface. The virtual run identifies the mapper’s current trim-selection input; physical-target trim choice and emitted panel light are separate questions.
 
 ## Other GStreamer desktop players
 

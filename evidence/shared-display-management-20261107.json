@@ -4,17 +4,20 @@
   "source_trees": {
     "ubuntu-ffmpeg-system-dv": "a1c874fd73030e53fa675e882f50494a58f87c2b",
     "ubuntu-libplacebo-system-dv": "ed53d88b87d69fff446be7658af354b9693d3fe0",
-    "ubuntu-mpv-system-dv": "e3455a19b68f30f2ef04dd95907a806029f219be"
+    "ubuntu-mpv-system-dv": "e3455a19b68f30f2ef04dd95907a806029f219be",
+    "ubuntu-mesa-wayland-hdr": "f7046d03815f6bcd05a1ccbd818b25e6d591005b"
   },
   "packages": {
     "mpv": "0.41.0-2ubuntu5+rogdv2",
     "libavfilter11": "7:8.1.2-2ubuntu2+rogdv1",
-    "private_runtime": "1.0.0+private20261107-4"
+    "private_runtime": "1.0.0+private20261107-4",
+    "mesa-vulkan-drivers": "26.2.4-1ubuntu1+rogwsi1"
   },
   "source_reconstruction": {
     "libplacebo": "pass",
     "mpv": "pass",
-    "ffmpeg": "pass"
+    "ffmpeg": "pass",
+    "mesa": "pass"
   },
   "renderer_cases": {
     "padded_master_with_fractional_crop_equal_dimensions": "pass",
@@ -34,9 +37,10 @@
       "synthetic HEVC Profile 8.1"
     ],
     "bypassed": [
-      "SDR",
-      "HDR10"
-    ]
+      "SDR control",
+      "FFV1 control with unspecified transfer/primaries"
+    ],
+    "original_hdr10_fixture": "Decoded frames lacked PQ and BT.2020 primaries. The run establishes ordinary fallback only."
   },
   "trim_effect": [
     {
@@ -80,5 +84,56 @@
     "surface": "offscreen"
   },
   "optical_measurement": false,
-  "reference_accuracy_qualified_on_this_build": false
+  "reference_accuracy_qualified_on_this_build": false,
+  "mpv_authored_l2": {
+    "source": "HEVC Profile 5",
+    "frame": 720,
+    "pts_seconds": 30,
+    "target_cd_m2": 100,
+    "target_gamut": "BT.2020",
+    "authored_level2": "non-neutral trim; prior mapper matched exact target",
+    "actual_vulkan_surface": "BT.2020/PQ",
+    "comparisons": {
+      "mpv_to_ffmpeg": {
+        "mean_absolute_normalized_PQ": 7.114e-05,
+        "p99_absolute_normalized_PQ": 0.00048829,
+        "max_absolute_normalized_PQ": 0.00196841,
+        "mean_delta_E_ITP_sample": 0.06665,
+        "p95_delta_E_ITP_sample": 0.29496,
+        "max_delta_E_ITP_sample": 0.86562
+      },
+      "mpv_to_prior_private_mapper": {
+        "mean_absolute_normalized_PQ": 0.00033628,
+        "p99_absolute_normalized_PQ": 0.00157168,
+        "max_absolute_normalized_PQ": 0.02026398,
+        "mean_delta_E_ITP_sample": 0.3957,
+        "p95_delta_E_ITP_sample": 0.66667,
+        "max_delta_E_ITP_sample": 7.96602
+      }
+    },
+    "delta_E_ITP_sample": "32400 pixels; 8x8 grid at offset (4,4); BT.2124 implementation in tools/dolby_harness/metric.py. Comparisons of implementations, not optical/reference conformance."
+  },
+  "true_hdr10_control": {
+    "input": "HEVC Main 10 with decoded BT.2020/PQ/BT.2020-NCL, mastering metadata and content-light metadata",
+    "provider_mapped": false,
+    "candidate_mpv_equals_stock_mpv": true,
+    "ffmpeg_export_target_max_cd_m2": 1000,
+    "cross_consumer_mean_absolute_normalized_PQ": 0.06281,
+    "cross_consumer_p99_absolute_normalized_PQ": 0.0878,
+    "cross_consumer_max_absolute_normalized_PQ": 0.3203
+  },
+  "automatic_panel_profile_replay": {
+    "source": "private read-only Wayland output description reproduced on an isolated compositor",
+    "physical_target_cd_m2": {
+      "minimum": 0.0004,
+      "maximum": 616,
+      "reference_white": 142
+    },
+    "transport": "BT.2020/PQ",
+    "physical_primaries_source": "display declaration",
+    "mapper_target_relative_peak": 880.644,
+    "wire_mastering_peak_cd_m2": 881,
+    "active_physical_surface_observed": false,
+    "limits": "The current player feeds reference-white-normalized peak to the mapper. Physical-target trim selection at nonstandard reference white needs separate qualification."
+  }
 }

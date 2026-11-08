@@ -7,7 +7,7 @@ records exact package hashes and remaining acceptance; no reinstall is needed.
 
 ## Shared Dolby Vision renderer — November 7
 
-Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, SDR/HDR10 controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. Packaged mpv exposed a second zero-MaxFALL sender in Mesa’s Vulkan Wayland path. Corrected driver qualification and host installation are pending. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
+Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Host installation and physical-target trim tuning remain open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
 
 ## Kernel security rebase — 2026-10-29
 
