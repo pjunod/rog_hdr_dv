@@ -9,9 +9,9 @@ from pathlib import Path
 import re
 import shutil
 
-CORE_VERSION = "0.1.0+rogdv2"
-GTK_VERSION = "0.15.2-1ubuntu2+rogdv3"
-SHOWTIME_VERSION = "50.0-2+rogdv3"
+CORE_VERSION = "0.1.0+rogdv2.1"
+GTK_VERSION = "0.15.2-1ubuntu2+rogdv3.1"
+SHOWTIME_VERSION = "50.0-2+rogdv3.1"
 FIXED_GTK = "4.24.1+ds-1+rogdv3"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
@@ -269,7 +269,8 @@ def prepare(workspace):
         showtime / "debian/rules": inputs["showtime"]["rules"],
         showtime / "debian/changelog": changelog(
             "showtime", SHOWTIME_VERSION,
-            ["Bind Dolby streams to their native surface target and HDR lease."],
+            ["Bind Dolby streams to their native surface target and HDR lease.",
+             "Require the matching sink and mapper with paused overlay preservation."],
             inputs["showtime"]["changelog"]),
     }
     # Complete all validation before creating backups or changing source files.
