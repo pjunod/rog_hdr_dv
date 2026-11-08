@@ -181,6 +181,8 @@ that an old mapping cannot survive invalidation and that no worker accesses
 GDK directly. The packaged GIR built; application-level introspection acceptance remains open. The observer
 alone does not prove any GStreamer mapper or standard player integration.
 
+The new per-surface request also passed through Python introspection with GTK's default Vulkan renderer. The submitted client image used a floating-point RGB framebuffer and BT.2020/PQ, with reference white at 203 cd/m². The reported physical display peak and reference white changed from 616/142 to 308/71 cd/m² in the fixture. In a separate EGL readback the largest absolute error across four uniform test patches was 0.59 of a 10-bit code value. Those samples exercised 203 cd/m² SDR white, half white, 400 cd/m² HDR and their 301.5 cd/m² linear-light mix. Both checks used a private compositor on the ROG.
+
 ## Package staging and recovery
 
 The host currently has GTK source version `4.24.1+ds-1`: amd64
