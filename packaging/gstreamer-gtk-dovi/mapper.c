@@ -3,6 +3,12 @@
 #include "native-input-formats.h"
 #include "gstdovipicture.h"
 #include <dv_provider387.h>
+#if !defined(DV_PROVIDER387_TARGET_V2_VERSION) || DV_PROVIDER387_TARGET_V2_VERSION != 2
+#error "Dolby provider target API v2 headers are required"
+#endif
+/* Optional additive API: binaries remain loadable with the v1 runtime. */
+#pragma weak dv_provider387_map_v2
+#pragma weak dv_provider387_last_target_strategy
 #include <libplacebo/vulkan.h>
 #include <libplacebo/renderer.h>
 #include <libplacebo/dispatch.h>
@@ -35,6 +41,7 @@ struct GstGtkDoviMapper {
   pl_tex source[4], output[4];
   int mapped;
   guint warned;
+  guint target_strategy_witness;
 };
 static int decline (GstGtkDoviMapper *s, guint bit, const char *reason)
 {
@@ -47,8 +54,23 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
     pl_tex *mapped, struct pl_color_space *color)
 {
   GstGtkDoviMapper *s = priv;
-  s->mapped = dv_provider387_map (s->provider, gpu, rpu, size, composed,
-      &s->physical, master, mapped, color);
+  guint strategy = 4; /* v1 runtime: complete named mapping */
+  if (dv_provider387_map_v2) {
+    s->mapped = dv_provider387_map_v2 (s->provider, gpu, rpu, size, composed,
+        &s->physical, master, mapped, color, NULL);
+    if (dv_provider387_last_target_strategy)
+      strategy = dv_provider387_last_target_strategy (s->provider);
+  } else {
+    s->mapped = dv_provider387_map (s->provider, gpu, rpu, size, composed,
+        &s->physical, master, mapped, color);
+  }
+  if (s->mapped == 1 && s->target_strategy_witness != strategy + 1) {
+    static const char *const names[] = { "named", "raw-xy-neutral-cm4",
+      "named-creative-fallback", "named-invalid-xy-fallback", "named-v1-runtime" };
+    GST_INFO ("Dolby target strategy=%s", strategy < G_N_ELEMENTS (names) ?
+        names[strategy] : "unknown");
+    s->target_strategy_witness = strategy + 1;
+  }
   if (s->mapped != 1) return s->mapped;
   if (s->transport_gain != 1.0f) {
     pl_fmt fmt = pl_find_fmt (gpu, PL_FMT_FLOAT, 4, 32, 0,

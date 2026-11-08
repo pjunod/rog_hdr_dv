@@ -1,0 +1,175 @@
+diff --git a/gst/matroska/ebml-read.c b/gst/matroska/ebml-read.c
+index 4ad1a5e..f1c72d2 100644
+--- a/gst/matroska/ebml-read.c
++++ b/gst/matroska/ebml-read.c
+@@ -348,7 +348,7 @@ gst_ebml_read_buffer (GstEbmlRead * ebml, guint32 * id, GstBuffer ** buf)
+  * Read the next element, return a pointer to it and its size.
+  */
+ 
+-static GstFlowReturn
++GstFlowReturn
+ gst_ebml_read_bytes (GstEbmlRead * ebml, guint32 * id, const guint8 ** data,
+     guint * size)
+ {
+diff --git a/gst/matroska/ebml-read.h b/gst/matroska/ebml-read.h
+index ce894da..6e05218 100644
+--- a/gst/matroska/ebml-read.h
++++ b/gst/matroska/ebml-read.h
+@@ -112,6 +112,12 @@ GstFlowReturn gst_ebml_read_master       (GstEbmlRead *ebml,
+ 
+ GstFlowReturn gst_ebml_read_pop_master   (GstEbmlRead *ebml);
+ 
++/* Module-internal, borrowed bytes valid while the EBML input is retained. */
++GstFlowReturn gst_ebml_read_bytes        (GstEbmlRead *ebml,
++                                          guint32 *id,
++                                          const guint8 **data,
++                                          guint *size);
++
+ GstFlowReturn gst_ebml_read_binary       (GstEbmlRead *ebml,
+                                           guint32     *id,
+                                           guint8     **binary,
+diff --git a/gst/matroska/matroska-demux.c b/gst/matroska/matroska-demux.c
+index 988b489..9b18a2b 100644
+--- a/gst/matroska/matroska-demux.c
++++ b/gst/matroska/matroska-demux.c
+@@ -727,6 +727,87 @@ beach:
+   return ret;
+ }
+ 
++typedef struct
++{
++  guint8 data[24];
++  guint size;
++  gboolean seen;
++  gboolean invalid;
++} GstMatroskaDoviConfiguration;
++
++/* TrackEntry-local only. Other mappings never supply a Dolby profile. Read
++ * borrowed bytes even for unknown/oversized payloads, retaining at most 24. */
++static GstFlowReturn
++gst_matroska_demux_parse_dovi_mapping (GstMatroskaDemux * demux,
++    GstEbmlRead * ebml, GstMatroskaDoviConfiguration * track)
++{
++  const guint64 dvcC = G_GUINT64_CONSTANT (0x64766343);
++  const guint64 dvvC = G_GUINT64_CONSTANT (0x64767643);
++  GstH265DoviConfiguration config;
++  GstFlowReturn ret;
++  guint32 id;
++  guint64 type = 0;
++  guint8 payload[24];
++  guint payload_size = 0;
++  gboolean type_seen = FALSE, extra_seen = FALSE;
++  gboolean dolby = FALSE, malformed = FALSE;
++
++  ret = gst_ebml_read_master (ebml, &id);
++  while (ret == GST_FLOW_OK && gst_ebml_read_has_remaining (ebml, 1, TRUE)) {
++    if ((ret = gst_ebml_peek_id (ebml, &id)) != GST_FLOW_OK)
++      break;
++    if (id == GST_MATROSKA_ID_BLOCKADDIDTYPE ||
++        id == GST_MATROSKA_ID_BLOCKADDIDEXTRADATA) {
++      const guint8 *bytes;
++      guint size;
++
++      ret = gst_ebml_read_bytes (ebml, &id, &bytes, &size);
++      if (ret != GST_FLOW_OK)
++        break;
++      if (id == GST_MATROSKA_ID_BLOCKADDIDTYPE) {
++        guint i;
++        guint64 value = 0;
++
++        malformed |= type_seen || size == 0 || size > 8;
++        type_seen = TRUE;
++        if (size > 0 && size <= 8) {
++          for (i = 0; i < size; i++)
++            value = (value << 8) | bytes[i];
++          type = value;
++          dolby |= value == dvcC || value == dvvC;
++        }
++      } else {
++        malformed |= extra_seen || size < 4 || size > sizeof (payload);
++        extra_seen = TRUE;
++        if (size >= 4 && size <= sizeof (payload)) {
++          memcpy (payload, bytes, size);
++          payload_size = size;
++        }
++      }
++    } else {
++      ret = gst_ebml_read_skip (ebml);
++    }
++  }
++
++  if (dolby) {
++    malformed |= !extra_seen || track->seen;
++    track->seen = TRUE;
++    if (!malformed &&
++        (!gst_codec_utils_h265_parse_dovi_configuration (payload, payload_size,
++                &config) || (type == dvcC) != (config.profile < 8)))
++      malformed = TRUE;
++    track->invalid |= malformed;
++    if (!malformed) {
++      memcpy (track->data, payload, payload_size);
++      track->size = payload_size;
++    } else {
++      GST_WARNING_OBJECT (demux,
++          "Ignoring malformed or duplicate Dolby track configuration");
++    }
++  }
++  return ret;
++}
++
+ static GstFlowReturn
+ gst_matroska_demux_parse_stream (GstMatroskaDemux * demux, GstEbmlRead * ebml,
+     GstMatroskaTrackContext ** dest_context)
+@@ -736,6 +817,7 @@ gst_matroska_demux_parse_stream (GstMatroskaDemux * demux, GstEbmlRead * ebml,
+   GstTagList *cached_taglist;
+   GstFlowReturn ret;
+   guint32 id, riff_fourcc = 0;
++  GstMatroskaDoviConfiguration dovi = { {0}, 0, FALSE, FALSE };
+   guint16 riff_audio_fmt = 0;
+   gchar *codec = NULL;
+ 
+@@ -1652,6 +1734,10 @@ gst_matroska_demux_parse_stream (GstMatroskaDemux * demux, GstEbmlRead * ebml,
+         break;
+       }
+ 
++      case GST_MATROSKA_ID_BLOCKADDITIONMAPPING:
++        ret = gst_matroska_demux_parse_dovi_mapping (demux, ebml, &dovi);
++        break;
++
+       case GST_MATROSKA_ID_TRACKMINCACHE:
+       case GST_MATROSKA_ID_TRACKMAXCACHE:
+       case GST_MATROSKA_ID_MAXBLOCKADDITIONID:
+@@ -1856,6 +1942,17 @@ gst_matroska_demux_parse_stream (GstMatroskaDemux * demux, GstEbmlRead * ebml,
+     }
+   }
+ 
++  if (dovi.seen && !dovi.invalid && caps && !gst_caps_is_empty (caps) &&
++      context->type == GST_MATROSKA_TRACK_TYPE_VIDEO &&
++      !strcmp (context->codec_id, GST_MATROSKA_CODEC_ID_VIDEO_MPEGH_HEVC) &&
++      gst_structure_has_name (gst_caps_get_structure (caps, 0), "video/x-h265")) {
++    GstBuffer *configuration = gst_buffer_new_memdup (dovi.data, dovi.size);
++
++    gst_caps_set_simple (caps, "dovi-configuration", GST_TYPE_BUFFER,
++        configuration, NULL);
++    gst_buffer_unref (configuration);
++  }
++
+   context->caps = caps;
+ 
+   /* tadaah! */
+diff --git a/gst/matroska/matroska-ids.h b/gst/matroska/matroska-ids.h
+index 336585a..6783089 100644
+--- a/gst/matroska/matroska-ids.h
++++ b/gst/matroska/matroska-ids.h
+@@ -96,6 +96,11 @@
+ #define GST_MATROSKA_ID_TRACKDEFAULTDURATION       0x23E383
+ #define GST_MATROSKA_ID_TRACKTIMECODESCALE         0x23314F
+ #define GST_MATROSKA_ID_MAXBLOCKADDITIONID         0x55EE
++#define GST_MATROSKA_ID_BLOCKADDITIONMAPPING       0x41E4
++
++/* IDs in the BlockAdditionMapping master */
++#define GST_MATROSKA_ID_BLOCKADDIDTYPE             0x41E7
++#define GST_MATROSKA_ID_BLOCKADDIDEXTRADATA        0x41ED
+ #define GST_MATROSKA_ID_TRACKATTACHMENTLINK        0x7446
+ #define GST_MATROSKA_ID_TRACKOVERLAY               0x6FAB
+ #define GST_MATROSKA_ID_TRACKTRANSLATE             0x6624
