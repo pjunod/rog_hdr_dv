@@ -197,3 +197,60 @@ the private task slot; their architecture, version and hashes are in the
 [staging receipt](../evidence/gdk-display-target-packages-20261107.json).
 
 Version `4.24.1+ds-1+rogdv1` built using the ordinary Ubuntu packaging rules. Its additive symbol and version are pinned in the second patch. Offline APT simulation upgraded the six packages listed above and restored the corresponding stock six from a modeled candidate state, with no removals or host changes. The snapshot provides display information to consumers. The GStreamer rendering integration remains in development. [Candidate and rollback hashes](../evidence/gdk-display-target-packages-20261107.json).
+
+
+## GtkVideo owns the view target
+
+**State, November 8, 2026:** normal Ubuntu GTK
+`4.24.1+ds-1+rogdv4` packages and their reconstructed source are staged.
+The [active source series](../patches/ubuntu-gtk4-display-target/series)
+replays to the exact compiled tree. The
+[package and product receipt](../evidence/gtkvideo-view-normal-packages-20261108.json)
+records the digital controls and private artifact hashes.
+
+Each realized `GtkVideo` has its own preferred-target snapshot, HDR lease and
+serialized mapper. A shared `GtkMediaFile` retains original pictures before
+playsink conversion. Target changes regrade the visible retained picture
+without seeking. A worker result is accepted only while its stream, caps,
+view binding and target generation remain current. Raw media paintables keep
+their shared baseline because they have no concrete display view.
+
+| Condition | View behavior |
+|---|---|
+| Complete ABI 1 SDK, native picture and ready HDR surface | Map for that view's copied physical target |
+| SDK absent, incompatible ABI or missing entry point | Original media backend; no SDK operation after rejection |
+| Ordinary SDR source | Preserve ordinary SDR pixels |
+| Explicit graphics offload or unrealized view | Release only that view's lease and use the shared baseline |
+
+Grading waits for actual presentation readiness: at least ten bits per RGB
+component, full-range BT.2020/PQ, and the declared 203 cd/m² reference and
+10,000 cd/m² encoding maximum. The SDK is loaded through checked entry points;
+GTK has no hard dependency on the optional mapping DSO.
+
+The package-extracted Profile 5 control used two views and the default Vulkan
+renderer in a private hardware-backed GNOME session. With the same picture at
+30.125 seconds, target generations advanced 2→3→4 for 616→308→616 cd/m².
+The B capture changed 11,009,083 raw video bytes and 194,000 independent XR30
+compositor words. Both returned exactly to A. Offload acquire/release,
+DV→SDR→DV replacement and one-view destruction also passed. SDK-present,
+genuinely absent, ABI-incompatible and incomplete-SDK starts produced identical
+SDR pixels and exited normally.
+
+The virtual monitor declared reference white 203 cd/m² and an encoding-fallback
+minimum of 0.005 cd/m². These checks cover encoded GPU output and lifecycle.
+Profile 7 FEL reconstruction has its own decoder acceptance boundary.
+Packages, raw captures and recovery files remain private; this candidate is
+not installed.
+
+The retained PR20 state pins its consumers to exact GTK `+rogdv3`.
+An isolated six-package GTK upgrade correctly refused the two resulting
+consumer removals. The matched release includes the updated versions of both
+clients. Its 45-package forward and exact inverse APT rehearsals passed on the
+ROG. [Combined release rehearsal](../evidence/panel-desktop-release-bundle.json).
+
+The [final coordinated-runtime aggregate](../evidence/gtkvideo-final-combined-20261108.json)
+repeats the affected lifecycle and ordinary startup controls after verifying
+the app binary mappings. The paused round trip remains exact, all five
+lifecycle controls pass, and ordinary SDR pixels match the earlier startup.
+Source, ABI and SDK rejection evidence is reused. All private services were
+stopped after the pass.
