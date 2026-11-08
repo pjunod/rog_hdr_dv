@@ -23,7 +23,22 @@
       26.082465,
       132.649367
     ],
-    "interpretation": "Source processing, subsampling, reconstruction, authoring-to-consumer metadata conversion and grading all contribute to this cross-release comparison."
+    "interpretation": "Source processing, subsampling, reconstruction, authoring-to-consumer metadata conversion and grading all contribute to this cross-release comparison.",
+    "mpv_window": {
+      "runtime": "Staged mpv 0.42 +rogdv4, normal NVIDIA gpu-next and NVDEC. A dedicated 1920×1080 compositor advertised BT.2020, target 0–600 cd/m² and reference white 203 cd/m². The captured window was tagged BT.2020/PQ.",
+      "identity": "A seek after presenting the first frame and continuous playback both reached frame 714 at 29.750 s and produced byte-identical PNG files.",
+      "linear_light_box": [
+        9.187006,
+        26.31285,
+        137.787399
+      ],
+      "pq_code_box": [
+        9.147157,
+        26.062518,
+        133.115199
+      ]
+    },
+    "cold_seek_control": "On direct startup at 29.750 s, installed and staged FFmpeg both lacked PPS 0 and first decoded the next keyframe at 30 s. The published dvhe track has a 23-byte header, and the in-band VPS/SPS/PPS for the 28 s keyframe are at the end of the preceding sample. Beginning with the keyframe skips those headers. The original stream and the player defaults were preserved."
   },
   "same_master": {
     "pixels": 8294400,
