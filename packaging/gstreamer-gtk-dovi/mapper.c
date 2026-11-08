@@ -100,7 +100,7 @@ void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
 static enum AVPixelFormat input_format (GstVideoFormat f)
 {
   switch (f) {
-#define IMPORT_FORMAT(gst, av) case GST_VIDEO_FORMAT_##gst: return AV_PIX_FMT_##av;
+#define IMPORT_FORMAT(gst, av, accelerator) case GST_VIDEO_FORMAT_##gst: return AV_PIX_FMT_##av;
     GTK_DOVI_NATIVE_INPUT_FORMATS (IMPORT_FORMAT)
 #undef IMPORT_FORMAT
     default: return AV_PIX_FMT_NONE;

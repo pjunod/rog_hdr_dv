@@ -36,23 +36,45 @@ static void set_context (GstElement *element, GstContext *context)
   }
   GST_ELEMENT_CLASS (gtk_dovi_map_parent_class)->set_context (element, context);
 }
-static GstCaps *native_input_caps (void)
+static GstCaps *native_format_caps (gboolean accelerator_only)
 {
   GstCaps *caps = gst_caps_new_empty_simple ("video/x-raw");
   GValue formats = G_VALUE_INIT;
   g_value_init (&formats, GST_TYPE_LIST);
-#define CAPS_FORMAT(gst, av) G_STMT_START { \
-  GValue format = G_VALUE_INIT; \
-  g_value_init (&format, G_TYPE_STRING); \
-  g_value_set_static_string (&format, gst_video_format_to_string (GST_VIDEO_FORMAT_##gst)); \
-  gst_value_list_append_value (&formats, &format); \
-  g_value_unset (&format); \
+#define CAPS_FORMAT(gst, av, accelerator) G_STMT_START { \
+  if (!accelerator_only || accelerator) { \
+    GValue format = G_VALUE_INIT; \
+    g_value_init (&format, G_TYPE_STRING); \
+    g_value_set_static_string (&format, gst_video_format_to_string (GST_VIDEO_FORMAT_##gst)); \
+    gst_value_list_append_value (&formats, &format); \
+    g_value_unset (&format); \
+  } \
 } G_STMT_END;
   GTK_DOVI_NATIVE_INPUT_FORMATS (CAPS_FORMAT)
 #undef CAPS_FORMAT
   gst_structure_set_value (gst_caps_get_structure (caps, 0), "format", &formats);
   g_value_unset (&formats);
   return caps;
+}
+static GstCaps *native_input_caps (void)
+{
+  GstCaps *caps = native_format_caps (FALSE);
+  const gchar *features[] = {GTK_DOVI_CUDA_MEMORY_FEATURE,
+      GTK_DOVI_VA_MEMORY_FEATURE};
+  for (guint i = 0; i < G_N_ELEMENTS (features); i++) {
+    GstCaps *accelerator = native_format_caps (TRUE);
+    gst_caps_set_features (accelerator, 0,
+        gst_caps_features_new (features[i], NULL));
+    gst_caps_append (caps, accelerator);
+  }
+  return caps;
+}
+static gboolean native_input_memory (const GstCapsFeatures *features)
+{
+  return gst_caps_features_is_equal (features, GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY) ||
+      (gst_caps_features_get_size (features) == 1 &&
+      (gst_caps_features_contains (features, GTK_DOVI_CUDA_MEMORY_FEATURE) ||
+       gst_caps_features_contains (features, GTK_DOVI_VA_MEMORY_FEATURE)));
 }
 static GstCaps *graded_output_caps (void)
 {
@@ -86,6 +108,11 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
       GstStructure *mapped = gst_caps_get_structure (allowed, j);
       gst_structure_remove_fields (mapped, "colorimetry", "format",
           "gtk-dovi-preconverted", "chroma-site", NULL);
+      /* Import may read concrete accelerator allocations, but mapped output
+       * is newly allocated system memory. Reverse queries expose only the
+       * explicitly listed host-mappable input domains, never arbitrary memory. */
+      gst_caps_set_features (allowed, j, direction == GST_PAD_SINK ?
+          gst_caps_features_new_empty () : gst_caps_features_new_any ());
     }
     constraint = direction == GST_PAD_SINK ? graded_output_caps () : native_input_caps ();
     one = gst_caps_intersect_full (allowed, constraint, GST_CAPS_INTERSECT_FIRST);
@@ -109,8 +136,7 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
   if (known) {
     if (!gst_caps_is_fixed (input) || !gst_caps_is_fixed (output) ||
         gst_caps_get_size (input) != 1 || gst_caps_get_size (output) != 1 ||
-        !gst_caps_features_is_equal (gst_caps_get_features (input, 0),
-            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY) ||
+        !native_input_memory (gst_caps_get_features (input, 0)) ||
         !gst_caps_features_is_equal (gst_caps_get_features (output, 0),
             GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY))
       return FALSE;

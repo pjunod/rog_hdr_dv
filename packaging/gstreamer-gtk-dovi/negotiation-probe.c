@@ -149,9 +149,53 @@ main (int argc, char **argv)
   require (gst_caps_can_intersect (reverse, p010), "reverse includes P010");
   require (!gst_caps_can_intersect (reverse, nv21), "reverse excludes NV21");
   require (!gst_caps_can_intersect (reverse, dma), "reverse excludes DMABuf");
-  for (guint i = 0; i < gst_caps_get_size (reverse); i++)
-    require (gst_caps_features_is_equal (gst_caps_get_features (reverse, i),
-            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY), "reverse memory is explicit system memory");
+  const gchar *accelerators[] = {"memory:CUDAMemory", "memory:VAMemory"};
+  const gchar *accelerator_formats[] = {"NV12", "P010_10LE"};
+  for (guint i = 0; i < G_N_ELEMENTS (accelerators); i++) {
+    for (guint j = 0; j < G_N_ELEMENTS (accelerator_formats); j++) {
+      GstCaps *input = caps_for (accelerator_formats[j], accelerators[i], TRUE);
+      GstCaps *mapped = klass->transform_caps (base, GST_PAD_SINK, input, NULL);
+      require (!gst_caps_is_empty (mapped) && gst_caps_is_fixed (mapped),
+          "host-readable accelerator format has graded output");
+      if (!gst_caps_is_empty (mapped)) {
+        require (gst_caps_features_is_equal (gst_caps_get_features (mapped, 0),
+                GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY),
+            "accelerator input produces system-memory output");
+        require (klass->set_caps (base, input, mapped),
+            "known host-readable accelerator input accepted");
+      }
+      require (gst_caps_can_intersect (reverse, input),
+          "reverse exposes concrete host-readable accelerator input");
+      gst_caps_unref (mapped);
+      gst_caps_unref (input);
+    }
+    GstCaps *unqualified = caps_for ("RGBA", accelerators[i], TRUE);
+    result = klass->transform_caps (base, GST_PAD_SINK, unqualified, NULL);
+    require (gst_caps_is_empty (result),
+        "accelerator domain does not imply all CPU formats are qualified");
+    require (!klass->set_caps (base, unqualified, output),
+        "unqualified accelerator format rejected at final gate");
+    gst_caps_unref (unqualified);
+    gst_caps_unref (result);
+  }
+  for (guint i = 0; i < gst_caps_get_size (reverse); i++) {
+    const GstCapsFeatures *features = gst_caps_get_features (reverse, i);
+    require (gst_caps_features_is_equal (features,
+            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY) ||
+        (gst_caps_features_get_size (features) == 1 &&
+        (gst_caps_features_contains (features, "memory:CUDAMemory") ||
+         gst_caps_features_contains (features, "memory:VAMemory"))),
+        "reverse exposes only concrete CPU-readable domains");
+  }
+  GstCaps *gpu_output = gst_caps_copy (output);
+  gst_caps_set_features (gpu_output, 0,
+      gst_caps_features_new ("memory:CUDAMemory", NULL));
+  require (!klass->set_caps (base, nv12, gpu_output),
+      "graded output must remain system memory");
+  result = klass->transform_caps (base, GST_PAD_SRC, gpu_output, NULL);
+  require (gst_caps_is_empty (result), "reverse rejects accelerator-domain output");
+  gst_caps_unref (gpu_output);
+  gst_caps_unref (result);
   GstCaps *bad_output = gst_caps_copy (output);
   gst_caps_set_simple (bad_output, "format", G_TYPE_STRING, "RGBA", NULL);
   require (!klass->set_caps (base, nv12, bad_output), "graded eight-bit output rejected");
