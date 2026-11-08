@@ -1,0 +1,32 @@
+From b604c5e2f8c4a1ab94989df74ce878105b89af73 Mon Sep 17 00:00:00 2001
+From: Michael Niedermayer <michael@niedermayer.cc>
+Date: Mon, 26 Oct 2026 01:12:01 +0100
+Subject: [PATCH 2/5] avcodec/bsf/dovi_split: reject NAL units that do not fit
+ the output length field
+
+Truncated length field Replicated through UnModified FFmpeg
+
+Found by a grok bot based audit of the code.
+---
+ libavcodec/bsf/dovi_split.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/libavcodec/bsf/dovi_split.c b/libavcodec/bsf/dovi_split.c
+index 3d953162..f4a19917 100644
+--- a/libavcodec/bsf/dovi_split.c
++++ b/libavcodec/bsf/dovi_split.c
+@@ -193,6 +193,13 @@ static int dovi_split_filter(AVBSFContext *ctx, AVPacket *out)
+         int payload_size;
+         if (!nal_is_kept(s, &s->pkt.nals[i], &payload, &payload_size))
+             continue;
++        if (s->out_nal_length_size && s->out_nal_length_size < 4 &&
++            payload_size >= 1 << (8 * s->out_nal_length_size)) {
++            av_log(ctx, AV_LOG_ERROR, "NAL unit size %d does not fit in %d bytes\n",
++                   payload_size, s->out_nal_length_size);
++            ret = AVERROR_INVALIDDATA;
++            goto fail;
++        }
+         out_size += prefix_size + payload_size;
+         kept_count++;
+     }
+

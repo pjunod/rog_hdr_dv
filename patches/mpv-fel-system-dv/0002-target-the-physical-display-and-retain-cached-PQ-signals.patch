@@ -1,0 +1,459 @@
+diff --git a/video/out/dovi_physical.h b/video/out/dovi_physical.h
+new file mode 100644
+index 0000000..fce3284
+--- /dev/null
++++ b/video/out/dovi_physical.h
+@@ -0,0 +1,29 @@
++/* Part of mpv; licensed under LGPL-2.1-or-later, like its native caller. */
++#ifndef MPV_DOVI_PHYSICAL_H
++#define MPV_DOVI_PHYSICAL_H
++#include <math.h>
++#include <stdbool.h>
++#include <libplacebo/colorspace.h>
++
++/* Inverse of Mutter add_luminance_mapping_op for a PQ surface whose protocol
++ * defaults are primary maximum 10000 and reference white 203. This is a
++ * multiplicative encoding transport, not the creative display-management
++ * target. Encoding minimum is deliberately not subtracted from physical black.
++ */
++static inline bool mp_dovi_transport_gain(float reference, float encoding_max,
++                                          float physical_min, float physical_max,
++                                          float *gain)
++{
++    if (!isfinite(reference) || reference <= 0 || !isfinite(encoding_max) ||
++        encoding_max <= 0 || !isfinite(physical_min) || physical_min < 0 ||
++        !isfinite(physical_max) || physical_max <= physical_min)
++        return false;
++    double g = ((double)PL_COLOR_SDR_WHITE / reference) * (encoding_max / 10000.0);
++    double peak = physical_max * g, black = physical_min * g;
++    if (!isfinite(g) || g <= 0 || !isfinite(peak) || peak > 10000 ||
++        !isfinite(black) || (physical_min > 0 && (float)black <= 0))
++        return false;
++    *gain = g;
++    return isfinite(*gain) && *gain > 0;
++}
++#endif
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 4932ad3..a82a980 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -22,6 +22,10 @@
+ 
+ #include <libplacebo/colorspace.h>
+ #include <libplacebo/options.h>
++#include <libplacebo/dispatch.h>
++#include <libplacebo/shaders/colorspace.h>
++#include <libplacebo/shaders/custom.h>
++#include <libplacebo/shaders/sampling.h>
+ #include <libplacebo/renderer.h>
+ #include <dv_provider387.h>
+ #include <libplacebo/shaders/lut.h>
+@@ -51,6 +55,10 @@
+ #include "gpu/video_shaders.h"
+ #include "sub/osd.h"
+ #include "gpu_next/context.h"
++#include "dovi_physical.h"
++#if HAVE_WAYLAND
++#include "wayland_common.h"
++#endif
+ 
+ #if HAVE_GL && defined(PL_HAVE_OPENGL)
+ #include <libplacebo/opengl.h>
+@@ -137,6 +145,12 @@ struct priv {
+     pl_log pllog;
+     pl_gpu gpu;
+     struct dv_provider387 *dovi_provider;
++    pl_dispatch dovi_dispatch;
++    pl_tex dovi_transport;
++    struct pl_color_space dovi_physical_target, dovi_last_signal;
++    float dovi_transport_gain, dovi_reference, dovi_encoding_min, dovi_encoding_max;
++    uint64_t dovi_physical_generation, dovi_render_generation, dovi_map_calls;
++    bool dovi_physical_active, dovi_display_signal_valid, dovi_physical_logged;
+     pl_renderer rr;
+     pl_queue queue;
+     pl_swapchain sw;
+@@ -1189,6 +1203,142 @@ static void info_callback(void *priv, const struct pl_render_info *info)
+     pl_dispatch_info_move(&frame->info[info->index], info->pass);
+ }
+ 
++static uint64_t dovi_render_signature(struct priv *p)
++{
++    return p->dovi_physical_active
++        ? DV_PROVIDER387_ABI ^ ((p->dovi_render_generation + 1) * UINT64_C(0x9e3779b97f4a7c15))
++        : DV_PROVIDER387_ABI;
++}
++
++static void update_dovi_physical_target(struct priv *p, struct vo *vo,
++                                         const struct mp_image *image)
++{
++    bool active = false;
++    uint64_t generation = 0;
++#if HAVE_WAYLAND
++    const struct gl_video_opts *opts = p->opts_cache->opts;
++    struct vo_wayland_physical_target raw;
++    bool raw_rpu = false;
++    if (image) {
++        for (int i = 0; i < image->num_ff_side_data; i++)
++            raw_rpu |= image->ff_side_data[i].type == AV_FRAME_DATA_DOVI_RPU_BUFFER;
++    }
++    // Only automatic physical Wayland/PQ display treatment. Explicit exports,
++    // source passthrough, ICC and SDR retain their original path and metadata.
++    if (image && raw_rpu && image->params.repr.sys == PL_COLOR_SYSTEM_DOLBYVISION &&
++        !strcmp(p->ra_ctx->fns->name, "waylandvk") &&
++        p->next_opts->target_hint != 0 && p->next_opts->target_hint_mode == 0 &&
++        !opts->target_prim && !opts->target_trc && !opts->target_peak &&
++        !opts->target_gamut && !opts->target_contrast && !opts->hdr_reference_white &&
++        !p->icc_profile && !p->next_opts->target_lut.path &&
++        vo_wayland_get_physical_target(vo, &raw) &&
++        raw.display.transfer == PL_COLOR_TRC_PQ &&
++        raw.display.primaries == PL_COLOR_PRIM_BT_2020 &&
++        raw.display.hdr.max_luma >= raw.reference_luma &&
++        mp_dovi_transport_gain(raw.reference_luma, raw.encoding_max,
++                               raw.display.hdr.min_luma, raw.display.hdr.max_luma,
++                               &p->dovi_transport_gain)) {
++        active = true;
++        generation = raw.generation;
++        p->dovi_physical_target = raw.display;
++        p->dovi_reference = raw.reference_luma;
++        p->dovi_encoding_min = raw.encoding_min;
++        p->dovi_encoding_max = raw.encoding_max;
++    }
++#endif
++    if (active != p->dovi_physical_active ||
++        (active && generation != p->dovi_physical_generation)) {
++        pl_renderer_flush_cache(p->rr);
++        dv_provider387_reset(p->dovi_provider);
++        p->dovi_render_generation++;
++        p->dovi_display_signal_valid = p->dovi_physical_logged = false;
++    }
++    p->dovi_physical_active = active;
++    p->dovi_physical_generation = generation;
++}
++
++static void dovi_reset(void *priv)
++{
++    struct priv *p = priv;
++    dv_provider387_reset(p->dovi_provider);
++}
++
++static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
++                     bool enhancement_layer_composed,
++                     const struct pl_color_space *target, pl_tex master,
++                     pl_tex *mapped, struct pl_color_space *mapped_color)
++{
++    struct priv *p = priv;
++    p->dovi_map_calls++;
++    if (!p->dovi_physical_active || target->transfer != PL_COLOR_TRC_PQ ||
++        target->primaries != PL_COLOR_PRIM_BT_2020) {
++        return dv_provider387_map(p->dovi_provider, gpu, rpu, size, enhancement_layer_composed, target,
++                               master, mapped, mapped_color);
++    }
++
++    // Keep the legacy signal envelope for unsupported/fallback frames. Only
++    // successful private display management receives the physical declaration.
++    struct pl_color_space physical = p->dovi_physical_target;
++    int status = dv_provider387_map(p->dovi_provider, gpu, rpu, size, enhancement_layer_composed, &physical,
++                                 master, mapped, mapped_color);
++    if (status <= 0)
++        return status;
++
++    if (!mapped || !*mapped || gpu != p->gpu)
++        return -1;
++    if (p->dovi_transport_gain != 1.0f) {
++        pl_fmt fmt = pl_find_fmt(gpu, PL_FMT_FLOAT, 4, 32, 0,
++                                 PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_SAMPLEABLE | PL_FMT_CAP_HOST_READABLE);
++        if (!fmt || !pl_tex_recreate(gpu, &p->dovi_transport, pl_tex_params(
++                .w = (*mapped)->params.w, .h = (*mapped)->params.h, .format = fmt,
++                .sampleable = true, .renderable = true, .host_readable = true,
++                .storable = fmt->caps & PL_FMT_CAP_STORABLE)))
++            return -1;
++        pl_shader sh = pl_dispatch_begin(p->dovi_dispatch);
++        if (!pl_shader_sample_direct(sh, pl_sample_src(.tex = *mapped))) {
++            pl_dispatch_abort(p->dovi_dispatch, &sh);
++            return -1;
++        }
++        const struct pl_color_space pq = {
++            .primaries = PL_COLOR_PRIM_BT_2020, .transfer = PL_COLOR_TRC_PQ,
++        };
++        pl_shader_linearize(sh, &pq);
++        struct pl_shader_var gain = {
++            .var = pl_var_float("dv_physical_transport_gain"),
++            .data = &p->dovi_transport_gain, .dynamic = true,
++        };
++        if (!pl_shader_custom(sh, &(struct pl_custom_shader) {
++                .description = "physical DV to Wayland PQ reference transport",
++                .body = "color.rgb *= dv_physical_transport_gain;",
++                .input = PL_SHADER_SIG_COLOR, .output = PL_SHADER_SIG_COLOR,
++                .variables = &gain, .num_variables = 1})) {
++            pl_dispatch_abort(p->dovi_dispatch, &sh);
++            return -1;
++        }
++        pl_shader_delinearize(sh, &pq);
++        if (!pl_dispatch_finish(p->dovi_dispatch, pl_dispatch_params(
++                .shader = &sh, .target = p->dovi_transport)))
++            return -1;
++
++        *mapped = p->dovi_transport;
++    }
++    // Static encoding conversion must see the unchanged signal envelope, so it
++    // cannot perform a second black/peak remapping. Physical fit and the one
++    // reference transport already happened above.
++    *mapped_color = *target;
++    if (!p->dovi_physical_logged) {
++        MP_INFO(p, "automatic DV physical target %.9g..%.9g nits; encoding %.9g..%.9g; "
++                "reference %.9g; PQ transport gain %.9g -> signal %.9g..%.9g; generation %llu\n",
++                physical.hdr.min_luma, physical.hdr.max_luma,
++                p->dovi_encoding_min, p->dovi_encoding_max, p->dovi_reference,
++                p->dovi_transport_gain, physical.hdr.min_luma * p->dovi_transport_gain,
++                physical.hdr.max_luma * p->dovi_transport_gain,
++                (unsigned long long)p->dovi_render_generation);
++        p->dovi_physical_logged = true;
++    }
++    return 1;
++}
++
+ static void update_options(struct vo *vo)
+ {
+     struct priv *p = vo->priv;
+@@ -1380,10 +1530,10 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     update_options(vo);
+ 
+     struct pl_render_params params = pars->params;
+-    params.dovi_map = dv_provider387_map;
+-    params.dovi_reset = dv_provider387_reset;
+-    params.dovi_priv = p->dovi_provider;
+-    params.dovi_signature = DV_PROVIDER387_ABI;
++    params.dovi_map = dovi_map;
++    params.dovi_reset = dovi_reset;
++    params.dovi_priv = p;
++    params.dovi_signature = dovi_render_signature(p);
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+     bool will_redraw = frame->display_synced && frame->num_vsyncs > 1;
+     bool cache_frame = will_redraw || frame->still || p->paused;
+@@ -1473,6 +1623,9 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+ 
+     struct ra_swapchain *sw = p->ra_ctx->swapchain;
+ 
++    update_dovi_physical_target(p, vo, frame->current);
++    params.dovi_signature = dovi_render_signature(p);
++
+     struct pl_color_space target_csp = {0};
+     // TODO: Implement this for all backends
+     if (sw->fns->target_csp)
+@@ -1791,12 +1944,22 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+ 
+     // Render frame
+     stats_time_start(p->stats, "render");
++    uint64_t map_calls_before = p->dovi_map_calls;
+     bool render_ok = pl_render_image_mix(p->rr, &mix, &target, &params);
+     stats_time_end(p->stats, "render");
+     if (!render_ok) {
+         MP_ERR(vo, "Failed rendering frame!\n");
+         goto done;
+     }
++    // A mixer cache hit presents the same signal without calling dovi_map.
++    // Preserve the actual successful display envelope, including fallback.
++    p->dovi_last_signal = target.color;
++    p->dovi_display_signal_valid = p->dovi_physical_active &&
++        target.color.transfer == PL_COLOR_TRC_PQ &&
++        target.color.primaries == PL_COLOR_PRIM_BT_2020;
++    MP_DBG(p, "DV display signal valid=%d cache_reuse=%d peak=%.9g\n",
++           p->dovi_display_signal_valid, p->dovi_map_calls == map_calls_before,
++           target.color.hdr.max_luma);
+ 
+     struct pl_frame ref_frame;
+     pl_frames_infer_mix(p->rr, &mix, &target, &ref_frame);
+@@ -1952,10 +2115,11 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+ 
+     update_options(vo);
+     struct pl_render_params params = pars->params;
+-    params.dovi_map = dv_provider387_map;
+-    params.dovi_reset = dv_provider387_reset;
+-    params.dovi_priv = p->dovi_provider;
+-    params.dovi_signature = DV_PROVIDER387_ABI;
++    const bool physical_capture = args->scaled && !args->native_csp;
++    params.dovi_map = physical_capture ? dovi_map : dv_provider387_map;
++    params.dovi_reset = physical_capture ? dovi_reset : dv_provider387_reset;
++    params.dovi_priv = physical_capture ? (void *)p : (void *)p->dovi_provider;
++    params.dovi_signature = physical_capture ? dovi_render_signature(p) : DV_PROVIDER387_ABI;
+     params.info_callback = NULL;
+     params.skip_caching_single_frame = true;
+     params.preserve_mixing_cache = false;
+@@ -2070,13 +2234,23 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+     if (args->scaled) {
+         // Apply target LUT, ICC profile and CSP override only in window mode
+-        apply_target_options(p, &target, 0, false, 0, NULL);
++        float minimum = 0;
++        if (physical_capture && p->dovi_physical_active && p->dovi_display_signal_valid) {
++            target.color = p->dovi_last_signal;
++            minimum = target.color.hdr.min_luma;
++        }
++        apply_target_options(p, &target, minimum, false, 0, NULL);
+     } else if (args->native_csp) {
+         target.color = image.color;
+     } else {
+         target.color = pl_color_space_srgb;
+     }
+ 
++    MP_DBG(p, "DV capture scaled=%d native=%d physical=%d signal_valid=%d transfer=%d peak=%.9g\n",
++           args->scaled, args->native_csp, p->dovi_physical_active,
++           p->dovi_display_signal_valid, target.color.transfer,
++           target.color.hdr.max_luma);
++
+     // sRGB reference display is pure 2.2 power function, see IEC 61966-2-1-1999.
+     // Round-trip back to sRGB if the source is also sRGB. In other cases, we
+     // use piecewise sRGB transfer function, as this is likely the be expected
+@@ -2539,6 +2713,8 @@ static void uninit(struct vo *vo)
+ 
+     pl_icc_close(&p->icc_profile);
+     pl_renderer_destroy(&p->rr);
++    pl_tex_destroy(p->gpu, &p->dovi_transport);
++    pl_dispatch_destroy(&p->dovi_dispatch);
+     dv_provider387_destroy(&p->dovi_provider);
+ 
+     for (int i = 0; i < VO_PASS_PERF_MAX; ++i) {
+@@ -2600,8 +2776,9 @@ static int preinit(struct vo *vo)
+         cache_init(vo, &p->icc_cache, 20 << 20, gl_opts->icc_opts->cache_dir);
+ 
+     pl_gpu_set_cache(p->gpu, p->shader_cache.cache);
++    p->dovi_dispatch = pl_dispatch_create(p->pllog, p->gpu);
+     p->dovi_provider = dv_provider387_create(p->gpu, p->pllog);
+-    if (!p->dovi_provider) {
++    if (!p->dovi_provider || !p->dovi_dispatch) {
+         MP_ERR(vo, "Failed initializing shared Dolby display manager\n");
+         goto err_out;
+     }
+diff --git a/video/out/wayland_common.c b/video/out/wayland_common.c
+index 679950a..840a9bd 100644
+--- a/video/out/wayland_common.c
++++ b/video/out/wayland_common.c
+@@ -305,6 +305,7 @@ struct vo_wayland_preferred_description_info {
+     float min_luma;
+     float max_luma;
+     float ref_luma;
++    bool has_encoding_luminances, has_target_luminances, has_target_primaries;
+     void *icc_file;
+     uint32_t icc_size;
+ };
+@@ -2235,6 +2236,8 @@ static void info_done(void *data, struct wp_image_description_info_v1 *image_des
+     wp_image_description_info_v1_destroy(image_description_info);
+ 
+     if (wd->icc_file) {
++        wl->physical_target.valid = false;
++        wl->physical_target.generation++;
+         if (wl->icc_size)
+             munmap(wl->icc_file, wl->icc_size);
+ 
+@@ -2259,6 +2262,35 @@ static void info_done(void *data, struct wp_image_description_info_v1 *image_des
+         MP_VERBOSE(wl, "Setting preferred transfer to PQ for HDR output.\n");
+         wd->csp.transfer = PL_COLOR_TRC_PQ;
+     }
++    // Save the compositor's physical declaration before legacy normalization.
++    // PQ color transforms anchor reference white multiplicatively; the
++    // physical black/peak are not affine libplacebo working coordinates.
++    struct vo_wayland_physical_target physical = {
++        .display = wd->csp,
++        .encoding_min = wd->min_luma,
++        .encoding_max = wd->max_luma,
++        .reference_luma = wd->ref_luma,
++        .valid = wd->has_encoding_luminances && wd->has_target_luminances &&
++                 wd->has_target_primaries && !wd->icc_file &&
++                 isfinite(wd->ref_luma) && wd->ref_luma > 0 &&
++                 isfinite(wd->max_luma) && wd->max_luma > wd->min_luma &&
++                 wd->ref_luma > wd->min_luma &&
++                 isfinite(wd->min_luma) && wd->min_luma >= 0 &&
++                 isfinite(wd->csp.hdr.min_luma) && wd->csp.hdr.min_luma >= 0 &&
++                 isfinite(wd->csp.hdr.max_luma) &&
++                 wd->csp.hdr.max_luma > wd->csp.hdr.min_luma &&
++                 pl_primaries_valid(&wd->csp.hdr.prim),
++    };
++    struct vo_wayland_physical_target *old = &wl->physical_target;
++    bool changed = physical.valid != old->valid ||
++                   !pl_color_space_equal(&physical.display, &old->display) ||
++                   physical.encoding_min != old->encoding_min ||
++                   physical.encoding_max != old->encoding_max ||
++                   physical.reference_luma != old->reference_luma;
++    physical.generation = old->generation + changed;
++    *old = physical;
++    if (changed)
++        wl->pending_vo_events |= VO_EVENT_EXPOSE;
+     // Wayland luminances are always in reference to the reference luminance. That is,
+     // if max_luma == 2*ref_luma, then there is 2x headroom above paper white. On the
+     // other hand, libplacebo hardcodes PL_COLOR_SDR_WHITE as the reference luminance.
+@@ -2346,6 +2378,7 @@ static void info_luminances(void *data, struct wp_image_description_info_v1 *ima
+     wd->min_luma = min_lum / (float)WAYLAND_MIN_LUM_FACTOR;
+     wd->max_luma = max_lum;
+     wd->ref_luma = reference_lum;
++    wd->has_encoding_luminances = true;
+ }
+ 
+ static void info_target_primaries(void *data, struct wp_image_description_info_v1 *image_description_info,
+@@ -2353,6 +2386,7 @@ static void info_target_primaries(void *data, struct wp_image_description_info_v
+                                   int32_t w_x, int32_t w_y)
+ {
+     struct vo_wayland_preferred_description_info *wd = data;
++    wd->has_target_primaries = true;
+     wd->csp.hdr.prim.red.x = (float)r_x / WAYLAND_COLOR_FACTOR;
+     wd->csp.hdr.prim.red.y = (float)r_y / WAYLAND_COLOR_FACTOR;
+     wd->csp.hdr.prim.green.x = (float)g_x / WAYLAND_COLOR_FACTOR;
+@@ -2367,6 +2401,7 @@ static void info_target_luminance(void *data, struct wp_image_description_info_v
+                                   uint32_t min_lum, uint32_t max_lum)
+ {
+     struct vo_wayland_preferred_description_info *wd = data;
++    wd->has_target_luminances = true;
+     wd->csp.hdr.min_luma = (float)min_lum / WAYLAND_MIN_LUM_FACTOR;
+     wd->csp.hdr.max_luma = (float)max_lum;
+ }
+@@ -4275,6 +4310,15 @@ bool vo_wayland_check_visible(struct vo *vo)
+     return render;
+ }
+ 
++bool vo_wayland_get_physical_target(struct vo *vo,
++                                     struct vo_wayland_physical_target *out)
++{
++    if (!vo->wl || !vo->wl->physical_target.valid)
++        return false;
++    *out = vo->wl->physical_target;
++    return true;
++}
++
+ struct pl_color_space vo_wayland_preferred_csp(struct vo *vo)
+ {
+     struct vo_wayland_state *wl = vo->wl;
+diff --git a/video/out/wayland_common.h b/video/out/wayland_common.h
+index 1f91bdd..8b5723f 100644
+--- a/video/out/wayland_common.h
++++ b/video/out/wayland_common.h
+@@ -53,6 +53,15 @@ struct vo_wayland_toplevel_pending_state {
+     uint32_t new_decoration_mode;
+ };
+ 
++/* Physical display volume and encoding coordinates are distinct from the
++ * libplacebo-normalized preferred signal. Never reconstruct these by division. */
++struct vo_wayland_physical_target {
++    struct pl_color_space display;
++    float encoding_min, encoding_max, reference_luma;
++    uint64_t generation;
++    bool valid;
++};
++
+ struct vo_wayland_state {
+     struct m_config_cache   *opts_cache;
+     struct mp_log           *log;
+@@ -131,6 +140,7 @@ struct vo_wayland_state {
+     void *icc_file;
+     uint32_t icc_size;
+     struct pl_color_space preferred_csp;
++    struct vo_wayland_physical_target physical_target;
+     bool image_description_info_done;
+     bool image_description_pending;
+ 
+@@ -228,6 +238,7 @@ struct vo_wayland_state {
+ 
+ bool vo_wayland_check_visible(struct vo *vo);
+ struct pl_color_space vo_wayland_preferred_csp(struct vo *vo);
++bool vo_wayland_get_physical_target(struct vo *vo, struct vo_wayland_physical_target *out);
+ bool vo_wayland_valid_format(struct vo_wayland_state *wl, uint32_t drm_format, uint64_t modifier);
+ bool vo_wayland_init(struct vo *vo);
+ bool vo_wayland_reconfig(struct vo *vo);

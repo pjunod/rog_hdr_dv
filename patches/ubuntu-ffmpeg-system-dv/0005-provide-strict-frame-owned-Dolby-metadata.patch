@@ -1,0 +1,437 @@
+From 741995279ec7602a1f7593ed780f55d2ffdfc7b8 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 02:55:00 +0000
+Subject: [PATCH 4/5] Publish strict authoritative Dolby metadata without
+ changing video error policy
+
+---
+ libavcodec/Makefile       |   4 +
+ libavcodec/dovi_parser.c  | 165 ++++++++++++++++++++++++++++++++++++++
+ libavcodec/dovi_parser.h  |  59 ++++++++++++++
+ libavcodec/dovi_rpudec.c  |   2 +-
+ libavcodec/hevc/hevcdec.c |  63 ++++++++++++++-
+ libavcodec/hevc/hevcdec.h |   1 +
+ 6 files changed, 291 insertions(+), 3 deletions(-)
+ create mode 100644 libavcodec/dovi_parser.c
+ create mode 100644 libavcodec/dovi_parser.h
+
+diff --git a/libavcodec/Makefile b/libavcodec/Makefile
+index 1410bd81..8095141a 100644
+--- a/libavcodec/Makefile
++++ b/libavcodec/Makefile
+@@ -13,6 +13,7 @@ HEADERS = ac3_parser.h                                                  \
+           d3d11va.h                                                     \
+           defs.h                                                        \
+           dirac.h                                                       \
++          dovi_parser.h                                                 \
+           dv_profile.h                                                  \
+           dxva2.h                                                       \
+           exif.h                                                        \
+@@ -41,6 +42,9 @@ OBJS = ac3_parser.o                                                     \
+        d3d11va.o                                                        \
+        decode.o                                                         \
+        dirac.o                                                          \
++       dovi_parser.o                                                    \
++       dovi_rpu.o                                                       \
++       dovi_rpudec.o                                                    \
+        dv_profile.o                                                     \
+        encode.o                                                         \
+        exif.o                                                           \
+diff --git a/libavcodec/dovi_parser.c b/libavcodec/dovi_parser.c
+new file mode 100644
+index 00000000..6e6dbd52
+--- /dev/null
++++ b/libavcodec/dovi_parser.c
+@@ -0,0 +1,165 @@
++/*
++ * Public Dolby Vision HEVC RPU resolver
++ * Copyright (C) 2026 ROG HDR contributors
++ *
++ * This file is part of FFmpeg, licensed under the GNU Lesser General Public
++ * License, version 2.1 or later. See COPYING.LGPLv2.1.
++ */
++#include <errno.h>
++#include <stddef.h>
++#include <string.h>
++#include "libavutil/error.h"
++#include "libavutil/mem.h"
++#include "dovi_parser.h"
++#include "dovi_rpu.h"
++
++struct AVDoviRpuParser {
++    DOVIContext context;
++    AVDOVIDecoderConfigurationRecord config;
++};
++
++AVDoviRpuParser *av_dovi_rpu_parser_alloc(void *logctx)
++{
++    AVDoviRpuParser *parser = av_mallocz(sizeof(*parser));
++    if (parser)
++        parser->context.logctx = logctx;
++    return parser;
++}
++
++void av_dovi_rpu_parser_flush(AVDoviRpuParser *parser)
++{
++    if (parser) {
++        ff_dovi_ctx_flush(&parser->context);
++        /* Parse error paths can unref the entire internal context. Keep the
++         * public API's configured stream record authoritative across them. */
++        parser->context.cfg = parser->config;
++    }
++}
++
++void av_dovi_rpu_parser_free(AVDoviRpuParser **parser)
++{
++    if (parser && *parser) {
++        ff_dovi_ctx_unref(&(*parser)->context);
++        av_freep(parser);
++    }
++}
++
++int av_dovi_rpu_parser_configure(AVDoviRpuParser *parser,
++                                const AVDOVIDecoderConfigurationRecord *config,
++                                size_t config_size)
++{
++    if (!parser)
++        return AVERROR(EINVAL);
++    av_dovi_rpu_parser_flush(parser);
++    memset(&parser->config, 0, sizeof(parser->config));
++    memset(&parser->context.cfg, 0, sizeof(parser->context.cfg));
++    if (!config)
++        return config_size ? AVERROR(EINVAL) : 0;
++    if (config_size < offsetof(AVDOVIDecoderConfigurationRecord, dv_md_compression) +
++                      sizeof(config->dv_md_compression) ||
++        config->dv_profile > 9 || config->rpu_present_flag > 1 ||
++        config->el_present_flag > 1 || config->bl_present_flag > 1 ||
++        config->dv_md_compression > AV_DOVI_COMPRESSION_EXTENDED)
++        return AVERROR(EINVAL);
++#define COPY(field) parser->config.field = config->field
++    COPY(dv_version_major); COPY(dv_version_minor); COPY(dv_profile);
++    COPY(dv_level); COPY(rpu_present_flag); COPY(el_present_flag);
++    COPY(bl_present_flag); COPY(dv_bl_signal_compatibility_id);
++    COPY(dv_md_compression);
++#undef COPY
++    parser->context.cfg = parser->config;
++    return 0;
++}
++
++static int complete_metadata(const AVDOVIMetadata *metadata)
++{
++    const AVDOVIColorMetadata *color = av_dovi_get_color(metadata);
++    /* Compressed DM without its required prior full DM must not publish
++     * zero-initialized matrix fields as if they were a resolved picture. */
++    if (color->signal_bit_depth < 8 || color->signal_bit_depth > 16)
++        return 0;
++    for (int i = 0; i < 9; i++)
++        if (color->ycc_to_rgb_matrix[i].den <= 0 || color->rgb_to_lms_matrix[i].den <= 0)
++            return 0;
++    for (int i = 0; i < 3; i++)
++        if (color->ycc_to_rgb_offset[i].den <= 0)
++            return 0;
++    for (int i = 0; i < metadata->num_ext_blocks; i++) {
++        switch (av_dovi_get_ext(metadata, i)->level) {
++        case 1: case 2: case 3: case 4: case 5: case 6: case 8: case 9:
++        case 10: case 11: case 254: case 255: break;
++        default: return 0; /* Decoder skipped an unknown extension's values. */
++        }
++    }
++    return 1;
++}
++
++int av_dovi_rpu_parser_parse(AVDoviRpuParser *parser,
++                            const uint8_t *payload, size_t payload_size,
++                            AVDOVIMetadata **metadata, size_t *metadata_size)
++{
++    uint8_t *rbsp = NULL;
++    size_t length = 0;
++    unsigned zeros = 0;
++    int ret = AVERROR_INVALIDDATA;
++    if (metadata)
++        *metadata = NULL;
++    if (metadata_size)
++        *metadata_size = 0;
++    if (!parser)
++        return AVERROR(EINVAL);
++    if (!metadata || !metadata_size || !payload || payload_size < 7 ||
++        payload_size > 65536 || payload[0] != 0x19)
++        goto fail;
++    /* HEVC trailing_zero_8bits are outside the RPU. Keep the original bytes
++     * with the caller; only this bounded parser copy is unescaped/trimmed. */
++    while (payload_size && !payload[payload_size - 1])
++        payload_size--;
++    if (payload_size < 7)
++        goto fail;
++    rbsp = av_mallocz(payload_size + AV_INPUT_BUFFER_PADDING_SIZE);
++    if (!rbsp) {
++        ret = AVERROR(ENOMEM);
++        goto fail;
++    }
++    for (size_t i = 0; i < payload_size; i++) {
++        uint8_t byte = payload[i];
++        if (zeros == 2 && byte == 3) {
++            if (i + 1 == payload_size || payload[i + 1] > 3)
++                goto fail;
++            zeros = 0;
++            continue;
++        }
++        if (zeros == 2 && byte < 3)
++            goto fail;
++        rbsp[length++] = byte;
++        zeros = byte ? 0 : zeros + 1;
++    }
++    /* The internal decoder intentionally ignores unknown RPU types, retaining
++     * its prior state. This fresh-picture API must never publish that state. */
++    if (length < 7 || (rbsp[1] >> 2) != 2)
++        goto fail;
++    ret = ff_dovi_rpu_parse(&parser->context, rbsp, length,
++                           AV_EF_CRCCHECK | AV_EF_EXPLODE);
++    if (ret < 0)
++        goto fail;
++    ret = ff_dovi_get_metadata(&parser->context, metadata);
++    if (ret <= 0) {
++        if (!ret)
++            ret = AVERROR_INVALIDDATA;
++        goto fail;
++    }
++    if (!complete_metadata(*metadata)) {
++        ret = AVERROR_INVALIDDATA;
++        goto fail;
++    }
++    *metadata_size = ret;
++    av_free(rbsp);
++    return 0;
++fail:
++    if (metadata)
++        av_freep(metadata);
++    av_free(rbsp);
++    av_dovi_rpu_parser_flush(parser);
++    return ret;
++}
+diff --git a/libavcodec/dovi_parser.h b/libavcodec/dovi_parser.h
+new file mode 100644
+index 00000000..3483688d
+--- /dev/null
++++ b/libavcodec/dovi_parser.h
+@@ -0,0 +1,59 @@
++/*
++ * Public Dolby Vision HEVC RPU resolver
++ * Copyright (C) 2026 ROG HDR contributors
++ *
++ * This file is part of FFmpeg, licensed under the GNU Lesser General Public
++ * License, version 2.1 or later. See COPYING.LGPLv2.1.
++ */
++#ifndef AVCODEC_DOVI_PARSER_H
++#define AVCODEC_DOVI_PARSER_H
++/* HEVC decoder option dovi_metadata_strict=1 marks only the current matched
++ * raw RPU side data after strict CRC/reference processing. Default decoders
++ * never emit this provenance. Rejected Dolby metadata does not reject video. */
++#define AV_DOVI_METADATA_STRICT_KEY "lavc.dovi.strict"
++#define AV_DOVI_METADATA_STRICT_VALUE "crc+references-v1"
++#include <stddef.h>
++#include <stdint.h>
++#include "libavutil/dovi_meta.h"
++/**
++ * Opaque, stream-owned Dolby Vision RPU state. Resolve in decode order, before
++ * picture reordering. The context is not thread-safe. No private layout is
++ * public; returned snapshots have no dependency on the context's lifetime.
++ */
++typedef struct AVDoviRpuParser AVDoviRpuParser;
++/** Allocate a resolver. logctx is an optional av_log-compatible context. */
++AVDoviRpuParser *av_dovi_rpu_parser_alloc(void *logctx);
++/**
++ * Replace stream configuration and discard all prior metadata state.
++ * NULL/zero clears configuration and enables HEVC profile guessing.
++ * config_size must cover the fields through dv_md_compression. The record is
++ * copied, never retained. AV1/EMDF (profile 10) is outside this HEVC API.
++ * Any error also discards prior state.
++ */
++int av_dovi_rpu_parser_configure(AVDoviRpuParser *parser,
++                                const AVDOVIDecoderConfigurationRecord *config,
++                                size_t config_size);
++/** Discard every mapping/DM reference at flush, seek or a stream boundary.
++ * The configured stream record and logctx are preserved. */
++void av_dovi_rpu_parser_flush(AVDoviRpuParser *parser);
++/** Free a resolver and set *parser to NULL. */
++void av_dovi_rpu_parser_free(AVDoviRpuParser **parser);
++/**
++ * Resolve one HEVC RPU from the original escaped NAL payload, beginning with
++ * 0x19, excluding start codes/length prefixes and the two-byte NAL header.
++ * payload_size is bounded to 65536 bytes. Input is borrowed only for this call.
++ *
++ * On success return 0 and place an allocated, complete public AVDOVIMetadata
++ * snapshot in *metadata and its allocation size in *metadata_size. The caller
++ * frees it with av_free(). No serialized private data or decoder frame is
++ * returned. On failure return a negative AVERROR, clear both outputs, and
++ * discard all inherited state. Missing references are errors: strict mode
++ * never substitutes another mapping ID. CRC and bitstream errors are fatal.
++ *
++ * Call only for the current picture's RPU. A metadata gap produces no call and
++ * no snapshot. It does not resolve to the last successfully parsed picture.
++ */
++int av_dovi_rpu_parser_parse(AVDoviRpuParser *parser,
++                            const uint8_t *payload, size_t payload_size,
++                            AVDOVIMetadata **metadata, size_t *metadata_size);
++#endif
+diff --git a/libavcodec/dovi_rpudec.c b/libavcodec/dovi_rpudec.c
+index d210ba52..c613197f 100644
+--- a/libavcodec/dovi_rpudec.c
++++ b/libavcodec/dovi_rpudec.c
+@@ -520,7 +520,7 @@ int ff_dovi_rpu_parse(DOVIContext *s, const uint8_t *rpu, size_t rpu_size,
+     if (use_prev_vdr_rpu) {
+         int prev_vdr_rpu_id = get_ue_golomb_31(gb);
+         VALIDATE(prev_vdr_rpu_id, 0, DOVI_MAX_DM_ID);
+-        if (!s->vdr[prev_vdr_rpu_id])
++        if (!s->vdr[prev_vdr_rpu_id] && !(err_recognition & AV_EF_EXPLODE))
+             prev_vdr_rpu_id = 0;
+         if (!s->vdr[prev_vdr_rpu_id]) {
+             /* FIXME: Technically, the spec says that in this case we should
+diff --git a/libavcodec/hevc/hevcdec.c b/libavcodec/hevc/hevcdec.c
+index ae5f0fe6..b4fde671 100644
+--- a/libavcodec/hevc/hevcdec.c
++++ b/libavcodec/hevc/hevcdec.c
+@@ -49,6 +49,7 @@
+ #include "hevc.h"
+ #include "parse.h"
+ #include "hevcdec.h"
++#include "libavcodec/dovi_parser.h"
+ #include "hwaccel_internal.h"
+ #include "hwconfig.h"
+ #include "internal.h"
+@@ -3084,6 +3085,7 @@ static int set_side_data(HEVCContext *s)
+     const HEVCSPS *sps = s->cur_frame->pps->sps;
+     AVFrame *out = s->cur_frame->f;
+     int ret;
++    const int strict_rpu = s->dovi_metadata_strict && s->rpu_buf;
+ 
+     // Decrement the mastering display and content light level flag when IRAP
+     // frame has no_rasl_output_flag=1 so the side data persists for the entire
+@@ -3152,6 +3154,14 @@ static int set_side_data(HEVCContext *s)
+ 
+     if ((ret = ff_dovi_attach_side_data(&s->dovi_ctx, out)) < 0)
+         return ret;
++    if (strict_rpu) {
++        AVFrameSideData *rpu = av_frame_get_side_data(out, AV_FRAME_DATA_DOVI_RPU_BUFFER);
++        AVFrameSideData *metadata = av_frame_get_side_data(out, AV_FRAME_DATA_DOVI_METADATA);
++        if (rpu && metadata)
++            av_dict_set(&rpu->metadata, AV_DOVI_METADATA_STRICT_KEY,
++                        AV_DOVI_METADATA_STRICT_VALUE, 0);
++    }
++
+ 
+     if (s->sei.common.dynamic_hdr_vivid.info) {
+         if (!av_frame_side_data_add(&out->side_data, &out->nb_side_data,
+@@ -3695,12 +3705,15 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
+ {
+     int i, ret = 0;
+     int eos_at_start = 1;
++    int strict_rpu_au_valid = 1;
+     int flags = (H2645_FLAG_IS_NALFF * !!s->is_nalff) | H2645_FLAG_SMALL_PADDING;
+ 
+     s->cur_frame = s->collocated_ref = NULL;
+     s->last_eos = s->eos;
+     s->eos = 0;
+     s->slice_initialized = 0;
++    if (s->dovi_metadata_strict)
++        av_buffer_unref(&s->rpu_buf); /* raw identity never crosses an AU */
+     if (s->last_eos)
+         decode_reset_recovery_point(s);
+ 
+@@ -3716,6 +3729,8 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
+     if (ret < 0) {
+         av_log(s->avctx, AV_LOG_ERROR,
+                "Error splitting the input into NAL units.\n");
++        if (s->dovi_metadata_strict)
++            ff_dovi_ctx_flush(&s->dovi_ctx);
+         return ret;
+     }
+ 
+@@ -3733,6 +3748,24 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
+         }
+     }
+ 
++    if (s->dovi_metadata_strict) {
++        int count = 0;
++        for (int n = 0; n < s->pkt.nb_nals; n++) {
++            H2645NAL *nal = &s->pkt.nals[n];
++            if (nal->type != HEVC_NAL_UNSPEC62)
++                continue;
++            count++;
++            if (n != s->pkt.nb_nals - 1 || nal->nuh_layer_id || nal->temporal_id)
++                strict_rpu_au_valid = 0;
++        }
++        if (count > 1)
++            strict_rpu_au_valid = 0;
++        if (!strict_rpu_au_valid) {
++            ff_dovi_ctx_flush(&s->dovi_ctx);
++            av_buffer_unref(&s->rpu_buf);
++        }
++    }
++
+     /*
+      * Check for RPU delimiter.
+      *
+@@ -3757,8 +3790,28 @@ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
+         }
+         memcpy(s->rpu_buf->data, nal->raw_data + 2, nal->raw_size - 2);
+ 
+-        ret = ff_dovi_rpu_parse(&s->dovi_ctx, nal->data + 2, nal->size - 2,
+-                                s->avctx->err_recognition);
++        if (s->dovi_metadata_strict) {
++            AVDOVIDecoderConfigurationRecord config = s->dovi_ctx.cfg;
++            int rpu_count = 0;
++            for (int n = 0; n < s->pkt.nb_nals; n++)
++                rpu_count += s->pkt.nals[n].type == HEVC_NAL_UNSPEC62;
++            /* Do not certify ignored RPU types or an ambiguous AU. A failed
++             * metadata parse must not leave inherited state for a later AU. */
++            if (!strict_rpu_au_valid || rpu_count != 1 || nal->size < 9 || nal->data[2] != 0x19 ||
++                (nal->data[3] >> 2) != 2) {
++                ret = AVERROR_INVALIDDATA;
++            } else {
++                ret = ff_dovi_rpu_parse(&s->dovi_ctx, nal->data + 2, nal->size - 2,
++                        s->avctx->err_recognition | AV_EF_CRCCHECK | AV_EF_EXPLODE);
++            }
++            if (ret < 0) {
++                ff_dovi_ctx_flush(&s->dovi_ctx);
++                s->dovi_ctx.cfg = config;
++            }
++        } else {
++            ret = ff_dovi_rpu_parse(&s->dovi_ctx, nal->data + 2, nal->size - 2,
++                                    s->avctx->err_recognition);
++        }
+         if (ret < 0) {
+             av_buffer_unref(&s->rpu_buf);
+             av_log(s->avctx, AV_LOG_WARNING, "Error parsing DOVI NAL unit.\n");
+@@ -3796,6 +3849,10 @@ fail:
+             ff_progress_frame_report(&l->cur_frame->tf, INT_MAX);
+     }
+ 
++    if (ret < 0 && s->dovi_metadata_strict) {
++        ff_dovi_ctx_flush(&s->dovi_ctx);
++        av_buffer_unref(&s->rpu_buf);
++    }
+     return ret;
+ }
+ 
+@@ -4208,6 +4265,8 @@ static av_cold void hevc_decode_flush(AVCodecContext *avctx)
+ #define PAR (AV_OPT_FLAG_DECODING_PARAM | AV_OPT_FLAG_VIDEO_PARAM)
+ 
+ static const AVOption options[] = {
++    { "dovi_metadata_strict", "Publish Dolby metadata only after strict CRC and reference validation; keep video decoding permissive",
++        OFFSET(dovi_metadata_strict), AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, PAR },
+     { "apply_defdispwin", "Apply default display window from VUI", OFFSET(apply_defdispwin),
+         AV_OPT_TYPE_BOOL, {.i64 = 0}, 0, 1, PAR },
+     { "strict-displaywin", "strictly apply default display window size", OFFSET(apply_defdispwin),
+diff --git a/libavcodec/hevc/hevcdec.h b/libavcodec/hevc/hevcdec.h
+index 8394740c..b88ae2ed 100644
+--- a/libavcodec/hevc/hevcdec.h
++++ b/libavcodec/hevc/hevcdec.h
+@@ -560,6 +560,7 @@ typedef struct HEVCContext {
+     int is_nalff;           ///< this flag is != 0 if bitstream is encapsulated
+                             ///< as a format defined in 14496-15
+     int apply_defdispwin;
++    int dovi_metadata_strict; ///< strict Dolby publication; video decode remains permissive
+ 
+     // multi-layer AVOptions
+     int         *view_ids;
+

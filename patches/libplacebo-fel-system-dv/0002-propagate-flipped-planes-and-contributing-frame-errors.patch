@@ -1,0 +1,69 @@
+diff --git a/src/renderer.c b/src/renderer.c
+index e4f44d9..a54a802 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -1705,6 +1705,13 @@ static pl_shader sample_el(struct pass_state *pass, const struct pl_frame *el,
+                  ref_tex->params.w, ref_tex->params.h, sx, sy,
+                  src.rect.x0, src.rect.y0, src.rect.x1, src.rect.y1);
+ 
++        if (plane->flipped) {
++            const float plane_h = el_ref->params.h *
++                (ry >= 1 ? roundf(ry) : 1.0f / roundf(1.0f / ry));
++            src.rect.y0 = plane_h - src.rect.y0;
++            src.rect.y1 = plane_h - src.rect.y1;
++        }
++
+         pl_shader plane_sh = pl_dispatch_begin_ex(rr->dp, true);
+         dispatch_sampler(pass, plane_sh, &rr->samplers_el[i], SAMPLER_PLANE,
+                          NULL, &src);
+@@ -3747,6 +3754,7 @@ void pl_frames_infer(pl_renderer rr, struct pl_frame *image,
+ 
+ static bool pass_init(struct pass_state *pass, bool acquire_image)
+ {
++    const bool target_already_acquired = pass->acquired.target;
+     struct pl_frame *image = pass->src_ref < 0 ? NULL : &pass->image;
+     struct pl_frame *target = &pass->target;
+ 
+@@ -3784,8 +3792,10 @@ static bool pass_init(struct pass_state *pass, bool acquire_image)
+                 pass->enhancement_layer = *image->enhancement_layer;
+                 image->enhancement_layer = &pass->enhancement_layer;
+                 if (!acquire_frame(pass, &pass->enhancement_layer,
+-                                   &pass->acquired.enhancement_layer))
++                                   &pass->acquired.enhancement_layer)) {
++                    pass->dovi_fatal = pass->params->dovi_map && image->dovi_rpu_size;
+                     goto error;
++                }
+             } else {
+                 // EL was attached but won't be composed, drop it.
+                 image->enhancement_layer = NULL;
+@@ -3803,6 +3813,9 @@ static bool pass_init(struct pass_state *pass, bool acquire_image)
+     return true;
+ 
+ error:
++    // A mixer subpass borrows the outer target's existing acquisition.
++    if (target_already_acquired)
++        pass->acquired.target = false;
+     pass_uninit(pass);
+     return false;
+ }
+@@ -4304,8 +4317,10 @@ retry:
+ 
+             // Render a single frame up to `pass_output_target`
+             memcpy(inter_pass.fbofmt, pass.fbofmt, sizeof(pass.fbofmt));
+-            if (!pass_init(&inter_pass, true))
+-                goto fail;
++            if (!pass_init(&inter_pass, true)) {
++                ok = false;
++                goto inter_pass_released;
++            }
+ 
+             pass_begin_frame(&inter_pass);
+             if (!(ok = pass_read_image(&inter_pass)))
+@@ -4362,6 +4377,7 @@ retry:
+ inter_pass_error:
+             inter_pass.acquired.target = false; // don't release target
+             pass_uninit(&inter_pass);
++inter_pass_released:
+             if (inter_pass.dovi_fatal) {
+                 // A failure on any contributing frame is fatal, including a
+                 // non-reference frame. Never retry just the reference image.

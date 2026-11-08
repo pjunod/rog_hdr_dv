@@ -515,11 +515,16 @@
       "component": "ubuntu-ffmpeg-system-dv",
       "base_commit": "310aa258610e3acf5cdab4ade2e19e3e1b6438e8",
       "base_tree": "db3ae0877e7860f0c8e57a2500612a45b027e59d",
-      "candidate_commit": "7ed5a5d24c23514bfbed18d950c1ad99d4ff4338",
-      "candidate_tree": "a1c874fd73030e53fa675e882f50494a58f87c2b",
-      "patch_count": 1,
+      "candidate_commit": "146b898d0245c354eb28856b212d0f2501b82daf",
+      "candidate_tree": "c193755decc059eb6ac539e76905b4bafb22a79e",
+      "patch_count": 6,
       "patch_order": [
-        "0001-ffmpeg-shared-display-management.patch"
+        "0001-ffmpeg-shared-display-management.patch",
+        "0002-backport-dovi-split-bitstream-filter.patch",
+        "0003-check-length-of-split-NAL-units.patch",
+        "0004-use-upstream-HEVC-configuration-packet-side-data.patch",
+        "0005-provide-strict-frame-owned-Dolby-metadata.patch",
+        "0006-version-distro-resolver-symbols.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -547,7 +552,8 @@
             "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/ffmpeg_8.1.2-2ubuntu2.debian.tar.xz"
           }
         ]
-      }
+      },
+      "candidate_status": "Staged version 7:8.1.2-2ubuntu2+rogdv2. Decoder adds dual-layer splitting and strict resolved-picture metadata. Deployment and complete package qualification are pending."
     },
     {
       "component": "ubuntu-libplacebo-system-dv",
@@ -779,6 +785,32 @@
       },
       "candidate_status": "Reviewed source, native GDK discovery and Ubuntu-default package build passed. Six-package offline forward and stock rollback plans passed. No host installation.",
       "candidate_package_version": "4.24.1+ds-1+rogdv1"
+    },
+    {
+      "component": "libplacebo-fel-system-dv",
+      "upstream": "https://github.com/haasn/libplacebo.git",
+      "base_commit": "275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
+      "base_tree": "9e95f4eff8376fa4bc5c9b932953946ee27dc443",
+      "candidate_commit": "8d7b8055b55df5b7b66c3373d91df832ee1dec55",
+      "candidate_tree": "55196f55f7e57cc8e81ce1fd67408159811eb4f0",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-map-the-native-reconstructed-dolby-master.patch",
+        "0002-propagate-flipped-planes-and-contributing-frame-errors.patch"
+      ]
+    },
+    {
+      "component": "mpv-fel-system-dv",
+      "upstream": "https://github.com/mpv-player/mpv.git",
+      "base_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
+      "base_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
+      "candidate_commit": "b5559002e694d156ada4af4ce3f5acea5d884a3c",
+      "candidate_tree": "04223cd5916a0b6289056a0227715c718ecbbffc",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
+        "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch"
+      ]
     }
   ]
 }
