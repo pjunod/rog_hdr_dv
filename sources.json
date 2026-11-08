@@ -676,13 +676,14 @@
       "component": "ubuntu-gst-plugins-base-rpu",
       "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
       "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
-      "candidate_commit": "752d41500972a2b09be88f8d4fd0b5e393f3a66a",
-      "candidate_tree": "9d721e6e19b91b394f2326a5e1931aaf6c66839f",
-      "patch_count": 3,
+      "candidate_commit": "4d7ff5c79950aef458a506395b4fe7b78345a2bd",
+      "candidate_tree": "48967577303944e3b5dc66df978ea33e150de0ff",
+      "patch_count": 4,
       "patch_order": [
         "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
         "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch",
-        "0003-package-frame-metadata-and-configuration-interfaces.patch"
+        "0003-package-frame-metadata-and-configuration-interfaces.patch",
+        "0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -711,7 +712,8 @@
           }
         ]
       },
-      "candidate_status": "Normal Ubuntu base binary and development packages built. The runtime identifies the required frame metadata and configuration API."
+      "candidate_status": "The normal source and binary packages preserve normalized 16-bit GL color and discard color-sensitive provenance after pixel changes. The four-patch replay matches the distributed source tree.",
+      "candidate_package_version": "1.28.7-1+rogdv2"
     },
     {
       "component": "ubuntu-gst-plugins-bad-rpu",

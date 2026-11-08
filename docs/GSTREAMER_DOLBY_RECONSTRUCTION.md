@@ -49,6 +49,10 @@ the original source offset again would crop the image twice. Size, orientation
 and colorspace tags prevent ordinary transformed buffers from retaining this
 source snapshot; native 180-degree rotation was checked explicitly.
 
+## High-precision GL color balance
+
+Ubuntu’s GL color balance previously accepted only RGBA8. The normal GStreamer base package now also accepts normalized RGBA64. Neutral processing preserves the native picture and all 4,096 levels in a 12-bit ramp. Nonneutral brightness, contrast and saturation produce more than 256 levels and clear the original picture’s color-dependent metadata. The versioned source package carries the change in its Debian quilt series. The public reconstruction produces the complete unpacked source tree of `gst-plugins-base1.0 1.28.7-1+rogdv2`. [Measurements](../evidence/gstreamer-gtk-private-development-20261108.json) · [Source registry](../sources.json).
+
 ## How container configuration stays attached
 
 The common GstPbutils parser validates exact `dovi-configuration` GstBuffer
