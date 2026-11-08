@@ -1,5 +1,11 @@
 # Preferred display targets for GTK playback
 
+## Requesting high-precision presentation
+
+A client that already knows its source needs HDR can request a Wayland HDR rendering lease on its own surface. Its state reports the current target generation, transfer, primaries and actual framebuffer precision after presentation. Moving the window, replacing the draw context or releasing the last request invalidates the previous witness. The app can use the same preferred-target snapshot to regrade the source for a new monitor.
+
+In the native EGL fixture, an SDR window first used eight bits, then acquired a ten-bit PQ framebuffer. Four framebuffer samples covered 203 and 101.5 cd/m² SDR UI, a 400 cd/m² PQ video patch and their 301.5 cd/m² linear-light mix. The quantized samples matched those four PQ values. Replacing the renderer with Cairo restored eight-bit sRGB, and destroying the surface cleared the request. The fixture used a private compositor. Default backend and normal player evidence have a separate scope.
+
 **State, November 7, 2026:** proposed source prerequisite for native GTK/GStreamer
 playback. Ubuntu GTK `4.24.1+ds-1` and the candidate GDK libraries compile on
 amd64. A clean patch replay reproduces the complete pinned candidate tree.

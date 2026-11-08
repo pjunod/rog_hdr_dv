@@ -1,0 +1,1518 @@
+diff --git a/debian/changelog b/debian/changelog
+index 6d4d5d0..9e39409 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,12 @@
++gtk4 (4.24.1+ds-1+rogdv2) stonking; urgency=medium
++
++  * Add surface-owned, independently released HDR rendering leases.
++  * Verify actual native framebuffer precision and committed color state.
++  * Composite leased HDR windows in linear Rec.2100 and preserve SDR fallback.
++  * Stage matching Wayland introspection and additive public symbol pins.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 04:00:00 +0000
++
+ gtk4 (4.24.1+ds-1+rogdv1) stonking; urgency=medium
+ 
+   * Retain the compositor's preferred physical target for native GTK consumers.
+diff --git a/debian/libgtk-4-1.symbols.in b/debian/libgtk-4-1.symbols.in
+index f0002fb..9fbb683 100644
+--- a/debian/libgtk-4-1.symbols.in
++++ b/debian/libgtk-4-1.symbols.in
+@@ -701,10 +701,13 @@ libgtk-@APIVER@.so.@SONAME@ @SHARED_PKG@ #MINVER#
+  (arch=linux-any)gdk_wayland_popup_get_type@Base 4.0.0
+  (arch=linux-any)gdk_wayland_seat_get_type@Base 4.0.0
+  (arch=linux-any)gdk_wayland_seat_get_wl_seat@Base 4.0.0
++ (arch=linux-any)gdk_wayland_hdr_rendering_get_state@Base 4.24.1+ds-1+rogdv2
++ (arch=linux-any)gdk_wayland_hdr_rendering_get_type@Base 4.24.1+ds-1+rogdv2
+  (arch=linux-any)gdk_wayland_surface_force_next_commit@Base 4.17.3
+  (arch=linux-any)gdk_wayland_surface_get_color_target@Base 4.24.1+ds-1+rogdv1
+  (arch=linux-any)gdk_wayland_surface_get_type@Base 4.0.0
+  (arch=linux-any)gdk_wayland_surface_get_wl_surface@Base 4.0.0
++ (arch=linux-any)gdk_wayland_surface_request_hdr_rendering@Base 4.24.1+ds-1+rogdv2
+  (arch=linux-any)gdk_wayland_toplevel_drop_exported_handle@Base 4.12.0
+  (arch=linux-any)gdk_wayland_toplevel_export_handle@Base 4.0.0
+  (arch=linux-any)gdk_wayland_toplevel_get_type@Base 4.0.0
+diff --git a/debian/patches/series b/debian/patches/series
+index 0f5f60e..c344ca5 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -15,3 +15,4 @@ x11-scale/gdk-x11-update-correct-shadow-size-according-to-window-si.patch
+ x11-scale/gdk-x11-update-cursor-size-on-the-extent-after-scale-chan.patch
+ testsuite-Don-t-build-waylandsocket-test-if-Wayland-is-di.patch
+ wayland-preferred-color-target.patch
++wayland-hdr-rendering-lease.patch
+diff --git a/debian/patches/wayland-hdr-rendering-lease.patch b/debian/patches/wayland-hdr-rendering-lease.patch
+new file mode 100644
+index 0000000..b08a9ed
+--- /dev/null
++++ b/debian/patches/wayland-hdr-rendering-lease.patch
+@@ -0,0 +1,1468 @@
++diff --git a/gdk/gdkglcontext.c b/gdk/gdkglcontext.c
++index ae06a06..c7874ba 100644
++--- a/gdk/gdkglcontext.c
+++++ b/gdk/gdkglcontext.c
++@@ -140,6 +140,8 @@ struct _GdkGLContextPrivate
++   gpointer egl_native_window;
++   EGLSurface egl_surface;
++   GdkMemoryDepth egl_surface_depth;
+++  gboolean last_egl_submit;
+++  gboolean egl_surface_hdr_requested;
++   EGLContext egl_context;
++   EGLBoolean (*eglSwapBuffersWithDamage) (EGLDisplay, EGLSurface, const EGLint *, EGLint);
++ #endif
++@@ -647,7 +649,9 @@ gdk_gl_context_ensure_egl_surface (GdkGLContext   *self,
++         depth = priv->egl_surface_depth;
++     }
++ 
+++  gboolean hdr_requested = gdk_surface_get_hdr_rendering_requested (surface);
++   if (priv->egl_surface == NULL ||
+++      priv->egl_surface_hdr_requested != hdr_requested ||
++       (priv->egl_surface != NULL &&
++        gdk_display_get_egl_config (display, priv->egl_surface_depth) != gdk_display_get_egl_config (display, depth)))
++     {
++@@ -661,8 +665,28 @@ gdk_gl_context_ensure_egl_surface (GdkGLContext   *self,
++       if (priv->egl_surface != NULL)
++         eglDestroySurface (gdk_display_get_egl_display (display), priv->egl_surface);
++ 
++-      egl_display = gdk_display_get_egl_display (display),
++-      egl_config = gdk_display_get_egl_config (display, depth),
+++      egl_display = gdk_display_get_egl_display (display);
+++      egl_config = gdk_display_get_egl_config (display, depth);
+++
+++      /* A leased HDR surface may use a real ten-bit window buffer when the
+++       * display's float config falls back to eight bits. Other surfaces keep
+++       * their existing config selection. */
+++      if (gdk_surface_get_hdr_rendering_requested (surface) && depth != GDK_MEMORY_U8)
+++        {
+++          EGLint red = 0;
+++          eglGetConfigAttrib (egl_display, egl_config, EGL_RED_SIZE, &red);
+++          if (red < 10)
+++            {
+++              EGLConfig candidate;
+++              EGLint count = 0;
+++              EGLint attrs[] = { EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+++                EGL_RENDERABLE_TYPE, gdk_gl_context_get_use_es (self) ? EGL_OPENGL_ES2_BIT : EGL_OPENGL_BIT,
+++                EGL_RED_SIZE, 10, EGL_GREEN_SIZE, 10, EGL_BLUE_SIZE, 10,
+++                EGL_ALPHA_SIZE, 2, EGL_COLOR_BUFFER_TYPE, EGL_RGB_BUFFER, EGL_NONE };
+++              if (eglChooseConfig (egl_display, attrs, &candidate, 1, &count) && count)
+++                egl_config = candidate;
+++            }
+++        }
++ 
++       i = 0;
++ /*
++@@ -689,7 +713,13 @@ gdk_gl_context_ensure_egl_surface (GdkGLContext   *self,
++                                                       (EGLNativeWindowType) priv->egl_native_window,
++                                                       NULL);
++         }
+++      if (priv->egl_surface == EGL_NO_SURFACE &&
+++          gdk_surface_get_hdr_rendering_requested (surface))
+++        priv->egl_surface = eglCreateWindowSurface (egl_display,
+++            gdk_display_get_egl_config (display, GDK_MEMORY_U8),
+++            (EGLNativeWindowType) priv->egl_native_window, NULL);
++       priv->egl_surface_depth = depth;
+++      priv->egl_surface_hdr_requested = hdr_requested;
++ 
++       if (cleared)
++         {
++@@ -700,6 +730,48 @@ gdk_gl_context_ensure_egl_surface (GdkGLContext   *self,
++ }
++ #endif
++ 
+++gboolean
+++gdk_gl_context_get_framebuffer_info (GdkGLContext *self, guint *red, guint *green,
+++                                      guint *blue, gboolean *floating_point)
+++{
+++#ifdef HAVE_EGL
+++  GdkGLContextPrivate *priv = gdk_gl_context_get_instance_private (self);
+++  GdkDisplay *display = gdk_draw_context_get_display (GDK_DRAW_CONTEXT (self));
+++  EGLDisplay egl_display = gdk_display_get_egl_display (display);
+++  EGLint id, count, r, g, b, type = EGL_COLOR_COMPONENT_TYPE_FIXED_EXT;
+++  EGLConfig config;
+++  if (!priv->egl_context || !priv->egl_surface ||
+++      !eglQuerySurface (egl_display, priv->egl_surface, EGL_CONFIG_ID, &id))
+++    return FALSE;
+++  EGLint attrs[] = { EGL_CONFIG_ID, id, EGL_SURFACE_TYPE, EGL_DONT_CARE,
+++                     EGL_RENDERABLE_TYPE, EGL_DONT_CARE, EGL_NONE };
+++  if (!eglChooseConfig (egl_display, attrs, &config, 1, &count) || count != 1 ||
+++      !eglGetConfigAttrib (egl_display, config, EGL_RED_SIZE, &r) ||
+++      !eglGetConfigAttrib (egl_display, config, EGL_GREEN_SIZE, &g) ||
+++      !eglGetConfigAttrib (egl_display, config, EGL_BLUE_SIZE, &b))
+++    return FALSE;
+++  if (epoxy_has_egl_extension (egl_display, "EGL_EXT_pixel_format_float") &&
+++      !eglGetConfigAttrib (egl_display, config, EGL_COLOR_COMPONENT_TYPE_EXT, &type))
+++    return FALSE;
+++  *red = r; *green = g; *blue = b;
+++  *floating_point = type == EGL_COLOR_COMPONENT_TYPE_FLOAT_EXT;
+++  return TRUE;
+++#else
+++  return FALSE;
+++#endif
+++}
+++
+++gboolean
+++gdk_gl_context_get_last_submit (GdkGLContext *self)
+++{
+++#ifdef HAVE_EGL
+++  GdkGLContextPrivate *priv = gdk_gl_context_get_instance_private (self);
+++  return priv->last_egl_submit;
+++#else
+++  return FALSE;
+++#endif
+++}
+++
++ static void
++ gdk_gl_context_real_begin_frame (GdkDrawContext  *draw_context,
++                                  gpointer         context_data,
++@@ -736,6 +808,18 @@ gdk_gl_context_real_begin_frame (GdkDrawContext  *draw_context,
++   
++   *out_depth = priv->egl_surface_depth;
++   *out_color_state = color_state;
+++  priv->last_egl_submit = FALSE;
+++  if (gdk_surface_get_hdr_rendering_requested (surface))
+++    {
+++      guint red = 0, green = 0, blue = 0;
+++      gboolean floating_point;
+++      if (!gdk_gl_context_get_framebuffer_info (context, &red, &green, &blue, &floating_point) ||
+++          red < 10 || green < 10 || blue < 10)
+++        {
+++          *out_color_state = GDK_COLOR_STATE_SRGB;
+++          *out_depth = GDK_MEMORY_U8;
+++        }
+++    }
++ #else
++   *out_color_state = gdk_color_state_get_srgb ();
++   *out_depth = GDK_MEMORY_U8;
++@@ -818,11 +902,11 @@ gdk_gl_context_real_end_frame (GdkDrawContext *draw_context,
++           rects[j++] = rect.width;
++           rects[j++] = rect.height;
++         }
++-      priv->eglSwapBuffersWithDamage (gdk_display_get_egl_display (display), priv->egl_surface, rects, n_rects);
+++      priv->last_egl_submit = priv->eglSwapBuffersWithDamage (gdk_display_get_egl_display (display), priv->egl_surface, rects, n_rects);
++       g_free (heap_rects);
++     }
++   else
++-    eglSwapBuffers (gdk_display_get_egl_display (display), priv->egl_surface);
+++    priv->last_egl_submit = eglSwapBuffers (gdk_display_get_egl_display (display), priv->egl_surface);
++ #endif
++ 
++   gdk_profiler_add_mark (begin_time, GDK_PROFILER_CURRENT_TIME - begin_time, "EGL swap buffers", NULL);
++@@ -840,6 +924,8 @@ gdk_gl_context_surface_detach (GdkDrawContext *draw_context)
++   g_assert (priv->egl_surface == NULL);
++ 
++   priv->egl_surface_depth = GDK_MEMORY_NONE;
+++  priv->last_egl_submit = FALSE;
+++  priv->egl_surface_hdr_requested = FALSE;
++ #endif
++ }
++ 
++diff --git a/gdk/gdkglcontextprivate.h b/gdk/gdkglcontextprivate.h
++index 5411579..f3ef5d5 100644
++--- a/gdk/gdkglcontextprivate.h
+++++ b/gdk/gdkglcontextprivate.h
++@@ -196,3 +196,8 @@ gboolean                gdk_gl_context_export_dmabuf            (GdkGLContext
++                                                                  GdkDmabuf       *dmabuf);
++ 
++ G_END_DECLS
+++
+++gboolean gdk_gl_context_get_framebuffer_info (GdkGLContext *self, guint *red,
+++                                              guint *green, guint *blue,
+++                                              gboolean *floating_point);
+++gboolean gdk_gl_context_get_last_submit (GdkGLContext *self);
++diff --git a/gdk/gdksurface.c b/gdk/gdksurface.c
++index 6f05e92..ebb5227 100644
++--- a/gdk/gdksurface.c
+++++ b/gdk/gdksurface.c
++@@ -83,6 +83,7 @@ struct _GdkSurfacePrivate
++   gpointer widget;
++ 
++   GdkColorState *color_state;
+++  gboolean hdr_rendering_requested;
++ };
++ 
++ enum {
++@@ -3072,6 +3073,20 @@ gdk_surface_get_subsurface (GdkSurface *surface,
++   return g_ptr_array_index (surface->subsurfaces, idx);
++ }
++ 
+++gboolean
+++gdk_surface_get_hdr_rendering_requested (GdkSurface *surface)
+++{
+++  GdkSurfacePrivate *priv = gdk_surface_get_instance_private (surface);
+++  return priv->hdr_rendering_requested;
+++}
+++
+++void
+++gdk_surface_set_hdr_rendering_requested (GdkSurface *surface, gboolean requested)
+++{
+++  GdkSurfacePrivate *priv = gdk_surface_get_instance_private (surface);
+++  priv->hdr_rendering_requested = requested;
+++}
+++
++ GdkColorState *
++ gdk_surface_get_color_state (GdkSurface *surface)
++ {
++@@ -3111,7 +3126,11 @@ gdk_surface_set_attached_context (GdkSurface     *self,
++ {
++   GdkSurfacePrivate *priv = gdk_surface_get_instance_private (self);
++ 
+++  if (priv->attached_context == context)
+++    return;
++   priv->attached_context = context;
+++  if (GDK_SURFACE_GET_CLASS (self)->draw_context_changed)
+++    GDK_SURFACE_GET_CLASS (self)->draw_context_changed (self);
++ }
++ 
++ GdkDrawContext *
++diff --git a/gdk/gdksurfaceprivate.h b/gdk/gdksurfaceprivate.h
++index 5ad36de..e3082c7 100644
++--- a/gdk/gdksurfaceprivate.h
+++++ b/gdk/gdksurfaceprivate.h
++@@ -173,6 +173,7 @@ struct _GdkSurfaceClass
++   /* Optional notification after native teardown and destroyed=TRUE.
++    * The core holds a reference across this callback and remaining cleanup. */
++   void         (* after_destroy)          (GdkSurface          *surface);
+++  void         (* draw_context_changed)   (GdkSurface          *surface);
++ };
++ 
++ #define GDK_SURFACE_DESTROYED(d) (((GdkSurface *)(d))->destroyed)
++@@ -382,3 +383,6 @@ gboolean   gdk_surface_real_should_set_opaque_rect (GdkSurface *surface,
++ 
++ 
++ G_END_DECLS
+++
+++gboolean gdk_surface_get_hdr_rendering_requested (GdkSurface *surface);
+++void gdk_surface_set_hdr_rendering_requested (GdkSurface *surface, gboolean requested);
++diff --git a/gdk/gdkvulkancontext.c b/gdk/gdkvulkancontext.c
++index add988d..7047172 100644
++--- a/gdk/gdkvulkancontext.c
+++++ b/gdk/gdkvulkancontext.c
++@@ -98,6 +98,11 @@ struct _GdkVulkanContextPrivate {
++     GdkMemoryFormat gdk_format;
++   } formats[GDK_N_DEPTHS];
++   GdkMemoryDepth current_depth;
+++  VkSurfaceFormatKHR hdr_format;
+++  GdkMemoryFormat hdr_memory_format;
+++  gboolean last_vk_submit;
+++  VkFormat bound_format;
+++  VkColorSpaceKHR bound_colorspace;
++ 
++   VkSwapchainKHR swapchain;
++ 
++@@ -552,6 +557,8 @@ gdk_vulkan_context_check_swapchain (GdkVulkanContext  *context,
++   if (res == VK_SUCCESS)
++     {
++       priv->swapchain = new_swapchain;
+++      priv->bound_format = priv->formats[priv->current_depth].vk_format.format;
+++      priv->bound_colorspace = priv->formats[priv->current_depth].vk_format.colorSpace;
++ 
++       GDK_VK_CHECK (vkGetSwapchainImagesKHR, device,
++                                              priv->swapchain,
++@@ -817,6 +824,40 @@ gdk_vulkan_context_release_presents (GdkVulkanContext *self,
++     }
++ }
++ 
+++gboolean
+++gdk_vulkan_context_get_framebuffer_info (GdkVulkanContext *self, guint *red,
+++                                          guint *green, guint *blue,
+++                                          gboolean *floating_point)
+++{
+++  GdkVulkanContextPrivate *priv = gdk_vulkan_context_get_instance_private (self);
+++  VkFormat format = priv->bound_format;
+++  /* GDK supplies the Wayland content description itself. A pass-through
+++   * swapchain is the explicit contract that the WSI applies no competing
+++   * encoding conversion or description to these PQ framebuffer values. */
+++  if (priv->bound_colorspace != VK_COLOR_SPACE_PASS_THROUGH_EXT)
+++    return FALSE;
+++  *floating_point = FALSE;
+++  switch (format)
+++    {
+++    case VK_FORMAT_B8G8R8A8_UNORM: case VK_FORMAT_R8G8B8A8_UNORM:
+++      *red = *green = *blue = 8; return TRUE;
+++    case VK_FORMAT_A2R10G10B10_UNORM_PACK32: case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+++      *red = *green = *blue = 10; return TRUE;
+++    case VK_FORMAT_R16G16B16A16_SFLOAT:
+++      *red = *green = *blue = 16; *floating_point = TRUE; return TRUE;
+++    case VK_FORMAT_R32G32B32A32_SFLOAT:
+++      *red = *green = *blue = 32; *floating_point = TRUE; return TRUE;
+++    default: return FALSE;
+++    }
+++}
+++
+++gboolean
+++gdk_vulkan_context_get_last_submit (GdkVulkanContext *self)
+++{
+++  GdkVulkanContextPrivate *priv = gdk_vulkan_context_get_instance_private (self);
+++  return priv->last_vk_submit;
+++}
+++
++ static void
++ gdk_vulkan_context_begin_frame (GdkDrawContext  *draw_context,
++                                 gpointer         context_data,
++@@ -848,9 +889,26 @@ gdk_vulkan_context_begin_frame (GdkDrawContext  *draw_context,
++   color_state = gdk_surface_get_color_state (surface);
++   depth = gdk_memory_depth_merge (depth, gdk_color_state_get_depth (color_state));
++ 
++-  if (depth != priv->current_depth && depth != GDK_MEMORY_NONE)
+++  gboolean hdr_format_changed = FALSE;
+++  VkSurfaceFormatKHR old_hdr16 = priv->formats[GDK_MEMORY_FLOAT16].vk_format;
+++  GdkMemoryFormat old_gdk16 = priv->formats[GDK_MEMORY_FLOAT16].gdk_format;
+++  VkSurfaceFormatKHR old_hdr32 = priv->formats[GDK_MEMORY_FLOAT32].vk_format;
+++  GdkMemoryFormat old_gdk32 = priv->formats[GDK_MEMORY_FLOAT32].gdk_format;
+++  priv->last_vk_submit = FALSE;
+++  if (gdk_surface_get_hdr_rendering_requested (surface) &&
+++      priv->hdr_format.format != VK_FORMAT_UNDEFINED &&
+++      (priv->formats[GDK_MEMORY_FLOAT16].vk_format.format == VK_FORMAT_B8G8R8A8_UNORM ||
+++       priv->formats[GDK_MEMORY_FLOAT16].vk_format.format == VK_FORMAT_R8G8B8A8_UNORM))
++     {
++-      if (priv->formats[depth].vk_format.format != priv->formats[priv->current_depth].vk_format.format ||
+++      hdr_format_changed = TRUE;
+++      priv->formats[GDK_MEMORY_FLOAT16].vk_format = priv->hdr_format;
+++      priv->formats[GDK_MEMORY_FLOAT16].gdk_format = priv->hdr_memory_format;
+++      priv->formats[GDK_MEMORY_FLOAT32] = priv->formats[GDK_MEMORY_FLOAT16];
+++    }
+++
+++  if ((depth != priv->current_depth || hdr_format_changed) && depth != GDK_MEMORY_NONE)
+++    {
+++      if (hdr_format_changed || priv->formats[depth].vk_format.format != priv->formats[priv->current_depth].vk_format.format ||
++           priv->formats[depth].vk_format.colorSpace != priv->formats[priv->current_depth].vk_format.colorSpace)
++         {
++           GdkMemoryDepth old_depth = priv->current_depth;
++@@ -862,6 +920,13 @@ gdk_vulkan_context_begin_frame (GdkDrawContext  *draw_context,
++               g_warning ("%s", error->message);
++               g_error_free (error);
++               priv->current_depth = old_depth;
+++              if (hdr_format_changed)
+++                {
+++                  priv->formats[GDK_MEMORY_FLOAT16].vk_format = old_hdr16;
+++                  priv->formats[GDK_MEMORY_FLOAT16].gdk_format = old_gdk16;
+++                  priv->formats[GDK_MEMORY_FLOAT32].vk_format = old_hdr32;
+++                  priv->formats[GDK_MEMORY_FLOAT32].gdk_format = old_gdk32;
+++                }
++             }
++         }
++     }
++@@ -933,6 +998,17 @@ gdk_vulkan_context_begin_frame (GdkDrawContext  *draw_context,
++ 
++   *out_color_state = color_state;
++   *out_depth = priv->current_depth;
+++  if (gdk_surface_get_hdr_rendering_requested (surface))
+++    {
+++      guint red = 0, green = 0, blue = 0;
+++      gboolean floating_point;
+++      if (!gdk_vulkan_context_get_framebuffer_info (context, &red, &green, &blue, &floating_point) ||
+++          red < 10 || green < 10 || blue < 10)
+++        {
+++          *out_color_state = GDK_COLOR_STATE_SRGB;
+++          *out_depth = GDK_MEMORY_U8;
+++        }
+++    }
++ }
++ 
++ static void
++@@ -991,7 +1067,7 @@ gdk_vulkan_context_end_frame (GdkDrawContext *draw_context,
++         }
++     }
++ 
++-  GDK_VK_CHECK (vkQueuePresentKHR, gdk_vulkan_context_get_queue (context),
+++  VkResult submit_result = GDK_VK_CHECK (vkQueuePresentKHR, gdk_vulkan_context_get_queue (context),
++                                    &(VkPresentInfoKHR) {
++                                        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
++                                        .waitSemaphoreCount = 1,
++@@ -1008,6 +1084,8 @@ gdk_vulkan_context_end_frame (GdkDrawContext *draw_context,
++                                        .pNext = pNext,
++                                    });
++ 
+++  priv->last_vk_submit = submit_result == VK_SUCCESS || submit_result == VK_SUBOPTIMAL_KHR;
+++
++   cairo_region_destroy (priv->regions[present->image_index]);
++   priv->regions[present->image_index] = cairo_region_create ();
++ }
++@@ -1100,6 +1178,17 @@ gdk_vulkan_context_surface_attach (GdkDrawContext  *context,
++                   }
++                 break;
++ 
+++              case VK_FORMAT_A2R10G10B10_UNORM_PACK32:
+++              case VK_FORMAT_A2B10G10R10_UNORM_PACK32:
+++                if (priv->hdr_format.format == VK_FORMAT_UNDEFINED ||
+++                    formats[i].colorSpace == VK_COLOR_SPACE_PASS_THROUGH_EXT)
+++                  {
+++                    priv->hdr_format = formats[i];
+++                    priv->hdr_memory_format = formats[i].format == VK_FORMAT_A2R10G10B10_UNORM_PACK32
+++                      ? GDK_MEMORY_ARGB2101010_PREMULTIPLIED : GDK_MEMORY_ABGR2101010_PREMULTIPLIED;
+++                  }
+++                break;
+++
++               case VK_FORMAT_R16G16B16A16_SFLOAT:
++                 if (priv->formats[GDK_MEMORY_FLOAT16].vk_format.colorSpace != VK_COLOR_SPACE_PASS_THROUGH_EXT)
++                   {
++diff --git a/gdk/gdkvulkancontextprivate.h b/gdk/gdkvulkancontextprivate.h
++index b6386ac..74cf266 100644
++--- a/gdk/gdkvulkancontextprivate.h
+++++ b/gdk/gdkvulkancontextprivate.h
++@@ -108,3 +108,10 @@ gdk_display_ref_vulkan (GdkDisplay  *display,
++ #endif /* !GDK_RENDERING_VULKAN */
++ 
++ G_END_DECLS
+++
+++#ifdef GDK_RENDERING_VULKAN
+++gboolean gdk_vulkan_context_get_framebuffer_info (GdkVulkanContext *self, guint *red,
+++                                                  guint *green, guint *blue,
+++                                                  gboolean *floating_point);
+++gboolean gdk_vulkan_context_get_last_submit (GdkVulkanContext *self);
+++#endif
++diff --git a/gdk/wayland/gdkcairocontext-wayland.c b/gdk/wayland/gdkcairocontext-wayland.c
++index e6cf2ad..2494719 100644
++--- a/gdk/wayland/gdkcairocontext-wayland.c
+++++ b/gdk/wayland/gdkcairocontext-wayland.c
++@@ -178,8 +178,12 @@ gdk_wayland_cairo_context_begin_frame (GdkDrawContext  *draw_context,
++   cairo_fill (cr);
++   cairo_destroy (cr);
++ 
++-  *out_color_state = gdk_surface_get_color_state (surface);
+++  /* SHM Cairo buffers are eight-bit. A rendering lease must not turn them
+++   * into quantized PQ or inherit an old GPU context's HDR witness. */
+++  *out_color_state = gdk_surface_get_hdr_rendering_requested (surface)
+++                   ? GDK_COLOR_STATE_SRGB : gdk_surface_get_color_state (surface);
++   *out_depth = GDK_MEMORY_U8;
+++  gdk_wayland_surface_hdr_frame_begin (surface, draw_context, *out_color_state);
++ }
++ 
++ static void
++@@ -198,6 +202,7 @@ gdk_wayland_cairo_context_end_frame (GdkDrawContext *draw_context,
++   gdk_profiler_add_mark (GDK_PROFILER_CURRENT_TIME, 0, "Wayland surface commit", NULL);
++   gdk_wayland_surface_commit (surface);
++   gdk_wayland_surface_notify_committed (surface);
+++  gdk_wayland_surface_hdr_frame_presented (surface, draw_context, FALSE, 8, 8, 8, FALSE);
++ 
++   g_clear_pointer (&self->paint_surface, gdk_wayland_cairo_context_surface_clear_region);
++ }
++diff --git a/gdk/wayland/gdkglcontext-wayland.c b/gdk/wayland/gdkglcontext-wayland.c
++index c2e9975..32de562 100644
++--- a/gdk/wayland/gdkglcontext-wayland.c
+++++ b/gdk/wayland/gdkglcontext-wayland.c
++@@ -58,6 +58,17 @@ struct _GdkWaylandGLContextClass
++ 
++ G_DEFINE_TYPE (GdkWaylandGLContext, gdk_wayland_gl_context, GDK_TYPE_GL_CONTEXT)
++ 
+++static void
+++gdk_wayland_gl_context_begin_frame (GdkDrawContext *context, gpointer context_data,
+++                         cairo_region_t *region, GdkColorState **out_color_state,
+++                         GdkMemoryDepth *out_depth)
+++{
+++  GDK_DRAW_CONTEXT_CLASS (gdk_wayland_gl_context_parent_class)->begin_frame (
+++      context, context_data, region, out_color_state, out_depth);
+++  gdk_wayland_surface_hdr_frame_begin (gdk_draw_context_get_surface (context),
+++                                       context, *out_color_state);
+++}
+++
++ static void
++ gdk_wayland_gl_context_end_frame (GdkDrawContext *draw_context,
++                                   gpointer        context_data,
++@@ -84,6 +95,16 @@ gdk_wayland_gl_context_end_frame (GdkDrawContext *draw_context,
++ 
++   GDK_DRAW_CONTEXT_CLASS (gdk_wayland_gl_context_parent_class)->end_frame (draw_context, context_data, painted);
++ 
+++  if (impl->hdr_requests)
+++    {
+++      guint red = 0, green = 0, blue = 0;
+++      gboolean floating_point = FALSE;
+++      gboolean known = gdk_gl_context_get_framebuffer_info (GDK_GL_CONTEXT (draw_context),
+++                                                            &red, &green, &blue, &floating_point);
+++      gdk_wayland_surface_hdr_frame_presented (surface, draw_context,
+++          known && gdk_gl_context_get_last_submit (GDK_GL_CONTEXT (draw_context)),
+++          red, green, blue, floating_point);
+++    }
++   gdk_wayland_surface_notify_committed (surface);
++ }
++ 
++@@ -148,6 +169,7 @@ gdk_wayland_gl_context_class_init (GdkWaylandGLContextClass *klass)
++   GdkDrawContextClass *draw_context_class = GDK_DRAW_CONTEXT_CLASS (klass);
++   GdkGLContextClass *context_class = GDK_GL_CONTEXT_CLASS (klass);
++ 
+++  draw_context_class->begin_frame = gdk_wayland_gl_context_begin_frame;
++   draw_context_class->end_frame = gdk_wayland_gl_context_end_frame;
++   draw_context_class->empty_frame = gdk_wayland_gl_context_empty_frame;
++   draw_context_class->surface_attach = gdk_wayland_gl_context_surface_attach;
++diff --git a/gdk/wayland/gdksurface-wayland-private.h b/gdk/wayland/gdksurface-wayland-private.h
++index 37deb34..47d6cc2 100644
++--- a/gdk/wayland/gdksurface-wayland-private.h
+++++ b/gdk/wayland/gdksurface-wayland-private.h
++@@ -47,6 +47,16 @@ struct _GdkWaylandSurface
++   GdkWaylandColorTarget color_target;
++   gboolean color_target_valid;
++ 
+++  GList *hdr_requests; /* weak pointers, owned by callers */
+++  guint hdr_notify_id;
+++  gboolean hdr_requested_active;
+++  gboolean hdr_render_state_valid;
+++  GdkWaylandHdrRenderState hdr_render_state;
+++  GdkColorState *hdr_normal_color_state;
+++  GdkColorState *hdr_frame_color_state;
+++  guint64 hdr_frame_generation;
+++  GdkDrawContext *hdr_frame_context; /* identity only; invalidated on detach */
+++
++   unsigned int color_state_changed : 1;
++   unsigned int initial_configure_received : 1;
++   unsigned int has_uncommitted_ack_configure : 1;
++@@ -172,3 +182,11 @@ void gdk_wayland_surface_restore_shortcuts (GdkSurface *surface,
++     default: \
++       g_assert_not_reached (); \
++     }
+++
+++void gdk_wayland_surface_hdr_requests_changed (GdkWaylandSurface *self);
+++void gdk_wayland_hdr_rendering_surface_changed (GdkWaylandSurface *self);
+++void gdk_wayland_hdr_rendering_surface_destroyed (GdkWaylandSurface *self);
+++void gdk_wayland_surface_hdr_frame_begin (GdkSurface *surface, GdkDrawContext *context, GdkColorState *color_state);
+++void gdk_wayland_surface_hdr_frame_presented (GdkSurface *surface, GdkDrawContext *context, gboolean submitted,
+++                                             guint red, guint green, guint blue,
+++                                             gboolean floating_point);
++diff --git a/gdk/wayland/gdksurface-wayland.c b/gdk/wayland/gdksurface-wayland.c
++index c3bddf7..9e66e90 100644
++--- a/gdk/wayland/gdksurface-wayland.c
+++++ b/gdk/wayland/gdksurface-wayland.c
++@@ -335,7 +335,7 @@ frame_callback (void               *data,
++   GdkSurface *surface = data;
++ 
++   g_assert (GDK_WAYLAND_SURFACE (surface)->frame_callback == callback);
++-  g_assert (!GDK_SURFACE_DESTROYED (surface));
+++  g_assert (!GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)));
++ 
++   gdk_wayland_surface_frame_callback (surface, time);
++ }
++@@ -472,7 +472,7 @@ gdk_wayland_surface_attach_image (GdkSurface           *surface,
++   uint32_t wl_surface_version;
++   int i, n;
++ 
++-  if (GDK_SURFACE_DESTROYED (surface))
+++  if (GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     return;
++ 
++   g_assert (_gdk_wayland_is_shm_surface (cairo_surface));
++@@ -550,9 +550,12 @@ gdk_wayland_surface_finalize (GObject *object)
++ 
++   impl = GDK_WAYLAND_SURFACE (object);
++ 
+++  gdk_wayland_hdr_rendering_surface_destroyed (impl);
++   g_clear_pointer (&impl->opaque_region, cairo_region_destroy);
++   g_clear_pointer (&impl->input_region, cairo_region_destroy);
++   g_clear_pointer (&impl->background_blur, cairo_region_destroy);
+++  g_clear_pointer (&impl->hdr_normal_color_state, gdk_color_state_unref);
+++  g_clear_pointer (&impl->hdr_frame_color_state, gdk_color_state_unref);
++ 
++   G_OBJECT_CLASS (gdk_wayland_surface_parent_class)->finalize (object);
++ }
++@@ -730,17 +733,21 @@ gdk_wayland_surface_sync_color_state (GdkSurface *surface)
++   if (!self->color_state_changed)
++     return;
++ 
+++  GdkColorState *frame_state = self->hdr_frame_color_state
+++                            ? self->hdr_frame_color_state
+++                            : gdk_surface_get_color_state (surface);
+++
++   /* Note that we don't have the actual fourcc here (since thats up
++    * up to mesa) so we just pass DRM_FORMAT_RGBA8888.
++    */
++   if (gdk_wayland_color_surface_can_set_color_state (self->display_server.color,
++-                                                     gdk_surface_get_color_state (surface),
+++                                                     frame_state,
++                                                      DRM_FORMAT_RGBA8888,
++                                                      TRUE,
++                                                      NULL))
++     {
++       gdk_wayland_color_surface_set_color_state (self->display_server.color,
++-                                                 gdk_surface_get_color_state (surface),
+++                                                 frame_state,
++                                                  DRM_FORMAT_RGBA8888,
++                                                  TRUE);
++     }
++@@ -921,6 +928,7 @@ gdk_wayland_surface_invalidate_color_target (GdkWaylandSurface *self)
++ 
++   self->color_target = (GdkWaylandColorTarget) { .generation = generation };
++   self->color_target_valid = FALSE;
+++  self->hdr_render_state_valid = FALSE;
++ }
++ 
++ static void
++@@ -929,6 +937,7 @@ gdk_wayland_surface_emit_color_target_changed (GdkWaylandSurface *self)
++   /* A handler may drop its last owned reference or destroy the surface. */
++   g_object_ref (self);
++   g_signal_emit_by_name (self, "color-target-changed");
+++  gdk_wayland_hdr_rendering_surface_changed (self);
++   g_object_unref (self);
++ }
++ 
++@@ -938,7 +947,7 @@ preferred_changed (GdkWaylandColorSurface     *color,
++                    const GdkWaylandColorTarget *target,
++                    gpointer                    data)
++ {
++-  GdkWaylandSurface *self = GDK_WAYLAND_SURFACE (data);
+++  GdkWaylandSurface *self = g_object_ref (GDK_WAYLAND_SURFACE (data));
++ 
++   /* NULL color state is the start of a new asynchronous feedback query. */
++   if (color_state == NULL)
++@@ -953,17 +962,26 @@ preferred_changed (GdkWaylandColorSurface     *color,
++       GDK_DISPLAY_DEBUG (gdk_surface_get_display (GDK_SURFACE (self)), EVENTS,
++                          "preferred color state, surface %p color state %s",
++                          self, gdk_color_state_get_name (color_state));
++-      gdk_surface_set_color_state (GDK_SURFACE (self), color_state);
+++      g_clear_pointer (&self->hdr_normal_color_state, gdk_color_state_unref);
+++      self->hdr_normal_color_state = gdk_color_state_ref (color_state);
+++      gdk_surface_set_color_state (GDK_SURFACE (self),
+++                                   self->hdr_requested_active ? GDK_COLOR_STATE_REC2100_PQ : color_state);
++       self->color_state_changed = TRUE;
++     }
++ 
+++  /* Re-evaluate an outstanding lease when pending preferred feedback and
+++   * compositor capabilities become available. This does not change the
+++   * preferred-target snapshot or enable any other surface. */
+++  if (self->hdr_requests && !GDK_SURFACE_DESTROYED (GDK_SURFACE (self)))
+++    gdk_wayland_surface_hdr_requests_changed (self);
++   gdk_surface_invalidate_rect (GDK_SURFACE (self), NULL);
++   /* The initial query starts inside color_surface_new(), before the native
++    * surface and feedback owner are installed. Construction publishes no
++    * signal; callers connect and query after obtaining the surface. */
++   if (self->display_server.wl_surface)
++     gdk_wayland_surface_emit_color_target_changed (self);
++-  /* Last: application handlers may destroy the native surface. */
+++  /* Application handlers may have destroyed the native surface. */
+++  g_object_unref (self);
++ }
++ 
++ static void
++@@ -1001,6 +1019,7 @@ gdk_wayland_surface_create_wl_surface (GdkSurface *surface)
++     }
++ 
++   self->display_server.wl_surface = wl_surface;
+++  gdk_wayland_surface_hdr_requests_changed (self);
++ }
++ 
++ static void
++@@ -1035,6 +1054,9 @@ gdk_wayland_surface_destroy_wl_surface (GdkWaylandSurface *self)
++   g_clear_pointer (&self->display_server.viewport, wp_viewport_destroy);
++   g_clear_pointer (&self->display_server.fractional_scale, wp_fractional_scale_v1_destroy);
++   g_clear_pointer (&self->display_server.color, gdk_wayland_color_surface_free);
+++  self->hdr_requested_active = FALSE;
+++  self->hdr_render_state_valid = FALSE;
+++  gdk_surface_set_hdr_rendering_requested (GDK_SURFACE (self), FALSE);
++   /* Publish unavailability now, but do not call application code in the
++    * middle of native teardown. The core's after_destroy boundary notifies
++    * only after the public destroyed state is set. */
++@@ -1255,7 +1277,7 @@ gdk_wayland_surface_get_geometry (GdkSurface *surface,
++                                   int        *width,
++                                   int        *height)
++ {
++-  if (!GDK_SURFACE_DESTROYED (surface))
+++  if (!GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     {
++       if (x)
++         *x = surface->x;
++@@ -1311,7 +1333,7 @@ gdk_wayland_surface_get_device_state (GdkSurface       *surface,
++                                       double           *y,
++                                       GdkModifierType  *mask)
++ {
++-  if (GDK_SURFACE_DESTROYED (surface))
+++  if (GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     return FALSE;
++ 
++   gdk_wayland_device_query_state (device, surface, x, y, mask);
++@@ -1325,7 +1347,7 @@ gdk_wayland_surface_set_input_region (GdkSurface     *surface,
++ {
++   GdkWaylandSurface *impl = GDK_WAYLAND_SURFACE (surface);
++ 
++-  if (GDK_SURFACE_DESTROYED (surface))
+++  if (GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     return;
++ 
++   g_clear_pointer (&impl->input_region, cairo_region_destroy);
++@@ -1362,13 +1384,14 @@ gdk_wayland_surface_destroy (GdkSurface *surface,
++ static void
++ gdk_wayland_surface_after_destroy (GdkSurface *surface)
++ {
+++  gdk_wayland_hdr_rendering_surface_destroyed (GDK_WAYLAND_SURFACE (surface));
++   gdk_wayland_surface_emit_color_target_changed (GDK_WAYLAND_SURFACE (surface));
++ }
++ 
++ static void
++ gdk_wayland_surface_destroy_notify (GdkSurface *surface)
++ {
++-  if (!GDK_SURFACE_DESTROYED (surface))
+++  if (!GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     {
++       g_warning ("GdkSurface %p unexpectedly destroyed", surface);
++       _gdk_surface_destroy (surface, TRUE);
++@@ -1391,7 +1414,7 @@ gdk_wayland_surface_set_opaque_region (GdkSurface     *surface,
++ {
++   GdkWaylandSurface *impl = GDK_WAYLAND_SURFACE (surface);
++ 
++-  if (GDK_SURFACE_DESTROYED (surface))
+++  if (GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     return;
++ 
++   g_clear_pointer (&impl->opaque_region, cairo_region_destroy);
++@@ -1409,6 +1432,22 @@ gdk_wayland_surface_default_hide_surface (GdkWaylandSurface *surface)
++ {
++ }
++ 
+++static void
+++gdk_wayland_surface_draw_context_changed (GdkSurface *surface)
+++{
+++  GdkWaylandSurface *self = GDK_WAYLAND_SURFACE (surface);
+++  if (!self->hdr_requests && !self->hdr_frame_color_state)
+++    return;
+++  self->hdr_render_state_valid = FALSE;
+++  self->hdr_frame_context = NULL;
+++  /* Until the new context supplies its actual frame state, software-safe
+++   * sRGB is the only description we can associate with an unknown buffer. */
+++  g_clear_pointer (&self->hdr_frame_color_state, gdk_color_state_unref);
+++  self->hdr_frame_color_state = gdk_color_state_ref (GDK_COLOR_STATE_SRGB);
+++  self->color_state_changed = TRUE;
+++  gdk_wayland_hdr_rendering_surface_changed (self);
+++}
+++
++ static void
++ gdk_wayland_surface_class_init (GdkWaylandSurfaceClass *klass)
++ {
++@@ -1426,6 +1465,7 @@ gdk_wayland_surface_class_init (GdkWaylandSurfaceClass *klass)
++   surface_class->set_input_region = gdk_wayland_surface_set_input_region;
++   surface_class->destroy = gdk_wayland_surface_destroy;
++   surface_class->after_destroy = gdk_wayland_surface_after_destroy;
+++  surface_class->draw_context_changed = gdk_wayland_surface_draw_context_changed;
++   surface_class->beep = gdk_wayland_surface_beep;
++ 
++   surface_class->destroy_notify = gdk_wayland_surface_destroy_notify;
++@@ -1479,7 +1519,7 @@ gdk_wayland_surface_get_color_target (GdkSurface            *surface,
++   g_return_val_if_fail (target != NULL, FALSE);
++ 
++   self = GDK_WAYLAND_SURFACE (surface);
++-  if (!self->color_target_valid || GDK_SURFACE_DESTROYED (surface))
+++  if (!self->color_target_valid || GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
++     {
++       *target = (GdkWaylandColorTarget) { .generation = self->color_target.generation };
++       return FALSE;
++@@ -1543,3 +1583,73 @@ gdk_wayland_surface_get_wl_surface (GdkSurface *surface)
++ 
++ /* }}}} */
++ /* vim:set foldmethod=marker: */
+++
+++void
+++gdk_wayland_surface_hdr_requests_changed (GdkWaylandSurface *self)
+++{
+++  gboolean active;
+++  if (!self->display_server.color || GDK_SURFACE_DESTROYED (GDK_SURFACE (self)))
+++    return;
+++  active = gdk_wayland_color_surface_request_hdr (self->display_server.color,
+++                                                  self->hdr_requests != NULL);
+++  if (active == self->hdr_requested_active)
+++    return;
+++  self->hdr_requested_active = active;
+++  self->hdr_render_state_valid = FALSE;
+++  gdk_surface_set_hdr_rendering_requested (GDK_SURFACE (self), active);
+++  gdk_surface_set_color_state (GDK_SURFACE (self), active ? GDK_COLOR_STATE_REC2100_PQ
+++      : self->hdr_normal_color_state ? self->hdr_normal_color_state : GDK_COLOR_STATE_SRGB);
+++  self->color_state_changed = TRUE;
+++  gdk_surface_invalidate_rect (GDK_SURFACE (self), NULL);
+++  gdk_wayland_hdr_rendering_surface_changed (self);
+++}
+++
+++void
+++gdk_wayland_surface_hdr_frame_begin (GdkSurface *surface, GdkDrawContext *context, GdkColorState *color_state)
+++{
+++  GdkWaylandSurface *self = GDK_WAYLAND_SURFACE (surface);
+++  if (!self->hdr_requests && !self->hdr_frame_color_state)
+++    return;
+++  if (self->hdr_frame_context != context || !self->hdr_frame_color_state ||
+++      !gdk_color_state_equal (self->hdr_frame_color_state, color_state))
+++    {
+++      self->hdr_render_state_valid = FALSE;
+++      self->color_state_changed = TRUE;
+++      gdk_wayland_hdr_rendering_surface_changed (self);
+++    }
+++  self->hdr_frame_context = context;
+++  g_clear_pointer (&self->hdr_frame_color_state, gdk_color_state_unref);
+++  self->hdr_frame_color_state = gdk_color_state_ref (color_state);
+++  self->hdr_frame_generation = self->color_target.generation;
+++}
+++
+++void
+++gdk_wayland_surface_hdr_frame_presented (GdkSurface *surface, GdkDrawContext *context, gboolean submitted,
+++                                          guint red, guint green, guint blue,
+++                                          gboolean floating_point)
+++{
+++  GdkWaylandSurface *self = GDK_WAYLAND_SURFACE (surface);
+++  GdkWaylandHdrRenderState state = { .generation = self->color_target.generation };
+++  const GdkCicp *cicp = self->hdr_frame_color_state
+++                     ? gdk_color_state_get_cicp (self->hdr_frame_color_state) : NULL;
+++  gboolean valid = submitted && context == self->hdr_frame_context &&
+++      context == gdk_surface_get_attached_context (surface) &&
+++      self->hdr_requested_active && self->color_target_valid &&
+++      self->hdr_frame_generation == state.generation && red >= 10 && green >= 10 && blue >= 10 &&
+++      cicp && cicp->color_primaries == 9 && cicp->transfer_function == 16 &&
+++      cicp->matrix_coefficients == 0 && cicp->range == GDK_CICP_RANGE_FULL &&
+++      gdk_wayland_color_surface_has_hdr_description (self->display_server.color);
+++  if (valid)
+++    state = (GdkWaylandHdrRenderState) {
+++      .generation = state.generation, .red_bits = red, .green_bits = green, .blue_bits = blue,
+++      .floating_point = floating_point, .color_primaries = cicp->color_primaries,
+++      .transfer_function = cicp->transfer_function, .matrix_coefficients = cicp->matrix_coefficients,
+++      .range = cicp->range, .min_luminance = 0, .max_luminance = 10000, .reference_luminance = 203,
+++    };
+++  if (valid != self->hdr_render_state_valid || memcmp (&state, &self->hdr_render_state, sizeof state))
+++    {
+++      self->hdr_render_state = state;
+++      self->hdr_render_state_valid = valid;
+++      gdk_wayland_hdr_rendering_surface_changed (self);
+++    }
+++}
++diff --git a/gdk/wayland/gdkvulkancontext-wayland.c b/gdk/wayland/gdkvulkancontext-wayland.c
++index 10bc36f..73a5338 100644
++--- a/gdk/wayland/gdkvulkancontext-wayland.c
+++++ b/gdk/wayland/gdkvulkancontext-wayland.c
++@@ -51,6 +51,17 @@ gdk_wayland_vulkan_context_create_surface (GdkVulkanContext *context,
++                                                    vr_surface);
++ }
++ 
+++static void
+++gdk_vulkan_context_wayland_begin_frame (GdkDrawContext *context, gpointer context_data,
+++                         cairo_region_t *region, GdkColorState **out_color_state,
+++                         GdkMemoryDepth *out_depth)
+++{
+++  GDK_DRAW_CONTEXT_CLASS (gdk_wayland_vulkan_context_parent_class)->begin_frame (
+++      context, context_data, region, out_color_state, out_depth);
+++  gdk_wayland_surface_hdr_frame_begin (gdk_draw_context_get_surface (context),
+++                                       context, *out_color_state);
+++}
+++
++ static void
++ gdk_vulkan_context_wayland_end_frame (GdkDrawContext *context,
++                                       gpointer        context_data,
++@@ -73,6 +84,16 @@ gdk_vulkan_context_wayland_end_frame (GdkDrawContext *context,
++ 
++   GDK_DRAW_CONTEXT_CLASS (gdk_wayland_vulkan_context_parent_class)->end_frame (context, context_data, painted);
++ 
+++  if (impl->hdr_requests)
+++    {
+++      guint red = 0, green = 0, blue = 0;
+++      gboolean floating_point = FALSE;
+++      gboolean known = gdk_vulkan_context_get_framebuffer_info (GDK_VULKAN_CONTEXT (context),
+++                                                                &red, &green, &blue, &floating_point);
+++      gdk_wayland_surface_hdr_frame_presented (surface, context,
+++          known && gdk_vulkan_context_get_last_submit (GDK_VULKAN_CONTEXT (context)),
+++          red, green, blue, floating_point);
+++    }
++   gdk_wayland_surface_notify_committed (surface);
++ }
++ 
++@@ -92,6 +113,7 @@ gdk_wayland_vulkan_context_class_init (GdkWaylandVulkanContextClass *klass)
++ 
++   vulkan_context_class->create_surface = gdk_wayland_vulkan_context_create_surface;
++ 
+++  draw_context_class->begin_frame = gdk_vulkan_context_wayland_begin_frame;
++   draw_context_class->end_frame = gdk_vulkan_context_wayland_end_frame;
++   draw_context_class->empty_frame = gdk_vulkan_context_wayland_empty_frame;
++ }
++diff --git a/gdk/wayland/gdkwaylandcolor-private.h b/gdk/wayland/gdkwaylandcolor-private.h
++index ff4d66b..ab12826 100644
++--- a/gdk/wayland/gdkwaylandcolor-private.h
+++++ b/gdk/wayland/gdkwaylandcolor-private.h
++@@ -52,3 +52,7 @@ void              gdk_wayland_color_surface_set_color_state     (GdkWaylandColor
++                                                                  uint32_t                fourcc,
++                                                                  gboolean                premultiplied);
++ void              gdk_wayland_color_surface_unset_color_state   (GdkWaylandColorSurface *self);
+++
+++gboolean gdk_wayland_color_surface_request_hdr (GdkWaylandColorSurface *self,
+++                                                gboolean requested);
+++gboolean gdk_wayland_color_surface_has_hdr_description (GdkWaylandColorSurface *self);
++diff --git a/gdk/wayland/gdkwaylandcolor.c b/gdk/wayland/gdkwaylandcolor.c
++index 620468a..8c36711 100644
++--- a/gdk/wayland/gdkwaylandcolor.c
+++++ b/gdk/wayland/gdkwaylandcolor.c
++@@ -200,6 +200,7 @@ struct _GdkWaylandColor
++ 
++   struct wp_color_manager_v1 *color_manager;
++   gboolean rendering_enabled;
+++  struct wp_image_description_v1 *hdr_description;
++   struct {
++     unsigned int intents;
++     unsigned int features;
++@@ -353,6 +354,7 @@ gdk_wayland_color_free (GdkWaylandColor *color)
++ {
++   g_clear_pointer (&color->color_manager, wp_color_manager_v1_destroy);
++ 
+++  g_clear_pointer (&color->hdr_description, wp_image_description_v1_destroy);
++   g_hash_table_unref (color->cs_to_desc);
++   g_hash_table_unref (color->id_to_cs);
++ 
++@@ -378,6 +380,7 @@ typedef struct _CsImageDescListenerData {
++   GdkColorState   *color_state;
++   gboolean         sync;
++   gboolean         done;
+++  gboolean         hdr;
++ } CsImageDescListenerData;
++ 
++ static void
++@@ -465,9 +468,9 @@ cs_image_desc_failed (void                           *data,
++   g_warning ("Failed to get one of the standard image descriptions: %s", msg);
++   wp_image_description_v1_destroy (desc);
++ 
++-  g_hash_table_insert (csi->color->cs_to_desc,
++-                       gdk_color_state_ref (csi->color_state),
++-                       NULL);
+++  if (!csi->hdr)
+++    g_hash_table_insert (csi->color->cs_to_desc,
+++                         gdk_color_state_ref (csi->color_state), NULL);
++ 
++   cs_image_listener_data_free (csi);
++ }
++@@ -479,9 +482,11 @@ cs_image_desc_ready (void                           *data,
++ {
++   CsImageDescListenerData *csi = data;
++ 
++-  g_hash_table_insert (csi->color->cs_to_desc,
++-                       gdk_color_state_ref (csi->color_state),
++-                       desc);
+++  if (csi->hdr)
+++    csi->color->hdr_description = desc;
+++  else
+++    g_hash_table_insert (csi->color->cs_to_desc,
+++                         gdk_color_state_ref (csi->color_state), desc);
++   g_hash_table_insert (csi->color->id_to_cs,
++                        GUINT_TO_POINTER (identity),
++                        gdk_color_state_ref (csi->color_state));
++@@ -497,7 +502,8 @@ static struct wp_image_description_v1_listener cs_image_desc_listener = {
++ static void
++ create_image_desc (GdkWaylandColor *color,
++                    GdkColorState   *cs,
++-                   gboolean         sync)
+++                   gboolean         sync,
+++                   gboolean         hdr)
++ {
++   CsImageDescListenerData data;
++   struct wp_image_description_creator_params_v1 *creator;
++@@ -537,6 +543,7 @@ create_image_desc (GdkWaylandColor *color,
++   data.color_state = cs;
++   data.sync = sync;
++   data.done = FALSE;
+++  data.hdr = hdr;
++ 
++   creator = wp_color_manager_v1_create_parametric_creator (color->color_manager);
++ 
++@@ -554,6 +561,8 @@ create_image_desc (GdkWaylandColor *color,
++                                                             p[6], p[7]);
++     }
++   wp_image_description_creator_params_v1_set_tf_named (creator, tf);
+++  if (hdr)
+++    wp_image_description_creator_params_v1_set_luminances (creator, 0, 10000, 203);
++ 
++   desc = wp_image_description_creator_params_v1_create (creator);
++ 
++@@ -712,19 +721,19 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
++ 
++   if (color->color_manager && color->rendering_enabled)
++     {
++-      create_image_desc (color, GDK_COLOR_STATE_SRGB, FALSE);
+++      create_image_desc (color, GDK_COLOR_STATE_SRGB, FALSE, FALSE);
++ 
++       if (color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR))
++-        create_image_desc (color, GDK_COLOR_STATE_SRGB_LINEAR, FALSE);
+++        create_image_desc (color, GDK_COLOR_STATE_SRGB_LINEAR, FALSE, FALSE);
++ 
++       if ((color->color_manager_supported.primaries & (1 << WP_COLOR_MANAGER_V1_PRIMARIES_BT2020) ||
++           (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES))))
++         {
++           if (color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ))
++-            create_image_desc (color, GDK_COLOR_STATE_REC2100_PQ, FALSE);
+++            create_image_desc (color, GDK_COLOR_STATE_REC2100_PQ, FALSE, FALSE);
++ 
++           if (color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR))
++-            create_image_desc (color, GDK_COLOR_STATE_REC2100_LINEAR, FALSE);
+++            create_image_desc (color, GDK_COLOR_STATE_REC2100_LINEAR, FALSE, FALSE);
++         }
++     }
++ 
++@@ -780,6 +789,8 @@ struct _GdkWaylandColorSurface
++   GdkWaylandColor *color;
++   struct wl_surface *wl_surface;
++   struct wp_color_management_surface_v1 *mgmt_surface;
+++  gboolean hdr_requested;
+++  gboolean hdr_description_bound;
++   struct wp_color_management_surface_feedback_v1 *mgmt_feedback;
++   ImageDescription *current_desc;
++   GdkColorStateChanged callback;
++@@ -1166,6 +1177,42 @@ gdk_wayland_color_surface_new (GdkWaylandColor      *color,
++   return self;
++ }
++ 
+++gboolean
+++gdk_wayland_color_surface_request_hdr (GdkWaylandColorSurface *self,
+++                                       gboolean                requested)
+++{
+++  GdkWaylandColor *color = self->color;
+++  self->hdr_requested = FALSE;
+++  if (!requested)
+++    return FALSE;
+++
+++  if (!color->color_manager || !color->color_representation_manager ||
+++      !(color->color_representation_supported.coefficients_full & (1 << cicp_to_wl_coefficients (0))) ||
+++      !(color->color_representation_supported.alpha_modes & (1 << gdk_alpha_to_wl_alpha (GDK_MEMORY_ALPHA_PREMULTIPLIED))) ||
+++      !(color->color_manager_supported.intents & (1 << WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)) ||
+++      !(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) ||
+++      !(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES)) ||
+++      !(color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ)) ||
+++      (!(color->color_manager_supported.primaries & (1 << WP_COLOR_MANAGER_V1_PRIMARIES_BT2020)) &&
+++       !(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES))))
+++    return FALSE;
+++
+++  if (!color->hdr_description)
+++    create_image_desc (color, GDK_COLOR_STATE_REC2100_PQ, TRUE, TRUE);
+++  if (!color->hdr_description)
+++    return FALSE;
+++  if (!self->mgmt_surface)
+++    self->mgmt_surface = wp_color_manager_v1_get_surface (color->color_manager, self->wl_surface);
+++  self->hdr_requested = TRUE;
+++  return TRUE;
+++}
+++
+++gboolean
+++gdk_wayland_color_surface_has_hdr_description (GdkWaylandColorSurface *self)
+++{
+++  return self && self->hdr_requested && self->hdr_description_bound;
+++}
+++
++ void
++ gdk_wayland_color_surface_free (GdkWaylandColorSurface *self)
++ {
++@@ -1187,7 +1234,7 @@ gdk_wayland_color_get_image_description (GdkWaylandColor *color,
++   if (g_hash_table_lookup_extended (color->cs_to_desc, cs, NULL, &result))
++     return result;
++ 
++-  create_image_desc (color, cs, TRUE);
+++  create_image_desc (color, cs, TRUE, FALSE);
++ 
++   if (!g_hash_table_lookup_extended (color->cs_to_desc, cs, NULL, &result))
++     {
++@@ -1250,9 +1297,12 @@ gdk_wayland_color_surface_set_color_state (GdkWaylandColorSurface *self,
++     {
++       struct wp_image_description_v1 *desc;
++ 
++-      desc = gdk_wayland_color_get_image_description (self->color, cs);
+++      desc = self->hdr_requested && gdk_color_state_equal (cs, GDK_COLOR_STATE_REC2100_PQ)
+++           ? self->color->hdr_description
+++           : gdk_wayland_color_get_image_description (self->color, cs);
++ 
++       g_assert (desc);
+++      self->hdr_description_bound = desc == self->color->hdr_description;
++ 
++       GDK_DISPLAY_DEBUG (GDK_DISPLAY (self->color->display), MISC,
++                          "Setting color state %s (fourcc %.4s, premul %d) on surface: image desc %p",
++@@ -1299,6 +1349,7 @@ gdk_wayland_color_surface_set_color_state (GdkWaylandColorSurface *self,
++ void
++ gdk_wayland_color_surface_unset_color_state (GdkWaylandColorSurface *self)
++ {
+++  self->hdr_description_bound = FALSE;
++   if (self->mgmt_surface)
++     wp_color_management_surface_v1_unset_image_description (self->mgmt_surface);
++ 
++@@ -1334,7 +1385,9 @@ gdk_wayland_color_surface_can_set_color_state (GdkWaylandColorSurface  *self,
++     }
++   else
++     {
++-      if (!gdk_wayland_color_get_image_description (self->color, cs))
+++      if (!(self->hdr_requested && gdk_color_state_equal (cs, GDK_COLOR_STATE_REC2100_PQ)
+++            ? self->color->hdr_description
+++            : gdk_wayland_color_get_image_description (self->color, cs)))
++         {
++           g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED, "No image description");
++           return FALSE;
++diff --git a/gdk/wayland/gdkwaylandhdrrendering.c b/gdk/wayland/gdkwaylandhdrrendering.c
++new file mode 100644
++index 0000000..e8c060f
++--- /dev/null
+++++ b/gdk/wayland/gdkwaylandhdrrendering.c
++@@ -0,0 +1,170 @@
+++/* Per-surface HDR rendering leases. LGPL-2.1-or-later, like GDK. */
+++#include "config.h"
+++#include "gdksurface-wayland-private.h"
+++#include "gdksurfaceprivate.h"
+++
+++struct _GdkWaylandHdrRendering
+++{
+++  GObject parent_instance;
+++  GWeakRef surface;
+++  guint64 generation;
+++};
+++
+++struct _GdkWaylandHdrRenderingClass
+++{
+++  GObjectClass parent_class;
+++};
+++
+++G_DEFINE_TYPE (GdkWaylandHdrRendering, gdk_wayland_hdr_rendering, G_TYPE_OBJECT)
+++
+++static void
+++gdk_wayland_hdr_rendering_finalize (GObject *object)
+++{
+++  GdkWaylandHdrRendering *self = GDK_WAYLAND_HDR_RENDERING (object);
+++  GdkWaylandSurface *surface = g_weak_ref_get (&self->surface);
+++  if (surface)
+++    {
+++      surface->hdr_requests = g_list_remove (surface->hdr_requests, self);
+++      if (!GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
+++        gdk_wayland_surface_hdr_requests_changed (surface);
+++      g_object_unref (surface);
+++    }
+++  g_weak_ref_clear (&self->surface);
+++  G_OBJECT_CLASS (gdk_wayland_hdr_rendering_parent_class)->finalize (object);
+++}
+++
+++static void
+++gdk_wayland_hdr_rendering_class_init (GdkWaylandHdrRenderingClass *klass)
+++{
+++  G_OBJECT_CLASS (klass)->finalize = gdk_wayland_hdr_rendering_finalize;
+++  /**
+++   * GdkWaylandHdrRendering::changed:
+++   * @self: the rendering request
+++   *
+++   * Emitted when actual rendering availability or its target generation changes.
+++   * Query get_state() again; a requested mode alone never implies readiness.
+++   */
+++  g_signal_new ("changed", G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
+++                0, NULL, NULL, NULL, G_TYPE_NONE, 0);
+++}
+++
+++static void
+++gdk_wayland_hdr_rendering_init (GdkWaylandHdrRendering *self)
+++{
+++  g_weak_ref_init (&self->surface, NULL);
+++}
+++
+++/**
+++ * gdk_wayland_surface_request_hdr_rendering:
+++ * @surface: (type GdkWaylandSurface): the Wayland surface
+++ *
+++ * Requests high-precision color-managed HDR rendering on this surface. The
+++ * request is a lease: releasing it affects only that request. Other consumers
+++ * remain active. The surface is not retained and destruction invalidates every
+++ * lease. Requesting does not promise a supported compositor or framebuffer.
+++ *
+++ * Returns: (transfer full) (nullable): a rendering lease
+++ */
+++GdkWaylandHdrRendering *
+++gdk_wayland_surface_request_hdr_rendering (GdkSurface *surface)
+++{
+++  GdkWaylandHdrRendering *request;
+++  GdkWaylandSurface *self;
+++  g_return_val_if_fail (GDK_IS_WAYLAND_SURFACE (surface), NULL);
+++  if (GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)))
+++    return NULL;
+++  self = g_object_ref (GDK_WAYLAND_SURFACE (surface));
+++  request = g_object_new (GDK_TYPE_WAYLAND_HDR_RENDERING, NULL);
+++  g_weak_ref_set (&request->surface, self);
+++  request->generation = self->color_target.generation;
+++  self->hdr_requests = g_list_prepend (self->hdr_requests, request);
+++  gdk_wayland_surface_hdr_requests_changed (self);
+++  g_object_unref (self);
+++  return request;
+++}
+++
+++/**
+++ * gdk_wayland_hdr_rendering_get_state:
+++ * @request: the rendering lease
+++ * @state: (out caller-allocates): actual output snapshot
+++ *
+++ * Returns a snapshot only after a successful native HDR frame submission with
+++ * its explicit Wayland content description and verified framebuffer precision.
+++ * While unavailable only the current target generation is supplied. Call again
+++ * after changed; snapshots become stale on target invalidation or teardown.
+++ *
+++ * Returns: whether a current actual HDR output snapshot is available
+++ */
+++gboolean
+++gdk_wayland_hdr_rendering_get_state (GdkWaylandHdrRendering *request,
+++                                     GdkWaylandHdrRenderState *state)
+++{
+++  GdkWaylandSurface *surface;
+++  gboolean valid = FALSE;
+++  g_return_val_if_fail (GDK_IS_WAYLAND_HDR_RENDERING (request), FALSE);
+++  g_return_val_if_fail (state != NULL, FALSE);
+++  *state = (GdkWaylandHdrRenderState) { .generation = request->generation };
+++  surface = g_weak_ref_get (&request->surface);
+++  if (surface)
+++    {
+++      state->generation = surface->color_target.generation;
+++      valid = !GDK_SURFACE_DESTROYED (GDK_SURFACE (surface)) && surface->hdr_requested_active &&
+++              surface->color_target_valid && surface->hdr_render_state_valid &&
+++              surface->hdr_frame_context != NULL &&
+++              surface->hdr_frame_context == gdk_surface_get_attached_context (GDK_SURFACE (surface)) &&
+++              surface->hdr_render_state.generation == state->generation;
+++      if (valid)
+++        *state = surface->hdr_render_state;
+++      g_object_unref (surface);
+++    }
+++  return valid;
+++}
+++
+++static gboolean
+++hdr_changed_idle (gpointer data)
+++{
+++  GdkWaylandSurface *surface = data;
+++  GList *requests;
+++  surface->hdr_notify_id = 0;
+++  requests = g_list_copy_deep (surface->hdr_requests, (GCopyFunc) g_object_ref, NULL);
+++  for (GList *l = requests; l; l = l->next)
+++    {
+++      GdkWaylandHdrRendering *request = l->data;
+++      request->generation = surface->color_target.generation;
+++      g_signal_emit_by_name (request, "changed");
+++    }
+++  g_list_free_full (requests, g_object_unref);
+++  return G_SOURCE_REMOVE;
+++}
+++
+++void
+++gdk_wayland_hdr_rendering_surface_changed (GdkWaylandSurface *surface)
+++{
+++  /* Native frame completion still has draw-context/GSK bookkeeping to do.
+++   * Notify application code afterward, when destroying or releasing a lease
+++   * cannot reenter that native submission stack. Snapshot queries are current
+++   * immediately; signals coalesce on the display's main thread. */
+++  if (surface->hdr_requests && !surface->hdr_notify_id)
+++    surface->hdr_notify_id = g_idle_add_full (G_PRIORITY_DEFAULT_IDLE, hdr_changed_idle,
+++                                             g_object_ref (surface), g_object_unref);
+++}
+++
+++void
+++gdk_wayland_hdr_rendering_surface_destroyed (GdkWaylandSurface *surface)
+++{
+++  GList *requests = g_list_copy_deep (surface->hdr_requests, (GCopyFunc) g_object_ref, NULL);
+++  if (surface->hdr_notify_id)
+++    {
+++      g_source_remove (surface->hdr_notify_id);
+++      surface->hdr_notify_id = 0;
+++    }
+++  g_clear_pointer (&surface->hdr_requests, g_list_free);
+++  for (GList *l = requests; l; l = l->next)
+++    {
+++      GdkWaylandHdrRendering *request = l->data;
+++      request->generation = surface->color_target.generation;
+++      g_weak_ref_set (&request->surface, NULL);
+++      g_signal_emit_by_name (request, "changed");
+++    }
+++  g_list_free_full (requests, g_object_unref);
+++}
++diff --git a/gdk/wayland/gdkwaylandsurface.h b/gdk/wayland/gdkwaylandsurface.h
++index 485ac34..24e2976 100644
++--- a/gdk/wayland/gdkwaylandsurface.h
+++++ b/gdk/wayland/gdkwaylandsurface.h
++@@ -74,6 +74,60 @@ GDK_AVAILABLE_IN_4_24
++ gboolean gdk_wayland_surface_get_color_target (GdkSurface            *surface,
++                                                 GdkWaylandColorTarget *target);
++ 
+++/**
+++ * GdkWaylandHdrRenderState:
+++ * @generation: current surface target generation, also set while unavailable
+++ * @red_bits: actual framebuffer red component precision
+++ * @green_bits: actual framebuffer green component precision
+++ * @blue_bits: actual framebuffer blue component precision
+++ * @floating_point: whether framebuffer components are floating point
+++ * @color_primaries: actual output CICP color primaries
+++ * @transfer_function: actual output CICP transfer function
+++ * @matrix_coefficients: actual output CICP matrix coefficients
+++ * @range: actual output CICP range
+++ * @min_luminance: declared encoding minimum in cd/m²
+++ * @max_luminance: declared encoding maximum in cd/m²
+++ * @reference_luminance: declared encoding reference white in cd/m²
+++ *
+++ * A caller-owned snapshot of a successfully submitted HDR framebuffer and
+++ * its committed Wayland content description. This is not the physical display
+++ * target: obtain that separately with gdk_wayland_surface_get_color_target().
+++ */
+++typedef struct
+++{
+++  guint64 generation;
+++  guint red_bits;
+++  guint green_bits;
+++  guint blue_bits;
+++  gboolean floating_point;
+++  guint color_primaries;
+++  guint transfer_function;
+++  guint matrix_coefficients;
+++  GdkCicpRange range;
+++  double min_luminance;
+++  double max_luminance;
+++  double reference_luminance;
+++} GdkWaylandHdrRenderState;
+++
+++typedef struct _GdkWaylandHdrRendering GdkWaylandHdrRendering;
+++typedef struct _GdkWaylandHdrRenderingClass GdkWaylandHdrRenderingClass;
+++
+++#define GDK_TYPE_WAYLAND_HDR_RENDERING (gdk_wayland_hdr_rendering_get_type ())
+++#define GDK_WAYLAND_HDR_RENDERING(obj) (G_TYPE_CHECK_INSTANCE_CAST ((obj), GDK_TYPE_WAYLAND_HDR_RENDERING, GdkWaylandHdrRendering))
+++#define GDK_IS_WAYLAND_HDR_RENDERING(obj) (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GDK_TYPE_WAYLAND_HDR_RENDERING))
+++
+++GDK_AVAILABLE_IN_4_24
+++GType gdk_wayland_hdr_rendering_get_type (void) G_GNUC_CONST;
+++
+++GDK_AVAILABLE_IN_4_24
+++GdkWaylandHdrRendering *gdk_wayland_surface_request_hdr_rendering (GdkSurface *surface);
+++
+++GDK_AVAILABLE_IN_4_24
+++gboolean gdk_wayland_hdr_rendering_get_state (GdkWaylandHdrRendering   *request,
+++                                              GdkWaylandHdrRenderState *state);
+++
+++G_DEFINE_AUTOPTR_CLEANUP_FUNC (GdkWaylandHdrRendering, g_object_unref)
+++
++ G_DEFINE_AUTOPTR_CLEANUP_FUNC (GdkWaylandSurface, g_object_unref)
++ 
++ G_END_DECLS
++diff --git a/gdk/wayland/meson.build b/gdk/wayland/meson.build
++index 7e89f4b..61fabf0 100644
++--- a/gdk/wayland/meson.build
+++++ b/gdk/wayland/meson.build
++@@ -19,6 +19,7 @@ gdk_wayland_sources = files([
++   'gdksettings-wayland.c',
++   'gdkshm.c',
++   'gdksurface-wayland.c',
+++  'gdkwaylandhdrrendering.c',
++   'gdksubsurface-wayland.c',
++   'gdktoplevel-wayland.c',
++   'gdkpopup-wayland.c',
++diff --git a/gsk/gpu/gskgpuframe.c b/gsk/gpu/gskgpuframe.c
++index 0498719..525682b 100644
++--- a/gsk/gpu/gskgpuframe.c
+++++ b/gsk/gpu/gskgpuframe.c
++@@ -804,7 +804,8 @@ gsk_gpu_frame_record (GskGpuFrame            *self,
++                       cairo_region_t         *clip,
++                       GskRenderNode          *node,
++                       const graphene_rect_t  *viewport,
++-                      GdkTexture            **texture)
+++                      GdkTexture            **texture,
+++                      gboolean                force_linear)
++ {
++   GskGpuFramePrivate *priv = gsk_gpu_frame_get_instance_private (self);
++   GskRenderPassType pass_type = texture ? GSK_RENDER_PASS_EXPORT : GSK_RENDER_PASS_PRESENT;
++@@ -814,7 +815,7 @@ gsk_gpu_frame_record (GskGpuFrame            *self,
++ 
++   gsk_gpu_frame_start_node (self, node, 0);
++ 
++-  gsk_gpu_node_processor_process (self, target, target_color_state, clip, node, viewport, pass_type);
+++  gsk_gpu_node_processor_process (self, target, target_color_state, clip, node, viewport, pass_type, force_linear);
++ 
++   gsk_gpu_frame_end_node (self);
++ 
++@@ -870,7 +871,8 @@ gsk_gpu_frame_render (GskGpuFrame            *self,
++                       cairo_region_t         *clip,
++                       GskRenderNode          *node,
++                       const graphene_rect_t  *viewport,
++-                      GdkTexture            **texture)
+++                      GdkTexture            **texture,
+++                      gboolean                force_linear)
++ {
++   GskRenderPassType pass_type = texture ? GSK_RENDER_PASS_EXPORT : GSK_RENDER_PASS_PRESENT;
++ 
++@@ -878,7 +880,7 @@ gsk_gpu_frame_render (GskGpuFrame            *self,
++ 
++   gsk_gpu_frame_cleanup (self);
++ 
++-  gsk_gpu_frame_record (self, timestamp, target, target_color_state, clip, node, viewport, texture);
+++  gsk_gpu_frame_record (self, timestamp, target, target_color_state, clip, node, viewport, texture, force_linear);
++ 
++   gsk_gpu_frame_submit (self, pass_type);
++ 
++diff --git a/gsk/gpu/gskgpuframeprivate.h b/gsk/gpu/gskgpuframeprivate.h
++index bd94c7b..d566e8a 100644
++--- a/gsk/gpu/gskgpuframeprivate.h
+++++ b/gsk/gpu/gskgpuframeprivate.h
++@@ -121,7 +121,8 @@ void                    gsk_gpu_frame_render                            (GskGpuF
++                                                                          cairo_region_t         *clip,
++                                                                          GskRenderNode          *node,
++                                                                          const graphene_rect_t  *viewport,
++-                                                                         GdkTexture            **texture);
+++                                                                         GdkTexture            **texture,
+++                                                                         gboolean                force_linear);
++ gboolean                gsk_gpu_frame_download_texture                  (GskGpuFrame            *self,
++                                                                          gint64                  timestamp,
++                                                                          GdkTexture             *texture,
++diff --git a/gsk/gpu/gskgpunodeprocessor.c b/gsk/gpu/gskgpunodeprocessor.c
++index c5bb9e3..f3e22c4 100644
++--- a/gsk/gpu/gskgpunodeprocessor.c
+++++ b/gsk/gpu/gskgpunodeprocessor.c
++@@ -424,7 +424,7 @@ gsk_gpu_node_processor_create_offscreen (GskGpuFrame           *frame,
++                                   cairo_region_create_rectangle (&area),
++                                   node,
++                                   viewport,
++-                                  GSK_RENDER_PASS_OFFSCREEN);
+++                                  GSK_RENDER_PASS_OFFSCREEN, FALSE);
++ 
++   return image;
++ }
++@@ -4055,7 +4055,8 @@ gsk_gpu_node_processor_process (GskGpuFrame           *frame,
++                                 cairo_region_t        *clip,
++                                 GskRenderNode         *node,
++                                 const graphene_rect_t *viewport,
++-                                GskRenderPassType      pass_type)
+++                                GskRenderPassType      pass_type,
+++                                gboolean               force_linear)
++ {
++   GskGpuRenderPass *self;
++   GdkColorState *ccs;
++@@ -4063,7 +4064,8 @@ gsk_gpu_node_processor_process (GskGpuFrame           *frame,
++   graphene_rect_t clip_bounds, tex_rect;
++   int i;
++ 
++-  ccs = gdk_color_state_get_rendering_color_state (target_color_state);
+++  ccs = force_linear ? target_color_state->rendering_color_state_linear
+++                     : gdk_color_state_get_rendering_color_state (target_color_state);
++ 
++   if (gdk_color_state_equal (ccs, target_color_state))
++     {
++diff --git a/gsk/gpu/gskgpunodeprocessorprivate.h b/gsk/gpu/gskgpunodeprocessorprivate.h
++index 5a105d5..3b634f6 100644
++--- a/gsk/gpu/gskgpunodeprocessorprivate.h
+++++ b/gsk/gpu/gskgpunodeprocessorprivate.h
++@@ -11,7 +11,8 @@ void                    gsk_gpu_node_processor_process                  (GskGpuF
++                                                                          cairo_region_t                 *clip,
++                                                                          GskRenderNode                  *node,
++                                                                          const graphene_rect_t          *viewport,
++-                                                                         GskRenderPassType               pass_type);
+++                                                                         GskRenderPassType               pass_type,
+++                                                                         gboolean                       force_linear);
++ GskGpuImage *           gsk_gpu_node_processor_convert_image            (GskGpuFrame                    *frame,
++                                                                          GdkMemoryFormat                 target_format,
++                                                                          GdkColorState                  *target_color_state,
++diff --git a/gsk/gpu/gskgpurenderer.c b/gsk/gpu/gskgpurenderer.c
++index f6680bd..81dd89a 100644
++--- a/gsk/gpu/gskgpurenderer.c
+++++ b/gsk/gpu/gskgpurenderer.c
++@@ -342,7 +342,8 @@ gsk_gpu_renderer_fallback_render_texture (GskGpuRenderer        *self,
++                                                      rounded_viewport->origin.y + y,
++                                                      tile_width,
++                                                      tile_height),
++-                                &texture);
+++                                &texture,
+++                        FALSE);
++           gsk_gpu_frame_sync (frame);
++           gsk_gpu_frame_wait (frame);
++ 
++@@ -426,7 +427,8 @@ gsk_gpu_renderer_render_texture (GskRenderer           *renderer,
++                         clip_region,
++                         root,
++                         &rounded_viewport,
++-                        &texture);
+++                        &texture,
+++                        FALSE);
++   gsk_gpu_frame_sync (frame);
++ 
++   gsk_gpu_frame_wait (frame);
++@@ -493,7 +495,9 @@ gsk_gpu_renderer_render (GskRenderer          *renderer,
++                           gsk_gpu_image_get_width (backbuffer) / scale,
++                           gsk_gpu_image_get_height (backbuffer) / scale
++                         ),
++-                        NULL);
+++                        NULL,
+++                        gdk_surface_get_hdr_rendering_requested (gdk_draw_context_get_surface (priv->context)) &&
+++                        gdk_color_state_equal (gdk_draw_context_get_color_state (priv->context), GDK_COLOR_STATE_REC2100_PQ));
++ 
++   gsk_gpu_frame_end (frame, priv->context);
++ 
