@@ -13,6 +13,13 @@ CORE_VERSION = "0.1.0+rogdv2"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv2"
 SHOWTIME_VERSION = "50.0-2+rogdv2"
 FIXED_GTK = "4.24.1+ds-1+rogdv3"
+QUALIFIED_GSTREAMER = {
+    "gstreamer1.0-gl": "1.28.7-1+rogdv2",
+    "gstreamer1.0-plugins-good": "1.28.7-1+rogdv1",
+    "gstreamer1.0-plugins-bad": "1.28.7-1+rogdv2",
+    "gstreamer1.0-plugins-extra": "1.28.7-1+rogdv2",
+    "gstreamer1.0-libav": "1.28.7-1+rogdv1",
+}
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
 INPUT_FILES = ("control", "rules", "changelog")
@@ -145,6 +152,9 @@ def gtk_control(original):
     depends = replace_once(
         depends, " ${misc:Depends},",
         f" libgtk-4-1 (>= {FIXED_GTK}),\n"
+        f" gstreamer1.0-gl (= {QUALIFIED_GSTREAMER['gstreamer1.0-gl']}),\n"
+        " libgstreamer-gl1.0-0 (= 1.28.7-1+rogdv2),\n"
+        " libgstreamer-plugins-base1.0-0 (= 1.28.7-1+rogdv2),\n"
         f" libgstgtk-dovi-core0 (= {CORE_VERSION}),\n ${{misc:Depends}},",
         "gtk plugin runtime dependencies",
     )
@@ -157,14 +167,29 @@ def showtime_control(original):
     depends = field_text(binary, "Depends")
     depends = replace_once(
         depends, " gstreamer1.0-gtk4,",
-        f" gstreamer1.0-gtk4 (>= {GTK_VERSION}),\n"
-        f" gstreamer1.0-gtk-dovi (>= {CORE_VERSION}),\n"
+        f" gstreamer1.0-gtk4 (= {GTK_VERSION}),\n"
+        f" gstreamer1.0-gtk-dovi (= {CORE_VERSION}),\n"
         f" libgtk-4-1 (>= {FIXED_GTK}),",
         "showtime sink dependencies",
     )
     depends = replace_once(
         depends, " gir1.2-gtk-4.0 (>= 4.20),",
         f" gir1.2-gtk-4.0 (>= {FIXED_GTK}),", "showtime GTK introspection",
+    )
+    for name in ("gstreamer1.0-gl", "gstreamer1.0-plugins-good"):
+        depends = replace_once(
+            depends, f" {name},", f" {name} (= {QUALIFIED_GSTREAMER[name]}),",
+            f"qualified {name}",
+        )
+    producer_lines = []
+    for name in ("gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra", "gstreamer1.0-libav"):
+        if re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", depends):
+            raise PreparationError(f"unexpected existing producer dependency: {name}")
+        producer_lines.append(f" {name} (= {QUALIFIED_GSTREAMER[name]}),\n")
+    depends = replace_once(
+        depends, " ${gst-plugins-extra:Depends},",
+        "".join(producer_lines) + " ${gst-plugins-extra:Depends},",
+        "qualified producer families",
     )
     binary = replace_field(binary, "Depends", depends)
     return source + "\n\n" + binary + "\n"
