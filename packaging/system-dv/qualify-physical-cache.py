@@ -70,6 +70,7 @@ def capture(name, physical):
     state = trace[-1]
     assert int(state[0]) == physical and int(state[1]) == physical, state
     if physical:
+        assert int(state[2]) == 12, state  # PL_COLOR_TRC_PQ in the pinned renderer ABI
         assert signal and abs(float(state[3]) - float(signal[-1])) < 1e-5, state
     assert (out / (name + '.png')).stat().st_size > 0
     return state
