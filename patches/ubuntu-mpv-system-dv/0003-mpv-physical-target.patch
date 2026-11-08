@@ -1,8 +1,15 @@
 diff --git a/debian/changelog b/debian/changelog
-index a89284f..0edbf81 100644
+index a89284f..e7be95a 100644
 --- a/debian/changelog
 +++ b/debian/changelog
-@@ -1,3 +1,10 @@
+@@ -1,3 +1,17 @@
++mpv (0.41.0-2ubuntu5+rogdv4) stonking; urgency=medium
++
++  * Preserve successful display signal for paused mixer-cache screenshots.
++  * Invalidate physical capture state on source and target changes.
++
++ -- Local HDR integration <operator@localhost>  Sun, 08 Nov 2026 05:00:00 +0000
++
 +mpv (0.41.0-2ubuntu5+rogdv3) stonking; urgency=medium
 +
 +  * Preserve physical Wayland display targets for automatic Dolby mapping.
@@ -49,7 +56,7 @@ index 0000000..fce3284
 +}
 +#endif
 diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
-index 5421bc1..b4ad056 100644
+index 5421bc1..fb84bdc 100644
 --- a/video/out/vo_gpu_next.c
 +++ b/video/out/vo_gpu_next.c
 @@ -22,6 +22,10 @@
@@ -82,13 +89,13 @@ index 5421bc1..b4ad056 100644
 +    pl_tex dovi_transport;
 +    struct pl_color_space dovi_physical_target, dovi_last_signal;
 +    float dovi_transport_gain, dovi_reference, dovi_encoding_min, dovi_encoding_max;
-+    uint64_t dovi_physical_generation, dovi_render_generation;
-+    bool dovi_physical_active, dovi_physical_mapped, dovi_physical_logged;
++    uint64_t dovi_physical_generation, dovi_render_generation, dovi_map_calls;
++    bool dovi_physical_active, dovi_display_signal_valid, dovi_physical_logged;
 +
      pl_renderer rr;
      pl_queue queue;
      pl_swapchain sw;
-@@ -823,6 +838,146 @@ static void info_callback(void *priv, const struct pl_render_info *info)
+@@ -823,6 +838,141 @@ static void info_callback(void *priv, const struct pl_render_info *info)
      pl_dispatch_info_move(&frame->info[info->index], info->pass);
  }
  
@@ -140,7 +147,7 @@ index 5421bc1..b4ad056 100644
 +        pl_renderer_flush_cache(p->rr);
 +        dv_provider_reset(p->dovi_provider);
 +        p->dovi_render_generation++;
-+        p->dovi_physical_mapped = p->dovi_physical_logged = false;
++        p->dovi_display_signal_valid = p->dovi_physical_logged = false;
 +    }
 +    p->dovi_physical_active = active;
 +    p->dovi_physical_generation = generation;
@@ -150,7 +157,6 @@ index 5421bc1..b4ad056 100644
 +{
 +    struct priv *p = priv;
 +    dv_provider_reset(p->dovi_provider);
-+    p->dovi_physical_mapped = false;
 +}
 +
 +static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
@@ -158,23 +164,20 @@ index 5421bc1..b4ad056 100644
 +                     pl_tex *mapped, struct pl_color_space *mapped_color)
 +{
 +    struct priv *p = priv;
++    p->dovi_map_calls++;
 +    if (!p->dovi_physical_active || target->transfer != PL_COLOR_TRC_PQ ||
 +        target->primaries != PL_COLOR_PRIM_BT_2020) {
-+        p->dovi_physical_mapped = false;
 +        return dv_provider_map(p->dovi_provider, gpu, rpu, size, target,
 +                               master, mapped, mapped_color);
 +    }
 +
 +    // Keep the legacy signal envelope for unsupported/fallback frames. Only
 +    // successful private display management receives the physical declaration.
-+    p->dovi_physical_mapped = false;
 +    struct pl_color_space physical = p->dovi_physical_target;
 +    int status = dv_provider_map(p->dovi_provider, gpu, rpu, size, &physical,
 +                                 master, mapped, mapped_color);
-+    if (status <= 0) {
-+        p->dovi_physical_mapped = false;
++    if (status <= 0)
 +        return status;
-+    }
 +
 +    if (!mapped || !*mapped || gpu != p->gpu)
 +        return -1;
@@ -218,7 +221,6 @@ index 5421bc1..b4ad056 100644
 +    // cannot perform a second black/peak remapping. Physical fit and the one
 +    // reference transport already happened above.
 +    *mapped_color = *target;
-+    p->dovi_physical_mapped = true;
 +    if (!p->dovi_physical_logged) {
 +        MP_INFO(p, "automatic DV physical target %.9g..%.9g nits; encoding %.9g..%.9g; "
 +                "reference %.9g; PQ transport gain %.9g -> signal %.9g..%.9g; generation %llu\n",
@@ -235,7 +237,7 @@ index 5421bc1..b4ad056 100644
  static void update_options(struct vo *vo)
  {
      struct priv *p = vo->priv;
-@@ -1026,10 +1181,10 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1026,10 +1176,10 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
      update_options(vo);
  
      struct pl_render_params params = pars->params;
@@ -250,7 +252,7 @@ index 5421bc1..b4ad056 100644
      const struct gl_video_opts *opts = p->opts_cache->opts;
      bool will_redraw = frame->display_synced && frame->num_vsyncs > 1;
      bool cache_frame = will_redraw || frame->still;
-@@ -1107,6 +1262,9 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1107,6 +1257,9 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
  
      struct ra_swapchain *sw = p->ra_ctx->swapchain;
  
@@ -260,16 +262,28 @@ index 5421bc1..b4ad056 100644
      bool pass_colorspace = false;
      struct pl_color_space target_csp = {0};
      // TODO: Implement this for all backends
-@@ -1425,6 +1583,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1425,10 +1578,20 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
      }
  
      // Render frame
-+    p->dovi_physical_mapped = false;
-+    p->dovi_last_signal = target.color;
++    uint64_t map_calls_before = p->dovi_map_calls;
      if (!pl_render_image_mix(p->rr, &mix, &target, &params)) {
          MP_ERR(vo, "Failed rendering frame!\n");
          goto done;
-@@ -1584,10 +1744,13 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+     }
++    // A mixer cache hit presents the same signal without calling dovi_map.
++    // Preserve the actual successful display envelope, including fallback.
++    p->dovi_last_signal = target.color;
++    p->dovi_display_signal_valid = p->dovi_physical_active &&
++        target.color.transfer == PL_COLOR_TRC_PQ &&
++        target.color.primaries == PL_COLOR_PRIM_BT_2020;
++    MP_DBG(p, "DV display signal valid=%d cache_reuse=%d peak=%.9g\n",
++           p->dovi_display_signal_valid, p->dovi_map_calls == map_calls_before,
++           target.color.hdr.max_luma);
+ 
+     struct pl_frame ref_frame;
+     pl_frames_infer_mix(p->rr, &mix, &target, &ref_frame);
+@@ -1584,10 +1747,13 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
  
      update_options(vo);
      struct pl_render_params params = pars->params;
@@ -287,13 +301,13 @@ index 5421bc1..b4ad056 100644
      params.info_callback = NULL;
      params.skip_caching_single_frame = true;
      params.preserve_mixing_cache = false;
-@@ -1698,7 +1861,12 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+@@ -1698,13 +1864,23 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
      const struct gl_video_opts *opts = p->opts_cache->opts;
      if (args->scaled) {
          // Apply target LUT, ICC profile and CSP override only in window mode
 -        apply_target_options(p, &target, 0, false);
 +        float minimum = 0;
-+        if (physical_capture && p->dovi_physical_mapped) {
++        if (physical_capture && p->dovi_physical_active && p->dovi_display_signal_valid) {
 +            target.color = p->dovi_last_signal;
 +            minimum = target.color.hdr.min_luma;
 +        }
@@ -301,7 +315,18 @@ index 5421bc1..b4ad056 100644
      } else if (args->native_csp) {
          target.color = image.color;
      } else {
-@@ -2132,6 +2300,8 @@ static void uninit(struct vo *vo)
+         target.color = pl_color_space_srgb;
+     }
+ 
++    MP_DBG(p, "DV capture scaled=%d native=%d physical=%d signal_valid=%d transfer=%d peak=%.9g\n",
++           args->scaled, args->native_csp, p->dovi_physical_active,
++           p->dovi_display_signal_valid, target.color.transfer,
++           target.color.hdr.max_luma);
++
+     // sRGB reference display is pure 2.2 power function, see IEC 61966-2-1-1999.
+     // Round-trip back to sRGB if the source is also sRGB. In other cases, we
+     // use piecewise sRGB transfer function, as this is likely the be expected
+@@ -2132,6 +2308,8 @@ static void uninit(struct vo *vo)
  
      pl_icc_close(&p->icc_profile);
      pl_renderer_destroy(&p->rr);
@@ -310,7 +335,7 @@ index 5421bc1..b4ad056 100644
      dv_provider_destroy(&p->dovi_provider);
  
      for (int i = 0; i < VO_PASS_PERF_MAX; ++i) {
-@@ -2192,8 +2362,9 @@ static int preinit(struct vo *vo)
+@@ -2192,8 +2370,9 @@ static int preinit(struct vo *vo)
          cache_init(vo, &p->icc_cache, 20 << 20, gl_opts->icc_opts->cache_dir);
  
      pl_gpu_set_cache(p->gpu, p->shader_cache.cache);
