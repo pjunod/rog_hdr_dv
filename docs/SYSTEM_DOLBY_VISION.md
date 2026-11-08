@@ -94,6 +94,13 @@ For the ROG panel comparison, the official renderer accepted the actual firmware
 
 The provider currently chooses canonical P3-D65 for this panel. To measure the effect of that choice, the official renderer processed the same frame twice at 616 cd/m², changing only the target chromaticities. Across the full chart, 25,923 pixels differed by more than 3 ΔE ITP and the largest difference was 5.169. Using the panel’s exact coordinates in the runtime mapper remains an engineering task. [Target definitions, controls and full-raster results](../evidence/dolby-official-chart-consumer.json).
 
+### Movie-frame comparison at 600 cd/m²
+
+At frame 714 of *Sol Levante*, the official renderer processed the original 4K P3-D65 master and unchanged CM v2.9 XML. The staged Intel filter processed a carrier built from that same master at native resolution. Across all 8,294,400 pixels, mean ΔE ITP was 2.61 and p95 was 7.20. Giving the reference tool the reconstructed 10-bit base reduced those figures to 2.02 and 6.49. The ordinary 1080p Profile 5 release scored 9.21 and 26.31 against the 4K official render downsampled in linear light. The Profile 5 result includes differences between two releases. [Source attribution and all full-raster controls](../evidence/dolby-sol-levante-frame714.json).
+
+The original XML and both consumer RPUs describe the same shot. The XML minimum corresponds to roughly 583 on the 12-bit PQ scale. Both RPUs contain 12. The middle and maximum agree to rounding. On identical uncompressed master pixels, the same CPU mapper measured mean 0.114 and p95 0.497 with the authoring anchors, and 1.607 and 6.291 with the delivered anchors. The consumer stream alone cannot distinguish original minima collapsed to the same encoded value. Consumer accuracy needs a reference that processes that stream’s delivered state. [Measured controls](../evidence/dolby-sol-levante-frame714.json) · [Generator’s range handling](https://github.com/quietvoid/dovi_tool/blob/2.3.4/dolby_vision/src/rpu/extension_metadata/blocks/level1.rs).
+
+
 ## Digital qualification
 
 | Check | Result |
