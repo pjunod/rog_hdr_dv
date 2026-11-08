@@ -1,0 +1,33 @@
+{
+  "status": "independently-reviewed-runtime-qualified-packages-staged-not-installed",
+  "integration_base": "31a8099300d301db3800bac3434fe5a4ad2d66e5",
+  "eventual_main_base": "31a8099300d301db3800bac3434fe5a4ad2d66e5",
+  "native_mpv_base": "fbad7df258891f0b5406c4595db85f42592568ac",
+  "native_mpv_package": "0.41.0-2ubuntu5",
+  "patch": "patches/ubuntu-mpv-system-dv/0003-mpv-physical-target.patch",
+  "scope": [
+    "preserve raw physical preferred target before normalization",
+    "automatic Wayland Vulkan PQ Dolby Vision display management",
+    "one multiplicative GPU transport following physical mapping",
+    "target feedback generations and explicit override fallback"
+  ],
+  "reference_case": {
+    "physical_peak_nits": 616,
+    "reference_nits": 142,
+    "physical_black_nits": 0.0004
+  },
+  "validation": {
+    "prior_compile_receipt": "compile-reviewed-corrections.log",
+    "new_runtime": "PASS: physical A-B-A generations 1/2/3, display/SDR/native exports, target-peak and source-hint suppression",
+    "physical_accuracy": "unmeasured; no colorimeter",
+    "math": "PASS: physical transport regression",
+    "repository": "PASS: check_repository.py 262 patches, 11 series",
+    "runtime_fixture": "headless Weston; software Vulkan; explicitly scoped patched Mesa WSI",
+    "packages": "PASS: distro-default mpv/libmpv2/libmpv-dev +rogdv3 built",
+    "offline_host_plan": "PASS: minimal mpv-only +rogdv2 to +rogdv3 and modeled rollback; no removals; libmpv2 remains absent; host dpkg status unchanged"
+  },
+  "native_candidate_commit": "be75015dbfac9afea99638caa22034961f69581f",
+  "native_candidate_tree": "3cbbcaa419e23fc42ef48ae7d5db3baf2dbbb3e9",
+  "package_version": "0.41.0-2ubuntu5+rogdv3",
+  "rollback_package_version": "0.41.0-2ubuntu5+rogdv2"
+}
