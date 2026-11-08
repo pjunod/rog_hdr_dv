@@ -13,7 +13,7 @@ struct probe {
   GstElement *pipeline;
   GMutex lock;
   GHashTable *expected, *values;
-  guint epoch, inputs, outputs[2], gaps, verified, failures, transformed;
+  guint epoch, inputs, outputs[2], gaps, verified, failures, transformed, headers;
   GstClockTime last_input_pts;
   GstVideoInfo decoded_info;
   gboolean have_decoded_info;
@@ -192,6 +192,67 @@ matches (GstBuffer *buffer, const struct expected *e)
   return equal;
 }
 
+static void
+report_mismatch (const gchar *stage, struct probe *p, GstBuffer *buffer,
+    const struct expected *expected)
+{
+  GstVideoDoviRpuMeta *meta = gst_buffer_get_video_dovi_rpu_meta (buffer);
+  gchar *actual = NULL;
+  if (meta && meta->rpu) {
+    gsize size;
+    const guint8 *bytes = g_bytes_get_data (meta->rpu, &size);
+    actual = g_compute_checksum_for_data (G_CHECKSUM_SHA256, bytes, size);
+  }
+  g_printerr ("mismatch stage=%s epoch=%u pts=%" G_GUINT64_FORMAT
+      " expected=%s actual=%s dimensions=%ux%u pending=%u inputs=%u\n",
+      stage, p->epoch, GST_BUFFER_PTS (buffer),
+      expected ? (expected->hash ? expected->hash : "NONE") : "MISSING",
+      actual ? actual : "NONE", meta ? meta->width : 0, meta ? meta->height : 0,
+      g_hash_table_size (p->expected), p->inputs);
+  g_free (actual);
+  if (!strcmp (stage, "parser")) {
+    GstMapInfo map;
+    if (gst_buffer_map (buffer, &map, GST_MAP_READ)) {
+      gsize header, pos = start_code (map.data, map.size, 0, &header);
+      guint count = 0;
+      g_printerr ("parser-buffer flags=%u size=%zu nal-types=", GST_BUFFER_FLAGS (buffer), map.size);
+      while (pos < map.size && header < map.size && count++ < 16) {
+        g_printerr ("%u,", (map.data[header] >> 1) & 63);
+        pos = start_code (map.data, map.size, header, &header);
+      }
+      g_printerr ("\n");
+      gst_buffer_unmap (buffer, &map);
+    }
+  }
+}
+
+/* h265parse may send VPS/SPS/PPS separately before a picture. Such a
+ * HEADER buffer has no presentation timestamp and is not a decoded picture. */
+static gboolean
+parameter_sets_only (GstBuffer *buffer)
+{
+  GstMapInfo map;
+  gsize header, pos;
+  guint count = 0;
+  gboolean valid = TRUE;
+  if (!GST_BUFFER_FLAG_IS_SET (buffer, GST_BUFFER_FLAG_HEADER) ||
+      gst_buffer_get_video_dovi_rpu_meta (buffer) ||
+      !gst_buffer_map (buffer, &map, GST_MAP_READ))
+    return FALSE;
+  pos = start_code (map.data, map.size, 0, &header);
+  valid = pos == 0;
+  while (pos < map.size && valid) {
+    gsize next_header, next = start_code (map.data, map.size, header, &next_header);
+    guint type = header < map.size ? (map.data[header] >> 1) & 63 : 0;
+    valid = next - header >= 2 && type >= 32 && type <= 34;
+    count++;
+    pos = next;
+    header = next_header;
+  }
+  gst_buffer_unmap (buffer, &map);
+  return valid && count;
+}
+
 static GstPadProbeReturn
 check_parser (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
 {
@@ -200,6 +261,12 @@ check_parser (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
   GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER (info);
   guint64 pts = GST_BUFFER_PTS (buffer);
   gboolean good;
+  if (!GST_CLOCK_TIME_IS_VALID (pts) && parameter_sets_only (buffer)) {
+    g_mutex_lock (&p->lock);
+    p->headers++;
+    g_mutex_unlock (&p->lock);
+    return GST_PAD_PROBE_OK;
+  }
   g_mutex_lock (&p->lock);
   if (p->input_flushing) {
     g_mutex_unlock (&p->lock);
@@ -209,8 +276,10 @@ check_parser (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
   good = e && matches (buffer, e);
   if (good)
     p->verified++;
-  else
+  else {
     p->failures++;
+    report_mismatch ("parser", p, buffer, e);
+  }
   g_mutex_unlock (&p->lock);
   if (!good)
     post (p, "probe-error");
@@ -264,6 +333,7 @@ check_decoded (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
     }
   } else {
     p->failures++;
+    report_mismatch ("decoder", p, buffer, e);
   }
   g_mutex_unlock (&p->lock);
   if (!good)
@@ -423,9 +493,9 @@ done:
           (p.transform_negative && !p.transformed)))
     result = 2; /* Insufficient fixture evidence never becomes a pass. */
   g_printerr ("decoder=%s before=%u after=%u gaps=%u parser-verified=%u "
-      "flushes=%u reordered=%d distinct-rpu=%u transformed=%u errors=%u result=%d\n",
+      "flushes=%u reordered=%d distinct-rpu=%u transformed=%u headers=%u errors=%u result=%d\n",
       argv[1], p.outputs[0], p.outputs[1], p.gaps, p.verified, p.epoch,
-      p.reordered, g_hash_table_size (p.values), p.transformed, p.failures, result);
+      p.reordered, g_hash_table_size (p.values), p.transformed, p.headers, p.failures, result);
   gst_object_unref (bus);
   gst_object_unref (p.pipeline);
   g_hash_table_unref (p.expected);
