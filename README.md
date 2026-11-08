@@ -191,6 +191,7 @@ has the remote and branch rules.
 | [Merged Ubuntu packages](docs/MERGED_UBUNTU_PACKAGES.md) | The hand-built 2026-10-17 release and its install/rollback test |
 | [Ubuntu delivery](docs/NATIVEHDR10_UBUNTU_DELIVERY.md) · [validation receipts](docs/NATIVEHDR10_VALIDATION.md) | The nativehdr10 delivery and its scoped validation |
 | [GTK frames compatibility](docs/GTK_FRAMES_COMPATIBILITY.md) | A packaging compatibility correction and its source pins |
+| [GTK display target](docs/GDK_DISPLAY_TARGET.md) | Proposed native preferred-target snapshot API, source pins and remaining GTK/GStreamer checks |
 | [HDR foundations](docs/QUALIFIED_HDR_FOUNDATIONS.md) | The reviewed main-targeting source batch and its provenance |
 | [Display diagnostics](docs/DISPLAY_DIAGNOSTICS.md) | The read-only inspector and Wayland colour probe |
 | [ICC characterisation](docs/ICC_CHARACTERISATION.md) | Reading factory profiles without applying them |

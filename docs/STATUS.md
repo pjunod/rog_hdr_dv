@@ -23,6 +23,23 @@ FEL residuals, normal GTK player rendering, physical target signalling and
 full-feature/multiarch packaging remain open. Additional malformed/region-copy
 negative cases are pending. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md).
 
+## GTK preferred display target — November 7
+
+A proposed GTK `4.24.1+ds-1` source change retains the real compositor target
+behind a caller-owned GDK snapshot and immediate invalidation notifications.
+The baseline and corrected candidate affected GDK libraries compile; complete
+source replay matches the pinned candidate. A review found mid-teardown signal
+reentrancy; notification now runs after the core publishes destroyed state.
+Native pending/ready reentrant destruction negatives now pass. Independent review and runtime checks
+remain pending. No desktop installation or GStreamer rendering acceptance is
+claimed. Initial reviewed runtime found default GTK hides the manager and its
+experimental renderer rejects Weston's missing sRGB transfer capability. A
+reviewed feedback-only correction preserves that rendering policy while making
+ordinary discovery independent. Default startup and both native lifecycle
+negatives pass; a late-manager race regression passes while its old control
+fails. Live profile/output lifecycle and package staging remain pending.
+[Consumer contract and native observer](GDK_DISPLAY_TARGET.md).
+
 ## Kernel security rebase — 2026-10-29
 
 The signed `7.3.0-nativehdr3` was installed and booted in the owner-authorized

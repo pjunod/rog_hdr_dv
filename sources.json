@@ -734,6 +734,50 @@
         ]
       },
       "candidate_status": "Compile-only raw RPU transport proposal; no runtime tests, host installation, resolved reconstruction or playback claim"
+    },
+    {
+      "component": "ubuntu-gtk4-display-target",
+      "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
+      "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
+      "candidate_commit": "8ee350d63359b2704318849e8f28a5823075c007",
+      "candidate_tree": "9dabbb97dfa2c68e7667dd7d71051a2407ee0c1b",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-wayland-expose-preferred-color-target-snapshots.patch",
+        "0002-debian-stage-preferred-target-snapshots.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gtk4",
+        "version": "4.24.1+ds-1",
+        "authentication": "APT source hashes authenticated by the configured Ubuntu archive signed metadata; dsc OpenPGP signature not independently checked.",
+        "import_recipe": "dpkg-source extraction with distribution patches; Git import includes every extracted file except .pc; fixed neutral author/committer and 2026-11-07T18:00:00-05:00 timestamps.",
+        "artifacts": [
+          {
+            "file": "gtk4_4.24.1+ds-1.debian.tar.xz",
+            "sha256": "1bfe98cecba76a947fb4f07335e013f7982a06c05805b4bda546b585c0915ea4",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds-1.debian.tar.xz"
+          },
+          {
+            "file": "gtk4_4.24.1+ds-1.dsc",
+            "sha256": "43ca7e4305ba039a28451b818c5f2f0027ea998f3279fa2a18087e7a8146a640",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds-1.dsc"
+          },
+          {
+            "file": "gtk4_4.24.1+ds.orig.tar.xz",
+            "sha256": "d148acf2132b9b5ad85e62f1544c9d765a7991ec18567c36ffb12765f50f4bf3",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds.orig.tar.xz"
+          }
+        ],
+        "source_import": {
+          "git_identity": "ROG HDR contributors <rog-hdr@invalid>",
+          "author_and_committer_date": "2026-11-07T18:00:00-05:00",
+          "commit_subject": "Import Ubuntu gtk4 4.24.1+ds-1 after distribution patches, excluding .pc",
+          "include": "git add -f -- . after omitting .pc from extracted source copy"
+        }
+      },
+      "candidate_status": "Proposed GTK rogdv1 source package. Runtime core/source unchanged from approved d2ce83e, with additive Debian symbol minimum and version4.24.1+ds-1+rogdv1. Exact stock rollback tuple retained. Packaging review and default-configuration package build pending; no host installation.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv1"
     }
   ]
 }
