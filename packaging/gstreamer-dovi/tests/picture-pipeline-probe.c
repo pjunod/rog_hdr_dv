@@ -433,7 +433,8 @@ int
 main (int argc, char **argv)
 {
   if ((argc != 3 && argc != 4) ||
-      (strcmp (argv[1], "avdec_h265") && strcmp (argv[1], "vah265dec")) ||
+      (strcmp (argv[1], "avdec_h265") && strcmp (argv[1], "vah265dec") &&
+       strcmp (argv[1], "nvh265dec")) ||
       (argc == 4 && strcmp (argv[3], "rotate-180")))
     return 2;
   gst_init (&argc, &argv);
