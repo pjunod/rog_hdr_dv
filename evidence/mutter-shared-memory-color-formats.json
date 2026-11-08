@@ -83,5 +83,18 @@
       0
     ]
   ],
-  "scope": "Digital screen capture of the monitor path. The session used a proof build linking the corrected source objects and a test-only virtual connector. Separate client connections exercised each format. Same-stream renegotiation, direct DMA-BUF capture and physical panel response were outside this measurement."
+  "scope": "Digital monitor screen capture using corrected source objects and a test-only virtual connector. The shared-memory path was exercised. Direct DMA-BUF capture and physical panel response were outside this measurement.",
+  "same_stream": {
+    "sequence": [
+      "xRGB_210LE",
+      "RGBA_F16",
+      "xRGB_210LE"
+    ],
+    "operation": "The consumer changed SPA_PARAM_EnumFormat on the same running stream. Each newly selected format produced a full shared-memory frame.",
+    "original_vs_returned_xr30_changed_pixels": 0,
+    "xr30_vs_half_float_max_sampled_channel_difference_in_10bit_units": 0.5732421875,
+    "returned_width": 1280,
+    "returned_height": 800
+  },
+  "area_control": "The separate GNOME area recorder produced its advertised BGRx SDR format and rejected the 10-bit PQ request."
 }

@@ -19,6 +19,20 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 
 On the ROG, the packaged Showtime client retained one decoded Profile 5 picture while a private GNOME monitor changed from 616 to 308 cd/m² and back. The mapper received both peaks with an unchanged 203 cd/m² reference white. GNOME’s 1280×800 PipeWire capture changed over 375,877 pixels inside the movie rectangle. The last capture matched the first byte for byte. The monitor advertised synthetic HDR capabilities, with the normal Mutter configuration, renderer and capture code. An independent late-HDR window also updated correctly on installed GNOME Shell. [Methods and measured differences](../evidence/gnome-showtime-paused-retarget.json).
 
+### Inspect a native GNOME screen pixel
+
+On the ROG, capture format matters when checking a wide-gamut image or an HDR movie. The same green patch measured (339, 582, 302) in 10-bit BT.2020/PQ and (0, 255, 0) in an 8-bit BT.709 capture. The corrected Mutter package writes the pixel format advertised to the recorder. [Native format controls](../evidence/mutter-shared-memory-color-formats.json).
+
+The [PipeWire pixel sampler](../tools/sample-screen-pixel.c) reads a single coordinate from an already authorized monitor stream. Build it against the PipeWire development headers. Pass the monitor node ID from the recording session and run it on that session’s PipeWire connection.
+
+```sh
+cc -std=gnu11 -O2 tools/sample-screen-pixel.c -o sample-screen-pixel \
+  $(pkg-config --cflags --libs libpipewire-0.3) -lm
+./sample-screen-pixel "$node" xr30 520 399
+```
+
+Coordinates use the captured frame’s pixel grid. The three printed numbers are red, green and blue. `xr30` and `xb30` return 10-bit PQ code values, `rgba-f16` returns floating-point PQ signals, and `bgrx` returns 8-bit SDR codes. The sampler requests the chosen encoding and a shared-memory buffer and times out after ten seconds. These measurements describe digital compositor output. Physical luminance and white point require panel measurements.
+
 ### Browser playback on the ROG
 
 Stock Chrome 156.0.8078.47 and Firefox 159.0 both presented a local AVC control frame. Both rejected the same local unencrypted Profile 8.1 MP4 with media error 4 (`MEDIA_ERR_SRC_NOT_SUPPORTED`). The chart has matched Dolby configuration and RPU data and plays through the native consumer pipeline. Each browser used a fresh profile. Chrome ran on its own NVIDIA-backed Wayland display and Firefox ran headless.
