@@ -63,6 +63,19 @@ A decoded frame, a PQ screenshot, and a successful process exit each leave open 
 
 This path requires a reconstructed master. Profile 7 FEL requires a decoded enhancement-layer residual. Compressed metadata needs its effective frame state. Unsupported cases remain outside the shared path’s qualification. Other video engines, browsers and protected streaming require their own integration. Panel black, peak, chromaticities and optical agreement require measurement; the firmware’s declared values are available for target selection.
 
+## Comparison with Dolby CM Offline
+
+The current player and filter both processed a Profile 8.1 carrier derived from the same original RGB chart and XML as a retained Dolby CM Offline render. The virtual display described the reference target of BT.2020/PQ, 0.005–1,000 cd/m². The staged mpv selected that target automatically on NVIDIA. FFmpeg used the same target explicitly on Intel. Each candidate logged CM4 display mapping.
+
+| Full-raster comparison at frame 0 | Mean ΔE ITP | p95 | Maximum |
+|---|---:|---:|---:|
+| Dolby reference vs. mpv window | 0.619 | 1.122 | 56.491 |
+| Dolby reference vs. FFmpeg export | 0.923 | 1.636 | 56.494 |
+| Original chart vs. decoded 10-bit base | 0.634 | 0.982 | 63.297 |
+| Dolby reference vs. decoded base without grading | 34.598 | 91.617 | 112.641 |
+
+All four comparisons cover all 3,276,800 pixels. The largest errors for both candidates and the codec control were near a source color transition. The mpv window’s maximum in patch interiors was 4.107. The reference target carries neutral Level 8 controls, so agreement here leaves creative-trim fidelity on other content open. The separate frame-local trim tests below verify that authored changes affect the intended frames. [Inputs, output encoding, metric and edge populations](../evidence/dolby-official-chart-consumer.json).
+
 ## Digital qualification
 
 | Check | Result |

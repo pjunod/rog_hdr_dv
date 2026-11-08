@@ -1,0 +1,111 @@
+{
+  "schema": 1,
+  "scope": "One private, self-owned color chart. This is a digital development comparison at one target. The chart does not supply an independent moving-content, nonneutral Level 8, Profile 5, Profile 7 FEL, panel, or certification result.",
+  "geometry": [
+    2560,
+    1280
+  ],
+  "frame": 0,
+  "source": "Full-range BT.2020 PQ RGB16 TIFF. The reference was rendered from the original TIFF and original XML with Dolby CM Offline. The retained log identifies target ID 255. The XML and both TIFF hashes matched the original private receipt.",
+  "target": {
+    "primaries": "BT.2020/D65",
+    "transfer": "PQ",
+    "range": "full",
+    "min_nits": 0.005,
+    "peak_nits": 1000
+  },
+  "carrier": "The same chart was converted to limited-range BT.2020 nonconstant-luminance 10-bit 4:2:0 without dither, then losslessly HEVC-coded. dovi_tool 2.3.4 encoded the original XML into Profile 8.1 RPU. The MP4 descriptor identified profile 8, level 5, BL and RPU present, no EL, HDR10 compatibility. The RPU describes a custom Level 8 target ID 255 and Level 10 target definition. The Level 8 trim controls are neutral.",
+  "candidate_window": "mpv 0.42 +rogdv4 and FFmpeg decoder +rogdv3; default NVIDIA gpu-next on private hardware-backed native Weston. Paused frame 0 filled the 2560x1280 output. The player automatically selected 0.005–1000 cd/m². Tagged RGBA64 PNG cICP 9/16/0/1. RGB channels compared at original size.",
+  "candidate_filter": "FFmpeg libplacebo on Intel Vulkan, explicit 0.005–1000 cd/m² BT.2020 target, planar 16-bit RGB output. Both candidates logged the CM4 raw-RPU path.",
+  "metric": {
+    "name": "BT.2124 ΔE ITP",
+    "implementation_sha256": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90",
+    "population": "All 3,276,800 pixels, nearest-rank p95. No fitting, image resizing or exposure adjustment. Each calculation strip included two scalar spot-checks against tools/dolby_harness/metric.py."
+  },
+  "full_raster": {
+    "source-base": {
+      "n": 3276800,
+      "mean": 0.6343099662796434,
+      "p95": 0.9824170509912077,
+      "max": 63.29701473456956
+    },
+    "official-mapped": {
+      "n": 3276800,
+      "mean": 0.9234671222748462,
+      "p95": 1.635819446991264,
+      "max": 56.49367345704991
+    },
+    "official-base": {
+      "n": 3276800,
+      "mean": 34.59830526764079,
+      "p95": 91.61725194849734,
+      "max": 112.64109979193975
+    },
+    "official-window": {
+      "n": 3276800,
+      "mean": 0.6194908953793624,
+      "p95": 1.1224357683191326,
+      "max": 56.490884723552526
+    },
+    "mapped-window": {
+      "n": 3276800,
+      "mean": 0.8772120223864249,
+      "p95": 1.2661014806796838,
+      "max": 3.3656327290970327
+    }
+  },
+  "edge_definition": "Mark both pixels on each horizontal or vertical change of RGB codes in the original uncompressed chart, then dilate by two pixels in each direction. This diagnostic classifies the original full-raster result without excluding any pixels from it.",
+  "stratified": {
+    "official-window": {
+      "interior": {
+        "n": 3064454,
+        "mean": 0.4861470486784331,
+        "p95": 1.0673835513678611,
+        "maximum": 4.106527160289945,
+        "above10": 0
+      },
+      "edge": {
+        "n": 212346,
+        "mean": 2.543831756040971,
+        "p95": 13.84011027180277,
+        "maximum": 56.490884723552526,
+        "above10": 13442
+      },
+      "worst_pixel_near_edge": true
+    },
+    "official-mapped": {
+      "interior": {
+        "n": 3064454,
+        "mean": 0.797811894109964,
+        "p95": 1.566749510768554,
+        "maximum": 2.070009291381437,
+        "above10": 0
+      },
+      "edge": {
+        "n": 212346,
+        "mean": 2.736850310895236,
+        "p95": 14.2976424238284,
+        "maximum": 56.49367345704991,
+        "above10": 13915
+      },
+      "worst_pixel_near_edge": true
+    },
+    "source-base": {
+      "interior": {
+        "n": 3064454,
+        "mean": 0.4363916282529583,
+        "p95": 0.9268779128543096,
+        "maximum": 1.026593348487134,
+        "above10": 0
+      },
+      "edge": {
+        "n": 212346,
+        "mean": 3.4905523378770713,
+        "p95": 18.175593235134116,
+        "maximum": 63.29701473456956,
+        "above10": 19204
+      },
+      "worst_pixel_near_edge": true
+    }
+  }
+}
