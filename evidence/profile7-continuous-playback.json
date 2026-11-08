@@ -39,5 +39,42 @@
       "NVIDIA RTX 4080 Laptop GPU": "A2R10G10B10 and A2B10G10R10 succeeded"
     }
   },
-  "scope": "The private Intel run missed real-time playback. Actual GNOME playback throughput is open. Swapchain allocation on the running desktop proves capability only."
+  "scope": "Normal GPU selection on the hardware-backed private compositor graded the three-second source at its 24 fps cadence. Intel remained slow. Real GNOME swapchain allocation succeeded on both GPUs; normal GNOME playback timing and longer content remain open.",
+  "private_hardware_compositor": {
+    "compositor": "Unprivileged Weston GL on the NVIDIA RTX 4080 Laptop GPU. No visible GNOME window.",
+    "automatic_gpu": {
+      "renderer": "NVIDIA RTX 4080 Laptop GPU",
+      "decode": "nvdec",
+      "mapper": "CM v4, 3840x2160, enhancement layer composed, 616 cd/m2",
+      "swapchain_errors": 0,
+      "decoder_drops": 0,
+      "output_drops": 0,
+      "delayed_frames": 0,
+      "eof": true,
+      "present_clock_samples_s": [
+        [
+          0.25,
+          1.731148
+        ],
+        [
+          1.0,
+          2.483035
+        ],
+        [
+          2.5,
+          3.985863
+        ]
+      ],
+      "source_fps": 24
+    },
+    "explicit_intel": {
+      "renderer": "Intel Arc",
+      "decode": "nvdec-copy",
+      "output_drops": 16,
+      "decoder_drops": 0,
+      "swapchain_errors": 0,
+      "first_to_last_position_sample_s": 71.708,
+      "eof": true
+    }
+  }
 }
