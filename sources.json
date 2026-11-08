@@ -841,8 +841,8 @@
       "component": "ubuntu-gst-plugins-good-dovi",
       "base_commit": "73d3a23875505394b9cbb0a7eca71050d0eeaaa3",
       "base_tree": "0a06fafebcfba125e6ede43150e685215b307b5b",
-      "candidate_commit": "5e672e3884cb5a067b8f256c04bbced24c9e78c9",
-      "candidate_tree": "586a19029e147db8fe54a387d57a9431aa259441",
+      "candidate_commit": "7bf3d71a76fcb0697ed5bbe158e1c800b7ce1cf6",
+      "candidate_tree": "ff0cc0b06d9b969a87bc2fc4926f19b28bc00eca",
       "source_origin": {
         "kind": "ubuntu-source-package",
         "artifacts": [
@@ -874,10 +874,23 @@
       "patch_order": [
         "0001-carry-Dolby-configuration-per-sample-entry.patch",
         "0002-use-the-shared-HEVC-configuration-parser.patch",
-        "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch"
+        "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
+        "0004-matroska-preserve-bounded-track-Dolby-configuration.patch",
+        "0005-package-the-reviewed-Matroska-configuration-series.patch"
       ],
-      "patch_count": 3,
-      "candidate_status": "The native MP4 demuxer and h265parse preserved exact records on genuine Profile 5 and synthetic 8.1. Missing, malformed and ambiguous records declined. Staged only."
+      "patch_count": 5,
+      "candidate_status": "The five-patch canonical replay matches all 1,791 paths and modes of the actual unsigned good+2 source package, including normal Debian dependency metadata. Five normal binary outputs and the recorded 25 track controls passed; P5 owned metadata transport passed on normal NVIDIA decoding. P7 is track metadata only, not FEL pixel qualification.",
+      "candidate_package_version": "1.28.7-1build1+rogdv2",
+      "candidate_source_package": {
+        "kind": "unsigned-private-source-package",
+        "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv2.dsc",
+        "sha256": "720c310e13798d104f4174dc05736e998472173bc2afd1e3d0d9bd3373c90f6f",
+        "debian_archive": {
+          "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv2.debian.tar.xz",
+          "sha256": "a9a71981cbf06a838e02748027d58d461d2789927a673a48d1cc7deb7644c04c"
+        },
+        "replay_receipt": "evidence/gstreamer-matroska-distribution-replay-20261108.json"
+      }
     },
     {
       "component": "ubuntu-libdovi-ffi",

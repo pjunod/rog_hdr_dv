@@ -1,0 +1,292 @@
+diff --git a/debian/changelog b/debian/changelog
+index e37310d..160c01e 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-good1.0 (1.28.7-1build1+rogdv2) stonking; urgency=medium
++
++  * Preserve validated, bounded track-local Dolby configuration in Matroska.
++  * Keep prior ISOBMFF transport and the complete Ubuntu plugin inventory.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 09:17:37 +0000
++
+ gst-plugins-good1.0 (1.28.7-1build1+rogdv1) stonking; urgency=medium
+ 
+   * Carry validated Dolby configuration through the normal qtdemux plugin.
+diff --git a/debian/patches/rog-dovi-isobmff.patch b/debian/patches/rog-dovi-isobmff.patch
+new file mode 100644
+index 0000000..533f917
+--- /dev/null
++++ b/debian/patches/rog-dovi-isobmff.patch
+@@ -0,0 +1,85 @@
++Description: Preserve validated ISOBMFF Dolby configuration
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++Last-Update: 2026-11-08
++
++--- gst-plugins-good1.0-1.28.7.orig/gst/isomp4/fourcc.h
+++++ gst-plugins-good1.0-1.28.7/gst/isomp4/fourcc.h
++@@ -156,6 +156,7 @@ G_BEGIN_DECLS
++ #define FOURCC_dvh1     GST_MAKE_FOURCC('d','v','h','1')
++ #define FOURCC_dvhe     GST_MAKE_FOURCC('d','v','h','e')
++ #define FOURCC_dvcC     GST_MAKE_FOURCC('d','v','c','C')
+++#define FOURCC_dvvC     GST_MAKE_FOURCC('d','v','v','C')
++ #define FOURCC_edts     GST_MAKE_FOURCC('e','d','t','s')
++ #define FOURCC_elst     GST_MAKE_FOURCC('e','l','s','t')
++ #define FOURCC_enda     GST_MAKE_FOURCC('e','n','d','a')
++--- gst-plugins-good1.0-1.28.7.orig/gst/isomp4/qtdemux.c
+++++ gst-plugins-good1.0-1.28.7/gst/isomp4/qtdemux.c
++@@ -14896,6 +14896,48 @@ error:
++  * about the trak.
++  * traks that do not decode to something (like strm traks) will not have a pad.
++  */
+++/* The configuration belongs to this sample description. A track may change
+++ * description, and two configuration boxes make its profile ambiguous. */
+++static void
+++qtdemux_set_dovi_configuration (GNode * entry, guint32 entry_size, GstCaps * caps)
+++{
+++  const guint8 *base = entry->data;
+++  const guint8 *record = NULL;
+++  guint record_size = 0;
+++  GNode *child;
+++  GstBuffer *buffer;
+++
+++  for (child = g_node_first_child (entry); child;
+++      child = g_node_next_sibling (child)) {
+++    const guint8 *data = child->data;
+++    gsize offset = data - base;
+++    guint32 type, size;
+++    GstH265DoviConfiguration config;
+++
+++    if (offset > entry_size || entry_size - offset < 8)
+++      return;
+++    type = QT_FOURCC (data + 4);
+++    if (type != FOURCC_dvcC && type != FOURCC_dvvC)
+++      continue;
+++    size = QT_UINT32 (data);
+++    /* A v1.0 record has 24 bytes including reserved fields. Older
+++     * four-byte records omit the base-layer compatibility identifier. */
+++    if (record || size < 12 || size > 32 || size > entry_size - offset)
+++      return;
+++    record = data + 8;
+++    record_size = size - 8;
+++    if (!gst_codec_utils_h265_parse_dovi_configuration (record, record_size,
+++            &config) || (type == FOURCC_dvcC) != (config.profile < 8))
+++      return;
+++  }
+++  if (!record)
+++    return;
+++
+++  buffer = gst_buffer_new_memdup (record, record_size);
+++  gst_caps_set_simple (caps, "dovi-configuration", GST_TYPE_BUFFER, buffer, NULL);
+++  gst_buffer_unref (buffer);
+++}
+++
++ static gboolean
++ qtdemux_parse_trak (GstQTDemux * qtdemux, GNode * trak, guint32 * mvhd_matrix)
++ {
++@@ -15557,6 +15599,8 @@ qtdemux_parse_trak (GstQTDemux * qtdemux
++             GNode *hvcC =
++                 qtdemux_tree_get_child_by_type (stsd_entry, FOURCC_hvcC);
++ 
+++            qtdemux_set_dovi_configuration (stsd_entry, len, entry->caps);
+++
++             if (hvcC) {
++               const guint8 *data;
++               guint32 size;
++--- gst-plugins-good1.0-1.28.7.orig/gst/isomp4/qtdemux_types.c
+++++ gst-plugins-good1.0-1.28.7/gst/isomp4/qtdemux_types.c
++@@ -215,6 +215,7 @@ static const QtNodeType qt_node_types[]
++   {FOURCC_dvhe, "HEVC-based Dolby Vision codec derived from hev1 ", 0},
++   {FOURCC_dvh1, "HEVC-based Dolby Vision codec derived from hvc1 ", 0},
++   {FOURCC_dvcC, "HEVC-based Dolby Vision codec configuration container", 0},
+++  {FOURCC_dvvC, "Dolby Vision profile 8 and later codec configuration container", 0},
++   {FOURCC_vvc1, "VVC codec configuration", 0},
++   {FOURCC_vvi1, "VVC codec configuration", 0},
++   {FOURCC_vvcC, "VVC codec configuration container", 0},
+diff --git a/debian/patches/rog-dovi-matroska-track.patch b/debian/patches/rog-dovi-matroska-track.patch
+new file mode 100644
+index 0000000..4f965f4
+--- /dev/null
++++ b/debian/patches/rog-dovi-matroska-track.patch
+@@ -0,0 +1,172 @@
++Description: Preserve bounded track-local Matroska Dolby configuration
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++Last-Update: 2026-11-08
++
++--- gst-plugins-good1.0-1.28.7.orig/gst/matroska/ebml-read.c
+++++ gst-plugins-good1.0-1.28.7/gst/matroska/ebml-read.c
++@@ -348,7 +348,7 @@ gst_ebml_read_buffer (GstEbmlRead * ebml
++  * Read the next element, return a pointer to it and its size.
++  */
++ 
++-static GstFlowReturn
+++GstFlowReturn
++ gst_ebml_read_bytes (GstEbmlRead * ebml, guint32 * id, const guint8 ** data,
++     guint * size)
++ {
++--- gst-plugins-good1.0-1.28.7.orig/gst/matroska/ebml-read.h
+++++ gst-plugins-good1.0-1.28.7/gst/matroska/ebml-read.h
++@@ -112,6 +112,12 @@ GstFlowReturn gst_ebml_read_master
++ 
++ GstFlowReturn gst_ebml_read_pop_master   (GstEbmlRead *ebml);
++ 
+++/* Module-internal, borrowed bytes valid while the EBML input is retained. */
+++GstFlowReturn gst_ebml_read_bytes        (GstEbmlRead *ebml,
+++                                          guint32 *id,
+++                                          const guint8 **data,
+++                                          guint *size);
+++
++ GstFlowReturn gst_ebml_read_binary       (GstEbmlRead *ebml,
++                                           guint32     *id,
++                                           guint8     **binary,
++--- gst-plugins-good1.0-1.28.7.orig/gst/matroska/matroska-demux.c
+++++ gst-plugins-good1.0-1.28.7/gst/matroska/matroska-demux.c
++@@ -727,6 +727,87 @@ beach:
++   return ret;
++ }
++ 
+++typedef struct
+++{
+++  guint8 data[24];
+++  guint size;
+++  gboolean seen;
+++  gboolean invalid;
+++} GstMatroskaDoviConfiguration;
+++
+++/* TrackEntry-local only. Other mappings never supply a Dolby profile. Read
+++ * borrowed bytes even for unknown/oversized payloads, retaining at most 24. */
+++static GstFlowReturn
+++gst_matroska_demux_parse_dovi_mapping (GstMatroskaDemux * demux,
+++    GstEbmlRead * ebml, GstMatroskaDoviConfiguration * track)
+++{
+++  const guint64 dvcC = G_GUINT64_CONSTANT (0x64766343);
+++  const guint64 dvvC = G_GUINT64_CONSTANT (0x64767643);
+++  GstH265DoviConfiguration config;
+++  GstFlowReturn ret;
+++  guint32 id;
+++  guint64 type = 0;
+++  guint8 payload[24];
+++  guint payload_size = 0;
+++  gboolean type_seen = FALSE, extra_seen = FALSE;
+++  gboolean dolby = FALSE, malformed = FALSE;
+++
+++  ret = gst_ebml_read_master (ebml, &id);
+++  while (ret == GST_FLOW_OK && gst_ebml_read_has_remaining (ebml, 1, TRUE)) {
+++    if ((ret = gst_ebml_peek_id (ebml, &id)) != GST_FLOW_OK)
+++      break;
+++    if (id == GST_MATROSKA_ID_BLOCKADDIDTYPE ||
+++        id == GST_MATROSKA_ID_BLOCKADDIDEXTRADATA) {
+++      const guint8 *bytes;
+++      guint size;
+++
+++      ret = gst_ebml_read_bytes (ebml, &id, &bytes, &size);
+++      if (ret != GST_FLOW_OK)
+++        break;
+++      if (id == GST_MATROSKA_ID_BLOCKADDIDTYPE) {
+++        guint i;
+++        guint64 value = 0;
+++
+++        malformed |= type_seen || size == 0 || size > 8;
+++        type_seen = TRUE;
+++        if (size > 0 && size <= 8) {
+++          for (i = 0; i < size; i++)
+++            value = (value << 8) | bytes[i];
+++          type = value;
+++          dolby |= value == dvcC || value == dvvC;
+++        }
+++      } else {
+++        malformed |= extra_seen || size < 4 || size > sizeof (payload);
+++        extra_seen = TRUE;
+++        if (size >= 4 && size <= sizeof (payload)) {
+++          memcpy (payload, bytes, size);
+++          payload_size = size;
+++        }
+++      }
+++    } else {
+++      ret = gst_ebml_read_skip (ebml);
+++    }
+++  }
+++
+++  if (dolby) {
+++    malformed |= !extra_seen || track->seen;
+++    track->seen = TRUE;
+++    if (!malformed &&
+++        (!gst_codec_utils_h265_parse_dovi_configuration (payload, payload_size,
+++                &config) || (type == dvcC) != (config.profile < 8)))
+++      malformed = TRUE;
+++    track->invalid |= malformed;
+++    if (!malformed) {
+++      memcpy (track->data, payload, payload_size);
+++      track->size = payload_size;
+++    } else {
+++      GST_WARNING_OBJECT (demux,
+++          "Ignoring malformed or duplicate Dolby track configuration");
+++    }
+++  }
+++  return ret;
+++}
+++
++ static GstFlowReturn
++ gst_matroska_demux_parse_stream (GstMatroskaDemux * demux, GstEbmlRead * ebml,
++     GstMatroskaTrackContext ** dest_context)
++@@ -736,6 +817,7 @@ gst_matroska_demux_parse_stream (GstMatr
++   GstTagList *cached_taglist;
++   GstFlowReturn ret;
++   guint32 id, riff_fourcc = 0;
+++  GstMatroskaDoviConfiguration dovi = { {0}, 0, FALSE, FALSE };
++   guint16 riff_audio_fmt = 0;
++   gchar *codec = NULL;
++ 
++@@ -1652,6 +1734,10 @@ gst_matroska_demux_parse_stream (GstMatr
++         break;
++       }
++ 
+++      case GST_MATROSKA_ID_BLOCKADDITIONMAPPING:
+++        ret = gst_matroska_demux_parse_dovi_mapping (demux, ebml, &dovi);
+++        break;
+++
++       case GST_MATROSKA_ID_TRACKMINCACHE:
++       case GST_MATROSKA_ID_TRACKMAXCACHE:
++       case GST_MATROSKA_ID_MAXBLOCKADDITIONID:
++@@ -1856,6 +1942,17 @@ gst_matroska_demux_parse_stream (GstMatr
++     }
++   }
++ 
+++  if (dovi.seen && !dovi.invalid && caps && !gst_caps_is_empty (caps) &&
+++      context->type == GST_MATROSKA_TRACK_TYPE_VIDEO &&
+++      !strcmp (context->codec_id, GST_MATROSKA_CODEC_ID_VIDEO_MPEGH_HEVC) &&
+++      gst_structure_has_name (gst_caps_get_structure (caps, 0), "video/x-h265")) {
+++    GstBuffer *configuration = gst_buffer_new_memdup (dovi.data, dovi.size);
+++
+++    gst_caps_set_simple (caps, "dovi-configuration", GST_TYPE_BUFFER,
+++        configuration, NULL);
+++    gst_buffer_unref (configuration);
+++  }
+++
++   context->caps = caps;
++ 
++   /* tadaah! */
++--- gst-plugins-good1.0-1.28.7.orig/gst/matroska/matroska-ids.h
+++++ gst-plugins-good1.0-1.28.7/gst/matroska/matroska-ids.h
++@@ -96,6 +96,11 @@
++ #define GST_MATROSKA_ID_TRACKDEFAULTDURATION       0x23E383
++ #define GST_MATROSKA_ID_TRACKTIMECODESCALE         0x23314F
++ #define GST_MATROSKA_ID_MAXBLOCKADDITIONID         0x55EE
+++#define GST_MATROSKA_ID_BLOCKADDITIONMAPPING       0x41E4
+++
+++/* IDs in the BlockAdditionMapping master */
+++#define GST_MATROSKA_ID_BLOCKADDIDTYPE             0x41E7
+++#define GST_MATROSKA_ID_BLOCKADDIDEXTRADATA        0x41ED
++ #define GST_MATROSKA_ID_TRACKATTACHMENTLINK        0x7446
++ #define GST_MATROSKA_ID_TRACKOVERLAY               0x6FAB
++ #define GST_MATROSKA_ID_TRACKTRANSLATE             0x6624
+diff --git a/debian/patches/series b/debian/patches/series
+index f203df4..fc4cee1 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -1 +1,3 @@
+ 0000_remove-flv-test.patch
++rog-dovi-isobmff.patch
++rog-dovi-matroska-track.patch
