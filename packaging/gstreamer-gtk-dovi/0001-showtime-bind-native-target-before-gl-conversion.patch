@@ -1,0 +1,240 @@
+--- a/showtime/play.py
++++ b/showtime/play.py
+@@ -16,6 +16,194 @@
+ 
+ from showtime import system, utils
+ 
++try:
++    import gi
++    gi.require_version("GdkWayland", "4.0")
++    from gi.repository import GdkWayland  # noqa: F401
++except (ImportError, ValueError):
++    GdkWayland = None
++
++
++class DoviSurfaceBinding:
++    """Composed rendering selected once per known Dolby stream."""
++
++    def __init__(self, picture, mapper, pipeline, precision_filter, render_sink):
++        import weakref
++
++        self.picture = weakref.ref(picture)
++        self.mapper = mapper
++        self.render_sink = render_sink
++        self.last_context_key = None
++        self.precision_filter = precision_filter
++        self.precision_dolby = None
++        self.hdr_request = None
++        self.hdr_handler = 0
++        self.surface = None
++        self.handler = 0
++        self.serial = 0
++        self.dolby_stream = False
++        self.offload = None
++        self.original_offload = None
++        self.bus = pipeline.get_bus()
++        self.bus_handler = self.bus.connect("message::element", self.stream_selected)
++        picture.connect("realize", self.refresh)
++        picture.connect("unrealize", self.unrealize)
++        picture.connect("notify::root", self.refresh)
++        self.widget_weak = picture.weak_ref(self.dispose)
++        self.refresh()
++
++    def stream_selected(self, _bus, message):
++        structure = message.get_structure()
++        if message.src != self.mapper or not structure or structure.get_name() != "gtk-dovi-stream-selected":
++            return
++        self.dolby_stream = bool(structure.get_value("dolby"))
++        self.configure_composition()
++        if self.surface is not None:
++            self.changed(self.surface)
++        else:
++            self.publish()
++
++    def configure_composition(self):
++        import weakref
++
++        if self.precision_filter is not None and self.precision_dolby != self.dolby_stream:
++            caps = Gst.Caps.from_string("video/x-raw(memory:GLMemory),format=RGBA64_LE;video/x-raw,format=RGBA64_LE") if self.dolby_stream else Gst.Caps.new_any()
++            self.precision_filter.set_property("caps", caps)
++            self.precision_dolby = self.dolby_stream
++        picture = self.picture()
++        offload = picture.get_parent() if picture else None
++        while offload is not None and not isinstance(offload, Gtk.GraphicsOffload):
++            offload = offload.get_parent()
++        old = self.offload() if self.offload else None
++        if old != offload and old is not None and self.original_offload is not None:
++            old.set_enabled(self.original_offload)
++            self.original_offload = None
++        if offload is None:
++            self.offload = None
++            self.original_offload = None
++            return True
++        self.offload = weakref.ref(offload)
++        if self.dolby_stream:
++            if self.original_offload is None:
++                self.original_offload = offload.get_enabled()
++            offload.set_enabled(Gtk.GraphicsOffloadEnabled.DISABLED)
++        elif self.original_offload is not None:
++            offload.set_enabled(self.original_offload)
++            self.original_offload = None
++        return offload.get_enabled() == Gtk.GraphicsOffloadEnabled.DISABLED
++
++    def render_state(self):
++        if not self.dolby_stream or self.surface is None:
++            if self.hdr_request is not None and self.hdr_handler:
++                self.hdr_request.disconnect(self.hdr_handler)
++            self.hdr_request, self.hdr_handler = None, 0
++            return None
++        # A request is a per-surface lease. No ambient debug flag and no guessed
++        # native precision: absent API/unsupported/pending witnesses stay false.
++        if self.hdr_request is None:
++            request = getattr(self.surface, "request_hdr_rendering", None)
++            if request is None:
++                return None
++            self.hdr_request = request()
++            if self.hdr_request is None:
++                return None
++            self.hdr_handler = self.hdr_request.connect("changed", self.render_changed)
++        try:
++            ready, state = self.hdr_request.get_state()
++            # CICP9/16/0 = BT2020/PQ/RGB. These are ISO identifiers.
++            if ready and min(state.red_bits, state.green_bits, state.blue_bits) >= 10 and state.color_primaries == 9 and state.transfer_function == 16 and state.matrix_coefficients == 0 and state.range == Gdk.CicpRange.FULL:
++                return state
++        except (AttributeError, TypeError):
++            pass
++        return None
++
++    def render_changed(self, request):
++        if request != self.hdr_request:
++            return
++        if self.surface is not None:
++            self.changed(self.surface)
++
++    def publish(self, target=None):
++        state = self.render_state()
++        if state is not None and target is not None and state.generation != target.generation:
++            state = None
++        composed = self.dolby_stream and self.configure_composition()
++        key = (id(self.surface), id(self.hdr_request), composed,
++               None if target is None else (target.generation, target.identity, tuple(target.primaries), target.min_luminance, target.max_luminance, target.reference_luminance),
++               None if state is None else (state.generation, state.red_bits, state.green_bits, state.blue_bits, state.floating_point, state.color_primaries, state.transfer_function, state.matrix_coefficients, state.range, state.min_luminance, state.max_luminance, state.reference_luminance))
++        if key == self.last_context_key:
++            return
++        self.last_context_key = key
++        self.serial += 1
++        structure = Gst.Structure.new_empty("gst.gtk.dovi.target.v1")
++        structure.set_value("generation", GObject.Value(GObject.TYPE_UINT64, self.serial))
++        structure.set_value("valid", target is not None)
++        structure.set_value("hdr-ready", state is not None)
++        for field in ("red_bits", "green_bits", "blue_bits", "color_primaries", "transfer_function", "matrix_coefficients"):
++            structure.set_value("actual-" + field.replace("_", "-"), int(getattr(state, field)) if state else 0)
++        structure.set_value("actual-floating-point", bool(state.floating_point) if state else False)
++        structure.set_value("actual-range", int(state.range) if state else 0)
++        structure.set_value("encoding-min-nits", float(state.min_luminance) if state else 0.0)
++        structure.set_value("surface-target-generation", GObject.Value(GObject.TYPE_UINT64, target.generation if target else 0))
++        structure.set_value("render-generation", GObject.Value(GObject.TYPE_UINT64, state.generation if state else 0))
++        structure.set_value("encoding-reference-nits", float(state.reference_luminance) if state else 0.0)
++        structure.set_value("encoding-max-nits", float(state.max_luminance) if state else 0.0)
++        structure.set_value("composed", composed)
++        structure.set_value("min-nits", float(target.min_luminance) if target else 0.0)
++        structure.set_value("max-nits", float(target.max_luminance) if target else 0.0)
++        structure.set_value("reference-nits", float(target.reference_luminance) if target else 0.0)
++        for name, value in zip(("primary-r-x", "primary-r-y", "primary-g-x", "primary-g-y", "primary-b-x", "primary-b-y", "white-x", "white-y"), target.primaries if target else [0.0] * 8):
++            structure.set_value(name, float(value))
++        context = self.mapper.emit("create-target-context", structure)
++        if context is None:
++            raise RuntimeError("Cannot construct native rendering context")
++        self.mapper.set_context(context)
++        self.render_sink.set_context(context)
++
++    def changed(self, surface):
++        if surface != self.surface:
++            return
++        try:
++            valid, target = GdkWayland.WaylandSurface.get_color_target(surface)
++        except (AttributeError, TypeError, NameError):
++            valid, target = False, None
++        self.publish(target if valid else None)
++
++    def close_surface(self):
++        old, handler = self.surface, self.handler
++        self.surface, self.handler = None, 0
++        self.publish()
++        if old is not None and handler:
++            old.disconnect(handler)
++
++    def unrealize(self, *_args):
++        self.close_surface()
++
++    def dispose(self):
++        self.dolby_stream = False
++        self.close_surface()
++        if self.bus_handler:
++            self.bus.disconnect(self.bus_handler)
++            self.bus_handler = 0
++        old = self.offload() if self.offload else None
++        if old is not None and self.original_offload is not None:
++            old.set_enabled(self.original_offload)
++        self.offload, self.original_offload = None, None
++        self.widget_weak = None
++
++    def refresh(self, *_args):
++        picture = self.picture()
++        native = picture.get_native() if picture and picture.get_realized() else None
++        surface = native.get_surface() if native else None
++        if surface == self.surface:
++            return
++        self.close_surface()
++        if surface is None or GdkWayland is None or not isinstance(surface, GdkWayland.WaylandSurface):
++            return
++        self.surface = surface
++        self.handler = surface.connect("color-target-changed", self.changed)
++        self.changed(surface)
++
+ 
+ def gst_play_setup(
+     picture: Gtk.Picture,
+@@ -29,17 +217,41 @@
+     paintable = paintable_sink.props.paintable  # pyright: ignore[reportAttributeAccessIssue]
+     picture.props.paintable = paintable
+ 
++    mapper = Gst.ElementFactory.make("gtkdovimap")
++    precision_filter = None
++
+     # OpenGL doesn't work on macOS properly
+     if paintable.props.gl_context and system != "Darwin":
+         gl_sink = Gst.ElementFactory.make("glsinkbin")
+-        gl_sink.props.sink = paintable_sink  # pyright: ignore[reportAttributeAccessIssue, reportOptionalMemberAccess]
++        if mapper:
++            precision_filter = Gst.ElementFactory.make("capsfilter")
++            render_sink = Gst.Bin.new(None)
++            render_sink.add(precision_filter)
++            render_sink.add(paintable_sink)
++            if not precision_filter.link(paintable_sink):
++                raise RuntimeError("Cannot link precision filter to GTK sink")
++            render_sink.add_pad(Gst.GhostPad.new("sink", precision_filter.get_static_pad("sink")))
++            gl_sink.props.sink = render_sink
++        else:
++            gl_sink.props.sink = paintable_sink
+         sink = gl_sink
++
++    if mapper:
++        video_bin = Gst.Bin.new(None)
++        video_bin.add(mapper)
++        video_bin.add(sink)
++        if not mapper.link(sink):
++            raise RuntimeError("Cannot link native Dolby mapper to video sink")
++        video_bin.add_pad(Gst.GhostPad.new("sink", mapper.get_static_pad("sink")))
++        sink = video_bin
+ 
+     play = GstPlay.Play(
+         video_renderer=GstPlay.PlayVideoOverlayVideoRenderer.new_with_sink(None, sink)
+     )
+ 
+     pipeline = play.props.pipeline
++    if mapper:
++        picture._dovi_surface_binding = DoviSurfaceBinding(picture, mapper, pipeline, precision_filter, paintable_sink)
+ 
+     def set_subtitle_font_desc(*_args) -> None:
+         pipeline.props.subtitle_font_desc = utils.get_subtitle_font_desc()

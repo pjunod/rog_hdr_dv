@@ -1,0 +1,541 @@
+--- a/build.rs
++++ b/build.rs
+@@ -3,5 +3,19 @@
+     {
+         println!("cargo:warning=\"wayland\" feature is deprecated, use \"waylandegl\" instead");
+     }
++    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
++    let flags = std::process::Command::new("pkg-config")
++        .args(["--libs", "gst-gtk-dovi-core"])
++        .output()
++        .expect("pkg-config for native Dolby renderer");
++    assert!(flags.status.success(), "gst-gtk-dovi-core SDK is required");
++    for flag in String::from_utf8(flags.stdout).unwrap().split_whitespace() {
++        if let Some(path) = flag.strip_prefix("-L") {
++            println!("cargo:rustc-link-search=native={path}");
++        }
++        if let Some(lib) = flag.strip_prefix("-l") {
++            println!("cargo:rustc-link-lib={lib}");
++        }
++    }
+     gst_plugin_version_helper::info()
+ }
+--- a/src/sink/mod.rs
++++ b/src/sink/mod.rs
+@@ -40,6 +40,7 @@
+ 
+ pub(super) mod frame;
+ pub(super) mod imp;
++pub(super) mod native;
+ pub(super) mod paintable;
+ pub(super) mod render_widget;
+ 
+--- /dev/null
++++ b/src/sink/native.rs
+@@ -0,0 +1,113 @@
++// SPDX-License-Identifier: MPL-2.0
++// Shared C core owns native buffers and metadata; no decoder pointers are borrowed.
++use gtk::glib::{self, translate::*};
++use std::{ffi::c_void, ptr::NonNull};
++
++unsafe extern "C" {
++    fn gst_gtk_dovi_core_abi() -> u32;
++    fn gst_gtk_dovi_mapper_new() -> *mut c_void;
++    fn gst_gtk_dovi_mapper_free(mapper: *mut c_void);
++    fn gst_gtk_dovi_native_frame_from_buffer(
++        buffer: *mut gst::ffi::GstBuffer,
++        generation: *mut u64,
++    ) -> *mut c_void;
++    fn gst_gtk_dovi_native_frame_ref(frame: *mut c_void) -> *mut c_void;
++    fn gst_gtk_dovi_native_frame_unref(frame: *mut c_void);
++    fn gst_gtk_dovi_native_frame_render(
++        frame: *mut c_void,
++        mapper: *mut c_void,
++        context: *const gst::ffi::GstContext,
++        output: *mut *mut gst::ffi::GstBuffer,
++        info: *mut gst_video::ffi::GstVideoInfo,
++        error: *mut *mut glib::ffi::GError,
++    ) -> i32;
++}
++#[derive(Debug)]
++pub(crate) struct NativeFrame(NonNull<c_void>);
++// The immutable C snapshot holds atomic GstBuffer/GBytes/picture references.
++unsafe impl Send for NativeFrame {}
++unsafe impl Sync for NativeFrame {}
++impl Clone for NativeFrame {
++    fn clone(&self) -> Self {
++        unsafe {
++            Self(NonNull::new_unchecked(gst_gtk_dovi_native_frame_ref(
++                self.0.as_ptr(),
++            )))
++        }
++    }
++}
++impl Drop for NativeFrame {
++    fn drop(&mut self) {
++        unsafe { gst_gtk_dovi_native_frame_unref(self.0.as_ptr()) }
++    }
++}
++impl NativeFrame {
++    pub(crate) fn from_buffer(buffer: &gst::Buffer) -> (Option<Self>, u64) {
++        let mut generation = 0;
++        let frame = unsafe {
++            gst_gtk_dovi_native_frame_from_buffer(buffer.to_glib_none().0, &mut generation)
++        };
++        (NonNull::new(frame).map(Self), generation)
++    }
++}
++pub(crate) struct Mapper(NonNull<c_void>);
++// Vulkan renderer access is serialized by the sink's mapper mutex.
++unsafe impl Send for Mapper {}
++impl Drop for Mapper {
++    fn drop(&mut self) {
++        unsafe { gst_gtk_dovi_mapper_free(self.0.as_ptr()) }
++    }
++}
++impl Mapper {
++    pub(crate) fn new() -> Result<Self, String> {
++        if unsafe { gst_gtk_dovi_core_abi() } != 1 {
++            return Err("Incompatible native Dolby renderer ABI".into());
++        }
++        NonNull::new(unsafe { gst_gtk_dovi_mapper_new() })
++            .map(Self)
++            .ok_or_else(|| "Native renderer allocation failed".into())
++    }
++    pub(crate) fn render(
++        &mut self,
++        source: &NativeFrame,
++        context: &gst::Context,
++    ) -> Result<Option<(gst::Buffer, gst_video::VideoInfo, bool)>, String> {
++        let mut output = std::ptr::null_mut();
++        let mut info = std::mem::MaybeUninit::<gst_video::ffi::GstVideoInfo>::uninit();
++        let mut error = std::ptr::null_mut();
++        let status = unsafe {
++            gst_gtk_dovi_native_frame_render(
++                source.0.as_ptr(),
++                self.0.as_ptr(),
++                context.to_glib_none().0,
++                &mut output,
++                info.as_mut_ptr(),
++                &mut error,
++            )
++        };
++        if status < 0 {
++            let message = if error.is_null() {
++                "Native picture redraw failed".into()
++            } else {
++                unsafe { from_glib_full::<_, glib::Error>(error) }.to_string()
++            };
++            if !output.is_null() {
++                drop(unsafe { from_glib_full::<_, gst::Buffer>(output) });
++            }
++            return Err(message);
++        }
++        if status == 0 {
++            return Ok(None);
++        }
++        if output.is_null() {
++            return Err("Native redraw returned no frame".into());
++        }
++        Ok(Some(unsafe {
++            (
++                from_glib_full(output),
++                from_glib_none(info.as_ptr()),
++                status == 1,
++            )
++        }))
++    }
++}
+--- a/src/sink/frame.rs
++++ b/src/sink/frame.rs
+@@ -143,6 +143,9 @@
+ pub(crate) struct Frame {
+     frame: MappedFrame,
+     overlays: Vec<Overlay>,
++    pub(crate) native_source: Option<super::native::NativeFrame>,
++    pub(crate) native_generation: u64,
++    pub(crate) native_epoch: u64,
+ }
+ 
+ #[derive(Debug, Default, glib::Enum, PartialEq, Eq, Copy, Clone)]
+@@ -730,6 +733,7 @@
+         orientation: Orientation,
+         wrapped_context: Option<&gst_gl::GLContext>,
+     ) -> Result<Self, gst::FlowError> {
++        let (native_source, native_generation) = super::native::NativeFrame::from_buffer(buffer);
+         // Empty buffers get filtered out in show_frame
+         debug_assert!(buffer.n_memory() > 0);
+ 
+@@ -908,6 +912,9 @@
+                 }
+             },
+             overlays: vec![],
++            native_source,
++            native_generation,
++            native_epoch: 0,
+         };
+ 
+         frame.overlays = frame
+--- a/src/sink/imp.rs
++++ b/src/sink/imp.rs
+@@ -63,6 +63,7 @@
+     /// Orientation from a stream scope tag
+     stream_orientation: Option<frame::Orientation>,
+     has_overlay: bool,
++    native_expected: bool,
+ }
+ 
+ impl Default for StreamConfig {
+@@ -72,8 +73,20 @@
+             global_orientation: frame::Orientation::Rotate0,
+             stream_orientation: None,
+             has_overlay: false,
+-        }
+-    }
++            native_expected: false,
++        }
++    }
++}
++
++#[derive(Default)]
++struct NativeVisible {
++    source: Option<super::native::NativeFrame>,
++    context: Option<gst::Context>,
++    generation: u64,
++    frame_serial: u64,
++    stream_epoch: u64,
++    context_serial: u64,
++    job_running: bool,
+ }
+ 
+ #[derive(Default)]
+@@ -83,6 +96,8 @@
+     config: Mutex<StreamConfig>,
+     sender: Mutex<Option<async_channel::Sender<SinkEvent>>>,
+     pending_frame: Mutex<Option<Frame>>,
++    native_visible: Mutex<NativeVisible>,
++    native_mapper: Mutex<Option<super::native::Mapper>>,
+     cached_caps: Mutex<Option<gst::Caps>>,
+     settings: Mutex<Settings>,
+     window_resized: AtomicBool,
+@@ -256,6 +271,18 @@
+ impl GstObjectImpl for PaintableSink {}
+ 
+ impl ElementImpl for PaintableSink {
++    fn set_context(&self, context: &gst::Context) {
++        if context.context_type() == "gst.gtk.dovi.target.v1" {
++            {
++                let mut state = self.native_visible.lock().unwrap();
++                state.context = Some(context.clone());
++                state.context_serial = state.context_serial.wrapping_add(1);
++            }
++            self.queue_native_redraw();
++        }
++        self.parent_set_context(context);
++    }
++
+     fn metadata() -> Option<&'static gst::subclass::ElementMetadata> {
+         static ELEMENT_METADATA: LazyLock<gst::subclass::ElementMetadata> = LazyLock::new(|| {
+             gst::subclass::ElementMetadata::new(
+@@ -557,6 +584,7 @@
+ 
+         match transition {
+             gst::StateChange::PausedToReady => {
++                self.clear_native_visible();
+                 *self.config.lock().unwrap() = StreamConfig::default();
+                 let _ = self.pending_frame.lock().unwrap().take();
+ 
+@@ -637,6 +665,9 @@
+         };
+ 
+         let mut config = self.config.lock().unwrap();
++        config.native_expected = caps
++            .structure(0)
++            .is_some_and(|s| s.get::<bool>("gtk-dovi-preconverted").unwrap_or(false));
+         config.info = Some(video_info);
+         config.has_overlay = caps
+             .features(0)
+@@ -764,7 +795,9 @@
+ 
+     fn event(&self, event: gst::Event) -> bool {
+         match event.view() {
++            gst::EventView::FlushStart(_) => self.clear_native_visible(),
+             gst::EventView::StreamStart(_) => {
++                self.clear_native_visible();
+                 let mut config = self.config.lock().unwrap();
+                 config.global_orientation = frame::Orientation::Rotate0;
+                 config.stream_orientation = None;
+@@ -790,6 +823,7 @@
+ 
+ impl VideoSinkImpl for PaintableSink {
+     fn show_frame(&self, buffer: &gst::Buffer) -> Result<gst::FlowSuccess, gst::FlowError> {
++        let native_epoch = self.native_visible.lock().unwrap().stream_epoch;
+         gst::trace!(CAT, imp = self, "Rendering buffer {:?}", buffer);
+ 
+         let reconfigure = {
+@@ -842,10 +876,19 @@
+                 }
+             }
+         };
+-        let frame = Frame::new(self, buffer, info, orientation, wrapped_context.as_ref())
++        let mut frame = Frame::new(self, buffer, info, orientation, wrapped_context.as_ref())
+             .inspect_err(|_err| {
+                 gst::error!(CAT, imp = self, "Failed to map video frame");
+             })?;
++        frame.native_epoch = native_epoch;
++        if config.native_expected && frame.native_source.is_none() {
++            gst::element_error!(
++                self.obj(),
++                gst::StreamError::Failed,
++                ("Lost the preconverted picture's owned native source before GTK")
++            );
++            return Err(gst::FlowError::Error);
++        }
+         self.pending_frame.lock().unwrap().replace(frame);
+ 
+         let sender = self.sender.lock().unwrap();
+@@ -870,6 +913,185 @@
+ }
+ 
+ impl PaintableSink {
++    fn clear_native_visible(&self) {
++        let mut state = self.native_visible.lock().unwrap();
++        let source = state.source.take();
++        state.stream_epoch = state.stream_epoch.wrapping_add(1);
++        state.frame_serial = state.frame_serial.wrapping_add(1);
++        state.generation = 0;
++        drop(state);
++        drop(source);
++        self.pending_frame.lock().unwrap().take();
++    }
++
++    fn native_became_visible(
++        &self,
++        source: Option<super::native::NativeFrame>,
++        generation: u64,
++        epoch: u64,
++    ) {
++        {
++            let mut state = self.native_visible.lock().unwrap();
++            if state.stream_epoch != epoch {
++                return;
++            }
++            state.source = source;
++            state.frame_serial = state.frame_serial.wrapping_add(1);
++            state.generation = generation;
++        }
++        self.queue_native_redraw();
++    }
++
++    fn queue_native_redraw(&self) {
++        let job = {
++            let mut state = self.native_visible.lock().unwrap();
++            if state.job_running {
++                return;
++            }
++            let Some(context) = state.context.clone() else {
++                return;
++            };
++            let Some(source) = state.source.clone() else {
++                return;
++            };
++            let generation = context.structure().get::<u64>("generation").unwrap_or(0);
++            if state.generation == generation {
++                return;
++            }
++            state.job_running = true;
++            (source, context, state.frame_serial, state.context_serial)
++        };
++        self.obj().call_async(move |obj| {
++            let (source, context, frame_serial, context_serial) = job;
++            let result = {
++                let mut mapper = obj.imp().native_mapper.lock().unwrap();
++                if mapper.is_none() {
++                    match super::native::Mapper::new() {
++                        Ok(created) => *mapper = Some(created),
++                        Err(error) => {
++                            let object = obj.clone();
++                            glib::idle_add_once(move || {
++                                object.imp().finish_native_redraw(
++                                    Err(error),
++                                    frame_serial,
++                                    context_serial,
++                                )
++                            });
++                            return;
++                        }
++                    }
++                }
++                mapper.as_mut().unwrap().render(&source, &context)
++            };
++            let object = obj.clone();
++            // Always dispatch on GTK's main loop, never invoke GTK on the GPU
++            // worker when the default main context temporarily has no owner.
++            glib::idle_add_once(move || {
++                object
++                    .imp()
++                    .finish_native_redraw(result, frame_serial, context_serial)
++            });
++        });
++    }
++
++    fn finish_native_redraw(
++        &self,
++        result: Result<Option<(gst::Buffer, gst_video::VideoInfo, bool)>, String>,
++        frame_serial: u64,
++        context_serial: u64,
++    ) {
++        let epoch = {
++            let mut state = self.native_visible.lock().unwrap();
++            state.job_running = false;
++            if state.frame_serial != frame_serial || state.context_serial != context_serial {
++                drop(state);
++                self.queue_native_redraw();
++                return;
++            }
++            state.stream_epoch
++        };
++        // A scheduled streaming frame takes precedence. Its normal visible
++        // publication will reconsider the newest target if required.
++        if self.pending_frame.lock().unwrap().is_some() {
++            return;
++        }
++        match result {
++            Err(error) => {
++                gst::element_error!(
++                    self.obj(),
++                    gst::StreamError::Failed,
++                    ("Native Dolby redraw failed: {error}")
++                );
++                self.clear_native_visible();
++                if let Some(paintable) = &*self.paintable.lock().unwrap() {
++                    paintable.get_ref().handle_flush_frames();
++                }
++            }
++            Ok(None) => {
++                if let Some(paintable) = &*self.paintable.lock().unwrap() {
++                    paintable.get_ref().handle_flush_frames();
++                }
++                let mut state = self.native_visible.lock().unwrap();
++                state.generation = state
++                    .context
++                    .as_ref()
++                    .and_then(|c| c.structure().get::<u64>("generation").ok())
++                    .unwrap_or(0);
++            }
++            Ok(Some((buffer, info, mapped))) => {
++                let config = self.config.lock().unwrap();
++                let Some(current) = config.info.as_ref() else {
++                    return;
++                };
++                if current.width() != info.width()
++                    || current.height() != info.height()
++                    || current.format() != info.format()
++                {
++                    return;
++                }
++                let orientation = config
++                    .stream_orientation
++                    .unwrap_or(config.global_orientation);
++                let frame = Frame::new(
++                    self,
++                    &buffer,
++                    &super::frame::VideoInfo::VideoInfo(info),
++                    orientation,
++                    None,
++                );
++                drop(config);
++                let Ok(mut frame) = frame else {
++                    gst::element_error!(
++                        self.obj(),
++                        gst::StreamError::Failed,
++                        ("Failed mapping native Dolby redraw")
++                    );
++                    self.clear_native_visible();
++                    if let Some(paintable) = &*self.paintable.lock().unwrap() {
++                        paintable.get_ref().handle_flush_frames();
++                    }
++                    return;
++                };
++                frame.native_epoch = epoch;
++                let source = frame.native_source.clone();
++                let generation = frame.native_generation;
++                if let Some(paintable) = &*self.paintable.lock().unwrap() {
++                    if !paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
++                        self.clear_native_visible();
++                        paintable.get_ref().handle_flush_frames();
++                        return;
++                    }
++                    gst::info!(
++                        CAT,
++                        imp = self,
++                        "Retargeted visible native picture without seek: frame-serial={frame_serial} context-serial={context_serial} mapped={mapped}"
++                    );
++                    self.native_became_visible(source, generation, epoch);
++                }
++            }
++        }
++    }
++
+     fn pending_frame(&self) -> Option<Frame> {
+         self.pending_frame.lock().unwrap().take()
+     }
+@@ -886,8 +1108,16 @@
+                 let Some(frame) = self.pending_frame() else {
+                     return glib::ControlFlow::Continue;
+                 };
++                if frame.native_epoch != self.native_visible.lock().unwrap().stream_epoch {
++                    return glib::ControlFlow::Continue;
++                }
+                 gst::trace!(CAT, imp = self, "Frame changed");
+-                paintable.get_ref().handle_frame_changed(&self.obj(), frame);
++                let source = frame.native_source.clone();
++                let generation = frame.native_generation;
++                let epoch = frame.native_epoch;
++                if paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
++                    self.native_became_visible(source, generation, epoch);
++                }
+             }
+         }
+ 
+--- a/src/sink/paintable/mod.rs
++++ b/src/sink/paintable/mod.rs
+@@ -30,8 +30,8 @@
+ }
+ 
+ impl Paintable {
+-    pub(crate) fn handle_frame_changed(&self, sink: &crate::PaintableSink, frame: Frame) {
+-        self.imp().handle_frame_changed(sink, frame);
++    pub(crate) fn handle_frame_changed(&self, sink: &crate::PaintableSink, frame: Frame) -> bool {
++        self.imp().handle_frame_changed(sink, frame)
+     }
+ 
+     pub(crate) fn handle_flush_frames(&self) {
+--- a/src/sink/paintable/imp.rs
++++ b/src/sink/paintable/imp.rs
+@@ -515,7 +515,7 @@
+         paintable_orientation
+     }
+ 
+-    pub(super) fn handle_frame_changed(&self, sink: &crate::PaintableSink, frame: Frame) {
++    pub(super) fn handle_frame_changed(&self, sink: &crate::PaintableSink, frame: Frame) -> bool {
+         let context = self.gl_context.borrow();
+ 
+         gst::trace!(CAT, imp = self, "Received new frame");
+@@ -529,7 +529,7 @@
+                         gst::ResourceError::Failed,
+                         ["Failed to transform frame into textures: {err}"]
+                     );
+-                    return;
++                    return false;
+                 }
+             };
+ 
+@@ -571,6 +571,7 @@
+         }
+ 
+         self.obj().invalidate_contents();
++        true
+     }
+ 
+     pub(super) fn handle_flush_frames(&self) {

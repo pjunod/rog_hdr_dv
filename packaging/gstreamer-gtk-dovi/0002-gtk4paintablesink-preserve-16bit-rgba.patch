@@ -1,0 +1,47 @@
+--- a/src/sink/imp.rs
++++ b/src/sink/imp.rs
+@@ -326,8 +326,12 @@
+                     None,
+                 ] {
+                     {
+-                        const GL_FORMATS: &[gst_video::VideoFormat] =
+-                            &[gst_video::VideoFormat::Rgba, gst_video::VideoFormat::Rgb];
++                        const GL_FORMATS: &[gst_video::VideoFormat] = &[
++                            gst_video::VideoFormat::Rgba,
++                            gst_video::VideoFormat::Rgb,
++                            #[cfg(feature = "gtk_v4_20")]
++                            gst_video::VideoFormat::Rgba64Le,
++                        ];
+                         const NON_GL_FORMATS: &[gst_video::VideoFormat] = &[
+                             #[cfg(feature = "gtk_v4_20")]
+                             gst_video::VideoFormat::Yuy2,
+@@ -415,6 +419,8 @@
+                             gst_video::VideoFormat::Abgr,
+                             gst_video::VideoFormat::Rgb,
+                             gst_video::VideoFormat::Bgr,
++                            #[cfg(feature = "gtk_v4_20")]
++                            gst_video::VideoFormat::Rgba64Le,
+                         ];
+ 
+                         let formats = if features.as_ref().is_some_and(|features| {
+--- a/src/sink/frame.rs
++++ b/src/sink/frame.rs
+@@ -305,6 +305,8 @@
+         gst_video::VideoFormat::Rgbx => gdk::MemoryFormat::R8g8b8x8,
+         #[cfg(feature = "gtk_v4_14")]
+         gst_video::VideoFormat::Xbgr => gdk::MemoryFormat::X8b8g8r8,
++        #[cfg(feature = "gtk_v4_20")]
++        gst_video::VideoFormat::Rgba64Le => gdk::MemoryFormat::R16g16b16a16,
+         gst_video::VideoFormat::Bgra => gdk::MemoryFormat::B8g8r8a8,
+         gst_video::VideoFormat::Argb => gdk::MemoryFormat::A8r8g8b8,
+         gst_video::VideoFormat::Rgba => gdk::MemoryFormat::R8g8b8a8,
+@@ -472,6 +474,9 @@
+                         // ourselves if not GLES3 with the new GL renderer is used as the GTK GL
+                         // backend does not natively support non-premultiplied formats.
+                         match format {
++                            gdk::MemoryFormat::R16g16b16a16 => {
++                                gdk::MemoryFormat::R16g16b16a16Premultiplied
++                            }
+                             gdk::MemoryFormat::B8g8r8a8 => gdk::MemoryFormat::B8g8r8a8Premultiplied,
+                             gdk::MemoryFormat::A8r8g8b8 => gdk::MemoryFormat::A8r8g8b8Premultiplied,
+                             gdk::MemoryFormat::R8g8b8a8 => gdk::MemoryFormat::R8g8b8a8Premultiplied,
