@@ -22,7 +22,8 @@ def stream_identity(stream):
         raise ValueError("Expected one Dolby Vision configuration with RPU present")
     fields = ("codec_name", "codec_tag_string", "width", "height",
               "color_range", "color_space", "color_transfer", "color_primaries")
-    return tuple(stream.get(key) for key in fields), sha256_field(stream["extradata_hash"]), configs[0]
+    config = json.dumps(configs[0], sort_keys=True, separators=(",", ":"))
+    return tuple(stream.get(key) for key in fields), sha256_field(stream["extradata_hash"]), config
 
 
 def signature(probe, reference_packets=None):
