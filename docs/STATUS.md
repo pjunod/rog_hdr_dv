@@ -26,8 +26,7 @@ transformed outputs. Independent correction review and exact signed-source
 replay/compilation passed. No packages or applications were installed and no
 defaults changed. This remains unshipped metadata transport: reconstruction,
 FEL residuals, normal GTK player rendering, physical target signalling and
-full-feature/multiarch packaging remain open. Additional malformed/region-copy
-negative cases are pending. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md).
+full-feature/multiarch packaging remain open. Five supplementary controls passed. These cover malformed duplicate/oversize units, NAL-aligned output, partial region copies and 26 matched resized VA pictures with format and colorimetry retained. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md).
 
 ## GTK preferred display target — November 7
 

@@ -272,3 +272,7 @@ product solution. Also, DMA-BUF offload uses a private subsurface with another
 affected mapped frames. The parent surface's target cannot be assumed to apply,
 and globally disabling offload is outside the contract. No host app has been
 installed to claim normal Showtime playback from this transport work.
+
+## Supplementary transport controls
+
+A full buffer copy retained the RPU and partial copies dropped it. NAL-aligned parser output carried no picture-level metadata. Duplicate and oversized RPU inputs each produced 24 timestamp-matched pictures with stale metadata removed. The first VA resize also changed colorimetry, so it could not isolate resizing. The corrected fixture negotiated the decoder’s original colorimetry and pixel format. All 26 matched pictures changed dimensions and dropped their RPU. [Original controls](../evidence/gstreamer-rpu-supplementary-first-run-20261107.json) · [Isolated resize](../evidence/gstreamer-rpu-supplementary-va-run-20261107.json).

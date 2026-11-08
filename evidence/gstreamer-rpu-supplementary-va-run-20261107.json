@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "reviewed_commit": "5ba386a",
+  "source_sha256": "27be57ccddb7489dfd732bf4361fd843cc1deb9887fca72dc48564b025974626",
+  "state": "PASS",
+  "fixture_sha256": "87fe0115f3002a621d2380a9f91852ef91a15854a446efe26de8744f77ef5346",
+  "probe_sha256": "461c81ed8ca99f5baae049e4e77b18eac03dcbf73e295bf3fa38c8a112dfacaf",
+  "runtime_cases_executed": 1,
+  "host_installation": false,
+  "production_changes": false,
+  "cases": [
+    {
+      "name": "va-size",
+      "exit_code": 0,
+      "timed_out": false,
+      "provenance_pass": true,
+      "devices": [
+        "/dev/dri/renderD128",
+        "/dev/dri/renderD129"
+      ],
+      "loaded": [
+        {
+          "name": "libgstvideo-1.0.so.0",
+          "sha256": "30607768fd7f43662b3d3bc40d52ca719de0989808fb8b079dc7ef3762016cd6"
+        },
+        {
+          "name": "libgstcodecparsers-1.0.so.0",
+          "sha256": "3e087eedb15c4266353ae50cacaabdde96caac2609cdeb4eaa21ae83de72a5c5"
+        },
+        {
+          "name": "libgstvideoparsersbad.so",
+          "sha256": "ffcf121a52c98ef83d8ec994e32def867d719b3ba42b6bc964a88e2d5887bbee"
+        },
+        {
+          "name": "libva.so.2",
+          "sha256": "d5724f06607ef941a13eb23e090d032b74ddfd281f96be72315243fa588f30a6"
+        },
+        {
+          "name": "libva-drm.so.2",
+          "sha256": "acba549ccd821e6822e1edeb884dd918494d9f3272fa5688fb00f9f0c02309fa"
+        },
+        {
+          "name": "libgstlibav.so",
+          "sha256": "899647b098a8dca7d7adfb36f37c60988abfb36ef46355d373774b18d288d1da"
+        },
+        {
+          "name": "libgstva-1.0.so.0",
+          "sha256": "fc4b2414c06b6c6499893b61872ab48655dbcb2360feee94964c7fe31116622e"
+        },
+        {
+          "name": "libgstcodecs-1.0.so.0",
+          "sha256": "153869a7060c096830a023a6809f8b9dead3fd17966556f13c853df574fbe2e8"
+        },
+        {
+          "name": "libgstva.so",
+          "sha256": "66b28c321845ac89a9dbf6ad59bece515f49bfb25677e1320933bb9203fc526a"
+        },
+        {
+          "name": "iHD_drv_video.so",
+          "sha256": "6dbf03ce963c55539cd6b48f2910d5c7b5088b232aae8632f6ab555aabe59fd3"
+        }
+      ],
+      "summary": [
+        "PASS mode=va-size positive=26 mutated=0 checked=26 rpu-nals=0 pictures=0 decoded-rpu=26 matched=26 dimension-change=1 format-preserved=1 color-preserved=1 absent-meta=26 failures=0 eos=1"
+      ],
+      "log_sha256": "89c012b5935bd72e7f8b1d1fd599adbd4206e4109b72f56335f14630c40dbf0c",
+      "elapsed_seconds": 1.02,
+      "observed_library_count": 194
+    }
+  ],
+  "host_package_status_unchanged": true,
+  "scope": "Raw RPU transport only: actual VA dimension change with format and colorimetry preserved. No mapping/rendering correctness claim. Original five-case receipt retained unchanged.",
+  "provenance_scope": "Public receipt lists relevant video, parser and VA modules; the complete loader log is retained privately."
+}
