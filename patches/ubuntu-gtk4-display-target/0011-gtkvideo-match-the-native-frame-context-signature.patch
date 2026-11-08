@@ -1,0 +1,33 @@
+From 4e50ee03d2c6927525a3b4731639ab092698e17f Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 04:19:32 -0500
+Subject: [PATCH 11/12] fix(media): match the native frame context ABI exactly
+
+---
+ gtk/media/gtkgstdoviview.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/gtk/media/gtkgstdoviview.c b/gtk/media/gtkgstdoviview.c
+index f1a6a92..5b57742 100644
+--- a/gtk/media/gtkgstdoviview.c
++++ b/gtk/media/gtkgstdoviview.c
+@@ -11,7 +11,6 @@
+ #include <mapper.h>
+ #include <gmodule.h>
+ 
+-
+ typedef struct
+ {
+   guint (*abi) (void);
+@@ -21,7 +20,7 @@ typedef struct
+   GstGtkDoviNativeFrame *(*frame_from_buffer) (GstBuffer *, guint64 *);
+   void (*frame_unref) (GstGtkDoviNativeFrame *);
+   int (*frame_render) (GstGtkDoviNativeFrame *, GstGtkDoviMapper *,
+-                       GstContext *, GstBuffer **, GstVideoInfo *, GError **);
++                       const GstContext *, GstBuffer **, GstVideoInfo *, GError **);
+ } DoviCore;
+ 
+ static const DoviCore *
+-- 
+2.54.0 (Apple Git-157)
+

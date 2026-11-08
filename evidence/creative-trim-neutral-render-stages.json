@@ -1,0 +1,54 @@
+{
+  "scope": "One 3840×2160 held-out Profile 8.1 carrier, CM2.9, neutral target-1 creative controls. Target 100 cd/m², black 0.005 cd/m², BT.709. All comparisons use absolute BT.2020/PQ RGB16LE and the public full-raster BT.2124 metric.",
+  "controls": [
+    "Replayed the shot's quantized analysis, mastering metadata and neutral trims using the scalar model and the packaged Vulkan provider.",
+    "Uploaded the reference RGB through RGBA32F and read it back. All 49,766,400 bytes matched.",
+    "Captured the normal FFmpeg callback's input and output on Intel Vulkan. The instrumented final export reproduced the ordinary export byte for byte.",
+    "Serialized the captured input to TIFF with a byte-exact readback. The official processor used the same metadata, target and output encoding for the original and captured inputs."
+  ],
+  "comparisons": {
+    "official_reference_vs_scalar_same_rgb": {
+      "mean": 0.66635,
+      "p95": 2.62079
+    },
+    "scalar_vs_direct_gpu_same_rgb": {
+      "mean": 0.00413,
+      "p95": 0.01377
+    },
+    "official_reference_vs_direct_gpu_same_rgb": {
+      "mean": 0.66635,
+      "p95": 2.62081
+    },
+    "reference_conversion_vs_normal_callback_input": {
+      "mean": 0.73188,
+      "p95": 1.19442
+    },
+    "direct_gpu_on_original_rgb_vs_normal_callback_output": {
+      "mean": 0.61632,
+      "p95": 1.0185
+    },
+    "replay_of_normal_callback_input_vs_original_callback_output": {
+      "mean": 0.00629,
+      "p95": 0.01421
+    },
+    "normal_callback_output_vs_normal_export": {
+      "mean": 0.08263,
+      "p95": 0.16397
+    },
+    "official_on_normal_callback_input_vs_normal_callback_output": {
+      "mean": 0.66718,
+      "p95": 2.62695
+    },
+    "official_on_normal_callback_input_vs_normal_export": {
+      "mean": 0.67922,
+      "p95": 2.62854
+    },
+    "official_response_to_input_conversion_difference": {
+      "mean": 0.61669,
+      "p95": 1.01791
+    }
+  },
+  "normal_input": "Decoded limited-range 10-bit HEVC, actual mapper input RGBA16F. The independent reference carrier converted the same 4:2:0 planes to RGB with zscale. The normal mapper returned RGBA32F.",
+  "interpretation": "With identical RGB inputs, the CPU and GPU mapping implementations agree closely on this neutral scene. Independent YUV-to-RGB reconstruction accounts for a sizeable part of the earlier pipeline disagreement. A residual remains against the official base grade even after matching the mapper input. The distances do not add linearly.",
+  "limits": "One scene and one neutral trim/target. This comparison does not identify which reconstruction is preferable, validate emitted light or establish a correction for other material."
+}

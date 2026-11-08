@@ -1,0 +1,73 @@
+{
+  "engine": "WebKitGTK 2.52.6-1ubuntu1, WebKit2 API 4.1",
+  "environment": "Installed runtime on the ROG, ephemeral profile in a private Xvfb display. JavaScript copied the decoded video frames to an sRGB canvas. The page used embedded media and disallowed network resources.",
+  "fixture": "One self-owned static 2560 × 1280 chart, clear Profile 8.1 carrier and an ordinary HEVC carrier made from its base bitstream. FFmpeg verified the first decoded pictures had identical SHA-256 digests.",
+  "control": {
+    "codec": "AVC",
+    "raster": [
+      128,
+      72
+    ],
+    "center_rgb8": [
+      0,
+      125,
+      1
+    ]
+  },
+  "capabilities": {
+    "avc1_42E01E": "probably",
+    "hvc1_2_4_L120_B0": "probably",
+    "dvh1_08_06": "",
+    "dvhe_08_06": "",
+    "dvh1_05_06": "",
+    "dvhe_07_06": ""
+  },
+  "comparison": {
+    "pixels": 3276800,
+    "changed_rgb_pixels": 0,
+    "both_pictures_rendered": true
+  },
+  "interpretation": "This WebKit HTML video element displayed the Profile 8.1 base image. Its canvas output showed no effect of adding the Dolby configuration and RPU on this fixture. The test covers cleared, unprotected content in this application and readback path. HDR compositor output, other browser builds and protected services require separate evidence.",
+  "gtk4_wayland": {
+    "engine": "Stock WebKitGTK 2.52.6, API 6.0",
+    "display": "Private hardware-backed Mutter virtual monitor. Its forced BT.2020/PQ rendering path was active. DisplayConfig listed the virtual monitor in mode 0 and accepted a temporary 616 cd/m² target. Capture negotiated 10-bit BT.2020/PQ XR30.",
+    "normal_accelerated_video": {
+      "frame_size": [
+        800,
+        600
+      ],
+      "pixels_compared": 480000,
+      "different_screen_pixels": 0,
+      "dv_distinct_screen_colors": 330,
+      "hevc_base_distinct_screen_colors": 330,
+      "avc_control_center_rgb10": [
+        338,
+        431,
+        236
+      ],
+      "chart_center_rgb10": [
+        292,
+        274,
+        278
+      ],
+      "canvas_control": "Accelerated canvas returned transparent black for the green AVC video. Only the actual compositor capture qualified this path."
+    },
+    "software_video_sink_control": {
+      "avc_center_rgba8": [
+        0,
+        125,
+        1,
+        255
+      ],
+      "full_resolution_canvas_pixels": 3276800,
+      "different_canvas_rgb_pixels": 0,
+      "chart_center_rgba8": [
+        77,
+        70,
+        78,
+        255
+      ]
+    },
+    "conclusion": "The default accelerated video path displayed the chart. Its compositor output was identical with and without the Dolby metadata. This establishes base-layer playback on this fixture. The software-sink control reached the same result through a working canvas readback."
+  }
+}

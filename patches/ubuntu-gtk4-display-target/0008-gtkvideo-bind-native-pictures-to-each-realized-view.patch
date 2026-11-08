@@ -1,0 +1,1221 @@
+From b73283b5464d527de5684e8390ca42de9530260e Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:23:56 -0500
+Subject: [PATCH 08/12] fix(media): bind GtkVideo Dolby Vision mapping to each
+ realized view
+
+---
+ gtk/gtkvideo.c                     |  38 ++
+ gtk/media/gtkgstdoviview.c         | 733 +++++++++++++++++++++++++++++
+ gtk/media/gtkgstdoviviewprivate.h  |  34 ++
+ gtk/media/gtkgstmediafile.c        |  16 +
+ gtk/media/gtkgstmediafileprivate.h |   5 +
+ gtk/media/gtkgstpaintable.c        | 110 +++++
+ gtk/media/gtkgstpaintableprivate.h |  10 +
+ gtk/media/gtkgstsink.c             |  22 +
+ gtk/media/gtkgstsinkprivate.h      |   4 +
+ gtk/media/meson.build              |   7 +
+ 10 files changed, 979 insertions(+)
+ create mode 100644 gtk/media/gtkgstdoviview.c
+ create mode 100644 gtk/media/gtkgstdoviviewprivate.h
+
+diff --git a/gtk/gtkvideo.c b/gtk/gtkvideo.c
+index 3b2feb5..1b1b7c1 100644
+--- a/gtk/gtkvideo.c
++++ b/gtk/gtkvideo.c
+@@ -36,6 +36,10 @@
+ #include "gtkprivate.h"
+ #include "gtktypebuiltins.h"
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++#include "media/gtkgstdoviviewprivate.h"
++#endif
++
+ /**
+  * GtkVideo:
+  *
+@@ -64,6 +68,9 @@ struct _GtkVideo
+ 
+   GFile *file;
+   GtkMediaStream *media_stream;
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  GdkPaintable *display_paintable;
++#endif
+ 
+   GtkWidget *box;
+   GtkWidget *video_picture;
+@@ -204,6 +211,11 @@ gtk_video_realize (GtkWidget *widget)
+       gtk_media_stream_realize (self->media_stream, surface);
+     }
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_dovi_view_set_surface (self->display_paintable,
++                                 gtk_native_get_surface (gtk_widget_get_native (widget)));
++#endif
++
+   if (self->file)
+     gtk_media_file_set_file (GTK_MEDIA_FILE (self->media_stream), self->file);
+ }
+@@ -213,6 +225,10 @@ gtk_video_unrealize (GtkWidget *widget)
+ {
+   GtkVideo *self = GTK_VIDEO (widget);
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_dovi_view_set_surface (self->display_paintable, NULL);
++#endif
++
+   if (self->autoplay && self->media_stream)
+     gtk_media_stream_pause (self->media_stream);
+ 
+@@ -711,6 +727,11 @@ gtk_video_set_media_stream (GtkVideo       *self,
+   if (self->media_stream == stream)
+     return;
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_dovi_view_set_surface (self->display_paintable, NULL);
++  g_clear_object (&self->display_paintable);
++#endif
++
+   if (self->media_stream)
+     {
+       if (self->autoplay)
+@@ -750,7 +771,21 @@ gtk_video_set_media_stream (GtkVideo       *self,
+     }
+ 
+   gtk_media_controls_set_media_stream (GTK_MEDIA_CONTROLS (self->controls), stream);
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  self->display_paintable = stream ? gtk_gst_dovi_view_new (stream) : NULL;
++  if (self->display_paintable)
++    {
++      gtk_gst_dovi_view_set_composed (self->display_paintable,
++        gtk_graphics_offload_get_enabled (GTK_GRAPHICS_OFFLOAD (self->graphics_offload)) == GTK_GRAPHICS_OFFLOAD_DISABLED);
++      if (gtk_widget_get_realized (GTK_WIDGET (self)))
++        gtk_gst_dovi_view_set_surface (self->display_paintable,
++          gtk_native_get_surface (gtk_widget_get_native (GTK_WIDGET (self))));
++    }
++  gtk_picture_set_paintable (GTK_PICTURE (self->video_picture),
++                            self->display_paintable ? self->display_paintable : GDK_PAINTABLE (stream));
++#else
+   gtk_picture_set_paintable (GTK_PICTURE (self->video_picture), GDK_PAINTABLE (stream));
++#endif
+ 
+   gtk_video_update_all (self);
+ 
+@@ -1005,6 +1040,9 @@ gtk_video_set_graphics_offload (GtkVideo                  *self,
+     return;
+ 
+   gtk_graphics_offload_set_enabled (GTK_GRAPHICS_OFFLOAD (self->graphics_offload), enabled);
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_dovi_view_set_composed (self->display_paintable, enabled == GTK_GRAPHICS_OFFLOAD_DISABLED);
++#endif
+ 
+   g_object_notify_by_pspec (G_OBJECT (self), properties[PROP_GRAPHICS_OFFLOAD]);
+ }
+diff --git a/gtk/media/gtkgstdoviview.c b/gtk/media/gtkgstdoviview.c
+new file mode 100644
+index 0000000..839e346
+--- /dev/null
++++ b/gtk/media/gtkgstdoviview.c
+@@ -0,0 +1,733 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++/* The shared core owns source pixels and all Dolby mapping. This file only
++ * binds immutable pictures to one GTK view and its actual native output. */
++#include "config.h"
++#include "gtkgstdoviviewprivate.h"
++#include "gtkgstpaintableprivate.h"
++#include "gtkgstmediafileprivate.h"
++#include <gdk/wayland/gdkwayland.h>
++#include <gst/video/video.h>
++#include "gdk/gdkmemoryformatprivate.h"
++#include <mapper.h>
++
++struct _GtkGstDoviFrame
++{
++  gatomicrefcount refs;
++  GstGtkDoviNativeFrame *native;
++  guint stream_epoch;
++  guint caps_epoch;
++};
++
++static GQuark
++frame_quark (void)
++{
++  return g_quark_from_static_string ("gtk-gst-owned-native-frame");
++}
++
++void
++gtk_gst_dovi_frame_unref (GtkGstDoviFrame *frame)
++{
++  if (frame && g_atomic_ref_count_dec (&frame->refs))
++    {
++      if (frame->native)
++        gst_gtk_dovi_native_frame_unref (frame->native);
++      g_free (frame);
++    }
++}
++
++void
++gtk_gst_dovi_tag_texture (GdkTexture *texture,
++                           GstBuffer *buffer,
++                           guint       stream_epoch,
++                           guint       caps_epoch)
++{
++  GtkGstDoviFrame *frame = g_new0 (GtkGstDoviFrame, 1);
++  g_atomic_ref_count_init (&frame->refs);
++  frame->native = gst_gtk_dovi_native_frame_from_buffer (buffer, NULL);
++  frame->stream_epoch = stream_epoch;
++  frame->caps_epoch = caps_epoch;
++  g_object_set_qdata_full (G_OBJECT (texture), frame_quark (), frame,
++                          (GDestroyNotify) gtk_gst_dovi_frame_unref);
++}
++
++gboolean
++gtk_gst_dovi_texture_is_current (GdkTexture *texture,
++                                  guint       stream_epoch,
++                                  guint       caps_epoch)
++{
++  GtkGstDoviFrame *frame = g_object_get_qdata (G_OBJECT (texture), frame_quark ());
++  return frame == NULL ||
++         (frame->stream_epoch == stream_epoch && frame->caps_epoch == caps_epoch);
++}
++
++GtkGstDoviFrame *
++gtk_gst_dovi_texture_ref_frame (GdkTexture *texture)
++{
++  GtkGstDoviFrame *frame = g_object_get_qdata (G_OBJECT (texture), frame_quark ());
++  if (frame)
++    g_atomic_ref_count_inc (&frame->refs);
++  return frame;
++}
++
++gboolean
++gtk_gst_dovi_frame_is_native (GtkGstDoviFrame *frame)
++{
++  return frame && frame->native;
++}
++
++GtkGstPaintableFrame *
++gtk_gst_paintable_frame_ref (GtkGstPaintableFrame *frame)
++{
++  if (frame)
++    g_atomic_ref_count_inc (&frame->refs);
++  return frame;
++}
++
++void
++gtk_gst_paintable_frame_unref (GtkGstPaintableFrame *frame)
++{
++  if (frame && g_atomic_ref_count_dec (&frame->refs))
++    {
++      g_object_unref (frame->texture);
++      gtk_gst_dovi_frame_unref (frame->native);
++      g_free (frame);
++    }
++}
++
++GstElement *
++gtk_gst_dovi_wrap_sink (GstElement *sink)
++{
++  GstElement *map, *bin;
++  GstPad *pad, *ghost;
++
++  if (gst_gtk_dovi_core_abi () != GST_GTK_DOVI_CORE_ABI)
++    return sink;
++  map = gst_element_factory_make ("gtkdovimap", NULL);
++  if (map == NULL)
++    return sink;
++
++  /* No display context is installed here. The shared producer stays an
++   * original-input baseline; each GtkVideo view maps its own retained source. */
++  bin = gst_bin_new (NULL);
++  gst_object_ref (sink);
++  gst_bin_add_many (GST_BIN (bin), map, sink, NULL);
++  if (!gst_element_link (map, sink))
++    goto fail;
++  pad = gst_element_get_static_pad (map, "sink");
++  ghost = gst_ghost_pad_new ("sink", pad);
++  gst_object_unref (pad);
++  if (!gst_element_add_pad (bin, ghost))
++    {
++      gst_object_unref (ghost);
++      goto fail;
++    }
++  gst_object_unref (sink);
++  return bin;
++
++fail:
++  gst_bin_remove (GST_BIN (bin), sink);
++  gst_object_unref (bin);
++  g_object_force_floating (G_OBJECT (sink));
++  return sink;
++}
++
++typedef struct
++{
++  gatomicrefcount refs;
++  GMutex lock;
++  GstGtkDoviMapper *mapper;
++} ViewMapper;
++
++typedef struct
++{
++  GObject parent_instance;
++  GtkMediaStream *source;
++  GtkGstPaintable *producer;
++  GWeakRef surface;
++  GdkWaylandHdrRendering *lease;
++  gulong lease_changed;
++  gulong source_contents;
++  gulong source_size;
++  GstContext *context;
++  char *context_signature;
++  guint64 target_revision;
++  guint64 binding_epoch;
++  gboolean context_ready;
++  gboolean composed;
++  gboolean busy;
++  gboolean target_refresh;
++  GtkGstPaintableFrame *latest;
++  GtkGstPaintableFrame *visible;
++  GdkPaintable *mapped;
++  guint64 mapped_revision;
++  guint64 failed_serial;
++  guint64 failed_revision;
++  ViewMapper *mapper;
++} GtkGstDoviView;
++
++typedef GObjectClass GtkGstDoviViewClass;
++static GType gtk_gst_dovi_view_get_type (void);
++static void view_paintable_init (GdkPaintableInterface *iface);
++static void view_update (GtkGstDoviView *self);
++
++G_DEFINE_TYPE_WITH_CODE (GtkGstDoviView, gtk_gst_dovi_view, G_TYPE_OBJECT,
++                         G_IMPLEMENT_INTERFACE (GDK_TYPE_PAINTABLE, view_paintable_init))
++
++static ViewMapper *
++view_mapper_ref (ViewMapper *mapper)
++{
++  g_atomic_ref_count_inc (&mapper->refs);
++  return mapper;
++}
++
++static void
++view_mapper_unref (ViewMapper *mapper)
++{
++  if (mapper && g_atomic_ref_count_dec (&mapper->refs))
++    {
++      gst_gtk_dovi_mapper_free (mapper->mapper);
++      g_mutex_clear (&mapper->lock);
++      g_free (mapper);
++    }
++}
++
++static void
++clear_mapped (GtkGstDoviView *self)
++{
++  g_clear_object (&self->mapped);
++  g_clear_pointer (&self->visible, gtk_gst_paintable_frame_unref);
++  self->mapped_revision = 0;
++}
++
++static void
++lease_changed (GdkWaylandHdrRendering *lease,
++               gpointer                data)
++{
++  GtkGstDoviView *self = data;
++  if (lease == self->lease)
++    {
++      view_update (self);
++      gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
++    }
++}
++
++static void
++release_lease (GtkGstDoviView *self)
++{
++  if (self->lease)
++    {
++      g_signal_handler_disconnect (self->lease, self->lease_changed);
++      self->lease_changed = 0;
++      g_clear_object (&self->lease);
++    }
++}
++
++static void
++set_context_snapshot (GtkGstDoviView *self,
++                      GdkSurface     *surface)
++{
++  GdkWaylandColorTarget physical = { 0 };
++  GdkWaylandHdrRenderState state = { 0 };
++  gboolean valid, ready;
++  GstContext *context;
++  GstStructure *structure;
++  char *signature;
++
++  valid = gdk_wayland_surface_get_color_target (surface, &physical);
++  ready = gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
++          state.generation == physical.generation &&
++          MIN (state.red_bits, MIN (state.green_bits, state.blue_bits)) >= 10 &&
++          state.color_primaries == 9 && state.transfer_function == 16 &&
++          state.matrix_coefficients == 0 && state.range == GDK_CICP_RANGE_FULL &&
++          state.reference_luminance == 203.0 && state.max_luminance == 10000.0;
++  context = gst_context_new ("gst.gtk.dovi.target.v1", FALSE);
++  structure = gst_context_writable_structure (context);
++  gst_structure_set (structure,
++                     "valid", G_TYPE_BOOLEAN, valid,
++                     "generation", G_TYPE_UINT64, physical.generation,
++                     "min-nits", G_TYPE_DOUBLE, physical.min_luminance,
++                     "max-nits", G_TYPE_DOUBLE, physical.max_luminance,
++                     "reference-nits", G_TYPE_DOUBLE, physical.reference_luminance,
++                     "composed", G_TYPE_BOOLEAN, self->composed,
++                     "hdr-ready", G_TYPE_BOOLEAN, ready,
++                     "encoding-reference-nits", G_TYPE_DOUBLE, state.reference_luminance,
++                     "encoding-max-nits", G_TYPE_DOUBLE, state.max_luminance,
++                     "primary-r-x", G_TYPE_DOUBLE, physical.primaries[0],
++                     "primary-r-y", G_TYPE_DOUBLE, physical.primaries[1],
++                     "primary-g-x", G_TYPE_DOUBLE, physical.primaries[2],
++                     "primary-g-y", G_TYPE_DOUBLE, physical.primaries[3],
++                     "primary-b-x", G_TYPE_DOUBLE, physical.primaries[4],
++                     "primary-b-y", G_TYPE_DOUBLE, physical.primaries[5],
++                     "white-x", G_TYPE_DOUBLE, physical.primaries[6],
++                     "white-y", G_TYPE_DOUBLE, physical.primaries[7], NULL);
++  signature = gst_structure_to_string (structure);
++  if (g_strcmp0 (signature, self->context_signature) != 0)
++    {
++      g_free (self->context_signature);
++      self->context_signature = signature;
++      g_clear_pointer (&self->context, gst_context_unref);
++      self->context = context;
++      self->target_revision++;
++      self->target_refresh = TRUE;
++    }
++  else
++    {
++      g_free (signature);
++      gst_context_unref (context);
++    }
++  self->context_ready = ready;
++}
++
++typedef struct
++{
++  GWeakRef view;
++  ViewMapper *mapper;
++  GtkGstPaintableFrame *frame;
++  GstContext *context;
++  guint64 target_revision;
++  guint64 binding_epoch;
++} RenderJob;
++
++typedef struct
++{
++  int result;
++  GstBuffer *buffer;
++  GstVideoInfo info;
++  GError *error;
++} RenderResult;
++
++static void
++render_job_free (gpointer data)
++{
++  RenderJob *job = data;
++  g_weak_ref_clear (&job->view);
++  view_mapper_unref (job->mapper);
++  gtk_gst_paintable_frame_unref (job->frame);
++  gst_context_unref (job->context);
++  g_free (job);
++}
++
++static void
++render_result_free (gpointer data)
++{
++  RenderResult *result = data;
++  gst_clear_buffer (&result->buffer);
++  g_clear_error (&result->error);
++  g_free (result);
++}
++
++static void
++render_thread (GTask        *task,
++               gpointer      source,
++               gpointer      data,
++               GCancellable *cancellable)
++{
++  RenderJob *job = data;
++  RenderResult *result = g_new0 (RenderResult, 1);
++
++  (void) source;
++  (void) cancellable;
++  g_mutex_lock (&job->mapper->lock);
++  result->result = gst_gtk_dovi_native_frame_render (job->frame->native->native,
++                                                     job->mapper->mapper,
++                                                     job->context, &result->buffer,
++                                                     &result->info, &result->error);
++  g_mutex_unlock (&job->mapper->lock);
++  g_task_return_pointer (task, result, render_result_free);
++}
++
++typedef struct
++{
++  GstBuffer *buffer;
++  GstMapInfo map;
++} MappedPixels;
++
++static void
++mapped_pixels_free (gpointer data)
++{
++  MappedPixels *pixels = data;
++  gst_buffer_unmap (pixels->buffer, &pixels->map);
++  gst_buffer_unref (pixels->buffer);
++  g_free (pixels);
++}
++
++static GdkTexture *
++texture_from_result (RenderResult *result)
++{
++  GstVideoInfo *info = &result->info;
++  MappedPixels *pixels;
++  GdkMemoryTextureBuilder *builder;
++  GdkMemoryFormat format;
++  GdkTexture *texture;
++  GBytes *bytes;
++  guint64 required;
++  gsize offset;
++  int stride;
++
++  if (result->buffer == NULL || GST_VIDEO_INFO_WIDTH (info) <= 0 ||
++      GST_VIDEO_INFO_HEIGHT (info) <= 0 ||
++      GST_VIDEO_INFO_FORMAT (info) != GST_VIDEO_FORMAT_RGBA64_LE ||
++      info->colorimetry.transfer != GST_VIDEO_TRANSFER_SMPTE2084 ||
++      info->colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT2020 ||
++      info->colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
++      info->colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255 ||
++      !gdk_memory_format_find_by_gst_video_format (GST_VIDEO_INFO_FORMAT (info),
++                                                   (GST_VIDEO_INFO_FLAGS (info) & GST_VIDEO_FLAG_PREMULTIPLIED_ALPHA) != 0,
++                                                   &format))
++    return NULL;
++  stride = GST_VIDEO_INFO_PLANE_STRIDE (info, 0);
++  offset = GST_VIDEO_INFO_PLANE_OFFSET (info, 0);
++  if (stride <= 0)
++    return NULL;
++  pixels = g_new0 (MappedPixels, 1);
++  pixels->buffer = gst_buffer_ref (result->buffer);
++  if (!gst_buffer_map (pixels->buffer, &pixels->map, GST_MAP_READ))
++    {
++      gst_buffer_unref (pixels->buffer);
++      g_free (pixels);
++      return NULL;
++    }
++  required = (guint64) offset +
++             (guint64) (GST_VIDEO_INFO_HEIGHT (info) - 1) * stride +
++             (guint64) GST_VIDEO_INFO_WIDTH (info) * 8;
++  if (required > pixels->map.size)
++    {
++      mapped_pixels_free (pixels);
++      return NULL;
++    }
++  bytes = g_bytes_new_with_free_func (pixels->map.data + offset,
++                                      pixels->map.size - offset,
++                                      mapped_pixels_free, pixels);
++  builder = gdk_memory_texture_builder_new ();
++  gdk_memory_texture_builder_set_width (builder, GST_VIDEO_INFO_WIDTH (info));
++  gdk_memory_texture_builder_set_height (builder, GST_VIDEO_INFO_HEIGHT (info));
++  gdk_memory_texture_builder_set_format (builder, format);
++  gdk_memory_texture_builder_set_stride (builder, stride);
++  gdk_memory_texture_builder_set_bytes (builder, bytes);
++  gdk_memory_texture_builder_set_color_state (builder, gdk_color_state_get_rec2100_pq ());
++  texture = gdk_memory_texture_builder_build (builder);
++  g_object_unref (builder);
++  g_bytes_unref (bytes);
++  return texture;
++}
++
++static void
++render_done (GObject      *source,
++             GAsyncResult *async,
++             gpointer      unused)
++{
++  GTask *task = G_TASK (async);
++  RenderJob *job = g_task_get_task_data (task);
++  RenderResult *result = g_task_propagate_pointer (task, NULL);
++  GtkGstDoviView *self = g_weak_ref_get (&job->view);
++  GdkTexture *texture = NULL;
++
++  (void) source;
++  (void) unused;
++  if (self == NULL)
++    {
++      render_result_free (result);
++      return;
++    }
++  /* Refresh actual GTK state before accepting a worker result. Deferred
++   * changed delivery must not make a vanished native witness appear current. */
++  view_update (self);
++  self->busy = FALSE;
++  if (self->context_ready && self->target_revision == job->target_revision &&
++      self->binding_epoch == job->binding_epoch &&
++      gtk_gst_paintable_frame_is_current (self->producer, job->frame) &&
++      (self->visible == NULL || job->frame->serial >= self->visible->serial))
++    {
++      if (result->result > 0)
++        texture = texture_from_result (result);
++      if (texture)
++        {
++          clear_mapped (self);
++          self->mapped = gtk_gst_paintable_frame_with_texture (job->frame, texture);
++          self->visible = gtk_gst_paintable_frame_ref (job->frame);
++          self->mapped_revision = job->target_revision;
++          self->target_refresh = FALSE;
++          g_object_unref (texture);
++        }
++      else
++        {
++          clear_mapped (self);
++          self->failed_serial = job->frame->serial;
++          self->failed_revision = job->target_revision;
++        }
++      gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
++    }
++  render_result_free (result);
++  view_update (self);
++  g_object_unref (self);
++}
++
++static void
++start_render (GtkGstDoviView      *self,
++              GtkGstPaintableFrame *frame)
++{
++  RenderJob *job;
++  GTask *task;
++
++  if (self->mapper == NULL)
++    {
++      self->mapper = g_new0 (ViewMapper, 1);
++      g_atomic_ref_count_init (&self->mapper->refs);
++      g_mutex_init (&self->mapper->lock);
++      gst_gtk_dovi_debug_init ();
++      self->mapper->mapper = gst_gtk_dovi_mapper_new ();
++    }
++  if (self->mapper->mapper == NULL)
++    {
++      self->failed_serial = frame->serial;
++      self->failed_revision = self->target_revision;
++      return;
++    }
++  job = g_new0 (RenderJob, 1);
++  g_weak_ref_init (&job->view, self);
++  job->mapper = view_mapper_ref (self->mapper);
++  job->frame = gtk_gst_paintable_frame_ref (frame);
++  job->context = gst_context_ref (self->context);
++  job->target_revision = self->target_revision;
++  job->binding_epoch = self->binding_epoch;
++  self->busy = TRUE;
++  task = g_task_new (NULL, NULL, render_done, NULL);
++  g_task_set_task_data (task, job, render_job_free);
++  g_task_run_in_thread (task, render_thread);
++  g_object_unref (task);
++}
++
++static void
++view_update (GtkGstDoviView *self)
++{
++  GdkSurface *surface;
++  GtkGstPaintableFrame *frame;
++
++  frame = gtk_gst_paintable_ref_frame (self->producer);
++  g_clear_pointer (&self->latest, gtk_gst_paintable_frame_unref);
++  self->latest = frame;
++  surface = g_weak_ref_get (&self->surface);
++  if (!self->composed || frame == NULL || surface == NULL ||
++      !GDK_IS_WAYLAND_SURFACE (surface))
++    {
++      release_lease (self);
++      if (self->context_signature)
++        {
++          g_clear_pointer (&self->context_signature, g_free);
++          g_clear_pointer (&self->context, gst_context_unref);
++          self->target_revision++;
++        }
++      self->context_ready = FALSE;
++      clear_mapped (self);
++      g_clear_object (&surface);
++      return;
++    }
++  if (self->lease == NULL)
++    {
++      self->lease = gdk_wayland_surface_request_hdr_rendering (surface);
++      if (self->lease == NULL)
++        {
++          g_object_unref (surface);
++          clear_mapped (self);
++          return;
++        }
++      self->lease_changed = g_signal_connect (self->lease, "changed",
++                                               G_CALLBACK (lease_changed), self);
++    }
++  set_context_snapshot (self, surface);
++  g_object_unref (surface);
++  if (!self->context_ready)
++    {
++      g_clear_object (&self->mapped);
++      self->mapped_revision = 0;
++      return;
++    }
++  if (self->visible && !gtk_gst_paintable_frame_is_current (self->producer, self->visible))
++    clear_mapped (self);
++  if (self->busy)
++    return;
++  /* Retune the exact visible picture first. Newer decoded pictures can be
++   * coalesced, but never replace a paused view's retained native source. */
++  if (self->target_refresh && self->visible)
++    frame = self->visible;
++  if (self->mapped && self->mapped_revision == self->target_revision &&
++      self->visible && self->visible->native->native == frame->native->native)
++    return;
++  if (self->failed_serial == frame->serial && self->failed_revision == self->target_revision)
++    return;
++  start_render (self, frame);
++}
++
++static void
++source_contents_changed (GdkPaintable *source,
++                         gpointer      data)
++{
++  GtkGstDoviView *self = data;
++  (void) source;
++  view_update (self);
++  gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
++}
++
++static void
++source_size_changed (GdkPaintable *source,
++                     gpointer      data)
++{
++  GtkGstDoviView *self = data;
++  (void) source;
++  view_update (self);
++  gdk_paintable_invalidate_size (GDK_PAINTABLE (self));
++}
++
++static void
++view_snapshot (GdkPaintable *paintable,
++               GdkSnapshot  *snapshot,
++               double        width,
++               double        height)
++{
++  GtkGstDoviView *self = (GtkGstDoviView *) paintable;
++  gdk_paintable_snapshot (self->mapped ? self->mapped : GDK_PAINTABLE (self->source),
++                          snapshot, width, height);
++}
++
++static GdkPaintable *
++view_current_image (GdkPaintable *paintable)
++{
++  GtkGstDoviView *self = (GtkGstDoviView *) paintable;
++  return gdk_paintable_get_current_image (self->mapped ? self->mapped : GDK_PAINTABLE (self->source));
++}
++
++static GdkPaintableFlags
++view_flags (GdkPaintable *paintable)
++{
++  GtkGstDoviView *self = (GtkGstDoviView *) paintable;
++  return gdk_paintable_get_flags (GDK_PAINTABLE (self->source)) & ~GDK_PAINTABLE_STATIC_CONTENTS;
++}
++
++static int
++view_width (GdkPaintable *paintable)
++{
++  return gdk_paintable_get_intrinsic_width (GDK_PAINTABLE (((GtkGstDoviView *) paintable)->source));
++}
++
++static int
++view_height (GdkPaintable *paintable)
++{
++  return gdk_paintable_get_intrinsic_height (GDK_PAINTABLE (((GtkGstDoviView *) paintable)->source));
++}
++
++static double
++view_aspect (GdkPaintable *paintable)
++{
++  return gdk_paintable_get_intrinsic_aspect_ratio (GDK_PAINTABLE (((GtkGstDoviView *) paintable)->source));
++}
++
++static void
++view_paintable_init (GdkPaintableInterface *iface)
++{
++  iface->snapshot = view_snapshot;
++  iface->get_current_image = view_current_image;
++  iface->get_flags = view_flags;
++  iface->get_intrinsic_width = view_width;
++  iface->get_intrinsic_height = view_height;
++  iface->get_intrinsic_aspect_ratio = view_aspect;
++}
++
++static void
++gtk_gst_dovi_view_dispose (GObject *object)
++{
++  GtkGstDoviView *self = (GtkGstDoviView *) object;
++  release_lease (self);
++  if (self->source_contents)
++    g_signal_handler_disconnect (self->source, self->source_contents);
++  if (self->source_size)
++    g_signal_handler_disconnect (self->source, self->source_size);
++  self->source_contents = self->source_size = 0;
++  g_clear_object (&self->source);
++  g_clear_object (&self->producer);
++  clear_mapped (self);
++  g_clear_pointer (&self->latest, gtk_gst_paintable_frame_unref);
++  g_clear_pointer (&self->context, gst_context_unref);
++  G_OBJECT_CLASS (gtk_gst_dovi_view_parent_class)->dispose (object);
++}
++
++static void
++gtk_gst_dovi_view_finalize (GObject *object)
++{
++  GtkGstDoviView *self = (GtkGstDoviView *) object;
++  g_weak_ref_clear (&self->surface);
++  view_mapper_unref (self->mapper);
++  g_free (self->context_signature);
++  G_OBJECT_CLASS (gtk_gst_dovi_view_parent_class)->finalize (object);
++}
++
++static void
++gtk_gst_dovi_view_class_init (GtkGstDoviViewClass *klass)
++{
++  klass->dispose = gtk_gst_dovi_view_dispose;
++  klass->finalize = gtk_gst_dovi_view_finalize;
++}
++
++static void
++gtk_gst_dovi_view_init (GtkGstDoviView *self)
++{
++  g_weak_ref_init (&self->surface, NULL);
++  self->composed = TRUE;
++}
++
++GdkPaintable *
++gtk_gst_dovi_view_new (GtkMediaStream *source)
++{
++  GtkGstPaintable *producer = gtk_gst_media_file_get_paintable (source);
++  GtkGstDoviView *self;
++  if (producer == NULL)
++    return NULL;
++  self = g_object_new (gtk_gst_dovi_view_get_type (), NULL);
++  self->source = g_object_ref (source);
++  self->producer = g_object_ref (producer);
++  self->source_contents = g_signal_connect (source, "invalidate-contents",
++                                             G_CALLBACK (source_contents_changed), self);
++  self->source_size = g_signal_connect (source, "invalidate-size",
++                                         G_CALLBACK (source_size_changed), self);
++  return GDK_PAINTABLE (self);
++}
++
++void
++gtk_gst_dovi_view_set_surface (GdkPaintable *paintable,
++                                 GdkSurface   *surface)
++{
++  GtkGstDoviView *self;
++  GdkSurface *previous;
++  if (paintable == NULL)
++    return;
++  g_return_if_fail (G_TYPE_CHECK_INSTANCE_TYPE (paintable, gtk_gst_dovi_view_get_type ()));
++  self = (GtkGstDoviView *) paintable;
++  previous = g_weak_ref_get (&self->surface);
++  if (previous != surface)
++    {
++      release_lease (self);
++      g_weak_ref_set (&self->surface, surface);
++      self->binding_epoch++;
++      self->target_revision++;
++      clear_mapped (self);
++      view_update (self);
++      gdk_paintable_invalidate_contents (paintable);
++    }
++  g_clear_object (&previous);
++}
++
++void
++gtk_gst_dovi_view_set_composed (GdkPaintable *paintable,
++                                  gboolean      composed)
++{
++  GtkGstDoviView *self;
++  if (paintable == NULL)
++    return;
++  g_return_if_fail (G_TYPE_CHECK_INSTANCE_TYPE (paintable, gtk_gst_dovi_view_get_type ()));
++  self = (GtkGstDoviView *) paintable;
++  if (self->composed == composed)
++    return;
++  self->composed = composed;
++  self->target_revision++;
++  view_update (self);
++  gdk_paintable_invalidate_contents (paintable);
++}
+diff --git a/gtk/media/gtkgstdoviviewprivate.h b/gtk/media/gtkgstdoviviewprivate.h
+new file mode 100644
+index 0000000..ffe220d
+--- /dev/null
++++ b/gtk/media/gtkgstdoviviewprivate.h
+@@ -0,0 +1,34 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#pragma once
++
++#include <gtk/gtkmediastream.h>
++#include <gst/gst.h>
++#include <graphene.h>
++
++typedef struct _GtkGstDoviFrame GtkGstDoviFrame;
++typedef struct _GtkGstPaintableFrame GtkGstPaintableFrame;
++
++struct _GtkGstPaintableFrame
++{
++  gatomicrefcount refs;
++  GdkTexture *texture;
++  GtkGstDoviFrame *native;
++  double pixel_aspect_ratio;
++  graphene_rect_t viewport;
++  int orientation;
++  guint stream_epoch;
++  guint caps_epoch;
++  guint64 serial;
++};
++
++void gtk_gst_dovi_tag_texture (GdkTexture *, GstBuffer *, guint, guint);
++gboolean gtk_gst_dovi_texture_is_current (GdkTexture *, guint, guint);
++GtkGstDoviFrame *gtk_gst_dovi_texture_ref_frame (GdkTexture *);
++void gtk_gst_dovi_frame_unref (GtkGstDoviFrame *);
++gboolean gtk_gst_dovi_frame_is_native (GtkGstDoviFrame *);
++GtkGstPaintableFrame *gtk_gst_paintable_frame_ref (GtkGstPaintableFrame *);
++void gtk_gst_paintable_frame_unref (GtkGstPaintableFrame *);
++GstElement *gtk_gst_dovi_wrap_sink (GstElement *);
++GdkPaintable *gtk_gst_dovi_view_new (GtkMediaStream *);
++void gtk_gst_dovi_view_set_surface (GdkPaintable *, GdkSurface *);
++void gtk_gst_dovi_view_set_composed (GdkPaintable *, gboolean);
+diff --git a/gtk/media/gtkgstmediafile.c b/gtk/media/gtkgstmediafile.c
+index 507ea3c..a288160 100644
+--- a/gtk/media/gtkgstmediafile.c
++++ b/gtk/media/gtkgstmediafile.c
+@@ -261,6 +261,9 @@ gtk_gst_media_file_destroy_play (GtkGstMediaFile *self)
+   g_signal_handlers_disconnect_by_func (self->playbin, gtk_gst_media_file_source_setup_cb, self);
+   g_signal_handlers_disconnect_by_func (self, gtk_gst_media_file_update_loop, NULL);
+   g_object_unref (self->play_adapter);
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_paintable_begin_stream (GTK_GST_PAINTABLE (self->paintable));
++#endif
+   gst_play_stop (self->play);
+   g_object_unref (self->play);
+   g_object_unref (self->playbin);
+@@ -276,6 +279,9 @@ gtk_gst_media_file_create_play (GtkGstMediaFile *file)
+   if (self->play != NULL)
+     return;
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_paintable_begin_stream (GTK_GST_PAINTABLE (self->paintable));
++#endif
+   self->play = gst_play_new (GST_PLAY_VIDEO_RENDERER (g_object_ref (self->paintable)));
+   self->play_adapter = gst_play_signal_adapter_new (self->play);
+   g_signal_connect (self->play_adapter, "media-info-updated", G_CALLBACK (gtk_gst_media_file_media_info_updated_cb), self);
+@@ -414,3 +420,13 @@ gtk_gst_media_file_init (GtkGstMediaFile *self)
+   g_signal_connect_swapped (self->paintable, "invalidate-size", G_CALLBACK (gdk_paintable_invalidate_size), self);
+   g_signal_connect_swapped (self->paintable, "invalidate-contents", G_CALLBACK (gdk_paintable_invalidate_contents), self);
+ }
++
++#ifdef HAVE_GST_GTK_DOVI_CORE
++GtkGstPaintable *
++gtk_gst_media_file_get_paintable (GtkMediaStream *stream)
++{
++  if (!GTK_IS_GST_MEDIA_FILE (stream))
++    return NULL;
++  return GTK_GST_PAINTABLE (GTK_GST_MEDIA_FILE (stream)->paintable);
++}
++#endif
+diff --git a/gtk/media/gtkgstmediafileprivate.h b/gtk/media/gtkgstmediafileprivate.h
+index ae7aa55..eb720f0 100644
+--- a/gtk/media/gtkgstmediafileprivate.h
++++ b/gtk/media/gtkgstmediafileprivate.h
+@@ -27,4 +27,9 @@ G_BEGIN_DECLS
+ 
+ G_DECLARE_FINAL_TYPE (GtkGstMediaFile, gtk_gst_media_file, GTK, GST_MEDIA_FILE, GtkMediaFile)
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++#include "gtkgstpaintableprivate.h"
++GtkGstPaintable *gtk_gst_media_file_get_paintable (GtkMediaStream *stream);
++#endif
++
+ G_END_DECLS
+diff --git a/gtk/media/gtkgstpaintable.c b/gtk/media/gtkgstpaintable.c
+index 8968e7d..1fe1d80 100644
+--- a/gtk/media/gtkgstpaintable.c
++++ b/gtk/media/gtkgstpaintable.c
+@@ -28,6 +28,10 @@
+ 
+ #include <math.h>
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++#include "gtkgstdoviviewprivate.h"
++#endif
++
+ #ifdef GDK_WINDOWING_WIN32
+ #include <gdk/win32/gdkwin32.h>
+ #endif
+@@ -42,6 +46,11 @@ struct _GtkGstPaintable
+   int orientation;
+ 
+   GdkSurface *surface;
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gint stream_epoch;
++  gint caps_epoch;
++  guint64 frame_serial;
++#endif
+ };
+ 
+ struct _GtkGstPaintableClass
+@@ -304,6 +313,10 @@ gtk_gst_paintable_video_renderer_create_video_sink (GstPlayVideoRenderer *render
+ 
+   g_clear_object (&context);
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  sink = gtk_gst_dovi_wrap_sink (sink);
++#endif
++
+   return sink;
+ }
+ 
+@@ -340,6 +353,9 @@ gtk_gst_paintable_class_init (GtkGstPaintableClass *klass)
+ static void
+ gtk_gst_paintable_init (GtkGstPaintable *self)
+ {
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  g_atomic_int_set (&self->stream_epoch, 1);
++#endif
+ }
+ 
+ GdkPaintable *
+@@ -398,6 +414,9 @@ gtk_gst_paintable_set_paintable (GtkGstPaintable       *self,
+     size_changed = FALSE;
+ 
+   g_set_object (&self->image, paintable);
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  self->frame_serial++;
++#endif
+   self->pixel_aspect_ratio = pixel_aspect_ratio;
+   self->viewport = *viewport;
+   self->orientation = orientation;
+@@ -432,6 +451,13 @@ gtk_gst_paintable_set_texture_invoke (gpointer data)
+ {
+   SetTextureInvocation *invoke = data;
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  if (!gtk_gst_dovi_texture_is_current (invoke->texture,
++                                       g_atomic_int_get (&invoke->paintable->stream_epoch),
++                                       g_atomic_int_get (&invoke->paintable->caps_epoch)))
++    return G_SOURCE_REMOVE;
++#endif
++
+   gtk_gst_paintable_set_paintable (invoke->paintable,
+                                    GDK_PAINTABLE (invoke->texture),
+                                    invoke->pixel_aspect_ratio,
+@@ -464,3 +490,87 @@ gtk_gst_paintable_queue_set_texture (GtkGstPaintable       *self,
+                               (GDestroyNotify) set_texture_invocation_free);
+ }
+ 
++
++#ifdef HAVE_GST_GTK_DOVI_CORE
++guint
++gtk_gst_paintable_get_stream_epoch (GtkGstPaintable *self)
++{
++  return g_atomic_int_get (&self->stream_epoch);
++}
++
++void
++gtk_gst_paintable_begin_stream (GtkGstPaintable *self)
++{
++  g_atomic_int_inc (&self->stream_epoch);
++  g_atomic_int_set (&self->caps_epoch, 0);
++  gdk_paintable_invalidate_contents (GDK_PAINTABLE (self));
++}
++
++static gboolean
++caps_changed_invoke (gpointer data)
++{
++  gdk_paintable_invalidate_contents (GDK_PAINTABLE (data));
++  return G_SOURCE_REMOVE;
++}
++
++void
++gtk_gst_paintable_caps_changed (GtkGstPaintable *self,
++                                  guint             stream_epoch,
++                                  guint             caps_epoch)
++{
++  if (gtk_gst_paintable_get_stream_epoch (self) != stream_epoch)
++    return;
++  g_atomic_int_set (&self->caps_epoch, caps_epoch);
++  g_main_context_invoke_full (NULL, G_PRIORITY_DEFAULT, caps_changed_invoke,
++                              g_object_ref (self), g_object_unref);
++}
++
++gboolean
++gtk_gst_paintable_frame_is_current (GtkGstPaintable      *self,
++                                      GtkGstPaintableFrame *frame)
++{
++  return frame && frame->stream_epoch == (guint) g_atomic_int_get (&self->stream_epoch) &&
++         frame->caps_epoch == (guint) g_atomic_int_get (&self->caps_epoch);
++}
++
++GtkGstPaintableFrame *
++gtk_gst_paintable_ref_frame (GtkGstPaintable *self)
++{
++  GtkGstDoviFrame *native;
++  GtkGstPaintableFrame *frame;
++
++  if (!GDK_IS_TEXTURE (self->image) ||
++      !gtk_gst_dovi_texture_is_current (GDK_TEXTURE (self->image),
++                                       g_atomic_int_get (&self->stream_epoch),
++                                       g_atomic_int_get (&self->caps_epoch)))
++    return NULL;
++  native = gtk_gst_dovi_texture_ref_frame (GDK_TEXTURE (self->image));
++  if (!gtk_gst_dovi_frame_is_native (native))
++    {
++      gtk_gst_dovi_frame_unref (native);
++      return NULL;
++    }
++  frame = g_new0 (GtkGstPaintableFrame, 1);
++  g_atomic_ref_count_init (&frame->refs);
++  frame->texture = g_object_ref (GDK_TEXTURE (self->image));
++  frame->native = native;
++  frame->stream_epoch = g_atomic_int_get (&self->stream_epoch);
++  frame->caps_epoch = g_atomic_int_get (&self->caps_epoch);
++  frame->serial = self->frame_serial;
++  frame->pixel_aspect_ratio = self->pixel_aspect_ratio;
++  frame->viewport = self->viewport;
++  frame->orientation = self->orientation;
++  return frame;
++}
++
++GdkPaintable *
++gtk_gst_paintable_frame_with_texture (GtkGstPaintableFrame *frame,
++                                        GdkTexture           *texture)
++{
++  GtkGstPaintable *result = GTK_GST_PAINTABLE (gtk_gst_paintable_new ());
++  gtk_gst_paintable_set_paintable (result, GDK_PAINTABLE (texture),
++                                   frame->pixel_aspect_ratio, &frame->viewport,
++                                   frame->orientation);
++  return GDK_PAINTABLE (result);
++}
++#endif
+diff --git a/gtk/media/gtkgstpaintableprivate.h b/gtk/media/gtkgstpaintableprivate.h
+index a7f544b..3987a32 100644
+--- a/gtk/media/gtkgstpaintableprivate.h
++++ b/gtk/media/gtkgstpaintableprivate.h
+@@ -40,4 +40,14 @@ void            gtk_gst_paintable_queue_set_texture     (GtkGstPaintable
+                                                          const graphene_rect_t  *viewport,
+                                                          int                     orientation);
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++#include "gtkgstdoviviewprivate.h"
++guint gtk_gst_paintable_get_stream_epoch (GtkGstPaintable *self);
++void gtk_gst_paintable_begin_stream (GtkGstPaintable *self);
++void gtk_gst_paintable_caps_changed (GtkGstPaintable *self, guint stream_epoch, guint caps_epoch);
++gboolean gtk_gst_paintable_frame_is_current (GtkGstPaintable *self, GtkGstPaintableFrame *frame);
++GtkGstPaintableFrame *gtk_gst_paintable_ref_frame (GtkGstPaintable *self);
++GdkPaintable *gtk_gst_paintable_frame_with_texture (GtkGstPaintableFrame *frame, GdkTexture *texture);
++#endif
++
+ G_END_DECLS
+diff --git a/gtk/media/gtkgstsink.c b/gtk/media/gtkgstsink.c
+index a706b09..dc1220d 100644
+--- a/gtk/media/gtkgstsink.c
++++ b/gtk/media/gtkgstsink.c
+@@ -77,7 +77,12 @@ GST_DEBUG_CATEGORY (gtk_debug_gst_sink);
+ #define D3D12_TEXTURE_CAPS GST_VIDEO_CAPS_MAKE_WITH_FEATURES (GST_CAPS_FEATURE_MEMORY_D3D12_MEMORY, GST_VIDEO_FORMATS_ALL)
+ #endif
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++#define GL_TEXTURE_CAPS GST_VIDEO_CAPS_MAKE_WITH_FEATURES (GST_CAPS_FEATURE_MEMORY_GL_MEMORY, "RGBA") ", gtk-dovi-preconverted=(boolean)false" \
++  "; " GST_VIDEO_CAPS_MAKE_WITH_FEATURES (GST_CAPS_FEATURE_MEMORY_GL_MEMORY, "RGBA64_LE") ", gtk-dovi-preconverted=(boolean)true"
++#else
+ #define GL_TEXTURE_CAPS GST_VIDEO_CAPS_MAKE_WITH_FEATURES (GST_CAPS_FEATURE_MEMORY_GL_MEMORY, "RGBA")
++#endif
+ 
+ #define DMABUF_TEXTURE_CAPS GST_VIDEO_DMA_DRM_CAPS_MAKE
+ 
+@@ -322,6 +327,10 @@ gtk_gst_sink_set_caps (GstBaseSink *bsink,
+   self->color_state = gtk_gst_color_state_from_colorimetry (self, &self->v_info.colorimetry);
+   if (self->color_state == NULL)
+     return FALSE;
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  gtk_gst_paintable_caps_changed (self->paintable, self->stream_epoch,
++                                  g_atomic_int_add (&self->caps_epoch, 1) + 1);
++#endif
+ 
+   return TRUE;
+ }
+@@ -450,6 +459,12 @@ gtk_gst_sink_event (GstBaseSink * bsink, GstEvent * event)
+   GtkGstSink *self = GTK_GST_SINK (bsink);
+   gboolean ret;
+ 
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  if (GST_EVENT_TYPE (event) == GST_EVENT_FLUSH_START)
++    gtk_gst_paintable_caps_changed (self->paintable, self->stream_epoch,
++                                    g_atomic_int_add (&self->caps_epoch, 1) + 1);
++#endif
++
+   if (GST_EVENT_TYPE (event) == GST_EVENT_TAG)
+     {
+       GstTagList *taglist;
+@@ -803,6 +818,10 @@ gtk_gst_sink_show_frame (GstVideoSink *vsink,
+   texture = gtk_gst_sink_texture_from_buffer (self, buf, &pixel_aspect_ratio, &viewport);
+   if (texture)
+     {
++#ifdef HAVE_GST_GTK_DOVI_CORE
++      gtk_gst_dovi_tag_texture (texture, buf, self->stream_epoch,
++                                g_atomic_int_get (&self->caps_epoch));
++#endif
+       gtk_gst_paintable_queue_set_texture (self->paintable,
+                                            texture,
+                                            pixel_aspect_ratio,
+@@ -1023,6 +1042,9 @@ gtk_gst_sink_set_property (GObject      *object,
+       self->paintable = g_value_dup_object (value);
+       if (self->paintable == NULL)
+         self->paintable = GTK_GST_PAINTABLE (gtk_gst_paintable_new ());
++#ifdef HAVE_GST_GTK_DOVI_CORE
++      self->stream_epoch = gtk_gst_paintable_get_stream_epoch (self->paintable);
++#endif
+       break;
+ 
+     case PROP_GL_CONTEXT:
+diff --git a/gtk/media/gtkgstsinkprivate.h b/gtk/media/gtkgstsinkprivate.h
+index 4bc4cb3..c5d22ce 100644
+--- a/gtk/media/gtkgstsinkprivate.h
++++ b/gtk/media/gtkgstsinkprivate.h
+@@ -59,6 +59,10 @@ struct _GtkGstSink
+   GdkColorState       *color_state;
+   gboolean             uses_gl;
+   int                  orientation;
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  guint                stream_epoch;
++  gint                 caps_epoch;
++#endif
+ };
+ 
+ struct _GtkGstSinkClass
+diff --git a/gtk/media/meson.build b/gtk/media/meson.build
+index 53f5c97..8e19e84 100644
+--- a/gtk/media/meson.build
++++ b/gtk/media/meson.build
+@@ -3,6 +3,13 @@ media_deps = []
+ media_backends = []
+ 
+ if gstplay_dep.found() and gstgl_dep.found() and gstallocators_dep.found()
++  # Optional shared source/mapping ABI; ordinary builds keep their backend.
++  dovi_core_dep = dependency('gst-gtk-dovi-core', version: '>=1', required: false)
++  if dovi_core_dep.found() and get_option('wayland-backend')
++    cdata.set('HAVE_GST_GTK_DOVI_CORE', 1)
++    media_deps += dovi_core_dep
++    media_sources += files('gtkgstdoviview.c')
++  endif
+   media_backends += 'gstreamer'
+   media_deps += [ libm, gstplay_dep, gstgl_dep, gstallocators_dep, gstd3d12_dep  ]
+   media_sources += files([
+-- 
+2.54.0 (Apple Git-157)
+

@@ -1,0 +1,34 @@
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index f59e3ef4cd21e81ec7b00175d515b689341ed4c6..5d42d9b9c6abdcaaf7362d20fa73b655dd318d52 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -28,6 +28,8 @@
+ #include <libplacebo/shaders/sampling.h>
+ #include <libplacebo/renderer.h>
+ #include <dv_provider387.h>
++#pragma weak dv_provider387_map_v2
++#pragma weak dv_provider387_last_target_strategy
+ #include <libplacebo/shaders/lut.h>
+ #include <libplacebo/shaders/icc.h>
+ #include <libplacebo/utils/libav.h>
+@@ -1279,8 +1281,18 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+     // Keep the legacy signal envelope for unsupported/fallback frames. Only
+     // successful private display management receives the physical declaration.
+     struct pl_color_space physical = p->dovi_physical_target;
+-    int status = dv_provider387_map(p->dovi_provider, gpu, rpu, size, enhancement_layer_composed, &physical,
+-                                 master, mapped, mapped_color);
++    int status = dv_provider387_map_v2
++        ? dv_provider387_map_v2(p->dovi_provider, gpu, rpu, size,
++                enhancement_layer_composed, &physical, master, mapped, mapped_color, NULL)
++        : dv_provider387_map(p->dovi_provider, gpu, rpu, size,
++                enhancement_layer_composed, &physical, master, mapped, mapped_color);
++    if (status > 0) {
++        unsigned strategy = dv_provider387_map_v2 && dv_provider387_last_target_strategy
++                          ? dv_provider387_last_target_strategy(p->dovi_provider) : 4;
++        MP_TRACE(p, "DV target strategy=%u (0=named 1=raw-xy-neutral-cm4 "
++                    "2=named-creative-fallback 3=named-invalid-xy-fallback "
++                    "4=named-v1-runtime)\n", strategy);
++    }
+     if (status <= 0)
+         return status;
+ 

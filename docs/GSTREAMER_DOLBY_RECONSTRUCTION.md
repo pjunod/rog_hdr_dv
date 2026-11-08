@@ -1,9 +1,6 @@
 # GStreamer resolved Dolby pictures
 
-**Status:** independently reviewed producer scope passes native software and Intel
-VA checks; unshipped. This qualification covers source metadata ownership,
-configuration transitions and conformance geometry. It establishes no normal
-player rendering, image-grade accuracy, package release or host installation.
+**Updated November 8, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The staged GNOME consumers also graded a paused Profile 5 picture with embedded text and restored the original image after a display-target round trip. Profile 7 enhancement-layer composition is qualified separately in mpv. The producer evidence below covers metadata ownership, configuration changes and conformance geometry. [GNOME playback results](../evidence/gnome-embedded-dolby-subtitles.json) · [Current installation status](STATUS.md).
 
 ## Normal GNOME playback
 

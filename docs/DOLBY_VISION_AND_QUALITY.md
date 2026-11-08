@@ -156,10 +156,9 @@ DV bitstream + frame-matched metadata
        i915 / eDP / internal OLED
 ```
 
-The diagram is the required responsibility chain, not a claim that the
-missing engine exists on Linux. The eventual design must specify whether
-display management runs in the player, a reusable media component, or an
-output stage, and prevent the compositor from mapping it a second time.
+The Linux implementation applies grading in a reusable media renderer. Its inputs are the reconstructed picture, that picture’s RPU and the target of the surface or export. It passes the correctly tagged result to composition. System mpv and FFmpeg use this path on the ROG. Staged GTK video and Showtime qualify the path through ordinary GNOME application entry points. [Implemented clients and profile coverage](SYSTEM_DOLBY_VISION.md).
+
+The following table records the routes investigated before that implementation.
 
 | Candidate | Concrete next proof | Current limit |
 |---|---|---|

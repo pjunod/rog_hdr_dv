@@ -1,0 +1,115 @@
+From 122e1c71f298f1d92f56e02a0eae84ee0cd952d7 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 04:01:55 -0500
+Subject: [PATCH 09/12] fix(media): capture native pictures before playsink
+ conversion
+
+---
+ gtk/media/gtkgstdoviview.c        | 37 +++++--------------------------
+ gtk/media/gtkgstdoviviewprivate.h |  2 +-
+ gtk/media/gtkgstmediafile.c       | 11 +++++++++
+ gtk/media/gtkgstpaintable.c       |  3 ---
+ 4 files changed, 17 insertions(+), 36 deletions(-)
+
+diff --git a/gtk/media/gtkgstdoviview.c b/gtk/media/gtkgstdoviview.c
+index 839e346..be59a63 100644
+--- a/gtk/media/gtkgstdoviview.c
++++ b/gtk/media/gtkgstdoviview.c
+@@ -95,40 +95,13 @@ gtk_gst_paintable_frame_unref (GtkGstPaintableFrame *frame)
+ }
+ 
+ GstElement *
+-gtk_gst_dovi_wrap_sink (GstElement *sink)
++gtk_gst_dovi_create_filter (void)
+ {
+-  GstElement *map, *bin;
+-  GstPad *pad, *ghost;
+-
+   if (gst_gtk_dovi_core_abi () != GST_GTK_DOVI_CORE_ABI)
+-    return sink;
+-  map = gst_element_factory_make ("gtkdovimap", NULL);
+-  if (map == NULL)
+-    return sink;
+-
+-  /* No display context is installed here. The shared producer stays an
+-   * original-input baseline; each GtkVideo view maps its own retained source. */
+-  bin = gst_bin_new (NULL);
+-  gst_object_ref (sink);
+-  gst_bin_add_many (GST_BIN (bin), map, sink, NULL);
+-  if (!gst_element_link (map, sink))
+-    goto fail;
+-  pad = gst_element_get_static_pad (map, "sink");
+-  ghost = gst_ghost_pad_new ("sink", pad);
+-  gst_object_unref (pad);
+-  if (!gst_element_add_pad (bin, ghost))
+-    {
+-      gst_object_unref (ghost);
+-      goto fail;
+-    }
+-  gst_object_unref (sink);
+-  return bin;
+-
+-fail:
+-  gst_bin_remove (GST_BIN (bin), sink);
+-  gst_object_unref (bin);
+-  g_object_force_floating (G_OBJECT (sink));
+-  return sink;
++    return NULL;
++  /* Capture original input before playsink conversion. No display context is
++   * installed on the shared producer: each realized view maps its own frame. */
++  return gst_element_factory_make ("gtkdovimap", NULL);
+ }
+ 
+ typedef struct
+diff --git a/gtk/media/gtkgstdoviviewprivate.h b/gtk/media/gtkgstdoviviewprivate.h
+index ffe220d..9a75549 100644
+--- a/gtk/media/gtkgstdoviviewprivate.h
++++ b/gtk/media/gtkgstdoviviewprivate.h
+@@ -28,7 +28,7 @@ void gtk_gst_dovi_frame_unref (GtkGstDoviFrame *);
+ gboolean gtk_gst_dovi_frame_is_native (GtkGstDoviFrame *);
+ GtkGstPaintableFrame *gtk_gst_paintable_frame_ref (GtkGstPaintableFrame *);
+ void gtk_gst_paintable_frame_unref (GtkGstPaintableFrame *);
+-GstElement *gtk_gst_dovi_wrap_sink (GstElement *);
++GstElement *gtk_gst_dovi_create_filter (void);
+ GdkPaintable *gtk_gst_dovi_view_new (GtkMediaStream *);
+ void gtk_gst_dovi_view_set_surface (GdkPaintable *, GdkSurface *);
+ void gtk_gst_dovi_view_set_composed (GdkPaintable *, gboolean);
+diff --git a/gtk/media/gtkgstmediafile.c b/gtk/media/gtkgstmediafile.c
+index a288160..a00d8da 100644
+--- a/gtk/media/gtkgstmediafile.c
++++ b/gtk/media/gtkgstmediafile.c
+@@ -291,6 +291,17 @@ gtk_gst_media_file_create_play (GtkGstMediaFile *file)
+   g_signal_connect (self->play_adapter, "error", G_CALLBACK (gtk_gst_media_file_error_cb), self);
+ 
+   g_object_get (self->play, "pipeline", &self->playbin, NULL);
++#ifdef HAVE_GST_GTK_DOVI_CORE
++  {
++    GstElement *filter = gtk_gst_dovi_create_filter ();
++    if (filter)
++      {
++        gst_object_ref_sink (filter);
++        g_object_set (self->playbin, "video-filter", filter, NULL);
++        gst_object_unref (filter);
++      }
++  }
++#endif
+   g_signal_connect (self->playbin, "source-setup", G_CALLBACK (gtk_gst_media_file_source_setup_cb), self);
+   g_signal_connect (self, "notify::loop", G_CALLBACK (gtk_gst_media_file_update_loop), NULL);
+   gtk_gst_media_file_update_loop (self);
+diff --git a/gtk/media/gtkgstpaintable.c b/gtk/media/gtkgstpaintable.c
+index 1fe1d80..252fef0 100644
+--- a/gtk/media/gtkgstpaintable.c
++++ b/gtk/media/gtkgstpaintable.c
+@@ -313,9 +313,6 @@ gtk_gst_paintable_video_renderer_create_video_sink (GstPlayVideoRenderer *render
+ 
+   g_clear_object (&context);
+ 
+-#ifdef HAVE_GST_GTK_DOVI_CORE
+-  sink = gtk_gst_dovi_wrap_sink (sink);
+-#endif
+ 
+   return sink;
+ }
+-- 
+2.54.0 (Apple Git-157)
+

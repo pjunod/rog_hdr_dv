@@ -1,0 +1,14 @@
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 5d42d9b9c6abdcaaf7362d20fa73b655dd318d52..af64fb3b6c32d8d913c87b71771043506495f585 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -28,6 +28,9 @@
+ #include <libplacebo/shaders/sampling.h>
+ #include <libplacebo/renderer.h>
+ #include <dv_provider387.h>
++#if !defined(DV_PROVIDER387_TARGET_V2_VERSION) || DV_PROVIDER387_TARGET_V2_VERSION != 2
++#error "Dolby provider target API v2 headers are required"
++#endif
+ #pragma weak dv_provider387_map_v2
+ #pragma weak dv_provider387_last_target_strategy
+ #include <libplacebo/shaders/lut.h>

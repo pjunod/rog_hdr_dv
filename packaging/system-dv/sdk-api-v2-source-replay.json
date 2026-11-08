@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "scope": "Public target API v2 capability source archives; no native implementation or SDK package identity",
+  "sdk_capabilities": {
+    "abi360": "rog-dv-provider-sdk-api (>= 2)",
+    "abi387": "rog-dv-provider387-sdk-api (>= 2)"
+  },
+  "normal_sources": [
+    {
+      "component": "ffmpeg",
+      "dsc_sha256": "f5a450d1a3cd0f6f73bbabd27d4e60b86633cd0268987718082456151ccd95cf",
+      "files": 10181,
+      "payload_tree_sha256": "46ae4b4f44b52106914a7687e1fa634403a9864e0b152aedb3e7304f7c01c91b",
+      "pass": true
+    },
+    {
+      "component": "mpv",
+      "dsc_sha256": "f27d0bd63fde9464ec72e48faffd7c647871b519203ca8236cb44979b52014f9",
+      "files": 922,
+      "payload_tree_sha256": "da8d2e0d7acaae3af6c7c0bc8bc7ed0539d2b3490d468ed1582993628f10dd2d",
+      "pass": true
+    },
+    {
+      "component": "core",
+      "dsc_sha256": "9f6c694daa2fdaf362cdbedc4201e3773b0ff1d305608ae39a0208d2e8b11d0e",
+      "files": 36,
+      "payload_tree_sha256": "ab4cc88686b2fa0c59714eb4ac1587928f5f53349f698d7df399d781ace09d6d",
+      "pass": true
+    }
+  ],
+  "mpv_new_orig": {
+    "upstream_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
+    "upstream_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
+    "archive_prefix": "mpv-0.42.0/",
+    "format": "git archive --format=tar.gz",
+    "sha256": "25709d945552dbb7498a855c942eddbe32636ce5a003afefbd0a5aae0ae0a5b0",
+    "origin": "New release source archive from pinned unmodified public upstream; not recovery of a prior DSC"
+  },
+  "public_source_revision": "1ace293",
+  "versions": {
+    "ffmpeg": "7:8.1.2-2ubuntu2+rogdv4.2",
+    "mpv": "0.42.0-0ubuntu0+rogdv5.1",
+    "core": "0.1.0+rogdv3.1"
+  },
+  "inputs": {
+    "packaging/system-dv/mpv-042-ubuntu-raw-xy.diff": "de96f70ea81049c042b90643e50860821dbe96ee445f8947545971960d67ee7d",
+    "patches/mpv-fel-system-dv/0005-require-public-target-api-v2-sdk-contract.patch": "3fa507266d77ac049a093ca9606698a9194a36ac8c4d15a8883ff52eed6d2170",
+    "patches/ubuntu-ffmpeg-system-dv/0014-accept-physical-xy-with-an-optional-provider-v2.patch": "519542a6afed045e0070a535e342d12cdeb4fdbaec031ff77fa6a0aaef562b4c",
+    "patches/ubuntu-ffmpeg-system-dv/0016-require-public-target-api-v2-sdk-contract.patch": "c1564a0a2ee9da7b838f74c458a85f0425416497dff1b875b31fbed8edbe2745",
+    "packaging/gstreamer-gtk-dovi/debian/control": "219eab79c9ddd8d66d588400f6d434078d48242f3b06e63a1304c415f8961cb1",
+    "packaging/gstreamer-gtk-dovi/mapper.c": "dbb003160f3bbf4d246ef033ebdf69080dfa6f405770b80d839aac5f95202e45",
+    "packaging/gstreamer-gtk-dovi/prepare-ubuntu-packages.py": "337a27f0fffff9315a7f6be34ecae2b8fb337495a456816f8cc50d04a1454131"
+  },
+  "reconstruction": {
+    "ffmpeg": "Replay registered Ubuntu source series, preserve applied Ubuntu quilt state from authenticated source extraction, integrate public source delta as normal quilt patch, dpkg-source -b; extract DSC afresh and compare full source payload.",
+    "mpv": "Create orig archive from pinned unmodified upstream tree, apply registered mpv-fel-system-dv series, use retained Ubuntu packaging source with maintained mpv-042 overlays including raw-xy packaging delta, integrate application delta as normal quilt patch, dpkg-source -b; extract and compare full payload.",
+    "core": "Export committed packaging/gstreamer-gtk-dovi tree, dpkg-source -b (native format), extract and compare full payload."
+  },
+  "mpv_registered_source": {
+    "commit": "12b007d41ea6510bc554233ac7f7224d5690d6bb",
+    "tree": "1b69124c05f23d97bdcc039f69699152724680a0",
+    "archive_files": 902,
+    "all_files_present_and_exact": true
+  },
+  "ffmpeg_complete_series_replay": {
+    "patches": 16,
+    "base_tree": "db3ae0877e7860f0c8e57a2500612a45b027e59d",
+    "candidate_commit": "dd557039083719d00564bb95e69b623d9a920319",
+    "candidate_tree": "6ac9565441c21491c3cac4fa48e9235e1649df6e",
+    "pass": true,
+    "normal_shlibs_template_present": true
+  }
+}

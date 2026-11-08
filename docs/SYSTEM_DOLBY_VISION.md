@@ -12,12 +12,21 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 |---|---|---|
 | Installed mpv 0.41.0, gpu-next | HDR output described to the player by the display system | `mpv --vo=gpu-next movie.mp4` |
 | Staged mpv 0.42.0, gpu-next | Physical display target. Supports native 4K Profile 7 FEL composition | Open an MP4 or Matroska video in mpv |
+| Staged GtkVideo widget | Display target of each realized view, including views sharing a media stream | Open a local Profile 5 video in an application using GtkVideo |
 | Staged GNOME Showtime | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
 | FFmpeg 8.1.2, libplacebo video filter | Explicit export target, because a filter graph can run without a display | Example below |
 
 ### Paused GNOME playback
 
 On the ROG, the packaged Showtime client retained one decoded Profile 5 picture while a private GNOME monitor changed from 616 to 308 cd/m² and back. The mapper received both peaks with an unchanged 203 cd/m² reference white. GNOME’s 1280×800 PipeWire capture changed over 375,877 pixels inside the movie rectangle. The last capture matched the first byte for byte. The monitor advertised synthetic HDR capabilities, with the normal Mutter configuration, renderer and capture code. An independent late-HDR window also updated correctly on installed GNOME Shell. [Methods and measured differences](../evidence/gnome-showtime-paused-retarget.json).
+
+The normal GtkVideo widget and Showtime both showed a subtitle while grading the underlying Profile 5 picture. To reproduce the carrier check, prepare two excerpts of the same length from the start of the same video, with one cue visible at the selected frame and one outside it. This command checks the first 819 source packets against every video packet in each excerpt. It compares the Dolby configuration, codec initialization, sample sizes, encoded bytes, presentation and decode timestamps, and durations. For complete movies omit the prefix option. The test clips stay on the machine where they were obtained.
+
+```sh
+python3 packaging/quality/verify-subtitle-carrier.py --reference-prefix-packets 819 ORIGINAL ACTIVE INACTIVE
+```
+
+Capture both players on the same paused frame at the initial target, the second target and the restored target. Wait for the completed mapped redraw each time. Compare the subtitle region between the two controls and the video region across target changes. [Observed subtitle and video results](../evidence/gnome-embedded-dolby-subtitles.json).
 
 ### Inspect a native GNOME screen pixel
 
@@ -38,6 +47,12 @@ Coordinates use the captured frame’s pixel grid. The three printed numbers are
 Stock Chrome 156.0.8078.47 and Firefox 159.0 both presented a local AVC control frame. Both rejected the same local unencrypted Profile 8.1 MP4 with media error 4 (`MEDIA_ERR_SRC_NOT_SUPPORTED`). The chart has matched Dolby configuration and RPU data and plays through the native consumer pipeline. Each browser used a fresh profile. Chrome ran on its own NVIDIA-backed Wayland display and Firefox ran headless.
 
 For ordinary MP4 files and Media Source Extensions, both browsers declined `dvh1.05.06`, `dvhe.05.06`, `dvhe.07.06`, `dvh1.08.06` and `dvhe.08.06`. Firefox accepted the Main and Main 10 HEVC capability queries. Chrome declined those queries in this configuration. This result covers clear content on these builds. A streaming service's protected playback requires separate evidence.
+
+WebKitGTK 2.52.6 played the clear Profile 8.1 chart through an HTML video element. Removing all Dolby metadata and playing the same HEVC base reproduced every one of the 3,276,800 canvas pixels. Its Dolby codec capability queries returned an empty string. This distinguishes base-layer playback from applying the grade on this fixture. [WebKit pixel comparison](../evidence/webkit-clear-dolby-base-comparison.json).
+
+The stock GTK4 engine (WebKit API 6.0) also displayed the chart on a private Wayland monitor. All 480,000 pixels in the accelerated 10-bit compositor capture matched the HEVC base. The green AVC control was visible in that capture. The accelerated canvas returned transparent black for the control, so it could not be used for the comparison. The software video sink produced the expected green canvas and identical chart/base pixels at full resolution. [GTK4 compositor and software controls](../evidence/webkit-clear-dolby-base-comparison.json).
+
+The matching Ubuntu WebKit source identifies two integration points. In the GTK port, `ScreenManager::collectScreenProperties` sends monitor geometry, depth and DPI, and `screenColorSpace` returns sRGB for every widget. The browser needs the active monitor's luminance and primaries in the process that presents each video. In the GStreamer player, the GL sink links upload and colour conversion directly to its appsink. The little-endian software sink accepts only 8-bit BGRx or BGRA. Both paths need to apply the picture's grade before conversion, and the compositor must preserve the resulting precision and colour state. A browser implementation can use the paired compositor and canvas controls to demonstrate where the authored grade first becomes visible. [Ubuntu WebKit source package](https://launchpad.net/ubuntu/+source/webkit2gtk/2.52.6-1ubuntu1).
 
 Chromium's public media configuration controls Dolby demuxing and leaves decoding to the platform. Its demuxer switches to the Dolby codec only when the requested type is supported. A Linux integration needs a decoder and renderer that retain the frame's metadata through composition, followed by a capability declaration for the supported profiles. [Chromium media build configuration](https://chromium.googlesource.com/chromium/src/+/cb3d3d1c5e989cc6792773dc6b1e46cefe68efb7/media/media_options.gni) · [Demuxer codec selection](https://chromium.googlesource.com/chromium/src/media/+/b677a686cfbe98c4b504845a15c2dfc046d2836a/ffmpeg/ffmpeg_common.cc).
 
@@ -176,3 +191,31 @@ A read-only query returned a firmware-derived target of 0.0004–616 cd/m², wit
 ## Other GStreamer desktop players
 
 The normal GNOME Showtime package uses the GTK GStreamer sink. The staged software, Intel VA and NVIDIA decoders keep reconstruction data and the raw RPU with each reordered picture. The sink grades that picture for its GTK surface before ordinary color conversion. Other GStreamer applications choose their own decoders, sinks and presentation paths. [Native metadata transport](GSTREAMER_DOLBY_TRANSPORT.md) · [Qualified app and plugin revisions](../evidence/gstreamer-gtk-final-packages-20261108.json).
+
+## Physical xy target candidate
+
+At the firmware-declared 616 cd/m² target, the normal Ubuntu FFmpeg filter produced all 19,660,800 chart bytes from the qualified development render on Intel Vulkan. Both codec architectures preserve their common package files exactly. The 32-bit decoder maintained all 544 decoders, 218 encoders and 67 hardware configurations and parsed a genuine Profile 7 metadata packet. [Release packages, source replay and digital checks](../evidence/ffmpeg-panel-xy-release.json).
+
+The separate raw-xy candidate adds an optional target-v2 API to the shared
+provider. The existing target structure, ABI number, named options and entry
+points stay unchanged. The public headers and adapters are reconstructible
+from this repository and the pinned upstream sources; the private mapping
+implementation and SDK payload remain outside the repository.
+
+Normal mpv passes the preferred Wayland surface target through its physical
+auto-target branch. The GTK mapper passes the surface target already retained
+in its frame/cache context. FFmpeg accepts an explicit
+`target_xy=rx/ry/gx/gy/bx/by/wx/wy` with `target_peak`; `target_gamut` supplies
+the complete named fallback. The adapters discover the additive symbols at
+runtime, so an older provider remains usable and reports named fallback.
+
+Debian builds request a versioned, public SDK capability. The development package that provides the interface declares the capability for its renderer ABI. The build verifies the version-2 target structure and declarations against the installed headers. An older runtime still uses the existing named-target path when the optional mapping symbol is unavailable. Private binary revisions and inventories stay on the build host.
+
+Raw xy currently applies to neutral creative-colour fields in CM4. Creative
+colour trims, unsupported models and invalid raw coordinates retain the full
+named mapping. Diagnostics distinguish these choices. This does not establish
+arbitrary-xy creative-gamut weighting or optical accuracy.
+
+The coordinated release contains mpv `+rogdv5.1`, FFmpeg `+rogdv4.2` on amd64 and i386, the GTK mapping core `+rogdv3.1`, GTK `+rogdv4`, and the GTK sink and Showtime `+rogdv4.1`. The build resolves its SDK through public interface version 2. FFmpeg derives exact sibling-library dependencies from its source version. A normal mpv process also played the chart using the older runtime's named-target fallback. [Normal source replay and SDK compatibility](../evidence/sdk-api-v2-normal-products.json).
+
+Offline APT on the ROG accepted all 45 changes with zero removals. The inverse transaction restores all 36 previously installed versions and removes the nine additions. All 81 archives passed hash verification on the laptop. The original rollback also exists on a separate private drive. A preference covering five Mutter packages selects the staged compositor under normal APT policy. The running desktop still uses the earlier release. [Package rehearsal](../evidence/panel-desktop-release-bundle.json) · [GTK sink and Showtime source replay](../evidence/panel-showtime-release-packages.json).

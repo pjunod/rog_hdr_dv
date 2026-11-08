@@ -1,0 +1,152 @@
+From 929a435d55712e5662bfe0bd5b3ecad21ab7f65e Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 04:14:33 -0500
+Subject: [PATCH 10/12] fix(media): tolerate an absent optional mapping SDK
+
+---
+ gtk/media/gtkgstdoviview.c | 66 +++++++++++++++++++++++++++++++++-----
+ gtk/media/meson.build      |  2 +-
+ 2 files changed, 59 insertions(+), 9 deletions(-)
+
+diff --git a/gtk/media/gtkgstdoviview.c b/gtk/media/gtkgstdoviview.c
+index be59a63..f1a6a92 100644
+--- a/gtk/media/gtkgstdoviview.c
++++ b/gtk/media/gtkgstdoviview.c
+@@ -9,6 +9,56 @@
+ #include <gst/video/video.h>
+ #include "gdk/gdkmemoryformatprivate.h"
+ #include <mapper.h>
++#include <gmodule.h>
++
++
++typedef struct
++{
++  guint (*abi) (void);
++  void (*debug_init) (void);
++  GstGtkDoviMapper *(*mapper_new) (void);
++  void (*mapper_free) (GstGtkDoviMapper *);
++  GstGtkDoviNativeFrame *(*frame_from_buffer) (GstBuffer *, guint64 *);
++  void (*frame_unref) (GstGtkDoviNativeFrame *);
++  int (*frame_render) (GstGtkDoviNativeFrame *, GstGtkDoviMapper *,
++                       GstContext *, GstBuffer **, GstVideoInfo *, GError **);
++} DoviCore;
++
++static const DoviCore *
++dovi_core (void)
++{
++  static gsize initialized;
++  static DoviCore api;
++  static gboolean available;
++
++  if (g_once_init_enter (&initialized))
++    {
++      GModule *module = g_module_open ("libgstgtkdovicore.so.0",
++                                       G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL);
++      gboolean valid = module != NULL;
++#define RESOLVE(member, symbol) \
++      valid = valid && g_module_symbol (module, symbol, (gpointer *) &api.member)
++      RESOLVE (abi, "gst_gtk_dovi_core_abi");
++      RESOLVE (debug_init, "gst_gtk_dovi_debug_init");
++      RESOLVE (mapper_new, "gst_gtk_dovi_mapper_new");
++      RESOLVE (mapper_free, "gst_gtk_dovi_mapper_free");
++      RESOLVE (frame_from_buffer, "gst_gtk_dovi_native_frame_from_buffer");
++      RESOLVE (frame_unref, "gst_gtk_dovi_native_frame_unref");
++      RESOLVE (frame_render, "gst_gtk_dovi_native_frame_render");
++#undef RESOLVE
++      valid = valid && api.abi () == GST_GTK_DOVI_CORE_ABI;
++      if (valid)
++        {
++          g_module_make_resident (module);
++          available = TRUE;
++        }
++      else if (module)
++        g_module_close (module);
++      g_once_init_leave (&initialized, 1);
++    }
++
++  return available ? &api : NULL;
++}
+ 
+ struct _GtkGstDoviFrame
+ {
+@@ -30,7 +80,7 @@ gtk_gst_dovi_frame_unref (GtkGstDoviFrame *frame)
+   if (frame && g_atomic_ref_count_dec (&frame->refs))
+     {
+       if (frame->native)
+-        gst_gtk_dovi_native_frame_unref (frame->native);
++        dovi_core ()->frame_unref (frame->native);
+       g_free (frame);
+     }
+ }
+@@ -43,7 +93,7 @@ gtk_gst_dovi_tag_texture (GdkTexture *texture,
+ {
+   GtkGstDoviFrame *frame = g_new0 (GtkGstDoviFrame, 1);
+   g_atomic_ref_count_init (&frame->refs);
+-  frame->native = gst_gtk_dovi_native_frame_from_buffer (buffer, NULL);
++  frame->native = dovi_core () ? dovi_core ()->frame_from_buffer (buffer, NULL) : NULL;
+   frame->stream_epoch = stream_epoch;
+   frame->caps_epoch = caps_epoch;
+   g_object_set_qdata_full (G_OBJECT (texture), frame_quark (), frame,
+@@ -97,7 +147,7 @@ gtk_gst_paintable_frame_unref (GtkGstPaintableFrame *frame)
+ GstElement *
+ gtk_gst_dovi_create_filter (void)
+ {
+-  if (gst_gtk_dovi_core_abi () != GST_GTK_DOVI_CORE_ABI)
++  if (dovi_core () == NULL)
+     return NULL;
+   /* Capture original input before playsink conversion. No display context is
+    * installed on the shared producer: each realized view maps its own frame. */
+@@ -158,7 +208,7 @@ view_mapper_unref (ViewMapper *mapper)
+ {
+   if (mapper && g_atomic_ref_count_dec (&mapper->refs))
+     {
+-      gst_gtk_dovi_mapper_free (mapper->mapper);
++      dovi_core ()->mapper_free (mapper->mapper);
+       g_mutex_clear (&mapper->lock);
+       g_free (mapper);
+     }
+@@ -301,7 +351,7 @@ render_thread (GTask        *task,
+   (void) source;
+   (void) cancellable;
+   g_mutex_lock (&job->mapper->lock);
+-  result->result = gst_gtk_dovi_native_frame_render (job->frame->native->native,
++  result->result = dovi_core ()->frame_render (job->frame->native->native,
+                                                      job->mapper->mapper,
+                                                      job->context, &result->buffer,
+                                                      &result->info, &result->error);
+@@ -447,8 +497,8 @@ start_render (GtkGstDoviView      *self,
+       self->mapper = g_new0 (ViewMapper, 1);
+       g_atomic_ref_count_init (&self->mapper->refs);
+       g_mutex_init (&self->mapper->lock);
+-      gst_gtk_dovi_debug_init ();
+-      self->mapper->mapper = gst_gtk_dovi_mapper_new ();
++      dovi_core ()->debug_init ();
++      self->mapper->mapper = dovi_core ()->mapper_new ();
+     }
+   if (self->mapper->mapper == NULL)
+     {
+@@ -652,7 +702,7 @@ gtk_gst_dovi_view_new (GtkMediaStream *source)
+ {
+   GtkGstPaintable *producer = gtk_gst_media_file_get_paintable (source);
+   GtkGstDoviView *self;
+-  if (producer == NULL)
++  if (producer == NULL || dovi_core () == NULL)
+     return NULL;
+   self = g_object_new (gtk_gst_dovi_view_get_type (), NULL);
+   self->source = g_object_ref (source);
+diff --git a/gtk/media/meson.build b/gtk/media/meson.build
+index 8e19e84..1c5f81c 100644
+--- a/gtk/media/meson.build
++++ b/gtk/media/meson.build
+@@ -7,7 +7,7 @@ if gstplay_dep.found() and gstgl_dep.found() and gstallocators_dep.found()
+   dovi_core_dep = dependency('gst-gtk-dovi-core', version: '>=1', required: false)
+   if dovi_core_dep.found() and get_option('wayland-backend')
+     cdata.set('HAVE_GST_GTK_DOVI_CORE', 1)
+-    media_deps += dovi_core_dep
++    media_deps += dovi_core_dep.partial_dependency(compile_args: true, includes: true)
+     media_sources += files('gtkgstdoviview.c')
+   endif
+   media_backends += 'gstreamer'
+-- 
+2.54.0 (Apple Git-157)
+

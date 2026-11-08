@@ -8,7 +8,7 @@ contains the unresolved design decisions and acceptance work.
  Application / media player
    source encoding, decoded pixels, frame metadata
                  |
-   Shared colour / full DV processing path (DV work pending)
+   Shared renderer: reconstruct picture and apply its RPU to the display target
                  |
    Wayland descriptions and compositor transforms
                  |
@@ -44,13 +44,8 @@ luminance and small-window peak are different quantities.
 3. **Each colour transform needs one owner.** Application ICC conversion,
    Dolby display management, composition and display calibration must agree
    on the encoding passed between them to avoid duplicate mapping.
-4. **Full Dolby Vision remains an explicit missing component.** The OEM
-   Windows plugin and profile are investigation inputs, not a working Linux
-   implementation. Host-side display management and TV-led HDMI transport
-   require different integration proofs.
-5. **Applications consume the platform capability.** Plurx negotiation and
-   player integration remain in Plurx; the shared display solution belongs
-   here and must be exercised by more than one application.
+4. **The media renderer owns host-side Dolby grading.** System mpv and FFmpeg use the shared provider. The staged GtkVideo and Showtime packages pass the retained native picture and the target for the view showing it. On a target change the renderer can grade that same paused picture again. The compositor receives pixels tagged with their output encoding. [Client and target contracts](SYSTEM_DOLBY_VISION.md).
+5. **Profile coverage belongs to each decoder and renderer pair.** The staged mpv 0.42 path composes the full Profile 7 enhancement layer before display management. The GTK playback controls exercise Profile 5. Recognizing a Profile 7 track in a demuxer establishes its configuration only. [Profile 7 reconstruction](SYSTEM_DOLBY_VISION.md#physical-trim-selection-and-the-staged-dual-layer-player) · [Matroska controls](../evidence/gstreamer-matroska-track-config-20261108.json).
 
 ## Characterisation and target mapping are separate contracts
 
