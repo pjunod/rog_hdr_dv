@@ -759,14 +759,17 @@
       "component": "ubuntu-gtk4-display-target",
       "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
       "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
-      "candidate_commit": "83825444020b06e3360e5f5bbc89eede8bcbeadd",
-      "candidate_tree": "ea44ab883374ff1bd9263aec3389aafbabb9e260",
-      "patch_count": 4,
+      "candidate_commit": "4157e3268bda91bde231545033fc08954b7e5e77",
+      "candidate_tree": "770b82e3cb6b16cb120a07570ca223ee1c03b2ec",
+      "patch_count": 7,
       "patch_order": [
         "0001-wayland-expose-preferred-color-target-snapshots.patch",
         "0002-debian-stage-preferred-target-snapshots.patch",
         "0003-wayland-track-native-HDR-presentation-per-surface.patch",
-        "0004-debian-ship-the-HDR-rendering-lease-and-SDK.patch"
+        "0004-debian-ship-the-HDR-rendering-lease-and-SDK.patch",
+        "0005-gdk-query-the-bound-read-framebuffer-format.patch",
+        "0006-debian-version-the-GLES-readback-correction.patch",
+        "0007-debian-omit-unshipped-suites-for-noinsttest.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -799,8 +802,8 @@
           "include_ignored": true
         }
       },
-      "candidate_status": "The native EGL path submitted ten-bit PQ, retained the reported state only for the current surface and render context, and restored SDR on Cairo fallback. Distro and ordinary-player qualification are separate.",
-      "candidate_package_version": "4.24.1+ds-1+rogdv1"
+      "candidate_status": "GTK submitted 10-bit EGL and floating-point Vulkan PQ surfaces. A source correction for OpenGL ES readback is staged; packaged end-to-end player qualification is in progress.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv3"
     },
     {
       "component": "libplacebo-fel-system-dv",

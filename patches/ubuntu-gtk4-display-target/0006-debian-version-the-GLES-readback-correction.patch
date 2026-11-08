@@ -1,0 +1,64 @@
+From cccb4bcae33764f814891401b44998baec78f92f Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 00:49:18 -0500
+Subject: [PATCH] build(debian): version GLES readback correction as rogdv3
+
+---
+ debian/changelog                         |  7 +++++++
+ debian/patches/gles-readback-query.patch | 22 ++++++++++++++++++++++
+ debian/patches/series                    |  1 +
+ 3 files changed, 30 insertions(+)
+ create mode 100644 debian/patches/gles-readback-query.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index 9e39409..4f42fb1 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gtk4 (4.24.1+ds-1+rogdv3) stonking; urgency=medium
++
++  * Query the supported GLES framebuffer readback format and type.
++  * Preserve normalized 16-bit GL textures through Vulkan upload fallback.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 06:00:00 +0000
++
+ gtk4 (4.24.1+ds-1+rogdv2) stonking; urgency=medium
+ 
+   * Add surface-owned, independently released HDR rendering leases.
+diff --git a/debian/patches/gles-readback-query.patch b/debian/patches/gles-readback-query.patch
+new file mode 100644
+index 0000000..71f21da
+--- /dev/null
++++ b/debian/patches/gles-readback-query.patch
+@@ -0,0 +1,22 @@
++diff --git a/gdk/gdkglcontext.c b/gdk/gdkglcontext.c
++index c7874ba..45b27a4 100644
++--- a/gdk/gdkglcontext.c
+++++ b/gdk/gdkglcontext.c
++@@ -2639,11 +2639,14 @@ gdk_gl_context_download (GdkGLContext          *self,
++       glGenFramebuffers (1, &fbo);
++       glBindFramebuffer (GL_FRAMEBUFFER, fbo);
++       glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_id, 0);
++-      if (gdk_gl_context_check_version (self, "4.3", "3.1"))
+++      if (gdk_gl_context_check_version (self, "4.5", "3.1"))
++         {
++           GLint read_format, read_type;
++-          glGetFramebufferParameteriv (GL_FRAMEBUFFER, GL_IMPLEMENTATION_COLOR_READ_FORMAT, &read_format);
++-          glGetFramebufferParameteriv (GL_FRAMEBUFFER, GL_IMPLEMENTATION_COLOR_READ_TYPE, &read_type);
+++
+++          /* Query the bound read framebuffer. These are not framebuffer
+++           * parameters in GLES, even when GetFramebufferParameteriv exists. */
+++          glGetIntegerv (GL_IMPLEMENTATION_COLOR_READ_FORMAT, &read_format);
+++          glGetIntegerv (GL_IMPLEMENTATION_COLOR_READ_TYPE, &read_type);
++           if (gdk_gl_context_find_format (self, gdk_memory_format_alpha (tex_format), read_format, read_type, &actual_format))
++             {
++               gl_read_format = read_format;
+diff --git a/debian/patches/series b/debian/patches/series
+index c344ca5..56c1149 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -16,3 +16,4 @@ x11-scale/gdk-x11-update-cursor-size-on-the-extent-after-scale-chan.patch
+ testsuite-Don-t-build-waylandsocket-test-if-Wayland-is-di.patch
+ wayland-preferred-color-target.patch
+ wayland-hdr-rendering-lease.patch
++gles-readback-query.patch

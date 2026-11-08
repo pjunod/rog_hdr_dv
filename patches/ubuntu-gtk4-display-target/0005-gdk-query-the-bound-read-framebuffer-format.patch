@@ -1,0 +1,31 @@
+From f27138d61b5f91d83de3d3cc1d7f99fee4de877b Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 00:48:34 -0500
+Subject: [PATCH] fix(gdk): query supported GLES readback format
+
+---
+ gdk/gdkglcontext.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/gdk/gdkglcontext.c b/gdk/gdkglcontext.c
+index c7874ba..45b27a4 100644
+--- a/gdk/gdkglcontext.c
++++ b/gdk/gdkglcontext.c
+@@ -2639,11 +2639,14 @@ gdk_gl_context_download (GdkGLContext          *self,
+       glGenFramebuffers (1, &fbo);
+       glBindFramebuffer (GL_FRAMEBUFFER, fbo);
+       glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex_id, 0);
+-      if (gdk_gl_context_check_version (self, "4.3", "3.1"))
++      if (gdk_gl_context_check_version (self, "4.5", "3.1"))
+         {
+           GLint read_format, read_type;
+-          glGetFramebufferParameteriv (GL_FRAMEBUFFER, GL_IMPLEMENTATION_COLOR_READ_FORMAT, &read_format);
+-          glGetFramebufferParameteriv (GL_FRAMEBUFFER, GL_IMPLEMENTATION_COLOR_READ_TYPE, &read_type);
++
++          /* Query the bound read framebuffer. These are not framebuffer
++           * parameters in GLES, even when GetFramebufferParameteriv exists. */
++          glGetIntegerv (GL_IMPLEMENTATION_COLOR_READ_FORMAT, &read_format);
++          glGetIntegerv (GL_IMPLEMENTATION_COLOR_READ_TYPE, &read_type);
+           if (gdk_gl_context_find_format (self, gdk_memory_format_alpha (tex_format), read_format, read_type, &actual_format))
+             {
+               gl_read_format = read_format;

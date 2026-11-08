@@ -183,6 +183,10 @@ alone does not prove any GStreamer mapper or standard player integration.
 
 The new per-surface request also passed through Python introspection with GTK's default Vulkan renderer. The submitted client image used a floating-point RGB framebuffer and BT.2020/PQ, with reference white at 203 cd/m². The reported physical display peak and reference white changed from 616/142 to 308/71 cd/m² in the fixture. In a separate EGL readback the largest absolute error across four uniform test patches was 0.59 of a 10-bit code value. Those samples exercised 203 cd/m² SDR white, half white, 400 cd/m² HDR and their 301.5 cd/m² linear-light mix. Both checks used a private compositor on the ROG.
 
+## OpenGL ES video texture readback
+
+On the ROG, a one-pixel opaque 400 cd/m² PQ source in a normalized 16-bit OpenGL ES texture reproduced the GNOME player’s black video with the default Vulkan renderer. The SDR UI stayed visible. The NVIDIA driver declined EGL image export, so GTK had to read the bound framebuffer. Its framebuffer-parameter query raised `GL_INVALID_ENUM` and its texture downloader returned transparent black. Querying the preferred read format and type with `glGetIntegerv` returned RGBA and unsigned short. A direct read recovered all four stored words (42767, 42767, 42767, 65535). The source correction is in GTK `+rogdv3`. A complete rendered-player check is pending. [OpenGL ES 3.1 framebuffer-dependent state](https://registry.khronos.org/OpenGL/specs/es/3.1/es_spec_3.1.pdf).
+
 ## Package staging and recovery
 
 The host currently has GTK source version `4.24.1+ds-1`: amd64
