@@ -1,0 +1,87 @@
+{
+  "mesa": "26.2.4-1ubuntu1",
+  "candidate_source": "37efe938d1bf72ff3e5f1f27ac9bb067c4032876",
+  "entry": "mpv 0.42 +rogdv4, native 4K FEL, Intel Arc Vulkan + VA-API, hardware-backed private Weston",
+  "wayland_presentation_clock": "CLOCK_MONOTONIC_RAW",
+  "sampled_clock_offset_ms": 4104.64,
+  "installed_driver": {
+    "name": "+rogwsi1",
+    "six_frame_interval": {
+      "media_advance_s": 0.209,
+      "elapsed_after_restart_s": 4.192304
+    },
+    "wire_deadline_delta_ms": {
+      "samples": 6,
+      "minimum": 4124.289,
+      "median": 4124.336,
+      "maximum": 4157.622
+    }
+  },
+  "corrected_driver": {
+    "name": "+rogwsi2 source, loaded via private ICD and verified in process maps",
+    "wire_deadline_delta_ms": {
+      "samples": 61,
+      "minimum": 16.167,
+      "median": 16.167,
+      "maximum": 32.833
+    },
+    "full_media_duration_s": 2.999,
+    "elapsed_from_first_to_last_position_sample_s": 3.54947,
+    "elapsed_after_restart_s": 2.872511,
+    "decoder_drops": 0,
+    "output_drops": 8,
+    "eof": true
+  },
+  "definition": "The wire delta is wp_commit_timer_v1.set_timestamp minus the most recent wp_presentation_feedback.presented timestamp observed by the client. The run did not install a driver on the host.",
+  "explicit_timing_control": {
+    "driver": "+rogwsi2 private Intel ICD",
+    "display": "dedicated hardware-backed Wayland compositor, fixed 60 Hz",
+    "client": "Ubuntu Vulkan Tools 1.4.341.0 C cube with a fixed request schedule and completion logging",
+    "extension": "VK_GOOGLE_display_timing, enabled for this process via the Mesa Wayland opt-in",
+    "schedule": "72 FIFO frames, requested time CLOCK_MONOTONIC + 20 ms except for IDs congruent to 4 modulo 8, which request 0",
+    "reported_completions": 69,
+    "reported_absolute_requests": 60,
+    "reported_zero_requests": 9,
+    "client_minus_actual_ms": {
+      "minimum": 10.307,
+      "median": 10.723,
+      "maximum": 11.106
+    },
+    "sampled_monotonic_minus_monotonic_raw_ms": 4115.506,
+    "elapsed_s": 1.27,
+    "scope": "The final three submitted frames were outside the polling interval. Completion time is compared to the client clock at query; this measures the reporting time domain, not physical presentation latency."
+  },
+  "normal_amd64_package": {
+    "package": "mesa-vulkan-drivers 26.2.4-1ubuntu1+rogwsi2 amd64",
+    "selection": "Intel ICD from the extracted distribution package, verified in mpv process maps; VA-API decode, private Intel GPU compositor, concurrent builds.",
+    "input": "2.999 s 4K 24 fps Profile 7 FEL; both layers composed for the 616 cd/m\u00b2 target.",
+    "media_interval_s": [
+      0.25,
+      2.5
+    ],
+    "wall_time_for_interval_s": 2.256676,
+    "elapsed_restart_to_unload_s": 2.943565,
+    "decoder_drops": 0,
+    "output_drops": 17,
+    "delayed_frames": 0,
+    "swapchain_errors": 0,
+    "eof": true
+  },
+  "distribution_architectures": {
+    "source_commit": "37efe938d1bf72ff3e5f1f27ac9bb067c4032876",
+    "amd64": {
+      "normal_packages": 15,
+      "ELF_payloads_compared": 26,
+      "Vulkan_drivers_with_identical_text_to_qualified_build": 9
+    },
+    "i386": {
+      "normal_packages": 14,
+      "ELF32_payloads_compared": 23,
+      "Vulkan_drivers_with_identical_text_to_qualified_build": 7,
+      "build": "One build job with LTO disabled in the 6 GiB isolated 32-bit compiler. No memory-limit or OOM events."
+    },
+    "exported_symbols_removed": 0,
+    "multiarch_common_files_identical": 26,
+    "recovery": "Independent offline APT accepted upgrade of both Vulkan driver architectures and restoration of both previously installed driver packages. The complete desktop bundle was simulated separately."
+  }
+}

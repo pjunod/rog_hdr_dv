@@ -1,0 +1,310 @@
+From 855b0d18f6f9e3a692356db4721f1bf7ccb9a0e7 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 08:00:00 +0000
+Subject: [PATCH] loupe: preserve ICC colour in the normal Ubuntu image path
+
+---
+ Cargo.lock                                    |   2 -
+ Cargo.toml                                    |   3 +
+ debian/changelog                              |   6 +
+ .../glycin/.cargo-checksum.json               |   2 +-
+ debian/missing-sources/glycin/src/dbus.rs     |  48 ++------
+ debian/missing-sources/glycin/src/icc.rs      | 115 ++++++++++--------
+ ...preserve-icc-gamut-in-floating-point.patch |  20 +++
+ debian/patches/series                         |   1 +
+ 8 files changed, 104 insertions(+), 93 deletions(-)
+ create mode 100644 debian/patches/preserve-icc-gamut-in-floating-point.patch
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 89751c2..c42f9bb 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -860,8 +860,6 @@ dependencies = [
+ [[package]]
+ name = "glycin"
+ version = "3.1.0"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "923674c1f2b1a28f69ebdc0f572672e63874e17ce0e60c96b8bfaff47a8ef4e9"
+ dependencies = [
+  "async-fs",
+  "async-global-executor",
+diff --git a/Cargo.toml b/Cargo.toml
+index 7c2cc69..27f3c8e 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -50,3 +50,6 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features =
+     "smallvec",
+     "std",
+ ] }
++
++[patch.crates-io]
++glycin = { path = "debian/missing-sources/glycin" }
+diff --git a/debian/changelog b/debian/changelog
+index 5fb79e0..c582c0d 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,9 @@
++loupe (50.0-0ubuntu2+rogcolor1) stonking; urgency=medium
++
++  * Preserve embedded ICC gamut in floating-point GTK textures.
++
++ -- ROG HDR contributors <maintainers@invalid.example>  Sun, 08 Nov 2026 07:40:00 +0000
++
+ loupe (50.0-0ubuntu2) resolute; urgency=medium
+ 
+   * d/source/options: Set reduced list of tar-ignore, fix FTBFS.
+diff --git a/debian/missing-sources/glycin/.cargo-checksum.json b/debian/missing-sources/glycin/.cargo-checksum.json
+index bc278a1..22d1892 100644
+--- a/debian/missing-sources/glycin/.cargo-checksum.json
++++ b/debian/missing-sources/glycin/.cargo-checksum.json
+@@ -1 +1 @@
+-{"files":{".cargo_vcs_info.json":"1581dc560b6233074e8e8758ceb0b8e5e6ecfa3688feae74f553e61d3e2c00a9","Cargo.lock":"ba1a5b616656fc0a78bc3f701ff461c6c04def8a904d03a166fc88c1f3b2f404","Cargo.toml":"ed232ed560406e98876b202c0f3729c735ac7609ac7b582e955fbdd6cdbcb90f","Cargo.toml.orig":"91bb5baf6c20e5ef023d16e149e6daa7fa7b5847f808999ea6344786b5bb7536","LICENSE":"3afb0531be0b931d8f3ce912a71a7093396fa095c8329f5460a6e85d320b1cf9","LICENSE-LGPL-2.1":"386cfa46dae08ff4a5d8c8c1ad37487aa49f6815147d0350561f313aa0ac4a7a","LICENSE-MPL-2.0":"3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04","README.md":"8f6c5cf1b8178c63fb40e9c96c54c3371d899d6705d4a912eec209570c7906e6","src/api_common.rs":"822cec90c2152141cbbd905635429de0d95f83a030c1e56ac58ebfdacfdba1fb","src/api_creator.rs":"f23c6716865a4cbb9f537213dad0bc69189baa1495dc1033604e1c346801dbed","src/api_editor.rs":"c031b2cd2cb7624e3d5e21dba78df1a65e7dff96eff7915fdc78592968ed4ee3","src/api_loader.rs":"c2f285991c8432054c3894e19ff5f13a29857ef02b950ba6062e96d92a8e3fde","src/config.rs":"04b68a0c222dc447b3b980693cd0b5542808f8bc83051cfa53f8d0618bc849c5","src/dbus.rs":"cf4b6617a6abaee8f9b0a58559b0911738a7f3f0dec3b1f96eaadb10cf9df5d0","src/error.rs":"21d558a4b703e22af0e585259b0ae299afdddc07acde03ef91c3aa43d39bfc1e","src/fontconfig.rs":"075b9168aac1aed31d7b3a14f51c64db2b820064c417a7b1839fb4c9329cded4","src/gobject.rs":"d9cd200ad04bc64ad9c33d3b1581de5541e2ab0b0fc4693f55b56b8fbfd8a76a","src/gobject/creator.rs":"32faf14b3fccf61606398210aa76ef6c4806ed2ddc833b4b1bbadf196a536102","src/gobject/encoded_image.rs":"8b2c945a487fa9c2a81a873a3c2f95fd19b943ba0e12ce9c29fc99cdfa7c3bee","src/gobject/frame.rs":"be224209489e4dcf87b303db4f9d4be9d4053ba980c619e756343f5a4eb1b109","src/gobject/frame_request.rs":"432c76696ae02668353bb62df2b4e1bc9a70c616e6f52ab398c7d3e10e1a29f1","src/gobject/image.rs":"a7b07cfc63ee60c973f776aad4f98f1eb494c930d9dd5f12b79c8d87eb2f9b9f","src/gobject/loader.rs":"9c980b371b074453cc7fc78faa5c78e59ee0cddcbd2f59d9a48098689fa0f4ed","src/gobject/new_frame.rs":"99aaf89493c75b0037ffb5aeafe850a722b1f3021f71ac53b0347d15eb9a786f","src/icc.rs":"37ee5c6c36b2660ed484eed3153e760846ae58be39e7680a93827c92034ece39","src/lib.rs":"1e693b1c4aa0a2e0ffd3de4070d16aa3a09eba3995e9e35f44a870b2758c1cbe","src/orientation.rs":"150707ada686677f446bb02f7d6309ddf90a671a20ba2a00bab64c553971b3aa","src/pool.rs":"f5f9604244242cf9d3df7c021ec5e27b71b3e4aaf76356e4662c490bf3ac746a","src/sandbox.rs":"3a67bccccf76029d006e645c4f2ed29a7f1a301458d8fcfefa2ffedc6098bb62","src/util.rs":"b409a15e61a41992b2f63c7b04e6f6a13e926d724d258d2ce30e7539ce9ceb43"},"package":"923674c1f2b1a28f69ebdc0f572672e63874e17ce0e60c96b8bfaff47a8ef4e9"}
+\ No newline at end of file
++{"files":{".cargo_vcs_info.json":"1581dc560b6233074e8e8758ceb0b8e5e6ecfa3688feae74f553e61d3e2c00a9","Cargo.lock":"ba1a5b616656fc0a78bc3f701ff461c6c04def8a904d03a166fc88c1f3b2f404","Cargo.toml":"ed232ed560406e98876b202c0f3729c735ac7609ac7b582e955fbdd6cdbcb90f","Cargo.toml.orig":"91bb5baf6c20e5ef023d16e149e6daa7fa7b5847f808999ea6344786b5bb7536","LICENSE":"3afb0531be0b931d8f3ce912a71a7093396fa095c8329f5460a6e85d320b1cf9","LICENSE-LGPL-2.1":"386cfa46dae08ff4a5d8c8c1ad37487aa49f6815147d0350561f313aa0ac4a7a","LICENSE-MPL-2.0":"3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04","README.md":"8f6c5cf1b8178c63fb40e9c96c54c3371d899d6705d4a912eec209570c7906e6","src/api_common.rs":"822cec90c2152141cbbd905635429de0d95f83a030c1e56ac58ebfdacfdba1fb","src/api_creator.rs":"f23c6716865a4cbb9f537213dad0bc69189baa1495dc1033604e1c346801dbed","src/api_editor.rs":"c031b2cd2cb7624e3d5e21dba78df1a65e7dff96eff7915fdc78592968ed4ee3","src/api_loader.rs":"c2f285991c8432054c3894e19ff5f13a29857ef02b950ba6062e96d92a8e3fde","src/config.rs":"04b68a0c222dc447b3b980693cd0b5542808f8bc83051cfa53f8d0618bc849c5","src/dbus.rs":"a085588cd6eb848a713740765934bb70d9f0e68c99a66a45180030c0ce04d302","src/error.rs":"21d558a4b703e22af0e585259b0ae299afdddc07acde03ef91c3aa43d39bfc1e","src/fontconfig.rs":"075b9168aac1aed31d7b3a14f51c64db2b820064c417a7b1839fb4c9329cded4","src/gobject.rs":"d9cd200ad04bc64ad9c33d3b1581de5541e2ab0b0fc4693f55b56b8fbfd8a76a","src/gobject/creator.rs":"32faf14b3fccf61606398210aa76ef6c4806ed2ddc833b4b1bbadf196a536102","src/gobject/encoded_image.rs":"8b2c945a487fa9c2a81a873a3c2f95fd19b943ba0e12ce9c29fc99cdfa7c3bee","src/gobject/frame.rs":"be224209489e4dcf87b303db4f9d4be9d4053ba980c619e756343f5a4eb1b109","src/gobject/frame_request.rs":"432c76696ae02668353bb62df2b4e1bc9a70c616e6f52ab398c7d3e10e1a29f1","src/gobject/image.rs":"a7b07cfc63ee60c973f776aad4f98f1eb494c930d9dd5f12b79c8d87eb2f9b9f","src/gobject/loader.rs":"9c980b371b074453cc7fc78faa5c78e59ee0cddcbd2f59d9a48098689fa0f4ed","src/gobject/new_frame.rs":"99aaf89493c75b0037ffb5aeafe850a722b1f3021f71ac53b0347d15eb9a786f","src/icc.rs":"2eec44af90ce5797af453656eecd24f0f42006a12fa019e370a2041395e823cd","src/lib.rs":"1e693b1c4aa0a2e0ffd3de4070d16aa3a09eba3995e9e35f44a870b2758c1cbe","src/orientation.rs":"150707ada686677f446bb02f7d6309ddf90a671a20ba2a00bab64c553971b3aa","src/pool.rs":"f5f9604244242cf9d3df7c021ec5e27b71b3e4aaf76356e4662c490bf3ac746a","src/sandbox.rs":"3a67bccccf76029d006e645c4f2ed29a7f1a301458d8fcfefa2ffedc6098bb62","src/util.rs":"b409a15e61a41992b2f63c7b04e6f6a13e926d724d258d2ce30e7539ce9ceb43"},"package":"923674c1f2b1a28f69ebdc0f572672e63874e17ce0e60c96b8bfaff47a8ef4e9"}
+\ No newline at end of file
+diff --git a/debian/missing-sources/glycin/src/dbus.rs b/debian/missing-sources/glycin/src/dbus.rs
+index 09a126d..9e7a50c 100644
+--- a/debian/missing-sources/glycin/src/dbus.rs
++++ b/debian/missing-sources/glycin/src/dbus.rs
+@@ -23,7 +23,6 @@ use glycin_utils::{
+     SparseEditorOutput,
+ };
+ use gufo_common::cicp::Cicp;
+-use gufo_common::math::ToI64;
+ use nix::sys::signal;
+ use zbus::zvariant::{self, OwnedObjectPath};
+ 
+@@ -358,26 +357,23 @@ impl RemoteProcess<LoaderProxy<'static>> {
+         } else if let Some(Ok(icc_profile)) =
+             frame.details.color_icc_profile.as_ref().map(|x| x.get())
+         {
+-            // Align stride with pixel size if necessary
+-            let mut img_buf = remove_stride_if_needed(img_buf, &mut frame)?;
+-
+-            let memory_format = frame.memory_format;
+-            let (icc_mmap, icc_result) = spawn_blocking(move || {
+-                let result = icc::apply_transformation(&icc_profile, memory_format, &mut img_buf);
+-                (img_buf, result)
++            let (returned_frame, converted) = spawn_blocking(move || {
++                let result = icc::apply_transformation(&icc_profile, &mut frame, &img_buf);
++                (frame, result.map_err(|err| (err, img_buf)))
+             })
+             .await;
+-
+-            match icc_result {
+-                Err(err) => {
+-                    tracing::warn!("Failed to apply ICC profile: {err}");
++            frame = returned_frame;
++            match converted {
++                Ok((pixels, state)) => {
++                    color_state = state;
++                    pixels
+                 }
+-                Ok(new_color_state) => {
+-                    color_state = new_color_state;
++                Err((Error::IccProfile(err), pixels)) => {
++                    tracing::warn!("Failed to apply ICC profile: {err}");
++                    pixels
+                 }
++                Err((err, _)) => return Err(err),
+             }
+-
+-            icc_mmap
+         } else {
+             img_buf
+         };
+@@ -719,26 +715,6 @@ unsafe fn gbytes_from_mmap(raw_fd: RawFd) -> Result<glib::Bytes, Error> {
+     }
+ }
+ 
+-fn remove_stride_if_needed(mut img_buf: ImgBuf, frame: &mut Frame) -> Result<ImgBuf, Error> {
+-    if frame.stride.srem(frame.memory_format.n_bytes().u32())? == 0 {
+-        return Ok(img_buf);
+-    }
+-
+-    let width = frame
+-        .width
+-        .try_usize()?
+-        .smul(frame.memory_format.n_bytes().usize())?;
+-    let stride = frame.stride.try_usize()?;
+-    let mut source = vec![0; width];
+-    for row in 1..frame.height.try_usize()? {
+-        source.copy_from_slice(&img_buf[row.smul(stride)?..row.smul(stride)?.sadd(width)?]);
+-        img_buf[row.smul(width)?..row.sadd(1)?.smul(width)?].copy_from_slice(&source);
+-    }
+-    frame.stride = width.try_u32()?;
+-
+-    Ok(img_buf.resize(frame.n_bytes()?.i64()?)?)
+-}
+-
+ #[cfg(not(feature = "tokio"))]
+ fn spawn_stdio_reader(
+     stdio: &mut Option<impl Read + Send + std::os::fd::AsFd + async_io::IoSafe + 'static>,
+diff --git a/debian/missing-sources/glycin/src/icc.rs b/debian/missing-sources/glycin/src/icc.rs
+index 5acd6c8..e956585 100644
+--- a/debian/missing-sources/glycin/src/icc.rs
++++ b/debian/missing-sources/glycin/src/icc.rs
+@@ -1,64 +1,71 @@
+-use glycin_common::{MemoryFormat, MemoryFormatInfo};
++use glycin_common::{ChannelType, MemoryFormat, MemoryFormatInfo};
++use glycin_utils::{Frame, ImgBuf};
++use gufo_common::cicp::Cicp;
+ 
+ use crate::{ColorState, Error};
+ 
+-pub fn apply_transformation(
+-    icc_profile: &[u8],
+-    memory_format: MemoryFormat,
+-    mmap: &mut [u8],
+-) -> Result<ColorState, Error> {
+-    transform(icc_profile, memory_format, mmap).map_err(Into::into)
++fn linear_rec2020() -> Result<lcms2::Profile, lcms2::Error> {
++    let xy = |x, y| lcms2::CIExyY { x, y, Y: 1.0 };
++    let primaries = lcms2::CIExyYTRIPLE {
++        Red: xy(0.708, 0.292),
++        Green: xy(0.170, 0.797),
++        Blue: xy(0.131, 0.046),
++    };
++    let linear = lcms2::ToneCurve::new(1.0);
++    lcms2::Profile::new_rgb(&xy(0.3127, 0.3290), &primaries, &[&linear; 3])
+ }
+ 
+-fn transformation<P: lcms2::Pod>(
+-    icc_profile: &[u8],
+-    memory_format: MemoryFormat,
+-) -> std::result::Result<lcms2::Transform<P, P>, lcms2::Error> {
+-    tracing::debug!("Converting to sRGB via ICC profile");
+-
+-    let icc_pixel_format = lcms_pixel_format(memory_format);
+-    let src_profile = lcms2::Profile::new_icc(icc_profile)?;
+-
+-    let target_profile;
+-
+-    if memory_format.n_channels() > 2 {
+-        target_profile = lcms2::Profile::new_srgb();
+-    } else {
+-        target_profile =
+-            lcms2::Profile::new_gray(lcms2_sys::ffi::CIExyY::d50(), &lcms2::ToneCurve::new(2.2))?;
++/// Convert a validated frame row by row. Commit a new layout only after a
++/// successful transform; an invalid profile leaves the original pixels intact.
++pub fn apply_transformation(
++    profile: &[u8],
++    frame: &mut Frame,
++    pixels: &[u8],
++) -> Result<(ImgBuf, ColorState), Error> {
++    let input = frame.memory_format;
++    let output = match (input.channel_type(), input.has_alpha()) {
++        (ChannelType::U8, false) => MemoryFormat::R16g16b16Float,
++        (ChannelType::U8, true) => MemoryFormat::R16g16b16a16Float,
++        (_, false) => MemoryFormat::R32g32b32Float,
++        (_, true) => MemoryFormat::R32g32b32a32Float,
+     };
+-
+-    lcms2::Transform::new(
+-        &src_profile,
+-        icc_pixel_format,
+-        &target_profile,
+-        icc_pixel_format,
++    let source = lcms2::Profile::new_icc(profile)?;
++    let target = linear_rec2020()?;
++    let transform = lcms2::Transform::<u8, u8>::new_flags(
++        &source,
++        lcms_pixel_format(input),
++        &target,
++        lcms_pixel_format(output),
+         lcms2::Intent::Perceptual,
+-    )
+-}
+-
+-fn transform(
+-    icc_profile: &[u8],
+-    memory_format: MemoryFormat,
+-    buf: &mut [u8],
+-) -> std::result::Result<ColorState, lcms2::Error> {
+-    let multiple = std::thread::available_parallelism().map_or(2, |x| x.get());
+-    tracing::trace!("Applying ICC profiles while using {multiple} threads");
+-
+-    let chunk_size = (buf.len() / memory_format.n_bytes().usize()).div_ceil(multiple)
+-        * memory_format.n_bytes().usize();
+-
+-    std::thread::scope(|s| {
+-        for chunk in buf.chunks_mut(chunk_size) {
+-            s.spawn(move || {
+-                let transform = transformation(icc_profile, memory_format)?;
+-                transform.transform_in_place(chunk);
+-                Ok::<(), lcms2::Error>(())
+-            });
+-        }
+-    });
+-
+-    Ok(ColorState::Srgb)
++        lcms2::Flags::COPY_ALPHA | lcms2::Flags::NO_OPTIMIZE,
++    )?;
++    let stride = frame
++        .width
++        .checked_mul(output.n_bytes().u32())
++        .ok_or(Error::TextureTooLarge)?;
++    let bytes = u64::from(stride) * u64::from(frame.height);
++    if bytes > crate::dbus::MAX_TEXTURE_SIZE {
++        return Err(Error::TextureTooLarge);
++    }
++    let len = usize::try_from(bytes).map_err(|_| Error::TextureTooLarge)?;
++    let mut converted = Vec::new();
++    converted
++        .try_reserve_exact(len)
++        .map_err(|_| Error::TextureTooLarge)?;
++    converted.resize(len, 0);
++    let source_width = frame.width as usize * input.n_bytes().usize();
++    for (src, dst) in pixels
++        .chunks(frame.stride as usize)
++        .zip(converted.chunks_exact_mut(stride as usize))
++    {
++        transform.transform_pixels(&src[..source_width], dst);
++    }
++    frame.stride = stride;
++    frame.memory_format = output;
++    Ok((
++        ImgBuf::Vec(converted),
++        ColorState::Cicp(Cicp::REC2020_LINEAR),
++    ))
+ }
+ 
+ const fn lcms_pixel_format(format: MemoryFormat) -> lcms2::PixelFormat {
+diff --git a/debian/patches/preserve-icc-gamut-in-floating-point.patch b/debian/patches/preserve-icc-gamut-in-floating-point.patch
+new file mode 100644
+index 0000000..3bc5752
+--- /dev/null
++++ b/debian/patches/preserve-icc-gamut-in-floating-point.patch
+@@ -0,0 +1,20 @@
++--- loupe-50.0.orig/Cargo.lock
+++++ loupe-50.0/Cargo.lock
++@@ -860,8 +860,6 @@ dependencies = [
++ [[package]]
++ name = "glycin"
++ version = "3.1.0"
++-source = "registry+https://github.com/rust-lang/crates.io-index"
++-checksum = "923674c1f2b1a28f69ebdc0f572672e63874e17ce0e60c96b8bfaff47a8ef4e9"
++ dependencies = [
++  "async-fs",
++  "async-global-executor",
++--- loupe-50.0.orig/Cargo.toml
+++++ loupe-50.0/Cargo.toml
++@@ -50,3 +50,6 @@ tracing-subscriber = { version = "0.3.18
++     "smallvec",
++     "std",
++ ] }
+++
+++[patch.crates-io]
+++glycin = { path = "debian/missing-sources/glycin" }
+diff --git a/debian/patches/series b/debian/patches/series
+index 0d74ff3..1c4d841 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -2,3 +2,4 @@
+ #patch-meson-build.diff
+ use-vendored-crates.patch
+ Make-background-color-switching-algorithm-more-aggressive.patch
++preserve-icc-gamut-in-floating-point.patch
+-- 
+2.55.0
+

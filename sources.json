@@ -125,11 +125,11 @@
     {
       "component": "ubuntu-mutter",
       "base_commit": "f8b113189f8c67beabf7475adf26f6ebcbf36684",
-      "candidate_commit": "1b22ba5ac5b710152b6f31b1b20bb4d2bebd3d17",
-      "patch_count": 105,
-      "candidate_tree": "08740f943fb2ddda60411fa4d72bb4ccc4238e5f",
-      "previous_candidate_tree": "8de2497c392a7ae16f6257090a451c6b35231471",
-      "previous_candidate_note": "nativehdr8 (patches 0001-0052), merged in PR 10 and installed on lab5 on 2026-10-11; the installed release until nativehdr9 is installed",
+      "candidate_commit": "2912b22f4426a956317a377b1eafd8ab165d500e",
+      "patch_count": 107,
+      "candidate_tree": "1d20b861bc329c8a16623063bad2b4fed33bf4fe",
+      "previous_candidate_tree": "08740f943fb2ddda60411fa4d72bb4ccc4238e5f",
+      "previous_candidate_note": "Ubuntu105 is the desktop series used by the installed nativehdr13 package.",
       "patch_order": [
         "0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch",
         "0002-backends-native-scope-native-capability-veto-to-exte.patch",
@@ -235,7 +235,9 @@
         "0102-debian-prepare-nativehdr10-candidate-with-warnings-a.patch",
         "0103-debian-bind-nativehdr10-exported-symbols-to-precise-.patch",
         "0104-tests-initialize-mastering-peak-sentinel-for-optimiz.patch",
-        "0105-frames-use-the-GTK-interface-color-scheme-property.patch"
+        "0105-frames-use-the-GTK-interface-color-scheme-property.patch",
+        "0106-color-compare-client-mastering-peaks-at-their-wire-precision.patch",
+        "0107-screencast-memory-format.patch"
       ],
       "base_tree": "30242cc54cebe1ec524a6d79473b41be5f07d05b",
       "historical_workspace_subdirectory": "mutter/work",
@@ -269,7 +271,7 @@
       "delivered_candidate_tree": "61bf80d9dea0995f98120f783155eb79029d6be1",
       "delivered_patch_count": 5,
       "delivered_version": "51.0-1ubuntu3+nativehdr2",
-      "candidate_status": "nativehdr10 Ubuntu105: component qualification retained from t_3d4a8bba; main-targeting integration review pending. Eight historical Mutter artifacts retain Ubuntu104 construction identity; see evidence/nativehdr10-ubuntu-qualification.json. Not a new package build or deployment."
+      "candidate_status": "Ubuntu106 adds wire-precision-aware HDR peak comparison. Native headless color-hdr regression passed. Deployment and physical output checks are pending."
     },
     {
       "component": "libdisplay-info",
@@ -515,9 +517,9 @@
       "component": "ubuntu-ffmpeg-system-dv",
       "base_commit": "310aa258610e3acf5cdab4ade2e19e3e1b6438e8",
       "base_tree": "db3ae0877e7860f0c8e57a2500612a45b027e59d",
-      "candidate_commit": "2bb3c3911d082392039609aaacde15a841a19da2",
-      "candidate_tree": "204d20eee83097c17445be395efbbc76b6b60a59",
-      "patch_count": 10,
+      "candidate_commit": "88ae2227cde7594a2d0536fe4ed45ec1f305decc",
+      "candidate_tree": "4b102e50b49e9fec09a5e987461a187caf0c5121",
+      "patch_count": 13,
       "patch_order": [
         "0001-ffmpeg-shared-display-management.patch",
         "0002-backport-dovi-split-bitstream-filter.patch",
@@ -528,7 +530,10 @@
         "0007-bind-strict-RPU-state-to-the-SPS-visible-rectangle.patch",
         "0008-resolve-private-sibling-version-dependencies.patch",
         "0009-reject-reserved-Dolby-compression.patch",
-        "0010-retain-the-compatible-provider-ABI.patch"
+        "0010-retain-the-compatible-provider-ABI.patch",
+        "0011-preserve-video-references-on-Dolby-configuration-change.patch",
+        "0012-identify-the-strict-HEVC-runtime-for-package-consumers.patch",
+        "0013-match-the-development-SDK-to-the-retained-runtime.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -557,7 +562,7 @@
           }
         ]
       },
-      "candidate_status": "Staged amd64 and i386. Offline host upgrade and rollback simulations passed on the final package tuple."
+      "candidate_status": "Both codec architectures built. The eight augmented amd64 runtime and SDK components installed together in the compiler against the retained stock utility libraries."
     },
     {
       "component": "ubuntu-libplacebo-system-dv",
@@ -633,11 +638,12 @@
       "component": "ubuntu-mesa-wayland-hdr",
       "base_commit": "bfe8881b713e285fcc2346eddfa7c89a753a1388",
       "base_tree": "b37f8d78f05b3207d732a824371578325845036c",
-      "candidate_commit": "2705c1c780362ab887e4359b2990d0e67b2e5a3b",
-      "candidate_tree": "f7046d03815f6bcd05a1ccbd818b25e6d591005b",
-      "patch_count": 1,
+      "candidate_commit": "37efe938d1bf72ff3e5f1f27ac9bb067c4032876",
+      "candidate_tree": "3e258097f75d252abd3924d8fe2d08262f7818c7",
+      "patch_count": 2,
       "patch_order": [
-        "0001-wsi-wayland-validate-optional-hdr-content-light.patch"
+        "0001-wsi-wayland-validate-optional-hdr-content-light.patch",
+        "0002-pace-FIFO-in-the-compositor-presentation-clock.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -671,12 +677,14 @@
       "component": "ubuntu-gst-plugins-base-rpu",
       "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
       "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
-      "candidate_commit": "da020e3f4958b1409fadbeed55b36f3ec7588f7d",
-      "candidate_tree": "a7e4ef6b029519668c96c0707bf591e61772a07a",
-      "patch_count": 2,
+      "candidate_commit": "4d7ff5c79950aef458a506395b4fe7b78345a2bd",
+      "candidate_tree": "48967577303944e3b5dc66df978ea33e150de0ff",
+      "patch_count": 4,
       "patch_order": [
         "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
-        "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch"
+        "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch",
+        "0003-package-frame-metadata-and-configuration-interfaces.patch",
+        "0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -705,17 +713,21 @@
           }
         ]
       },
-      "candidate_status": "Raw RPU transport passed native software and Intel VA frame association and transform controls. Staged source; downstream reconstruction and normal player integration pending."
+      "candidate_status": "The normal source and binary packages preserve normalized 16-bit GL color and discard color-sensitive provenance after pixel changes. The four-patch replay matches the distributed source tree.",
+      "candidate_package_version": "1.28.7-1+rogdv2"
     },
     {
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "fa79f6aecf188858f128308053e67450071e0bca",
-      "candidate_tree": "237df5dd6ed2fe9177636cbdbcc0672f8e7c3693",
-      "patch_count": 1,
+      "candidate_commit": "6a95f6a8aee5d1fb1e01b7033bba92d1953a5f7f",
+      "candidate_tree": "d3775948a231a9dada3e51541aee7e97db34167f",
+      "patch_count": 4,
       "patch_order": [
-        "0001-h265parse-attach-original-RPU-from-completed-access-units.patch"
+        "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
+        "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
+        "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
+        "0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -744,18 +756,23 @@
           }
         ]
       },
-      "candidate_status": "Raw RPU transport passed native software and Intel VA frame association and transform controls. Staged source; downstream reconstruction and normal player integration pending."
+      "candidate_status": "The transport and VA resolved-picture code passed native matched-frame, crop and configuration-change controls."
     },
     {
       "component": "ubuntu-gtk4-display-target",
       "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
       "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
-      "candidate_commit": "8ee350d63359b2704318849e8f28a5823075c007",
-      "candidate_tree": "9dabbb97dfa2c68e7667dd7d71051a2407ee0c1b",
-      "patch_count": 2,
+      "candidate_commit": "4157e3268bda91bde231545033fc08954b7e5e77",
+      "candidate_tree": "770b82e3cb6b16cb120a07570ca223ee1c03b2ec",
+      "patch_count": 7,
       "patch_order": [
         "0001-wayland-expose-preferred-color-target-snapshots.patch",
-        "0002-debian-stage-preferred-target-snapshots.patch"
+        "0002-debian-stage-preferred-target-snapshots.patch",
+        "0003-wayland-track-native-HDR-presentation-per-surface.patch",
+        "0004-debian-ship-the-HDR-rendering-lease-and-SDK.patch",
+        "0005-gdk-query-the-bound-read-framebuffer-format.patch",
+        "0006-debian-version-the-GLES-readback-correction.patch",
+        "0007-debian-omit-unshipped-suites-for-noinsttest.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -788,8 +805,8 @@
           "include_ignored": true
         }
       },
-      "candidate_status": "Reviewed source, native GDK discovery and Ubuntu-default package build passed. Six-package offline forward and stock rollback plans passed. No host installation.",
-      "candidate_package_version": "4.24.1+ds-1+rogdv1"
+      "candidate_status": "GTK submitted 10-bit EGL and floating-point Vulkan PQ surfaces. A source correction for OpenGL ES readback is staged; packaged end-to-end player qualification is in progress.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv3"
     },
     {
       "component": "libplacebo-fel-system-dv",
@@ -809,20 +826,21 @@
       "upstream": "https://github.com/mpv-player/mpv.git",
       "base_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
       "base_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
-      "candidate_commit": "b5559002e694d156ada4af4ce3f5acea5d884a3c",
-      "candidate_tree": "04223cd5916a0b6289056a0227715c718ecbbffc",
-      "patch_count": 2,
+      "candidate_commit": "250e7dac0e19baa238a737bcecd4aefa5f1b2fba",
+      "candidate_tree": "5691d477969c8e3fb45d3a43bce973ad7c0fe616",
+      "patch_count": 3,
       "patch_order": [
         "0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
-        "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch"
+        "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch",
+        "0003-retain-displayed-grade-in-tagged-window-captures.patch"
       ]
     },
     {
       "component": "ubuntu-gst-plugins-good-dovi",
       "base_commit": "73d3a23875505394b9cbb0a7eca71050d0eeaaa3",
       "base_tree": "0a06fafebcfba125e6ede43150e685215b307b5b",
-      "candidate_commit": "e56a7fde2e4d413c5461595bfc3a1e004b2db3a1",
-      "candidate_tree": "e35b7299c87330b43b373ae31850b5ee229b6919",
+      "candidate_commit": "5e672e3884cb5a067b8f256c04bbced24c9e78c9",
+      "candidate_tree": "586a19029e147db8fe54a387d57a9431aa259441",
       "source_origin": {
         "kind": "ubuntu-source-package",
         "artifacts": [
@@ -853,9 +871,10 @@
       },
       "patch_order": [
         "0001-carry-Dolby-configuration-per-sample-entry.patch",
-        "0002-use-the-shared-HEVC-configuration-parser.patch"
+        "0002-use-the-shared-HEVC-configuration-parser.patch",
+        "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch"
       ],
-      "patch_count": 2,
+      "patch_count": 3,
       "candidate_status": "The native MP4 demuxer and h265parse preserved exact records on genuine Profile 5 and synthetic 8.1. Missing, malformed and ambiguous records declined. Staged only."
     },
     {
@@ -899,6 +918,132 @@
       ],
       "patch_count": 5,
       "candidate_status": "Private staged 3.3.2-3+rogdv1. One CRC-valid unsupported interpolation record aborted stock libdovi3 and returned a recoverable parser error on the candidate. Exact development package contains functional declarations."
+    },
+    {
+      "component": "ubuntu-gst-libav-dovi-picture",
+      "base_commit": "a0c80a3a10d81e1b008d8b426a6e5543f4c984ab",
+      "base_tree": "873b508a0fc742bde2e046163f2d57c04e3cfa63",
+      "candidate_commit": "0ba924e3719fbbf2940e1b1125262cafd3623892",
+      "candidate_tree": "ac242d745591cfb3bb69c3c3037de878aef224b6",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-bind-strict-Dolby-metadata-to-the-decoded-picture.patch",
+        "0002-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch"
+      ],
+      "prerequisite_components": [],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gst-libav1.0",
+        "version": "1.28.7-1",
+        "source_binding": "Ubuntu gst-libav1.0 1.28.7-1; selected upstream files unchanged by distro patch; Git IDs bind actual owned source snapshots, not an upstream release commit.",
+        "artifacts": [
+          {
+            "file": "gst-libav1.0_1.28.7-1.dsc",
+            "sha256": "049325224ed34c159047cd539cf2a616c8192e072a136be6a218a9a7772dd038",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/universe/g/gst-libav1.0/gst-libav1.0_1.28.7-1.dsc"
+          },
+          {
+            "file": "gst-libav1.0_1.28.7-1.debian.tar.xz",
+            "sha256": "28240db107f47c7abce8578f82d6a21374f0dbd9e38cd70bd8dcd17fcd955d92",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/universe/g/gst-libav1.0/gst-libav1.0_1.28.7-1.debian.tar.xz"
+          },
+          {
+            "file": "gst-libav1.0_1.28.7.orig.tar.xz",
+            "sha256": "58da51dd39ecf1cf6faade34cc6412001be2e2e145bca8ae0f45336f60a36ab2",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/universe/g/gst-libav1.0/gst-libav1.0_1.28.7.orig.tar.xz"
+          }
+        ]
+      },
+      "candidate_status": "Native software HEVC producer passed frame association, live configuration and crop controls."
+    },
+    {
+      "component": "ubuntu-loupe-image-colour",
+      "base_commit": "27c57fc898a317ad8a7e3e3bd9a09c43c4d0c2eb",
+      "base_tree": "272eaf1eca52c4f53356b63a1fc772c469ee1bdf",
+      "candidate_commit": "482d246e5e4c5878f8179820a12fffc01b794873",
+      "candidate_tree": "101752343b2c975d4d164a0e8b6b349c0b81e47c",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-preserve-ICC-colour-in-floating-point.patch",
+        "0002-unassociate-alpha-before-ICC-colour-conversion.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "loupe",
+        "version": "50.0-0ubuntu2",
+        "authentication": "Source archive hashes obtained through configured signed Ubuntu APT metadata; original dsc OpenPGP signature not independently verified. Locally generated candidate dsc is unsigned.",
+        "import_recipe": "dpkg-source extraction with distribution patches; every extracted file except .pc imported with neutral identity and fixed 2026-11-08T08:00:00+00:00 timestamp.",
+        "artifacts": [
+          {
+            "file": "loupe_50.0-0ubuntu2.debian.tar.xz",
+            "sha256": "695b49e4d89f0927c57b8b8b13473f940643097b6d17ef111c657712865fe25b",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/l/loupe/loupe_50.0-0ubuntu2.debian.tar.xz"
+          },
+          {
+            "file": "loupe_50.0-0ubuntu2.dsc",
+            "sha256": "822c7071446ce09383e4401f12ee4be464d9e51b95a80afee5e5060529c2b9b4",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/l/loupe/loupe_50.0-0ubuntu2.dsc"
+          },
+          {
+            "file": "loupe_50.0.orig.tar.xz",
+            "sha256": "7ae4fbae5e19316aa640c56f80dc5a791448a62dd8f0ff06e29a58bad813a994",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/l/loupe/loupe_50.0.orig.tar.xz"
+          }
+        ],
+        "source_import": {
+          "git_identity": "ROG HDR contributors <rog-hdr@invalid>",
+          "author_and_committer_date": "2026-11-08T08:00:00+00:00",
+          "commit_subject": "Import Ubuntu loupe 50.0-0ubuntu2 after distribution patches, excluding .pc",
+          "include": "git add -f -- . ':(exclude).pc'",
+          "include_ignored": true
+        }
+      },
+      "candidate_package_version": "50.0-0ubuntu2+rogcolor2",
+      "candidate_status": "Normal Ubuntu-feature packages built from reconstructed DSC source, with existing compiler cache reused for unchanged decoder code. Exact packaged sandboxed analytic controls, ordinary 10-bit PQ window comparison and two-package offline upgrade/rollback passed; not installed; no optical calibration claim."
+    },
+    {
+      "component": "ubuntu-glycin-image-colour",
+      "base_commit": "e23a0f33d3f7ca6620fb58df20c074a984fe97b3",
+      "base_tree": "0956d284bae0b091d3f87fb923fe0c2ccdb6ba98",
+      "candidate_commit": "61798168aa323c335a70d1e677abbd49f757637d",
+      "candidate_tree": "ab8f1af070c1a20a87ba2a040868bd3a95c33c67",
+      "patch_count": 1,
+      "patch_order": [
+        "0001-read-TIFF-byte-tags-under-the-metadata-budget.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "glycin",
+        "version": "2.2.1+ds-1ubuntu2",
+        "authentication": "Source archive hashes obtained through configured signed Ubuntu APT metadata; original dsc OpenPGP signature not independently verified. Locally generated candidate dsc is unsigned.",
+        "import_recipe": "dpkg-source extraction with distribution patches; every extracted file except .pc imported with neutral identity and fixed 2026-11-08T08:00:00+00:00 timestamp.",
+        "artifacts": [
+          {
+            "file": "glycin_2.2.1+ds-1ubuntu2.debian.tar.xz",
+            "sha256": "a611e20742007da4ee116c4c5376225cf63b628c2347a31429ec0dc3823190cf",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/glycin/glycin_2.2.1+ds-1ubuntu2.debian.tar.xz"
+          },
+          {
+            "file": "glycin_2.2.1+ds-1ubuntu2.dsc",
+            "sha256": "a823d8bfe4882db4d03b3c4cb0288356887cfb927cb7c0c145a6b0a9845fccd0",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/glycin/glycin_2.2.1+ds-1ubuntu2.dsc"
+          },
+          {
+            "file": "glycin_2.2.1+ds.orig.tar.xz",
+            "sha256": "e489427ccd4450f94dd0a13755fa8738406d761447e19d76f998d0337181e30a",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/glycin/glycin_2.2.1+ds.orig.tar.xz"
+          }
+        ],
+        "source_import": {
+          "git_identity": "ROG HDR contributors <rog-hdr@invalid>",
+          "author_and_committer_date": "2026-11-08T08:00:00+00:00",
+          "commit_subject": "Import Ubuntu glycin 2.2.1+ds-1ubuntu2 after distribution patches, excluding .pc",
+          "include": "git add -f -- . ':(exclude).pc'",
+          "include_ignored": true
+        }
+      },
+      "candidate_package_version": "2.2.1+ds-1ubuntu2+rogcolor1",
+      "candidate_status": "Normal Ubuntu-feature packages built from reconstructed DSC source, with existing compiler cache reused for unchanged decoder code. Exact packaged sandboxed analytic controls, ordinary 10-bit PQ window comparison and two-package offline upgrade/rollback passed; not installed; no optical calibration claim."
     }
   ]
 }

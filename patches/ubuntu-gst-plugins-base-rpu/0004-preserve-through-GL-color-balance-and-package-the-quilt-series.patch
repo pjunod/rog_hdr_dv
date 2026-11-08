@@ -1,0 +1,483 @@
+From 4d7ff5c79950aef458a506395b4fe7b78345a2bd Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 06:22:00 +0000
+Subject: [PATCH] glcolorbalance: preserve high precision and invalidate
+ transformed color metadata
+
+---
+ debian/changelog                              |   7 +
+ .../rog-dovi-base-api-and-gl-precision.patch  | 403 ++++++++++++++++++
+ debian/patches/series                         |   1 +
+ ext/gl/gstglcolorbalance.c                    |  11 +-
+ 4 files changed, 420 insertions(+), 2 deletions(-)
+ create mode 100644 debian/patches/rog-dovi-base-api-and-gl-precision.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index 6f41637..41dc12f 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-base1.0 (1.28.7-1+rogdv2) unstable; urgency=medium
++
++  * Preserve RGBA64 precision in normal GL color-balance processing.
++  * Drop color-sensitive provenance when pixels are transformed.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 00:00:00 +0000
++
+ gst-plugins-base1.0 (1.28.7-1+rogdv1) stonking; urgency=medium
+ 
+   * Ship frame-owned Dolby RPU metadata and bounded HEVC configuration parsing.
+diff --git a/debian/patches/rog-dovi-base-api-and-gl-precision.patch b/debian/patches/rog-dovi-base-api-and-gl-precision.patch
+new file mode 100644
+index 0000000..85abe6f
+--- /dev/null
++++ b/debian/patches/rog-dovi-base-api-and-gl-precision.patch
+@@ -0,0 +1,403 @@
++From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
++From: ROG HDR contributors <rog-hdr@invalid>
++Date: Nov, 08 2026 05:27:12 +0000
++Subject: [PATCH] <short summary of the patch>
++
++TODO: Put a short summary on the line above and replace this paragraph
++with a longer explanation of this change. Complete the meta-information
++with other relevant fields (see below for details). To make it easier, the
++information below has been extracted from the changelog. Adjust it or drop
++it.
++
++---
++The information above should follow the Patch Tagging Guidelines, please
++checkout https://dep.debian.net/deps/dep3/ to learn about the format. Here
++are templates for supplementary fields that you might want to add:
++
++Origin: (upstream|backport|vendor|other), (<patch-url>|commit:<commit-id>)
++Bug: <upstream-bugtracker-url>
++Bug-<Vendor>: <vendor-bugtracker-url>
++Forwarded: (no|not-needed|<patch-forwarded-url>)
++Applied-Upstream: <version>, (<commit-url>|commit:<commid-id>)
++Reviewed-By: <name and email of someone who approved/reviewed the patch>
++
++--- gst-plugins-base1.0-1.28.7.orig/ext/gl/gstglcolorbalance.c
+++++ gst-plugins-base1.0-1.28.7/ext/gl/gstglcolorbalance.c
++@@ -57,7 +57,7 @@ GST_DEBUG_CATEGORY_STATIC (glcolorbalanc
++ 
++ #define GST_GL_COLOR_BALANCE_VIDEO_CAPS \
++     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY "), "              \
++-    "format = (string) RGBA, "              \
+++    "format = (string) { RGBA, RGBA64_LE }, "              \
++     "width = " GST_VIDEO_SIZE_RANGE ", "                                \
++     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
++     "framerate = " GST_VIDEO_FPS_RANGE ", "                             \
++@@ -65,7 +65,7 @@ GST_DEBUG_CATEGORY_STATIC (glcolorbalanc
++     " ; "                                                               \
++     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY ","                \
++     GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION "), "           \
++-    "format = (string) RGBA, "              \
+++    "format = (string) { RGBA, RGBA64_LE }, "              \
++     "width = " GST_VIDEO_SIZE_RANGE ", "                                \
++     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
++     "framerate = " GST_VIDEO_FPS_RANGE ", "                             \
++@@ -398,6 +398,13 @@ gst_gl_color_balance_transform_meta (Gst
++ {
++   const GstMetaInfo *info = meta->info;
++   gboolean should_copy = TRUE;
+++
+++  /* Neutral balance uses GstBaseTransform passthrough and retains the input
+++   * buffer. Once pixels are transformed, color-sensitive provenance no longer
+++   * describes the output; do not carry it through the generic video tag path. */
+++  if (gst_meta_api_type_has_tag (info->api,
+++          g_quark_from_static_string (GST_META_TAG_VIDEO_COLORSPACE_STR)))
+++    return FALSE;
++   const gchar *valid_tags[] = {
++     GST_META_TAG_VIDEO_STR,
++     GST_META_TAG_VIDEO_ORIENTATION_STR,
++--- gst-plugins-base1.0-1.28.7.orig/gst-libs/gst/pbutils/codec-utils.c
+++++ gst-plugins-base1.0-1.28.7/gst-libs/gst/pbutils/codec-utils.c
++@@ -1180,6 +1180,69 @@ utils_get_scalable_format_range_extensio
++ }
++ 
++ /**
+++ * gst_codec_utils_h265_parse_dovi_configuration:
+++ * @data: (array length=size): dvcC or dvvC payload without its box header
+++ * @size: number of bytes in @data
+++ * @config: (out) (optional): parsed configuration, written only on success
+++ *
+++ * Parses the HEVC single-layer and dual-layer profiles supported by this
+++ * integration. Short records may omit trailing fields. A missing
+++ * compatibility identifier does not establish the base layer's color space.
+++ *
+++ * Returns: %TRUE if @data contains a supported configuration record.
+++ */
+++gboolean
+++gst_codec_utils_h265_parse_dovi_configuration (const guint8 * data,
+++    gsize size, GstH265DoviConfiguration * config)
+++{
+++  GstH265DoviConfiguration record = { 0 };
+++  guint16 fields;
+++
+++  if (!data || size < 4 || size > 24 || data[0] != 1 || data[1] != 0)
+++    return FALSE;
+++  fields = GST_READ_UINT16_BE (data + 2);
+++  record.version_major = data[0];
+++  record.version_minor = data[1];
+++  record.profile = fields >> 9;
+++  record.level = (fields >> 3) & 0x3f;
+++  record.rpu_present = (fields >> 2) & 1;
+++  record.el_present = (fields >> 1) & 1;
+++  record.bl_present = fields & 1;
+++  if (!record.level || (!record.el_present && !record.bl_present))
+++    return FALSE;
+++
+++  switch (record.profile) {
+++    case 4:
+++    case 7:
+++      break;
+++    case 5:
+++    case 8:
+++      if (record.el_present || !record.bl_present)
+++        return FALSE;
+++      break;
+++    default:
+++      return FALSE;
+++  }
+++
+++  if (size > 4) {
+++    record.compatibility_known = TRUE;
+++    record.compatibility_id = data[4] >> 4;
+++    record.compression = (data[4] >> 2) & 3;
+++    /* Compression 2 is reserved. Both limited (1) and extended (3)
+++     * compression are defined independently of a consumer's support. */
+++    if ((data[4] & 3) != 0 || record.compression == 2)
+++      return FALSE;
+++    for (gsize i = 5; i < size; i++) {
+++      if (data[i] != 0)
+++        return FALSE;
+++    }
+++  }
+++  if (config)
+++    *config = record;
+++  return TRUE;
+++}
+++
+++/**
++  * gst_codec_utils_h265_get_profile:
++  * @profile_tier_level: (array length=len): Pointer to the profile_tier_level
++  *   structure for the stream.
++--- gst-plugins-base1.0-1.28.7.orig/gst-libs/gst/pbutils/codec-utils.h
+++++ gst-plugins-base1.0-1.28.7/gst-libs/gst/pbutils/codec-utils.h
++@@ -77,6 +77,30 @@ gboolean      gst_codec_utils_h264_get_p
++ 
++ /* H.265 */
++ 
+++/**
+++ * GstH265DoviConfiguration:
+++ *
+++ * Fields of a version 1.0 HEVC Dolby Vision decoder configuration record.
+++ * @compatibility_known is false for a shortened four-byte record.
+++ */
+++typedef struct {
+++  guint8 version_major;
+++  guint8 version_minor;
+++  guint8 profile;
+++  guint8 level;
+++  guint8 rpu_present;
+++  guint8 el_present;
+++  guint8 bl_present;
+++  guint8 compatibility_id;
+++  guint8 compression;
+++  gboolean compatibility_known;
+++  gpointer _gst_reserved[GST_PADDING];
+++} GstH265DoviConfiguration;
+++
+++GST_PBUTILS_API
+++gboolean gst_codec_utils_h265_parse_dovi_configuration (const guint8 * data,
+++    gsize size, GstH265DoviConfiguration * config);
+++
++ GST_PBUTILS_API
++ const gchar * gst_codec_utils_h265_get_profile                     (const guint8 * profile_tier_level,
++                                                                     guint len);
++--- gst-plugins-base1.0-1.28.7.orig/gst-libs/gst/video/gstvideodecoder.c
+++++ gst-plugins-base1.0-1.28.7/gst-libs/gst/video/gstvideodecoder.c
++@@ -297,6 +297,7 @@
++ #include <gst/video/video-event.h>
++ #include <gst/video/gstvideopool.h>
++ #include <gst/video/gstvideometa.h>
+++#include "gstvideodovirpumeta.h"
++ #include <string.h>
++ 
++ GST_DEBUG_CATEGORY (videodecoder_debug);
++@@ -3354,6 +3355,17 @@ gst_video_decoder_transform_meta_default
++     NULL,
++   };
++ 
+++  /* RPU instructions still describe the coded signal after decoding. Copy
+++   * from this exact codec frame, never a parser-global "latest RPU". Unlike
+++   * an ordinary color conversion, decoding does not consume the RPU. Refuse
+++   * low-resolution or dimension-changing decoder output. */
+++  if (info->api == GST_VIDEO_DOVI_RPU_META_API_TYPE) {
+++    const GstVideoDoviRpuMeta *dovi = (const GstVideoDoviRpuMeta *) meta;
+++    const GstVideoCodecState *state = decoder->priv->output_state;
+++    return state && dovi->width == (guint) GST_VIDEO_INFO_WIDTH (&state->info) &&
+++        dovi->height == (guint) GST_VIDEO_INFO_HEIGHT (&state->info);
+++  }
+++
++   tags = gst_meta_api_type_get_tags (info->api);
++ 
++   if (!tags)
++--- /dev/null
+++++ gst-plugins-base1.0-1.28.7/gst-libs/gst/video/gstvideodovirpumeta.c
++@@ -0,0 +1,115 @@
+++/* GStreamer
+++ * Copyright (C) 2026 ROG HDR contributors
+++ *
+++ * This library is free software; you can redistribute it and/or
+++ * modify it under the terms of the GNU Library General Public
+++ * License as published by the Free Software Foundation; either
+++ * version 2 of the License, or (at your option) any later version.
+++ *
+++ * This library is distributed in the hope that it will be useful,
+++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+++ * Library General Public License for more details.
+++ *
+++ * You should have received a copy of the GNU Library General Public
+++ * License along with this library; if not, write to the
+++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+++ * Boston, MA 02110-1301, USA.
+++ */
+++
+++#ifdef HAVE_CONFIG_H
+++#include "config.h"
+++#endif
+++
+++#include "gstvideodovirpumeta.h"
+++#include "video.h"
+++
+++GType
+++gst_video_dovi_rpu_meta_api_get_type (void)
+++{
+++  static GType type = 0;
+++  static const gchar *tags[] = {
+++    GST_META_TAG_VIDEO_STR, GST_META_TAG_VIDEO_COLORSPACE_STR,
+++    GST_META_TAG_VIDEO_SIZE_STR, GST_META_TAG_VIDEO_ORIENTATION_STR, NULL
+++  };
+++
+++  if (g_once_init_enter (&type)) {
+++    GType api = gst_meta_api_type_register ("GstVideoDoviRpuMetaAPI", tags);
+++    g_once_init_leave (&type, api);
+++  }
+++  return type;
+++}
+++
+++static gboolean
+++gst_video_dovi_rpu_meta_init (GstMeta * meta, gpointer params,
+++    GstBuffer * buffer)
+++{
+++  GstVideoDoviRpuMeta *dovi = (GstVideoDoviRpuMeta *) meta;
+++  dovi->rpu = NULL;
+++  dovi->width = dovi->height = 0;
+++  return TRUE;
+++}
+++
+++static void
+++gst_video_dovi_rpu_meta_free (GstMeta * meta, GstBuffer * buffer)
+++{
+++  GstVideoDoviRpuMeta *dovi = (GstVideoDoviRpuMeta *) meta;
+++  g_clear_pointer (&dovi->rpu, g_bytes_unref);
+++}
+++
+++static gboolean
+++gst_video_dovi_rpu_meta_transform (GstBuffer * dest, GstMeta * meta,
+++    GstBuffer * buffer, GQuark type, gpointer data)
+++{
+++  GstVideoDoviRpuMeta *src = (GstVideoDoviRpuMeta *) meta;
+++  GstVideoDoviRpuMeta *out;
+++  const GstMetaTransformCopy *copy = data;
+++
+++  if (!GST_META_TRANSFORM_IS_COPY (type) || !src->rpu ||
+++      (copy && copy->region) || gst_buffer_get_video_dovi_rpu_meta (dest))
+++    return FALSE;
+++  out = (GstVideoDoviRpuMeta *) gst_buffer_add_meta (dest,
+++      GST_VIDEO_DOVI_RPU_META_INFO, NULL);
+++  if (!out)
+++    return FALSE;
+++  out->rpu = g_bytes_ref (src->rpu);
+++  out->width = src->width;
+++  out->height = src->height;
+++  return TRUE;
+++}
+++
+++const GstMetaInfo *
+++gst_video_dovi_rpu_meta_get_info (void)
+++{
+++  static const GstMetaInfo *info = NULL;
+++  if (g_once_init_enter ((GstMetaInfo **) &info)) {
+++    const GstMetaInfo *registered = gst_meta_register (
+++        GST_VIDEO_DOVI_RPU_META_API_TYPE, "GstVideoDoviRpuMeta",
+++        sizeof (GstVideoDoviRpuMeta), gst_video_dovi_rpu_meta_init,
+++        gst_video_dovi_rpu_meta_free, gst_video_dovi_rpu_meta_transform);
+++    g_once_init_leave ((GstMetaInfo **) &info, (GstMetaInfo *) registered);
+++  }
+++  return info;
+++}
+++
+++GstVideoDoviRpuMeta *
+++gst_buffer_add_video_dovi_rpu_meta (GstBuffer * buffer, const guint8 * rpu,
+++    gsize size, guint width, guint height)
+++{
+++  GstVideoDoviRpuMeta *meta;
+++
+++  g_return_val_if_fail (GST_IS_BUFFER (buffer), NULL);
+++  g_return_val_if_fail (gst_buffer_is_writable (buffer), NULL);
+++  g_return_val_if_fail (rpu && size && size <= GST_VIDEO_DOVI_RPU_MAX_SIZE, NULL);
+++  g_return_val_if_fail (width && width <= G_MAXINT && height && height <= G_MAXINT, NULL);
+++  g_return_val_if_fail (!gst_buffer_get_video_dovi_rpu_meta (buffer), NULL);
+++
+++  meta = (GstVideoDoviRpuMeta *) gst_buffer_add_meta (buffer,
+++      GST_VIDEO_DOVI_RPU_META_INFO, NULL);
+++  if (meta) {
+++    meta->rpu = g_bytes_new (rpu, size);
+++    meta->width = width;
+++    meta->height = height;
+++  }
+++  return meta;
+++}
++--- /dev/null
+++++ gst-plugins-base1.0-1.28.7/gst-libs/gst/video/gstvideodovirpumeta.h
++@@ -0,0 +1,74 @@
+++/* GStreamer
+++ * Copyright (C) 2026 ROG HDR contributors
+++ *
+++ * This library is free software; you can redistribute it and/or
+++ * modify it under the terms of the GNU Library General Public
+++ * License as published by the Free Software Foundation; either
+++ * version 2 of the License, or (at your option) any later version.
+++ *
+++ * This library is distributed in the hope that it will be useful,
+++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+++ * Library General Public License for more details.
+++ *
+++ * You should have received a copy of the GNU Library General Public
+++ * License along with this library; if not, write to the
+++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+++ * Boston, MA 02110-1301, USA.
+++ */
+++
+++#ifndef __GST_VIDEO_DOVI_RPU_META_H__
+++#define __GST_VIDEO_DOVI_RPU_META_H__
+++
+++#include <gst/gst.h>
+++#include <gst/video/video-prelude.h>
+++
+++G_BEGIN_DECLS
+++
+++/* Private proposed API. This is raw transport, not a Dolby processing claim. */
+++#define GST_VIDEO_DOVI_RPU_MAX_SIZE 65536
+++#define GST_VIDEO_DOVI_RPU_META_API_TYPE (gst_video_dovi_rpu_meta_api_get_type ())
+++#define GST_VIDEO_DOVI_RPU_META_INFO (gst_video_dovi_rpu_meta_get_info ())
+++
+++/**
+++ * GstVideoDoviRpuMeta:
+++ * @meta: parent #GstMeta
+++ * @rpu: (transfer none): immutable original RPU bytes, without the two-byte
+++ *   HEVC NAL header or the start code / length prefix
+++ * @width: native visible picture width before scaling
+++ * @height: native visible picture height before scaling
+++ *
+++ * One access unit's original Dolby Vision RPU, owned by its picture buffer.
+++ * The bytes are not inherited from another picture. This does not assert
+++ * that profile-specific reshaping, temporal metadata resolution or enhancement
+++ * layer reconstruction has taken place. A downstream consumer must resolve
+++ * those requirements using a public parser before interpreting the pixels.
+++ * In particular, a base-layer-only FEL decode is never a reconstructed master.
+++ *
+++ * Read fields only. Whole-buffer copies retain the immutable bytes; region
+++ * copies and non-copy transforms do not preserve this meta. The colorspace,
+++ * size and orientation tags allow pixel-changing transforms to discard it. Decoders may
+++ * transport it through their matched #GstVideoCodecFrame, without changing the
+++ * visible dimensions. Consuming display management must remove it.
+++ */
+++typedef struct _GstVideoDoviRpuMeta {
+++  GstMeta meta;
+++  GBytes *rpu;
+++  guint width;
+++  guint height;
+++} GstVideoDoviRpuMeta;
+++
+++GST_VIDEO_API
+++GType gst_video_dovi_rpu_meta_api_get_type (void);
+++GST_VIDEO_API
+++const GstMetaInfo *gst_video_dovi_rpu_meta_get_info (void);
+++
+++#define gst_buffer_get_video_dovi_rpu_meta(b) \
+++  ((GstVideoDoviRpuMeta *) gst_buffer_get_meta ((b), GST_VIDEO_DOVI_RPU_META_API_TYPE))
+++
+++GST_VIDEO_API
+++GstVideoDoviRpuMeta *gst_buffer_add_video_dovi_rpu_meta (GstBuffer * buffer,
+++    const guint8 * rpu, gsize size, guint width, guint height);
+++
+++G_END_DECLS
+++#endif
++--- gst-plugins-base1.0-1.28.7.orig/gst-libs/gst/video/meson.build
+++++ gst-plugins-base1.0-1.28.7/gst-libs/gst/video/meson.build
++@@ -6,6 +6,7 @@ video_sources = files([
++   'gstvideocodecalphameta.c',
++   'gstvideoaggregator.c',
++   'gstvideodecoder.c',
+++  'gstvideodovirpumeta.c',
++   'gstvideodmabufpool.c',
++   'gstvideoencoder.c',
++   'gstvideofilter.c',
++@@ -47,6 +48,7 @@ video_headers = files([
++   'gstvideocodecalphameta.h',
++   'gstvideoaggregator.h',
++   'gstvideodecoder.h',
+++  'gstvideodovirpumeta.h',
++   'gstvideodmabufpool.h',
++   'gstvideoencoder.h',
++   'gstvideofilter.h',
+diff --git a/debian/patches/series b/debian/patches/series
+index 301ff1e..53a6a31 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -4,3 +4,4 @@
+ 0006_failing-test-appsrc.patch
+ 0007_failing-test-compositor.patch
+ 0008_failing-test-videoscale.patch
++rog-dovi-base-api-and-gl-precision.patch
+diff --git a/ext/gl/gstglcolorbalance.c b/ext/gl/gstglcolorbalance.c
+index e160afa..01714b4 100644
+--- a/ext/gl/gstglcolorbalance.c
++++ b/ext/gl/gstglcolorbalance.c
+@@ -57,7 +57,7 @@ GST_DEBUG_CATEGORY_STATIC (glcolorbalance_debug);
+ 
+ #define GST_GL_COLOR_BALANCE_VIDEO_CAPS \
+     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY "), "              \
+-    "format = (string) RGBA, "              \
++    "format = (string) { RGBA, RGBA64_LE }, "              \
+     "width = " GST_VIDEO_SIZE_RANGE ", "                                \
+     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
+     "framerate = " GST_VIDEO_FPS_RANGE ", "                             \
+@@ -65,7 +65,7 @@ GST_DEBUG_CATEGORY_STATIC (glcolorbalance_debug);
+     " ; "                                                               \
+     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY ","                \
+     GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION "), "           \
+-    "format = (string) RGBA, "              \
++    "format = (string) { RGBA, RGBA64_LE }, "              \
+     "width = " GST_VIDEO_SIZE_RANGE ", "                                \
+     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
+     "framerate = " GST_VIDEO_FPS_RANGE ", "                             \
+@@ -398,6 +398,13 @@ gst_gl_color_balance_transform_meta (GstBaseTransform * bt,
+ {
+   const GstMetaInfo *info = meta->info;
+   gboolean should_copy = TRUE;
++
++  /* Neutral balance uses GstBaseTransform passthrough and retains the input
++   * buffer. Once pixels are transformed, color-sensitive provenance no longer
++   * describes the output; do not carry it through the generic video tag path. */
++  if (gst_meta_api_type_has_tag (info->api,
++          g_quark_from_static_string (GST_META_TAG_VIDEO_COLORSPACE_STR)))
++    return FALSE;
+   const gchar *valid_tags[] = {
+     GST_META_TAG_VIDEO_STR,
+     GST_META_TAG_VIDEO_ORIENTATION_STR,

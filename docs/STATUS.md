@@ -1,9 +1,49 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-11-07 (America/New_York) · **Current:** APT `nativehdr13`
-userspace and signed kernel `nativehdr3` are installed. External plurx Player
-owns the playback product. The [software install/rollback handoff](SOFTWARE_DELIVERY.md)
-records exact package hashes and remaining acceptance; no reinstall is needed.
+**Updated November 8, 2026.** The ROG runs the seven-package playback update, nativehdr13 desktop and nativehdr3 kernel. Normal mpv opens MP4 and Matroska by default. The staged player graded the complete three-second 4K Profile 7 FEL clip at 24 fps with zero decoder or output drops on the default NVIDIA path in a private hardware-backed compositor. The corrected distribution driver advanced 2.25 seconds of media in 2.26 seconds on Intel. It reported 17 output drops over the clip while package builds were active. [Player release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop and kernel versions](SOFTWARE_DELIVERY.md).
+
+| On the laptop today | Current development result |
+|---|---|
+| mpv 0.41, FFmpeg filter and the installed Vulkan update | Staged mpv 0.42 played the 4K FEL sample at 24 fps on NVIDIA. |
+| GNOME uses Mutter nativehdr13 and the existing GTK runtime | The updated GTK runtime fixes black Showtime output. The staged player regraded the same paused Profile 5 picture when a virtual GNOME monitor changed from 616 to 308 cd/m². Returning to 616 restored the exact original screen pixels. [GNOME capture](../evidence/gnome-showtime-paused-retarget.json). |
+| Firmware provides panel color and luminance data | The staged player scored mean ΔE ITP 0.651 and p95 1.274 on one chart at the panel target. The current mapper approximates the gamut as P3-D65. Optical calibration is pending. |
+
+**GNOME screen capture.** Mutter wrote 8-bit pixels into shared-memory buffers advertised as 10-bit HDR. With the corrected writer, two 10-bit channel layouts reproduced identical colors across six patches. The half-float capture agreed to within 0.58 of a 10-bit code value. The same paused Dolby movie changed across 397,853 native 10-bit pixels when retargeted from 616 to 308 cd/m². Restoring 616 reproduced the original capture byte for byte. Both checks used a private GNOME monitor on the ROG GPU. [Format and pixel evidence](../evidence/mutter-shared-memory-color-formats.json).
+
+**Photographs.** The staged GNOME Image Viewer preserves Adobe RGB color on the HDR desktop. Across six patches its output matched an independent BT.2020 reference within one 10-bit value per channel. The normal loader also retained the embedded color profile in small TIFFs. [Image viewer, package versions and qualification](GNOME_IMAGE_COLOUR.md).
+
+**Release rehearsal.** The corrected 45-package candidate completed its upgrade and rollback rehearsal after review. The corrected GTK mapper passed 65 negotiation checks and graded real Dolby frames on both the NVIDIA and Intel decoders. The second fix preserves subtitles changed downstream when the display target changes during pause. Its normal distribution package built and replayed from source. The packaged sink preserved added, replaced and removed subtitles across a paused 616→308→616 cd/m² target change. Video pixels returned exactly to their original values, and subtitle order, alpha, bounds and the paused timestamp stayed correct. [Paused subtitle controls](../packaging/gstreamer-gtk-dovi/probes/paused-overlay-product-receipt.json). [Mapper source, packages and hardware results](../evidence/gstreamer-gtk-mapper-negotiation.json). Offline APT accepted the complete upgrade and an inverse transaction restoring 36 previous packages and removing the nine additions. Normal APT policy selected all 45 intended versions with the five-package compositor preference applied in the simulation. The running desktop still uses the installed versions listed above. [Versions and solver results](../evidence/gnome-desktop-release-bundle.json).
+
+**Movie-frame quality.** At 600 cd/m² the staged Intel filter measured mean ΔE ITP 2.61 and p95 7.20 on one 4K *Sol Levante* frame against Dolby’s render of the original master. The published 1080p Profile 5 release measured 9.21 and 26.31 against the downsampled reference. When the official processor received the same decoded base and a private XML copy carrying the three brightness values actually present in the stream, the Linux filter measured mean 0.65 and p95 1.60. [Source, individual controls and interpretation](../evidence/dolby-sol-levante-frame714.json).
+
+**Browser coverage.** Stock Chrome and Firefox on the laptop played the AVC control and rejected the clear Dolby Vision chart. Firefox accepted ordinary HEVC capability queries. [Browser versions, codec queries and playback conditions](SYSTEM_DOLBY_VISION.md#browser-playback-on-the-rog).
+
+**The normal player was compared with Dolby’s reference output.** On one 2560×1280 Profile 8.1 chart at a matched 1,000 cd/m² BT.2020 target, the staged NVIDIA mpv window had mean ΔE ITP 0.62 and p95 1.12 over all pixels. At a second 600 cd/m² target, the corresponding mean was 0.58 and p95 was 1.06. The maximum at 1,000 cd/m² was 56.49 at a color boundary. The 10-bit 4:2:0 transport control also showed much larger errors at boundaries than within patches. The 1,000 cd/m² target has neutral Level 8 trims. Further moving-content, isolated nonneutral-trim and optical comparisons remain open. [Methods, population and controls](../evidence/dolby-official-chart-consumer.json).
+
+**The default NVIDIA path sustained 24 fps.** On a private hardware-backed Weston compositor, mpv chose the RTX 4080 and NVDEC automatically. It graded the entire 4K sample for 616 cd/m² with the enhancement layer composed. From media time 0.25 to 2.50 s, 2.255 s elapsed, with zero decoder drops, output drops or delayed frames. Before the Intel clock fix, explicitly selecting Intel on that compositor took 71.71 s and dropped 16 output frames. The 2.999-second, 24 fps Dolby Vision Profile 7 FEL clip reached EOF in the staged Intel run. On the earlier software-compositor run, its first and last sampled positions were 63.46 seconds apart, with 24 output drops and zero decoder drops. This test selected the Intel Vulkan ICD and used a software-rendered Weston compositor. Automatic selection chose NVIDIA in that fixture and swapchain creation failed. On the actual GNOME desktop an invisible probe successfully created both 10-bit PQ swapchain formats on each GPU. Physical desktop playback speed still needs measurement. [Continuous playback receipt](../evidence/profile7-continuous-playback.json).
+
+The Intel pacing fault was traced to Mesa comparing two different clocks. On a 60 Hz compositor advertising `CLOCK_MONOTONIC_RAW`, the installed driver requested the next frame about 4,124 ms after presentation. The source fix keeps Wayland deadlines in the compositor clock and converts completion timestamps only when reporting them to Vulkan. The corrected private driver requested a median of 16.17 ms. The full three-second clip reached EOF at playback speed with eight output drops and zero decoder drops. A separate Vulkan client requested both absolute and unspecified presentation times. All 69 returned timestamps were within 12 ms of its monotonic clock while the two clocks differed by 4.12 s. Both 64-bit and 32-bit distribution drivers built. The release rehearsal included the two updated runtime archives and their exact rollback versions. [Timing and wire evidence](../evidence/mesa-wsi-presentation-clock.json).
+
+The mpv 0.42 `+rogdv4` package and updated decoder played the complete three-second genuine 4K Profile 7 FEL fixture and a nine-second native Profile 5 interval at 24 fps with zero decoder or output drops on the default NVIDIA GPU. Its ten-package upgrade and exact rollback passed offline simulation and were backed up privately. It also preserves the displayed grade in a tagged window screenshot. Its saved PNG carries BT.2020/PQ. A Level 8 trim edit changed the intended frame, and an untouched frame plus ordinary HDR10 controls matched exactly. [File-level evidence](../evidence/mpv-window-grade-capture.json).
+
+### GNOME still-image colour in development
+
+The ordinary Image Viewer candidate preserves ICC-tagged photographs as linear
+BT.2020 floating-point textures. Native analytic controls retained 256 gray
+levels and adjacent 16-bit midtones, and verified alpha and metadata precedence.
+A separate sandboxed decoder correction preserves valid ICC metadata in small
+TIFF files. The ordinary candidate and an independently encoded reference agreed
+within one 10-bit PQ code on six synthetic patches in an isolated compositor;
+stock materially clipped wide colour. Both normal Ubuntu packages built from
+reconstructed DSC source; the exact two-package offline upgrade and rollback
+passed with zero removals. Nothing is installed, and physical
+panel accuracy remains unmeasured. [Source, digital controls and recovery](GNOME_IMAGE_COLOUR.md).
+
+### GNOME playback in development
+
+The GTK default Vulkan renderer presented an actual floating-point RGB surface using BT.2020/PQ in the isolated Wayland session. A separate EGL framebuffer readback placed SDR white, half white, a 400 cd/m² patch and a translucent SDR overlay over that patch within one 10-bit code value of their expected encodings. These are digital checks of GTK composition. The GStreamer software and Intel VA decoder paths preserved frame metadata across a seek. Playback of a complete movie through the GNOME player and installation on the running desktop remain open. [GTK presentation](GDK_DISPLAY_TARGET.md) · [GStreamer picture ownership](GSTREAMER_DOLBY_RECONSTRUCTION.md).
+
+The NVIDIA HEVC decoder now preserves each decoded picture’s Dolby configuration, crop and metadata across seeking and changes of configuration. All 95 cropped pictures matched the software decoder. Ordinary Showtime automatically chose NVIDIA, ran the Profile 5 mapper and retained the same paused native picture when the target changed. The CPU-side handoff contained nonblack, opaque pixels. The private compositor still saw an all-black Showtime output on the same frame that rendered visibly in mpv. A standalone GTK OpenGL ES texture reproduced the black output. GTK queried the framebuffer read format and type with an unsupported OpenGL ES command. The supported query returned the expected 16-bit format, and direct readback recovered the exact pixel. The corrected GTK library recovered the exact 16-bit pixel and showed 44,730 distinct colors in the Showtime framebuffer on the original GL path. A paused target change still produced identical framebuffer bytes and remains under investigation. [NVIDIA producer qualification](../evidence/gstreamer-nvidia-picture-qualification.json).
 
 ## Shared Dolby Vision renderer — November 7
 
@@ -17,11 +57,13 @@ A separate staged mpv 0.42 rendered a genuine 3840×2160 Profile 7 FEL picture o
 
 ### Packaged Profile 7 and MP4 configuration
 
-The normal mpv 0.42 Debian package rendered a 3840×2160 Profile 7 FEL frame on Intel. It reconstructed the full enhancement layer, selected the CM v4 trim for 0.0004–616 cd/m², and presented BT.2020/PQ through an isolated compositor configured with the panel declaration. A separate display-referred window capture retained PQ. An HDR10 control produced the same decoded screenshot pixels as upstream mpv 0.42. Package installation and optical validation remain open. [Source and qualification](SYSTEM_DOLBY_VISION.md#physical-trim-selection-and-the-staged-dual-layer-player).
+The normal mpv 0.42 Debian package rendered a 3840×2160 Profile 7 FEL frame on Intel. It reconstructed the full enhancement layer, selected the CM v4 trim for 0.0004–616 cd/m², and presented BT.2020/PQ through an isolated compositor configured with the panel declaration. The screenshot framebuffer retained PQ with file tagging disabled. The resulting PNG carried no transfer declaration. An HDR10 control produced the same decoded screenshot pixels as upstream mpv 0.42. Package installation and optical validation remain open. [Source and qualification](SYSTEM_DOLBY_VISION.md#physical-trim-selection-and-the-staged-dual-layer-player).
 
 The 32-bit decoder retained all 544 stock decoders, 218 encoders and 67 hardware configurations. A native 32-bit client parsed a genuine Profile 7 RPU into an owned metadata snapshot. The combined ten-package upgrade and eight-package rollback plus removal of the two new runtimes passed offline APT simulation. The signed stock packages and private candidate are backed up. [Playback and package hashes](../evidence/profile7-ubuntu-packages.json).
 
 Ubuntu's MP4 demuxer now carries the sample description's Dolby configuration through `h265parse`. Genuine Profile 5 and synthetic 8.1 preserved all 24 bytes. Plain HDR10, duplicate boxes and invalid fields carried no Dolby configuration. A four-byte legacy record retained its explicit unknown base compatibility. GTK player rendering remains a separate work item. [Demux and parser controls](../evidence/gstreamer-dovi-isobmff-controls.json).
+
+The corrected packaged player also ran with the laptop’s existing mpv video options and the Intel Vulkan ICD selected by the test environment. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. The five normal Ubuntu compositor packages built, and their upgrade and exact five-package rollback passed offline simulation. The running compositor still uses its previous version. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
 
 ## GStreamer RPU transport — native scope passed, November 7
 
@@ -35,6 +77,10 @@ replay/compilation passed. No packages or applications were installed and no
 defaults changed. This remains unshipped metadata transport: reconstruction,
 FEL residuals, normal GTK player rendering, physical target signalling and
 full-feature/multiarch packaging remain open. Five supplementary controls passed. These cover malformed duplicate/oversize units, NAL-aligned output, partial region copies and 26 matched resized VA pictures with format and colorimetry retained. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md).
+
+## GNOME playback integration
+
+Software HEVC and Intel VA now publish owned, frame-matched Dolby state across seeks, reordered pictures and conformance crops. Both decoded all 95 pictures when the container changed Dolby configuration without changing the video sequence. Earlier software decoding lost 32 pictures at that transition. The normal Ubuntu base runtime and SDK and the shared picture library built. The GTK player and real high-precision surface still require end-to-end qualification. [Controls and package contract](GSTREAMER_DOLBY_RECONSTRUCTION.md).
 
 ## GTK preferred display target — November 7
 

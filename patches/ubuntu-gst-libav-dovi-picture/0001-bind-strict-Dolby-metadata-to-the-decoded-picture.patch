@@ -1,0 +1,308 @@
+diff --git a/ext/libav/gstavviddec.c b/ext/libav/gstavviddec.c
+index 39335d9..5a535d6 100644
+--- a/ext/libav/gstavviddec.c
++++ b/ext/libav/gstavviddec.c
+@@ -32,6 +32,8 @@
+ #include "gstavcodecmap.h"
+ #include "gstavutils.h"
+ #include "gstavviddec.h"
++#include <gstdovipicture.h>
++#include <libavutil/opt.h>
+ 
+ GST_DEBUG_CATEGORY_STATIC (GST_CAT_PERFORMANCE);
+ 
+@@ -89,7 +91,7 @@ static void gst_ffmpegviddec_get_property (GObject * object,
+     guint prop_id, GValue * value, GParamSpec * pspec);
+ 
+ static gboolean gst_ffmpegviddec_negotiate (GstFFMpegVidDec * ffmpegdec,
+-    AVCodecContext * context, AVFrame * picture, GstBufferFlags flags);
++    AVCodecContext * context, AVFrame * picture, GstBufferFlags flags, GBytes *dovi_config);
+ 
+ /* some sort of bufferpool handling, but different */
+ static int gst_ffmpegviddec_get_buffer2 (AVCodecContext * context,
+@@ -470,6 +472,11 @@ gst_ffmpegviddec_open (GstFFMpegVidDec * ffmpegdec)
+ 
+   oclass = GST_FFMPEGVIDDEC_GET_CLASS (ffmpegdec);
+ 
++  /* Strictness applies to Dolby publication only. Do not add EXPLODE to the
++   * global video error policy or refuse ordinary playback on an older codec. */
++  if (oclass->in_plugin->id == AV_CODEC_ID_HEVC && ffmpegdec->context->priv_data)
++    av_opt_set_int (ffmpegdec->context->priv_data, "dovi_metadata_strict", 1, 0);
++
+   if (gst_ffmpeg_avcodec_open (ffmpegdec->context, oclass->in_plugin) < 0)
+     goto could_not_open;
+ 
+@@ -536,6 +543,13 @@ gst_ffmpegviddec_needs_reset (GstFFMpegVidDec * ffmpegdec,
+   gst_structure_remove_field (gst_caps_get_structure (new_caps, 0),
+       "framerate");
+ 
++  /* Container Dolby configuration is delivered explicitly per AU. It must
++   * not invalidate ordinary HEVC reference pictures when the SPS is unchanged. */
++  if (ffmpegdec->context && ffmpegdec->context->codec_id == AV_CODEC_ID_HEVC) {
++    gst_structure_remove_field (gst_caps_get_structure (last_caps, 0), "dovi-configuration");
++    gst_structure_remove_field (gst_caps_get_structure (new_caps, 0), "dovi-configuration");
++  }
++
+   needs_reset = !gst_caps_is_equal (last_caps, new_caps);
+ 
+   gst_caps_unref (last_caps);
+@@ -557,6 +571,7 @@ gst_ffmpegviddec_set_format (GstVideoDecoder * decoder,
+ 
+   ffmpegdec = GST_FFMPEGVIDDEC (decoder);
+   oclass = GST_FFMPEGVIDDEC_GET_CLASS (ffmpegdec);
++  ffmpegdec->dovi_epoch++;
+ 
+   GST_DEBUG_OBJECT (ffmpegdec, "setcaps called");
+ 
+@@ -712,6 +727,18 @@ gst_ffmpegviddec_set_format (GstVideoDecoder * decoder,
+     gst_video_decoder_set_subframe_mode (decoder, nal_aligned);
+   }
+ 
++  if (oclass->in_plugin->id == AV_CODEC_ID_HEVC) {
++    AVDOVIDecoderConfigurationRecord config;
++    GBytes *bytes = NULL;
++    if (gst_dovi_caps_get_stream_config (state->caps, &config, &bytes)) {
++      AVPacketSideData *side = av_packet_side_data_new (
++          &ffmpegdec->context->coded_side_data, &ffmpegdec->context->nb_coded_side_data,
++          AV_PKT_DATA_DOVI_CONF, sizeof (config), 0);
++      if (side) memcpy (side->data, &config, sizeof (config));
++    }
++    g_clear_pointer (&bytes, g_bytes_unref);
++  }
++
+   /* open codec - we don't select an output pix_fmt yet,
+    * simply because we don't know! We only get it
+    * during playback... */
+@@ -719,6 +746,8 @@ gst_ffmpegviddec_set_format (GstVideoDecoder * decoder,
+     goto open_failed;
+ 
+ update_state:
++  ffmpegdec->dovi_config_ready = TRUE;
++  ffmpegdec->dovi_new_stream = FALSE;
+   if (ffmpegdec->input_state)
+     gst_video_codec_state_unref (ffmpegdec->input_state);
+   ffmpegdec->input_state = gst_video_codec_state_ref (state);
+@@ -805,8 +834,20 @@ typedef struct
+    * the same codec frame.
+    */
+   guint refcount;
++  gboolean dovi_config_known;
++  AVDOVIDecoderConfigurationRecord dovi_config;
++  GBytes *dovi_config_bytes;
++  guint64 dovi_epoch;
+ } GstFFMpegVidDecCodecFrameData;
+ 
++static void
++gst_ffmpegviddec_codec_frame_data_free (gpointer opaque)
++{
++  GstFFMpegVidDecCodecFrameData *data = opaque;
++  g_clear_pointer (&data->dovi_config_bytes, g_bytes_unref);
++  g_free (data);
++}
++
+ /* Replaces the 'frame' reference of a VidDecVideoFrame to its codec frame.
+  * Consumes the passed 'frame'. Can be passed NULL as the new 'frame' to clear
+  * the reference.
+@@ -847,7 +888,7 @@ gst_ffmpegviddec_video_frame_take_frame (GstFFMpegVidDecVideoFrame * dframe,
+ 
+     if (data == NULL) {
+       data = g_new0 (GstFFMpegVidDecCodecFrameData, 1);
+-      gst_video_codec_frame_set_user_data (frame, data, g_free);
++      gst_video_codec_frame_set_user_data (frame, data, gst_ffmpegviddec_codec_frame_data_free);
+     }
+     data->refcount++;
+ 
+@@ -1355,6 +1396,7 @@ update_video_context (GstFFMpegVidDec * ffmpegdec, AVCodecContext * context,
+       pic_field_order |= GST_VIDEO_BUFFER_FLAG_TFF;
+   }
+ 
++
+   if (!picture_changed (ffmpegdec, picture, one_field)
+       && !context_changed (ffmpegdec, context))
+     return FALSE;
+@@ -1583,7 +1625,7 @@ content_light_metadata_av_to_gst (AVContentLightMetadata * av,
+ 
+ static gboolean
+ gst_ffmpegviddec_negotiate (GstFFMpegVidDec * ffmpegdec,
+-    AVCodecContext * context, AVFrame * picture, GstBufferFlags flags)
++    AVCodecContext * context, AVFrame * picture, GstBufferFlags flags, GBytes *dovi_config)
+ {
+   GstVideoFormat fmt;
+   GstVideoInfo *in_info, *out_info;
+@@ -1595,6 +1637,15 @@ gst_ffmpegviddec_negotiate (GstFFMpegVidDec * ffmpegdec,
+   gint caps_height;
+   gboolean one_field = !!(flags & GST_VIDEO_BUFFER_FLAG_ONEFIELD);
+ 
++  if (ffmpegdec->output_state && ffmpegdec->output_state->caps) {
++    AVDOVIDecoderConfigurationRecord previous;
++    GBytes *bytes = NULL;
++    gst_dovi_caps_get_stream_config (ffmpegdec->output_state->caps, &previous, &bytes);
++    if ((!bytes != !dovi_config) || (bytes && dovi_config && !g_bytes_equal (bytes, dovi_config)))
++      ffmpegdec->needs_renegotation = TRUE;
++    g_clear_pointer (&bytes, g_bytes_unref);
++  }
++
+   if (!update_video_context (ffmpegdec, context, picture, one_field)
+       && !ffmpegdec->needs_renegotation) {
+     return TRUE;
+@@ -1803,6 +1854,8 @@ gst_ffmpegviddec_negotiate (GstFFMpegVidDec * ffmpegdec,
+     }
+   }
+ 
++  gst_dovi_caps_apply_stream_config (output_state->caps, dovi_config);
++
+   if (!gst_video_decoder_negotiate (GST_VIDEO_DECODER (ffmpegdec)))
+     goto negotiate_failed;
+ 
+@@ -2115,8 +2168,10 @@ gst_ffmpegviddec_video_frame (GstFFMpegVidDec * ffmpegdec,
+   GST_DEBUG_OBJECT (ffmpegdec, "corrupted frame: %d",
+       !!(ffmpegdec->picture->flags & AV_FRAME_FLAG_CORRUPT));
+ 
++  GstFFMpegVidDecCodecFrameData *dovi_input = gst_video_codec_frame_get_user_data (output_frame);
+   if (!gst_ffmpegviddec_negotiate (ffmpegdec, ffmpegdec->context,
+-          ffmpegdec->picture, GST_BUFFER_FLAGS (output_frame->input_buffer)))
++          ffmpegdec->picture, GST_BUFFER_FLAGS (output_frame->input_buffer),
++          dovi_input ? dovi_input->dovi_config_bytes : NULL))
+     goto negotiation_error;
+ 
+   pool = gst_video_decoder_get_buffer_pool (GST_VIDEO_DECODER (ffmpegdec));
+@@ -2148,6 +2203,49 @@ gst_ffmpegviddec_video_frame (GstFFMpegVidDec * ffmpegdec,
+   if (G_UNLIKELY (*ret != GST_FLOW_OK))
+     goto no_output;
+ 
++  /* Publish only the metadata owned by this exact received AVFrame. The
++   * allocation/copy path above has completed; never borrow decoder storage. */
++  {
++    GstDoviPicture *dovi = NULL;
++    GstDoviPictureMeta *old;
++    AVFrame *decoded = ffmpegdec->picture;
++    output_frame->output_buffer =
++        gst_buffer_make_writable (output_frame->output_buffer);
++    while ((old = gst_buffer_get_dovi_picture_meta (output_frame->output_buffer)))
++      gst_buffer_remove_meta (output_frame->output_buffer, &old->meta);
++    if (!ffmpegdec->lowres &&
++        !decoded->crop_left && !decoded->crop_right &&
++        !decoded->crop_top && !decoded->crop_bottom &&
++        decoded->width == GST_VIDEO_INFO_WIDTH (&ffmpegdec->output_state->info) &&
++        decoded->height == GST_VIDEO_INFO_HEIGHT (&ffmpegdec->output_state->info))
++    {
++      GstFFMpegVidDecCodecFrameData *data = gst_video_codec_frame_get_user_data (output_frame);
++      dovi = gst_dovi_picture_from_avframe_with_config (decoded, NULL,
++          data && data->dovi_config_known ? &data->dovi_config : NULL,
++          data ? data->dovi_epoch : ffmpegdec->dovi_epoch,
++          output_frame->system_frame_number, NULL);
++    }
++    if (dovi) {
++      const GstDoviGeometry *geometry = gst_dovi_picture_get_geometry (dovi);
++      if (geometry->x || geometry->y || geometry->width != geometry->coded_width ||
++          geometry->height != geometry->coded_height) {
++        /* A direct-render GstBuffer can still name the uncropped allocation,
++         * although FFmpeg moved its AVFrame planes. Copy the complete active
++         * image from those exact planes before attaching the source snapshot. */
++        GstBuffer *coded = output_frame->output_buffer;
++        output_frame->output_buffer = NULL;
++        *ret = get_output_buffer (ffmpegdec, output_frame);
++        gst_buffer_unref (coded);
++        if (*ret != GST_FLOW_OK) {
++          gst_dovi_picture_unref (dovi);
++          goto no_output;
++        }
++      }
++      gst_buffer_add_dovi_picture_meta (output_frame->output_buffer, dovi);
++      gst_dovi_picture_unref (dovi);
++    }
++  }
++
+   /* Mark corrupted frames as corrupted */
+   if (ffmpegdec->picture->flags & AV_FRAME_FLAG_CORRUPT)
+     GST_BUFFER_FLAG_SET (output_frame->output_buffer,
+@@ -2307,6 +2405,15 @@ no_codec:
+ static gboolean
+ gst_ffmpegviddec_sink_event (GstVideoDecoder * decoder, GstEvent * event)
+ {
++  GstFFMpegVidDec *dovi_self = GST_FFMPEGVIDDEC (decoder);
++  if (GST_EVENT_TYPE (event) == GST_EVENT_STREAM_START) {
++    dovi_self->dovi_new_stream = TRUE;
++    dovi_self->dovi_config_ready = FALSE;
++
++  } else if (GST_EVENT_TYPE (event) == GST_EVENT_SEGMENT && !dovi_self->dovi_new_stream) {
++    dovi_self->dovi_config_ready = dovi_self->input_state != NULL;
++  }
++
+   GstFFMpegVidDec *ffmpegdec = GST_FFMPEGVIDDEC (decoder);
+ 
+   if (GST_EVENT_TYPE (event) == GST_EVENT_GAP) {
+@@ -2432,6 +2539,27 @@ gst_ffmpegviddec_handle_frame (GstVideoDecoder * decoder,
+   packet->data = data;
+   packet->size = size;
+ 
++  if (ffmpegdec->context->codec_id == AV_CODEC_ID_HEVC) {
++    GstFFMpegVidDecCodecFrameData *data = gst_video_codec_frame_get_user_data (frame);
++    if (!data) {
++      data = g_new0 (GstFFMpegVidDecCodecFrameData, 1);
++      gst_video_codec_frame_set_user_data (frame, data, gst_ffmpegviddec_codec_frame_data_free);
++    }
++    g_clear_pointer (&data->dovi_config_bytes, g_bytes_unref);
++    memset (&data->dovi_config, 0, sizeof (data->dovi_config));
++    data->dovi_config_known = ffmpegdec->dovi_config_ready &&
++        gst_dovi_caps_get_stream_config (ffmpegdec->input_state->caps,
++            &data->dovi_config, &data->dovi_config_bytes);
++    data->dovi_epoch = ffmpegdec->dovi_epoch;
++    /* An absent/incomplete record is an explicit clear, never 'no update'. */
++    uint8_t *side = av_packet_new_side_data (packet, AV_PKT_DATA_DOVI_CONF,
++        sizeof (data->dovi_config));
++    if (!side)
++      goto send_packet_failed;
++    memcpy (side, &data->dovi_config, sizeof (data->dovi_config));
++  }
++
++
+   /* Store a reference to the input frame. This will be carried along by FFmpeg
+    * to the resulting AVPicture */
+ #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT (60, 31, 100)
+@@ -2518,6 +2646,8 @@ gst_ffmpegviddec_stop (GstVideoDecoder * decoder)
+ {
+   GstFFMpegVidDec *ffmpegdec = GST_FFMPEGVIDDEC (decoder);
+ 
++  ffmpegdec->dovi_epoch++;
++
+   GST_OBJECT_LOCK (ffmpegdec);
+   av_frame_free (&ffmpegdec->picture);
+   gst_ffmpegviddec_close (ffmpegdec);
+@@ -2575,6 +2705,10 @@ gst_ffmpegviddec_flush (GstVideoDecoder * decoder)
+ {
+   GstFFMpegVidDec *ffmpegdec = GST_FFMPEGVIDDEC (decoder);
+ 
++  ffmpegdec->dovi_config_ready = FALSE;
++
++  ffmpegdec->dovi_epoch++;
++
+   if (ffmpegdec->context) {
+     GST_LOG_OBJECT (decoder, "flushing buffers");
+     GST_VIDEO_DECODER_STREAM_UNLOCK (ffmpegdec);
+diff --git a/ext/libav/gstavviddec.h b/ext/libav/gstavviddec.h
+index e0734ba..efbdcf2 100644
+--- a/ext/libav/gstavviddec.h
++++ b/ext/libav/gstavviddec.h
+@@ -51,6 +51,8 @@ struct _GstFFMpegVidDec
+   /* decoding */
+   AVCodecContext *context;
+   AVFrame *picture;
++  gboolean dovi_config_ready, dovi_new_stream;
++  guint64 dovi_epoch; /* advanced before decoder flush */
+   GstVideoMultiviewMode picture_multiview_mode;
+   GstVideoMultiviewFlags picture_multiview_flags;
+   gint stride[AV_NUM_DATA_POINTERS];
+diff --git a/ext/libav/meson.build b/ext/libav/meson.build
+index 85e334e..22c5266 100644
+--- a/ext/libav/meson.build
++++ b/ext/libav/meson.build
+@@ -31,7 +31,7 @@ gstlibav_plugin = library('gstlibav',
+     c_args : gst_libav_args,
+     include_directories : [configinc],
+     dependencies : libav_deps + [gst_dep, gstbase_dep, gstvideo_dep,
+-        gstaudio_dep, gstpbutils_dep],
++        gstaudio_dep, gstpbutils_dep, dependency('gstdovipicture-1.0', version: '=0.2.0')],
+     install : true,
+     install_dir : plugins_install_dir,
+   )

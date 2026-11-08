@@ -12,6 +12,8 @@ import time
 p = argparse.ArgumentParser()
 p.add_argument('--ordinary-media', required=True)
 p.add_argument('--start', default='0')
+p.add_argument('--check-tagged-png', action='store_true',
+               help='also verify the saved window PNG colour declaration (mpv 0.42 +rogdv4 or newer)')
 for name in ('mpv', 'media', 'weston_config', 'fixture_module', 'output'):
     p.add_argument('--' + name.replace('_', '-'), required=True)
 a = p.parse_args()
@@ -61,11 +63,11 @@ def log_text():
     return (out / 'mpv.log').read_text(errors='replace')
 
 
-def capture(name, physical):
+def capture(name, physical, native_csp=0):
     signal = re.findall(r'DV display signal valid=1 cache_reuse=\d peak=([\d.e+-]+)', log_text())
     marker = len(log_text())
     ipc(['screenshot-to-file', str(out / (name + '.png')), 'window'])
-    trace = re.findall(r'DV capture scaled=1 native=0 physical=(\d) signal_valid=(\d) transfer=(\d+) peak=([\d.e+-]+)', log_text()[marker:])
+    trace = re.findall(rf'DV capture scaled=1 native={native_csp} physical=(\d) signal_valid=(\d) transfer=(\d+) peak=([\d.e+-]+)', log_text()[marker:])
     assert trace, 'no display capture state witness'
     state = trace[-1]
     assert int(state[0]) == physical and int(state[1]) == physical, state
@@ -99,6 +101,18 @@ try:
     ipc(['show-text', 'paused cache regression', 10000])
     wait_until(lambda: 'DV display signal valid=1 cache_reuse=1' in log_text()[marker:])
     cached = capture('A-paused-cache-window', 1)
+    tagged = None
+    if a.check_tagged_png:
+        ipc(['set_property', 'screenshot-tag-colorspace', True])
+        tagged = capture('A-tagged-window', 1, native_csp=1)
+        stream = json.loads(subprocess.check_output([
+            'ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries',
+            'stream=color_primaries,color_transfer,color_space,color_range',
+            '-of', 'json', str(out / 'A-tagged-window.png')]))['streams'][0]
+        assert (stream.get('color_primaries'), stream.get('color_transfer'),
+                stream.get('color_space'), stream.get('color_range')) == (
+                    'bt2020', 'smpte2084', 'gbr', 'pc'), stream
+        ipc(['set_property', 'screenshot-tag-colorspace', False])
     fd = os.open(runtime / 'physical-target-control', os.O_WRONLY | os.O_NONBLOCK)
     try:
         os.write(fd, b'B\n')
@@ -114,6 +128,7 @@ try:
     ordinary = capture('ordinary-window', 0)
     (out / 'receipt.json').write_text(json.dumps({'status':'pass',
         'paused_cache_reuse':True, 'A':first, 'A_cached_capture':cached,
+        'A_tagged_window_capture':tagged,
         'B':second, 'B_capture':changed, 'ordinary_source_capture':ordinary,
         'physical_accuracy':'unmeasured; compositor-declared target only'}, indent=2)+'\n')
 finally:

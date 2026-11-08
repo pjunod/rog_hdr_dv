@@ -1,0 +1,28 @@
+From 4157e3268bda91bde231545033fc08954b7e5e77 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 00:53:17 -0500
+Subject: [PATCH] build(debian): scope unshipped test builds to noinsttest
+ profile
+
+---
+ debian/rules | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/debian/rules b/debian/rules
+index 0094f43..1288ac2 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -146,6 +146,13 @@ configure_flags_udeb = \
+ 	-Dx11-backend=true \
+ 	$(NULL)
+ 
++# The noinsttest profile omits both test and example binary packages.
++# Avoid compiling their unshipped suites; ordinary source builds keep defaults.
++ifneq (,$(filter noinsttest,$(DEB_BUILD_PROFILES)))
++configure_flags_deb += -Dbuild-tests=false -Dbuild-testsuite=false
++configure_flags_udeb += -Dbuild-testsuite=false
++endif
++
+ %:
+ 	dh $@ $(dh_options)
+ 

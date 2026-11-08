@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-08",
+  "public_build_revision": "3783db711e47a445ecd24b0ca3c67ebcca670831",
+  "cause": "Advertised input caps were broader than the CPU importer. Restricting them to ordinary system memory also broke NVIDIA and Intel decoders whose allocators implement CPU reads.",
+  "ordinary_video": "Unmarked input keeps its ordinary caps, format and memory domain.",
+  "input_contract": {
+    "SystemMemory": "All11 actual importer formats from canonical private table",
+    "CUDAMemory": [
+      "NV12",
+      "P010_10LE"
+    ],
+    "VAMemory": [
+      "NV12",
+      "P010_10LE"
+    ],
+    "excluded": [
+      "DMABuf",
+      "DMA_DRM",
+      "ANY at final marked set_caps",
+      "other accelerator-domain formats"
+    ]
+  },
+  "output_contract": "Always newly allocated SystemMemory RGBA64_LE/full BT.2020 PQ; both forward transform and final set_caps enforce this. Reverse exposes three explicit input-domain alternatives.",
+  "allocator_source": {
+    "native_source_commit": "6a95f6a8aee5d1fb1e01b7033bba92d1953a5f7f",
+    "cuda": {
+      "file": "gst-libs/gst/cuda/gstcudamemory.cpp",
+      "sha256": "ec76f7bece05033ec814a47bdae5ee93d784c0f2e85e6e8103c69db39df65da2",
+      "function": "cuda_mem_map",
+      "ordinary_READ": "Without GST_MAP_CUDA, downloads/synchronizes into host staging and returns staging pointer."
+    },
+    "va": {
+      "file": "gst-libs/gst/va/gstvaallocator.c",
+      "sha256": "524006875a26844aaafb36bb32716469370e11f54060269ba6dd00b7fd275c26",
+      "function": "_va_map_unlocked",
+      "ordinary_READ": "Without GST_MAP_VA, ensures derived/downloaded VAImage and returns host va_map_buffer storage."
+    }
+  },
+  "source_sha256": {
+    "native-input-formats.h": "78fd6f17d290c60f0d0f18f149d384c34d6c52068002524b4a08305da7e90709",
+    "mapper.c": "6134b601a13c69ef3b1c60de87168e7be369353f328eca79ee7940af1dd4d5db",
+    "gstgtkdovimap.c": "d4b1745368f36ab5745f61b8ba749dbc8b10925f2d591b0ee8a7c9a01770f416",
+    "negotiation-probe.c": "59e2e0d2722652bed6776d833adb8e844638b6664e1c5c6b34d7f5ab765572bf"
+  },
+  "release": {
+    "version": "0.1.0+rogdv2.1",
+    "normal_source_replay": "All product files and Debian packaging compared byte-for-byte against the public commit after extracting the built DSC.",
+    "sha256": {
+      "gstreamer1.0-gtk-dovi_0.1.0+rogdv2.1_amd64.deb": "a634baf7dd6839f5da62b1ed36c9acfba6591de17e320899a28f72a8cb511c81",
+      "libgstgtk-dovi-core-dev_0.1.0+rogdv2.1_amd64.deb": "74e1e2901d47ba07000312a240a72c366b36c01860f6cb79feaa2e0dd229990f",
+      "libgstgtk-dovi-core0_0.1.0+rogdv2.1_amd64.deb": "f82c6f56999f53a59daa0a8296d3a8cebebfc5e987fc7f05d47013e9873d7e02",
+      "gst-gtk-dovi-map_0.1.0+rogdv2.1.dsc": "2b5c59a3573bcb9a3c500d6ff632a2c7aa98005cf132bcefed4a2c765f9c597c"
+    }
+  },
+  "focused": {
+    "program": "packaging/gstreamer-gtk-dovi/negotiation-probe.c",
+    "checks": 65,
+    "failures": 0,
+    "controls": [
+      "NV12/P010 marked direct-caps acceptance",
+      "NV21/DMABuf/unknown memory direct-caps rejection",
+      "forward/reverse marked queries exclude unsupported input and impossible output",
+      "graded output format/transfer rejection",
+      "unmarked caps/features/ANY passthrough",
+      "real appsrc pipeline rejects marked unsupported inputs at link or not-negotiated, while matching unmarked pipelines reach EOS",
+      "NV12 and P010 map from the CUDA and VA domains to graded system memory. Reverse negotiation names each supported input domain."
+    ]
+  },
+  "gpu": {
+    "method": "ISO BMFF through qtdemux and h265parse. The first run let decodebin select the decoder. The second selected vah265dec explicitly. A fakesink consumed the graded output. The mapper received the previously recorded 616 cd/m2 target and the original release provider. Both fixtures reached the bounded end on each GPU. Counts describe mapper log records, including preroll.",
+    "output": "RGBA64_LE full-range BT.2020/PQ system memory",
+    "loaded_mapper_sha256": "7ba0b1e773ce7a5b0cdd478aeac63ed4abc0e082519aca38417b71601a12cc79",
+    "cpu_only_regression": "With the first negotiation fix the real NVIDIA stream stopped with GST_FLOW_NOT_NEGOTIATED before the first mapped frame. The previous package played the identical stream.",
+    "decoders": {
+      "nvh265dec": {
+        "input": "P010_10LE in CUDAMemory",
+        "profile5": {
+          "mapped": 7,
+          "baseline": 5
+        },
+        "metadata_gap_chart": {
+          "mapped": 60,
+          "baseline": 56
+        }
+      },
+      "vah265dec": {
+        "input": "P010_10LE in VAMemory",
+        "profile5": {
+          "mapped": 9,
+          "baseline": 0
+        },
+        "metadata_gap_chart": {
+          "mapped": 60,
+          "baseline": 54
+        }
+      }
+    }
+  },
+  "scope": "Digital render and negotiation only. No real desktop window, system install or panel measurement."
+}

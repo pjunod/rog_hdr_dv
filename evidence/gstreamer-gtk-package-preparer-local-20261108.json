@@ -1,0 +1,32 @@
+{
+  "scope": "one local direct metadata fixture exercise; no build, suite or laptop calls",
+  "inputs": "exact authenticated Ubuntu Debian archive members, matched retained original backups",
+  "idempotent": true,
+  "unmodified_showtime_source_stanza": true,
+  "refused_without_mutation": [
+    "manual source edits"
+  ],
+  "refused_exact_match_cases": [
+    "missing",
+    "duplicate",
+    "new-output"
+  ],
+  "default_clean": "removes source-owned target and debian/cargo_home; external task overrides not removed",
+  "output_inventory": {
+    "gtk": {
+      "source": "rust-gst-plugin-gtk4",
+      "binary_packages": [
+        "gstreamer1.0-gtk4"
+      ],
+      "excluded_packages": {
+        "librust-gst-plugin-gtk4-dev": "This recipe builds the native plugin, not a Debian Rust crate SDK."
+      }
+    },
+    "showtime": {
+      "source": "showtime",
+      "binary_packages": [
+        "showtime"
+      ]
+    }
+  }
+}

@@ -1,0 +1,156 @@
+From 2912b22f4426a956317a377b1eafd8ab165d500e Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 08:22:28 +0000
+Subject: [PATCH] screen-cast: write shared-memory frames in the negotiated
+ pixel format
+
+---
+ src/backends/meta-stream-source-area.c    |  1 -
+ src/backends/meta-stream-source-monitor.c |  1 -
+ src/backends/meta-stream-source-virtual.c |  1 -
+ src/backends/meta-stream-source.c         | 38 +++++++++++++++++------
+ src/backends/meta-stream-source.h         |  1 -
+ 5 files changed, 28 insertions(+), 14 deletions(-)
+
+diff --git a/src/backends/meta-stream-source-area.c b/src/backends/meta-stream-source-area.c
+index e44c4cc..bd1205d 100644
+--- a/src/backends/meta-stream-source-area.c
++++ b/src/backends/meta-stream-source-area.c
+@@ -479,7 +479,6 @@ meta_stream_source_area_record_to_buffer (MetaStreamSource      *source,
+                                              &area, scale,
+                                              width, height, stride,
+                                              data,
+-                                             COGL_PIXEL_FORMAT_ARGB32_NATIVE,
+                                              damage,
+                                              error);
+ 
+diff --git a/src/backends/meta-stream-source-monitor.c b/src/backends/meta-stream-source-monitor.c
+index d18f7ff..235f460 100644
+--- a/src/backends/meta-stream-source-monitor.c
++++ b/src/backends/meta-stream-source-monitor.c
+@@ -598,7 +598,6 @@ meta_stream_source_monitor_record_to_buffer (MetaStreamSource      *source,
+                                              framebuffer,
+                                              &logical_monitor->rect, scale,
+                                              width, height, stride, data,
+-                                             COGL_PIXEL_FORMAT_ARGB32_NATIVE,
+                                              damage,
+                                              error);
+ }
+diff --git a/src/backends/meta-stream-source-virtual.c b/src/backends/meta-stream-source-virtual.c
+index d972133..fed9f2a 100644
+--- a/src/backends/meta-stream-source-virtual.c
++++ b/src/backends/meta-stream-source-virtual.c
+@@ -408,7 +408,6 @@ meta_stream_source_virtual_record_to_buffer (MetaStreamSource      *source,
+                                              framebuffer,
+                                              &view_rect, scale,
+                                              width, height, stride, data,
+-                                             COGL_PIXEL_FORMAT_ARGB32_NATIVE,
+                                              damage,
+                                              error);
+ }
+diff --git a/src/backends/meta-stream-source.c b/src/backends/meta-stream-source.c
+index 263a05d..aac6688 100644
+--- a/src/backends/meta-stream-source.c
++++ b/src/backends/meta-stream-source.c
+@@ -436,6 +436,7 @@ ensure_framebuffer (MetaStreamSource *source,
+                     CoglContext      *cogl_context,
+                     int               width,
+                     int               height,
++                    CoglPixelFormat   format,
+                     GError          **error)
+ {
+   MetaStreamSourcePrivate *priv =
+@@ -446,9 +447,7 @@ ensure_framebuffer (MetaStreamSource *source,
+       g_autoptr (CoglTexture) texture = NULL;
+       CoglOffscreen *offscreen;
+ 
+-      texture = cogl_texture_2d_new_with_size (cogl_context,
+-                                               width,
+-                                               height);
++      texture = cogl_texture_2d_new_with_format (cogl_context, width, height, format);
+       if (!texture)
+         {
+           g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED,
+@@ -539,10 +538,12 @@ meta_stream_source_paint_to_buffer (MetaStreamSource   *source,
+                                     int                 height,
+                                     int                 stride,
+                                     uint8_t            *data,
+-                                    CoglPixelFormat     format,
+                                     MtkRegion          *damage,
+                                     GError            **error)
+ {
++  MetaStreamSourcePrivate *priv =
++    meta_stream_source_get_instance_private (source);
++  CoglPixelFormat format;
+   MetaStream *stream = meta_stream_source_get_stream (source);
+   MetaBackend *backend = meta_stream_get_backend (stream);
+   ClutterStage *stage = CLUTTER_STAGE (meta_backend_get_stage (backend));
+@@ -556,6 +557,13 @@ meta_stream_source_paint_to_buffer (MetaStreamSource   *source,
+   MtkRectangle extents;
+   int bpp;
+ 
++  if (!cogl_pixel_format_from_spa_video_format (priv->video_format.format, &format))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
++                           "Unknown shared-memory screencast pixel format");
++      return FALSE;
++    }
++
+   paint_flags = CLUTTER_PAINT_FLAG_NONE;
+   switch (meta_stream_get_cursor_mode (stream))
+     {
+@@ -570,7 +578,7 @@ meta_stream_source_paint_to_buffer (MetaStreamSource   *source,
+ 
+   if (!framebuffer)
+     {
+-      framebuffer = ensure_framebuffer (source, cogl_context, width, height, error);
++      framebuffer = ensure_framebuffer (source, cogl_context, width, height, format, error);
+       if (!framebuffer)
+         return FALSE;
+ 
+@@ -604,11 +612,16 @@ meta_stream_source_paint_to_buffer (MetaStreamSource   *source,
+                                      extents.y * stride +
+                                      extents.x * bpp);
+ 
+-  cogl_framebuffer_read_pixels_into_bitmap (framebuffer,
+-                                            extents.x,
+-                                            extents.y,
+-                                            COGL_READ_PIXELS_COLOR_BUFFER,
+-                                            bitmap);
++  if (!cogl_framebuffer_read_pixels_into_bitmap (framebuffer,
++                                                 extents.x,
++                                                 extents.y,
++                                                 COGL_READ_PIXELS_COLOR_BUFFER,
++                                                 bitmap))
++    {
++      g_set_error_literal (error, G_IO_ERROR, G_IO_ERROR_FAILED,
++                           "Failed to read screencast pixels");
++      return FALSE;
++    }
+   return TRUE;
+ }
+ 
+@@ -2241,6 +2254,11 @@ on_format_param_changed (MetaStreamSource *source,
+                   video_format.max_framerate.denom);
+     }
+ 
++  if (priv->video_format.format != video_format.format ||
++      priv->video_format.size.width != video_format.size.width ||
++      priv->video_format.size.height != video_format.size.height)
++    g_clear_object (&priv->framebuffer);
++
+   priv->video_format = video_format;
+ 
+   meta_topic (META_DEBUG_SCREEN_CAST,
+diff --git a/src/backends/meta-stream-source.h b/src/backends/meta-stream-source.h
+index dc1dc40..c4f213b 100644
+--- a/src/backends/meta-stream-source.h
++++ b/src/backends/meta-stream-source.h
+@@ -167,7 +167,6 @@ gboolean meta_stream_source_paint_to_buffer (MetaStreamSource   *source,
+                                              int                 height,
+                                              int                 stride,
+                                              uint8_t            *data,
+-                                             CoglPixelFormat     format,
+                                              MtkRegion          *damage,
+                                              GError            **error);
+ 

@@ -1,0 +1,34 @@
+--- a/ext/gl/gstglcolorbalance.c
++++ b/ext/gl/gstglcolorbalance.c
+@@ -57,7 +57,7 @@
+ 
+ #define GST_GL_COLOR_BALANCE_VIDEO_CAPS \
+     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY "), "              \
+-    "format = (string) RGBA, "              \
++    "format = (string) { RGBA, RGBA64_LE }, "              \
+     "width = " GST_VIDEO_SIZE_RANGE ", "                                \
+     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
+     "framerate = " GST_VIDEO_FPS_RANGE ", "                             \
+@@ -65,7 +65,7 @@
+     " ; "                                                               \
+     "video/x-raw(" GST_CAPS_FEATURE_MEMORY_GL_MEMORY ","                \
+     GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION "), "           \
+-    "format = (string) RGBA, "              \
++    "format = (string) { RGBA, RGBA64_LE }, "              \
+     "width = " GST_VIDEO_SIZE_RANGE ", "                                \
+     "height = " GST_VIDEO_SIZE_RANGE ", "                               \
+     "framerate = " GST_VIDEO_FPS_RANGE ", "                             \
+@@ -398,6 +398,13 @@
+ {
+   const GstMetaInfo *info = meta->info;
+   gboolean should_copy = TRUE;
++
++  /* Neutral balance uses GstBaseTransform passthrough and retains the input
++   * buffer. Once pixels are transformed, color-sensitive provenance no longer
++   * describes the output; do not carry it through the generic video tag path. */
++  if (gst_meta_api_type_has_tag (info->api,
++          g_quark_from_static_string (GST_META_TAG_VIDEO_COLORSPACE_STR)))
++    return FALSE;
+   const gchar *valid_tags[] = {
+     GST_META_TAG_VIDEO_STR,
+     GST_META_TAG_VIDEO_ORIENTATION_STR,

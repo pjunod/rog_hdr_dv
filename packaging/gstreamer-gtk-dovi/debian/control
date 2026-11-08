@@ -1,0 +1,30 @@
+Source: gst-gtk-dovi-map
+Section: video
+Priority: optional
+Maintainer: ROG HDR contributors <rog-hdr@invalid>
+Build-Depends: debhelper-compat (= 13), meson, pkgconf, libgstreamer1.0-dev (>= 1.28.7), libgstreamer-plugins-base1.0-dev (>= 1.28.7), libgstdovipicture-1.0-dev (>= 0.2.0+rogdv1), librog-dv-provider387-dev, libavutil-dev
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+
+Package: libgstgtk-dovi-core0
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}, libgstdovipicture-1.0-0 (>= 0.2.0+rogdv1), rog-dv-hevc-runtime (>= 2), rog-gstreamer-dovi-base-api (= 1)
+Description: Native per-picture Dolby renderer integration for GTK video
+ Shared immutable native-picture lifecycle and per-surface mapping adapter.
+ Requires the separately distributed private mapping provider.
+
+Package: libgstgtk-dovi-core-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: libgstgtk-dovi-core0 (= ${binary:Version}), libgstreamer-plugins-base1.0-dev, ${misc:Depends}
+Description: Development files for GTK native Dolby picture mapping
+ Public integration header and pkg-config metadata, without private mapping code.
+
+Package: gstreamer1.0-gtk-dovi
+Architecture: any
+Multi-Arch: same
+Depends: libgstgtk-dovi-core0 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Per-surface pre-conversion Dolby mapper for GTK GStreamer playback
+ Explicitly inserted by the bound application; plugin ranks are unchanged.

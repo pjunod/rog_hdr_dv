@@ -1,0 +1,55 @@
+diff --git a/debian/changelog b/debian/changelog
+index 42bdf72..e37310d 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-good1.0 (1.28.7-1build1+rogdv1) stonking; urgency=medium
++
++  * Carry validated Dolby configuration through the normal qtdemux plugin.
++  * Require the explicit private base/strict runtime ABI where consumed.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 04:35:15 +0000
++
+ gst-plugins-good1.0 (1.28.7-1build1) stonking; urgency=medium
+ 
+   * No-change rebuild for Qt 6.11.2 private ABI.
+diff --git a/debian/control b/debian/control
+index 6c2c23e..d265696 100644
+--- a/debian/control
++++ b/debian/control
+@@ -4,7 +4,7 @@ Maintainer: Maintainers of GStreamer packages <gst-plugins-good1.0@packages.debi
+ Uploaders: Sebastian Dröge <slomo@debian.org>,
+            Sjoerd Simons <sjoerd@debian.org>,
+            Marc Leeman <marc.leeman@gmail.com>,
+-Build-Depends: debhelper,
++Build-Depends: rog-gstreamer-dovi-base-api (= 1), debhelper,
+                debhelper-compat (= 13),
+                dpkg-dev (>= 1.15.1),
+                meson (>= 1.4.0),
+@@ -157,7 +157,7 @@ Description: GStreamer plugin for GTK+3
+ Package: gstreamer1.0-plugins-good
+ Architecture: any
+ Multi-Arch: same
+-Depends: ${misc:Depends},
++Depends: rog-gstreamer-dovi-base-api (= 1), ${misc:Depends},
+          ${shlibs:Depends},
+          gstreamer1.0-audiosink,
+          gstreamer1.0-plugins-base (>= 1.28.0),
+diff --git a/debian/rules b/debian/rules
+index 7f94678..4437e70 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -5,6 +5,13 @@ include /usr/share/dpkg/pkg-info.mk
+ 
+ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+ export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
++
++# Bound native GCC LTO workers independently of the outer job count.
++ifeq ($(DEB_HOST_ARCH),amd64)
++export DEB_CFLAGS_MAINT_APPEND += -flto=2
++export DEB_CXXFLAGS_MAINT_APPEND += -flto=2
++export DEB_LDFLAGS_MAINT_APPEND += -flto=2
++endif
+ export HOME=$(CURDIR)/fake-home
+ export QT_SELECT=5
+ 

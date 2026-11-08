@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --without single-binary
+
+override_dh_gencontrol:
+ifeq ($(shell dpkg-vendor --query vendor),Ubuntu)
+	dh_gencontrol -- -Vgst-plugins-extra:Depends=gir1.2-gst-plugins-extra-1.0
+else
+	dh_gencontrol -- -Vgst-plugins-extra:Depends=gir1.2-gst-plugins-bad-1.0
+endif
+
+# We only use dh_gnome to automatically run dh_translations in Ubuntu
+override_dh_gnome:

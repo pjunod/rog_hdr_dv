@@ -1,0 +1,28 @@
+From 250e7dac0e19baa238a737bcecd4aefa5f1b2fba Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <noreply@rog-hdr-dv.invalid>
+Date: Sat, 7 Nov 2026 23:41:09 -0500
+Subject: [PATCH] vo_gpu_next: keep the displayed Dolby grade in tagged window
+ captures
+
+---
+ video/out/vo_gpu_next.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index a82a980..f59e3ef 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -2115,7 +2115,9 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+ 
+     update_options(vo);
+     struct pl_render_params params = pars->params;
+-    const bool physical_capture = args->scaled && !args->native_csp;
++    // A window screenshot reproduces the displayed grade. native_csp describes
++    // what the file writer accepts, independently of which view was requested.
++    const bool physical_capture = args->scaled;
+     params.dovi_map = physical_capture ? dovi_map : dv_provider387_map;
+     params.dovi_reset = physical_capture ? dovi_reset : dv_provider387_reset;
+     params.dovi_priv = physical_capture ? (void *)p : (void *)p->dovi_provider;
+-- 
+2.54.0 (Apple Git-157)
+

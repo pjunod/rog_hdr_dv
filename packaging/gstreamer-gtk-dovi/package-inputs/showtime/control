@@ -1,0 +1,40 @@
+Source: showtime
+Standards-Version: 4.7.4
+Maintainer: Debian GNOME Maintainers <pkg-gnome-maintainers@lists.alioth.debian.org>
+Uploaders:
+ Danial Behzadi <dani.behzi@ubuntu.com>,
+Section: video
+Build-Depends:
+ debhelper-compat (= 14),
+ dh-sequence-gnome,
+ dh-sequence-python3,
+ appstream <!nocheck>,
+ blueprint-compiler (>= 0.18),
+ desktop-file-utils,
+ gobject-introspection,
+ libadwaita-1-dev (>= 1.8),
+ libglib2.0-dev,
+ libgtk-4-dev (>= 4.20),
+ libxml2-utils,
+ meson,
+ pkgconf,
+Vcs-Browser: https://salsa.debian.org/gnome-team/showtime
+Vcs-Git: https://salsa.debian.org/gnome-team/showtime.git
+Homepage: https://apps.gnome.org/Showtime
+
+Package: showtime
+Architecture: all
+Depends:
+ gir1.2-adw-1 (>= 1.8),
+ gir1.2-gst-plugins-base-1.0,
+ gir1.2-gtk-4.0 (>= 4.20),
+ gstreamer1.0-gl,
+ gstreamer1.0-gtk4,
+ gstreamer1.0-plugins-good,
+ python3-gi,
+ ${gst-plugins-extra:Depends},
+Description: Watch without distraction
+ Play your favorite movies and video files without hassle. Showtime features
+ simple playback controls that fade out of your way when you're watching,
+ fullscreen, adjustable playback speed, multiple language and subtitle tracks,
+ and screenshots — everything you need for a straightforward viewing experience.

@@ -1,0 +1,333 @@
+diff --git a/sys/va/gstvabasedec.c b/sys/va/gstvabasedec.c
+index 7a49e55..7eb18f4 100644
+--- a/sys/va/gstvabasedec.c
++++ b/sys/va/gstvabasedec.c
+@@ -18,6 +18,7 @@
+  * Boston, MA 02110-1301, USA.
+  */
+ 
++#include <gstdovipicture.h>
+ #include "gstvabasedec.h"
+ 
+ #include <gst/va/gstva.h>
+@@ -1177,6 +1178,15 @@ gst_va_base_dec_set_output_state (GstVaBaseDec * base)
+   if (capsfeatures)
+     gst_caps_set_features_simple (base->output_state->caps, capsfeatures);
+ 
++  {
++    AVDOVIDecoderConfigurationRecord config;
++    GBytes *bytes = NULL;
++    if (base->input_state)
++      gst_dovi_caps_get_stream_config (base->input_state->caps, &config, &bytes);
++    gst_dovi_caps_apply_stream_config (base->output_state->caps, bytes);
++    g_clear_pointer (&bytes, g_bytes_unref);
++  }
++
+   GST_INFO_OBJECT (base, "Negotiated caps %" GST_PTR_FORMAT,
+       base->output_state->caps);
+ 
+diff --git a/sys/va/gstvah265dec.c b/sys/va/gstvah265dec.c
+index fa5eec5..422ccc3 100644
+--- a/sys/va/gstvah265dec.c
++++ b/sys/va/gstvah265dec.c
+@@ -52,6 +52,8 @@
+ #ifdef HAVE_CONFIG_H
+ #include "config.h"
+ #endif
++#include <gstdovipicture.h>
++
+ 
+ #include "gstvah265dec.h"
+ 
+@@ -89,6 +91,9 @@ struct _GstVaH265Dec
+   GstVaBaseDec parent;
+ 
+   gint dpb_size;
++  GstDoviResolver *dovi_resolver;
++  guint64 dovi_generation;
++  gboolean dovi_config_ready, dovi_new_stream;
+ 
+   VAPictureParameterBufferHEVCExtension pic_param;
+ 
+@@ -99,6 +104,111 @@ struct _GstVaH265Dec
+ 
+ static GstElementClass *parent_class = NULL;
+ 
++typedef struct {
++  GstDoviPicture *picture;
++  guint64 generation;
++} GstVaDoviSnapshot;
++
++static GQuark
++dovi_snapshot_quark (void)
++{
++  return g_quark_from_static_string ("gst-va-h265-owned-dovi-picture");
++}
++
++static void
++dovi_snapshot_free (gpointer data)
++{
++  GstVaDoviSnapshot *snapshot = data;
++  gst_dovi_picture_unref (snapshot->picture);
++  g_free (snapshot);
++}
++
++static void
++dovi_reset (GstVaH265Dec *self)
++{
++  if (self->dovi_resolver)
++    gst_dovi_resolver_reset (self->dovi_resolver);
++  self->dovi_generation++;
++}
++
++static gboolean
++gst_va_h265_dec_flush (GstVideoDecoder *decoder)
++{
++  GstVideoDecoderClass *parent = GST_VIDEO_DECODER_CLASS (parent_class);
++  GST_VA_H265_DEC (decoder)->dovi_config_ready = FALSE;
++  dovi_reset (GST_VA_H265_DEC (decoder));
++  return !parent->flush || parent->flush (decoder);
++}
++
++static void
++dovi_configure_from_caps (GstVaH265Dec *self)
++{
++  GstH265Decoder *decoder = GST_H265_DECODER (self);
++  AVDOVIDecoderConfigurationRecord config;
++  GBytes *bytes = NULL;
++  gboolean known = self->dovi_config_ready && decoder->input_state &&
++      gst_dovi_caps_get_stream_config (decoder->input_state->caps, &config, &bytes);
++  if (self->dovi_resolver)
++    gst_dovi_resolver_configure (self->dovi_resolver, known ? &config : NULL,
++        known ? sizeof (config) : 0, NULL);
++  g_clear_pointer (&bytes, g_bytes_unref);
++}
++static gboolean
++gst_va_h265_dec_sink_event (GstVideoDecoder *decoder, GstEvent *event)
++{
++  GstVaH265Dec *self = GST_VA_H265_DEC (decoder);
++  GstH265Decoder *h265 = GST_H265_DECODER (decoder);
++  GstVideoDecoderClass *parent = GST_VIDEO_DECODER_CLASS (parent_class);
++  GstEventType type = GST_EVENT_TYPE (event);
++  if (type == GST_EVENT_CAPS) {
++    AVDOVIDecoderConfigurationRecord ignored;
++    GBytes *before = NULL, *after = NULL;
++    gboolean was_ready = self->dovi_config_ready && !self->dovi_new_stream;
++    if (h265->input_state)
++      gst_dovi_caps_get_stream_config (h265->input_state->caps, &ignored, &before);
++    gboolean accepted = !parent->sink_event || parent->sink_event (decoder, event);
++    if (accepted && h265->input_state)
++      gst_dovi_caps_get_stream_config (h265->input_state->caps, &ignored, &after);
++    gboolean changed = (!before != !after) ||
++        (before && after && !g_bytes_equal (before, after));
++    self->dovi_new_stream = FALSE;
++    self->dovi_config_ready = accepted && h265->input_state != NULL;
++    if (!accepted || changed || !was_ready) {
++      dovi_reset (self);
++      dovi_configure_from_caps (self);
++    }
++    if (accepted && h265->input_state) {
++      GstVaBaseDec *base = GST_VA_BASE_DEC (self);
++      g_clear_pointer (&base->input_state, gst_video_codec_state_unref);
++      base->input_state = gst_video_codec_state_ref (h265->input_state);
++      base->need_negotiation = TRUE;
++    }
++    g_clear_pointer (&before, g_bytes_unref);
++    g_clear_pointer (&after, g_bytes_unref);
++    return accepted;
++  }
++  if (type == GST_EVENT_STREAM_START) {
++    self->dovi_new_stream = TRUE;
++    self->dovi_config_ready = FALSE;
++    dovi_reset (self);
++  } else if (type == GST_EVENT_SEGMENT && !self->dovi_new_stream) {
++    self->dovi_config_ready = TRUE;
++    dovi_configure_from_caps (self);
++  }
++  /* FLUSH_START is not serialized. Derived state is invalidated exclusively
++   * in the serialized flush callback, never by racing streaming state here. */
++  return !parent->sink_event || parent->sink_event (decoder, event);
++}
++
++static gboolean
++gst_va_h265_dec_stop (GstVideoDecoder *decoder)
++{
++  GstVideoDecoderClass *parent = GST_VIDEO_DECODER_CLASS (parent_class);
++  dovi_reset (GST_VA_H265_DEC (decoder));
++  return !parent->stop || parent->stop (decoder);
++}
++
++
+ /* *INDENT-OFF* */
+ static const gchar *src_caps_str =
+     GST_VIDEO_CAPS_MAKE_WITH_FEATURES (GST_CAPS_FEATURE_MEMORY_VA,
+@@ -205,12 +315,14 @@ gst_va_h265_dec_end_picture (GstH265Decoder * decoder, GstH265Picture * picture)
+   _replace_previous_slice (self, NULL, 0);
+ 
+   if (!ret) {
++    dovi_reset (self);
+     GST_ERROR_OBJECT (self, "Failed to submit the previous slice");
+     return GST_FLOW_ERROR;
+   }
+ 
+   ret = gst_va_decoder_decode (base->decoder, va_pic);
+   if (!ret) {
++    dovi_reset (self);
+     GST_ERROR_OBJECT (self, "Failed at end picture %p, (poc %d)",
+         picture, picture->pic_order_cnt);
+     return GST_FLOW_ERROR;
+@@ -239,6 +351,31 @@ gst_va_h265_dec_output_picture (GstH265Decoder * decoder,
+ 
+   ret = gst_va_base_dec_process_output (base, frame,
+       GST_CODEC_PICTURE (picture)->discont_state, picture->buffer_flags);
++  if (ret) {
++    GstVaDoviSnapshot *snapshot = gst_mini_object_get_qdata (
++        GST_MINI_OBJECT (picture), dovi_snapshot_quark ());
++    GstDoviPictureMeta *old;
++    frame->output_buffer = gst_buffer_make_writable (frame->output_buffer);
++    while ((old = gst_buffer_get_dovi_picture_meta (frame->output_buffer)))
++      gst_buffer_remove_meta (frame->output_buffer, &old->meta);
++    if (snapshot && snapshot->generation == self->dovi_generation) {
++      const GstDoviGeometry *geometry = gst_dovi_picture_get_geometry (snapshot->picture);
++      GstVideoCropMeta *crop = gst_buffer_get_video_crop_meta (frame->output_buffer);
++      GstVideoMeta *video = gst_buffer_get_video_meta (frame->output_buffer);
++      gboolean active_output = geometry->width == (guint) GST_VIDEO_INFO_WIDTH (&base->output_info) &&
++          geometry->height == (guint) GST_VIDEO_INFO_HEIGHT (&base->output_info);
++      if (crop) {
++        active_output &= crop->x == geometry->x && crop->y == geometry->y &&
++            crop->width == geometry->width && crop->height == geometry->height &&
++            video && video->width >= geometry->x + geometry->width &&
++            video->height >= geometry->y + geometry->height;
++      } else if (video) {
++        active_output &= video->width == geometry->width && video->height == geometry->height;
++      }
++      if (active_output)
++        gst_buffer_add_dovi_picture_meta (frame->output_buffer, snapshot->picture);
++    }
++  }
+   gst_h265_picture_unref (picture);
+ 
+   if (ret)
+@@ -486,7 +623,7 @@ gst_va_h265_dec_decode_slice (GstH265Decoder * decoder,
+   if (!_submit_previous_slice (base, va_pic)) {
+     _replace_previous_slice (self, NULL, 0);
+     GST_ERROR_OBJECT (base, "Failed to submit previous slice buffers");
+-    return GST_FLOW_ERROR;
++    { dovi_reset (self); return GST_FLOW_ERROR; }
+   }
+ 
+   slice_param = &self->prev_slice.param;
+@@ -664,6 +801,46 @@ gst_va_h265_dec_start_picture (GstH265Decoder * decoder,
+   pps = slice->header.pps;
+   sps = pps->sps;
+ 
++  /* new/start_picture run in decode order. Resolve now, then keep this owned
++   * immutable snapshot on the exact picture through display-order output. */
++  {
++    GstVideoCodecFrame *frame = gst_video_decoder_get_frame (
++        GST_VIDEO_DECODER (decoder), GST_CODEC_PICTURE (picture)->system_frame_number);
++    GBytes *rpu = NULL;
++    int extracted = frame ? gst_dovi_extract_hevc_rpu (frame->input_buffer,
++        decoder->input_state, &rpu, NULL) : -1;
++    if (extracted < 0 || (frame &&
++            GST_BUFFER_FLAG_IS_SET (frame->input_buffer, GST_BUFFER_FLAG_DISCONT)))
++      dovi_reset (self);
++    if (extracted > 0 && self->dovi_resolver) {
++      GstDoviGeometry geometry = { sps->width, sps->height, 0, 0,
++        sps->width, sps->height };
++      if (sps->conformance_window_flag) {
++        geometry.x = sps->crop_rect_x; geometry.y = sps->crop_rect_y;
++        geometry.width = sps->crop_rect_width; geometry.height = sps->crop_rect_height;
++      }
++      GstDoviPicture *resolved = gst_dovi_resolver_resolve_geometry (self->dovi_resolver,
++          rpu, &geometry, GST_CODEC_PICTURE (picture)->system_frame_number, NULL);
++      if (!resolved) {
++        dovi_reset (self);
++      } else if (sps->chroma_format_idc == 1 && !(geometry.x & 1) && !(geometry.y & 1) &&
++          !(geometry.width & 1) && !(geometry.height & 1) && !sps->vui_params.field_seq_flag &&
++          !sps->vui_params.default_display_window_flag) {
++        GstVaDoviSnapshot *snapshot = g_new0 (GstVaDoviSnapshot, 1);
++        snapshot->picture = resolved;
++        snapshot->generation = self->dovi_generation;
++        gst_mini_object_set_qdata (GST_MINI_OBJECT (picture),
++            dovi_snapshot_quark (), snapshot, dovi_snapshot_free);
++      } else {
++        gst_dovi_picture_unref (resolved);
++      }
++    }
++    g_clear_pointer (&rpu, g_bytes_unref);
++    if (frame)
++      gst_video_codec_frame_unref (frame);
++  }
++
++
+   /* *INDENT-OFF* */
+   pic_param->base = (VAPictureParameterBufferHEVC) {
+     .pic_width_in_luma_samples = sps->pic_width_in_luma_samples,
+@@ -793,7 +970,7 @@ gst_va_h265_dec_start_picture (GstH265Decoder * decoder,
+       sizeof (*pic_param) : sizeof (pic_param->base);
+   if (!gst_va_decoder_add_param_buffer (base->decoder, va_pic,
+           VAPictureParameterBufferType, pic_param, pic_param_size))
+-    return GST_FLOW_ERROR;
++    { dovi_reset (self); return GST_FLOW_ERROR; }
+ 
+   if (pps->scaling_list_data_present_flag ||
+       (sps->scaling_list_enabled_flag
+@@ -833,7 +1010,7 @@ gst_va_h265_dec_start_picture (GstH265Decoder * decoder,
+ 
+     if (!gst_va_decoder_add_param_buffer (base->decoder, va_pic,
+             VAIQMatrixBufferType, &iq_matrix, sizeof (iq_matrix))) {
+-      return GST_FLOW_ERROR;
++      { dovi_reset (self); return GST_FLOW_ERROR; }
+     }
+   }
+ 
+@@ -1049,6 +1226,9 @@ gst_va_h265_dec_new_sequence (GstH265Decoder * decoder, const GstH265SPS * sps,
+   guint rt_format;
+   gboolean negotiation_needed = FALSE;
+ 
++  dovi_reset (self);
++  dovi_configure_from_caps (self);
++
+   if (self->dpb_size < max_dpb_size)
+     self->dpb_size = max_dpb_size;
+ 
+@@ -1195,6 +1375,7 @@ gst_va_h265_dec_getcaps (GstVideoDecoder * decoder, GstCaps * filter)
+ static void
+ gst_va_h265_dec_dispose (GObject * object)
+ {
++  g_clear_pointer (&GST_VA_H265_DEC (object)->dovi_resolver, gst_dovi_resolver_free);
+   g_free (GST_VA_H265_DEC (object)->prev_slice.data);
+ 
+   gst_va_base_dec_close (GST_VIDEO_DECODER (object));
+@@ -1244,6 +1425,9 @@ gst_va_h265_dec_class_init (gpointer g_class, gpointer class_data)
+   gobject_class->dispose = gst_va_h265_dec_dispose;
+ 
+   decoder_class->getcaps = GST_DEBUG_FUNCPTR (gst_va_h265_dec_getcaps);
++  decoder_class->flush = GST_DEBUG_FUNCPTR (gst_va_h265_dec_flush);
++  decoder_class->sink_event = GST_DEBUG_FUNCPTR (gst_va_h265_dec_sink_event);
++  decoder_class->stop = GST_DEBUG_FUNCPTR (gst_va_h265_dec_stop);
+ 
+   h265decoder_class->new_sequence =
+       GST_DEBUG_FUNCPTR (gst_va_h265_dec_new_sequence);
+@@ -1270,6 +1454,7 @@ gst_va_h265_dec_class_init (gpointer g_class, gpointer class_data)
+ static void
+ gst_va_h265_dec_init (GTypeInstance * instance, gpointer g_class)
+ {
++  GST_VA_H265_DEC (instance)->dovi_resolver = gst_dovi_resolver_new ();
+   gst_va_base_dec_init (GST_VA_BASE_DEC (instance), GST_CAT_DEFAULT);
+   gst_h265_decoder_set_process_ref_pic_lists (GST_H265_DECODER (instance),
+       TRUE);
+diff --git a/sys/va/meson.build b/sys/va/meson.build
+index 5b06b2b..0f2de38 100644
+--- a/sys/va/meson.build
++++ b/sys/va/meson.build
+@@ -128,7 +128,7 @@ gstva = library('gstva',
+   c_args : gst_plugins_bad_args + extra_args,
+   cpp_args : gst_plugins_bad_args + extra_args,
+   include_directories : [configinc, libsinc],
+-  dependencies : [gstcodecs_dep, gstva_dep, libgudev_dep, libm, gstpbutils_dep] + extra_dep,
++  dependencies : [gstcodecs_dep, gstva_dep, libgudev_dep, libm, gstpbutils_dep, dependency('gstdovipicture-1.0', version: '=0.2.0')] + extra_dep,
+   override_options : c_std_arg,
+   install : true,
+   install_dir : plugins_install_dir,

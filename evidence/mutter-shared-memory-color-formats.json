@@ -1,0 +1,149 @@
+{
+  "component": "Ubuntu Mutter 51, patch 0107, source tree 1d20b861bc329c8a16623063bad2b4fed33bf4fe",
+  "conditions": "Private GNOME compositor on the ROG Intel GPU. The virtual connector advertised PQ and BT.2020 for this fixture. 1280 by 800 at 60 Hz, 616 cd/m\u00b2 peak, 203 cd/m\u00b2 reference white. The viewer displayed six flat patches encoded independently as BT.2020. The screen recorder requested a single exact SPA format and shared-memory (MemFd) buffers. Each connection captured a complete frame directly, with no video converter.",
+  "failure_before_fix": "A black pixel in a buffer negotiated as xRGB_210LE contained 0xff000000. In that layout red is 1008. The monitor shared-memory writer had used its native 8-bit ARGB readback for every format. The area and virtual-output writers passed the same constant. Detached repaint also allocated a default-precision texture.",
+  "sequence": [
+    "xRGB_210LE",
+    "xBGR_210LE",
+    "RGBA_F16",
+    "BGRx",
+    "xRGB_210LE"
+  ],
+  "patch_order": [
+    "red",
+    "green",
+    "blue",
+    "white",
+    "mixed",
+    "black"
+  ],
+  "pq_rgb_10bit": [
+    [
+      579,
+      362,
+      247
+    ],
+    [
+      339,
+      582,
+      302
+    ],
+    [
+      300,
+      204,
+      587
+    ],
+    [
+      594,
+      594,
+      594
+    ],
+    [
+      335,
+      434,
+      534
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "max_channel_difference_xrgb_xbgr_after_unpacking": 0,
+  "max_channel_difference_rgba_f16_times_1023_vs_xrgb_10bit": 0.5732421875,
+  "sdr_bgrx_unpacked_rgb8": [
+    [
+      255,
+      0,
+      0
+    ],
+    [
+      0,
+      255,
+      0
+    ],
+    [
+      0,
+      0,
+      255
+    ],
+    [
+      255,
+      255,
+      255
+    ],
+    [
+      0,
+      129,
+      204
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "scope": "Digital monitor screen capture using corrected source objects and a test-only virtual connector. The shared-memory path was exercised. Direct DMA-BUF capture and physical panel response were outside this measurement.",
+  "same_stream": {
+    "sequence": [
+      "xRGB_210LE",
+      "RGBA_F16",
+      "xRGB_210LE"
+    ],
+    "operation": "The consumer changed SPA_PARAM_EnumFormat on the same running stream. Each newly selected format produced a full shared-memory frame.",
+    "original_vs_returned_xr30_changed_pixels": 0,
+    "xr30_vs_half_float_max_sampled_channel_difference_in_10bit_units": 0.5732421875,
+    "returned_width": 1280,
+    "returned_height": 800
+  },
+  "area_control": "The separate GNOME area recorder produced its advertised BGRx SDR format and rejected the 10-bit PQ request.",
+  "moving_damage_control": {
+    "fixture": "Full-screen GTK window with standard CSS sRGB backgrounds. The window was stationary for an idle capture, then alternated between the two colors every 200 ms while one stream stayed connected.",
+    "sdr_inputs": [
+      [
+        69,
+        135,
+        187
+      ],
+      [
+        70,
+        136,
+        188
+      ]
+    ],
+    "bgrx_unpacked_rgb8": [
+      [
+        69,
+        135,
+        187
+      ],
+      [
+        70,
+        136,
+        188
+      ]
+    ],
+    "xr30_rgb10": [
+      [
+        396,
+        446,
+        516
+      ],
+      [
+        398,
+        448,
+        517
+      ]
+    ],
+    "captured_frames_per_format": 8,
+    "result": "All eight samples alternated with the source in both formats. The idle value matched the corresponding active frame."
+  },
+  "normal_package_replay": {
+    "version": "51.0-1ubuntu3+nativehdr15",
+    "source_dsc_sha256": "8fe72c02c758b0c62a8cf9d7a1732398e01e9454da5ebf53b2ff1dc6c280fa8e",
+    "source": "The complete 107-patch series replayed from the pinned Ubuntu archives. A separate extraction of the final Debian source package matched all five affected source files against both the reconstructed source and the compiler inputs.",
+    "runtime_libmutter_deb_sha256": "cdbc93727077c25052fc23372e2de3ca1a2f61472ac52aa2e556beba52490be6",
+    "runtime": "Stock virtual connector with Mutter debug force-HDR active in a private session. The unmodified five-package distribution prefix provided the compositor executable and its loaded Mutter, Clutter, Cogl and MTK libraries, confirmed from the running process.",
+    "result": "On that release build the two stationary and eight actively changing color samples per format reproduced the documented XR30 and BGRx values."
+  }
+}

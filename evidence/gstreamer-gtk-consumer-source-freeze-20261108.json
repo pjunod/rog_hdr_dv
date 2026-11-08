@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "scope": "source and compile only; no consumer runtime executed",
+  "source_packages": {
+    "rust-gst-plugin-gtk4": "0.15.2-1ubuntu2",
+    "showtime": "50.0-2"
+  },
+  "source_dsc_sha256": {
+    "rust-gst-plugin-gtk4": "ad7995bbe500effc176eb2f901e77a9ef8f696fb44426809e327665c47bc979b",
+    "showtime": "710bbc16b2df5c75a397e584c43c64da2c572cb1f11db8fdc66d71792c295f7a"
+  },
+  "checks": {
+    "shared_C_core_and_module": "PASS strict compiler/link; Werror",
+    "Rust_check": "PASS; two preexisting unexpected winegl cfg warnings",
+    "Rust_full_cdylib": "PASS offline -j1, full distro features; two preexisting winegl cfg warnings",
+    "Showtime_resource_build": "PASS final py_compile and Meson app resource build -j1",
+    "public_patch_replay": "PASS all three patches exactly reproduce compiled native source",
+    "ELF_namespace": "C core imports pl_rog387_*; uniquely named renderer/provider SONAMEs"
+  },
+  "public_source_sha256": {
+    "packaging/gstreamer-gtk-dovi/0001-showtime-bind-native-target-before-gl-conversion.patch": "d02697b6924d1026e5493c622c1fca44179845b9a3bc87aa52d50e73ad2ca87b",
+    "packaging/gstreamer-gtk-dovi/0002-gtk4paintablesink-preserve-16bit-rgba.patch": "72eb29708b3245166d9ca2e6c120cb64c73188db11ebd2314459282ce7d936bf",
+    "packaging/gstreamer-gtk-dovi/0003-gtk4paintablesink-retarget-visible-native-pictures.patch": "b6e26049f2c1a3692fe65a2e4429ac29526963f0d2c060339d0fc5e84fb46bf3",
+    "packaging/gstreamer-gtk-dovi/gstgtkdovimap.c": "2fc60da5c159a3e7e38a6f9be4c1bdb77622f1b91fbc205ca4b0337bdee3e42c",
+    "packaging/gstreamer-gtk-dovi/mapper.c": "c3a9cc21c76cc3df92f372cc71e3555c3c8c07c1a679827c28eaa678e6e4facc",
+    "packaging/gstreamer-gtk-dovi/mapper.h": "525173294164821e5061a4ad9679a135b057bec696a68d6c59ad7903f411193c",
+    "packaging/gstreamer-gtk-dovi/meson.build": "b9bf9bc8d57b576d40ba0756e4e4229b48a252a32d3f670329ece39f22978d05",
+    "packaging/gstreamer-gtk-dovi/native-frame.c": "78b64a0ff4f9805457dd99b0e6682baef53073e0aa19640ddfb3d64c5bd0478b",
+    "packaging/gstreamer-gtk-dovi/stream.h": "428374e4958652a82fafe7bd24724f5b6ac2fb69fb3e630aaaf7e56d4199e1a9"
+  },
+  "runtime_required": [
+    "independent source review before executions",
+    "ordinary Showtime default GPU/backend",
+    "genuine P5 and qualified P8.1",
+    "graded/gap adjacency and original-transfer fallback",
+    "plain HDR10 and SDR",
+    "paused same native picture target changes without seeking",
+    "exact loaded closure and fixture hashes"
+  ],
+  "claims": {
+    "FEL_reconstruction": false,
+    "optical_accuracy": false,
+    "host_install": false,
+    "default_rank_change": false
+  },
+  "artifacts_and_logs": {
+    "meson-build/libgstgtkdovicore.so.0.0.0": {
+      "sha256": "239bdab7ebb4909a46d0410d04dc21b232d9f0ed5440f4b6cfcd7aa3b5923c18",
+      "size": 381720
+    },
+    "meson-build/libgstgtkdovimap.so": {
+      "sha256": "27265776ffe52ba8ec4a4d8901019168523d0319b96c6932562c389c89de8e43",
+      "size": 85976
+    },
+    "target/debug/libgstgtk4.so": {
+      "sha256": "34c5c81f6c5cffbe2e33433018b10aa9aeab9834f0a895a9e12ccc346346d4d3",
+      "size": 88591456
+    },
+    "mapper-final-build.log": {
+      "sha256": "0a59d91700807eedb783056d11637f698d2a72ed94fb697a435e36e3ca5e2053",
+      "size": 1530
+    },
+    "paused-final-check.log": {
+      "sha256": "1497abb6f2a234d2724a4e92af8381cf1bb9a6119c57e40fd760dcab58ebbd3c",
+      "size": 1779
+    },
+    "paused-final-build.log": {
+      "sha256": "629d6c2141971636931855a710b46fab74fda131bec715af1000924c7e6a67a1",
+      "size": 3112
+    },
+    "showtime-final-build.log": {
+      "sha256": "80dfe3fefb30eff1a050e42b84bfb0c25cf35fc92871574c3c9285991c1349cb",
+      "size": 232
+    }
+  },
+  "compiled_source_commit": "060f3e8"
+}

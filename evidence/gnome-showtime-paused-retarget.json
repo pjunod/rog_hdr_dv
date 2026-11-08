@@ -1,0 +1,52 @@
+{
+  "scope": "Staged GNOME Showtime on the ROG; private Wayland and D-Bus sessions, headless virtual monitors and PipeWire digital screen captures. The live desktop and its saved monitor configuration were untouched.",
+  "gtk_control": {
+    "compositor": "Installed GNOME Shell 51 / Mutter nativehdr13, 800\u00d7600 test monitor, forced HDR encoding. Staged packaged GTK +rogdv3 with default GskVulkanRenderer.",
+    "operation": "Acquire the HDR surface lease after the first SDR paint; switch the same synthetic pattern through 400, 0, then 0.001 cd/m\u00b2. Submitted framebuffer RGB16 float, PQ reference 203.",
+    "capture": "At 400, white was visible. At 0, 127,520 captured pixels were black. At 0.001, 113,458 were RGB (1,1,1). This independently distinguishes the stuck capture previously observed on the private Weston fixture."
+  },
+  "paused_movie": {
+    "compositor": "Staged Mutter 51 nativehdr14 using its default compositor plugin. The only fixture code change declared support for PQ and BT.2020 on the virtual connector. The production monitor configuration, Wayland, renderer, and screencast code were used. Forced HDR was disabled.",
+    "screen": "1280\u00d7800, 60 Hz. Temporary monitor peak 616 \u2192 308 \u2192 616 cd/m\u00b2; minimum approximately 0.005 and reference white 203 throughout. The virtual connector has no physical panel primaries.",
+    "app": "Release Showtime +rogdv3, sink +rogdv3, native mapper +rogdv2 and GTK +rogdv3 in an extracted package prefix. Only the launcher\u2019s resource directory was redirected to that prefix.",
+    "input": "Public Sol Levante, Profile 5, 1920\u00d71080. MPRIS position 30.125 s at each capture. Renderer trace retained picture 44 in epoch 18, PTS 30.250 s, across both target updates.",
+    "result": "Normal raw-RPU CM v2.9 GPU mapping was observed at 308 and 616 cd/m\u00b2 on the same retained picture. Both final captures at 616 cd/m\u00b2 were byte-identical.",
+    "changed_pixels": 375877,
+    "pixels_over_two_8bit_codes": 244739,
+    "largest_channel_change": 98,
+    "total_pixels": 1024000,
+    "changed_bounds_xy_inclusive": [
+      219,
+      163,
+      1061,
+      636
+    ],
+    "distinct_rgb_initial": 72498,
+    "distinct_rgb_lower_peak": 84327
+  },
+  "package_dependency_control": "Offline APT accepted the 41 non-Mesa candidates, with 32 original versions restored and 9 additions removed in the inverse simulation. Separate controls omitting the qualified GStreamer GL or good package each failed with the corresponding unmet dependency.",
+  "limits": "The PipeWire RGB screen capture establishes a visible change on a virtual GNOME output and exact return at the original target. It does not measure the physical OLED or validate the creative intent of this movie frame.",
+  "native_pq_repeat": {
+    "encoding": "No video converter. MemFd xRGB_210LE, BT.2020 primaries, SMPTE ST 2084, 1280 \u00d7 800. Corrected shared-memory writer from Mutter patch 0107.",
+    "targets_cd_m2": [
+      616,
+      308,
+      616
+    ],
+    "mpris_position_seconds": [
+      30.125,
+      30.125,
+      30.125
+    ],
+    "changed_pixels_between_first_two_captures": 397853,
+    "pixels_with_any_channel_difference_above_two_10bit_codes": 357895,
+    "maximum_10bit_code_change": 77,
+    "changed_rectangle_inclusive": [
+      219,
+      163,
+      1061,
+      636
+    ],
+    "original_vs_restored_changed_pixels": 0
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "scope": "Development observation of frame 714 (29.750 s) in Sol Levante, at standard target 28, 600 cd/m² peak, 0 cd/m² minimum, BT.2020/PQ full-range output. The tests use one shot. They do not certify consumer playback, optical output, or other frames.",
+  "attribution": {
+    "work": "Sol Levante (2020), Netflix and Production I.G",
+    "asset_catalog": "https://opencontent.netflix.com/",
+    "license": "https://creativecommons.org/licenses/by/4.0/",
+    "consumer_source": "https://github.com/DolbyLaboratories/dolby-vision-contents/tree/main/SolLevante_Netflix",
+    "source_frame_sha256": "dd478efb5dc78fa4770a684acc1dc073d7c3fe89ec576af9350398d541310a7c",
+    "original_xml_sha256": "ed782c213d158dad8204d3a4bde8d72e5956649696bb39ae6d9a0162d58c4ceb"
+  },
+  "reference": "Dolby CM Offline 5.6.4, one CPU thread, original 3840×2160 RGB16 P3-D65/PQ master and unmodified CM v2.9 XML, frame range 714–714. The authoring tool rejects custom targets for this algorithm version, so the firmware-specific 616 cd/m² target was not used.",
+  "method": "BT.2124 ΔE ITP over every pixel, nearest-rank p95, full RGB raster. Reported tuples give mean, p95 and maximum. The vector calculation was checked against the project scalar implementation on two pixels in each strip.",
+  "profile5_release": {
+    "pixels": 2073600,
+    "render": "Normal staged FFmpeg libplacebo filter on Intel Vulkan. The 1920×1080 Profile 5 release decoded PTS 29.750 s and selected the CM2.9 raw-RPU mapper at 600 cd/m². The 4K official render was reduced by 2×2 averaging for the reference comparison.",
+    "linear_light_box": [
+      9.211413,
+      26.309895,
+      137.318005
+    ],
+    "pq_code_box": [
+      9.173565,
+      26.082465,
+      132.649367
+    ],
+    "interpretation": "Source processing, subsampling, reconstruction, authoring-to-consumer metadata conversion and grading all contribute to this cross-release comparison.",
+    "mpv_window": {
+      "runtime": "Staged mpv 0.42 +rogdv4, normal NVIDIA gpu-next and NVDEC. A dedicated 1920×1080 compositor advertised BT.2020, target 0–600 cd/m² and reference white 203 cd/m². The captured window was tagged BT.2020/PQ.",
+      "identity": "A seek after presenting the first frame and continuous playback both reached frame 714 at 29.750 s and produced byte-identical PNG files.",
+      "linear_light_box": [
+        9.187006,
+        26.31285,
+        137.787399
+      ],
+      "pq_code_box": [
+        9.147157,
+        26.062518,
+        133.115199
+      ]
+    },
+    "cold_seek_control": "On direct startup at 29.750 s, installed and staged FFmpeg both lacked PPS 0 and first decoded the next keyframe at 30 s. The published dvhe track has a 23-byte header, and the in-band VPS/SPS/PPS for the 28 s keyframe are at the end of the preceding sample. Beginning with the keyframe skips those headers. The original stream and the player defaults were preserved."
+  },
+  "same_master": {
+    "pixels": 8294400,
+    "render": "Convert the exact original frame to BT.2020 nonconstant-luminance limited-range 10-bit 4:2:0, losslessly encode HEVC, and inject its XML-derived frame RPU from dovi_tool 2.3.4. Normal staged FFmpeg consumed the Profile 8.1 descriptor and logged CM2.9 at native 3840×2160 on Intel Vulkan.",
+    "official_vs_consumer": [
+      2.609707,
+      7.204321,
+      30.461762
+    ],
+    "ungraded_source_vs_decoded_base": [
+      1.676671,
+      4.630513,
+      34.629303
+    ],
+    "official_vs_ungraded_decoded_base": [
+      16.581305,
+      28.466081,
+      43.298078
+    ],
+    "official_decoded_base_vs_consumer": [
+      2.018682,
+      6.489443,
+      25.833569
+    ],
+    "official_decoded_base_vs_official_original": [
+      1.615695,
+      4.462437,
+      33.428123
+    ],
+    "decoded_reference_method": "Decode the same base into full-range 16-bit P3-D65/PQ RGB, then run CM Offline with the unchanged XML and identical target."
+  },
+  "metadata_control": {
+    "pixels": 8294400,
+    "method": "The current unmodified CM2.9 double-precision CPU mapping and spatial detail stage received identical uncompressed full-resolution master pixels in BT.2020/PQ, identical 0.0001–1000 cd/m² mastering display, target and neutral trims. One run used the original XML shot’s three image-character anchors, the other the three actual consumer RPU anchors. No XML or RPU was edited.",
+    "official_vs_xml_anchors": [
+      0.114027,
+      0.497327,
+      4.792476
+    ],
+    "official_vs_rpu_anchors": [
+      1.607053,
+      6.290886,
+      26.285863
+    ],
+    "xml_vs_rpu_anchors": [
+      1.571732,
+      6.284011,
+      22.739695
+    ],
+    "observations": "The Profile 5 and generated Profile 8.1 RPUs match at L1, L2 and L5. Their L4 presence and L6 content-light fields differ. The published XML minimum is about 583 on the 12-bit PQ scale, while both consumer RPUs contain 12. Their middle and maximum agree with XML to rounding. The upstream generator clamps the minimum to 12. Encoding loses information about this shot’s authoring minimum.",
+    "generator_source": "https://github.com/quietvoid/dovi_tool/blob/2.3.4/dolby_vision/src/rpu/extension_metadata/blocks/level1.rs"
+  },
+  "delivered_anchor_reference_control": {
+    "method": "Two additional official authoring-tool renders. In a private copy of the original XML, replace only the three image-character values of the shot starting at frame 650 with the frame RPU minimum, average and maximum (12, 1919, 3063 divided by 4095). All other XML bytes and target settings are unchanged. Render the master once and the decoded 4K base once. The official tool reads the surrogate XML, not the consumer bitstream.",
+    "metric": "Full 3840×2160 BT.2124, mean, nearest-rank p95, maximum, number above 3. No exposure fit or normalization.",
+    "official_surrogate_master_vs_cpu_on_same_master": [
+      0.12662,
+      0.542532,
+      4.855598,
+      2546
+    ],
+    "official_surrogate_decoded_base_vs_staged_ffmpeg_on_same_base": [
+      0.650361,
+      1.595536,
+      12.746173,
+      93700
+    ],
+    "official_original_vs_surrogate_on_same_master": [
+      1.574951,
+      6.293249,
+      26.492696,
+      1331806
+    ],
+    "interpretation": "Matching the available shot anchors closes most of the difference on this development frame. The staged GPU filter still differs measurably from the matched reference. The surrogate does not establish equivalence to a consumer Dolby decoder."
+  }
+}

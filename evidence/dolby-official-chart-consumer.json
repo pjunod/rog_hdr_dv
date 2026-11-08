@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "scope": "One private, self-owned color chart at two authored targets and the firmware-declared panel target. These digital development comparisons do not qualify moving content, isolated nonneutral Level 8 effects, Profile 5, Profile 7 FEL, optical response, or certification.",
+  "geometry": [
+    2560,
+    1280
+  ],
+  "frame": 0,
+  "source": "Full-range BT.2020 PQ RGB16 TIFF. The reference was rendered from the original TIFF and original XML with Dolby CM Offline. The retained log identifies target ID 255. The XML and both TIFF hashes matched the original private receipt.",
+  "target": {
+    "primaries": "BT.2020/D65",
+    "transfer": "PQ",
+    "range": "full",
+    "min_nits": 0.005,
+    "peak_nits": 1000
+  },
+  "carrier": "The same chart was converted to limited-range BT.2020 nonconstant-luminance 10-bit 4:2:0 without dither, then losslessly HEVC-coded. dovi_tool 2.3.4 encoded the original XML into Profile 8.1 RPU. The MP4 descriptor identified profile 8, level 5, BL and RPU present, no EL, HDR10 compatibility. The RPU describes a custom Level 8 target ID 255 and Level 10 target definition. The Level 8 trim controls are neutral.",
+  "candidate_window": "mpv 0.42 +rogdv4 and FFmpeg decoder +rogdv3; default NVIDIA gpu-next on private hardware-backed native Weston. Paused frame 0 filled the 2560x1280 output. The player automatically selected 0.005–1000 cd/m². Tagged RGBA64 PNG cICP 9/16/0/1. RGB channels compared at original size.",
+  "candidate_filter": "FFmpeg libplacebo on Intel Vulkan, explicit 0.005–1000 cd/m² BT.2020 target, planar 16-bit RGB output. Both candidates logged the CM4 raw-RPU path.",
+  "metric": {
+    "name": "BT.2124 ΔE ITP",
+    "implementation_sha256": "a37fdb5107062d60bed388ded2f305504fb8f71af84ee8ddc766d05a53c43f90",
+    "population": "All 3,276,800 pixels, nearest-rank p95. No fitting, image resizing or exposure adjustment. Each calculation strip included two scalar spot-checks against tools/dolby_harness/metric.py."
+  },
+  "full_raster": {
+    "source-base": {
+      "n": 3276800,
+      "mean": 0.6343099662796434,
+      "p95": 0.9824170509912077,
+      "max": 63.29701473456956
+    },
+    "official-mapped": {
+      "n": 3276800,
+      "mean": 0.9234671222748462,
+      "p95": 1.635819446991264,
+      "max": 56.49367345704991
+    },
+    "official-base": {
+      "n": 3276800,
+      "mean": 34.59830526764079,
+      "p95": 91.61725194849734,
+      "max": 112.64109979193975
+    },
+    "official-window": {
+      "n": 3276800,
+      "mean": 0.6194908953793624,
+      "p95": 1.1224357683191326,
+      "max": 56.490884723552526
+    },
+    "mapped-window": {
+      "n": 3276800,
+      "mean": 0.8772120223864249,
+      "p95": 1.2661014806796838,
+      "max": 3.3656327290970327
+    }
+  },
+  "edge_definition": "Mark both pixels on each horizontal or vertical change of RGB codes in the original uncompressed chart, then dilate by two pixels in each direction. This diagnostic classifies the original full-raster result without excluding any pixels from it.",
+  "stratified": {
+    "official-window": {
+      "interior": {
+        "n": 3064454,
+        "mean": 0.4861470486784331,
+        "p95": 1.0673835513678611,
+        "maximum": 4.106527160289945,
+        "above10": 0
+      },
+      "edge": {
+        "n": 212346,
+        "mean": 2.543831756040971,
+        "p95": 13.84011027180277,
+        "maximum": 56.490884723552526,
+        "above10": 13442
+      },
+      "worst_pixel_near_edge": true
+    },
+    "official-mapped": {
+      "interior": {
+        "n": 3064454,
+        "mean": 0.797811894109964,
+        "p95": 1.566749510768554,
+        "maximum": 2.070009291381437,
+        "above10": 0
+      },
+      "edge": {
+        "n": 212346,
+        "mean": 2.736850310895236,
+        "p95": 14.2976424238284,
+        "maximum": 56.49367345704991,
+        "above10": 13915
+      },
+      "worst_pixel_near_edge": true
+    },
+    "source-base": {
+      "interior": {
+        "n": 3064454,
+        "mean": 0.4363916282529583,
+        "p95": 0.9268779128543096,
+        "maximum": 1.026593348487134,
+        "above10": 0
+      },
+      "edge": {
+        "n": 212346,
+        "mean": 3.4905523378770713,
+        "p95": 18.175593235134116,
+        "maximum": 63.29701473456956,
+        "above10": 19204
+      },
+      "worst_pixel_near_edge": true
+    }
+  },
+  "second_target": {
+    "geometry": [
+      2560,
+      1280
+    ],
+    "frame": 0,
+    "target_id": 28,
+    "min_nits": 0,
+    "peak_nits": 600,
+    "primaries": "BT.2020/D65",
+    "transfer": "PQ",
+    "range": "full",
+    "reference": "Dolby CM Offline 5.6.4, CPU only, 1 thread, original metadata XML and image 0, existing named target 28, full-range BT.2020/PQ RGB TIFF. Inputs mounted read-only in a network-isolated private container.",
+    "carrier": "Identical consumer carrier and frame as the 1000-nit case. The XML carries nonneutral Level 2 controls for target 28, with a Level 8 block for target 255. This comparison does not isolate how the mapper chooses between metadata levels.",
+    "window": "NVIDIA gpu-next, same package, automatic matched 0–600 physical target on its own native Weston output. The raw-RPU mapper logged that target. Full-size, 16-bit tagged BT.2020/PQ window capture.",
+    "filter": "Intel FFmpeg, same package, explicit 0–600 cd/m² BT.2020 target.",
+    "population": 3276800,
+    "mean_p95_max_delta_itp": {
+      "official_vs_mpv_window": [
+        0.5778936715,
+        1.0572847268,
+        55.61690591
+      ],
+      "official_vs_ffmpeg_export": [
+        0.8339740862,
+        1.4307591794,
+        55.64923406
+      ],
+      "official_vs_ungraded_decoded_base": [
+        47.13043867,
+        124.57459797,
+        151.7759189
+      ],
+      "mpv_window_vs_ffmpeg_export": [
+        0.7982264164,
+        1.1893081818,
+        3.196817532
+      ]
+    }
+  },
+  "panel_target": {
+    "scope": "One source frame, compared digitally at the declared target. No optical measurement.",
+    "official_target": "The reference program accepted the four firmware-derived xy pairs, 0.0004 cd/m² black and 616 cd/m² peak. It rendered BT.2020/PQ at the unchanged source resolution.",
+    "player_target": "The Wayland fixture replayed the panel description. mpv selected 0.0004–616 cd/m², named P3-D65, with reference white 142 cd/m² and encoding ceiling 10000 cd/m². The provider currently accepts only a named gamut.",
+    "comparison": "Undo the declared window transport gain 203/142 in linear BT.2020 light before comparing with the absolute reference. FFmpeg used a physical 616-nit P3-D65 target directly.",
+    "full_raster_pixels": 3276800,
+    "delta_itp_mean_p95_max": {
+      "mpv_vs_panel_reference": [
+        0.650620709,
+        1.27386777,
+        55.577888631
+      ],
+      "ffmpeg_vs_panel_reference": [
+        0.929565475,
+        1.69597714,
+        55.201911837
+      ],
+      "mpv_vs_ffmpeg": [
+        0.821561751,
+        1.198942019,
+        3.249012172
+      ],
+      "uncorrected_desktop_encoding_vs_physical_reference": [
+        15.185697898,
+        27.201243034,
+        59.425293546
+      ]
+    },
+    "gamut_control": "Only the declared chromaticities in the official target changed. Both reference arms used the same unchanged source, XML, output encoding, luminance and CPU renderer.",
+    "exact_vs_named_reference": {
+      "mean": 0.097460012,
+      "p95": 0.170311442,
+      "maximum": 5.168659859,
+      "pixels_delta_itp_above_3": 25923
+    }
+  }
+}

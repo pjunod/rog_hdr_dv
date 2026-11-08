@@ -1,0 +1,64 @@
+From a3446761b16558c3457ff2f9810cb9eb3f4dadf0 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 04:13:30 +0000
+Subject: [PATCH] debian: identify codecs with picture-bound configuration
+ support
+
+---
+ debian/changelog            | 9 +++++++++
+ debian/control              | 3 ++-
+ debian/rog-system-dv.shlibs | 4 ++--
+ 3 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/debian/changelog b/debian/changelog
+index b3975b26..a06de337 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,12 @@
++ffmpeg (7:8.1.2-2ubuntu2+rogdv3) stonking; urgency=medium
++
++  * Reset strict Dolby metadata on packet configuration changes without
++    dropping HEVC reference pictures.
++  * Identify codecs supporting dual-layer video and live Dolby configuration
++    with the versioned rog-dv-hevc-runtime virtual package.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 04:13:00 +0000
++
+ ffmpeg (7:8.1.2-2ubuntu2+rogdv2) stonking; urgency=medium
+ 
+   * Add the HEVC dual-layer splitter and enhancement configuration side data.
+diff --git a/debian/control b/debian/control
+index c0bc221b..253941cd 100644
+--- a/debian/control
++++ b/debian/control
+@@ -242,6 +242,7 @@ Package: libavcodec62
+ Architecture: any
+ Section: libs
+ Multi-Arch: same
++Provides: rog-dv-hevc-runtime (= 2)
+ Depends:
+  ${shlibs:Depends},
+  ${misc:Depends}
+@@ -271,7 +272,7 @@ Architecture: any
+ Section: libs
+ Multi-Arch: same
+ Conflicts: libavcodec62
+-Provides: libavcodec62 (= ${binary:Version})
++Provides: libavcodec62 (= ${binary:Version}), rog-dv-hevc-runtime (= 2)
+ Depends:
+  ${shlibs:Depends},
+  ${misc:Depends}
+diff --git a/debian/rog-system-dv.shlibs b/debian/rog-system-dv.shlibs
+index 765f9c12..85e127ba 100644
+--- a/debian/rog-system-dv.shlibs
++++ b/debian/rog-system-dv.shlibs
+@@ -1,4 +1,4 @@
+-libavcodec 62 libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv2)
+-libavformat 62 libavformat62 (= 7:8.1.2-2ubuntu2+rogdv2)
++libavcodec 62 libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv3)
++libavformat 62 libavformat62 (= 7:8.1.2-2ubuntu2+rogdv3)
+ libavutil 60 libavutil60 (= 7:8.1.2-2ubuntu2)
+ libdv-provider 1 librog-dv-provider1 (>= 1.0.0+private20261107-4)
+-- 
+2.55.0
+

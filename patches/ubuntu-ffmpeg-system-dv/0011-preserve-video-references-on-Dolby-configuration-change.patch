@@ -1,0 +1,39 @@
+From dad74c7fa834a2ba10d0264a3be99794b275b385 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:39:20 +0000
+Subject: [PATCH] Reset strict Dolby metadata state on a live container record
+ change without resetting video
+
+---
+ libavcodec/hevc/hevcdec.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/libavcodec/hevc/hevcdec.c b/libavcodec/hevc/hevcdec.c
+index 59b561c9..8fca1151 100644
+--- a/libavcodec/hevc/hevcdec.c
++++ b/libavcodec/hevc/hevcdec.c
+@@ -3946,7 +3946,20 @@ static int hevc_receive_frame(AVCodecContext *avctx, AVFrame *frame)
+     sd = av_packet_get_side_data(avpkt, AV_PKT_DATA_DOVI_CONF, &sd_size);
+     if (sd && sd_size >= sizeof(s->dovi_ctx.cfg)) {
+         int old = s->dovi_ctx.cfg.dv_profile;
+-        s->dovi_ctx.cfg = *(AVDOVIDecoderConfigurationRecord *) sd;
++        const AVDOVIDecoderConfigurationRecord *incoming = (const void *) sd;
++        /* A live container-record change is a metadata boundary, not a video
++         * decoder reset. Frame-owned snapshots already queued remain valid. */
++        if (s->dovi_metadata_strict && (
++#define CHANGED(field) s->dovi_ctx.cfg.field != incoming->field
++            CHANGED(dv_version_major) || CHANGED(dv_version_minor) ||
++            CHANGED(dv_profile) || CHANGED(dv_level) ||
++            CHANGED(rpu_present_flag) || CHANGED(el_present_flag) ||
++            CHANGED(bl_present_flag) || CHANGED(dv_bl_signal_compatibility_id) ||
++            CHANGED(dv_md_compression)
++#undef CHANGED
++            ))
++            ff_dovi_ctx_flush(&s->dovi_ctx);
++        s->dovi_ctx.cfg = *incoming;
+         if (old)
+             av_log(avctx, AV_LOG_DEBUG,
+                    "New DOVI configuration record from input packet (profile %d -> %u).\n",
+-- 
+2.55.0
+

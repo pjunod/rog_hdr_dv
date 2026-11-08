@@ -1,0 +1,245 @@
+From d7e876b291c90138de0857c4a9fee853f8e3d774 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 04:06:10 +0000
+Subject: [PATCH] color: compare client mastering peaks at their wire precision
+
+Compare integer Wayland mastering maxima and MaxCLL against the nearest representable display peak in the source reference-white units. Preserve exact native encoder declarations and the original peak used for the mapping curve. Include declaration provenance in both color-state cache keys.
+---
+ .../clutter-color-state-params-private.h      |  8 +++
+ clutter/clutter/clutter-color-state-params.c  | 41 ++++++++++++++++
+ clutter/clutter/clutter-color-transform.c     |  9 +++-
+ debian/libmutter-51-0.symbols                 |  1 +
+ src/tests/clutter/conform/color-hdr.c         | 49 +++++++++++++++++++
+ src/wayland/meta-wayland-color-management.c   |  4 +-
+ 6 files changed, 109 insertions(+), 3 deletions(-)
+
+diff --git a/clutter/clutter/clutter-color-state-params-private.h b/clutter/clutter/clutter-color-state-params-private.h
+index c487366..df3e5cb 100644
+--- a/clutter/clutter/clutter-color-state-params-private.h
++++ b/clutter/clutter/clutter-color-state-params-private.h
+@@ -66,6 +66,14 @@ CLUTTER_EXPORT
+ ClutterColorState * clutter_color_state_params_new_with_target_volume (ClutterColorStateParams        *color_state_params,
+                                                                        const ClutterColorTargetVolume *target_volume);
+ 
++/* Wayland encodes mastering maximum and MaxCLL in whole cd/m². */
++CLUTTER_EXPORT
++ClutterColorState * clutter_color_state_params_new_with_integer_peak_volume (ClutterColorStateParams        *params,
++                                                                            const ClutterColorTargetVolume *volume);
++
++gboolean clutter_color_state_params_peak_matches_wire_precision (ClutterColorStateParams *params,
++                                                                 double                   target_headroom);
++
+ /* Exported for libmutter: only the color device of an output makes one. */
+ CLUTTER_EXPORT
+ ClutterColorState * clutter_color_state_params_new_display_target (ClutterColorStateParams        *color_state_params,
+diff --git a/clutter/clutter/clutter-color-state-params.c b/clutter/clutter/clutter-color-state-params.c
+index 185fa1b..d475ddc 100644
+--- a/clutter/clutter/clutter-color-state-params.c
++++ b/clutter/clutter/clutter-color-state-params.c
+@@ -58,6 +58,7 @@ typedef struct _ClutterColorStateParams
+   ClutterLuminance luminance;
+ 
+   ClutterColorTargetVolume target_volume;
++  gboolean integer_peak_volume;
+ 
+   /* The luminance, in cd/m², at which reference white is reproduced on the
+    * display the target volume describes, or 0 if the state's own luminances
+@@ -374,6 +375,7 @@ clutter_color_state_params_equals (ClutterColorState *color_state,
+                               &other_color_state_params->target_volume) &&
+          color_state_params->display_reference_lum ==
+          other_color_state_params->display_reference_lum &&
++         color_state_params->integer_peak_volume == other_color_state_params->integer_peak_volume &&
+          color_state_params->display_target ==
+          other_color_state_params->display_target &&
+          adapted_white_equal (color_state_params, other_color_state_params);
+@@ -753,6 +755,7 @@ clutter_color_state_params_get_blending (ClutterColorState *color_state,
+                                     &color_state_params->target_volume,
+                                     color_state_params->display_target,
+                                     clutter_color_state_params_get_display_reference_luminance (color_state_params));
++    CLUTTER_COLOR_STATE_PARAMS (copy)->integer_peak_volume = color_state_params->integer_peak_volume;
+     copy_adapted_white (CLUTTER_COLOR_STATE_PARAMS (copy), color_state_params);
+ 
+     return copy;
+@@ -795,6 +798,7 @@ clutter_color_state_params_hash (ClutterColorState *color_state)
+   hash = hash * 31 + float_hash (params->target_volume.max_cll);
+   hash = hash * 31 + float_hash (params->target_volume.max_fall);
+   hash = hash * 31 + float_hash (params->display_reference_lum);
++  hash = hash * 31 + params->integer_peak_volume;
+   hash = hash * 31 + params->display_target;
+   hash = hash * 31 + params->has_adapted_white;
+   if (params->has_adapted_white)
+@@ -886,6 +890,7 @@ clutter_color_state_identical (ClutterColorState *color_state,
+          target_volume_equal (&params->target_volume,
+                               &other_params->target_volume) &&
+          params->display_reference_lum == other_params->display_reference_lum &&
++         params->integer_peak_volume == other_params->integer_peak_volume &&
+          params->display_target == other_params->display_target &&
+          adapted_white_equal (params, other_params);
+ }
+@@ -1125,6 +1130,42 @@ clutter_color_state_params_new_with_target_volume (ClutterColorStateParams
+                                   color_state_params->display_reference_lum);
+ }
+ 
++/* Keep the accuracy of integer-valued client declarations on the immutable
++ * state, without changing the layout of the target-volume constructor ABI. */
++ClutterColorState *
++clutter_color_state_params_new_with_integer_peak_volume (ClutterColorStateParams        *params,
++                                                        const ClutterColorTargetVolume *volume)
++{
++  ClutterColorState *state =
++    clutter_color_state_params_new_with_target_volume (params, volume);
++
++  if (state && (volume->has_luminance || volume->max_cll > 0.0f))
++    CLUTTER_COLOR_STATE_PARAMS (state)->integer_peak_volume = TRUE;
++  return state;
++}
++
++/* When the display peak, in the source volume's absolute units, would
++ * produce exactly the client's integer declaration, the protocol cannot
++ * distinguish the two peaks. Either mastering maximum or MaxCLL bounds the
++ * picture. MaxFALL and the nominal limits of an encoding do not describe a
++ * quantized content peak here. */
++gboolean
++clutter_color_state_params_peak_matches_wire_precision (ClutterColorStateParams *params,
++                                                       double                   target_headroom)
++{
++  const ClutterColorTargetVolume *volume = &params->target_volume;
++  double target_wire_peak;
++
++  if (!params->integer_peak_volume)
++    return FALSE;
++
++  target_wire_peak =
++    round (target_headroom * clutter_color_state_params_get_display_reference_luminance (params));
++
++  return (volume->has_luminance && volume->max_lum == target_wire_peak) ||
++         (volume->max_cll > 0.0f && volume->max_cll == target_wire_peak);
++}
++
+ /*
+  * clutter_color_state_params_new_display_target:
+  * @color_state_params: the color state a display's content is rendered in
+diff --git a/clutter/clutter/clutter-color-transform.c b/clutter/clutter/clutter-color-transform.c
+index 95ffda9..af4de04 100644
+--- a/clutter/clutter/clutter-color-transform.c
++++ b/clutter/clutter/clutter-color-transform.c
+@@ -1061,6 +1061,7 @@ compute_highlight_mapping (ClutterColorState *source_color_state,
+   const ClutterLuminance *source_lum;
+   double source_min, source_peak;
+   float target_max, display_ref;
++  double target_peak;
+ 
+   if (!CLUTTER_IS_COLOR_STATE_PARAMS (target_color_state) ||
+       !clutter_color_state_params_get_display_target (CLUTTER_COLOR_STATE_PARAMS (target_color_state),
+@@ -1076,7 +1077,13 @@ compute_highlight_mapping (ClutterColorState *source_color_state,
+       !(source_peak > source_min))
+     return FALSE;
+ 
+-  return source_peak > target_max / (double) display_ref;
++  target_peak = target_max / (double) display_ref;
++  if (source_peak <= target_peak)
++    return FALSE;
++
++  return !CLUTTER_IS_COLOR_STATE_PARAMS (source_color_state) ||
++         !clutter_color_state_params_peak_matches_wire_precision (
++           CLUTTER_COLOR_STATE_PARAMS (source_color_state), target_peak);
+ }
+ 
+ /* SMPTE ST 2084 inverse EOTF of an absolute luminance in cd/m². */
+diff --git a/debian/libmutter-51-0.symbols b/debian/libmutter-51-0.symbols
+index 4bcd534..2fa1a08 100644
+--- a/debian/libmutter-51-0.symbols
++++ b/debian/libmutter-51-0.symbols
+@@ -1521,6 +1521,7 @@ libmutter-clutter-51.so.0 libmutter-51-0 #MINVER#
+  clutter_color_state_params_new_from_cicp@Base 49.0
+  clutter_color_state_params_new_from_primitives@Base 48.0
+  clutter_color_state_params_new_full@Base 48.0
++ clutter_color_state_params_new_with_integer_peak_volume@Base 51.0-1ubuntu3+nativehdr14~
+  clutter_color_state_params_new_with_target_volume@Base 51.0-1ubuntu3+nativehdr6~
+  clutter_color_state_params_nominal_max_is_content_peak@Base 51.0-1ubuntu3+nativehdr8~
+  clutter_color_state_required_format@Base 47.0
+diff --git a/src/tests/clutter/conform/color-hdr.c b/src/tests/clutter/conform/color-hdr.c
+index 1984eed..017e261 100644
+--- a/src/tests/clutter/conform/color-hdr.c
++++ b/src/tests/clutter/conform/color-hdr.c
+@@ -666,6 +666,54 @@ create_with_target_volume (ClutterColorState *color_state,
+                                                             &target_volume);
+ }
+ 
++/* Reproduce the integer values a PQ Vulkan client can signal for a
++ * display with a different reference white. */
++static void
++mapping_wire_peak (void)
++{
++  g_autoptr (ClutterColorState) output = create_pq_output (142.0f);
++  g_autoptr (ClutterColorState) target = create_targeted_blending (output, 616.0f, FALSE);
++  g_autoptr (ClutterColorState) pq = create_pq_output (203.0f);
++  static const struct {
++    float mastering_max;
++    float max_cll;
++    gboolean exact_maps;
++    gboolean wire_maps;
++  } cases[] = {
++    { 880.0f, 0.0f, FALSE, FALSE },
++    { 881.0f, 0.0f, TRUE,  FALSE },
++    { 882.0f, 0.0f, TRUE,  TRUE  },
++    { 0.0f, 881.0f, TRUE,  FALSE },
++    { 882.0f, 881.0f, TRUE, FALSE },
++    { 882.0f, 882.0f, TRUE, TRUE },
++    { 0.0f, 0.0f, FALSE, FALSE },
++  };
++
++  for (size_t i = 0; i < G_N_ELEMENTS (cases); i++)
++    {
++      ClutterColorTargetVolume volume = {
++        .has_luminance = cases[i].mastering_max > 0.0f,
++        .max_lum = cases[i].mastering_max,
++        .max_cll = cases[i].max_cll,
++      };
++      g_autoptr (ClutterColorState) exact =
++        clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (pq),
++                                                           &volume);
++      g_autoptr (ClutterColorState) wire =
++        clutter_color_state_params_new_with_integer_peak_volume (CLUTTER_COLOR_STATE_PARAMS (pq),
++                                                                 &volume);
++
++      /* Alternate states with identical numeric peaks through the shared
++       * renderer and plane-eligibility decision cache. */
++      g_assert_cmpint (clutter_color_transform_requires_highlight_mapping (exact, target),
++                       ==, cases[i].exact_maps);
++      g_assert_cmpint (clutter_color_transform_requires_highlight_mapping (wire, target),
++                       ==, cases[i].wire_maps);
++      g_assert_cmpint (clutter_color_transform_requires_highlight_mapping (exact, target),
++                       ==, cases[i].exact_maps);
++    }
++}
++
+ static void
+ mapping_predicate (void)
+ {
+@@ -3898,6 +3946,7 @@ CLUTTER_TEST_SUITE (
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/cicp", hlg_from_cicp)
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/parameters-validity", hlg_parameters_validity)
+   CLUTTER_TEST_UNIT ("/color-hdr/hlg/shader-matches-cpu", hlg_shader_matches_cpu)
++  CLUTTER_TEST_UNIT ("/color-hdr/mapping/wire-peak", mapping_wire_peak)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/predicate", mapping_predicate)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/extended-range-peak", mapping_extended_range_peak)
+   CLUTTER_TEST_UNIT ("/color-hdr/mapping/undeclared-pq-peak", mapping_undeclared_pq_peak)
+diff --git a/src/wayland/meta-wayland-color-management.c b/src/wayland/meta-wayland-color-management.c
+index b653fef..199f36f 100644
+--- a/src/wayland/meta-wayland-color-management.c
++++ b/src/wayland/meta-wayland-color-management.c
+@@ -1748,8 +1748,8 @@ creator_params_create (struct wl_client   *client,
+           g_autoptr (ClutterColorState) encoding = g_steal_pointer (&color_state);
+ 
+           color_state =
+-            clutter_color_state_params_new_with_target_volume (CLUTTER_COLOR_STATE_PARAMS (encoding),
+-                                                               &creator_params->target_volume);
++            clutter_color_state_params_new_with_integer_peak_volume (CLUTTER_COLOR_STATE_PARAMS (encoding),
++                                                                     &creator_params->target_volume);
+         }
+ 
+       meta_wayland_image_description_set_ready (image_desc,
+-- 
+2.55.0
+

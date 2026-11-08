@@ -18,13 +18,12 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-11-07)
+## What works today (2026-11-08)
 
-Installed on the laptop: APT libdisplay-info `0.3.0-1+nativehdr13` (amd64
-and i386), Mutter `51.0-1ubuntu3+nativehdr13`, kernel
-`7.3.0-nativehdr3`, and external plurx Player `0.4.1` for Dolby Vision.
-The [software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) binds the
-exact versions, package hashes and retained receipts. No reinstall is needed.
+The ROG runs the seven-package mpv, FFmpeg and Mesa playback update alongside Mutter and libdisplay-info `nativehdr13` and the `nativehdr3` kernel. The separate mpv 0.42 release reconstructed a genuine 4K Dolby Vision Profile 7 full enhancement layer on the laptop, selected the CM v4 grade for 616 cd/m², and ran with the existing mpv video settings on the explicitly selected Intel Vulkan driver. With automatic GPU selection on a hardware-backed private compositor, NVIDIA played the full three-second clip at 24 fps with zero drops. A staged Mesa clock correction restored playback speed on Intel with eight output drops. The running desktop still uses the seven-package stack. [Playback release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop and kernel handoff](docs/SOFTWARE_DELIVERY.md).
+
+The staged player also ran a genuine movie-frame comparison against Dolby's render of the original master. The published 1080p Profile 5 release and the 4K master differ in resolution and delivered metadata. The controls quantify both effects. The project provides an offline APT rehearsal for testing a candidate and its exact rollback on the destination system. [Movie-frame comparison](evidence/dolby-sol-levante-frame714.json) · [Package rehearsal](docs/SYSTEM_DOLBY_VISION.md#rehearse-a-local-package-bundle).
+
 The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
 the fix and retains Ubuntu security policies; see the
@@ -40,9 +39,9 @@ the fix and retains Ubuntu security policies; see the
 | Night Light in HDR, per-monitor overrides | **Installed** (since `nativehdr10`, now APT `nativehdr13`) | October 15 warm HDR/SDR observations and persistence accepted; no post-update acceptance inferred |
 | Ubuntu packages | **APT repository** (2026-10-27) | Rebuilt from Ubuntu's current source whenever Ubuntu updates it; one command sets a machine up ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)) |
 | Private package output retention | **Implemented** | Exclusive durable run directories preserve future source/build/rollback outputs without destructive reuse; existing nativehdr13 original-record recovery is separate ([retention](docs/UBUNTU_APT_REPOSITORY.md#private-source-and-recovery-output-retention)) |
-| Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
+| Dolby Vision display mapping | **Reference comparison on four titles** | The private CM v4.0 and CM v2.9 implementation achieved mean ΔE_ITP of 0.0036–0.0055 on selected frames at 600 cd/m². At the firmware-declared panel target, the staged mpv window had mean ΔE ITP 0.651 and p95 1.274 on one full-raster chart, after decoding the window’s reference-white gain. Optical calibration remains open. |
 | Shared Dolby Vision playback and export | **mpv Wayland and FFmpeg Intel export verified** | Normal Ubuntu mpv and FFmpeg’s libplacebo filter consume per-frame metadata through the same target-aware renderer. [Packages, commands and qualification](docs/SYSTEM_DOLBY_VISION.md) |
-| GStreamer per-picture RPU transport | **Native transport checks passed; unshipped** | Software/Intel VA reorder, flushing seek, RPU gaps and rotation metadata invalidation passed; reconstruction and native display-target delivery remain separate work. [Contract and phase boundaries](docs/GSTREAMER_DOLBY_TRANSPORT.md) |
+| GStreamer per-picture RPU transport | **Staged GNOME playback verified** | Software, Intel VA and NVIDIA preserve picture-owned metadata. Packaged Showtime regraded the same paused movie frame on a private GNOME monitor when its peak changed and restored the original pixels when the peak returned. [Contract and phase boundaries](docs/GSTREAMER_DOLBY_TRANSPORT.md) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
 | Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; nativehdr3 correction built, not activated; fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
@@ -104,7 +103,9 @@ development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md)):
 - **Where they run:** in plurx, the owner's media server — its processing
   helper and **plurx Player**, an mpv build launched from the plurx web app
   that maps each frame on the laptop's GPU at the panel's own peak, and
-  combines Profile 7's full enhancement layer itself.
+  combines Profile 7's full enhancement layer itself. The separate system
+  packages bring the mapper to ordinary mpv and FFmpeg. The staged mpv 0.42
+  build supports the matched enhancement layer. [System playback](docs/SYSTEM_DOLBY_VISION.md).
 - **What stays private:** the derivations and Dolby's measured outputs live on
   a private branch, never on `main` or its mirror.
 
@@ -149,6 +150,8 @@ has the remote and branch rules.
 
 | Document | Answers |
 |---|---|
+| [GNOME image colour](docs/GNOME_IMAGE_COLOUR.md) | Ordinary Image Viewer ICC gamut, precision, sandboxed TIFF metadata, package source and recovery |
+| [GStreamer resolved Dolby pictures](docs/GSTREAMER_DOLBY_RECONSTRUCTION.md) | Decoder-owned frame state, native software and Intel controls, and the ABI for renderers |
 | [Status](docs/STATUS.md) · [status page](docs/STATUS.html) | What is proven, what is installed, what remains |
 | [Hardware](docs/HARDWARE.md) | Exactly which panel this is and what its firmware declares |
 | [Architecture](docs/ARCHITECTURE.md) | Which component owns which part of the colour path |
