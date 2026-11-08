@@ -135,5 +135,49 @@
     "wire_mastering_peak_cd_m2": 881,
     "active_physical_surface_observed": false,
     "limits": "The current player feeds reference-white-normalized peak to the mapper. Physical-target trim selection at nonstandard reference white needs separate qualification."
+  },
+  "ubuntu_package_preflight": {
+    "mesa_vulkan_drivers_version": "26.2.4-1ubuntu1+rogwsi1",
+    "native_builds": [
+      "amd64",
+      "i386"
+    ],
+    "stock_driver_and_icd_file_inventories_match": true,
+    "amd64_driver_sections_match_before_and_after_packaging": [
+      ".text",
+      ".rodata",
+      ".data.rel.ro",
+      ".data",
+      ".rela.dyn",
+      ".rela.plt"
+    ],
+    "amd64_drivers_compared": [
+      "Intel",
+      "lavapipe"
+    ],
+    "offline_apt_install": {
+      "upgrade": [
+        "mpv",
+        "libavfilter11",
+        "mesa-vulkan-drivers:amd64",
+        "mesa-vulkan-drivers:i386"
+      ],
+      "add": [
+        "libplacebo-rog1-360",
+        "librog-dv-provider1",
+        "libshaderc1"
+      ],
+      "remove": []
+    },
+    "offline_apt_rollback": {
+      "starting_state": "projected installed candidate on the ROG",
+      "restore_stock_packages": 4,
+      "remove_added_packages": 3
+    },
+    "private_external_copy_sha256_verified": {
+      "candidate": 7,
+      "rollback": 4
+    },
+    "actual_host_install_at_preflight": false
   }
 }

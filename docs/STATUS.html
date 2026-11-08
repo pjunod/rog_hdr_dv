@@ -17,7 +17,7 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
 <p class="muted">Updated November 7, 2026 · APT nativehdr13 and kernel nativehdr3 installed · historical receipts retain their original scope</p></header>
-<section><h2>Shared Dolby Vision renderer</h2><p>Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with the same frame-aware display mapper. FFmpeg passed both creative-trim comparisons and mapped Profile 5 on the ROG’s Intel GPU. With the corrected Mesa driver, normal mpv rendered a nonblack frame with an authored Level 2 trim on a signalled BT.2020/PQ Wayland surface. A verified HDR10 control matched stock mpv. Host installation and physical-target trim tuning remain open. <a href="SYSTEM_DOLBY_VISION.md">Packages, commands and recovery</a>.</p></section>
+<section><h2>Shared Dolby Vision renderer</h2><p>Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with the same frame-aware display mapper. FFmpeg passed both creative-trim comparisons and mapped Profile 5 on the ROG’s Intel GPU. With the corrected Mesa driver, normal mpv rendered a nonblack frame with an authored Level 2 trim on a signalled BT.2020/PQ Wayland surface. A verified HDR10 control matched stock mpv. Both driver architectures built, and offline APT simulations passed for installation and rollback. Host installation and physical-target trim tuning remain open. <a href="SYSTEM_DOLBY_VISION.md">Packages, commands and recovery</a>.</p></section>
 
 <h2>Current software handoff — November 7</h2>
 <div class="callout">ROG already has Mutter <code>51.0-1ubuntu3+nativehdr13</code>,
@@ -56,7 +56,7 @@ rollback is retained, not executed. November 7 center, reduced-motion and lifecy
 two centering JS TypeErrors at <code>windowAnimation.js:185</code>
 (<code>actor.ease(...)</code> returned undefined before <code>.catch</code>)
 are corrected in the built <code>51.26.10.6ubuntu+nativehdr3</code> source;
-the target still runs nativehdr2. Extension CLI INACTIVE → ACTIVE, exact enablement
+the corrected package is installed for the next normal login. Extension CLI INACTIVE → ACTIVE, exact enablement
 restoration, settings readback and normal application close were recorded.
 The owner accepted the final composite reactivation/fullscreen prompt, but the
 harness saw no F11 callbacks: fullscreen transitions remain unverified. Only
@@ -78,8 +78,8 @@ at reference white 142 corresponds to firmware-declared 616 through
 <code>616 × 203 / 142</code>, not optical measurement or general-title acceptance.
 <a href="../evidence/local-video-target-20261107.json">Target receipt</a>.
 The nativehdr3 animation correction is built: all 28 packaged JavaScript files
-match replay and the stock payload delta is exactly five paths. It is not
-installed; current nativehdr2 runtime errors remain open.
+match replay and the stock payload delta is exactly five paths. The package was installed and verified November 7. The existing Shell
+session continued running. Centering with the installed fix awaits a new login.
 <a href="../evidence/tiling-animation-nativehdr3-build-20261107.json">Build receipt</a>.</p>
 <h2>Kernel security rebase — October 29, 2026</h2>
 <div class="callout"><strong>Running CVE fix verified:</strong>
