@@ -1,0 +1,55 @@
+diff --git a/debian/changelog b/debian/changelog
+index 50b4d67d3475f07231ca62e0bb31cb97ea0d2531..419083203fa88ab7cb4f8f98a8d58ee71e9ed1c8 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,11 @@
++ffmpeg (7:8.1.2-2ubuntu2+rogdv4.1) stonking; urgency=medium
++
++  * Generate exact dependencies between the augmented codec and format
++    libraries from the current package version. Keep the stock utility
++    library and compatible provider dependency floors.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 10:10:00 +0000
++
+ ffmpeg (7:8.1.2-2ubuntu2+rogdv4) stonking; urgency=medium
+ 
+   * Accept validated explicit physical xy targets through the optional
+diff --git a/debian/rog-system-dv.shlibs b/debian/rog-system-dv.shlibs
+deleted file mode 100644
+index 85e127ba9489f20ef778b163d70600d158649748..0000000000000000000000000000000000000000
+--- a/debian/rog-system-dv.shlibs
++++ /dev/null
+@@ -1,4 +0,0 @@
+-libavcodec 62 libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv3)
+-libavformat 62 libavformat62 (= 7:8.1.2-2ubuntu2+rogdv3)
+-libavutil 60 libavutil60 (= 7:8.1.2-2ubuntu2)
+-libdv-provider 1 librog-dv-provider1 (>= 1.0.0+private20261107-4)
+diff --git a/debian/rog-system-dv.shlibs.in b/debian/rog-system-dv.shlibs.in
+new file mode 100644
+index 0000000000000000000000000000000000000000..216148e1aa6a1eeda24c0f2c86a473a782bf7f69
+--- /dev/null
++++ b/debian/rog-system-dv.shlibs.in
+@@ -0,0 +1,4 @@
++libavcodec 62 libavcodec62 (= @DEB_VERSION@)
++libavformat 62 libavformat62 (= @DEB_VERSION@)
++libavutil 60 libavutil60 (= 7:8.1.2-2ubuntu2)
++libdv-provider 1 librog-dv-provider1 (>= 1.0.0+private20261107-4)
+diff --git a/debian/rules b/debian/rules
+index c18a75e5edcc70e22670a38fbb14d8345c7efe27..ff8a2e276cc77f092b0ef6c1647ea1ff9957454b 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -344,8 +344,12 @@ endif
+ # The deployed codec and format are new, while libavutil stays at its
+ # source-identical stock version on both architectures. Resolve avpriv
+ # dependencies against the exact members of that delivery tuple.
+-override_dh_shlibdeps:
+-	dh_shlibdeps -plibavcodec62 -plibavfilter11 -plibavformat62 -plibavdevice62 -- -Ldebian/rog-system-dv.shlibs
++debian/.debhelper/rog-system-dv.shlibs: debian/rog-system-dv.shlibs.in debian/changelog
++	mkdir -p $(@D)
++	sed 's/@DEB_VERSION@/$(DEB_VERSION)/g' $< > $@
++
++override_dh_shlibdeps: debian/.debhelper/rog-system-dv.shlibs
++	dh_shlibdeps -plibavcodec62 -plibavfilter11 -plibavformat62 -plibavdevice62 -- -Ldebian/.debhelper/rog-system-dv.shlibs
+ 	dh_shlibdeps --remaining-packages
+ 
+ # avoid error: Unknown DWARF DW_OP_0
