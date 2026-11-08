@@ -20,7 +20,7 @@ repository owns the operating-system display work.
 
 ## What works today (2026-11-07)
 
-The ROG runs the seven-package mpv, FFmpeg and Mesa playback update alongside Mutter and libdisplay-info `nativehdr13` and the `nativehdr3` kernel. The separate mpv 0.42 release reconstructed a genuine 4K Dolby Vision Profile 7 full enhancement layer on the laptop, selected the CM v4 grade for 616 cd/m², and ran with the existing file associations and video settings. That ten-package upgrade is staged. [Playback release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop and kernel handoff](docs/SOFTWARE_DELIVERY.md).
+The ROG runs the seven-package mpv, FFmpeg and Mesa playback update alongside Mutter and libdisplay-info `nativehdr13` and the `nativehdr3` kernel. The separate mpv 0.42 release reconstructed a genuine 4K Dolby Vision Profile 7 full enhancement layer on the laptop, selected the CM v4 grade for 616 cd/m², and ran with the existing mpv video settings on the explicitly selected Intel Vulkan driver. The full three-second clip missed real time in that private compositor. The ten-package upgrade remains staged. [Playback release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop and kernel handoff](docs/SOFTWARE_DELIVERY.md).
 
 The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
