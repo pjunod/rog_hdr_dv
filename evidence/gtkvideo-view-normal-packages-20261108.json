@@ -1,0 +1,235 @@
+{
+  "schema": 1,
+  "date": "2026-11-08",
+  "scope": "normal Ubuntu GtkVideo view-owned Profile 5 mapping and optional SDK startup",
+  "source": {
+    "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
+    "candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
+    "candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980",
+    "package_version": "4.24.1+ds-1+rogdv4",
+    "source_replay_tracked_files": 8589,
+    "source_replay_mismatches": 0,
+    "archives": [
+      {
+        "file": "gtk4_4.24.1+ds-1+rogdv4.dsc",
+        "sha256": "66e1f5f93ac43626494f4e7c1312d6c5fa9fa2dca812451eb478d575f1f65dfe"
+      },
+      {
+        "file": "gtk4_4.24.1+ds.orig.tar.xz",
+        "sha256": "d148acf2132b9b5ad85e62f1544c9d765a7991ec18567c36ffb12765f50f4bf3"
+      },
+      {
+        "file": "gtk4_4.24.1+ds-1+rogdv4.debian.tar.xz",
+        "sha256": "c67107bde9edc6541b2a7b2fd4bd98e09b65935f1d028a373c7724d25abff369"
+      }
+    ],
+    "public_series_patch_count": 12,
+    "public_series_replay_tree": "46ef2e57785d9651050e2f2620c913423eb8a980"
+  },
+  "construction": {
+    "method": "normal dpkg-buildpackage -nc -b -us -uc",
+    "profiles": [
+      "noinsttest",
+      "noudeb"
+    ],
+    "outer_jobs": 1,
+    "LTO_link_workers": 2,
+    "cpus": 2,
+    "memory_limit_bytes": 8589934592,
+    "new_memory_limit_events": 0,
+    "OOM_kills": 0,
+    "normal_packages": 7,
+    "omitted_packages": [
+      "gtk-4-tests",
+      "gtk-4-examples",
+      "libgtk-4-1-udeb"
+    ],
+    "source_authenticated": "original Ubuntu source archive hashes verified against signed Sources metadata"
+  },
+  "packages": [
+    {
+      "file": "gir1.2-gtk-4.0_4.24.1+ds-1+rogdv4_amd64.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "b2a7cb6be2af8c0308b81b386c2fe209f931e46a1c0c7d6360b4e31789a09208"
+    },
+    {
+      "file": "gtk-update-icon-cache_4.24.1+ds-1+rogdv4_amd64.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "1884b4386866cbc8ea399c61e32b9ad8fe24a66765fabcd8e4cd1012227551ed"
+    },
+    {
+      "file": "libgtk-4-1_4.24.1+ds-1+rogdv4_amd64.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "7126438686a2b17cb17faadfa3701b638994f243fcd5f526161b1c7a193e2d32"
+    },
+    {
+      "file": "libgtk-4-bin_4.24.1+ds-1+rogdv4_amd64.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "7291d71a40c0010a23b6f39d59c06ccb9b585871b8ffce853fe7298348a4eaf3"
+    },
+    {
+      "file": "libgtk-4-common_4.24.1+ds-1+rogdv4_all.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "ff4bfa0e864a41dc9e89567a14b614b322924d62cd62b4b46d8cf96b6735d328"
+    },
+    {
+      "file": "libgtk-4-dev_4.24.1+ds-1+rogdv4_amd64.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "7384a4f3e39faf7bf8839a973de75e64cd6a495c9848ef1bac06df2eb0abc5ac"
+    },
+    {
+      "file": "libgtk-4-doc_4.24.1+ds-1+rogdv4_all.deb",
+      "version": "4.24.1+ds-1+rogdv4",
+      "sha256": "86011c62a07441b745f0906617848e56464e326a717e4f16e87ab0f2c71dfedf"
+    }
+  ],
+  "ABI": {
+    "exported_symbols": 5525,
+    "removed": [],
+    "added": [],
+    "hard_mapping_SDK_dependency": false
+  },
+  "product": {
+    "status": "pass",
+    "frontend": "GtkVideo, two views sharing one GtkMediaFile",
+    "renderer": "GskVulkanRenderer",
+    "renderer_override": false,
+    "decoder_override": false,
+    "scope": "private hardware-backed GNOME virtual monitor; encoded pixel and lifecycle evidence",
+    "profile": 5,
+    "source_picture_pts_seconds": 30.125,
+    "GUI_timestamp_seconds": 30,
+    "targets_nits": [
+      616,
+      308,
+      616
+    ],
+    "minimum_nits": 0.005,
+    "minimum_source": "encoding fallback",
+    "reference_nits": 203,
+    "target_generation": [
+      2,
+      3,
+      4
+    ],
+    "video_encoding": "RGBA64 BT.2020/PQ full RGB",
+    "compositor_encoding": "independently copied XR30 BT.2020/PQ MemFd",
+    "changed_raw_bytes_AB": 11009083,
+    "changed_compositor_words_AB": 194000,
+    "raw_A_equals_A2": true,
+    "compositor_A_equals_A2": true,
+    "lifecycle_controls": [
+      {
+        "control": "offload one view",
+        "status": "pass"
+      },
+      {
+        "control": "offload release restores own mapping",
+        "status": "pass"
+      },
+      {
+        "control": "DV to ordinary SDR invalidates mapped frame",
+        "status": "pass"
+      },
+      {
+        "control": "new DV stream renders its own original frame",
+        "status": "pass"
+      },
+      {
+        "control": "destroy one view preserves second view",
+        "status": "pass"
+      }
+    ],
+    "normal_exit": true,
+    "development_loader_paths": [],
+    "Profile_7_FEL_acceptance": false
+  },
+  "optional_SDK": {
+    "status": "pass",
+    "ABI_expected": 1,
+    "cases": [
+      {
+        "case": "present-sdr",
+        "status": "pass",
+        "exit_code": 0,
+        "paintable": "GtkGstDoviView",
+        "marker_events": []
+      },
+      {
+        "case": "absent",
+        "status": "pass",
+        "exit_code": 0,
+        "paintable": "GtkGstMediaFile",
+        "marker_events": []
+      },
+      {
+        "case": "abi2",
+        "status": "pass",
+        "exit_code": 0,
+        "paintable": "GtkGstMediaFile",
+        "marker_events": [
+          "loaded",
+          "abi-called",
+          "unloaded"
+        ]
+      },
+      {
+        "case": "missing-symbol",
+        "status": "pass",
+        "exit_code": 0,
+        "paintable": "GtkGstMediaFile",
+        "marker_events": [
+          "loaded",
+          "unloaded"
+        ]
+      }
+    ],
+    "same_SDR_pixels_all_cases": true,
+    "genuine_absence_checked": true,
+    "actual_library_maps_retained_privately": true
+  },
+  "six_only_delta_negative": {
+    "baseline": "reviewed PR20 projected state, GTK +rogdv3",
+    "requested_GTK_upgrades": 6,
+    "exit_code": 100,
+    "proposed_removals": [
+      "gstreamer1.0-gtk4",
+      "showtime"
+    ],
+    "reason": "Both installed matched consumers require exact GTK +rogdv3; --no-remove refuses this unsupported partial transaction. The coordinator owns the matched +4 release bundle.",
+    "reversal": "not executed after rejected forward transaction"
+  },
+  "custody": {
+    "installed": false,
+    "active_desktop_changed": false,
+    "private_compositor_and_services_stopped": true,
+    "raw_captures_and_packages": "retained privately"
+  },
+  "merge_checks": "independent review and repository fast lane remain pending; no automated unit suite run",
+  "introspection": {
+    "status": "pass",
+    "typelibs": [
+      {
+        "file": "Gdk-4.0.typelib",
+        "sha256": "463aa063d0443b8ceacf3d6db3c88b5b595e5d1516814a8a00e29ab67de8e87e"
+      },
+      {
+        "file": "GdkWayland-4.0.typelib",
+        "sha256": "14bda57be1501bb274c3b74d91ec86852bb7a937928a161b04ae7f732799b3b6"
+      },
+      {
+        "file": "GdkX11-4.0.typelib",
+        "sha256": "31896f6836329583b0f5f8d99e7be1236e11f787f7cb7b8a70a2c0f9de97a066"
+      },
+      {
+        "file": "Gsk-4.0.typelib",
+        "sha256": "eae0e154299fb9f81fd8ae9b9f7bf1f64f4367a010e2c676ac4ef487ca0ee999"
+      },
+      {
+        "file": "Gtk-4.0.typelib",
+        "sha256": "3daafbef461001efa84aaa0ffeb12190383dcd09e0a0f50440747ec6504460aa"
+      }
+    ]
+  },
+  "runtime_role": "The public ABI 1 mapping SDK supplies target-aware GPU rendering; matched codec and producer artifacts and renderer provenance remain in private custody."
+}

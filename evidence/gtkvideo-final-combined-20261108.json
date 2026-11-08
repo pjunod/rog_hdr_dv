@@ -1,0 +1,81 @@
+{
+  "schema": 1,
+  "date": "2026-11-08",
+  "scope": "affected GtkVideo lifecycle and ordinary startup on final coordinated library set",
+  "GTK_source_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
+  "GTK_source_tree": "46ef2e57785d9651050e2f2620c913423eb8a980",
+  "GTK_package_version": "4.24.1+ds-1+rogdv4",
+  "prior_source_product_export": "e984cb3deef026a759876c033d3dcb570a8928bd",
+  "coordinator_import": "a0881cf",
+  "binary_mapping_verification": {
+    "status": "pass",
+    "timing": "actual app mappings verified against coordinated normal package payloads before lifecycle controls",
+    "development_paths": [],
+    "detailed_provenance": "retained in private custody"
+  },
+  "product": {
+    "status": "pass",
+    "frontend": "two GtkVideo views sharing one media source",
+    "renderer": "GskVulkanRenderer",
+    "renderer_override": false,
+    "decoder_override": false,
+    "profile": 5,
+    "picture_pts_seconds": 30.125,
+    "targets_nits": [
+      616,
+      308,
+      616
+    ],
+    "strict_generations": [
+      2,
+      3,
+      4
+    ],
+    "raw_changed_bytes_AB": 11009083,
+    "compositor_changed_XR30_words_AB": 194000,
+    "raw_A_equals_A2": true,
+    "compositor_A_equals_A2": true,
+    "lifecycle_controls": [
+      {
+        "control": "offload one view",
+        "status": "pass"
+      },
+      {
+        "control": "offload release restores own mapping",
+        "status": "pass"
+      },
+      {
+        "control": "DV to ordinary SDR invalidates mapped frame",
+        "status": "pass"
+      },
+      {
+        "control": "new DV stream renders its own original frame",
+        "status": "pass"
+      },
+      {
+        "control": "destroy one view preserves second view",
+        "status": "pass"
+      }
+    ],
+    "normal_exit": true
+  },
+  "ordinary_startup": {
+    "status": "pass",
+    "normal_exit": true,
+    "SDR_pixels_equal_prior_qualified_startup": true
+  },
+  "reused_evidence": [
+    "authenticated source construction and exact complete patch replay",
+    "normal distribution build and public ABI preservation",
+    "genuine missing SDK, incompatible ABI and incomplete SDK rejection controls",
+    "original six-only partial-upgrade rejection"
+  ],
+  "custody": {
+    "all_private_services_stopped": true,
+    "private_binaries_sources_and_detailed_provenance": "retained on ROG",
+    "private_payload_transfer": false,
+    "installed": false,
+    "owner_session_changed": false
+  },
+  "checks": "Only affected functional controls rerun; no repository fast lane or automated unit suite executed."
+}

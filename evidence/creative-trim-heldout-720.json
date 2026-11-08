@@ -1,0 +1,128 @@
+{
+  "metric": "DeltaE_ITP",
+  "self_tests": "PASS",
+  "original_input_guards": "PASS",
+  "comparisons": {
+    "official_matched_vs_mapped": {
+      "pixels": 8294400,
+      "mean": 1.8355513423595191,
+      "median": 1.1455806904501433,
+      "p95": 5.931051900196053,
+      "p99": 11.969049115589366,
+      "max": 43.36129796175455,
+      "fraction_gt1": 0.5751311728395062,
+      "fraction_gt3": 0.13853853202160493,
+      "fraction_gt10": 0.016647738233024692
+    },
+    "official_original_vs_mapped": {
+      "pixels": 8294400,
+      "mean": 4.258618877575155,
+      "median": 3.645358146731202,
+      "p95": 9.624152767598988,
+      "p99": 13.472712769350725,
+      "max": 43.01917130172255,
+      "fraction_gt1": 0.9403082802854938,
+      "fraction_gt3": 0.6051050106095679,
+      "fraction_gt10": 0.042557146990740743
+    },
+    "original_master_vs_decoded_baseline": {
+      "pixels": 8294400,
+      "mean": 4.905306734560703,
+      "median": 4.227304966791658,
+      "p95": 11.103269941615801,
+      "p99": 14.898534921718491,
+      "max": 58.756693925133376,
+      "fraction_gt1": 0.949086612654321,
+      "fraction_gt3": 0.6739586950231482,
+      "fraction_gt10": 0.07671790605709876
+    },
+    "official_original_vs_official_matched": {
+      "pixels": 8294400,
+      "mean": 3.7759432928925802,
+      "median": 3.2099465141947707,
+      "p95": 8.893992615054108,
+      "p99": 11.818741053305681,
+      "max": 39.23685611553838,
+      "fraction_gt1": 0.8852918836805556,
+      "fraction_gt3": 0.532792365933642,
+      "fraction_gt10": 0.028196252893518518
+    },
+    "official_matched_vs_dv_disabled": {
+      "pixels": 8294400,
+      "mean": 9.138426033995064,
+      "median": 9.512362873604449,
+      "p95": 12.895067993514466,
+      "p99": 15.054886721696617,
+      "max": 28.616101142590153,
+      "fraction_gt1": 0.999803481867284,
+      "fraction_gt3": 0.9944305796682099,
+      "fraction_gt10": 0.43399221161265433
+    },
+    "mapped_vs_dv_disabled": {
+      "pixels": 8294400,
+      "mean": 9.102876369507365,
+      "median": 9.351028724117247,
+      "p95": 12.863418968053539,
+      "p99": 16.00557241055792,
+      "max": 39.82912033847311,
+      "fraction_gt1": 0.9999521363811729,
+      "fraction_gt3": 0.9953233506944444,
+      "fraction_gt10": 0.4048350694444444
+    }
+  },
+  "output_signal_bounds": {
+    "official_original": {
+      "channel_min_cd_m2": 0.009913700507461525,
+      "channel_max_cd_m2": 99.77340908476896
+    },
+    "official_matched": {
+      "channel_min_cd_m2": 0.01747533287010179,
+      "channel_max_cd_m2": 99.69757765586338
+    },
+    "mapped": {
+      "channel_min_cd_m2": 0.013330848233337623,
+      "channel_max_cd_m2": 99.72790377755418
+    },
+    "dv_disabled": {
+      "channel_min_cd_m2": 0.00037955842529858866,
+      "channel_max_cd_m2": 99.72790377755418
+    }
+  },
+  "schema": 1,
+  "scope": "Single held-out nonneutral authored creative trim, original target 1; digital serialized output only",
+  "frame": 720,
+  "geometry": [
+    3840,
+    2160
+  ],
+  "target": {
+    "peak_cd_m2": 100,
+    "black_cd_m2": 0.005,
+    "gamut": "BT.709",
+    "authored_transfer": "BT.1886 gamma 2.4"
+  },
+  "comparison_encoding": "Full-range BT.2020/PQ RGB16LE; absolute luminance, common output container",
+  "official_processor": "CM Offline 5.6.4, CPU-only, original XML target 1; input read-only, isolated network-disabled container",
+  "candidate": "Normal staged FFmpeg +4 libplacebo filter, delivered original frame RPU; provider success at 100 nits verified in retained native log",
+  "input_matching": "Original P3D65/PQ full RGB master converted to BT.2020/PQ; lossless Main10 4:2:0 carrier decoded to the exact RGB TIFF used for the matched official reference",
+  "association": "Full-sequence index verified against prior known frame 714 payload before selecting frame 720",
+  "static_mastering": "Carrier includes original mastering declaration; decoded RGB bytes identical before and after declaration",
+  "control": "Exact same candidate target/output options, changing only apply_dolbyvision=0; disables all Dolby processing, not creative trims alone",
+  "guards": "All original media, XML, RPU and licensed processor hashes unchanged after execution; detailed provenance retained only on native host",
+  "method_source": "https://www.itu.int/dms_pubrec/itu-r/rec/bt/R-REC-BT.2124-0-201901-I!!PDF-E.pdf",
+  "method": "Float64 BT.2124 ICtCp conversion; T=0.5Ct; 720 times Euclidean distance; all pixels; linear quantiles",
+  "method_checks": "Published rounded examples, neutral-axis precision, identical-input zero; initial approximate blue illustration tolerance corrected before metric execution without changing normative constants",
+  "limitations": [
+    "Synthetic matched-input carrier, not an authored Dolby bitstream or conformance vector",
+    "Input conversion and 4:2:0 10-bit quantization materially alter the original master; original-versus-decoded and both official references reported separately",
+    "One held-out frame and one authored target; no tuning on this frame",
+    "DV-disabled baseline does not isolate creative trim contribution",
+    "No optical, display accuracy or conformance claim",
+    "Provider log proves mapping invocation, not independent per-coefficient creative implementation attribution"
+  ],
+  "failed_setup_preserved": [
+    "Initial baseline zscale output-format negotiation failed; corrected explicit planar RGB16 serialization",
+    "Initial disabled control requested incompatible intermediate output and failed initialization; successful control differs only by apply_dolbyvision"
+  ],
+  "script_sha256": "78af7445e682497ee229242d0428768ea8be99b62702896dd122b97d69132094"
+}

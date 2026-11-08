@@ -1,0 +1,30 @@
+{
+  "scope": "Normal Ubuntu GTK video and Showtime consumer packages on the ROG using a private hardware-backed compositor. The identical paused picture was presented at 30.125 seconds. The controlled compositor supplied 616, 308, then 616 cd/m².",
+  "input_controls": {
+    "original": "Profile 5 MP4",
+    "original_video_packets": 6314,
+    "excerpt_video_packets_matching_source_prefix": 819,
+    "replay": "python3 packaging/quality/verify-subtitle-carrier.py --reference-prefix-packets 819 ORIGINAL ACTIVE INACTIVE",
+    "matching_dolby_configuration_bytes": 32,
+    "tracks": "Matched embedded text tracks with the cue active or outside this frame. Showtime also disabled the text track on the identical active-cue carrier."
+  },
+  "gtk_video": {
+    "visible_text_changed_raw_pixels": 28821,
+    "visible_text_changed_compositor_pixels": 2545,
+    "mapped_pq_with_text": true,
+    "target_change_changed_video_with_active_and_inactive_cue": true,
+    "return_to_initial_target_restored_video_and_compositor_exactly": true
+  },
+  "showtime": {
+    "selected_active_text_stream": 0,
+    "source_timestamp_ns": 30125000000,
+    "visible_text_changed_screen_pixels_at_616": 15713,
+    "visible_text_changed_screen_pixels_at_308": 15716,
+    "changed_screen_pixels_at_target_transition": 921295,
+    "active_and_inactive_return_exactly": true,
+    "same_carrier_text_disabled_target_transition_changed_screen_pixels": 921295,
+    "same_carrier_text_disabled_return_exactly": true,
+    "capture_timing": "The text-disabled comparison waited for an actual completed mapped redraw before taking each capture. A fixed-delay capture had been premature."
+  },
+  "rejected_setup": "The initial remux preserved video samples but omitted the Dolby configuration and selected ordinary HEVC playback. Those captures cannot support any claim about rendering Dolby video with subtitles. The retained configuration and unchanged video packets were verified before the accepted runs."
+}
