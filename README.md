@@ -37,9 +37,9 @@ the fix and retains Ubuntu security policies; see the
 | Night Light in HDR, per-monitor overrides | **Installed** (since `nativehdr10`, now APT `nativehdr13`) | October 15 warm HDR/SDR observations and persistence accepted; no post-update acceptance inferred |
 | Ubuntu packages | **APT repository** (2026-10-27) | Rebuilt from Ubuntu's current source whenever Ubuntu updates it; one command sets a machine up ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)) |
 | Private package output retention | **Implemented** | Exclusive durable run directories preserve future source/build/rollback outputs without destructive reuse; existing nativehdr13 original-record recovery is separate ([retention](docs/UBUNTU_APT_REPOSITORY.md#private-source-and-recovery-output-retention)) |
-| Dolby Vision display mapping | **Done** (closed form) | Closed-form CM v4.0 and CM v2.9 equations; mean ΔE_ITP about 0.005 from Dolby's reference renderer on four titles at 600 nits (below) |
+| Dolby Vision display mapping | **Reference comparison on four titles** | The private CM v4.0 and CM v2.9 implementation achieved mean ΔE_ITP of 0.0036–0.0055 on selected frames at 600 cd/m². Reference comparison of the staged system player at the panel target remains open. |
 | Shared Dolby Vision playback and export | **mpv Wayland and FFmpeg Intel export verified** | Normal Ubuntu mpv and FFmpeg’s libplacebo filter consume per-frame metadata through the same target-aware renderer. [Packages, commands and qualification](docs/SYSTEM_DOLBY_VISION.md) |
-| GStreamer per-picture RPU transport | **Native transport checks passed; unshipped** | Software/Intel VA reorder, flushing seek, RPU gaps and rotation metadata invalidation passed; reconstruction and native display-target delivery remain separate work. [Contract and phase boundaries](docs/GSTREAMER_DOLBY_TRANSPORT.md) |
+| GStreamer per-picture RPU transport | **Native transport checks passed; unshipped** | Software and Intel VA preserved picture-owned metadata across reordering, seek and configuration changes. Rotation invalidated the original metadata. Normal GNOME player qualification continues. [Contract and phase boundaries](docs/GSTREAMER_DOLBY_TRANSPORT.md) |
 | Dolby Vision playback | **Working** through plurx Player | Profile 5, 8.1 and 7 FEL from the plurx web app, mapped at the panel's 616 nits ([plurx Player](#dolby-vision--the-equations-and-where-they-run)) |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
 | Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; nativehdr3 correction built, not activated; fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
@@ -101,7 +101,9 @@ development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md)):
 - **Where they run:** in plurx, the owner's media server — its processing
   helper and **plurx Player**, an mpv build launched from the plurx web app
   that maps each frame on the laptop's GPU at the panel's own peak, and
-  combines Profile 7's full enhancement layer itself.
+  combines Profile 7's full enhancement layer itself. The separate system
+  packages bring the mapper to ordinary mpv and FFmpeg. The staged mpv 0.42
+  build supports the matched enhancement layer. [System playback](docs/SYSTEM_DOLBY_VISION.md).
 - **What stays private:** the derivations and Dolby's measured outputs live on
   a private branch, never on `main` or its mirror.
 

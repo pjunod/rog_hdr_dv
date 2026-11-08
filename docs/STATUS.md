@@ -2,6 +2,8 @@
 
 **Updated November 7, 2026.** The ROG runs the seven-package playback update, nativehdr13 desktop and nativehdr3 kernel. Normal mpv opens MP4 and Matroska by default. The newer Profile 7 player has passed on the ROG using its existing video settings. Its ten-package installation is pending. [Player release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop and kernel versions](SOFTWARE_DELIVERY.md).
 
+The development mpv 0.42 package now preserves the displayed grade in a tagged window screenshot. Its saved PNG carries BT.2020/PQ. A Level 8 trim edit changed the intended frame, and an untouched frame plus ordinary HDR10 controls matched exactly. [File-level evidence](../evidence/mpv-window-grade-capture.json).
+
 ### GNOME playback in development
 
 The GTK default Vulkan renderer presented an actual floating-point RGB surface using BT.2020/PQ in the isolated Wayland session. A separate EGL framebuffer readback placed SDR white, half white, a 400 cd/m² patch and a translucent SDR overlay over that patch within one 10-bit code value of their expected encodings. These are digital checks of GTK composition. The GStreamer software and Intel VA decoder paths preserved frame metadata across a seek. Playback of a complete movie through the GNOME player and installation on the running desktop remain open. [GTK presentation](GDK_DISPLAY_TARGET.md) · [GStreamer picture ownership](GSTREAMER_DOLBY_RECONSTRUCTION.md).
