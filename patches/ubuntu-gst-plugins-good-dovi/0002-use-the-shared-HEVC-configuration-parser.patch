@@ -1,0 +1,36 @@
+From e56a7fde2e4d413c5461595bfc3a1e004b2db3a1 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:20:53 +0000
+Subject: [PATCH 2/2] qtdemux: share validation with the native HEVC decoders
+
+---
+ gst/isomp4/qtdemux.c | 9 +++------
+ 1 file changed, 3 insertions(+), 6 deletions(-)
+
+diff --git a/gst/isomp4/qtdemux.c b/gst/isomp4/qtdemux.c
+index 60b7502..989cd93 100644
+--- a/gst/isomp4/qtdemux.c
++++ b/gst/isomp4/qtdemux.c
+@@ -14912,7 +14912,7 @@ qtdemux_set_dovi_configuration (GNode * entry, guint32 entry_size, GstCaps * cap
+     const guint8 *data = child->data;
+     gsize offset = data - base;
+     guint32 type, size;
+-    guint profile;
++    GstH265DoviConfiguration config;
+ 
+     if (offset > entry_size || entry_size - offset < 8)
+       return;
+@@ -14926,11 +14926,8 @@ qtdemux_set_dovi_configuration (GNode * entry, guint32 entry_size, GstCaps * cap
+       return;
+     record = data + 8;
+     record_size = size - 8;
+-    profile = record[2] >> 1;
+-    if (record[0] != 1 || record[1] != 0 || !profile ||
+-        (type == FOURCC_dvcC) != (profile < 8) ||
+-        !(GST_READ_UINT16_BE (record + 2) & 0x1f8) ||
+-        !(record[3] & 3))
++    if (!gst_codec_utils_h265_parse_dovi_configuration (record, record_size,
++            &config) || (type == FOURCC_dvcC) != (config.profile < 8))
+       return;
+   }
+   if (!record)
