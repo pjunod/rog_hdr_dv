@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "state": "ADAPTER_COMPILE_ONLY_NOT_LINKED_IN_SINK",
+  "source_files": {
+    "mapper.h": "421f6069170b07856e396f700281fadbf4056ffc94fc1a9d20c0ccb6f4a146ed",
+    "mapper.c": "a2a4e09c50bddf31e54edd8758f2baa3c1f82125d015543104295765df692ab6"
+  },
+  "compiler": "cc Ubuntu15.3.0",
+  "flags": [
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-fPIC"
+  ],
+  "sdk": "isolated libplacebo-rog387 and rog-dv-provider387; GstDoviPicture bridge ABI1",
+  "native_slot": "gstreamer-gtk-dovi",
+  "rust_baseline": {
+    "source": "Ubuntu rust-gst-plugin-gtk4 0.15.2-1ubuntu2",
+    "compiler": "rustc1.97.1",
+    "command": "cargo check --offline -j4 --features gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28",
+    "result": "pass;2 pre-existing winegl cfg warnings"
+  },
+  "object_compile": "pass;zero warnings",
+  "object_symbol_check": "all observed pl_* undefined symbols use pl_rog387_*",
+  "runtime_executed": false,
+  "installation": false,
+  "limitations": [
+    "Adapter has no sink or player entrypoint yet",
+    "Surface target ownership/context binding pending",
+    "Caps-preserving ordinary pre-GL integration pending",
+    "No mapping correctness or app support claim"
+  ]
+}
