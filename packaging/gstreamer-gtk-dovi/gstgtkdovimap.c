@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "mapper.h"
+#include "native-input-formats.h"
 #include "stream.h"
 #include "gstdovipicture.h"
 #include <gst/video/gstvideodovirpumeta.h>
@@ -35,25 +36,62 @@ static void set_context (GstElement *element, GstContext *context)
   }
   GST_ELEMENT_CLASS (gtk_dovi_map_parent_class)->set_context (element, context);
 }
+static GstCaps *native_input_caps (void)
+{
+  GstCaps *caps = gst_caps_new_empty_simple ("video/x-raw");
+  GValue formats = G_VALUE_INIT;
+  g_value_init (&formats, GST_TYPE_LIST);
+#define CAPS_FORMAT(gst, av) G_STMT_START { \
+  GValue format = G_VALUE_INIT; \
+  g_value_init (&format, G_TYPE_STRING); \
+  g_value_set_static_string (&format, gst_video_format_to_string (GST_VIDEO_FORMAT_##gst)); \
+  gst_value_list_append_value (&formats, &format); \
+  g_value_unset (&format); \
+} G_STMT_END;
+  GTK_DOVI_NATIVE_INPUT_FORMATS (CAPS_FORMAT)
+#undef CAPS_FORMAT
+  gst_structure_set_value (gst_caps_get_structure (caps, 0), "format", &formats);
+  g_value_unset (&formats);
+  return caps;
+}
+static GstCaps *graded_output_caps (void)
+{
+  GstVideoColorimetry pq = {GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB,
+      GST_VIDEO_TRANSFER_SMPTE2084, GST_VIDEO_COLOR_PRIMARIES_BT2020};
+  gchar *color = gst_video_colorimetry_to_string (&pq);
+  GstCaps *caps = gst_caps_new_simple ("video/x-raw", "format", G_TYPE_STRING,
+      "RGBA64_LE", "colorimetry", G_TYPE_STRING, color,
+      "gtk-dovi-preconverted", G_TYPE_BOOLEAN, TRUE, NULL);
+  g_free (color);
+  return caps;
+}
 static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection direction,
     GstCaps *caps, GstCaps *filter)
 {
+  GstCaps *result = gst_caps_is_any (caps) ? gst_caps_copy (caps) : gst_caps_new_empty ();
   (void) base;
-  GstCaps *result = gst_caps_copy (caps);
-  for (guint i = 0; i < gst_caps_get_size (result); i++) {
-    GstStructure *st = gst_caps_get_structure (result, i);
-    if (!gtk_dovi_stream_profile (st)) continue;
-    if (direction == GST_PAD_SINK) {
-      GstVideoColorimetry pq = {GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB,
-          GST_VIDEO_TRANSFER_SMPTE2084, GST_VIDEO_COLOR_PRIMARIES_BT2020};
-      gchar *color = gst_video_colorimetry_to_string (&pq);
-      gst_structure_set (st, "format", G_TYPE_STRING, "RGBA64_LE", "colorimetry", G_TYPE_STRING, color, "gtk-dovi-preconverted", G_TYPE_BOOLEAN, TRUE, NULL);
-      g_free (color);
-      gst_caps_set_features (result, i, gst_caps_features_new_empty ());
-    } else {
-      gst_structure_remove_fields (st, "colorimetry", "format", "gtk-dovi-preconverted", NULL);
-      gst_caps_set_features (result, i, gst_caps_features_new_any ());
+  for (guint i = 0; i < gst_caps_get_size (caps); i++) {
+    const GstStructure *st = gst_caps_get_structure (caps, i);
+    if (!gtk_dovi_stream_profile (st)) {
+      gst_caps_append_structure_full (result, gst_structure_copy (st),
+          gst_caps_features_copy (gst_caps_get_features (caps, i)));
+      continue;
     }
+    GstCaps *one = gst_caps_copy_nth (caps, i);
+    GstCaps *constraint = direction == GST_PAD_SINK ? native_input_caps () : graded_output_caps ();
+    GstCaps *allowed = gst_caps_intersect_full (one, constraint, GST_CAPS_INTERSECT_FIRST);
+    gst_caps_unref (one);
+    gst_caps_unref (constraint);
+    for (guint j = 0; j < gst_caps_get_size (allowed); j++) {
+      GstStructure *mapped = gst_caps_get_structure (allowed, j);
+      gst_structure_remove_fields (mapped, "colorimetry", "format",
+          "gtk-dovi-preconverted", "chroma-site", NULL);
+    }
+    constraint = direction == GST_PAD_SINK ? graded_output_caps () : native_input_caps ();
+    one = gst_caps_intersect_full (allowed, constraint, GST_CAPS_INTERSECT_FIRST);
+    gst_caps_unref (allowed);
+    gst_caps_unref (constraint);
+    gst_caps_append (result, one);
   }
   if (filter) {
     GstCaps *intersection = gst_caps_intersect_full (filter, result, GST_CAPS_INTERSECT_FIRST);
@@ -64,19 +102,41 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
 static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *output)
 {
   GtkDoviMap *s = (GtkDoviMap *) base;
-  guint profile = gtk_dovi_stream_profile (gst_caps_get_structure (input, 0));
+  guint profile = 0;
+  for (guint i = 0; i < gst_caps_get_size (input) && !profile; i++)
+    profile = gtk_dovi_stream_profile (gst_caps_get_structure (input, i));
   gboolean known = profile != 0;
   if (known) {
-    if (!gst_video_info_from_caps (&s->info, input) ||
-        !gst_video_info_from_caps (&s->output_info, output) ||
-        GST_VIDEO_INFO_WIDTH (&s->info) != GST_VIDEO_INFO_WIDTH (&s->output_info) ||
-        GST_VIDEO_INFO_HEIGHT (&s->info) != GST_VIDEO_INFO_HEIGHT (&s->output_info) ||
-        GST_VIDEO_INFO_FORMAT (&s->output_info) != GST_VIDEO_FORMAT_RGBA64_LE ||
-        s->output_info.colorimetry.transfer != GST_VIDEO_TRANSFER_SMPTE2084 ||
-        s->output_info.colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT2020 ||
-        s->output_info.colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
+    if (!gst_caps_is_fixed (input) || !gst_caps_is_fixed (output) ||
+        gst_caps_get_size (input) != 1 || gst_caps_get_size (output) != 1 ||
+        !gst_caps_features_is_equal (gst_caps_get_features (input, 0),
+            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY) ||
         !gst_caps_features_is_equal (gst_caps_get_features (output, 0),
-            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY)) return FALSE;
+            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY))
+      return FALSE;
+    GstCaps *allowed = native_input_caps ();
+    gboolean supported = gst_caps_is_subset (input, allowed);
+    gst_caps_unref (allowed);
+    if (!supported) return FALSE;
+    /* Derive the final output from the same forward contract: identity fields
+     * and authoritative stream configuration cannot silently change here. */
+    allowed = transform_caps (base, GST_PAD_SINK, input, NULL);
+    supported = gst_caps_is_subset (output, allowed);
+    gst_caps_unref (allowed);
+    if (!supported) return FALSE;
+    GstVideoInfo info, output_info;
+    if (!gst_video_info_from_caps (&info, input) ||
+        !gst_video_info_from_caps (&output_info, output) ||
+        GST_VIDEO_INFO_WIDTH (&info) != GST_VIDEO_INFO_WIDTH (&output_info) ||
+        GST_VIDEO_INFO_HEIGHT (&info) != GST_VIDEO_INFO_HEIGHT (&output_info) ||
+        GST_VIDEO_INFO_FORMAT (&output_info) != GST_VIDEO_FORMAT_RGBA64_LE ||
+        output_info.colorimetry.transfer != GST_VIDEO_TRANSFER_SMPTE2084 ||
+        output_info.colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT2020 ||
+        output_info.colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
+        output_info.colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255)
+      return FALSE;
+    s->info = info;
+    s->output_info = output_info;
   } else if (!gst_caps_is_equal (input, output)) return FALSE;
   if (s->known_stream != known) {
     s->known_stream = known;

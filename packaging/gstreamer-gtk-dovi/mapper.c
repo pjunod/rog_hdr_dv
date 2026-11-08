@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "mapper.h"
+#include "native-input-formats.h"
 #include "gstdovipicture.h"
 #include <dv_provider387.h>
 #include <libplacebo/vulkan.h>
@@ -99,17 +100,9 @@ void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
 static enum AVPixelFormat input_format (GstVideoFormat f)
 {
   switch (f) {
-    case GST_VIDEO_FORMAT_RGBA: return AV_PIX_FMT_RGBA;
-    case GST_VIDEO_FORMAT_BGRA: return AV_PIX_FMT_BGRA;
-    case GST_VIDEO_FORMAT_RGB: return AV_PIX_FMT_RGB24;
-    case GST_VIDEO_FORMAT_BGR: return AV_PIX_FMT_BGR24;
-    case GST_VIDEO_FORMAT_RGBx: return AV_PIX_FMT_RGB0;
-    case GST_VIDEO_FORMAT_BGRx: return AV_PIX_FMT_BGR0;
-    case GST_VIDEO_FORMAT_RGBA64_LE: return AV_PIX_FMT_RGBA64LE;
-    case GST_VIDEO_FORMAT_NV12: return AV_PIX_FMT_NV12;
-    case GST_VIDEO_FORMAT_P010_10LE: return AV_PIX_FMT_P010LE;
-    case GST_VIDEO_FORMAT_I420: return AV_PIX_FMT_YUV420P;
-    case GST_VIDEO_FORMAT_I420_10LE: return AV_PIX_FMT_YUV420P10LE;
+#define IMPORT_FORMAT(gst, av) case GST_VIDEO_FORMAT_##gst: return AV_PIX_FMT_##av;
+    GTK_DOVI_NATIVE_INPUT_FORMATS (IMPORT_FORMAT)
+#undef IMPORT_FORMAT
     default: return AV_PIX_FMT_NONE;
   }
 }
