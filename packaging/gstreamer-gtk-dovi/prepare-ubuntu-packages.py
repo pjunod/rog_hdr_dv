@@ -10,8 +10,8 @@ import re
 import shutil
 
 CORE_VERSION = "0.1.0+rogdv2"
-GTK_VERSION = "0.15.2-1ubuntu2+rogdv2"
-SHOWTIME_VERSION = "50.0-2+rogdv2"
+GTK_VERSION = "0.15.2-1ubuntu2+rogdv3"
+SHOWTIME_VERSION = "50.0-2+rogdv3"
 FIXED_GTK = "4.24.1+ds-1+rogdv3"
 QUALIFIED_GSTREAMER = {
     "gstreamer1.0-gl": "1.28.7-1+rogdv2",
