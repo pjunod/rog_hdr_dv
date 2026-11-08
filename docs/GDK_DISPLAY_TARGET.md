@@ -4,7 +4,7 @@
 playback. Ubuntu GTK `4.24.1+ds-1` and the candidate GDK libraries compile on
 amd64. A clean patch replay reproduces the complete pinned candidate tree.
 Independent source review and ordinary native target/destruction checks pass.
-Live profile/output lifecycle and package qualification remain pending. Nothing is installed on
+The Ubuntu-default package build and offline forward/rollback simulation passed. Physical output hotplug remains open. Nothing is installed on
 the user's desktop, and no playback or optical acceptance follows from this work.
 
 ## Why an accessor is needed
@@ -17,7 +17,7 @@ chromaticities. In `gdkwaylandcolor.c`, `ImageDescription` receives those values
 but `image_desc_info_done()` reduces them to a color state and discards them.
 The encoding cache can also skip the information query entirely.
 
-The [one-patch GTK series](../patches/ubuntu-gtk4-display-target/series) keeps
+The [GTK series](../patches/ubuntu-gtk4-display-target/series) keeps
 that existing ownership. It publishes a copied target from the existing
 preferred parametric description. It creates no second color-management
 surface object and makes no monitor guesses. It also corrects the existing
@@ -172,7 +172,7 @@ ready, a move between outputs, a spanning surface, a compositor target update,
 rapid replacement of an outstanding query, hide/show and destruction, and a
 missing or failed parametric target. A renderer consumer must separately prove
 that an old mapping cannot survive invalidation and that no worker accesses
-GDK directly. Introspection and Debian package builds also remain unqualified. The observer
+GDK directly. The packaged GIR built; application-level introspection acceptance remains open. The observer
 alone does not prove any GStreamer mapper or standard player integration.
 
 ## Package staging and recovery
@@ -184,10 +184,4 @@ i386 runtime is installed. The exact six stock packages are downloaded into
 the private task slot; their architecture, version and hashes are in the
 [staging receipt](../evidence/gdk-display-target-packages-20261107.json).
 
-Candidate version `4.24.1+ds-1+rogdv1` is authorized for private staging. Its
-Debian symbol template and version are source-pinned in a separate packaging
-patch; independent packaging review and a build using Ubuntu's existing
-configuration defaults remain pending. There is
-no desktop install transaction or play-ready package acceptance yet. The GDK
-target prerequisite remains separate from reconstruction and downstream
-GStreamer/GTK rendering.
+Version `4.24.1+ds-1+rogdv1` built using the ordinary Ubuntu packaging rules. Its additive symbol and version are pinned in the second patch. Offline APT simulation upgraded the six packages listed above and restored the corresponding stock six from a modeled candidate state, with no removals or host changes. The snapshot provides display information to consumers. The GStreamer rendering integration remains in development. [Candidate and rollback hashes](../evidence/gdk-display-target-packages-20261107.json).

@@ -9,6 +9,12 @@ records exact package hashes and remaining acceptance; no reinstall is needed.
 
 Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Both Vulkan driver architectures built. APT simulated the seven-package installation and its exact stock rollback offline. All seven packages are installed and dpkg-verified. The installed FFmpeg mapped genuine Profile 5 on Intel at 616 cd/m². Installed mpv mapped the same title on a private Wayland surface, where the 880.644-nit automatic trim-selection issue remains reproducible. The existing GNOME session stayed open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
 
+### Panel target correction and Profile 7
+
+The staged mpv `+rogdv3` selects creative trims using the panel declaration of 0.0004–616 cd/m² at reference white 142. A private compositor changed the target to 308 cd/m² and back. The player selected each new physical target even though normalized headroom stayed constant. Desktop and native screenshot paths used their respective encodings. The Ubuntu-default package built and both offline APT plans changed only mpv. [Qualification and package](../packaging/system-dv/physical-target-runtime-receipt.json).
+
+A separate staged mpv 0.42 rendered a genuine 3840×2160 Profile 7 FEL picture on the laptop’s Intel GPU. The renderer combined the matched enhancement layer at native resolution before applying CM v4 trims for an explicit 616 cd/m² destination. Disabling the enhancement layer made the shared mapper decline the residual-dependent picture. Shipping the 0.42 player, automatic target integration for that version, and comparison with an independent Dolby reference remain open. [Matched-frame digital receipt](../evidence/profile7-intel-dual-layer.json).
+
 ## GStreamer RPU transport — native scope passed, November 7
 
 Exact Ubuntu base `1.28.7-1` and bad `1.28.6-1ubuntu1` source series now carry
@@ -25,20 +31,7 @@ negative cases are pending. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md)
 
 ## GTK preferred display target — November 7
 
-A proposed GTK `4.24.1+ds-1` source change retains the real compositor target
-behind a caller-owned GDK snapshot and immediate invalidation notifications.
-The baseline and corrected candidate affected GDK libraries compile; complete
-source replay matches the pinned candidate. A review found mid-teardown signal
-reentrancy; notification now runs after the core publishes destroyed state.
-Native pending/ready reentrant destruction negatives now pass. Independent review and runtime checks
-remain pending. No desktop installation or GStreamer rendering acceptance is
-claimed. Initial reviewed runtime found default GTK hides the manager and its
-experimental renderer rejects Weston's missing sRGB transfer capability. A
-reviewed feedback-only correction preserves that rendering policy while making
-ordinary discovery independent. Default startup and both native lifecycle
-negatives pass; a late-manager race regression passes while its old control
-fails. Live profile/output lifecycle and package staging remain pending.
-[Consumer contract and native observer](GDK_DISPLAY_TARGET.md).
+GTK now exposes the compositor's preferred output through a surface-owned snapshot. The ordinary Wayland path passed initial discovery, target changes, destruction and delayed color-manager startup in an isolated compositor. The six GTK packages already present on the ROG were rebuilt with the normal Ubuntu feature set. Offline APT simulation accepted all six candidate packages and the exact six-package stock rollback. The ROG still runs stock GTK. GStreamer playback needs a renderer that consumes the snapshot. [Native observer and package receipt](GDK_DISPLAY_TARGET.md).
 
 ## Kernel security rebase — 2026-10-29
 

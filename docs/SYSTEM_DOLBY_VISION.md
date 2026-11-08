@@ -35,6 +35,12 @@ Keep the seven files, the four original Ubuntu packages and their hashes togethe
 
 The ROG now has the seven verified packages. The normal system FFmpeg binary mapped a genuine, nonblack Profile 5 frame at 30 seconds on the integrated Intel GPU, with a target of 0.0004–616 cd/m² and P3-D65 primaries. Normal mpv loaded the system libraries and mapped the same title on Intel through a private Wayland compositor reproducing the panel declaration. The trace shows BT.2020/PQ and a rounded maximum of 881 cd/m². This confirms the automatic target discrepancy on the installed player. The GNOME session stayed open throughout.
 
+### Physical trim selection and the staged dual-layer player
+
+The reviewed mpv 0.41 `+rogdv3` passes the compositor's physical peak and black level to the creative mapper. For the laptop declaration, it chooses the trim at 616 cd/m², then scales linear light by 203/142 for the compositor encoding. A change of physical target invalidates cached mappings even when the desktop reports the same normalized headroom. Explicit targets and native exports retain their own target rules. The private rollback restores the installed `+rogdv2`. [Runtime qualification](../packaging/system-dv/physical-target-runtime-receipt.json) · [Package hashes](../packaging/system-dv/physical-target-package-receipt.json).
+
+The separate mpv 0.42 candidate decodes both layers of Profile 7. Its libplacebo 7.387 integration calls the mapper after successful native-size enhancement-layer composition. A 4K picture at 0.5 s passed on Intel Vulkan using an explicit 616 cd/m² target. The corresponding base-only control declined the grade. Stock upstream mpv also produced different full-layer and base-only pictures at that timestamp, independently exercising the residual. These tests establish a digital reconstruction path on the ROG. Dolby reference agreement, automatic targeting in 0.42 and distribution packages for this player remain open. [Measurements and controls](../evidence/profile7-intel-dual-layer.json).
+
 ## Scope of the evidence
 
 A decoded frame, a PQ screenshot, and a successful process exit each leave open whether the authored trims reached the output. Check the provider mapping result, the selected target and captured pixels together. [Status](STATUS.md) records what has actually passed. Earlier four-title comparisons against a reference renderer apply to the earlier engine and test conditions.

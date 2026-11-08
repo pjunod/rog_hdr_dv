@@ -1,5 +1,5 @@
 {
-  "state": "stock rollback staging only; candidate source version authorized but not packaged",
+  "state": "Ubuntu-default build and six-package forward/rollback APT simulations passed",
   "installed_source_version": "4.24.1+ds-1",
   "candidate_source_version": "4.24.1+ds-1+rogdv1",
   "installed_architectures": [
@@ -83,5 +83,37 @@
       "debian/patches/wayland-preferred-color-target.patch": "3916a7ade9881674215287c0efa0d86db58a198953e1707a722ebbf850edc21a"
     }
   },
-  "candidate_state": "metadata staged and source-pinned; separate packaging review and Ubuntu-default build pending; no host installation"
+  "candidate_state": "Reviewed source and package built; privately staged only. Host still uses stock GTK.",
+  "candidate_packages": [
+    {
+      "file": "gir1.2-gtk-4.0_4.24.1+ds-1+rogdv1_amd64.deb",
+      "sha256": "3a52d87cf27d065fab2a766b06c6fda61031c584b45248711e0b8f0ca4ff1444"
+    },
+    {
+      "file": "gtk-update-icon-cache_4.24.1+ds-1+rogdv1_amd64.deb",
+      "sha256": "d7b74ca90f511b5c2579109bab0f143085d472a3eab248b3ed4e02ca5200fc87"
+    },
+    {
+      "file": "libgtk-4-1_4.24.1+ds-1+rogdv1_amd64.deb",
+      "sha256": "083d073e5251275ab4bd6552016165f36e736bc28e4dde826614b2d743d40361"
+    },
+    {
+      "file": "libgtk-4-bin_4.24.1+ds-1+rogdv1_amd64.deb",
+      "sha256": "81e9a2c67a3c0c7710a22474d72f12c1dd8e299c0f9756e5bc667cdd810defb2"
+    },
+    {
+      "file": "libgtk-4-common_4.24.1+ds-1+rogdv1_all.deb",
+      "sha256": "15e0d3c35cd31962fec45983616f87b9aeaf2f630296b35c13d777bce88da057"
+    },
+    {
+      "file": "libgtk-4-dev_4.24.1+ds-1+rogdv1_amd64.deb",
+      "sha256": "2ee83c9c16b00b0b645ff0612f73cdc9c32b612bdb62736a1fdad1bc0c450fdc"
+    }
+  ],
+  "offline_apt": {
+    "forward_changes": 6,
+    "rollback_changes": 6,
+    "removals": 0,
+    "host_status_unchanged": true
+  }
 }
