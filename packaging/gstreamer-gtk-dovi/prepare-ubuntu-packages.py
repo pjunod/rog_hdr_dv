@@ -13,13 +13,6 @@ CORE_VERSION = "0.1.0+rogdv2"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv3"
 SHOWTIME_VERSION = "50.0-2+rogdv3"
 FIXED_GTK = "4.24.1+ds-1+rogdv3"
-QUALIFIED_GSTREAMER = {
-    "gstreamer1.0-gl": "1.28.7-1+rogdv2",
-    "gstreamer1.0-plugins-good": "1.28.7-1+rogdv1",
-    "gstreamer1.0-plugins-bad": "1.28.7-1+rogdv2",
-    "gstreamer1.0-plugins-extra": "1.28.7-1+rogdv2",
-    "gstreamer1.0-libav": "1.28.7-1+rogdv1",
-}
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
 INPUT_FILES = ("control", "rules", "changelog")
@@ -99,6 +92,34 @@ class PreparationError(Exception):
     pass
 
 
+def qualified_pipeline():
+    """Use actual binary metadata, grouped by its independently built source."""
+    expected = {
+        "gst-plugins-base1.0": {
+            "gstreamer1.0-gl", "libgstreamer-gl1.0-0",
+            "libgstreamer-plugins-base1.0-0",
+        },
+        "gst-plugins-good1.0": {"gstreamer1.0-plugins-good"},
+        "gst-plugins-bad1.0": {
+            "gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra",
+        },
+        "gst-libav1.0": {"gstreamer1.0-libav"},
+    }
+    families = json.loads((INPUT_DIR / "qualified-pipeline.json").read_text())["source_families"]
+    if set(families) != set(expected):
+        raise PreparationError("unrecognized qualified GStreamer source families")
+    versions = {}
+    for source, names in expected.items():
+        family = families[source]
+        if not family["source_version"] or set(family["binary_packages"]) != names:
+            raise PreparationError(f"unrecognized binary inventory for {source}")
+        for name, binary in family["binary_packages"].items():
+            if not binary["version"] or not re.fullmatch(r"[0-9a-f]{64}", binary["deb_sha256"]):
+                raise PreparationError(f"incomplete qualified binary metadata: {name}")
+            versions[name] = binary["version"]
+    return versions
+
+
 def replace_once(text, old, new, label):
     count = text.count(old)
     if count != 1:
@@ -138,6 +159,7 @@ def control_stanzas(text, source, expected_packages):
 
 
 def gtk_control(original):
+    qualified = qualified_pipeline()
     source, rust_sdk, plugin = control_stanzas(
         original, "rust-gst-plugin-gtk4", GTK_SOURCE_PACKAGES
     )
@@ -152,9 +174,9 @@ def gtk_control(original):
     depends = replace_once(
         depends, " ${misc:Depends},",
         f" libgtk-4-1 (= {FIXED_GTK}),\n"
-        f" gstreamer1.0-gl (= {QUALIFIED_GSTREAMER['gstreamer1.0-gl']}),\n"
-        " libgstreamer-gl1.0-0 (= 1.28.7-1+rogdv2),\n"
-        " libgstreamer-plugins-base1.0-0 (= 1.28.7-1+rogdv2),\n"
+        f" gstreamer1.0-gl (= {qualified['gstreamer1.0-gl']}),\n"
+        f" libgstreamer-gl1.0-0 (= {qualified['libgstreamer-gl1.0-0']}),\n"
+        f" libgstreamer-plugins-base1.0-0 (= {qualified['libgstreamer-plugins-base1.0-0']}),\n"
         f" libgstgtk-dovi-core0 (= {CORE_VERSION}),\n ${{misc:Depends}},",
         "gtk plugin runtime dependencies",
     )
@@ -163,6 +185,7 @@ def gtk_control(original):
 
 
 def showtime_control(original):
+    qualified = qualified_pipeline()
     source, binary = control_stanzas(original, "showtime", ("showtime",))
     depends = field_text(binary, "Depends")
     depends = replace_once(
@@ -178,14 +201,14 @@ def showtime_control(original):
     )
     for name in ("gstreamer1.0-gl", "gstreamer1.0-plugins-good"):
         depends = replace_once(
-            depends, f" {name},", f" {name} (= {QUALIFIED_GSTREAMER[name]}),",
+            depends, f" {name},", f" {name} (= {qualified[name]}),",
             f"qualified {name}",
         )
     producer_lines = []
     for name in ("gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra", "gstreamer1.0-libav"):
         if re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", depends):
             raise PreparationError(f"unexpected existing producer dependency: {name}")
-        producer_lines.append(f" {name} (= {QUALIFIED_GSTREAMER[name]}),\n")
+        producer_lines.append(f" {name} (= {qualified[name]}),\n")
     depends = replace_once(
         depends, " ${gst-plugins-extra:Depends},",
         "".join(producer_lines) + " ${gst-plugins-extra:Depends},",
