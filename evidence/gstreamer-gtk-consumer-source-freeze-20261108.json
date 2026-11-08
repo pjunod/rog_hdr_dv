@@ -12,8 +12,10 @@
   "checks": {
     "shared_C_core_and_module": "PASS strict compiler/link; Werror",
     "Rust_check": "PASS; two preexisting unexpected winegl cfg warnings",
-    "Rust_full_cdylib": "in progress -j1",
-    "Showtime_resource_build": "prior build PASS; final recheck queued"
+    "Rust_full_cdylib": "PASS offline -j1, full distro features; two preexisting winegl cfg warnings",
+    "Showtime_resource_build": "PASS final py_compile and Meson app resource build -j1",
+    "public_patch_replay": "PASS all three patches exactly reproduce compiled native source",
+    "ELF_namespace": "C core imports pl_rog387_*; uniquely named renderer/provider SONAMEs"
   },
   "public_source_sha256": {
     "packaging/gstreamer-gtk-dovi/0001-showtime-bind-native-target-before-gl-conversion.patch": "d02697b6924d1026e5493c622c1fca44179845b9a3bc87aa52d50e73ad2ca87b",
@@ -40,5 +42,36 @@
     "optical_accuracy": false,
     "host_install": false,
     "default_rank_change": false
-  }
+  },
+  "artifacts_and_logs": {
+    "meson-build/libgstgtkdovicore.so.0.0.0": {
+      "sha256": "239bdab7ebb4909a46d0410d04dc21b232d9f0ed5440f4b6cfcd7aa3b5923c18",
+      "size": 381720
+    },
+    "meson-build/libgstgtkdovimap.so": {
+      "sha256": "27265776ffe52ba8ec4a4d8901019168523d0319b96c6932562c389c89de8e43",
+      "size": 85976
+    },
+    "target/debug/libgstgtk4.so": {
+      "sha256": "34c5c81f6c5cffbe2e33433018b10aa9aeab9834f0a895a9e12ccc346346d4d3",
+      "size": 88591456
+    },
+    "mapper-final-build.log": {
+      "sha256": "0a59d91700807eedb783056d11637f698d2a72ed94fb697a435e36e3ca5e2053",
+      "size": 1530
+    },
+    "paused-final-check.log": {
+      "sha256": "1497abb6f2a234d2724a4e92af8381cf1bb9a6119c57e40fd760dcab58ebbd3c",
+      "size": 1779
+    },
+    "paused-final-build.log": {
+      "sha256": "629d6c2141971636931855a710b46fab74fda131bec715af1000924c7e6a67a1",
+      "size": 3112
+    },
+    "showtime-final-build.log": {
+      "sha256": "80dfe3fefb30eff1a050e42b84bfb0c25cf35fc92871574c3c9285991c1349cb",
+      "size": 232
+    }
+  },
+  "compiled_source_commit": "060f3e8"
 }
