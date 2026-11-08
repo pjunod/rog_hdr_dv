@@ -586,12 +586,13 @@
       "component": "ubuntu-mpv-system-dv",
       "base_commit": "de5bd09beff0808d9c1849ce0bb4c04273de687a",
       "base_tree": "34c6eb056cc71e50246e7e8c7fbb075c570b0b1e",
-      "candidate_commit": "9b90c65c8df97fdb763c544b6df50f613dedb435",
-      "candidate_tree": "e3455a19b68f30f2ef04dd95907a806029f219be",
-      "patch_count": 2,
+      "candidate_commit": "5105bb7d8904de6185d96ef60bfe86a7936c8c12",
+      "candidate_tree": "f2ffc6627b45a2cc3d4d385d772d46ad17d65356",
+      "patch_count": 3,
       "patch_order": [
         "0001-mpv-shared-display-management.patch",
-        "0002-mpv-wayland-optional-content-light.patch"
+        "0002-mpv-wayland-optional-content-light.patch",
+        "0003-mpv-physical-target.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -614,7 +615,9 @@
             "url": "https://archive.ubuntu.com/ubuntu/pool/universe/m/mpv/mpv_0.41.0-2ubuntu5.debian.tar.xz"
           }
         ]
-      }
+      },
+      "candidate_package_version": "0.41.0-2ubuntu5+rogdv4",
+      "rollback_package_version": "0.41.0-2ubuntu5+rogdv2"
     },
     {
       "component": "ubuntu-mesa-wayland-hdr",
@@ -653,6 +656,129 @@
           }
         ]
       }
+    },
+    {
+      "component": "ubuntu-gst-plugins-base-rpu",
+      "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
+      "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
+      "candidate_commit": "23a21d1f6a8b6c263006aef993e4073b5476c126",
+      "candidate_tree": "9d9a28d60ebaf12902679c01da767ceab2902948",
+      "patch_count": 1,
+      "patch_order": [
+        "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gst-plugins-base1.0",
+        "version": "1.28.7-1",
+        "artifacts": [
+          {
+            "file": "gst-plugins-base1.0_1.28.7-1.dsc",
+            "sha256": "2e9f9c6f4c3f1c7a7f4c21d9d33c0afbb5d3fdc0c3cdac1b82d62c2cec6f7343",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1.dsc"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7.orig.tar.xz",
+            "sha256": "ed6e5410f496d171818763af2265e7977154bc7f9b827e98acf8c5bed21dd5a7",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7.orig.tar.xz"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7.orig.tar.xz.asc",
+            "sha256": "5f53281ad6ae154bac5e6717932b04370f0eafd2355d58b5777594b73568d1ca",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7.orig.tar.xz.asc"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7-1.debian.tar.xz",
+            "sha256": "4e86147d3fc8f39fb476b1b9ec8ab38778ff8902eef2a2bb03e4d852f993f6c3",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1.debian.tar.xz"
+          }
+        ]
+      },
+      "candidate_status": "Raw RPU transport passed native software and Intel VA frame association and transform controls. Staged source; downstream reconstruction and normal player integration pending."
+    },
+    {
+      "component": "ubuntu-gst-plugins-bad-rpu",
+      "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
+      "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
+      "candidate_commit": "fa79f6aecf188858f128308053e67450071e0bca",
+      "candidate_tree": "237df5dd6ed2fe9177636cbdbcc0672f8e7c3693",
+      "patch_count": 1,
+      "patch_order": [
+        "0001-h265parse-attach-original-RPU-from-completed-access-units.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gst-plugins-bad1.0",
+        "version": "1.28.6-1ubuntu1",
+        "artifacts": [
+          {
+            "file": "gst-plugins-bad1.0_1.28.6-1ubuntu1.dsc",
+            "sha256": "8352f9eb7efde49ca339552f0c914739aabea3b4fb468070cfb9963a41162b73",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-bad1.0/gst-plugins-bad1.0_1.28.6-1ubuntu1.dsc"
+          },
+          {
+            "file": "gst-plugins-bad1.0_1.28.6.orig.tar.xz",
+            "sha256": "6636f2c2289ceda52c4aba971338c81e2b5780d3381bd3673c1c116ec87587c3",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-bad1.0/gst-plugins-bad1.0_1.28.6.orig.tar.xz"
+          },
+          {
+            "file": "gst-plugins-bad1.0_1.28.6.orig.tar.xz.asc",
+            "sha256": "1f4f8fd4d5a66ce5bc1d5e31b95c3fff4bc78e702fa35c47e73518fb36ac481a",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-bad1.0/gst-plugins-bad1.0_1.28.6.orig.tar.xz.asc"
+          },
+          {
+            "file": "gst-plugins-bad1.0_1.28.6-1ubuntu1.debian.tar.xz",
+            "sha256": "1c6e5a5e2bc118c36e6227b7f04fdbf6a238d09d0c372f9182876ce4ffde0bc8",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-bad1.0/gst-plugins-bad1.0_1.28.6-1ubuntu1.debian.tar.xz"
+          }
+        ]
+      },
+      "candidate_status": "Raw RPU transport passed native software and Intel VA frame association and transform controls. Staged source; downstream reconstruction and normal player integration pending."
+    },
+    {
+      "component": "ubuntu-gtk4-display-target",
+      "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
+      "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
+      "candidate_commit": "8ee350d63359b2704318849e8f28a5823075c007",
+      "candidate_tree": "9dabbb97dfa2c68e7667dd7d71051a2407ee0c1b",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-wayland-expose-preferred-color-target-snapshots.patch",
+        "0002-debian-stage-preferred-target-snapshots.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gtk4",
+        "version": "4.24.1+ds-1",
+        "authentication": "APT source hashes authenticated by the configured Ubuntu archive signed metadata; dsc OpenPGP signature not independently checked.",
+        "import_recipe": "dpkg-source extraction with distribution patches; Git import includes every extracted file except .pc; fixed neutral author/committer and 2026-11-07T18:00:00-05:00 timestamps.",
+        "artifacts": [
+          {
+            "file": "gtk4_4.24.1+ds-1.debian.tar.xz",
+            "sha256": "1bfe98cecba76a947fb4f07335e013f7982a06c05805b4bda546b585c0915ea4",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds-1.debian.tar.xz"
+          },
+          {
+            "file": "gtk4_4.24.1+ds-1.dsc",
+            "sha256": "43ca7e4305ba039a28451b818c5f2f0027ea998f3279fa2a18087e7a8146a640",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds-1.dsc"
+          },
+          {
+            "file": "gtk4_4.24.1+ds.orig.tar.xz",
+            "sha256": "d148acf2132b9b5ad85e62f1544c9d765a7991ec18567c36ffb12765f50f4bf3",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds.orig.tar.xz"
+          }
+        ],
+        "source_import": {
+          "git_identity": "ROG HDR contributors <rog-hdr@invalid>",
+          "author_and_committer_date": "2026-11-07T18:00:00-05:00",
+          "commit_subject": "Import Ubuntu gtk4 4.24.1+ds-1 after distribution patches, excluding .pc",
+          "include": "git add -f -- . after omitting .pc from extracted source copy",
+          "include_ignored": true
+        }
+      },
+      "candidate_status": "Reviewed source, native GDK discovery and Ubuntu-default package build passed. Six-package offline forward and stock rollback plans passed. No host installation.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv1"
     }
   ]
 }

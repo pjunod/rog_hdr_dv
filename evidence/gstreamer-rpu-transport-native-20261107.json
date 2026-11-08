@@ -1,0 +1,369 @@
+{
+  "schema": 1,
+  "state": "NATIVE_TRANSPORT_SCOPE_PASS_UNSHIPPED",
+  "date_local": "2026-11-07 America/New_York",
+  "runtime_utc": "2026-11-08T00:49:02Z",
+  "reviewed_transport_commit": "1be9669",
+  "reviewed_probe_followup_commit": "8d4aaf8",
+  "probe_source_sha256": "f17b7fac1029357b1068a011c972bf92283be26edcc1aa1074fea6442b1301fc",
+  "probe_binary_sha256": "13b56412f39f8535ec6cfd821f8a95b473e961352f8fc64d5547ae15c85b91b2",
+  "source_packages": [
+    {
+      "component": "ubuntu-gst-plugins-base-rpu",
+      "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
+      "candidate_tree": "9d9a28d60ebaf12902679c01da767ceab2902948"
+    },
+    {
+      "component": "ubuntu-gst-plugins-bad-rpu",
+      "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
+      "candidate_tree": "237df5dd6ed2fe9177636cbdbcc0672f8e7c3693"
+    }
+  ],
+  "fixture": {
+    "sha256": "87fe0115f3002a621d2380a9f91852ef91a15854a446efe26de8744f77ef5346",
+    "type": "genuine Profile 5 SolLevante BL+RPU MP4, 1920x1080; not an authored display-management reference",
+    "mutation": "selected original RPU NALs removed while deliberately retaining obsolete upstream meta; source file unchanged"
+  },
+  "native_floor": {
+    "libgstreamer1.0-0": "1.28.7-1",
+    "gstreamer1.0-libav": "1.28.7-1",
+    "gstreamer1.0-plugins-extra": "1.28.6-1ubuntu1",
+    "gstreamer1.0-plugins-good": "1.28.7-1build1",
+    "libgstreamer-plugins-bad1.0-0": "1.28.6-1ubuntu1",
+    "intel-media-va-driver": "26.2.4+dfsg1-1"
+  },
+  "native_package_verification": "dpkg -V for all listed packages completed with no differences",
+  "hardware": {
+    "vendor": "Intel 0x8086",
+    "driver": "i915",
+    "drm_render_node": "renderD129",
+    "driver_binary": "iHD_drv_video.so"
+  },
+  "runtime_scope": {
+    "explicit_native_factories": true,
+    "fallback_decoder_substitution": false,
+    "stock_rank_or_mime_changes": false,
+    "display_output": false,
+    "host_package_changes": false,
+    "host_application_installation": false,
+    "temporary_staging_only": true,
+    "no_rpu_bytes_in_logs": true
+  },
+  "cases": [
+    {
+      "case": "avdec",
+      "decoder": "avdec_h265",
+      "rotation": null,
+      "exit_code": 0,
+      "observations": {
+        "before": 30,
+        "after": 60,
+        "gaps": 12,
+        "parser-verified": 126,
+        "flushes": 1,
+        "reordered": 1,
+        "distinct-rpu": 8,
+        "transformed": 0,
+        "headers": 1,
+        "errors": 0,
+        "result": 0
+      },
+      "loaded_objects": [
+        {
+          "file": "libgstvideo-1.0.so.0",
+          "sha256": "30607768fd7f43662b3d3bc40d52ca719de0989808fb8b079dc7ef3762016cd6"
+        },
+        {
+          "file": "libgstlibav.so",
+          "sha256": "899647b098a8dca7d7adfb36f37c60988abfb36ef46355d373774b18d288d1da"
+        },
+        {
+          "file": "libgstva.so",
+          "sha256": "66b28c321845ac89a9dbf6ad59bece515f49bfb25677e1320933bb9203fc526a"
+        },
+        {
+          "file": "libgstvideoparsersbad.so",
+          "sha256": "ffcf121a52c98ef83d8ec994e32def867d719b3ba42b6bc964a88e2d5887bbee"
+        },
+        {
+          "file": "iHD_drv_video.so",
+          "sha256": "6dbf03ce963c55539cd6b48f2910d5c7b5088b232aae8632f6ab555aabe59fd3"
+        },
+        {
+          "file": "libavcodec.so.62",
+          "sha256": "f1a7cc7cd9d98e3fd992947af545c237f9220ae8bdd5a7e10e29c096d78964f1"
+        },
+        {
+          "file": "libavutil.so.60",
+          "sha256": "a6ecdb69d7d43bb9f79a543e6071736b1d341017c8ba0c4347ac9085332b1008"
+        },
+        {
+          "file": "libglib-2.0.so.0",
+          "sha256": "9990987ffc88baf5bf5a24c0e1d39fe47834556c3a9c058917362e378f2078a3"
+        },
+        {
+          "file": "libgstcodecparsers-1.0.so.0",
+          "sha256": "3e087eedb15c4266353ae50cacaabdde96caac2609cdeb4eaa21ae83de72a5c5"
+        },
+        {
+          "file": "libgstcodecs-1.0.so.0",
+          "sha256": "153869a7060c096830a023a6809f8b9dead3fd17966556f13c853df574fbe2e8"
+        },
+        {
+          "file": "libgstreamer-1.0.so.0",
+          "sha256": "1cebd48eca451815dbc3a8f4260c019b6bde4367172feb6c231f18c504556fe6"
+        },
+        {
+          "file": "libgstva-1.0.so.0",
+          "sha256": "fc4b2414c06b6c6499893b61872ab48655dbcb2360feee94964c7fe31116622e"
+        },
+        {
+          "file": "libva-drm.so.2",
+          "sha256": "acba549ccd821e6822e1edeb884dd918494d9f3272fa5688fb00f9f0c02309fa"
+        },
+        {
+          "file": "libva.so.2",
+          "sha256": "d5724f06607ef941a13eb23e090d032b74ddfd281f96be72315243fa588f30a6"
+        }
+      ],
+      "log_sha256": "fbac8926d3a71fc2f1048252a3e49ef41f0e8868608e1380a7e0e416f9904cc4",
+      "all_loaded_object_count": 190
+    },
+    {
+      "case": "intel-va",
+      "decoder": "vah265dec",
+      "rotation": null,
+      "exit_code": 0,
+      "observations": {
+        "before": 30,
+        "after": 60,
+        "gaps": 12,
+        "parser-verified": 96,
+        "flushes": 1,
+        "reordered": 1,
+        "distinct-rpu": 8,
+        "transformed": 0,
+        "headers": 1,
+        "errors": 0,
+        "result": 0
+      },
+      "loaded_objects": [
+        {
+          "file": "libgstvideo-1.0.so.0",
+          "sha256": "30607768fd7f43662b3d3bc40d52ca719de0989808fb8b079dc7ef3762016cd6"
+        },
+        {
+          "file": "libgstlibav.so",
+          "sha256": "899647b098a8dca7d7adfb36f37c60988abfb36ef46355d373774b18d288d1da"
+        },
+        {
+          "file": "libgstva.so",
+          "sha256": "66b28c321845ac89a9dbf6ad59bece515f49bfb25677e1320933bb9203fc526a"
+        },
+        {
+          "file": "libgstvideoparsersbad.so",
+          "sha256": "ffcf121a52c98ef83d8ec994e32def867d719b3ba42b6bc964a88e2d5887bbee"
+        },
+        {
+          "file": "iHD_drv_video.so",
+          "sha256": "6dbf03ce963c55539cd6b48f2910d5c7b5088b232aae8632f6ab555aabe59fd3"
+        },
+        {
+          "file": "libavcodec.so.62",
+          "sha256": "f1a7cc7cd9d98e3fd992947af545c237f9220ae8bdd5a7e10e29c096d78964f1"
+        },
+        {
+          "file": "libavutil.so.60",
+          "sha256": "a6ecdb69d7d43bb9f79a543e6071736b1d341017c8ba0c4347ac9085332b1008"
+        },
+        {
+          "file": "libglib-2.0.so.0",
+          "sha256": "9990987ffc88baf5bf5a24c0e1d39fe47834556c3a9c058917362e378f2078a3"
+        },
+        {
+          "file": "libgstcodecparsers-1.0.so.0",
+          "sha256": "3e087eedb15c4266353ae50cacaabdde96caac2609cdeb4eaa21ae83de72a5c5"
+        },
+        {
+          "file": "libgstcodecs-1.0.so.0",
+          "sha256": "153869a7060c096830a023a6809f8b9dead3fd17966556f13c853df574fbe2e8"
+        },
+        {
+          "file": "libgstreamer-1.0.so.0",
+          "sha256": "1cebd48eca451815dbc3a8f4260c019b6bde4367172feb6c231f18c504556fe6"
+        },
+        {
+          "file": "libgstva-1.0.so.0",
+          "sha256": "fc4b2414c06b6c6499893b61872ab48655dbcb2360feee94964c7fe31116622e"
+        },
+        {
+          "file": "libva-drm.so.2",
+          "sha256": "acba549ccd821e6822e1edeb884dd918494d9f3272fa5688fb00f9f0c02309fa"
+        },
+        {
+          "file": "libva.so.2",
+          "sha256": "d5724f06607ef941a13eb23e090d032b74ddfd281f96be72315243fa588f30a6"
+        }
+      ],
+      "log_sha256": "9d83e1340edcbb8b6d764f5e6d152950eee8f2d5034ffa86404a33913a7bbe47",
+      "all_loaded_object_count": 190
+    },
+    {
+      "case": "intel-va-rotate180",
+      "decoder": "vah265dec",
+      "rotation": "native vapostproc 180 degrees, accepted property, same pixel format and dimensions",
+      "exit_code": 0,
+      "observations": {
+        "before": 30,
+        "after": 60,
+        "gaps": 12,
+        "parser-verified": 96,
+        "flushes": 1,
+        "reordered": 1,
+        "distinct-rpu": 8,
+        "transformed": 90,
+        "headers": 1,
+        "errors": 0,
+        "result": 0
+      },
+      "loaded_objects": [
+        {
+          "file": "libgstvideo-1.0.so.0",
+          "sha256": "30607768fd7f43662b3d3bc40d52ca719de0989808fb8b079dc7ef3762016cd6"
+        },
+        {
+          "file": "libgstlibav.so",
+          "sha256": "899647b098a8dca7d7adfb36f37c60988abfb36ef46355d373774b18d288d1da"
+        },
+        {
+          "file": "libgstva.so",
+          "sha256": "66b28c321845ac89a9dbf6ad59bece515f49bfb25677e1320933bb9203fc526a"
+        },
+        {
+          "file": "libgstvideoparsersbad.so",
+          "sha256": "ffcf121a52c98ef83d8ec994e32def867d719b3ba42b6bc964a88e2d5887bbee"
+        },
+        {
+          "file": "iHD_drv_video.so",
+          "sha256": "6dbf03ce963c55539cd6b48f2910d5c7b5088b232aae8632f6ab555aabe59fd3"
+        },
+        {
+          "file": "libavcodec.so.62",
+          "sha256": "f1a7cc7cd9d98e3fd992947af545c237f9220ae8bdd5a7e10e29c096d78964f1"
+        },
+        {
+          "file": "libavutil.so.60",
+          "sha256": "a6ecdb69d7d43bb9f79a543e6071736b1d341017c8ba0c4347ac9085332b1008"
+        },
+        {
+          "file": "libglib-2.0.so.0",
+          "sha256": "9990987ffc88baf5bf5a24c0e1d39fe47834556c3a9c058917362e378f2078a3"
+        },
+        {
+          "file": "libgstcodecparsers-1.0.so.0",
+          "sha256": "3e087eedb15c4266353ae50cacaabdde96caac2609cdeb4eaa21ae83de72a5c5"
+        },
+        {
+          "file": "libgstcodecs-1.0.so.0",
+          "sha256": "153869a7060c096830a023a6809f8b9dead3fd17966556f13c853df574fbe2e8"
+        },
+        {
+          "file": "libgstreamer-1.0.so.0",
+          "sha256": "1cebd48eca451815dbc3a8f4260c019b6bde4367172feb6c231f18c504556fe6"
+        },
+        {
+          "file": "libgstva-1.0.so.0",
+          "sha256": "fc4b2414c06b6c6499893b61872ab48655dbcb2360feee94964c7fe31116622e"
+        },
+        {
+          "file": "libva-drm.so.2",
+          "sha256": "acba549ccd821e6822e1edeb884dd918494d9f3272fa5688fb00f9f0c02309fa"
+        },
+        {
+          "file": "libva.so.2",
+          "sha256": "d5724f06607ef941a13eb23e090d032b74ddfd281f96be72315243fa588f30a6"
+        }
+      ],
+      "log_sha256": "f65886027a7f1a545fb70a5d7a52cd76366050b7c1bf44610654eb7b84a92353",
+      "all_loaded_object_count": 190
+    }
+  ],
+  "failed_attempts_preserved": [
+    {
+      "id": "20261108T004600Z",
+      "reason": "probe classified valid standalone no-PTS VPS/SPS/PPS HEADER as a missing picture; transport source unchanged"
+    },
+    {
+      "id": "20261108T004713Z",
+      "reason": "probe classified valid standalone no-PTS VPS/SPS/PPS HEADER as a missing picture; transport source unchanged"
+    },
+    {
+      "id": "20261108T004801Z",
+      "reason": "probe classified valid standalone no-PTS VPS/SPS/PPS HEADER as a missing picture; transport source unchanged"
+    }
+  ],
+  "clean_source_replay": {
+    "result": "both exact base and candidate trees match signed archive pins; both source replay targets compile with -Dwerror=true and four jobs",
+    "commands": [
+      [
+        "meson",
+        "setup",
+        "/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/base-build",
+        "/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/ubuntu-gst-plugins-base-rpu",
+        "--prefix=/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/prefix",
+        "-Dorc=disabled",
+        "-Dauto_features=disabled",
+        "-Dtests=disabled",
+        "-Dexamples=disabled",
+        "-Dintrospection=disabled",
+        "-Ddoc=disabled",
+        "-Dwerror=true"
+      ],
+      [
+        "meson",
+        "compile",
+        "-C",
+        "/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/base-build",
+        "-j4",
+        "gstvideo-1.0",
+        "gstpbutils-1.0"
+      ],
+      [
+        "meson",
+        "setup",
+        "/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/bad-build",
+        "/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/ubuntu-gst-plugins-bad-rpu",
+        "--prefix=/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/prefix",
+        "-Dvideoparsers=enabled",
+        "-Dauto_features=disabled",
+        "-Dtests=disabled",
+        "-Dexamples=disabled",
+        "-Dintrospection=disabled",
+        "-Ddoc=disabled",
+        "-Dwerror=true"
+      ],
+      [
+        "meson",
+        "compile",
+        "-C",
+        "/work/gstreamer-rpu-transport/native-replay/20261108T005047Z/bad-build",
+        "-j4",
+        "gstvideoparsersbad"
+      ]
+    ],
+    "outputs": {
+      "base-build/gst-libs/gst/video/libgstvideo-1.0.so.0.2807.0": "81db7a7236290b973b595dc75b5c763c1d3faba437c0c4c4baecc701f741345f",
+      "bad-build/gst/videoparsers/libgstvideoparsersbad.so": "35660781d6b0df50b56ee8df566b36db2a44a75d14ed1fe2019861f7f1b254c6"
+    },
+    "installed": false
+  },
+  "limits": [
+    "metadata transport only; no decoded-pixel reconstruction or display mapping claim",
+    "RPU presence does not resolve compressed/inherited data or reconstruct FEL residual",
+    "normal application/GTK sink integration and physical target signalling not yet implemented",
+    "full Ubuntu-feature packaging, ABI symbols, coinstalled i386 qualification and rollback transaction remain pending",
+    "additional malformed/oversize/NAL-alignment/region-copy/dimension-change negative matrix has not been executed"
+  ],
+  "full_private_runtime_manifest_sha256": "800d37746859915893a4804d08cd79e9bf46abfe664f72cdb94038a2bc13a9dd",
+  "loaded_identity_scope": "Relevant candidate, codec, native VA and foundational library identities shown; complete loaded-object list retained in hashed private runtime manifest"
+}

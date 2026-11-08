@@ -1,0 +1,114 @@
+From fa79f6aecf188858f128308053e67450071e0bca Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sat, 7 Nov 2026 19:23:23 -0500
+Subject: [PATCH] feat(h265parse): attach original RPU from completed access
+ units
+
+---
+ gst/videoparsers/gsth265parse.c | 76 +++++++++++++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
+
+diff --git a/gst/videoparsers/gsth265parse.c b/gst/videoparsers/gsth265parse.c
+index 6d9bf56..c51ca3d 100644
+--- a/gst/videoparsers/gsth265parse.c
++++ b/gst/videoparsers/gsth265parse.c
+@@ -24,6 +24,7 @@
+ 
+ #include <gst/base/base.h>
+ #include <gst/pbutils/pbutils.h>
++#include <gst/video/gstvideodovirpumeta.h>
+ #include "gstvideoparserselements.h"
+ #include "gsth265parse.h"
+ 
+@@ -3007,6 +3008,76 @@ gst_h265_parse_handle_vps_sps_pps_nals (GstH265Parse * h265parse,
+   return send_done;
+ }
+ 
++/* Inspect the completed output AU, after all rewrapping and header insertion.
++ * There is intentionally no retained RPU in GstH265Parse stream state: seek,
++ * flush, dropped pictures and RPU gaps therefore cannot inherit another AU. */
++static gboolean
++gst_h265_parse_add_dovi_rpu_meta (GstH265Parse * parse, GstBuffer * buffer)
++{
++  GstMapInfo map;
++  GstVideoDoviRpuMeta *old;
++  guint offset = 0;
++  const guint8 *rpu = NULL;
++  gsize rpu_size = 0;
++  gboolean valid = TRUE;
++
++  while ((old = gst_buffer_get_video_dovi_rpu_meta (buffer))) {
++    if (!gst_buffer_remove_meta (buffer, &old->meta))
++      return FALSE;
++  }
++  if (parse->align != GST_H265_PARSE_ALIGN_AU ||
++      parse->width <= 0 || parse->height <= 0)
++    return TRUE;
++  if (!gst_buffer_map (buffer, &map, GST_MAP_READ))
++    return FALSE;
++  /* GstH265NalUnit offsets and sizes are guint. */
++  if (map.size > G_MAXUINT) {
++    valid = FALSE;
++    goto done;
++  }
++  while (offset < map.size) {
++    GstH265NalUnit nal;
++    GstH265ParserResult ret;
++    if (parse->format == GST_H265_PARSE_FORMAT_BYTE)
++      ret = gst_h265_parser_identify_nalu (parse->nalparser,
++          map.data, offset, map.size, &nal);
++    else
++      ret = gst_h265_parser_identify_nalu_hevc (parse->nalparser,
++          map.data, offset, map.size, parse->nal_length_size, &nal);
++    if ((ret != GST_H265_PARSER_OK &&
++            ret != GST_H265_PARSER_NO_NAL_END) || !nal.valid ||
++        nal.offset < offset || nal.offset > map.size ||
++        nal.size > map.size - nal.offset || !nal.size) {
++      valid = FALSE;
++      break;
++    }
++    if (nal.type == 62) {
++      /* A single base-layer RPU is the transport boundary. Never guess which
++       * RPU applies when an AU contains duplicates or another layer's RPU. */
++      if (rpu || nal.layer_id != 0 || nal.size <= 2 ||
++          nal.size - 2 > GST_VIDEO_DOVI_RPU_MAX_SIZE) {
++        valid = FALSE;
++        break;
++      }
++      rpu = map.data + nal.offset + 2;
++      rpu_size = nal.size - 2;
++    }
++    offset = nal.offset + nal.size;
++    if (ret == GST_H265_PARSER_NO_NAL_END)
++      break;
++  }
++  if (valid && rpu && !gst_buffer_add_video_dovi_rpu_meta (buffer,
++          rpu, rpu_size, parse->width, parse->height)) {
++    gst_buffer_unmap (buffer, &map);
++    return FALSE;
++  }
++done:
++  gst_buffer_unmap (buffer, &map);
++  if (!valid)
++    GST_WARNING_OBJECT (parse, "Not attaching RPU metadata to an ambiguous or invalid access unit");
++  return TRUE;
++}
++
+ static GstFlowReturn
+ gst_h265_parse_pre_push_frame (GstBaseParse * parse, GstBaseParseFrame * frame)
+ {
+@@ -3341,6 +3412,11 @@ gst_h265_parse_pre_push_frame (GstBaseParse * parse, GstBaseParseFrame * frame)
+     }
+   }
+ 
++  if (!gst_h265_parse_add_dovi_rpu_meta (h265parse, parse_buffer)) {
++    gst_h265_parse_reset_frame (h265parse);
++    return GST_FLOW_ERROR;
++  }
++
+   gst_video_push_user_data ((GstElement *) h265parse, &h265parse->user_data,
+       parse_buffer);
+ 
+-- 
+2.54.0 (Apple Git-157)
+

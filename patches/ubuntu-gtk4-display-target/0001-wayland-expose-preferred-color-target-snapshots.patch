@@ -1,0 +1,516 @@
+From 78824fc9e90b67c8114beab0c324152d62f8967d Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sat, 7 Nov 2026 18:00:00 -0500
+Subject: [PATCH] wayland: expose preferred color target snapshots
+
+---
+ gdk/gdksurface.c                         |   3 +
+ gdk/gdksurfaceprivate.h                  |   4 +
+ gdk/wayland/gdkdisplay-wayland.c         |   9 +-
+ gdk/wayland/gdksurface-wayland-private.h |   3 +
+ gdk/wayland/gdksurface-wayland.c         | 114 +++++++++++++++++++++--
+ gdk/wayland/gdkwaylandcolor-private.h    |   2 +
+ gdk/wayland/gdkwaylandcolor.c            |  99 +++++++++++++-------
+ gdk/wayland/gdkwaylandsurface.h          |  28 ++++++
+ 8 files changed, 215 insertions(+), 47 deletions(-)
+
+diff --git a/gdk/gdksurface.c b/gdk/gdksurface.c
+index b676bf0..6f05e92 100644
+--- a/gdk/gdksurface.c
++++ b/gdk/gdksurface.c
+@@ -1049,6 +1049,9 @@ _gdk_surface_destroy_hierarchy (GdkSurface *surface,
+ 
+   g_object_ref (surface);
+ 
++  if (GDK_SURFACE_GET_CLASS (surface)->after_destroy)
++    GDK_SURFACE_GET_CLASS (surface)->after_destroy (surface);
++
+   g_object_notify_by_pspec (G_OBJECT (surface), properties[PROP_MAPPED]);
+ 
+   if (surface->gl_paint_context)
+diff --git a/gdk/gdksurfaceprivate.h b/gdk/gdksurfaceprivate.h
+index 50799ff..5ad36de 100644
+--- a/gdk/gdksurfaceprivate.h
++++ b/gdk/gdksurfaceprivate.h
+@@ -169,6 +169,10 @@ struct _GdkSurfaceClass
+ 
+   GdkSubsurface *
+                (* create_subsurface)      (GdkSurface          *surface);
++
++  /* Optional notification after native teardown and destroyed=TRUE.
++   * The core holds a reference across this callback and remaining cleanup. */
++  void         (* after_destroy)          (GdkSurface          *surface);
+ };
+ 
+ #define GDK_SURFACE_DESTROYED(d) (((GdkSurface *)(d))->destroyed)
+diff --git a/gdk/wayland/gdkdisplay-wayland.c b/gdk/wayland/gdkdisplay-wayland.c
+index a8b6912..0546d9b 100644
+--- a/gdk/wayland/gdkdisplay-wayland.c
++++ b/gdk/wayland/gdkdisplay-wayland.c
+@@ -181,8 +181,9 @@ init_skip_protocols (GdkWaylandDisplay *display_wayland)
+         p++;
+     }
+ 
+-  if (!GDK_DISPLAY_DEBUG_CHECK (GDK_DISPLAY (display_wayland), COLOR_MANAGEMENT))
+-    g_strv_builder_add (strv, wp_color_manager_v1_interface.name);
++  /* Preferred-target feedback is useful independently of the experimental
++   * color-managed rendering path. Bind one manager for both; the color owner
++   * retains the rendering opt-in and honors explicit GDK_WAYLAND_DISABLE. */
+ 
+   if (help)
+     {
+@@ -716,6 +717,10 @@ gdk_registry_handle_global (void               *data,
+   else if (match_global (display_wayland, interface, version, wp_color_manager_v1_interface.name, 0))
+     {
+       gdk_wayland_color_set_color_manager (display_wayland->color, registry, id, version);
++      /* The registry's initial sync (and other globals' syncs) may precede
++       * this bind. Wait for this manager's initial capabilities and done
++       * before prepare() or any surface decides whether feedback exists. */
++      _gdk_wayland_display_async_roundtrip (display_wayland);
+     }
+   else if (match_global (display_wayland, interface, version, wp_color_representation_manager_v1_interface.name, 0))
+     {
+diff --git a/gdk/wayland/gdksurface-wayland-private.h b/gdk/wayland/gdksurface-wayland-private.h
+index 6e08814..37deb34 100644
+--- a/gdk/wayland/gdksurface-wayland-private.h
++++ b/gdk/wayland/gdksurface-wayland-private.h
+@@ -44,6 +44,9 @@ struct _GdkWaylandSurface
+ 
+   GdkWaylandPresentationTime *presentation_time;
+ 
++  GdkWaylandColorTarget color_target;
++  gboolean color_target_valid;
++
+   unsigned int color_state_changed : 1;
+   unsigned int initial_configure_received : 1;
+   unsigned int has_uncommitted_ack_configure : 1;
+diff --git a/gdk/wayland/gdksurface-wayland.c b/gdk/wayland/gdksurface-wayland.c
+index a9d2ccc..c3bddf7 100644
+--- a/gdk/wayland/gdksurface-wayland.c
++++ b/gdk/wayland/gdksurface-wayland.c
+@@ -915,19 +915,55 @@ static const struct wl_surface_listener surface_listener = {
+ };
+ 
+ static void
+-preferred_changed (GdkWaylandColorSurface *color,
+-                   GdkColorState          *color_state,
+-                   gpointer                data)
++gdk_wayland_surface_invalidate_color_target (GdkWaylandSurface *self)
+ {
+-  GdkWaylandSurface *self = GDK_WAYLAND_SURFACE (data);
++  guint64 generation = self->color_target.generation + 1;
+ 
+-  GDK_DISPLAY_DEBUG (gdk_surface_get_display (GDK_SURFACE (self)), EVENTS,
+-                     "preferred color state, surface %p color state %s",
+-                     self, gdk_color_state_get_name (color_state));
++  self->color_target = (GdkWaylandColorTarget) { .generation = generation };
++  self->color_target_valid = FALSE;
++}
+ 
+-  gdk_surface_set_color_state (GDK_SURFACE (self), color_state);
++static void
++gdk_wayland_surface_emit_color_target_changed (GdkWaylandSurface *self)
++{
++  /* A handler may drop its last owned reference or destroy the surface. */
++  g_object_ref (self);
++  g_signal_emit_by_name (self, "color-target-changed");
++  g_object_unref (self);
++}
++
++static void
++preferred_changed (GdkWaylandColorSurface     *color,
++                   GdkColorState              *color_state,
++                   const GdkWaylandColorTarget *target,
++                   gpointer                    data)
++{
++  GdkWaylandSurface *self = GDK_WAYLAND_SURFACE (data);
+ 
+-  self->color_state_changed = TRUE;
++  /* NULL color state is the start of a new asynchronous feedback query. */
++  if (color_state == NULL)
++    gdk_wayland_surface_invalidate_color_target (self);
++  else
++    {
++      guint64 generation = self->color_target.generation;
++
++      self->color_target = target ? *target : (GdkWaylandColorTarget) { 0 };
++      self->color_target.generation = generation;
++      self->color_target_valid = target != NULL;
++      GDK_DISPLAY_DEBUG (gdk_surface_get_display (GDK_SURFACE (self)), EVENTS,
++                         "preferred color state, surface %p color state %s",
++                         self, gdk_color_state_get_name (color_state));
++      gdk_surface_set_color_state (GDK_SURFACE (self), color_state);
++      self->color_state_changed = TRUE;
++    }
++
++  gdk_surface_invalidate_rect (GDK_SURFACE (self), NULL);
++  /* The initial query starts inside color_surface_new(), before the native
++   * surface and feedback owner are installed. Construction publishes no
++   * signal; callers connect and query after obtaining the surface. */
++  if (self->display_server.wl_surface)
++    gdk_wayland_surface_emit_color_target_changed (self);
++  /* Last: application handlers may destroy the native surface. */
+ }
+ 
+ static void
+@@ -999,6 +1035,10 @@ gdk_wayland_surface_destroy_wl_surface (GdkWaylandSurface *self)
+   g_clear_pointer (&self->display_server.viewport, wp_viewport_destroy);
+   g_clear_pointer (&self->display_server.fractional_scale, wp_fractional_scale_v1_destroy);
+   g_clear_pointer (&self->display_server.color, gdk_wayland_color_surface_free);
++  /* Publish unavailability now, but do not call application code in the
++   * middle of native teardown. The core's after_destroy boundary notifies
++   * only after the public destroyed state is set. */
++  gdk_wayland_surface_invalidate_color_target (self);
+ 
+   g_clear_pointer (&self->display_server.wl_surface, wl_surface_destroy);
+ 
+@@ -1319,6 +1359,12 @@ gdk_wayland_surface_destroy (GdkSurface *surface,
+   g_signal_handlers_disconnect_by_func (frame_clock, on_frame_clock_after_paint, surface);
+ }
+ 
++static void
++gdk_wayland_surface_after_destroy (GdkSurface *surface)
++{
++  gdk_wayland_surface_emit_color_target_changed (GDK_WAYLAND_SURFACE (surface));
++}
++
+ static void
+ gdk_wayland_surface_destroy_notify (GdkSurface *surface)
+ {
+@@ -1379,6 +1425,7 @@ gdk_wayland_surface_class_init (GdkWaylandSurfaceClass *klass)
+   surface_class->get_device_state = gdk_wayland_surface_get_device_state;
+   surface_class->set_input_region = gdk_wayland_surface_set_input_region;
+   surface_class->destroy = gdk_wayland_surface_destroy;
++  surface_class->after_destroy = gdk_wayland_surface_after_destroy;
+   surface_class->beep = gdk_wayland_surface_beep;
+ 
+   surface_class->destroy_notify = gdk_wayland_surface_destroy_notify;
+@@ -1389,10 +1436,59 @@ gdk_wayland_surface_class_init (GdkWaylandSurfaceClass *klass)
+   surface_class->request_layout = gdk_wayland_surface_request_layout;
+   surface_class->create_subsurface = gdk_wayland_surface_create_subsurface;
+ 
++  /**
++   * GdkWaylandSurface::color-target-changed:
++   * @surface: the surface
++   *
++   * Emitted when preferred target feedback is invalidated or completed, and
++   * after native teardown and publication of the destroyed state. No signal
++   * is emitted during construction. Query get_color_target() again;
++   * it returns FALSE while asynchronous feedback is pending or unavailable.
++   * Handlers run on the display's main context, as do other GDK operations.
++   */
++  g_signal_new ("color-target-changed",
++                G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
++                0, NULL, NULL, NULL, G_TYPE_NONE, 0);
++
+   klass->handle_configure = gdk_wayland_surface_default_handle_configure;
+   klass->hide_surface = gdk_wayland_surface_default_hide_surface;
+ }
+ 
++/**
++ * gdk_wayland_surface_get_color_target:
++ * @surface: a Wayland surface
++ * @target: (out caller-allocates): caller-owned target snapshot
++ *
++ * Copies the currently completed preferred parametric display target. Call
++ * only on the display's main context. Connect to `color-target-changed` and
++ * query again on each notification, including after output moves. The
++ * compositor selects the preferred target for surfaces spanning outputs.
++ *
++ * Returns: TRUE for a complete target; FALSE while unavailable, pending,
++ *   unsupported or destroyed. On FALSE, only @target's generation is usable;
++ *   all target values are cleared. The generation is local to @surface and
++ *   changes on invalidation, even if a later target has identical values.
++ */
++gboolean
++gdk_wayland_surface_get_color_target (GdkSurface            *surface,
++                                      GdkWaylandColorTarget *target)
++{
++  GdkWaylandSurface *self;
++
++  g_return_val_if_fail (GDK_IS_WAYLAND_SURFACE (surface), FALSE);
++  g_return_val_if_fail (target != NULL, FALSE);
++
++  self = GDK_WAYLAND_SURFACE (surface);
++  if (!self->color_target_valid || GDK_SURFACE_DESTROYED (surface))
++    {
++      *target = (GdkWaylandColorTarget) { .generation = self->color_target.generation };
++      return FALSE;
++    }
++
++  *target = self->color_target;
++  return TRUE;
++}
++
+ /* }}} */
+ /* {{{ Private Surface API */
+ 
+diff --git a/gdk/wayland/gdkwaylandcolor-private.h b/gdk/wayland/gdkwaylandcolor-private.h
+index d48f0ab..ff4d66b 100644
+--- a/gdk/wayland/gdkwaylandcolor-private.h
++++ b/gdk/wayland/gdkwaylandcolor-private.h
+@@ -2,6 +2,7 @@
+ 
+ #include "gdkcolorstateprivate.h"
+ #include "gdkwaylanddisplay.h"
++#include "gdkwaylandsurface.h"
+ #include <wayland-client.h>
+ 
+ typedef struct _GdkWaylandColor GdkWaylandColor;
+@@ -30,6 +31,7 @@ typedef struct _GdkWaylandColorSurface GdkWaylandColorSurface;
+ 
+ typedef void      (* GdkColorStateChanged)                      (GdkWaylandColorSurface *self,
+                                                                  GdkColorState          *cs,
++                                                                 const GdkWaylandColorTarget *target,
+                                                                  gpointer                data);
+ 
+ GdkWaylandColorSurface *
+diff --git a/gdk/wayland/gdkwaylandcolor.c b/gdk/wayland/gdkwaylandcolor.c
+index 9c39f48..620468a 100644
+--- a/gdk/wayland/gdkwaylandcolor.c
++++ b/gdk/wayland/gdkwaylandcolor.c
+@@ -199,6 +199,7 @@ struct _GdkWaylandColor
+   GdkWaylandDisplay *display;
+ 
+   struct wp_color_manager_v1 *color_manager;
++  gboolean rendering_enabled;
+   struct {
+     unsigned int intents;
+     unsigned int features;
+@@ -317,6 +318,7 @@ gdk_wayland_color_new (GdkWaylandDisplay *display)
+   color = g_new0 (GdkWaylandColor, 1);
+ 
+   color->display = display;
++  color->rendering_enabled = GDK_DISPLAY_DEBUG_CHECK (GDK_DISPLAY (display), COLOR_MANAGEMENT);
+ 
+   color->cs_to_desc = g_hash_table_new_full (color_state_hash,
+                                              color_state_equal,
+@@ -690,25 +692,25 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+         }
+     }
+ 
+-  if (color->color_manager &&
++  if (color->color_manager && color->rendering_enabled &&
+       !(color->color_manager_supported.intents & (1 << WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)))
+     {
+-      GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color management: Missing perceptual render intent");
+-      g_clear_pointer (&color->color_manager, wp_color_manager_v1_destroy);
++      GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color-managed rendering: Missing perceptual render intent");
++      color->rendering_enabled = FALSE;
+     }
+ 
+-  if (color->color_manager &&
++  if (color->color_manager && color->rendering_enabled &&
+       (!(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) ||
+        !(color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB)) ||
+        !((color->color_manager_supported.primaries & (1 << WP_COLOR_MANAGER_V1_PRIMARIES_SRGB)) ||
+          (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES)))))
+ 
+     {
+-      GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color management: Can't create srgb image description");
+-      g_clear_pointer (&color->color_manager, wp_color_manager_v1_destroy);
++      GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color-managed rendering: Can't create srgb image description");
++      color->rendering_enabled = FALSE;
+     }
+ 
+-  if (color->color_manager)
++  if (color->color_manager && color->rendering_enabled)
+     {
+       create_image_desc (color, GDK_COLOR_STATE_SRGB, FALSE);
+ 
+@@ -858,10 +860,34 @@ image_desc_info_done (void *data,
+   ImageDescription *desc = data;
+   GdkWaylandColorSurface *self = desc->surface;
+   GdkColorState *cs;
++  GdkWaylandColorTarget target = { 0 };
++  gboolean has_target = desc->has_target_primaries &&
++                        desc->has_target_luminance && desc->has_luminances;
++  GdkColorStateChanged callback = self->callback;
++  gpointer callback_data = self->data;
+ 
+   g_assert (self->current_desc == desc);
+ 
+-  cs = gdk_color_state_from_image_description_bits (desc);
++  if (has_target)
++    {
++      target.identity = desc->identity;
++      target.primaries[0] = desc->target_r_x / 1000000.0;
++      target.primaries[1] = desc->target_r_y / 1000000.0;
++      target.primaries[2] = desc->target_g_x / 1000000.0;
++      target.primaries[3] = desc->target_g_y / 1000000.0;
++      target.primaries[4] = desc->target_b_x / 1000000.0;
++      target.primaries[5] = desc->target_b_y / 1000000.0;
++      target.primaries[6] = desc->target_w_x / 1000000.0;
++      target.primaries[7] = desc->target_w_y / 1000000.0;
++      target.min_luminance = desc->target_min_lum / 10000.0;
++      target.max_luminance = desc->target_max_lum;
++      target.reference_luminance = desc->ref_lum;
++    }
++
++  /* Target discovery must not opt the surface into experimental rendering.
++   * Its existing sRGB encoding remains in use unless rendering was requested
++   * and its independent compositor capability checks succeeded. */
++  cs = self->color->rendering_enabled ? gdk_color_state_from_image_description_bits (desc) : NULL;
+   if (cs)
+     {
+       g_hash_table_insert (self->color->id_to_cs,
+@@ -874,12 +900,14 @@ image_desc_info_done (void *data,
+       g_clear_pointer (&desc->image_desc, wp_image_description_v1_destroy);
+     }
+ 
+-  if (self->callback)
+-    self->callback (desc->surface, cs, self->data);
++  /* Retire the query before notifying application code, which may destroy
++   * the native surface and its color feedback owner. */
++  gdk_wayland_color_surface_clear_image_desc (self);
++
++  if (callback)
++    callback (self, cs, has_target ? &target : NULL, callback_data);
+ 
+   gdk_color_state_unref (cs);
+-
+-  gdk_wayland_color_surface_clear_image_desc (self);
+ }
+ 
+ static void
+@@ -906,9 +934,9 @@ image_desc_info_primaries (void *data,
+   ImageDescription *desc = data;
+ 
+   desc->r_x = r_x; desc->r_y = r_y;
+-  desc->g_x = g_x; desc->r_y = g_y;
+-  desc->b_x = b_x; desc->r_y = b_y;
+-  desc->w_x = w_x; desc->r_y = w_y;
++  desc->g_x = g_x; desc->g_y = g_y;
++  desc->b_x = b_x; desc->b_y = b_y;
++  desc->w_x = w_x; desc->w_y = w_y;
+   desc->has_primaries = 1;
+   if (primaries_to_wl_primaries ((uint[]) { r_x, r_y, g_x, g_y, b_x, b_y, w_x, w_y },
+                                  &desc->primaries))
+@@ -928,9 +956,9 @@ image_desc_info_primaries_named (void *data,
+   desc->has_primaries = 1;
+   p = wl_primaries_to_primaries (primaries);
+   desc->r_x = p[0]; desc->r_y = p[1];
+-  desc->g_x = p[2]; desc->r_y = p[3];
+-  desc->b_x = p[4]; desc->r_y = p[5];
+-  desc->w_x = p[6]; desc->r_y = p[7];
++  desc->g_x = p[2]; desc->g_y = p[3];
++  desc->b_x = p[4]; desc->b_y = p[5];
++  desc->w_x = p[6]; desc->w_y = p[7];
+ }
+ 
+ static void
+@@ -981,9 +1009,9 @@ image_desc_info_target_primaries (void *data,
+   ImageDescription *desc = data;
+ 
+   desc->target_r_x = r_x; desc->target_r_y = r_y;
+-  desc->target_g_x = g_x; desc->target_r_y = g_y;
+-  desc->target_b_x = b_x; desc->target_r_y = b_y;
+-  desc->target_w_x = w_x; desc->target_r_y = w_y;
++  desc->target_g_x = g_x; desc->target_g_y = g_y;
++  desc->target_b_x = b_x; desc->target_b_y = b_y;
++  desc->target_w_x = w_x; desc->target_w_y = w_y;
+   desc->has_target_primaries = 1;
+ }
+ 
+@@ -1047,9 +1075,11 @@ image_desc_failed (void                           *data,
+ 
+   g_assert (self->current_desc == desc);
+ 
+-  self->callback (self, GDK_COLOR_STATE_SRGB, self->data);
++  GdkColorStateChanged callback = self->callback;
++  gpointer callback_data = self->data;
+ 
+   gdk_wayland_color_surface_clear_image_desc (self);
++  callback (self, GDK_COLOR_STATE_SRGB, NULL, callback_data);
+ }
+ 
+ static void
+@@ -1059,19 +1089,10 @@ image_desc_ready (void                           *data,
+ {
+   ImageDescription *desc = data;
+   GdkWaylandColorSurface *self = desc->surface;
+-  GdkColorState *cs;
+-
+   g_assert (self->current_desc == desc);
+ 
+-  cs = g_hash_table_lookup (self->color->id_to_cs, GUINT_TO_POINTER (identity));
+-  if (cs)
+-    {
+-      self->callback (self, cs, self->data);
+-
+-      gdk_wayland_color_surface_clear_image_desc (self);
+-      return;
+-    }
+-
++  /* The encoding cache does not contain the physical target. Always fetch
++   * the complete immutable description before publishing a target. */
+   desc->info = wp_image_description_v1_get_information (image_desc);
+   desc->identity = identity;
+ 
+@@ -1105,6 +1126,10 @@ preferred_changed (void *data,
+   desc->image_desc = wp_color_management_surface_feedback_v1_get_preferred_parametric (self->mgmt_feedback);
+ 
+   wp_image_description_v1_add_listener (desc->image_desc, &image_desc_listener, desc);
++
++  /* Publish unavailability immediately, not after the asynchronous query.
++   * Last: a signal handler can destroy this feedback owner. */
++  self->callback (self, NULL, NULL, self->data);
+ }
+ 
+ static const struct wp_color_management_surface_feedback_v1_listener color_listener = {
+@@ -1124,11 +1149,13 @@ gdk_wayland_color_surface_new (GdkWaylandColor      *color,
+   self->color = color;
+   self->wl_surface = wl_surface;
+ 
+-  if (color->color_manager)
++  if (color->color_manager && color->rendering_enabled)
++    self->mgmt_surface = wp_color_manager_v1_get_surface (color->color_manager, wl_surface);
++
++  if (color->color_manager && callback &&
++      (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)))
+     {
+-      self->mgmt_surface = wp_color_manager_v1_get_surface (color->color_manager, wl_surface);
+       self->mgmt_feedback = wp_color_manager_v1_get_surface_feedback (color->color_manager, wl_surface);
+-
+       self->callback = callback;
+       self->data = data;
+ 
+diff --git a/gdk/wayland/gdkwaylandsurface.h b/gdk/wayland/gdkwaylandsurface.h
+index 79f3312..485ac34 100644
+--- a/gdk/wayland/gdkwaylandsurface.h
++++ b/gdk/wayland/gdkwaylandsurface.h
+@@ -46,6 +46,34 @@ struct wl_surface       *gdk_wayland_surface_get_wl_surface       (GdkSurface *s
+ GDK_AVAILABLE_IN_4_18
+ void                     gdk_wayland_surface_force_next_commit    (GdkSurface *surface);
+ 
++/**
++ * GdkWaylandColorTarget:
++ * @generation: surface-local generation, including while unavailable
++ * @identity: Wayland image-description identity, local to this connection
++ * @primaries: CIE 1931 xy pairs for red, green, blue and white, in that order
++ * @min_luminance: target black luminance in cd/m², including ambient flare
++ * @max_luminance: target peak luminance in cd/m²
++ * @reference_luminance: encoding reference white luminance in cd/m²
++ *
++ * A caller-owned copy of the compositor's preferred parametric target.
++ * These are declared values, not optical measurements. No fallback values
++ * are supplied. A copy remains owned by its caller but becomes stale when
++ * the surface emits `color-target-changed`.
++ */
++typedef struct
++{
++  guint64 generation;
++  guint32 identity;
++  double primaries[8];
++  double min_luminance;
++  double max_luminance;
++  double reference_luminance;
++} GdkWaylandColorTarget;
++
++GDK_AVAILABLE_IN_4_24
++gboolean gdk_wayland_surface_get_color_target (GdkSurface            *surface,
++                                                GdkWaylandColorTarget *target);
++
+ G_DEFINE_AUTOPTR_CLEANUP_FUNC (GdkWaylandSurface, g_object_unref)
+ 
+ G_END_DECLS

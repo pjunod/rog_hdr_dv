@@ -7,7 +7,30 @@ records exact package hashes and remaining acceptance; no reinstall is needed.
 
 ## Shared Dolby Vision renderer — November 7
 
-Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Both Vulkan driver architectures built. APT simulated the seven-package installation and its exact stock rollback offline. Host installation and physical-target trim tuning remain open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
+Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Both Vulkan driver architectures built. APT simulated the seven-package installation and its exact stock rollback offline. All seven packages are installed and dpkg-verified. The installed FFmpeg mapped genuine Profile 5 on Intel at 616 cd/m². Installed mpv mapped the same title on a private Wayland surface, where the 880.644-nit automatic trim-selection issue remains reproducible. The existing GNOME session stayed open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
+
+### Panel target correction and Profile 7
+
+The staged mpv `+rogdv4` selects creative trims using the panel declaration of 0.0004–616 cd/m² at reference white 142. A private compositor changed the target to 308 cd/m² and back. The player selected each new physical target even though normalized headroom stayed constant. Desktop and native screenshot paths used their respective encodings. The Ubuntu-default package built and both offline APT plans changed only mpv. [Qualification and package](../packaging/system-dv/physical-target-runtime-receipt.json).
+
+A separate staged mpv 0.42 rendered a genuine 3840×2160 Profile 7 FEL picture on the laptop’s Intel GPU. The renderer combined the matched enhancement layer at native resolution before applying CM v4 trims for an explicit 616 cd/m² destination. Disabling the enhancement layer made the shared mapper decline the residual-dependent picture. A subsequent 0.42 build also selected the 616 and 308 cd/m² trims with the enhancement layer composed, retained PQ on a paused cached frame, and cleared its display state when an ordinary video replaced it. Distribution and comparison with an independent Dolby reference remain open. [Matched-frame digital receipt](../evidence/profile7-intel-dual-layer.json).
+
+## GStreamer RPU transport — native scope passed, November 7
+
+Exact Ubuntu base `1.28.7-1` and bad `1.28.6-1ubuntu1` source series now carry
+immutable original RPU bytes with each matched decoded codec frame. Native
+software avdec and Intel VA each verified 30 pre-seek and 60 post-seek pictures,
+including real coded-order reordering and 12 RPU gaps. A native same-format,
+same-size VA 180-degree rotation removed the original metadata from all 90
+transformed outputs. Independent correction review and exact signed-source
+replay/compilation passed. No packages or applications were installed and no
+defaults changed. This remains unshipped metadata transport: reconstruction,
+FEL residuals, normal GTK player rendering, physical target signalling and
+full-feature/multiarch packaging remain open. Five supplementary controls passed. These cover malformed duplicate/oversize units, NAL-aligned output, partial region copies and 26 matched resized VA pictures with format and colorimetry retained. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md).
+
+## GTK preferred display target — November 7
+
+GTK now exposes the compositor's preferred output through a surface-owned snapshot. The ordinary Wayland path passed initial discovery, target changes, destruction and delayed color-manager startup in an isolated compositor. The six GTK packages already present on the ROG were rebuilt with the normal Ubuntu feature set. Offline APT simulation accepted all six candidate packages and the exact six-package stock rollback. The ROG still runs stock GTK. GStreamer playback needs a renderer that consumes the snapshot. [Native observer and package receipt](GDK_DISPLAY_TARGET.md).
 
 ## Kernel security rebase — 2026-10-29
 

@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "state": "PREPARED_NOT_EXECUTED",
+  "scope": "raw RPU transport only; no source reconstruction or display mapping",
+  "fixture": {
+    "name": "retained genuine Profile5 MP4",
+    "sha256": "87fe0115f3002a621d2380a9f91852ef91a15854a446efe26de8744f77ef5346",
+    "native_dimensions": [
+      1920,
+      1080
+    ],
+    "bytes_not_in_repository": true
+  },
+  "cases": [
+    {
+      "argv": [
+        "regions"
+      ],
+      "controls": "full copy retains owned immutable bytes after source destruction; partial origin and offset copies omit meta"
+    },
+    {
+      "argv": [
+        "nal",
+        "FIXTURE"
+      ],
+      "controls": "actual negotiated NAL alignment, at least three RPU NALs and three VCL NALs observed; no output RPU meta"
+    },
+    {
+      "argv": [
+        "duplicate",
+        "FIXTURE"
+      ],
+      "mutation": "retain original RPU then append a second original RPU NAL; preserve stale incoming meta deliberately",
+      "controls": "at least three mutated pictures reach second parser by PTS; no output meta"
+    },
+    {
+      "argv": [
+        "oversize",
+        "FIXTURE"
+      ],
+      "mutation": "replace original RPU with type62 header plus65537 synthetic0x55 bytes; preserve stale incoming meta deliberately",
+      "controls": "at least three mutated pictures reach second parser by PTS; no output meta"
+    },
+    {
+      "argv": [
+        "va-size",
+        "FIXTURE"
+      ],
+      "pipeline": "normal vah265dec and vapostproc, fixed960x540 output",
+      "controls": "at least three output pictures matched by PTS to decoded pictures carrying RPU; actual dimensions change while pixel format and colorimetry remain unchanged; no output meta"
+    }
+  ],
+  "runtime": {
+    "review_required_before_execution": true,
+    "candidate_sdk_and_plugins": "reuse exact reviewed native transport runtime; never substitute system gstvideo or a fallback decoder",
+    "bounded_output_buffers": 24,
+    "timeout_seconds": 60,
+    "display_access": false,
+    "host_installation": false
+  }
+}

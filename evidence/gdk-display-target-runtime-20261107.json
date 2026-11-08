@@ -1,0 +1,370 @@
+{
+  "date": "2026-11-07",
+  "state": "reviewed native GDK target and destruction paths passed under ordinary settings; live profile/output lifecycle and package qualification pending",
+  "reviewed_repository_commit": "d2ce83e459b1293422a8622aa17ead538285d8a5",
+  "source_candidate_commit": "78824fc9e90b67c8114beab0c324152d62f8967d",
+  "source_candidate_tree": "420b4be5ab8e8c5245b03c8ea145ce954a2e030b",
+  "ordinary_native": {
+    "reviewed_commit": "d2ce83e459b1293422a8622aa17ead538285d8a5",
+    "scope": "native headless Weston only; no desktop session access",
+    "cases": [
+      {
+        "case": "pending",
+        "exit": 0,
+        "lines": [
+          "PASS mode=pending construction=0 ready=0 destroy=1 reentered=1 published_destroyed=1 native_gone=1 cleared=1 finalized=1 late=0"
+        ]
+      },
+      {
+        "case": "ready",
+        "exit": 0,
+        "lines": [
+          "PASS mode=ready construction=0 ready=1 destroy=1 reentered=1 published_destroyed=1 native_gone=1 cleared=1 finalized=1 late=0"
+        ]
+      },
+      {
+        "case": "exact-observer",
+        "termination": "externally stopped after 3 seconds",
+        "exit": -15,
+        "records": [
+          {
+            "generation": 1,
+            "ready": false
+          },
+          {
+            "generation": 1,
+            "ready": true,
+            "identity": 2,
+            "xy": [
+              0.679931,
+              0.320068,
+              0.23706,
+              0.7229,
+              0.139892,
+              0.050048,
+              0.312744,
+              0.329101
+            ],
+            "black_cd_m2": 0.0004,
+            "peak_cd_m2": 616,
+            "reference_white_cd_m2": 142
+          }
+        ]
+      }
+    ],
+    "files": {
+      "weston.log": "44efcfd7c934bd4f1a8816f996703a158e5cb08cb52a6f8f06c83116560ee0e2",
+      "pending.log": "e88c0f3ddce2069bf0d93b45fdb5e101562759f3e43d2a42f7c19525f4ebe427",
+      "ready.log": "e5fcde7e6bf253034f6014bc809d2562f86c5aa0e45a55a79ac097fdb8aafc92",
+      "observer.stderr": "4e4c6d544bdca1913b9859bbced27d515c8128e56180c031f1faebdf92951843",
+      "observer.stdout": "d07c25ac8baefa957e0119ade780632efd46dd9ecd5cf76613f543efe63c2ce4"
+    }
+  },
+  "late_manager": {
+    "pending": {
+      "exit": 0,
+      "relay": {
+        "client_order": [
+          "sync",
+          "bind:wl_compositor",
+          "bind:wl_subcompositor",
+          "bind:wp_viewporter",
+          "bind:wp_presentation",
+          "bind:wp_single_pixel_buffer_manager_v1",
+          "bind:wl_data_device_manager",
+          "bind:wl_shm",
+          "bind:wp_color_representation_manager_v1",
+          "bind:wl_output",
+          "sync",
+          "bind:wp_color_manager_v1",
+          "sync",
+          "bind:xdg_wm_base",
+          "create_surface"
+        ],
+        "advertised_globals": [
+          "wl_compositor",
+          "wl_subcompositor",
+          "wp_viewporter",
+          "zxdg_output_manager_v1",
+          "wp_presentation",
+          "wp_single_pixel_buffer_manager_v1",
+          "wp_tearing_control_manager_v1",
+          "wp_fifo_manager_v1",
+          "wp_commit_timing_manager_v1",
+          "wp_alpha_modifier_v1",
+          "zwp_relative_pointer_manager_v1",
+          "zwp_pointer_constraints_v1",
+          "zwp_input_timestamps_manager_v1",
+          "weston_capture_v1",
+          "wl_data_device_manager",
+          "wl_shm",
+          "zwp_linux_dmabuf_v1",
+          "zwp_linux_explicit_synchronization_v1",
+          "wp_color_representation_manager_v1",
+          "wl_output",
+          "xdg_wm_base",
+          "wp_color_manager_v1"
+        ],
+        "manager_delayed_ms": 50,
+        "errors": [],
+        "child_exit": 0,
+        "post_manager_sync_before_surface": true,
+        "manager_advertised_last": true,
+        "pass": true
+      }
+    },
+    "ready": {
+      "exit": 0,
+      "relay": {
+        "client_order": [
+          "sync",
+          "bind:wl_compositor",
+          "bind:wl_subcompositor",
+          "bind:wp_viewporter",
+          "bind:wp_presentation",
+          "bind:wp_single_pixel_buffer_manager_v1",
+          "bind:wl_data_device_manager",
+          "bind:wl_shm",
+          "bind:wp_color_representation_manager_v1",
+          "bind:wl_output",
+          "sync",
+          "bind:wp_color_manager_v1",
+          "sync",
+          "bind:xdg_wm_base",
+          "create_surface"
+        ],
+        "advertised_globals": [
+          "wl_compositor",
+          "wl_subcompositor",
+          "wp_viewporter",
+          "zxdg_output_manager_v1",
+          "wp_presentation",
+          "wp_single_pixel_buffer_manager_v1",
+          "wp_tearing_control_manager_v1",
+          "wp_fifo_manager_v1",
+          "wp_commit_timing_manager_v1",
+          "wp_alpha_modifier_v1",
+          "zwp_relative_pointer_manager_v1",
+          "zwp_pointer_constraints_v1",
+          "zwp_input_timestamps_manager_v1",
+          "weston_capture_v1",
+          "wl_data_device_manager",
+          "wl_shm",
+          "zwp_linux_dmabuf_v1",
+          "zwp_linux_explicit_synchronization_v1",
+          "wp_color_representation_manager_v1",
+          "wl_output",
+          "xdg_wm_base",
+          "wp_color_manager_v1"
+        ],
+        "manager_delayed_ms": 50,
+        "errors": [],
+        "child_exit": 0,
+        "post_manager_sync_before_surface": true,
+        "manager_advertised_last": true,
+        "pass": true
+      }
+    }
+  },
+  "old_700c596_control": {
+    "pending": {
+      "exit": 1,
+      "relay": {
+        "client_order": [
+          "sync",
+          "bind:wl_compositor",
+          "bind:wl_subcompositor",
+          "bind:wp_viewporter",
+          "bind:wp_presentation",
+          "bind:wp_single_pixel_buffer_manager_v1",
+          "bind:wl_data_device_manager",
+          "bind:wl_shm",
+          "bind:wp_color_representation_manager_v1",
+          "bind:wl_output",
+          "sync",
+          "bind:wp_color_manager_v1"
+        ],
+        "advertised_globals": [
+          "wl_compositor",
+          "wl_subcompositor",
+          "wp_viewporter",
+          "zxdg_output_manager_v1",
+          "wp_presentation",
+          "wp_single_pixel_buffer_manager_v1",
+          "wp_tearing_control_manager_v1",
+          "wp_fifo_manager_v1",
+          "wp_commit_timing_manager_v1",
+          "wp_alpha_modifier_v1",
+          "zwp_relative_pointer_manager_v1",
+          "zwp_pointer_constraints_v1",
+          "zwp_input_timestamps_manager_v1",
+          "weston_capture_v1",
+          "wl_data_device_manager",
+          "wl_shm",
+          "zwp_linux_dmabuf_v1",
+          "zwp_linux_explicit_synchronization_v1",
+          "wp_color_representation_manager_v1",
+          "wl_output",
+          "xdg_wm_base",
+          "wp_color_manager_v1"
+        ],
+        "manager_delayed_ms": 50,
+        "errors": [
+          "BrokenPipeError(32, 'Broken pipe')"
+        ],
+        "child_exit": 2,
+        "post_manager_sync_before_surface": false,
+        "manager_advertised_last": true,
+        "pass": false
+      }
+    },
+    "ready": {
+      "exit": 1,
+      "relay": {
+        "client_order": [
+          "sync",
+          "bind:wl_compositor",
+          "bind:wl_subcompositor",
+          "bind:wp_viewporter",
+          "bind:wp_presentation",
+          "bind:wp_single_pixel_buffer_manager_v1",
+          "bind:wl_data_device_manager",
+          "bind:wl_shm",
+          "bind:wp_color_representation_manager_v1",
+          "bind:wl_output",
+          "sync",
+          "bind:wp_color_manager_v1"
+        ],
+        "advertised_globals": [
+          "wl_compositor",
+          "wl_subcompositor",
+          "wp_viewporter",
+          "zxdg_output_manager_v1",
+          "wp_presentation",
+          "wp_single_pixel_buffer_manager_v1",
+          "wp_tearing_control_manager_v1",
+          "wp_fifo_manager_v1",
+          "wp_commit_timing_manager_v1",
+          "wp_alpha_modifier_v1",
+          "zwp_relative_pointer_manager_v1",
+          "zwp_pointer_constraints_v1",
+          "zwp_input_timestamps_manager_v1",
+          "weston_capture_v1",
+          "wl_data_device_manager",
+          "wl_shm",
+          "zwp_linux_dmabuf_v1",
+          "zwp_linux_explicit_synchronization_v1",
+          "wp_color_representation_manager_v1",
+          "wl_output",
+          "xdg_wm_base",
+          "wp_color_manager_v1"
+        ],
+        "manager_delayed_ms": 50,
+        "errors": [
+          "BrokenPipeError(32, 'Broken pipe')"
+        ],
+        "child_exit": 2,
+        "post_manager_sync_before_surface": false,
+        "manager_advertised_last": true,
+        "pass": false
+      }
+    }
+  },
+  "negative_control_interpretation": "Expected failure: both old children exit2 with unavailable generation0 and no post-manager sync. BrokenPipe is the relay observing that early exit before it delivers delayed capabilities; it is retained, not counted as corrected-runtime success.",
+  "historical_unavailable": {
+    "date": "2026-11-07",
+    "state": "prior reviewed lifecycle candidate correctly reports unavailable; no successful target lifecycle acceptance yet",
+    "reviewed_repository_commit": "3c89f42be965428b3724429c48df04aded2b8fc4",
+    "default": {
+      "reviewed_commit": "3c89f42be965428b3724429c48df04aded2b8fc4",
+      "scope": "native headless Weston only; no desktop session access",
+      "cases": [
+        {
+          "case": "pending",
+          "exit": 2,
+          "lines": [
+            "expected an outstanding parametric query; ready=0 generation=0"
+          ]
+        },
+        {
+          "case": "ready",
+          "exit": 2,
+          "lines": [
+            "expected an outstanding parametric query; ready=0 generation=0"
+          ]
+        },
+        {
+          "case": "exact-observer",
+          "termination": "externally stopped after 3 seconds",
+          "exit": -15,
+          "records": [
+            {
+              "generation": 0,
+              "ready": false
+            }
+          ]
+        }
+      ],
+      "files": {
+        "weston.log": "83977d8bc18f874c6e56fdd7c05cec0e2fae3ea9caa3998d1ddb9b88ab6af05d",
+        "pending.log": "ccd2664d61c4ad6efdc793fd0caef5449cf74a1e9aa01d95954ed84c86ba70ff",
+        "ready.log": "5a2db99d529628fbc26357379a62cb29791bc5c17605b4c396b228b0e20b736c",
+        "observer.stderr": "6f9e46b1661b7842749ef8f0661046bf59da40dc6d4c9ed58479976915f29459",
+        "observer.stdout": "012da6a2906e61a2eac8a1c647729ca4e57665f9867378e464e5f04245c9fd08"
+      }
+    },
+    "upstream_diagnostic_optin": {
+      "reviewed_commit": "3c89f42be965428b3724429c48df04aded2b8fc4",
+      "scope": "native headless Weston only; no desktop session access",
+      "cases": [
+        {
+          "case": "pending",
+          "exit": 2,
+          "lines": [
+            "expected an outstanding parametric query; ready=0 generation=0"
+          ]
+        },
+        {
+          "case": "ready",
+          "exit": 2,
+          "lines": [
+            "expected an outstanding parametric query; ready=0 generation=0"
+          ]
+        },
+        {
+          "case": "exact-observer",
+          "termination": "externally stopped after 3 seconds",
+          "exit": -15,
+          "records": [
+            {
+              "generation": 0,
+              "ready": false
+            }
+          ]
+        }
+      ],
+      "files": {
+        "weston.log": "c260ded5fc28cb3943c5a0015d3ac5d2b8df35aa5a4a1759bcae5f0de31bd369",
+        "pending.log": "b7b11b91262b055b1851c149b8838141d065e6602e562c93d3cafaa85bb7a15d",
+        "ready.log": "8b53762694189137a40c1baf823fc49dee880294a5d7451c2d19ca5ecabf9628",
+        "observer.stderr": "27befe5e653aa5ac6da3626f0a00d5ccaa3123879f4c437f82c3fa187f44d6d3",
+        "observer.stdout": "012da6a2906e61a2eac8a1c647729ca4e57665f9867378e464e5f04245c9fd08"
+      }
+    },
+    "source_explanation": [
+      "Default gdkdisplay-wayland.c adds wp_color_manager_v1 to disabled globals unless GDK_DEBUG=color-mgmt.",
+      "With that documented opt-in, Weston advertises parametric targets but only named transfer functions 2,3,11,5. GTK rendering requires named sRGB9, so prepare destroys the shared manager.",
+      "Neither run has a usable target; lifecycle negatives exit2 rather than fabricate metadata."
+    ],
+    "next_candidate": "Separate default target feedback from the existing experimental rendering opt-in/capability checks; one shared manager and one feedback per native GdkSurface. Fresh review required before runtime.",
+    "host_changes": false
+  },
+  "limits": [
+    "Synthetic headless compositor declared-profile replay; not a new physical or optical measurement.",
+    "The exact GTK observer was externally terminated after three seconds; lifecycle destruction is proved by the separate owned-reference native negatives.",
+    "GTK content color-management remains unrequested in default feedback-only discovery.",
+    "Private offloaded subsurface target ownership remains a downstream integration requirement.",
+    "No GStreamer display mapper or end-to-end playback acceptance."
+  ],
+  "host_changes": false
+}

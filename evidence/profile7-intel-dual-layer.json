@@ -1,0 +1,69 @@
+{
+  "scope": "Staged normal mpv 0.42; Intel Vulkan on the ROG; private headless Wayland; no host package installation",
+  "input": {
+    "profile": 7,
+    "base_layer": true,
+    "enhancement_layer": true,
+    "rpu": true,
+    "disable_residual_flag": 0,
+    "source_dimensions": [
+      3840,
+      2160
+    ],
+    "frame_rate": 24
+  },
+  "output": {
+    "timestamp_seconds": 0.5,
+    "estimated_frame_number": 12,
+    "captured_dimensions": [
+      1920,
+      1080
+    ],
+    "explicit_peak_cd_m2": 616,
+    "wire_primaries": "BT.2020",
+    "wire_transfer": "PQ",
+    "private_target": true
+  },
+  "checks": {
+    "flip_probe": "3 mapped and composed; no invalid size",
+    "nonreference_acquire_failure": "1 mapped, 1 rejected acquisition; render failed as required",
+    "candidate": "native 3840x2160 master, EL composed=1, CM4 mapping",
+    "base_only_candidate": "residual-dependent grade declined",
+    "stock_comparison": "identical explicit destination on both arms; compositing hint disabled for both stock controls",
+    "candidate_comparison": "compositing hint enabled for both candidate controls"
+  },
+  "capture_rgb48le": {
+    "total_pixels": 2073600,
+    "stock_full_vs_base": {
+      "changed_pixels": 1501513,
+      "mean_absolute_channel_code_difference": 57.279175,
+      "p99_absolute_channel_code_difference": 350
+    },
+    "candidate_full_vs_base": {
+      "changed_pixels": 1553790,
+      "mean_absolute_channel_code_difference": 126.388499,
+      "p99_absolute_channel_code_difference": 486
+    }
+  },
+  "interpretation": "Stock comparison isolates enhancement-layer participation; candidate comparison includes reconstruction and the enabled creative mapper. Pixel differences are not an accuracy score.",
+  "limitations": [
+    "One captured movie timestamp",
+    "Explicit target; no automatic panel-target claim for this build",
+    "No physical measurement or independent Dolby reference comparison"
+  ],
+  "subsequent_staged_042_automatic_check": {
+    "source": "b5559002e694d156ada4af4ce3f5acea5d884a3c",
+    "dimensions": [
+      3840,
+      2160
+    ],
+    "enhancement_layer_composed": true,
+    "physical_targets_cd_m2": [
+      616,
+      308
+    ],
+    "cached_pq_window_capture": true,
+    "ordinary_source_transition_cleared_target": true,
+    "installed": false
+  }
+}

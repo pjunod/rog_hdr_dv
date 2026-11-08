@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "state": "COMPILED_PENDING_INDEPENDENT_REVIEW_AND_RUNTIME",
+  "date": "2026-11-07",
+  "scope": "Owned per-AU raw RPU transport only; not parsed reconstruction, display management or playback",
+  "source_packages": [
+    {
+      "component": "ubuntu-gst-plugins-base-rpu",
+      "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
+      "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
+      "candidate_commit": "906fd88fde0187ec51baeea28bc7ddda90969226",
+      "candidate_tree": "b601f4925bc2baee92bb78d6c2cb6e6eaa738eaa"
+    },
+    {
+      "component": "ubuntu-gst-plugins-bad-rpu",
+      "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
+      "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
+      "candidate_commit": "fa79f6aecf188858f128308053e67450071e0bca",
+      "candidate_tree": "237df5dd6ed2fe9177636cbdbcc0672f8e7c3693"
+    }
+  ],
+  "build": {
+    "source": "exact Ubuntu source artifacts authenticated by apt source with pinned package versions",
+    "sdk": "exact signed Ubuntu core/base runtime and development .debs unpacked in task SDK; not installed",
+    "configuration": [
+      "-Dauto_features=disabled",
+      "-Dtests=disabled",
+      "-Dexamples=disabled",
+      "-Dintrospection=disabled",
+      "-Ddoc=disabled",
+      "-Dwerror=true"
+    ],
+    "jobs": 4,
+    "targets": [
+      "gstvideo-1.0",
+      "gstvideoparsersbad"
+    ],
+    "compile_output_sha256": {
+      "libgstvideo-1.0.so.0.2807.0": "c1bb1551571276039ad7f70ef9fcd480e2acc0defb6a5bbf83d13d5c725e0120",
+      "libgstvideoparsersbad.so": "ffcf121a52c98ef83d8ec994e32def867d719b3ba42b6bc964a88e2d5887bbee",
+      "rpu-pipeline-probe": "b70a3a58d11753f4cd56b7d5d8d5ef7085946448ff0b85b8f460112ef005091e"
+    }
+  },
+  "runtime_tests_executed": 0,
+  "host_installation": false,
+  "container_installation": false,
+  "new_app_installation": false,
+  "default_or_rank_changes": false,
+  "private_mapper_arithmetic": false,
+  "review_gate": "Independent source and regression-probe review required before runtime execution; native avdec and Intel VA reorder plus flush/stale negative evidence required before merge"
+}

@@ -1,0 +1,268 @@
+{
+  "date": "2026-11-07",
+  "state": "proposed; compile and replay only",
+  "component": "ubuntu-gtk4-display-target",
+  "source_origin": {
+    "kind": "ubuntu-source-package",
+    "package": "gtk4",
+    "version": "4.24.1+ds-1",
+    "authentication": "APT source hashes authenticated by the configured Ubuntu archive signed metadata; dsc OpenPGP signature not independently checked.",
+    "import_recipe": "dpkg-source extraction with distribution patches; Git import includes every extracted file except .pc; fixed neutral author/committer and 2026-11-07T18:00:00-05:00 timestamps.",
+    "artifacts": [
+      {
+        "file": "gtk4_4.24.1+ds-1.debian.tar.xz",
+        "sha256": "1bfe98cecba76a947fb4f07335e013f7982a06c05805b4bda546b585c0915ea4",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds-1.debian.tar.xz"
+      },
+      {
+        "file": "gtk4_4.24.1+ds-1.dsc",
+        "sha256": "43ca7e4305ba039a28451b818c5f2f0027ea998f3279fa2a18087e7a8146a640",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds-1.dsc"
+      },
+      {
+        "file": "gtk4_4.24.1+ds.orig.tar.xz",
+        "sha256": "d148acf2132b9b5ad85e62f1544c9d765a7991ec18567c36ffb12765f50f4bf3",
+        "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gtk4/gtk4_4.24.1+ds.orig.tar.xz"
+      }
+    ],
+    "source_import": {
+      "git_identity": "ROG HDR contributors <rog-hdr@invalid>",
+      "author_and_committer_date": "2026-11-07T18:00:00-05:00",
+      "commit_subject": "Import Ubuntu gtk4 4.24.1+ds-1 after distribution patches, excluding .pc",
+      "include": "git add -f -- . after omitting .pc from extracted source copy"
+    }
+  },
+  "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
+  "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
+  "candidate_commit": "78824fc9e90b67c8114beab0c324152d62f8967d",
+  "candidate_tree": "420b4be5ab8e8c5245b03c8ea145ce954a2e030b",
+  "source_replay": {
+    "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
+    "candidate_tree": "420b4be5ab8e8c5245b03c8ea145ce954a2e030b",
+    "replay_tree": "420b4be5ab8e8c5245b03c8ea145ce954a2e030b",
+    "changed_files": {
+      "gdk/wayland/gdksurface-wayland-private.h": {
+        "base_sha256": "b244f96ded490cd2534553174dbd304f6e9d9b0fa1c5fde1088d1f8887c08c18",
+        "candidate_sha256": "9522cd20187727fd6595476dc8b0baf1dadaac41429772d7821a539599f8a3a9"
+      },
+      "gdk/wayland/gdkwaylandcolor.c": {
+        "base_sha256": "8b695fc1e18f6eb96f3006136e5e5dcaa8037ad6ef7535a59c2ce98652ef38d4",
+        "candidate_sha256": "99f4b7bb5cf6f00a7681f9cbeff8f1a0520cd1c20210a9acedfb0f6ca63544b5"
+      },
+      "gdk/wayland/gdksurface-wayland.c": {
+        "base_sha256": "f75829a17450c5c90abfc7a697a5158a85a4e1e894c3300731e506fa0a0798bc",
+        "candidate_sha256": "5d001728a0e7399e32b288d68152946f2879cb2622917cc3f5d6fc82f6807e5e"
+      },
+      "gdk/wayland/gdkwaylandsurface.h": {
+        "base_sha256": "befa03989c142a39f6db41dc60ca2abd4711726d26e5eaa16035601405505e7d",
+        "candidate_sha256": "d4a195bd3fbb36c3d11d5b26ad274f5e63c5696633ecb9fb0b53b3d42216c582"
+      },
+      "gdk/wayland/gdkwaylandcolor-private.h": {
+        "base_sha256": "e623f2a03bec4086d4075fd9698afecd8f9b86777e127209a8002db67aacea8a",
+        "candidate_sha256": "0750ff30b6d0998aab31fd61b62a28b76514177c5dfee83c92fc706541d11766"
+      },
+      "gdk/gdksurface.c": {
+        "base_sha256": "15dfc8b06ee517c385825f6df858d95e742a20625b818b0009c8ea47df740286",
+        "candidate_sha256": "bfb0b91dad1af40d05a66b4cc6cc5982b80dcdc48b2a8e104eb03e71cfc5ec89"
+      },
+      "gdk/gdksurfaceprivate.h": {
+        "base_sha256": "98a0db904565b7d00f1e47cc12d899c00fb6264e19c3667b8969764e3e39ab40",
+        "candidate_sha256": "24ac5fb52ea6f26c39fb3731a02f621c473e20a541dccc20ae6880ecea6c6f9c"
+      },
+      "gdk/wayland/gdkdisplay-wayland.c": {
+        "base_sha256": "3128b74995aec4ad3f5acc72192107bb90457e9aa1c8922b2944eb166fadbe49",
+        "candidate_sha256": "115a3bd6899da94edb64e7bea10a2b536ef4f4302d3af5c5fed0bf9ebfd858fb"
+      }
+    },
+    "patch_sha256": "3916a7ade9881674215287c0efa0d86db58a198953e1707a722ebbf850edc21a",
+    "replay": "PASS: complete Git tree equals candidate tree",
+    "runtime_tests": "NOT RUN; independent review required first"
+  },
+  "native_build": {
+    "architecture": "amd64",
+    "compiler": "cc (Ubuntu 15.3.0-4ubuntu1) 15.3.0",
+    "logs": {
+      "candidate-reentrancy-build.log": {
+        "sha256": "d31b09c3a156e51f290f3f5e92f8aef3b37e8b668eae3cdfdb98cba91666e50a",
+        "warnings": 0
+      },
+      "probe-reentrancy-build.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "warnings": 0
+      },
+      "reentrancy-compile.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "warnings": 0
+      }
+    },
+    "outputs": {
+      "build/gtk/libgtk-4.so.1.2400.1": "aab5ef0310d290cfc25fbd5c764ab5f5d1160607f377fe97d18f5f56defa8416",
+      "gdk-display-target-probe": "651c68d8294b901b37f05d196d97d153e9513fb0a41ee04c6640fafb6e4b1362",
+      "gdk-display-target-probe.c": "ae3b475fa171b217310fa91bd1a76f2b9d5e74e8da9920e2c27ed35fef233a7b",
+      "gdk-display-target-reentrancy": "8c426da85d9f32f5038fa0ebf73073514c8498ff43f51bd9b1a0eb1728f3a5c6",
+      "gdk-display-target-reentrancy.c": "b45bff806d8d5e6998eb4366b0df889f6e349fac4cb1c2837951a1d271c94f83"
+    },
+    "symbol_export": "GLOBAL DEFAULT gdk_wayland_surface_get_color_target",
+    "runtime_tests": "NOT RUN; corrected candidate requires fresh independent review"
+  },
+  "checks": [
+    {
+      "check": "baseline affected libraries",
+      "result": "PASS",
+      "command": "ninja -C build -j4 gdk/wayland/libgdk-wayland.a gdk/libgdk.a"
+    },
+    {
+      "check": "candidate affected libraries",
+      "result": "PASS",
+      "command": "ninja -C build -j4 gdk/wayland/libgdk-wayland.a gdk/libgdk.a"
+    },
+    {
+      "check": "candidate shared library",
+      "result": "PASS",
+      "command": "ninja -C build -j4 gtk/libgtk-4.so.1.2400.1"
+    },
+    {
+      "check": "native observer compile/link",
+      "result": "PASS",
+      "command": "cc -std=c11 -Wall -Wextra -Werror gdk-display-target-probe.c -o gdk-display-target-probe $(pkg-config --cflags --libs gtk4-wayland) -Wl,-rpath,<build>/gtk"
+    },
+    {
+      "check": "public symbol export",
+      "result": "PASS",
+      "command": "readelf -Ws build/gtk/libgtk-4.so.1.2400.1"
+    },
+    {
+      "check": "clean full-source replay",
+      "result": "PASS",
+      "method": "Apply published patch to imported base with git apply --whitespace=error; git write-tree equals candidate_tree"
+    },
+    {
+      "check": "corrected native GTK/GDK compilation",
+      "result": "PASS; 116 build steps, zero warnings",
+      "command": "ninja -C build -j4 gdk/wayland/libgdk-wayland.a gdk/libgdk.a gtk/libgtk-4.so.1.2400.1"
+    },
+    {
+      "check": "real native pending/ready reentrant-destruction negatives",
+      "result": "COMPILE/LINK PASS ONLY; NOT RUN",
+      "command": "cc -std=c11 -Wall -Wextra -Werror gdk-display-target-reentrancy.c -o gdk-display-target-reentrancy $(pkg-config --cflags --libs gtk4-wayland) -Wl,-rpath,<build>/gtk"
+    },
+    {
+      "check": "ordinary feedback-only candidate compilation",
+      "result": "PASS; zero warnings; not run pending fresh review",
+      "command": "ninja -C build -j4 gdk/wayland/libgdk-wayland.a gdk/libgdk.a gtk/libgtk-4.so.1.2400.1"
+    },
+    {
+      "check": "post-manager capability synchronization",
+      "result": "native GDK/full GTK compile/link PASS; startup-order runtime regression prepared but not run",
+      "command": "ninja -C build -j4 gdk/wayland/libgdk-wayland.a gdk/libgdk.a gtk/libgtk-4.so.1.2400.1"
+    }
+  ],
+  "constraints": [
+    "No observer or library runtime test executed; independent review required first.",
+    "No installation on the desktop, compositor restart, profile change, player launch or optical test.",
+    "No GTK introspection or Debian package build acceptance.",
+    "Snapshot availability must be handled on every signal, including pending/ready within the same generation.",
+    "A consuming GTK paintable/rendering path and GStreamer mapper remain separate prerequisites.",
+    "Private GdkWaylandSubsurface offload owns a separate Wayland surface with no target callback; the public accessor covers the GtkNative GdkSurface used for ordinary composition, not an unqualified child offload target.",
+    "Manager binding includes its own asynchronous startup roundtrip; initial registry or other globals roundtrips can precede bind and cannot establish capability readiness. Late-manager proxy regression remains unrun pending corrected source review."
+  ],
+  "previous_review_candidate": {
+    "repository_commit": "ed19b2f32c3c538eca04610344d6ce38e884ac34",
+    "source_candidate_commit": "018b049dac22c3f1c7c6a07a51ae97576ad48a70",
+    "source_candidate_tree": "50248f0bf8aff806eb613fcbef6bcd91c7f3ebe2",
+    "native_build": {
+      "architecture": "amd64",
+      "compiler": "cc (Ubuntu 15.3.0-4ubuntu1) 15.3.0",
+      "meson": "1.10.1",
+      "logs": {
+        "baseline-setup.log": {
+          "sha256": "4cb0b7643d0f440627864438be6eabd31023b649459d4924bf48da081a4d9555",
+          "warnings": 0
+        },
+        "baseline-build.log": {
+          "sha256": "159f9127b42eb09f9b70c48781d19f94ff7ec94bdf3dda66ea3542ef81f43676",
+          "warnings": 0
+        },
+        "candidate-build.log": {
+          "sha256": "6b4cd24748a0d639adb514195f123e0b2d9b711a309b45a72cf47c6991641e5f",
+          "warnings": 0
+        },
+        "candidate-shared-build.log": {
+          "sha256": "4b57c9e5282a3b1fe15b9fdc61dd2c4dc5ece7f21ed2aaf93ab0967c90e5a7b9",
+          "warnings": 0
+        },
+        "candidate-final-build.log": {
+          "sha256": "be1868c876325d5f08157c6fe05feeb4c772dda8f6e554ba948f495e53afd46c",
+          "warnings": 0
+        },
+        "probe-build.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "warnings": 0
+        },
+        "export-check.log": {
+          "sha256": "ad74b96b159c4e0685e5006ea882cee54a8df70d5bcb37a494886e72951c9ec0",
+          "warnings": 0
+        },
+        "builddeps-plan.log": {
+          "sha256": "fff664adfb13b33d1d1d82096b4f10fa54bf42c7d484b0d9ca1150b7d7ec2507",
+          "warnings": 0
+        },
+        "builddeps.log": {
+          "sha256": "79926005f227198fcf0fcd25d5982767fb0017d70a55a96103bb19ef1c9b2d5b",
+          "warnings": 0
+        },
+        "apt-source.log": {
+          "sha256": "a330b27ff17eb142f24cd2e1b951d4475180bf638ac2eff613365cc144e74ada",
+          "warnings": 0
+        }
+      },
+      "outputs": {
+        "build/gtk/libgtk-4.so.1.2400.1": "ac4ea3763fcbf073855412ad47d1c532a40516809744f5ebedf20fa0ad77f306",
+        "gdk-display-target-probe": "651c68d8294b901b37f05d196d97d153e9513fb0a41ee04c6640fafb6e4b1362",
+        "gdk-display-target-probe.c": "ae3b475fa171b217310fa91bd1a76f2b9d5e74e8da9920e2c27ed35fef233a7b"
+      },
+      "symbol_export": "GLOBAL DEFAULT gdk_wayland_surface_get_color_target",
+      "runtime_tests": "NOT RUN"
+    },
+    "finding": "P1: color-target-changed emitted mid-native teardown before public destroyed flag; a handler could recursively destroy. Constructor also emitted before the native owner was installed.",
+    "correction": "Private core after_destroy boundary runs after destroyed=TRUE with a core strong reference held; emission has its own strong reference; native teardown only clears state. Initial pending query emits no signal during construction."
+  },
+  "reviewed_lifecycle_candidate": {
+    "candidate_commit": "51b8236be48a546ab22f0316e5a7e4c89272dbd8",
+    "candidate_tree": "52c0c1e85eb10fc9f3f3950c5424c1035c04f269",
+    "native_build": {
+      "architecture": "amd64",
+      "compiler": "cc (Ubuntu 15.3.0-4ubuntu1) 15.3.0",
+      "logs": {
+        "candidate-reentrancy-build.log": {
+          "sha256": "d31b09c3a156e51f290f3f5e92f8aef3b37e8b668eae3cdfdb98cba91666e50a",
+          "warnings": 0
+        },
+        "probe-reentrancy-build.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "warnings": 0
+        },
+        "reentrancy-compile.log": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "warnings": 0
+        }
+      },
+      "outputs": {
+        "build/gtk/libgtk-4.so.1.2400.1": "aab5ef0310d290cfc25fbd5c764ab5f5d1160607f377fe97d18f5f56defa8416",
+        "gdk-display-target-probe": "651c68d8294b901b37f05d196d97d153e9513fb0a41ee04c6640fafb6e4b1362",
+        "gdk-display-target-probe.c": "ae3b475fa171b217310fa91bd1a76f2b9d5e74e8da9920e2c27ed35fef233a7b",
+        "gdk-display-target-reentrancy": "8c426da85d9f32f5038fa0ebf73073514c8498ff43f51bd9b1a0eb1728f3a5c6",
+        "gdk-display-target-reentrancy.c": "b45bff806d8d5e6998eb4366b0df889f6e349fac4cb1c2837951a1d271c94f83"
+      },
+      "symbol_export": "GLOBAL DEFAULT gdk_wayland_surface_get_color_target",
+      "runtime_tests": "NOT RUN; corrected candidate requires fresh independent review"
+    },
+    "repository_commit": "3c89f42be965428b3724429c48df04aded2b8fc4"
+  },
+  "feedback_only_build": {
+    "log_sha256": "4ba869642ee816e2f0798f839ed29b04c81180df627c1f3481fd3bb1fff0a105",
+    "warnings": 0,
+    "library_sha256": "202808b99caf8c90f90e2eeac5501fb89465455cc559c63b5758f14c47f91161",
+    "result": "native affected GDK and full GTK link PASS; final feedback-only behavior not run pending review"
+  }
+}

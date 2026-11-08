@@ -17,8 +17,14 @@ code{font-size:.9em}footer{margin-top:36px;color:#a9b8ca}@media(max-width:650px)
 <p>Accurate colour and consistent SDR/HDR across applications, with full Dolby
 Vision and tuning for the internal OLED.</p>
 <p class="muted">Updated November 7, 2026 · APT nativehdr13 and kernel nativehdr3 installed · historical receipts retain their original scope</p></header>
-<section><h2>Shared Dolby Vision renderer</h2><p>Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with the same frame-aware display mapper. FFmpeg passed both creative-trim comparisons and mapped Profile 5 on the ROG’s Intel GPU. With the corrected Mesa driver, normal mpv rendered a nonblack frame with an authored Level 2 trim on a signalled BT.2020/PQ Wayland surface. A verified HDR10 control matched stock mpv. Both driver architectures built, and offline APT simulations passed for installation and rollback. Host installation and physical-target trim tuning remain open. <a href="SYSTEM_DOLBY_VISION.md">Packages, commands and recovery</a>.</p></section>
+<section><h2>Shared Dolby Vision renderer</h2><p>Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with the same frame-aware display mapper. FFmpeg passed both creative-trim comparisons and mapped Profile 5 on the ROG’s Intel GPU. With the corrected Mesa driver, normal mpv rendered a nonblack frame with an authored Level 2 trim on a signalled BT.2020/PQ Wayland surface. A verified HDR10 control matched stock mpv. Both driver architectures built, and offline APT simulations passed for installation and rollback. All seven packages are installed. The system FFmpeg mapped Profile 5 at 616 cd/m² on Intel. On a private Wayland output the installed mpv still selected an 880.644-nit mapper target. Panel-specific trim tuning continues. <a href="SYSTEM_DOLBY_VISION.md">Packages, commands and recovery</a>.</p></section>
 
+<h2>GStreamer RPU transport — native scope passed</h2>
+<p>Software avdec and Intel VA passed reordered-picture, flushing-seek and RPU-gap
+checks. Native VA rotation invalidated the original metadata; exact signed source
+replay and compilation passed. No host installation occurred. Reconstruction,
+normal GTK playback, physical target signalling and package qualification remain
+open. <a href="GSTREAMER_DOLBY_TRANSPORT.md">Contract and evidence</a>.</p>
 <h2>Current software handoff — November 7</h2>
 <div class="callout">ROG already has Mutter <code>51.0-1ubuntu3+nativehdr13</code>,
 libdisplay-info <code>0.3.0-1+nativehdr13</code> on amd64 and i386, and external
