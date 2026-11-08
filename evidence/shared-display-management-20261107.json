@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "scope": "Digital qualification of the shared Ubuntu rendering path",
+  "source_trees": {
+    "ubuntu-ffmpeg-system-dv": "a1c874fd73030e53fa675e882f50494a58f87c2b",
+    "ubuntu-libplacebo-system-dv": "ed53d88b87d69fff446be7658af354b9693d3fe0",
+    "ubuntu-mpv-system-dv": "e3455a19b68f30f2ef04dd95907a806029f219be"
+  },
+  "packages": {
+    "mpv": "0.41.0-2ubuntu5+rogdv2",
+    "libavfilter11": "7:8.1.2-2ubuntu2+rogdv1",
+    "private_runtime": "1.0.0+private20261107-4"
+  },
+  "source_reconstruction": {
+    "libplacebo": "pass",
+    "mpv": "pass",
+    "ffmpeg": "pass"
+  },
+  "renderer_cases": {
+    "padded_master_with_fractional_crop_equal_dimensions": "pass",
+    "padded_master_with_fractional_crop_bilinear": "pass",
+    "nonreference_mixer_failure_reaches_caller": "pass"
+  },
+  "export_graph": {
+    "already_pq": true,
+    "output_peak_cd_m2": 600,
+    "source_hdr10plus_removed": true,
+    "source_dolby_rpu_removed": true
+  },
+  "export_samples": {
+    "target_cd_m2": 1000,
+    "mapped": [
+      "HEVC Profile 5",
+      "synthetic HEVC Profile 8.1"
+    ],
+    "bypassed": [
+      "SDR",
+      "HDR10"
+    ]
+  },
+  "trim_effect": [
+    {
+      "metadata": "CM v2.9 Level 2",
+      "target_cd_m2": 600,
+      "gamut": "P3-D65",
+      "decoded_base_equal": true,
+      "frame_count": 6,
+      "changed_input_trim_frames": [
+        2,
+        3
+      ],
+      "changed_output_frames": [
+        2,
+        3
+      ]
+    },
+    {
+      "metadata": "CM v4.0 Level 8",
+      "target_cd_m2": 600,
+      "gamut": "P3-D65",
+      "decoded_base_equal": true,
+      "frame_count": 6,
+      "changed_input_trim_frames": [
+        2,
+        3
+      ],
+      "changed_output_frames": [
+        2,
+        3
+      ]
+    }
+  ],
+  "intel_gpu": {
+    "implementation": "Mesa Intel Arc (Meteor Lake) Vulkan",
+    "source": "1920x1080 HEVC Profile 5",
+    "provider_mapped": true,
+    "target_cd_m2": 616,
+    "target_gamut": "P3-D65",
+    "output_encoding": "BT.2020/PQ",
+    "surface": "offscreen"
+  },
+  "optical_measurement": false,
+  "reference_accuracy_qualified_on_this_build": false
+}

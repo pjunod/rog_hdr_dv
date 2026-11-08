@@ -5,6 +5,10 @@ userspace and signed kernel `nativehdr3` are installed. External plurx Player
 owns the playback product. The [software install/rollback handoff](SOFTWARE_DELIVERY.md)
 records exact package hashes and remaining acceptance; no reinstall is needed.
 
+## Shared Dolby Vision renderer — November 7
+
+Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, SDR/HDR10 controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. Packaged mpv exposed a second zero-MaxFALL sender in Mesa’s Vulkan Wayland path. Corrected driver qualification and host installation are pending. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
+
 ## Kernel security rebase — 2026-10-29
 
 The signed `7.3.0-nativehdr3` was installed and booted in the owner-authorized
