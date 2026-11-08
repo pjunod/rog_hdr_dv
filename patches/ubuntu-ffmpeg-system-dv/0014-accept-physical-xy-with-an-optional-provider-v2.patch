@@ -1,0 +1,134 @@
+diff --git a/libavfilter/vf_libplacebo.c b/libavfilter/vf_libplacebo.c
+index 8ee8b1c9f13ad01abf281ff10103c14db39c206c..2edf6d556043c1d461dc9c0188b9b1156a54815b 100644
+--- a/libavfilter/vf_libplacebo.c
++++ b/libavfilter/vf_libplacebo.c
+@@ -34,6 +34,9 @@
+ #include "scale_eval.h"
+ 
+ #include <dv_provider.h>
++#include <stdlib.h>
++#pragma weak dv_provider_map_v2
++#pragma weak dv_provider_last_target_strategy
+ #include <libplacebo/renderer.h>
+ #include <libplacebo/utils/libav.h>
+ #include <libplacebo/utils/frame_queue.h>
+@@ -146,6 +149,10 @@ enum var_name {
+ typedef struct LibplaceboInput {
+     int idx;
+     struct dv_provider *provider;
++    struct dv_provider_target_v2 physical_target;
++    int has_physical_xy;
++    unsigned target_strategy_witness;
++    AVFilterContext *log_ctx;
+     struct pl_color_space display;
+     pl_renderer renderer;
+     pl_queue queue;
+@@ -222,6 +229,8 @@ typedef struct LibplaceboContext {
+     int apply_dovi;
+     double target_peak, target_black;
+     int target_gamut;
++    char *target_xy;
++    struct dv_provider_target_v2 physical_target;
+     int colorspace;
+     int color_range;
+     int color_primaries;
+@@ -568,12 +577,60 @@ static void libplacebo_uninit(AVFilterContext *avctx);
+ static int libplacebo_config_input(AVFilterLink *inlink);
+ static int init_vulkan(AVFilterContext *avctx, const AVVulkanDeviceContext *hwctx);
+ 
++/* Explicit physical xy, never source/mastering primaries. Named options
++ * remain the complete fallback for old runtimes and creative-gamut models. */
++static int parse_target_xy(const char *text, double xy[8])
++{
++    const char *p = text;
++    for (int i = 0; i < 8; i++) {
++        char *end;
++        xy[i] = strtod(p, &end);
++        if (end == p || !isfinite(xy[i]) || xy[i] < 0 || xy[i] > 1)
++            return AVERROR(EINVAL);
++        if (i < 7) {
++            if (*end != '/') return AVERROR(EINVAL);
++            p = end + 1;
++        } else if (*end) {
++            return AVERROR(EINVAL);
++        }
++    }
++    for (int i = 0; i < 8; i += 2)
++        if (xy[i + 1] <= 1e-9 || xy[i] + xy[i + 1] > 1.000001)
++            return AVERROR(EINVAL);
++    double ax = xy[0] - xy[4], ay = xy[1] - xy[5];
++    double bx = xy[2] - xy[4], by = xy[3] - xy[5];
++    double wx = xy[6] - xy[4], wy = xy[7] - xy[5];
++    double det = ax * by - bx * ay;
++    if (fabs(det) < 1e-9) return AVERROR(EINVAL);
++    double a = (wx * by - bx * wy) / det;
++    double b = (ax * wy - wx * ay) / det;
++    if (a <= 0 || b <= 0 || a + b >= 1) return AVERROR(EINVAL);
++    return 0;
++}
++
+ static int libplacebo_init(AVFilterContext *avctx)
+ {
+     int err = 0;
+     LibplaceboContext *s = avctx->priv;
+     const AVVulkanDeviceContext *vkhwctx = NULL;
+ 
++    if (s->target_xy) {
++        if (s->target_peak <= 0 ||
++            parse_target_xy(s->target_xy, s->physical_target.xy) < 0) {
++            av_log(avctx, AV_LOG_ERROR, "target_xy requires target_peak and eight valid physical rx/ry/gx/gy/bx/by/wx/wy coordinates.\n");
++            return AVERROR(EINVAL);
++        }
++        s->physical_target.struct_size = sizeof(s->physical_target);
++        s->physical_target.version = DV_PROVIDER_TARGET_V2_VERSION;
++        s->physical_target.flags = DV_PROVIDER_TARGET_RAW_XY;
++        s->physical_target.named = (struct dv_provider_target) {
++            .peak_nits = s->target_peak, .min_nits = s->target_black,
++            .primaries = s->target_gamut == PL_COLOR_PRIM_DISPLAY_P3 ? DV_PROVIDER_P3D65 :
++                         s->target_gamut == PL_COLOR_PRIM_BT_709 ? DV_PROVIDER_BT709 : DV_PROVIDER_BT2020,
++            .cm4_trims = true, .cm29_trims = true,
++        };
++    }
++
+     if (s->target_peak > 0) {
+         if ((s->target_gamut != PL_COLOR_PRIM_BT_2020 &&
+              s->target_gamut != PL_COLOR_PRIM_DISPLAY_P3 &&
+@@ -721,6 +778,11 @@ static int input_init(AVFilterContext *avctx, LibplaceboInput *input, int idx)
+     input->queue = pl_queue_create(s->gpu);
+     input->renderer = pl_renderer_create(s->log, s->gpu);
+     input->idx = idx;
++    input->log_ctx = avctx;
++    input->has_physical_xy = !!s->target_xy;
++    input->physical_target = s->physical_target;
++    if (input->has_physical_xy && !dv_provider_map_v2)
++        av_log(avctx, AV_LOG_WARNING, "Dolby target strategy=named-v1-runtime; retaining target_gamut fallback.\n");
+     if (s->target_peak > 0) {
+         if (dv_provider_abi() != DV_PROVIDER_ABI)
+             return AVERROR_EXTERNAL;
+@@ -1029,6 +1091,18 @@ static int map_dovi_export(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t si
+                            pl_tex *mapped, struct pl_color_space *color)
+ {
+     LibplaceboInput *in = priv;
++    if (in->has_physical_xy && dv_provider_map_v2) {
++        int status = dv_provider_map_v2(in->provider, gpu, rpu, size,
++                &in->display, master, mapped, color, &in->physical_target);
++        if (status > 0 && dv_provider_last_target_strategy) {
++            unsigned strategy = dv_provider_last_target_strategy(in->provider);
++            if (in->target_strategy_witness != strategy + 1) {
++                av_log(in->log_ctx, AV_LOG_INFO, "Dolby target strategy=%u (0=named 1=raw-xy-neutral-cm4 2=named-creative-fallback 3=named-invalid-xy-fallback).\n", strategy);
++                in->target_strategy_witness = strategy + 1;
++            }
++        }
++        return status;
++    }
+     return dv_provider_map(in->provider, gpu, rpu, size, &in->display, master, mapped, color);
+ }
+ 
+@@ -1846,6 +1920,7 @@ static const AVOption libplacebo_options[] = {
+     { "apply_filmgrain", "Apply film grain metadata", OFFSET(apply_filmgrain), AV_OPT_TYPE_BOOL, {.i64 = 1}, 0, 1, DYNAMIC },
+     { "target_peak", "Export display peak luminance in cd/m2 (zero leaves the export target unspecified)", OFFSET(target_peak), AV_OPT_TYPE_DOUBLE, {.dbl = 0}, 0, 10000, STATIC },
+     { "target_black", "Export display black luminance in cd/m2", OFFSET(target_black), AV_OPT_TYPE_DOUBLE, {.dbl = 0}, 0, 10000, STATIC },
++    { "target_xy", "Physical rx/ry/gx/gy/bx/by/wx/wy; target_gamut remains the named fallback", OFFSET(target_xy), AV_OPT_TYPE_STRING, {.str = NULL}, 0, 0, STATIC },
+     { "target_gamut", "Export display gamut inside the BT.2020/PQ encoding", OFFSET(target_gamut), AV_OPT_TYPE_INT, {.i64 = PL_COLOR_PRIM_BT_2020}, 0, PL_COLOR_PRIM_COUNT - 1, STATIC, .unit = "export_gamut" },
+         { "bt2020", "Rec. 2020", 0, AV_OPT_TYPE_CONST, {.i64 = PL_COLOR_PRIM_BT_2020}, 0, 0, STATIC, .unit = "export_gamut" },
+         { "p3", "Display P3 (D65)", 0, AV_OPT_TYPE_CONST, {.i64 = PL_COLOR_PRIM_DISPLAY_P3}, 0, 0, STATIC, .unit = "export_gamut" },
