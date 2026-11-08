@@ -273,7 +273,7 @@
          gst::trace!(CAT, imp = self, "Rendering buffer {:?}", buffer);
  
          let reconfigure = {
-@@ -842,10 +876,19 @@
+@@ -842,10 +876,21 @@
                  }
              }
          };
@@ -284,17 +284,19 @@
              })?;
 +        frame.native_epoch = native_epoch;
 +        if config.native_expected && frame.native_source.is_none() {
-+            gst::element_error!(
-+                self.obj(),
-+                gst::StreamError::Failed,
-+                ("Lost the preconverted picture's owned native source before GTK")
++            // A pixel-changing transform legitimately drops color-sensitive
++            // native provenance. Display its truthful CICP pixels, but never
++            // retain an older picture or claim paused native retargeting.
++            gst::debug!(
++                CAT,
++                imp = self,
++                "Preconverted pixels have no native snapshot; paused retargeting unavailable"
 +            );
-+            return Err(gst::FlowError::Error);
 +        }
          self.pending_frame.lock().unwrap().replace(frame);
  
          let sender = self.sender.lock().unwrap();
-@@ -870,6 +913,185 @@
+@@ -870,6 +915,185 @@
  }
  
  impl PaintableSink {
@@ -480,7 +482,7 @@
      fn pending_frame(&self) -> Option<Frame> {
          self.pending_frame.lock().unwrap().take()
      }
-@@ -886,8 +1108,16 @@
+@@ -886,8 +1110,16 @@
                  let Some(frame) = self.pending_frame() else {
                      return glib::ControlFlow::Continue;
                  };

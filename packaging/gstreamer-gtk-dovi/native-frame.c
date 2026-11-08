@@ -112,6 +112,15 @@ int gst_gtk_dovi_native_frame_render (GstGtkDoviNativeFrame *frame, GstGtkDoviMa
       GstMapInfo pixels;
       if (gst_buffer_map (*output, &pixels, GST_MAP_READ)) {
         gchar *sha = g_compute_checksum_for_data (G_CHECKSUM_SHA256, pixels.data, pixels.size);
+        guint rgb_min = 65535, rgb_max = 0, alpha_min = 65535, alpha_max = 0;
+        for (gsize i = 0; i + 7 < pixels.size; i += 8) {
+          for (guint c = 0; c < 4; c++) {
+            guint v = GST_READ_UINT16_LE (pixels.data + i + c * 2);
+            if (c == 3) { alpha_min = MIN (alpha_min, v); alpha_max = MAX (alpha_max, v); }
+            else { rgb_min = MIN (rgb_min, v); rgb_max = MAX (rgb_max, v); }
+          }
+        }
+        GST_LOG ("native pixels rgb=%u..%u alpha=%u..%u", rgb_min, rgb_max, alpha_min, alpha_max);
         GST_LOG ("visible native redraw result=%s pts=%" GST_TIME_FORMAT " epoch=%" G_GUINT64_FORMAT
             " picture=%" G_GUINT64_FORMAT " target-generation=%" G_GUINT64_FORMAT
             " peak=%.9g reference=%.9g rgba64-sha256=%s",

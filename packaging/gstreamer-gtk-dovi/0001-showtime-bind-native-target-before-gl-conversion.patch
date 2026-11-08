@@ -1,6 +1,6 @@
 --- a/showtime/play.py
 +++ b/showtime/play.py
-@@ -16,6 +16,194 @@
+@@ -16,6 +16,209 @@
  
  from showtime import system, utils
  
@@ -30,6 +30,8 @@
 +        self.handler = 0
 +        self.serial = 0
 +        self.dolby_stream = False
++        self.disposed = False
++        self.stream_event_serial = 0
 +        self.offload = None
 +        self.original_offload = None
 +        self.bus = pipeline.get_bus()
@@ -44,12 +46,23 @@
 +        structure = message.get_structure()
 +        if message.src != self.mapper or not structure or structure.get_name() != "gtk-dovi-stream-selected":
 +            return
-+        self.dolby_stream = bool(structure.get_value("dolby"))
++        # GstPlay dispatches its bus from its own context. GTK/GDK operations
++        # must be applied on the application's main loop, with stale events
++        # discarded after replacement or disposal.
++        self.stream_event_serial += 1
++        GLib.idle_add(self.apply_stream_selected, self.stream_event_serial,
++                      bool(structure.get_value("dolby")))
++
++    def apply_stream_selected(self, serial, selected):
++        if self.disposed or serial != self.stream_event_serial:
++            return GLib.SOURCE_REMOVE
++        self.dolby_stream = selected
 +        self.configure_composition()
 +        if self.surface is not None:
 +            self.changed(self.surface)
 +        else:
 +            self.publish()
++        return GLib.SOURCE_REMOVE
 +
 +    def configure_composition(self):
 +        import weakref
@@ -168,6 +181,8 @@
 +        self.close_surface()
 +
 +    def dispose(self):
++        self.disposed = True
++        self.stream_event_serial += 1
 +        self.dolby_stream = False
 +        self.close_surface()
 +        if self.bus_handler:
@@ -195,7 +210,7 @@
  
  def gst_play_setup(
      picture: Gtk.Picture,
-@@ -29,17 +217,41 @@
+@@ -29,17 +232,41 @@
      paintable = paintable_sink.props.paintable  # pyright: ignore[reportAttributeAccessIssue]
      picture.props.paintable = paintable
  
