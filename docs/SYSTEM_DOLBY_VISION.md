@@ -179,6 +179,8 @@ The normal GNOME Showtime package uses the GTK GStreamer sink. The staged softwa
 
 ## Physical xy target candidate
 
+At the firmware-declared 616 cd/m² target, the normal Ubuntu FFmpeg filter produced all 19,660,800 chart bytes from the qualified development render on Intel Vulkan. Both codec architectures preserve their common package files exactly. The 32-bit decoder maintained all 544 decoders, 218 encoders and 67 hardware configurations and parsed a genuine Profile 7 metadata packet. [Release packages, source replay and digital checks](../evidence/ffmpeg-panel-xy-release.json).
+
 The separate raw-xy candidate adds an optional target-v2 API to the shared
 provider. The existing target structure, ABI number, named options and entry
 points stay unchanged. The public headers and adapters are reconstructible
