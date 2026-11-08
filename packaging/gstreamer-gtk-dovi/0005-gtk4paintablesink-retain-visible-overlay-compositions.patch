@@ -1,0 +1,198 @@
+diff --git a/src/sink/frame.rs b/src/sink/frame.rs
+index 50fd86899756106fc4f65d5d9c5c9b1c9fe567e3..c8dace2d3b219b87caf7083440d5ea04003279cf 100644
+--- a/src/sink/frame.rs
++++ b/src/sink/frame.rs
+@@ -143,6 +143,7 @@ impl MappedFrame {
+ pub(crate) struct Frame {
+     frame: MappedFrame,
+     overlays: Vec<Overlay>,
++    pub(crate) overlay_compositions: Vec<gst_video::VideoOverlayComposition>,
+     pub(crate) native_source: Option<super::native::NativeFrame>,
+     pub(crate) native_generation: u64,
+     pub(crate) native_epoch: u64,
+@@ -733,6 +734,32 @@ impl Frame {
+         orientation: Orientation,
+         wrapped_context: Option<&gst_gl::GLContext>,
+     ) -> Result<Self, gst::FlowError> {
++        // The sink buffer is authoritative: downstream elements may have
++        // added, replaced, or removed overlays after native mapping.
++        let overlays = buffer
++            .iter_meta::<gst_video::VideoOverlayCompositionMeta>()
++            .map(|meta| meta.overlay().to_owned())
++            .collect();
++        Self::new_with_overlays(
++            dbg_obj,
++            buffer,
++            info,
++            orientation,
++            wrapped_context,
++            overlays,
++        )
++    }
++
++    pub(crate) fn new_with_overlays(
++        dbg_obj: &PaintableSink,
++        buffer: &gst::Buffer,
++        info: &VideoInfo,
++        orientation: Orientation,
++        wrapped_context: Option<&gst_gl::GLContext>,
++        overlay_compositions: Vec<gst_video::VideoOverlayComposition>,
++    ) -> Result<Self, gst::FlowError> {
++        // An explicitly empty list is a visible composition too. Never fall
++        // back to metadata retained on the original native mapper input.
+         let (native_source, native_generation) = super::native::NativeFrame::from_buffer(buffer);
+         // Empty buffers get filtered out in show_frame
+         debug_assert!(buffer.n_memory() > 0);
+@@ -912,17 +939,17 @@ impl Frame {
+                 }
+             },
+             overlays: vec![],
++            overlay_compositions,
+             native_source,
+             native_generation,
+             native_epoch: 0,
+         };
+ 
+         frame.overlays = frame
+-            .frame
+-            .buffer()
+-            .iter_meta::<gst_video::VideoOverlayCompositionMeta>()
+-            .flat_map(|meta| {
+-                meta.overlay()
++            .overlay_compositions
++            .iter()
++            .flat_map(|composition| {
++                composition
+                     .iter()
+                     .filter_map(|rect| {
+                         let buffer = rect
+diff --git a/src/sink/imp.rs b/src/sink/imp.rs
+index fe18afe9e89c0a82ffe6019ca9ebbdab379330f1..22d4ebf10241a2c6bb7d1f3620ad92cc6594209e 100644
+--- a/src/sink/imp.rs
++++ b/src/sink/imp.rs
+@@ -78,9 +78,15 @@ impl Default for StreamConfig {
+     }
+ }
+ 
++#[derive(Clone)]
++struct VisibleNativeFrame {
++    native: super::native::NativeFrame,
++    overlays: Vec<gst_video::VideoOverlayComposition>,
++}
++
+ #[derive(Default)]
+ struct NativeVisible {
+-    source: Option<super::native::NativeFrame>,
++    source: Option<VisibleNativeFrame>,
+     context: Option<gst::Context>,
+     generation: u64,
+     frame_serial: u64,
+@@ -929,18 +935,22 @@ impl PaintableSink {
+     fn native_became_visible(
+         &self,
+         source: Option<super::native::NativeFrame>,
++        overlays: Vec<gst_video::VideoOverlayComposition>,
+         generation: u64,
+         epoch: u64,
+     ) {
+-        {
++        let visible = source.map(|native| VisibleNativeFrame { native, overlays });
++        let previous = {
+             let mut state = self.native_visible.lock().unwrap();
+             if state.stream_epoch != epoch {
+                 return;
+             }
+-            state.source = source;
++            let previous = std::mem::replace(&mut state.source, visible);
+             state.frame_serial = state.frame_serial.wrapping_add(1);
+             state.generation = generation;
+-        }
++            previous
++        };
++        drop(previous);
+         self.queue_native_redraw();
+     }
+ 
+@@ -977,21 +987,25 @@ impl PaintableSink {
+                                     Err(error),
+                                     frame_serial,
+                                     context_serial,
++                                    source.overlays,
+                                 )
+                             });
+                             return;
+                         }
+                     }
+                 }
+-                mapper.as_mut().unwrap().render(&source, &context)
++                mapper.as_mut().unwrap().render(&source.native, &context)
+             };
+             let object = obj.clone();
+             // Always dispatch on GTK's main loop, never invoke GTK on the GPU
+             // worker when the default main context temporarily has no owner.
+             glib::idle_add_once(move || {
+-                object
+-                    .imp()
+-                    .finish_native_redraw(result, frame_serial, context_serial)
++                object.imp().finish_native_redraw(
++                    result,
++                    frame_serial,
++                    context_serial,
++                    source.overlays,
++                )
+             });
+         });
+     }
+@@ -1001,6 +1015,7 @@ impl PaintableSink {
+         result: Result<Option<(gst::Buffer, gst_video::VideoInfo, bool)>, String>,
+         frame_serial: u64,
+         context_serial: u64,
++        overlays: Vec<gst_video::VideoOverlayComposition>,
+     ) {
+         let epoch = {
+             let mut state = self.native_visible.lock().unwrap();
+@@ -1054,12 +1069,13 @@ impl PaintableSink {
+                 let orientation = config
+                     .stream_orientation
+                     .unwrap_or(config.global_orientation);
+-                let frame = Frame::new(
++                let frame = Frame::new_with_overlays(
+                     self,
+                     &buffer,
+                     &super::frame::VideoInfo::VideoInfo(info),
+                     orientation,
+                     None,
++                    overlays,
+                 );
+                 drop(config);
+                 let Ok(mut frame) = frame else {
+@@ -1076,6 +1092,7 @@ impl PaintableSink {
+                 };
+                 frame.native_epoch = epoch;
+                 let source = frame.native_source.clone();
++                let overlays = frame.overlay_compositions.clone();
+                 let generation = frame.native_generation;
+                 if let Some(paintable) = &*self.paintable.lock().unwrap() {
+                     if !paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
+@@ -1088,7 +1105,7 @@ impl PaintableSink {
+                         imp = self,
+                         "Retargeted visible native picture without seek: frame-serial={frame_serial} context-serial={context_serial} mapped={mapped}"
+                     );
+-                    self.native_became_visible(source, generation, epoch);
++                    self.native_became_visible(source, overlays, generation, epoch);
+                 }
+             }
+         }
+@@ -1115,10 +1132,11 @@ impl PaintableSink {
+                 }
+                 gst::trace!(CAT, imp = self, "Frame changed");
+                 let source = frame.native_source.clone();
++                let overlays = frame.overlay_compositions.clone();
+                 let generation = frame.native_generation;
+                 let epoch = frame.native_epoch;
+                 if paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
+-                    self.native_became_visible(source, generation, epoch);
++                    self.native_became_visible(source, overlays, generation, epoch);
+                 }
+             }
+         }
