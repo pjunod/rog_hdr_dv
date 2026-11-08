@@ -1,0 +1,163 @@
+From 01058759653165d3fe6ffc8d0c3828227bbb8b2a Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sat, 7 Nov 2026 18:00:00 -0500
+Subject: [PATCH] Use the shared display mapper with the preferred output
+ target
+
+---
+ debian/changelog        |  7 +++++++
+ debian/control          |  4 ++--
+ meson.build             |  5 +++--
+ video/out/vo_gpu_next.c | 31 +++++++++++++++++++++++++++++++
+ 4 files changed, 43 insertions(+), 4 deletions(-)
+
+diff --git a/debian/changelog b/debian/changelog
+index 3818275..6a314a4 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++mpv (0.41.0-2ubuntu5+rogdv1) stonking; urgency=medium
++
++  * Integrate the isolated shared Dolby display-management provider in gpu-next.
++  * Retain normal Ubuntu application features and stock fallback paths.
++
++ -- Local HDR integration <operator@localhost>  Sat, 07 Nov 2026 17:00:00 +0000
++
+ mpv (0.41.0-2ubuntu5) stonking; urgency=medium
+ 
+   * No-change rebuild for libbluray4.
+diff --git a/debian/control b/debian/control
+index 65dc201..6c18312 100644
+--- a/debian/control
++++ b/debian/control
+@@ -33,7 +33,7 @@ Build-Depends:
+  liblua5.2-dev,
+  libmujs-dev,
+  libpipewire-0.3-dev [linux-any],
+- libplacebo-dev (>= 6.338),
++ librog-dv-provider-dev,
+  libpulse-dev,
+  librubberband-dev,
+  libsixel-dev,
+@@ -127,7 +127,7 @@ Depends:
+  liblua5.2-dev,
+  libmujs-dev,
+  libpipewire-0.3-dev [linux-any],
+- libplacebo-dev (>= 6.338),
++ librog-dv-provider-dev,
+  libpulse-dev,
+  librubberband-dev,
+  libsixel-dev,
+diff --git a/meson.build b/meson.build
+index fb10be5..953795f 100644
+--- a/meson.build
++++ b/meson.build
+@@ -26,14 +26,15 @@ libavutil = dependency('libavutil', version: '>= 58.29.100')
+ libswresample = dependency('libswresample', version: '>= 4.12.100')
+ libswscale = dependency('libswscale', version: '>= 7.5.100')
+ 
+-libplacebo = dependency('libplacebo', version: '>=6.338.2',
++libplacebo = dependency('libplacebo-rog1', version: '>=6.338.2',
+                 default_options: ['default_library=static', 'demos=false'])
+ 
+ libass = dependency('libass', version: '>= 0.12.2')
+ 
+ # the dependency order of libass -> ffmpeg is necessary due to
+ # static linking symbol resolution between fontconfig and MinGW
+-dependencies = [libass,
++dv_provider = dependency('rog-dv-provider', version: '>=1', required: true)
++dependencies = [dv_provider, libass,
+                 libavcodec,
+                 libavfilter,
+                 libavformat,
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 2d95eb8..5421bc1 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -23,6 +23,7 @@
+ #include <libplacebo/colorspace.h>
+ #include <libplacebo/options.h>
+ #include <libplacebo/renderer.h>
++#include <dv_provider.h>
+ #include <libplacebo/shaders/lut.h>
+ #include <libplacebo/shaders/icc.h>
+ #include <libplacebo/utils/libav.h>
+@@ -117,6 +118,7 @@ struct priv {
+ 
+     pl_log pllog;
+     pl_gpu gpu;
++    struct dv_provider *dovi_provider;
+     pl_renderer rr;
+     pl_queue queue;
+     pl_swapchain sw;
+@@ -671,6 +673,20 @@ static bool map_frame(pl_gpu gpu, pl_tex *tex, const struct pl_source_frame *src
+         .user_data = mpi,
+     };
+ 
++    // mp_image_new_ref retains each side-data AVBufferRef until unmap_frame.
++    // Never borrow the decoder's mutable AVFrame or another frame's metadata.
++    if (frame->repr.sys == PL_COLOR_SYSTEM_DOLBYVISION && frame->repr.dovi) {
++        for (int i = 0; i < mpi->num_ff_side_data; i++) {
++            if (mpi->ff_side_data[i].type == AV_FRAME_DATA_DOVI_RPU_BUFFER) {
++                frame->dovi_rpu = mpi->ff_side_data[i].buf->data;
++                frame->dovi_rpu_size = mpi->ff_side_data[i].buf->size;
++                frame->dovi_master_width = mpi->params.w;
++                frame->dovi_master_height = mpi->params.h;
++                break;
++            }
++        }
++    }
++
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+     if (opts->hdr_reference_white && !pl_color_transfer_is_hdr(frame->color.transfer))
+         frame->color.hdr.max_luma = opts->hdr_reference_white;
+@@ -1010,6 +1026,10 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     update_options(vo);
+ 
+     struct pl_render_params params = pars->params;
++    params.dovi_map = dv_provider_map;
++    params.dovi_reset = dv_provider_reset;
++    params.dovi_priv = p->dovi_provider;
++    params.dovi_signature = DV_PROVIDER_ABI;
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+     bool will_redraw = frame->display_synced && frame->num_vsyncs > 1;
+     bool cache_frame = will_redraw || frame->still;
+@@ -1059,6 +1079,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+         if (p->want_reset) {
+             pl_renderer_flush_cache(p->rr);
+             pl_queue_reset(p->queue);
++            dv_provider_reset(p->dovi_provider);
+             p->last_pts = 0.0;
+             p->last_id = 0;
+             p->want_reset = false;
+@@ -1563,6 +1584,10 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+ 
+     update_options(vo);
+     struct pl_render_params params = pars->params;
++    params.dovi_map = dv_provider_map;
++    params.dovi_reset = dv_provider_reset;
++    params.dovi_priv = p->dovi_provider;
++    params.dovi_signature = DV_PROVIDER_ABI;
+     params.info_callback = NULL;
+     params.skip_caching_single_frame = true;
+     params.preserve_mixing_cache = false;
+@@ -2107,6 +2132,7 @@ static void uninit(struct vo *vo)
+ 
+     pl_icc_close(&p->icc_profile);
+     pl_renderer_destroy(&p->rr);
++    dv_provider_destroy(&p->dovi_provider);
+ 
+     for (int i = 0; i < VO_PASS_PERF_MAX; ++i) {
+         pl_shader_info_deref(&p->perf_fresh.info[i].shader);
+@@ -2166,6 +2192,11 @@ static int preinit(struct vo *vo)
+         cache_init(vo, &p->icc_cache, 20 << 20, gl_opts->icc_opts->cache_dir);
+ 
+     pl_gpu_set_cache(p->gpu, p->shader_cache.cache);
++    p->dovi_provider = dv_provider_create(p->gpu, p->pllog);
++    if (!p->dovi_provider) {
++        MP_ERR(vo, "Failed initializing shared Dolby display manager\n");
++        goto err_out;
++    }
+     p->rr = pl_renderer_create(p->pllog, p->gpu);
+     p->queue = pl_queue_create(p->gpu);
+     p->osd_fmt[SUBBITMAP_LIBASS] = pl_find_named_fmt(p->gpu, "r8");
