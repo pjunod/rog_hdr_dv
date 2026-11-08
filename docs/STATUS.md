@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**Updated November 8, 2026.** The ROG runs the seven-package playback update, nativehdr13 desktop and nativehdr3 kernel. Normal mpv opens MP4 and Matroska by default. The staged player graded the complete three-second 4K Profile 7 FEL clip at 24 fps with zero decoder or output drops on the default NVIDIA path in a private hardware-backed compositor. A staged Intel driver correction restored playback speed with eight output drops. [Player release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop and kernel versions](SOFTWARE_DELIVERY.md).
+**Updated November 8, 2026.** The ROG runs the seven-package playback update, nativehdr13 desktop and nativehdr3 kernel. Normal mpv opens MP4 and Matroska by default. The staged player graded the complete three-second 4K Profile 7 FEL clip at 24 fps with zero decoder or output drops on the default NVIDIA path in a private hardware-backed compositor. The corrected distribution driver advanced 2.25 seconds of media in 2.26 seconds on Intel. It reported 17 output drops over the clip while package builds were active. [Player release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop and kernel versions](SOFTWARE_DELIVERY.md).
 
 | On the laptop today | Current development result |
 |---|---|
