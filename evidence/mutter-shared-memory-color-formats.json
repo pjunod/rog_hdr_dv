@@ -1,0 +1,87 @@
+{
+  "component": "Ubuntu Mutter 51, patch 0107, source tree 1d20b861bc329c8a16623063bad2b4fed33bf4fe",
+  "conditions": "Private GNOME compositor on the ROG Intel GPU. The virtual connector advertised PQ and BT.2020 for this fixture. 1280 by 800 at 60 Hz, 616 cd/m\u00b2 peak, 203 cd/m\u00b2 reference white. The viewer displayed six flat patches encoded independently as BT.2020. The screen recorder requested a single exact SPA format and shared-memory (MemFd) buffers. Each connection captured a complete frame directly, with no video converter.",
+  "failure_before_fix": "A black pixel in a buffer negotiated as xRGB_210LE contained 0xff000000. In that layout red is 1008. The monitor shared-memory writer had used its native 8-bit ARGB readback for every format. The area and virtual-output writers passed the same constant. Detached repaint also allocated a default-precision texture.",
+  "sequence": [
+    "xRGB_210LE",
+    "xBGR_210LE",
+    "RGBA_F16",
+    "BGRx",
+    "xRGB_210LE"
+  ],
+  "patch_order": [
+    "red",
+    "green",
+    "blue",
+    "white",
+    "mixed",
+    "black"
+  ],
+  "pq_rgb_10bit": [
+    [
+      579,
+      362,
+      247
+    ],
+    [
+      339,
+      582,
+      302
+    ],
+    [
+      300,
+      204,
+      587
+    ],
+    [
+      594,
+      594,
+      594
+    ],
+    [
+      335,
+      434,
+      534
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "max_channel_difference_xrgb_xbgr_after_unpacking": 0,
+  "max_channel_difference_rgba_f16_times_1023_vs_xrgb_10bit": 0.5732421875,
+  "sdr_bgrx_unpacked_rgb8": [
+    [
+      255,
+      0,
+      0
+    ],
+    [
+      0,
+      255,
+      0
+    ],
+    [
+      0,
+      0,
+      255
+    ],
+    [
+      255,
+      255,
+      255
+    ],
+    [
+      0,
+      129,
+      204
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "scope": "Digital screen capture of the monitor path. The session used a proof build linking the corrected source objects and a test-only virtual connector. Separate client connections exercised each format. Same-stream renegotiation, direct DMA-BUF capture and physical panel response were outside this measurement."
+}
