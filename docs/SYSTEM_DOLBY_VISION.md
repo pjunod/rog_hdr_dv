@@ -10,7 +10,9 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 
 | Ubuntu client | Destination | Normal entry point |
 |---|---|---|
-| mpv 0.41.0, gpu-next | HDR output described to the player by the display system | `mpv --vo=gpu-next movie.mp4` |
+| Installed mpv 0.41.0, gpu-next | HDR output described to the player by the display system | `mpv --vo=gpu-next movie.mp4` |
+| Staged mpv 0.42.0, gpu-next | Physical display target. Supports native 4K Profile 7 FEL composition | Open an MP4 or Matroska video in mpv |
+| Staged GNOME Showtime | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
 | FFmpeg 8.1.2, libplacebo video filter | Explicit export target, because a filter graph can run without a display | Example below |
 
 For a 600 cd/m² P3-D65 mastering display, the filter accepts the following invocation. This example stores the resulting 10-bit PQ video losslessly. Select the peak, black level and primaries for the **destination** you intend to reproduce.
@@ -77,6 +79,10 @@ The current player and filter both processed a Profile 8.1 carrier derived from 
 All four comparisons cover all 3,276,800 pixels. The largest errors for both candidates and the codec control were near a source color transition. The mpv window’s maximum in patch interiors was 4.107. The reference target carries neutral Level 8 controls, so agreement here leaves creative-trim fidelity on other content open. The separate frame-local trim tests below verify that authored changes affect the intended frames. [Inputs, output encoding, metric and edge populations](../evidence/dolby-official-chart-consumer.json).
 
 At the chart’s second target, Dolby CM Offline 5.6.4 rendered the unchanged frame and original XML for target 28 (BT.2020/PQ, 0–600 cd/m²). At the same physical target the mpv window’s mean ΔE ITP was 0.578 and p95 was 1.057. FFmpeg measured 0.834 and 1.431. Leaving the decoded base ungraded measured 47.13 and 124.57. The chart contains nonneutral Level 2 fields for this target; a matched render by itself cannot attribute the result to a particular trim field. Both targets use the same source scene. [Complete second-target results](../evidence/dolby-official-chart-consumer.json).
+
+For the ROG panel comparison, the official renderer accepted the actual firmware-derived red, green, blue and white chromaticities, with a 616 cd/m² peak and 0.0004 cd/m² black. The private compositor advertised the laptop’s 142 cd/m² reference white. The mpv window encoded a linear gain of 203/142 for the compositor. Removing this known gain before comparing absolute light gave mean ΔE ITP 0.651 and p95 1.274. Leaving the desktop encoding in place gave 15.186 and 27.201. These are digital measurements of the window.
+
+The provider currently chooses canonical P3-D65 for this panel. To measure the effect of that choice, the official renderer processed the same frame twice at 616 cd/m², changing only the target chromaticities. Across the full chart, 25,923 pixels differed by more than 3 ΔE ITP and the largest difference was 5.169. Using the panel’s exact coordinates in the runtime mapper remains an engineering task. [Target definitions, controls and full-raster results](../evidence/dolby-official-chart-consumer.json).
 
 ## Digital qualification
 

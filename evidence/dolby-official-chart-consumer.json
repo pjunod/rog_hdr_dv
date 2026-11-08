@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "scope": "One private, self-owned color chart at two targets. These digital development comparisons do not qualify moving content, isolated nonneutral Level 8 effects, Profile 5, Profile 7 FEL, optical response, or certification.",
+  "scope": "One private, self-owned color chart at two authored targets and the firmware-declared panel target. These digital development comparisons do not qualify moving content, isolated nonneutral Level 8 effects, Profile 5, Profile 7 FEL, optical response, or certification.",
   "geometry": [
     2560,
     1280
@@ -146,6 +146,42 @@
         1.1893081818,
         3.196817532
       ]
+    }
+  },
+  "panel_target": {
+    "scope": "One source frame, compared digitally at the declared target. No optical measurement.",
+    "official_target": "The reference program accepted the four firmware-derived xy pairs, 0.0004 cd/m² black and 616 cd/m² peak. It rendered BT.2020/PQ at the unchanged source resolution.",
+    "player_target": "The Wayland fixture replayed the panel description. mpv selected 0.0004–616 cd/m², named P3-D65, with reference white 142 cd/m² and encoding ceiling 10000 cd/m². The provider currently accepts only a named gamut.",
+    "comparison": "Undo the declared window transport gain 203/142 in linear BT.2020 light before comparing with the absolute reference. FFmpeg used a physical 616-nit P3-D65 target directly.",
+    "full_raster_pixels": 3276800,
+    "delta_itp_mean_p95_max": {
+      "mpv_vs_panel_reference": [
+        0.650620709,
+        1.27386777,
+        55.577888631
+      ],
+      "ffmpeg_vs_panel_reference": [
+        0.929565475,
+        1.69597714,
+        55.201911837
+      ],
+      "mpv_vs_ffmpeg": [
+        0.821561751,
+        1.198942019,
+        3.249012172
+      ],
+      "uncorrected_desktop_encoding_vs_physical_reference": [
+        15.185697898,
+        27.201243034,
+        59.425293546
+      ]
+    },
+    "gamut_control": "Only the declared chromaticities in the official target changed. Both reference arms used the same unchanged source, XML, output encoding, luminance and CPU renderer.",
+    "exact_vs_named_reference": {
+      "mean": 0.097460012,
+      "p95": 0.170311442,
+      "maximum": 5.168659859,
+      "pixels_delta_itp_above_3": 25923
     }
   }
 }
