@@ -110,6 +110,8 @@ At frame 714 of *Sol Levante*, the official renderer processed the original 4K P
 
 The original XML and both consumer RPUs describe the same shot. The XML minimum corresponds to roughly 583 on the 12-bit PQ scale. Both RPUs contain 12. The middle and maximum agree to rounding. On identical uncompressed master pixels, the same CPU mapper measured mean 0.114 and p95 0.497 with the authoring anchors, and 1.607 and 6.291 with the delivered anchors. The consumer stream alone cannot distinguish original minima collapsed to the same encoded value. Consumer accuracy needs a reference that processes that stream’s delivered state. [Measured controls](../evidence/dolby-sol-levante-frame714.json) · [Generator’s range handling](https://github.com/quietvoid/dovi_tool/blob/2.3.4/dolby_vision/src/rpu/extension_metadata/blocks/level1.rs).
 
+With only the shot’s three brightness anchors replaced by their delivered RPU values in a copy of the XML, the reference comparison on the same 4K decoded pixels gave mean ΔE ITP 0.650 and p95 1.596 for the Linux filter. Over 8,294,400 pixels, 93,700 exceeded 3. The CPU mapper on original master pixels scored 0.127 and 0.543 against the corresponding reference. This isolates the available metadata and source pixels on one shot. The official processor used its XML input for both comparisons. [Matched-input measurements](../evidence/dolby-sol-levante-frame714.json).
+
 
 ## Digital qualification
 
