@@ -12,6 +12,8 @@
 
 **Photographs.** The staged GNOME Image Viewer preserves Adobe RGB color on the HDR desktop. Across six patches its output matched an independent BT.2020 reference within one 10-bit value per channel. The normal loader also retained the embedded color profile in small TIFFs. [Image viewer, package versions and qualification](GNOME_IMAGE_COLOUR.md).
 
+**Release rehearsal.** All 45 candidate archives are built. Offline APT accepted the complete upgrade and an inverse transaction restoring 36 previous packages and removing the nine additions. Normal APT policy selected all 45 intended versions with the five-package compositor preference applied in the simulation. The running desktop still uses the installed versions listed above. [Versions and solver results](../evidence/gnome-desktop-release-bundle.json).
+
 **Movie-frame quality.** At 600 cd/m² the staged Intel filter measured mean ΔE ITP 2.61 and p95 7.20 on one 4K *Sol Levante* frame against Dolby’s render of the original master. The published 1080p Profile 5 release measured 9.21 and 26.31 against the downsampled reference. When the official processor received the same decoded base and a private XML copy carrying the three brightness values actually present in the stream, the Linux filter measured mean 0.65 and p95 1.60. [Source, individual controls and interpretation](../evidence/dolby-sol-levante-frame714.json).
 
 **Browser coverage.** Stock Chrome and Firefox on the laptop played the AVC control and rejected the clear Dolby Vision chart. Firefox accepted ordinary HEVC capability queries. [Browser versions, codec queries and playback conditions](SYSTEM_DOLBY_VISION.md#browser-playback-on-the-rog).
