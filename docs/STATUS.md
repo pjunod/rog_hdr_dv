@@ -23,6 +23,8 @@ The 32-bit decoder retained all 544 stock decoders, 218 encoders and 67 hardware
 
 Ubuntu's MP4 demuxer now carries the sample description's Dolby configuration through `h265parse`. Genuine Profile 5 and synthetic 8.1 preserved all 24 bytes. Plain HDR10, duplicate boxes and invalid fields carried no Dolby configuration. A four-byte legacy record retained its explicit unknown base compatibility. GTK player rendering remains a separate work item. [Demux and parser controls](../evidence/gstreamer-dovi-isobmff-controls.json).
 
+The corrected packaged player also ran with the laptop’s existing mpv video options. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. This correction passed its native headless test and awaits packaging. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
+
 ## GStreamer RPU transport — native scope passed, November 7
 
 Exact Ubuntu base `1.28.7-1` and bad `1.28.6-1ubuntu1` source series now carry

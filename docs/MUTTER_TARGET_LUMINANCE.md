@@ -1,5 +1,11 @@
 # Mutter target luminance — independent output feedback
 
+## Integer client peak declarations
+
+A Vulkan player grading for 616 cd/m² at reference white 142 encodes that peak as 880.62 cd/m² at its working reference white of 203. Wayland carries the mastering maximum and MaxCLL in whole cd/m². In the native Ubuntu105 compositor, wire declarations of 880, 881 and 882 triggered highlight mapping for the last two values. The player had already graded the 881 case to the display target.
+
+Ubuntu106 compares an integer client limit with the display peak rounded in the source volume’s own units. An exact 881 declaration supplied by another API still triggers mapping. A Wayland declaration of 882 does too. Mastering maximum and MaxCLL bound the content independently. The original declared peak still determines the curve when the display genuinely needs one. The native headless Clutter regression exercised both metadata fields, adjacent values and cache reuse between exact and rounded states. The installed desktop compositor remains nativehdr13.
+
 **Status:** implemented, compiled, independently reviewed; all eleven selected checks passed. **Date:** 2026-10-09.
 The coordinator owns design and integration; the implementation agent owns its
 independent source clone. [Status](STATUS.md) records current qualification.
