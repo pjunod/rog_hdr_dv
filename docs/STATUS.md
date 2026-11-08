@@ -38,6 +38,10 @@ defaults changed. This remains unshipped metadata transport: reconstruction,
 FEL residuals, normal GTK player rendering, physical target signalling and
 full-feature/multiarch packaging remain open. Five supplementary controls passed. These cover malformed duplicate/oversize units, NAL-aligned output, partial region copies and 26 matched resized VA pictures with format and colorimetry retained. [Contract and receipt](GSTREAMER_DOLBY_TRANSPORT.md).
 
+## GNOME playback integration
+
+Software HEVC and Intel VA now publish owned, frame-matched Dolby state across seeks, reordered pictures and conformance crops. Both decoded all 95 pictures when the container changed Dolby configuration without changing the video sequence. Earlier software decoding lost 32 pictures at that transition. The normal Ubuntu base runtime and SDK and the shared picture library built. The GTK player and real high-precision surface still require end-to-end qualification. [Controls and package contract](GSTREAMER_DOLBY_RECONSTRUCTION.md).
+
 ## GTK preferred display target — November 7
 
 GTK now exposes the compositor's preferred output through a surface-owned snapshot. The ordinary Wayland path passed initial discovery, target changes, destruction and delayed color-manager startup in an isolated compositor. The six GTK packages already present on the ROG were rebuilt with the normal Ubuntu feature set. Offline APT simulation accepted all six candidate packages and the exact six-package stock rollback. The ROG still runs stock GTK. GStreamer playback needs a renderer that consumes the snapshot. [Native observer and package receipt](GDK_DISPLAY_TARGET.md).

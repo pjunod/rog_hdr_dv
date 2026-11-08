@@ -1,0 +1,27 @@
+Source: gstreamer-dovi-picture
+Section: libs
+Priority: optional
+Maintainer: ROG HDR contributors <noreply@rog-hdr-dv.invalid>
+Build-Depends: debhelper-compat (= 13), meson, ninja-build, pkgconf,
+ libgstreamer-plugins-base1.0-dev, rog-gstreamer-dovi-base-api (= 1),
+ libavcodec-dev, libavutil-dev, rog-dv-hevc-runtime (>= 2)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: libgstdovipicture-1.0-0
+Architecture: any
+Multi-Arch: same
+Depends: ${misc:Depends}, ${shlibs:Depends}, rog-gstreamer-dovi-base-api (= 1),
+ rog-dv-hevc-runtime (>= 2)
+Description: GStreamer frame-owned Dolby Vision picture metadata
+ Shares resolved metadata, original RPU bytes, configuration and visible
+ geometry between native decoders and rendering elements.
+
+Package: libgstdovipicture-1.0-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: ${misc:Depends}, libgstdovipicture-1.0-0 (= ${binary:Version}),
+ libgstreamer-plugins-base1.0-dev, libavcodec-dev, libavutil-dev, pkgconf
+Description: GStreamer Dolby picture development files
+ Headers, linker names and pkg-config file for native video clients.

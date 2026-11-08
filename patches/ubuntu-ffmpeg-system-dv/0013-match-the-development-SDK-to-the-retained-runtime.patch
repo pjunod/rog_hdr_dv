@@ -1,0 +1,65 @@
+From 88ae2227cde7594a2d0536fe4ed45ec1f305decc Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 04:20:08 +0000
+Subject: [PATCH] debian: resolve augmented SDK dependencies against the
+ retained utility libraries
+
+---
+ debian/control | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/debian/control b/debian/control
+index 253941cd..490ab3c7 100644
+--- a/debian/control
++++ b/debian/control
+@@ -330,8 +330,8 @@ Section: libdevel
+ Multi-Arch: same
+ Depends:
+  libavcodec62 (= ${binary:Version}),
+- libavutil-dev (= ${binary:Version}),
+- libswresample-dev (= ${binary:Version}),
++ libavutil-dev (= 7:8.1.2-2ubuntu2),
++ libswresample-dev (= 7:8.1.2-2ubuntu2),
+  ${misc:Depends}
+ Description: FFmpeg library with de/encoders for audio/video codecs - development files
+  FFmpeg is the leading multimedia framework, able to decode, encode, transcode,
+@@ -377,9 +377,9 @@ Depends:
+  libavdevice62 (= ${binary:Version}),
+  libavfilter-dev (= ${binary:Version}),
+  libavformat-dev (= ${binary:Version}),
+- libavutil-dev (= ${binary:Version}),
+- libswscale-dev (= ${binary:Version}),
+- libswresample-dev (= ${binary:Version}),
++ libavutil-dev (= 7:8.1.2-2ubuntu2),
++ libswscale-dev (= 7:8.1.2-2ubuntu2),
++ libswresample-dev (= 7:8.1.2-2ubuntu2),
+  ${misc:Depends}
+ Description: FFmpeg library for handling input and output devices - development files
+  FFmpeg is the leading multimedia framework, able to decode, encode, transcode,
+@@ -469,9 +469,9 @@ Depends:
+  libavcodec-dev (= ${binary:Version}),
+  libavfilter11 (= ${binary:Version}),
+  libavformat-dev (= ${binary:Version}),
+- libavutil-dev (= ${binary:Version}),
+- libswresample-dev (= ${binary:Version}),
+- libswscale-dev (= ${binary:Version}),
++ libavutil-dev (= 7:8.1.2-2ubuntu2),
++ libswresample-dev (= 7:8.1.2-2ubuntu2),
++ libswscale-dev (= 7:8.1.2-2ubuntu2),
+  ${misc:Depends}
+ Description: FFmpeg library containing media filters - development files
+  FFmpeg is the leading multimedia framework, able to decode, encode, transcode,
+@@ -559,8 +559,8 @@ Multi-Arch: same
+ Depends:
+  libavcodec-dev (= ${binary:Version}),
+  libavformat62 (= ${binary:Version}),
+- libavutil-dev (= ${binary:Version}),
+- libswresample-dev (= ${binary:Version}),
++ libavutil-dev (= 7:8.1.2-2ubuntu2),
++ libswresample-dev (= 7:8.1.2-2ubuntu2),
+  ${misc:Depends}
+ Description: FFmpeg library with (de)muxers for multimedia containers - development files
+  FFmpeg is the leading multimedia framework, able to decode, encode, transcode,
+-- 
+2.55.0
+

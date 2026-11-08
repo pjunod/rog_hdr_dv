@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "bridge_abi": 2,
+  "bridge_pkgconfig_version": "0.2.0",
+  "required_versioned_runtime": "rog-dv-hevc-runtime (>= 2)",
+  "reason": "Strict AVFrame provenance must include metadata-only set/clear transitions; codec/library version numbers alone cannot establish this behavior.",
+  "consumers": [
+    "shared GstDoviPicture ABI2 library",
+    "GStreamer libav HEVC producer",
+    "VA producer via the shared ABI2 bridge dependency"
+  ],
+  "packaging_ownership": "Coordinator-owned Debian dependency/version changes remain separate from these frozen runtime patches. Preserve existing rollback package versions.",
+  "ffmpeg_final_increment": {
+    "base_commit": "2bb3c3911d082392039609aaacde15a841a19da2",
+    "base_tree": "204d20eee83097c17445be395efbbc76b6b60a59",
+    "candidate_commit": "dad74c7fa834a2ba10d0264a3be99794b275b385",
+    "candidate_tree": "3127c4c6a71200df05f06b702f8ec9e35f37d3c1",
+    "patch_sha256": "b3c9521e332da742f2d587b2792ecda8a579b19f10ba5c97529a1acb93915de5"
+  },
+  "shared_sdk_requirement": "Reviewed gst_codec_utils_h265_parse_dovi_configuration in GstPbutils1.28.7; header and runtime must be staged together.",
+  "configuration_contract": "Exact validated dvcC/dvvC payload4..24bytes is copied losslessly. Full mapping/compatibility qualification requires24bytes. Absence/incomplete config uses an explicit zero public record per HEVC AU.",
+  "producer_pins": {
+    "libav": {
+      "base_commit": "a0c80a3a10d81e1b008d8b426a6e5543f4c984ab",
+      "base_tree": "873b508a0fc742bde2e046163f2d57c04e3cfa63",
+      "candidate_commit": "3f6398f16f4bb8e0bc1a8d40842108ca46516e56",
+      "candidate_tree": "7483de352c297eff27fb7e1e0592199d78bf4427"
+    },
+    "bad": {
+      "base_commit": "10487b128c7cef317e9b4c52457a273c5525f97d",
+      "base_tree": "237df5dd6ed2fe9177636cbdbcc0672f8e7c3693",
+      "candidate_commit": "a5e4ff1eccfd9b8d0f62fcc5aac1ba6be42c9ab9",
+      "candidate_tree": "34a7631d81e1cf47ccedd75edde99b4d61a5846d"
+    }
+  }
+}
