@@ -32,8 +32,17 @@ def run(args, cwd=None, env=None):
                           stdout=subprocess.PIPE).stdout.strip()
 
 
+def entries():
+    return json.loads((ROOT / "sources.json").read_text())["series"]
+
+
+def supported(entry):
+    kind = entry.get("source_origin", {}).get("kind")
+    return kind == "ubuntu-source-package" or (kind is None and entry.get("upstream"))
+
+
 def series(component):
-    for entry in json.loads((ROOT / "sources.json").read_text())["series"]:
+    for entry in entries():
         if entry["component"] == component:
             return entry
     raise SystemExit(f"unknown component {component}")
@@ -43,7 +52,14 @@ def apply_series(component, tree_dir):
     pdir = ROOT / "patches" / component
     names = (pdir / "series").read_text().split()
     for name in names:
-        run(["git", "am", "--quiet", "--keep-cr", str(pdir / name)], cwd=tree_dir)
+        patch = pdir / name
+        with patch.open("rb") as source:
+            plain_diff = source.readline().startswith(b"diff --git ")
+        if plain_diff:
+            run(["git", "apply", "--index", str(patch)], cwd=tree_dir)
+            run(["git", "commit", "--quiet", "-m", name], cwd=tree_dir)
+        else:
+            run(["git", "am", "--quiet", "--keep-cr", str(patch)], cwd=tree_dir)
     return len(names)
 
 
@@ -88,9 +104,9 @@ def ubuntu(component, entry, work):
         raise SystemExit(f"{tree_dir} exists; use an empty work directory")
     run(["dpkg-source", "--no-check", "-x", str(dsc), str(tree_dir)])
     run(["git", "init", "--quiet"], cwd=tree_dir)
-    # The recorded imports honour the package's own .gitignore (which keeps
-    # subprojects/gvdb and debian/tests/build out) and exclude quilt's .pc/.
-    run(["git", "add", "--", ".", ":(exclude).pc"], cwd=tree_dir)
+    # Most imports honor package ignore rules. Some archives pin ignored payloads too.
+    force = ["--force"] if origin.get("source_import", {}).get("include_ignored") else []
+    run(["git", "add", *force, "--", ".", ":(exclude).pc"], cwd=tree_dir)
     ok = check("base tree", run(["git", "write-tree"], cwd=tree_dir), entry["base_tree"])
     if not ok:
         return False
@@ -103,11 +119,7 @@ def ubuntu(component, entry, work):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("component", choices=["libdisplay-info", "mutter", "wine",
-                                              "ubuntu-libdisplay-info", "ubuntu-mutter",
-                                              "ubuntu-libplacebo-system-dv", "ubuntu-mpv-system-dv",
-                                              "ubuntu-ffmpeg-system-dv", "ubuntu-mesa-wayland-hdr",
-                                              "ubuntu-gst-plugins-base-rpu", "ubuntu-gst-plugins-bad-rpu"])
+    parser.add_argument("component", choices=[e["component"] for e in entries() if supported(e)])
     parser.add_argument("workdir", type=pathlib.Path, help="Disposable directory outside this repository")
     args = parser.parse_args()
     work = args.workdir.resolve()
