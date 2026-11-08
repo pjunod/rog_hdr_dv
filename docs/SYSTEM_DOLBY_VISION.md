@@ -39,6 +39,8 @@ Stock Chrome 156.0.8078.47 and Firefox 159.0 both presented a local AVC control 
 
 For ordinary MP4 files and Media Source Extensions, both browsers declined `dvh1.05.06`, `dvhe.05.06`, `dvhe.07.06`, `dvh1.08.06` and `dvhe.08.06`. Firefox accepted the Main and Main 10 HEVC capability queries. Chrome declined those queries in this configuration. This result covers clear content on these builds. A streaming service's protected playback requires separate evidence.
 
+WebKitGTK 2.52.6 played the clear Profile 8.1 chart through an HTML video element. Removing all Dolby metadata and playing the same HEVC base reproduced every one of the 3,276,800 canvas pixels. Its Dolby codec capability queries returned an empty string. This distinguishes base-layer playback from applying the grade on this fixture. [WebKit pixel comparison](../evidence/webkit-clear-dolby-base-comparison.json).
+
 Chromium's public media configuration controls Dolby demuxing and leaves decoding to the platform. Its demuxer switches to the Dolby codec only when the requested type is supported. A Linux integration needs a decoder and renderer that retain the frame's metadata through composition, followed by a capability declaration for the supported profiles. [Chromium media build configuration](https://chromium.googlesource.com/chromium/src/+/cb3d3d1c5e989cc6792773dc6b1e46cefe68efb7/media/media_options.gni) · [Demuxer codec selection](https://chromium.googlesource.com/chromium/src/media/+/b677a686cfbe98c4b504845a15c2dfc046d2836a/ffmpeg/ffmpeg_common.cc).
 
 ### FFmpeg export
