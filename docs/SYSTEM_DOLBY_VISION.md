@@ -33,6 +33,8 @@ The offline APT install simulation on the ROG used seven local files with empty 
 
 Keep the seven files, the four original Ubuntu packages and their hashes together. Before installation, record APT holds and auto/manual marks, verify every hash, and simulate the complete transaction against the current host. The offline recovery simulation started from the projected installed state, restored both stock Mesa architectures, mpv and libavfilter11, and removed the three new libraries. Recheck reverse dependencies and restore the original marks during actual recovery. No session or compositor restart is required to install these packages. A newly launched player loads the new libraries.
 
+The ROG now has the seven verified packages. The normal system FFmpeg binary mapped a genuine, nonblack Profile 5 frame at 30 seconds on the integrated Intel GPU, with a target of 0.0004–616 cd/m² and P3-D65 primaries. Normal mpv loaded the system libraries and mapped the same title on Intel through a private Wayland compositor reproducing the panel declaration. The trace shows BT.2020/PQ and a rounded maximum of 881 cd/m². This confirms the automatic target discrepancy on the installed player. The GNOME session stayed open throughout.
+
 ## Scope of the evidence
 
 A decoded frame, a PQ screenshot, and a successful process exit each leave open whether the authored trims reached the output. Check the provider mapping result, the selected target and captured pixels together. [Status](STATUS.md) records what has actually passed. Earlier four-title comparisons against a reference renderer apply to the earlier engine and test conditions.
