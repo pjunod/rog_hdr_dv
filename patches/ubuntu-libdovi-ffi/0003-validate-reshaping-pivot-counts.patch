@@ -1,0 +1,74 @@
+From be6d3abe826c288e8d51f08b4c59f7f868d28694 Mon Sep 17 00:00:00 2001
+From: quietvoid <tcChlisop0@gmail.com>
+Date: Sun, 8 Nov 2026 03:00:34 +0000
+Subject: [PATCH 3/5] Backport upstream pivots
+
+Backported from quietvoid/dovi_tool f41b2809cd00f41118248fcd8a1a3dff6216efcf to the Ubuntu crate source layout.
+
+---
+ src/rpu/mod.rs              |  1 +
+ src/rpu/rpu_data_mapping.rs | 17 ++++++++++++++++-
+ 2 files changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/src/rpu/mod.rs b/src/rpu/mod.rs
+index 6e2ef96..cf5617d 100644
+--- a/src/rpu/mod.rs
++++ b/src/rpu/mod.rs
+@@ -15,6 +15,7 @@ static CRC32_INSTANCE: Crc<u32, Table<16>> = Crc::<u32, Table<16>>::new(&CRC_32_
+ 
+ pub const NUM_COMPONENTS: usize = 3;
+ 
++pub(crate) const RESHAPING_MAX_PIECES: u64 = 8;
+ pub(crate) const MMR_MAX_COEFFS: usize = 7;
+ pub(crate) const NLQ_NUM_PIVOTS: usize = 2;
+ 
+diff --git a/src/rpu/rpu_data_mapping.rs b/src/rpu/rpu_data_mapping.rs
+index 40935b5..42ffa3d 100644
+--- a/src/rpu/rpu_data_mapping.rs
++++ b/src/rpu/rpu_data_mapping.rs
+@@ -7,7 +7,7 @@ use bitvec_helpers::{
+ use serde::Serialize;
+ use tinyvec::{ArrayVec, array_vec};
+ 
+-use crate::rpu::MMR_MAX_COEFFS;
++use crate::rpu::{MMR_MAX_COEFFS, RESHAPING_MAX_PIECES};
+ 
+ use super::rpu_data_header::RpuDataHeader;
+ use super::rpu_data_nlq::{DoviELType, RpuDataNlq};
+@@ -114,6 +114,8 @@ impl RpuDataMapping {
+             let curve = &mut mapping.curves[cmp];
+ 
+             curve.num_pivots_minus2 = reader.read_ue()?;
++            ensure!(curve.num_pivots_minus2 < RESHAPING_MAX_PIECES);
++
+             let num_pivots = (curve.num_pivots_minus2 + 2) as usize;
+ 
+             curve.pivots = vec![0; num_pivots];
+@@ -304,6 +306,10 @@ impl RpuDataMapping {
+     }
+ 
+     pub fn validate(&self, profile: u8) -> Result<()> {
++        for curve in &self.curves {
++            curve.validate()?;
++        }
++
+         match profile {
+             5 => {
+                 ensure!(
+@@ -384,6 +390,15 @@ impl RpuDataMapping {
+     }
+ }
+ 
++impl DoviReshapingCurve {
++    fn validate(&self) -> Result<()> {
++        ensure!(self.num_pivots_minus2 < RESHAPING_MAX_PIECES);
++        ensure!(self.pivots.len() == self.num_pivots_minus2 as usize + 2);
++
++        Ok(())
++    }
++}
++
+ impl DoviPolynomialCurve {
+     fn new(num_pieces: usize) -> Self {
+         DoviPolynomialCurve {
+

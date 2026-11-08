@@ -1,0 +1,42 @@
+From 146b898d0245c354eb28856b212d0f2501b82daf Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 02:58:23 +0000
+Subject: [PATCH 5/5] debian: version the shared decoder and strict RPU
+ resolver interfaces
+
+---
+ debian/changelog               | 7 +++++++
+ debian/libavcodec62.symbols.in | 5 +++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index 0a21c156..b3975b26 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++ffmpeg (7:8.1.2-2ubuntu2+rogdv2) stonking; urgency=medium
++
++  * Add the HEVC dual-layer splitter and enhancement configuration side data.
++  * Expose strict picture-level Dolby metadata resolution for native video clients.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 02:50:00 +0000
++
+ ffmpeg (7:8.1.2-2ubuntu2+rogdv1) stonking; urgency=medium
+ 
+   * Use the shared display mapper in the libplacebo filter for explicit
+diff --git a/debian/libavcodec62.symbols.in b/debian/libavcodec62.symbols.in
+index b3bef1f7..183803f1 100644
+--- a/debian/libavcodec62.symbols.in
++++ b/debian/libavcodec62.symbols.in
+@@ -29,6 +29,11 @@ libavcodec.so.62 libavcodec62 #MINVER#
+  av_cpb_properties_alloc@LIBAVCODEC_62 7:8.0
+  av_d3d11va_alloc_context@LIBAVCODEC_62 7:8.0
+  av_dirac_parse_sequence_header@LIBAVCODEC_62 7:8.0
++ av_dovi_rpu_parser_alloc@LIBAVCODEC_62 7:8.1.2-2ubuntu2+rogdv2
++ av_dovi_rpu_parser_configure@LIBAVCODEC_62 7:8.1.2-2ubuntu2+rogdv2
++ av_dovi_rpu_parser_flush@LIBAVCODEC_62 7:8.1.2-2ubuntu2+rogdv2
++ av_dovi_rpu_parser_free@LIBAVCODEC_62 7:8.1.2-2ubuntu2+rogdv2
++ av_dovi_rpu_parser_parse@LIBAVCODEC_62 7:8.1.2-2ubuntu2+rogdv2
+  av_dv_codec_profile2@LIBAVCODEC_62 7:8.0
+  av_dv_codec_profile@LIBAVCODEC_62 7:8.0
+  av_dv_frame_profile@LIBAVCODEC_62 7:8.0

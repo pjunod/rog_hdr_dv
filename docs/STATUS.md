@@ -15,6 +15,14 @@ The staged mpv `+rogdv4` selects creative trims using the panel declaration of 0
 
 A separate staged mpv 0.42 rendered a genuine 3840×2160 Profile 7 FEL picture on the laptop’s Intel GPU. The renderer combined the matched enhancement layer at native resolution before applying CM v4 trims for an explicit 616 cd/m² destination. Disabling the enhancement layer made the shared mapper decline the residual-dependent picture. A subsequent 0.42 build also selected the 616 and 308 cd/m² trims with the enhancement layer composed, retained PQ on a paused cached frame, and cleared its display state when an ordinary video replaced it. Distribution and comparison with an independent Dolby reference remain open. [Matched-frame digital receipt](../evidence/profile7-intel-dual-layer.json).
 
+### Packaged Profile 7 and MP4 configuration
+
+The normal mpv 0.42 Debian package rendered a 3840×2160 Profile 7 FEL frame on Intel. It reconstructed the full enhancement layer, selected the CM v4 trim for 0.0004–616 cd/m², and presented BT.2020/PQ through an isolated compositor configured with the panel declaration. A separate display-referred window capture retained PQ. An HDR10 control produced the same decoded screenshot pixels as upstream mpv 0.42. Package installation and optical validation remain open. [Source and qualification](SYSTEM_DOLBY_VISION.md#physical-trim-selection-and-the-staged-dual-layer-player).
+
+The 32-bit decoder retained all 544 stock decoders, 218 encoders and 67 hardware configurations. A native 32-bit client parsed a genuine Profile 7 RPU into an owned metadata snapshot. The combined ten-package upgrade and eight-package rollback plus removal of the two new runtimes passed offline APT simulation. The signed stock packages and private candidate are backed up. [Playback and package hashes](../evidence/profile7-ubuntu-packages.json).
+
+Ubuntu's MP4 demuxer now carries the sample description's Dolby configuration through `h265parse`. Genuine Profile 5 and synthetic 8.1 preserved all 24 bytes. Plain HDR10, duplicate boxes and invalid fields carried no Dolby configuration. A four-byte legacy record retained its explicit unknown base compatibility. GTK player rendering remains a separate work item. [Demux and parser controls](../evidence/gstreamer-dovi-isobmff-controls.json).
+
 ## GStreamer RPU transport — native scope passed, November 7
 
 Exact Ubuntu base `1.28.7-1` and bad `1.28.6-1ubuntu1` source series now carry

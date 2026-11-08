@@ -1,0 +1,23 @@
+From 33224c7920c0a0962e9780acc1f1b9b304ae2736 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:30:44 +0000
+Subject: [PATCH 2/3] Reject reserved metadata compression at the public RPU
+ configuration boundary
+
+---
+ libavcodec/dovi_parser.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/libavcodec/dovi_parser.c b/libavcodec/dovi_parser.c
+index 6e6dbd52..b0bd2371 100644
+--- a/libavcodec/dovi_parser.c
++++ b/libavcodec/dovi_parser.c
+@@ -59,6 +59,7 @@ int av_dovi_rpu_parser_configure(AVDoviRpuParser *parser,
+                       sizeof(config->dv_md_compression) ||
+         config->dv_profile > 9 || config->rpu_present_flag > 1 ||
+         config->el_present_flag > 1 || config->bl_present_flag > 1 ||
++        config->dv_md_compression == AV_DOVI_COMPRESSION_RESERVED ||
+         config->dv_md_compression > AV_DOVI_COMPRESSION_EXTENDED)
+         return AVERROR(EINVAL);
+ #define COPY(field) parser->config.field = config->field
+

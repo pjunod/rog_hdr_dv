@@ -1,0 +1,341 @@
+diff --git a/demux/demux_mkv.c b/demux/demux_mkv.c
+index d3e565e..47b0bbc 100644
+--- a/demux/demux_mkv.c
++++ b/demux/demux_mkv.c
+@@ -1830,7 +1830,7 @@ static int demux_mkv_open_video(demuxer_t *demuxer, mkv_track_t *track, int idx)
+                               track->dovi_config->el_present_flag;
+     }
+ 
+-#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(62, 35, 100)
++#if HAVE_AV_HEVC_CONF
+     if (track->hvce.len > 0) {
+         void *data = av_memdup(track->hvce.start, track->hvce.len);
+         MP_HANDLE_OOM(data);
+diff --git a/filters/f_enhancement_pair.c b/filters/f_enhancement_pair.c
+index 7b74d10..cbb4337 100644
+--- a/filters/f_enhancement_pair.c
++++ b/filters/f_enhancement_pair.c
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include <libavutil/buffer.h>
++#include <libavutil/frame.h>
+ 
+ #include "common/common.h"
+ #include "common/msg.h"
+@@ -98,13 +99,34 @@ static struct mp_image *take_head(struct mp_image ***queue, int *num)
+ // Downstream code expects the DV RPU and the related color/repr/HDR fields on
+ // the BL frame. In dual-track sources these are carried on the EL stream, so
+ // mirror them onto the BL here. This keeps DV bookkeeping local.
+-static void inherit_dovi_from_el(struct mp_image *bl, struct mp_image *el)
++static bool inherit_dovi_from_el(struct mp_image *bl, struct mp_image *el)
+ {
+     if (bl->params.no_dovi || bl->dovi || !el->dovi)
+-        return;
++        return true;
++
++    // Raw instructions must come from the same picture as the borrowed
++    // reconstruction state. Drop stale BL instructions even if EL has none.
++    for (int i = bl->num_ff_side_data - 1; i >= 0; i--) {
++        if (bl->ff_side_data[i].type == AV_FRAME_DATA_DOVI_RPU_BUFFER) {
++            av_buffer_unref(&bl->ff_side_data[i].buf);
++            MP_TARRAY_REMOVE_AT(bl->ff_side_data, bl->num_ff_side_data, i);
++        }
++    }
++    for (int i = 0; i < el->num_ff_side_data; i++) {
++        if (el->ff_side_data[i].type != AV_FRAME_DATA_DOVI_RPU_BUFFER)
++            continue;
++        struct mp_ff_side_data raw = {
++            .type = AV_FRAME_DATA_DOVI_RPU_BUFFER,
++            .buf = av_buffer_ref(el->ff_side_data[i].buf),
++        };
++        if (!raw.buf)
++            return false;
++        MP_TARRAY_APPEND(bl, bl->ff_side_data, bl->num_ff_side_data, raw);
++        break;
++    }
+     bl->dovi = av_buffer_ref(el->dovi);
+     if (!bl->dovi)
+-        return;
++        return false;
+     bl->params.repr.dovi = (void *)bl->dovi->data;
+     bl->params.repr.sys = el->params.repr.sys;
+     bl->params.color.primaries = el->params.color.primaries;
+@@ -113,6 +135,7 @@ static void inherit_dovi_from_el(struct mp_image *bl, struct mp_image *el)
+     bl->params.color.hdr.max_luma = el->params.color.hdr.max_luma;
+     bl->params.color.hdr.max_pq_y = el->params.color.hdr.max_pq_y;
+     bl->params.color.hdr.avg_pq_y = el->params.color.hdr.avg_pq_y;
++    return true;
+ }
+ 
+ static void pair_process(struct mp_filter *f)
+@@ -151,7 +174,12 @@ static void pair_process(struct mp_filter *f)
+         if (p->num_el_pending > 0 && cmp == 0) {
+             struct mp_image *el = take_head(&p->el_pending, &p->num_el_pending);
+             take_head(&p->bl_pending, &p->num_bl_pending);
+-            inherit_dovi_from_el(bl, el);
++            if (!inherit_dovi_from_el(bl, el)) {
++                talloc_free(el);
++                talloc_free(bl);
++                mp_filter_internal_mark_failed(f);
++                return;
++            }
+             if (bl->params.no_enhancement_layer) {
+                 talloc_free(el);
+             } else {
+diff --git a/meson.build b/meson.build
+index b15f310..fa8088e 100644
+--- a/meson.build
++++ b/meson.build
+@@ -27,14 +27,14 @@ libavutil = dependency('libavutil', version: '>= 58.29.100')
+ libswresample = dependency('libswresample', version: '>= 4.12.100')
+ libswscale = dependency('libswscale', version: '>= 7.5.100')
+ 
+-libplacebo = dependency('libplacebo', version: '>=7.387.0',
+-                default_options: ['default_library=static', 'demos=false'])
++libplacebo = dependency('libplacebo-rog387', version: '>=7.387.0')
++dv_provider = dependency('rog-dv-provider387', required: true)
+ 
+ libass = dependency('libass', version: '>= 0.12.2')
+ 
+ # the dependency order of libass -> ffmpeg is necessary due to
+ # static linking symbol resolution between fontconfig and MinGW
+-dependencies = [libass,
++dependencies = [dv_provider, libass,
+                 libavcodec,
+                 libavfilter,
+                 libavformat,
+@@ -284,6 +284,8 @@ sources = files(
+ 
+ # compiler stuff
+ cc = meson.get_compiler('c')
++features += {'av-hevc-conf': cc.has_header_symbol('libavcodec/packet.h',
++    'AV_PKT_DATA_HEVC_CONF', dependencies: libavcodec)}
+ 
+ flags = ['-D_FILE_OFFSET_BITS=64']
+ flags_c = []
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index b6d6930..4932ad3 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -23,6 +23,7 @@
+ #include <libplacebo/colorspace.h>
+ #include <libplacebo/options.h>
+ #include <libplacebo/renderer.h>
++#include <dv_provider387.h>
+ #include <libplacebo/shaders/lut.h>
+ #include <libplacebo/shaders/icc.h>
+ #include <libplacebo/utils/libav.h>
+@@ -135,6 +136,7 @@ struct priv {
+ 
+     pl_log pllog;
+     pl_gpu gpu;
++    struct dv_provider387 *dovi_provider;
+     pl_renderer rr;
+     pl_queue queue;
+     pl_swapchain sw;
+@@ -1033,6 +1035,20 @@ static bool map_frame(pl_gpu gpu, pl_tex *tex, const struct pl_source_frame *src
+         .user_data = mpi,
+     };
+ 
++    // mp_image_new_ref retains each side-data AVBufferRef until unmap_frame.
++    // Never borrow the decoder's mutable AVFrame or another frame's metadata.
++    if (frame->repr.sys == PL_COLOR_SYSTEM_DOLBYVISION && frame->repr.dovi) {
++        for (int i = 0; i < mpi->num_ff_side_data; i++) {
++            if (mpi->ff_side_data[i].type == AV_FRAME_DATA_DOVI_RPU_BUFFER) {
++                frame->dovi_rpu = mpi->ff_side_data[i].buf->data;
++                frame->dovi_rpu_size = mpi->ff_side_data[i].buf->size;
++                frame->dovi_master_width = mpi->params.w;
++                frame->dovi_master_height = mpi->params.h;
++                break;
++            }
++        }
++    }
++
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+     float ref_luma;
+     if (!pl_color_transfer_is_hdr(frame->color.transfer) && (ref_luma = get_ref_luma(p)))
+@@ -1364,6 +1380,10 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     update_options(vo);
+ 
+     struct pl_render_params params = pars->params;
++    params.dovi_map = dv_provider387_map;
++    params.dovi_reset = dv_provider387_reset;
++    params.dovi_priv = p->dovi_provider;
++    params.dovi_signature = DV_PROVIDER387_ABI;
+     const struct gl_video_opts *opts = p->opts_cache->opts;
+     bool will_redraw = frame->display_synced && frame->num_vsyncs > 1;
+     bool cache_frame = will_redraw || frame->still || p->paused;
+@@ -1419,6 +1439,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+ 
+         if (p->want_reset) {
+             pl_queue_reset(p->queue);
++            dv_provider387_reset(p->dovi_provider);
+             p->last_pts = 0.0;
+             p->last_id = 0;
+             p->want_reset = false;
+@@ -1931,6 +1952,10 @@ static void video_screenshot(struct vo *vo, struct voctrl_screenshot *args)
+ 
+     update_options(vo);
+     struct pl_render_params params = pars->params;
++    params.dovi_map = dv_provider387_map;
++    params.dovi_reset = dv_provider387_reset;
++    params.dovi_priv = p->dovi_provider;
++    params.dovi_signature = DV_PROVIDER387_ABI;
+     params.info_callback = NULL;
+     params.skip_caching_single_frame = true;
+     params.preserve_mixing_cache = false;
+@@ -2514,6 +2539,7 @@ static void uninit(struct vo *vo)
+ 
+     pl_icc_close(&p->icc_profile);
+     pl_renderer_destroy(&p->rr);
++    dv_provider387_destroy(&p->dovi_provider);
+ 
+     for (int i = 0; i < VO_PASS_PERF_MAX; ++i) {
+         pl_shader_info_deref(&p->perf_fresh.info[i].shader);
+@@ -2574,6 +2600,11 @@ static int preinit(struct vo *vo)
+         cache_init(vo, &p->icc_cache, 20 << 20, gl_opts->icc_opts->cache_dir);
+ 
+     pl_gpu_set_cache(p->gpu, p->shader_cache.cache);
++    p->dovi_provider = dv_provider387_create(p->gpu, p->pllog);
++    if (!p->dovi_provider) {
++        MP_ERR(vo, "Failed initializing shared Dolby display manager\n");
++        goto err_out;
++    }
+     p->rr = pl_renderer_create(p->pllog, p->gpu);
+     p->queue = pl_queue_create(p->gpu);
+     p->osd_fmt[SUBBITMAP_LIBASS] = pl_find_named_fmt(p->gpu, "r8");
+diff --git a/video/out/wayland_common.c b/video/out/wayland_common.c
+index d5a008c..679950a 100644
+--- a/video/out/wayland_common.c
++++ b/video/out/wayland_common.c
+@@ -17,6 +17,8 @@
+ 
+ #include <errno.h>
+ #include <limits.h>
++#include <math.h>
++#include <stdint.h>
+ #include <linux/input-event-codes.h>
+ #include <poll.h>
+ #include <time.h>
+@@ -3215,30 +3217,52 @@ static void cm_dispatch_color_queue(struct vo_wayland_state *wl,
+             break;
+ }
+ 
+-static bool cm_metadata_sanitize(struct vo_wayland_state *wl, struct pl_hdr_metadata *hdr)
++struct wayland_hdr_metadata {
++    uint32_t min_luma, max_luma, max_cll, max_fall;
++    bool has_cll, has_fall;
++};
++
++static bool encode_luminance(double value, double scale, bool positive,
++                             uint32_t *encoded)
+ {
+-    // Always return a hard failure if this condition fails.
+-    if (hdr->min_luma >= hdr->max_luma)
++    if (!isfinite(value) || value < 0.0)
+         return false;
++    double rounded = nearbyint(value * scale);
++    if (!isfinite(rounded) || rounded < 0.0 || rounded > UINT32_MAX ||
++        (positive && rounded == 0.0))
++        return false;
++    *encoded = (uint32_t) rounded;
++    return true;
++}
+ 
+-    // If max_cll or max_fall are invalid, set them to zero.
+-    if (wp_color_manager_v1_get_version(wl->color_manager) == 1) {
+-        if (hdr->max_cll &&
+-            (hdr->max_cll <= hdr->min_luma || hdr->max_cll > hdr->max_luma))
+-            hdr->max_cll = 0;
+-
+-        if (hdr->max_fall &&
+-            (hdr->max_fall <= hdr->min_luma || hdr->max_fall > hdr->max_luma))
+-            hdr->max_fall = 0;
+-    }
+-
+-    if (hdr->max_cll && hdr->max_fall && hdr->max_fall > hdr->max_cll) {
+-        hdr->max_cll = 0;
+-        hdr->max_fall = 0;
+-    }
++static bool hdr_metadata_valid(struct vo_wayland_state *wl,
++                               const struct pl_hdr_metadata *hdr,
++                               struct wayland_hdr_metadata *out)
++{
++    *out = (struct wayland_hdr_metadata) {0};
++    // Validate the actual unsigned protocol arguments, including quantization.
++    // Minimum luminance has 1/10000 cd/m2 units; maximum has whole cd/m2.
++    if (!encode_luminance(hdr->min_luma, WAYLAND_MIN_LUM_FACTOR, false,
++                          &out->min_luma) ||
++        !encode_luminance(hdr->max_luma, 1.0, true, &out->max_luma) ||
++        (uint64_t) out->min_luma >=
++            (uint64_t) out->max_luma * WAYLAND_MIN_LUM_FACTOR)
++        return false;
+ 
++    out->has_cll = encode_luminance(hdr->max_cll, 1.0, true, &out->max_cll);
++    out->has_fall = encode_luminance(hdr->max_fall, 1.0, true, &out->max_fall);
++    if (wp_color_manager_v1_get_version(wl->color_manager) == 1) {
++        out->has_cll &= (uint64_t) out->max_cll * WAYLAND_MIN_LUM_FACTOR >
++                           out->min_luma && out->max_cll <= out->max_luma;
++        out->has_fall &= (uint64_t) out->max_fall * WAYLAND_MIN_LUM_FACTOR >
++                            out->min_luma && out->max_fall <= out->max_luma;
++    }
++    // Omit only the inconsistent optional average; keep a valid content peak.
++    if (out->has_cll && out->has_fall && out->max_fall > out->max_cll)
++        out->has_fall = false;
+     return true;
+ }
++
+ #endif
+ 
+ static bool create_input(struct vo_wayland_state *wl)
+@@ -3726,7 +3750,8 @@ static void set_color_management(struct vo_wayland_state *wl, struct pl_color_sp
+ 
+     struct pl_hdr_metadata hdr = color->hdr;
+ 
+-    bool use_metadata = cm_metadata_sanitize(wl, &hdr);
++    struct wayland_hdr_metadata encoded;
++    bool use_metadata = hdr_metadata_valid(wl, &hdr, &encoded);
+     if (!use_metadata)
+         MP_VERBOSE(wl, "supplied color metadata is invalid. Not using it.\n");
+ 
+@@ -3745,11 +3770,11 @@ static void set_color_management(struct vo_wayland_state *wl, struct pl_color_sp
+             // black, similar to PQ transfer. Configure it in the same way as PQ.
+             if (use_metadata) {
+                 wp_image_description_creator_params_v1_set_luminances(image_creator_params,
+-                    0 * WAYLAND_MIN_LUM_FACTOR, hdr.max_luma, PL_COLOR_SDR_WHITE);
++                    0, encoded.max_luma, PL_COLOR_SDR_WHITE);
+                 MP_VERBOSE(wl, "Setting linear luminance range: min=0, max=%.5f, ref=%.2f\n",
+                     hdr.max_luma, PL_COLOR_SDR_WHITE);
+                 wp_image_description_creator_params_v1_set_mastering_luminance(image_creator_params,
+-                    lrintf(hdr.min_luma * WAYLAND_MIN_LUM_FACTOR), lrintf(hdr.max_luma));
++                    encoded.min_luma, encoded.max_luma);
+                 MP_VERBOSE(wl, "Setting linear luminance mastering range: min=%.5f, max=%.2f\n",
+                     hdr.min_luma, hdr.max_luma);
+             }
+@@ -3761,7 +3786,7 @@ static void set_color_management(struct vo_wayland_state *wl, struct pl_color_sp
+             // Set SDR luminance range for all relative transfers
+             if (use_metadata) {
+                 wp_image_description_creator_params_v1_set_luminances(image_creator_params,
+-                    hdr.min_luma * WAYLAND_MIN_LUM_FACTOR, hdr.max_luma, PL_COLOR_SDR_WHITE);
++                    encoded.min_luma, encoded.max_luma, PL_COLOR_SDR_WHITE);
+                 MP_VERBOSE(wl, "Setting relative luminance range: min=%.5f, max=%.2f, ref=%.2f\n",
+                     hdr.min_luma, hdr.max_luma, PL_COLOR_SDR_WHITE);
+             }
+@@ -3791,11 +3816,13 @@ static void set_color_management(struct vo_wayland_state *wl, struct pl_color_sp
+ 
+             MP_VERBOSE(wl, "min_luma: %f, max_luma: %f\n", hdr.min_luma, hdr.max_luma);
+             wp_image_description_creator_params_v1_set_mastering_luminance(image_creator_params,
+-                lrintf(hdr.min_luma * WAYLAND_MIN_LUM_FACTOR), lrintf(hdr.max_luma));
++                encoded.min_luma, encoded.max_luma);
+         }
+         MP_VERBOSE(wl, "max_cll: %f, max_fall: %f\n", hdr.max_cll, hdr.max_fall);
+-        wp_image_description_creator_params_v1_set_max_cll(image_creator_params, lrintf(hdr.max_cll));
+-        wp_image_description_creator_params_v1_set_max_fall(image_creator_params, lrintf(hdr.max_fall));
++        if (encoded.has_cll)
++            wp_image_description_creator_params_v1_set_max_cll(image_creator_params, encoded.max_cll);
++        if (encoded.has_fall)
++            wp_image_description_creator_params_v1_set_max_fall(image_creator_params, encoded.max_fall);
+     }
+     image_description = wp_image_description_creator_params_v1_create(image_creator_params);
+     cm_dispatch_color_queue(wl, image_description);

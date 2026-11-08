@@ -1,0 +1,66 @@
+From 4cb213d36b572fcd0688753896cc3d7b927b8b22 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:08:34 +0000
+Subject: [PATCH] Capture exact per-picture conformance geometry in strict
+ Dolby provenance v2
+
+---
+ libavcodec/dovi_parser.h  |  7 ++++++-
+ libavcodec/hevc/hevcdec.c | 26 +++++++++++++++++++++++---
+ 2 files changed, 29 insertions(+), 4 deletions(-)
+
+diff --git a/libavcodec/dovi_parser.h b/libavcodec/dovi_parser.h
+index 3483688d..5ca08731 100644
+--- a/libavcodec/dovi_parser.h
++++ b/libavcodec/dovi_parser.h
+@@ -11,7 +11,12 @@
+  * raw RPU side data after strict CRC/reference processing. Default decoders
+  * never emit this provenance. Rejected Dolby metadata does not reject video. */
+ #define AV_DOVI_METADATA_STRICT_KEY "lavc.dovi.strict"
+-#define AV_DOVI_METADATA_STRICT_VALUE "crc+references-v1"
++#define AV_DOVI_METADATA_STRICT_VALUE "crc+references+geometry-v2"
++/* Decimal per-picture coded size and conformance rect: coded_width,
++ * coded_height, x, y, width, height. Captured before automatic frame cropping.
++ * The v2 marker is emitted only when every field is present and the requested
++ * output window equals the SPS conformance window (no extra display crop). */
++#define AV_DOVI_METADATA_GEOMETRY_PREFIX "lavc.dovi.geometry."
+ #include <stddef.h>
+ #include <stdint.h>
+ #include "libavutil/dovi_meta.h"
+diff --git a/libavcodec/hevc/hevcdec.c b/libavcodec/hevc/hevcdec.c
+index b4fde671..59b561c9 100644
+--- a/libavcodec/hevc/hevcdec.c
++++ b/libavcodec/hevc/hevcdec.c
+@@ -3157,9 +3157,29 @@ static int set_side_data(HEVCContext *s)
+     if (strict_rpu) {
+         AVFrameSideData *rpu = av_frame_get_side_data(out, AV_FRAME_DATA_DOVI_RPU_BUFFER);
+         AVFrameSideData *metadata = av_frame_get_side_data(out, AV_FRAME_DATA_DOVI_METADATA);
+-        if (rpu && metadata)
+-            av_dict_set(&rpu->metadata, AV_DOVI_METADATA_STRICT_KEY,
+-                        AV_DOVI_METADATA_STRICT_VALUE, 0);
++        const HEVCWindow *window = &sps->pic_conf_win;
++        /* Keep the exact source active image distinct from coded padding.
++         * The generic decoder applies cropping only after this snapshot. */
++        if (rpu && metadata && !(s->avctx->flags2 & AV_CODEC_FLAG2_IGNORE_CROP) &&
++            out->width == sps->width && out->height == sps->height &&
++            out->crop_left == window->left_offset && out->crop_top == window->top_offset &&
++            out->crop_right == window->right_offset && out->crop_bottom == window->bottom_offset &&
++            out->crop_left < out->width && out->crop_right < out->width - out->crop_left &&
++            out->crop_top < out->height && out->crop_bottom < out->height - out->crop_top) {
++            int error = 0;
++#define GEOMETRY(key, value) error |= av_dict_set_int(&rpu->metadata, \
++                AV_DOVI_METADATA_GEOMETRY_PREFIX key, (value), 0)
++            GEOMETRY("coded_width", sps->width);
++            GEOMETRY("coded_height", sps->height);
++            GEOMETRY("x", out->crop_left);
++            GEOMETRY("y", out->crop_top);
++            GEOMETRY("width", out->width - out->crop_left - out->crop_right);
++            GEOMETRY("height", out->height - out->crop_top - out->crop_bottom);
++#undef GEOMETRY
++            if (!error)
++                av_dict_set(&rpu->metadata, AV_DOVI_METADATA_STRICT_KEY,
++                            AV_DOVI_METADATA_STRICT_VALUE, 0);
++        }
+     }
+ 
+ 

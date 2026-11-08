@@ -1,0 +1,45 @@
+From d1814d8215859d5c2db05bc7812b48414f8a2637 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@users.noreply.github.com>
+Date: Sun, 8 Nov 2026 01:25:48 +0000
+Subject: [PATCH 3/5] avcodec: backport the upstream HEVC enhancement-layer
+ configuration identity
+
+Adapted from FFmpeg 5f6dff5e7dbd9b1f3221f7c37225365dbf1e1038 for the 8.1 packet enum.
+---
+ libavcodec/packet.c | 1 +
+ libavcodec/packet.h | 9 +++++++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/libavcodec/packet.c b/libavcodec/packet.c
+index 348159f7..0227c67e 100644
+--- a/libavcodec/packet.c
++++ b/libavcodec/packet.c
+@@ -310,6 +310,7 @@ const char *av_packet_side_data_name(enum AVPacketSideDataType type)
+     case AV_PKT_DATA_3D_REFERENCE_DISPLAYS:      return "3D Reference Displays Info";
+     case AV_PKT_DATA_RTCP_SR:                    return "RTCP Sender Report";
+     case AV_PKT_DATA_EXIF:                       return "EXIF metadata";
++    case AV_PKT_DATA_HEVC_CONF:                  return "HEVC enhancement-layer decoder configuration";
+     }
+     return NULL;
+ }
+diff --git a/libavcodec/packet.h b/libavcodec/packet.h
+index 59bfddf4..e7337989 100644
+--- a/libavcodec/packet.h
++++ b/libavcodec/packet.h
+@@ -368,6 +368,15 @@ enum AVPacketSideDataType {
+      */
+      AV_PKT_DATA_EXIF,
+ 
++    /**
++     * Dolby Vision enhancement-layer HEVC decoder configuration.
++     * The raw HEVCDecoderConfigurationRecord comes from an hvcE box
++     * or the corresponding Matroska BlockAdditionMapping.
++     * Preserve the upstream identifier across this 8.1 backport. The
++     * intervening number is assigned to SMPTE 2094 App 5 upstream.
++     */
++    AV_PKT_DATA_HEVC_CONF = AV_PKT_DATA_EXIF + 2,
++
+     /**
+      * The number of side data types.
+      * This is not part of the public API/ABI in the sense that it may
+

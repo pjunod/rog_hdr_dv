@@ -1,0 +1,51 @@
+From 77e3243116d4e4f22298192364c6e5d9e6389857 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:28:48 +0000
+Subject: [PATCH 1/3] debian: resolve private sibling symbols against the
+ deployed multiarch tuple
+
+---
+ debian/rog-filter-stock.shlibs | 2 --
+ debian/rog-system-dv.shlibs    | 3 +++
+ debian/rules                   | 7 ++++---
+ 3 files changed, 7 insertions(+), 5 deletions(-)
+ delete mode 100644 debian/rog-filter-stock.shlibs
+ create mode 100644 debian/rog-system-dv.shlibs
+
+diff --git a/debian/rog-filter-stock.shlibs b/debian/rog-filter-stock.shlibs
+deleted file mode 100644
+index 7320666d..00000000
+--- a/debian/rog-filter-stock.shlibs
++++ /dev/null
+@@ -1,2 +0,0 @@
+-libavcodec 62 libavcodec62 (= 7:8.1.2-2ubuntu2)
+-libavutil 60 libavutil60 (= 7:8.1.2-2ubuntu2)
+diff --git a/debian/rog-system-dv.shlibs b/debian/rog-system-dv.shlibs
+new file mode 100644
+index 00000000..c8226407
+--- /dev/null
++++ b/debian/rog-system-dv.shlibs
+@@ -0,0 +1,3 @@
++libavcodec 62 libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv2)
++libavformat 62 libavformat62 (= 7:8.1.2-2ubuntu2+rogdv2)
++libavutil 60 libavutil60 (= 7:8.1.2-2ubuntu2)
+diff --git a/debian/rules b/debian/rules
+index 7f921b2c..c18a75e5 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -341,10 +341,11 @@ ifeq ($(filter pkg.ffmpeg.noextra,$(DEB_BUILD_PROFILES)),)
+ 	done
+ endif
+ 
+-# Only this filter package is delivered. Its avpriv imports bind to the
+-# exact Ubuntu libraries from the source package used for this build.
++# The deployed codec and format are new, while libavutil stays at its
++# source-identical stock version on both architectures. Resolve avpriv
++# dependencies against the exact members of that delivery tuple.
+ override_dh_shlibdeps:
+-	dh_shlibdeps -plibavfilter11 -- -Ldebian/rog-filter-stock.shlibs
++	dh_shlibdeps -plibavcodec62 -plibavfilter11 -plibavformat62 -plibavdevice62 -- -Ldebian/rog-system-dv.shlibs
+ 	dh_shlibdeps --remaining-packages
+ 
+ # avoid error: Unknown DWARF DW_OP_0
+

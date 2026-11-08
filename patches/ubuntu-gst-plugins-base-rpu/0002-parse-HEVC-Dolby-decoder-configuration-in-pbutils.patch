@@ -1,0 +1,120 @@
+From da020e3f4958b1409fadbeed55b36f3ec7588f7d Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 03:20:51 +0000
+Subject: [PATCH] pbutils: decode bounded ISO Dolby Vision HEVC configuration
+ records
+
+---
+ gst-libs/gst/pbutils/codec-utils.c | 63 ++++++++++++++++++++++++++++++
+ gst-libs/gst/pbutils/codec-utils.h | 24 ++++++++++++
+ 2 files changed, 87 insertions(+)
+
+diff --git a/gst-libs/gst/pbutils/codec-utils.c b/gst-libs/gst/pbutils/codec-utils.c
+index a7cf9df..da591b7 100644
+--- a/gst-libs/gst/pbutils/codec-utils.c
++++ b/gst-libs/gst/pbutils/codec-utils.c
+@@ -1179,6 +1179,69 @@ utils_get_scalable_format_range_extensions_profile (GstH265ExtensionProfile *
+       ext_profile);
+ }
+ 
++/**
++ * gst_codec_utils_h265_parse_dovi_configuration:
++ * @data: (array length=size): dvcC or dvvC payload without its box header
++ * @size: number of bytes in @data
++ * @config: (out) (optional): parsed configuration, written only on success
++ *
++ * Parses the HEVC single-layer and dual-layer profiles supported by this
++ * integration. Short records may omit trailing fields. A missing
++ * compatibility identifier does not establish the base layer's color space.
++ *
++ * Returns: %TRUE if @data contains a supported configuration record.
++ */
++gboolean
++gst_codec_utils_h265_parse_dovi_configuration (const guint8 * data,
++    gsize size, GstH265DoviConfiguration * config)
++{
++  GstH265DoviConfiguration record = { 0 };
++  guint16 fields;
++
++  if (!data || size < 4 || size > 24 || data[0] != 1 || data[1] != 0)
++    return FALSE;
++  fields = GST_READ_UINT16_BE (data + 2);
++  record.version_major = data[0];
++  record.version_minor = data[1];
++  record.profile = fields >> 9;
++  record.level = (fields >> 3) & 0x3f;
++  record.rpu_present = (fields >> 2) & 1;
++  record.el_present = (fields >> 1) & 1;
++  record.bl_present = fields & 1;
++  if (!record.level || (!record.el_present && !record.bl_present))
++    return FALSE;
++
++  switch (record.profile) {
++    case 4:
++    case 7:
++      break;
++    case 5:
++    case 8:
++      if (record.el_present || !record.bl_present)
++        return FALSE;
++      break;
++    default:
++      return FALSE;
++  }
++
++  if (size > 4) {
++    record.compatibility_known = TRUE;
++    record.compatibility_id = data[4] >> 4;
++    record.compression = (data[4] >> 2) & 3;
++    /* Compression 2 is reserved. Both limited (1) and extended (3)
++     * compression are defined independently of a consumer's support. */
++    if ((data[4] & 3) != 0 || record.compression == 2)
++      return FALSE;
++    for (gsize i = 5; i < size; i++) {
++      if (data[i] != 0)
++        return FALSE;
++    }
++  }
++  if (config)
++    *config = record;
++  return TRUE;
++}
++
+ /**
+  * gst_codec_utils_h265_get_profile:
+  * @profile_tier_level: (array length=len): Pointer to the profile_tier_level
+diff --git a/gst-libs/gst/pbutils/codec-utils.h b/gst-libs/gst/pbutils/codec-utils.h
+index 0da17a8..b75cbbc 100644
+--- a/gst-libs/gst/pbutils/codec-utils.h
++++ b/gst-libs/gst/pbutils/codec-utils.h
+@@ -77,6 +77,30 @@ gboolean      gst_codec_utils_h264_get_profile_flags_level (const guint8 * codec
+ 
+ /* H.265 */
+ 
++/**
++ * GstH265DoviConfiguration:
++ *
++ * Fields of a version 1.0 HEVC Dolby Vision decoder configuration record.
++ * @compatibility_known is false for a shortened four-byte record.
++ */
++typedef struct {
++  guint8 version_major;
++  guint8 version_minor;
++  guint8 profile;
++  guint8 level;
++  guint8 rpu_present;
++  guint8 el_present;
++  guint8 bl_present;
++  guint8 compatibility_id;
++  guint8 compression;
++  gboolean compatibility_known;
++  gpointer _gst_reserved[GST_PADDING];
++} GstH265DoviConfiguration;
++
++GST_PBUTILS_API
++gboolean gst_codec_utils_h265_parse_dovi_configuration (const guint8 * data,
++    gsize size, GstH265DoviConfiguration * config);
++
+ GST_PBUTILS_API
+ const gchar * gst_codec_utils_h265_get_profile                     (const guint8 * profile_tier_level,
+                                                                     guint len);

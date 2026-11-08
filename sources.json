@@ -515,11 +515,20 @@
       "component": "ubuntu-ffmpeg-system-dv",
       "base_commit": "310aa258610e3acf5cdab4ade2e19e3e1b6438e8",
       "base_tree": "db3ae0877e7860f0c8e57a2500612a45b027e59d",
-      "candidate_commit": "7ed5a5d24c23514bfbed18d950c1ad99d4ff4338",
-      "candidate_tree": "a1c874fd73030e53fa675e882f50494a58f87c2b",
-      "patch_count": 1,
+      "candidate_commit": "2bb3c3911d082392039609aaacde15a841a19da2",
+      "candidate_tree": "204d20eee83097c17445be395efbbc76b6b60a59",
+      "patch_count": 10,
       "patch_order": [
-        "0001-ffmpeg-shared-display-management.patch"
+        "0001-ffmpeg-shared-display-management.patch",
+        "0002-backport-dovi-split-bitstream-filter.patch",
+        "0003-check-length-of-split-NAL-units.patch",
+        "0004-use-upstream-HEVC-configuration-packet-side-data.patch",
+        "0005-provide-strict-frame-owned-Dolby-metadata.patch",
+        "0006-version-distro-resolver-symbols.patch",
+        "0007-bind-strict-RPU-state-to-the-SPS-visible-rectangle.patch",
+        "0008-resolve-private-sibling-version-dependencies.patch",
+        "0009-reject-reserved-Dolby-compression.patch",
+        "0010-retain-the-compatible-provider-ABI.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -547,7 +556,8 @@
             "url": "https://archive.ubuntu.com/ubuntu/pool/universe/f/ffmpeg/ffmpeg_8.1.2-2ubuntu2.debian.tar.xz"
           }
         ]
-      }
+      },
+      "candidate_status": "Staged amd64 and i386. Offline host upgrade and rollback simulations passed on the final package tuple."
     },
     {
       "component": "ubuntu-libplacebo-system-dv",
@@ -661,11 +671,12 @@
       "component": "ubuntu-gst-plugins-base-rpu",
       "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
       "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
-      "candidate_commit": "23a21d1f6a8b6c263006aef993e4073b5476c126",
-      "candidate_tree": "9d9a28d60ebaf12902679c01da767ceab2902948",
-      "patch_count": 1,
+      "candidate_commit": "da020e3f4958b1409fadbeed55b36f3ec7588f7d",
+      "candidate_tree": "a7e4ef6b029519668c96c0707bf591e61772a07a",
+      "patch_count": 2,
       "patch_order": [
-        "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch"
+        "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
+        "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -779,6 +790,115 @@
       },
       "candidate_status": "Reviewed source, native GDK discovery and Ubuntu-default package build passed. Six-package offline forward and stock rollback plans passed. No host installation.",
       "candidate_package_version": "4.24.1+ds-1+rogdv1"
+    },
+    {
+      "component": "libplacebo-fel-system-dv",
+      "upstream": "https://github.com/haasn/libplacebo.git",
+      "base_commit": "275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
+      "base_tree": "9e95f4eff8376fa4bc5c9b932953946ee27dc443",
+      "candidate_commit": "8d7b8055b55df5b7b66c3373d91df832ee1dec55",
+      "candidate_tree": "55196f55f7e57cc8e81ce1fd67408159811eb4f0",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-map-the-native-reconstructed-dolby-master.patch",
+        "0002-propagate-flipped-planes-and-contributing-frame-errors.patch"
+      ]
+    },
+    {
+      "component": "mpv-fel-system-dv",
+      "upstream": "https://github.com/mpv-player/mpv.git",
+      "base_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
+      "base_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
+      "candidate_commit": "b5559002e694d156ada4af4ce3f5acea5d884a3c",
+      "candidate_tree": "04223cd5916a0b6289056a0227715c718ecbbffc",
+      "patch_count": 2,
+      "patch_order": [
+        "0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
+        "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch"
+      ]
+    },
+    {
+      "component": "ubuntu-gst-plugins-good-dovi",
+      "base_commit": "73d3a23875505394b9cbb0a7eca71050d0eeaaa3",
+      "base_tree": "0a06fafebcfba125e6ede43150e685215b307b5b",
+      "candidate_commit": "e56a7fde2e4d413c5461595bfc3a1e004b2db3a1",
+      "candidate_tree": "e35b7299c87330b43b373ae31850b5ee229b6919",
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "artifacts": [
+          {
+            "file": "gst-plugins-good1.0_1.28.7-1build1.debian.tar.xz",
+            "sha256": "2ab86c0bd75f42a0092759590eba79cf22795834cad84dc6c4257605d264f0ef",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7-1build1.debian.tar.xz"
+          },
+          {
+            "file": "gst-plugins-good1.0_1.28.7-1build1.dsc",
+            "sha256": "2056c0fa9ad443f28d16d61ac82563ab5c6f73b97ef36610ba3dafa340b32e50",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7-1build1.dsc"
+          },
+          {
+            "file": "gst-plugins-good1.0_1.28.7.orig.tar.xz",
+            "sha256": "87256969c82cf3bc8574301f3e7044a90de0ac500a5a27d8ba38c4dde894dd8b",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7.orig.tar.xz"
+          },
+          {
+            "file": "gst-plugins-good1.0_1.28.7.orig.tar.xz.asc",
+            "sha256": "93ba387fd360430a21463ad416649d5feff3d8a129e235bfe074b48f5f52b147",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7.orig.tar.xz.asc"
+          }
+        ],
+        "package": "gst-plugins-good1.0",
+        "version": "1.28.7-1build1",
+        "authentication": "Downloaded through configured Ubuntu APT source indexes and SHA256 pinned."
+      },
+      "patch_order": [
+        "0001-carry-Dolby-configuration-per-sample-entry.patch",
+        "0002-use-the-shared-HEVC-configuration-parser.patch"
+      ],
+      "patch_count": 2,
+      "candidate_status": "The native MP4 demuxer and h265parse preserved exact records on genuine Profile 5 and synthetic 8.1. Missing, malformed and ambiguous records declined. Staged only."
+    },
+    {
+      "component": "ubuntu-libdovi-ffi",
+      "base_commit": "18d1f8dd890dcb4934f457b08de7224e1dcfae38",
+      "base_tree": "27555b0b3819a91cfcf3572e353f7b80c4ae6307",
+      "candidate_commit": "2141cb69ab7a4e893154092ba7ce5f4c93cd7ebe",
+      "candidate_tree": "99d8672dce9d3a06dae6d7730651973d6e201f2c",
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "artifacts": [
+          {
+            "file": "rust-dolby-vision_3.3.2-3.debian.tar.xz",
+            "sha256": "98fcdd8e9d72d13855ee074bcafd78c657c8c7c26287407466d59794fef17536",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/universe/r/rust-dolby-vision/rust-dolby-vision_3.3.2-3.debian.tar.xz"
+          },
+          {
+            "file": "rust-dolby-vision_3.3.2-3.dsc",
+            "sha256": "c082c5c2bce9c36ef1d894b5a8aff1c9b57b7b2c5ae20439a94c22f9e2f022df",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/universe/r/rust-dolby-vision/rust-dolby-vision_3.3.2-3.dsc"
+          },
+          {
+            "file": "rust-dolby-vision_3.3.2.orig.tar.gz",
+            "sha256": "533d9f32336f4d03822e87fcee32277fd4a52e3f1278549bf42c8b28e3b0f798",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/universe/r/rust-dolby-vision/rust-dolby-vision_3.3.2.orig.tar.gz"
+          }
+        ],
+        "package": "rust-dolby-vision",
+        "version": "3.3.2-3",
+        "authentication": "Downloaded through configured Ubuntu APT source indexes and SHA256 pinned.",
+        "source_import": {
+          "include_ignored": true
+        }
+      },
+      "patch_order": [
+        "0001-backport-upstream-C-FFI-ownership-fixes.patch",
+        "0002-return-parser-errors-for-unsupported-interpolation.patch",
+        "0003-validate-reshaping-pivot-counts.patch",
+        "0004-check-generated-C-SDK-declarations.patch",
+        "0005-require-staged-development-header.patch"
+      ],
+      "patch_count": 5,
+      "candidate_status": "Private staged 3.3.2-3+rogdv1. One CRC-valid unsupported interpolation record aborted stock libdovi3 and returned a recoverable parser error on the candidate. Exact development package contains functional declarations."
     }
   ]
 }
