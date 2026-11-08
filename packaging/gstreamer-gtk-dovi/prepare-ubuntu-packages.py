@@ -74,7 +74,11 @@ override_dh_auto_install:
 \tinstall -D "$(CARGO_TARGET_DIR)/release/libgstgtk4.so" debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/gstreamer-1.0/libgstgtk4.so
 
 override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 \tcargo test --offline --release -j1 --features $(FEATURES)
+else
+\t@echo "Skipping unit tests (DEB_BUILD_OPTIONS=nocheck)"
+endif
 
 override_dh_auto_clean:
 \trm -rf -- target debian/cargo_home
