@@ -22,6 +22,8 @@ repository owns the operating-system display work.
 
 The ROG runs the seven-package mpv, FFmpeg and Mesa playback update alongside Mutter and libdisplay-info `nativehdr13` and the `nativehdr3` kernel. The separate mpv 0.42 release reconstructed a genuine 4K Dolby Vision Profile 7 full enhancement layer on the laptop, selected the CM v4 grade for 616 cd/m², and ran with the existing mpv video settings on the explicitly selected Intel Vulkan driver. With automatic GPU selection on a hardware-backed private compositor, NVIDIA played the full three-second clip at 24 fps with zero drops. A staged Mesa clock correction restored playback speed on Intel with eight output drops. The running desktop still uses the seven-package stack. [Playback release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop and kernel handoff](docs/SOFTWARE_DELIVERY.md).
 
+The staged player also ran a genuine movie-frame comparison against Dolby's render of the original master. The published 1080p Profile 5 release and the 4K master differ in resolution and delivered metadata. The controls quantify both effects. The project provides an offline APT rehearsal for testing a candidate and its exact rollback on the destination system. [Movie-frame comparison](evidence/dolby-sol-levante-frame714.json) · [Package rehearsal](docs/SYSTEM_DOLBY_VISION.md#rehearse-a-local-package-bundle).
+
 The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
 the fix and retains Ubuntu security policies; see the

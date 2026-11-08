@@ -47,6 +47,16 @@ Keep the seven files, the four original Ubuntu packages and their hashes togethe
 
 The ROG now has the seven verified packages. The normal system FFmpeg binary mapped a genuine, nonblack Profile 5 frame at 30 seconds on the integrated Intel GPU, with a target of 0.0004–616 cd/m² and P3-D65 primaries. Normal mpv loaded the system libraries and mapped the same title on Intel through a private Wayland compositor reproducing the panel declaration. The trace shows BT.2020/PQ and a rounded maximum of 881 cd/m². This confirms the automatic target discrepancy on the installed player. The GNOME session stayed open throughout.
 
+### Rehearse a local package bundle
+
+On the destination Ubuntu system, place the candidate archives and the exact previously installed versions in separate directories. Include each changed architecture. Omit rollback archives for newly introduced packages. Choose a fresh private receipt directory outside this checkout.
+
+```sh
+python3 tools/qualify-ubuntu-bundle.py /path/to/candidate /path/to/rollback /path/to/private/receipt
+```
+
+The tool runs APT in simulation mode against a copy of the installed package database and empty repository lists. It rejects extra installations and removals. It then builds a package-state snapshot representing the upgrade and checks the inverse transaction against the supplied rollback archives. It records both solver logs and archive SHA-256 hashes. Preserve the receipt privately because its starting snapshot lists all installed packages. The simulations cover dependency resolution. Maintainer scripts, live-session changes and optical behavior require their own checks.
+
 ### Vulkan presentation timing on Intel
 
 With a compositor using a raw monotonic clock, the installed Intel driver used presentation feedback converted to the Vulkan clock when scheduling its next Wayland FIFO commit. On the ROG the two clocks differed by about 4.1 seconds. The driver queued deadlines seconds in the future, and mpv blocked acquiring a reusable swapchain image. Keeping the Wayland scheduler in the compositor clock reduced the median deadline from 4,124 ms to 16.17 ms at 60 Hz. The 4K FEL sample then played to EOF in real time, with eight output drops on Intel. NVIDIA played the same sample with zero drops. These were private hardware-backed compositor runs. [Wire and playback measurements](../evidence/mesa-wsi-presentation-clock.json).
