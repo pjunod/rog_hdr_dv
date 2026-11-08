@@ -151,7 +151,7 @@ def gtk_control(original):
     depends = field_text(plugin, "Depends")
     depends = replace_once(
         depends, " ${misc:Depends},",
-        f" libgtk-4-1 (>= {FIXED_GTK}),\n"
+        f" libgtk-4-1 (= {FIXED_GTK}),\n"
         f" gstreamer1.0-gl (= {QUALIFIED_GSTREAMER['gstreamer1.0-gl']}),\n"
         " libgstreamer-gl1.0-0 (= 1.28.7-1+rogdv2),\n"
         " libgstreamer-plugins-base1.0-0 (= 1.28.7-1+rogdv2),\n"
@@ -169,7 +169,7 @@ def showtime_control(original):
         depends, " gstreamer1.0-gtk4,",
         f" gstreamer1.0-gtk4 (= {GTK_VERSION}),\n"
         f" gstreamer1.0-gtk-dovi (= {CORE_VERSION}),\n"
-        f" libgtk-4-1 (>= {FIXED_GTK}),",
+        f" libgtk-4-1 (= {FIXED_GTK}),",
         "showtime sink dependencies",
     )
     depends = replace_once(
