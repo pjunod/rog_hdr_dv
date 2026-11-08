@@ -1,0 +1,117 @@
+From 37efe938d1bf72ff3e5f1f27ac9bb067c4032876 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <noreply@rog-hdr-dv.invalid>
+Date: Sun, 8 Nov 2026 05:25:48 +0000
+Subject: [PATCH] wsi/wayland: pace FIFO in the compositor clock domain
+
+---
+ debian/changelog                              |  7 ++++
+ .../patches/rog-wsi-presentation-clock.patch  | 37 +++++++++++++++++++
+ debian/patches/series                         |  1 +
+ src/vulkan/wsi/wsi_common_wayland.c           | 19 ++++++----
+ 4 files changed, 56 insertions(+), 8 deletions(-)
+ create mode 100644 debian/patches/rog-wsi-presentation-clock.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index 642ef83..1b4ec29 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++mesa (26.2.4-1ubuntu1+rogwsi2) stonking; urgency=medium
++
++  * Keep Vulkan Wayland FIFO deadlines in the presentation clock.
++  * Preserve the no-timestamp sentinel for absolute present requests.
++
++ -- ROG HDR contributors <noreply@rog-hdr-dv.invalid>  Sun, 08 Nov 2026 05:24:00 +0000
++
+ mesa (26.2.4-1ubuntu1+rogwsi1) stonking; urgency=medium
+ 
+   * Omit undefined or invalid optional Wayland Vulkan HDR light metadata.
+diff --git a/debian/patches/rog-wsi-presentation-clock.patch b/debian/patches/rog-wsi-presentation-clock.patch
+new file mode 100644
+index 0000000..a4e1890
+--- /dev/null
++++ b/debian/patches/rog-wsi-presentation-clock.patch
+@@ -0,0 +1,37 @@
++Description: Keep internal Wayland FIFO deadlines in the compositor clock
++Origin: local
++--- a/src/vulkan/wsi/wsi_common_wayland.c
+++++ b/src/vulkan/wsi/wsi_common_wayland.c
++@@ -2713,7 +2713,8 @@
++    chain->timing_request = *request;
++ 
++    /* Convert absolute target time from swapchain time domain to whatever Wayland natively expects. */
++-   if (!(chain->timing_request.flags & VK_PRESENT_TIMING_INFO_PRESENT_AT_RELATIVE_TIME_BIT_EXT)) {
+++   if (chain->timing_request.time &&
+++       !(chain->timing_request.flags & VK_PRESENT_TIMING_INFO_PRESENT_AT_RELATIVE_TIME_BIT_EXT)) {
++       chain->timing_request.time =
++          wsi_wl_convert_wayland_to_swapchain_time(chain, chain->timing_request.time, true);
++    }
++@@ -3115,13 +3116,15 @@
++     * Knowing VRR or FRR is not mission critical for most use cases, so just report "Unknown" for now. */
++    wsi_swapchain_present_timing_update_refresh_rate(&chain->base, refresh, 0, 0);
++ 
++-   /* Convert whatever Wayland provides to swapchain time domain. */
++-   presentation_time = wsi_wl_convert_wayland_to_swapchain_time(chain, presentation_time, false);
++-
++-   /* Notify this before present wait to reduce latency of presentation timing requests
++-    * if the application is driving its queries based off present waits. */
++-   if (id->timing_serial)
++-      wsi_swapchain_present_timing_notify_completion(&chain->base, id->timing_serial, presentation_time, id->img);
+++   /* FIFO pacing and Wayland commit timestamps use the compositor clock.
+++    * Only the completion timestamp returned to Vulkan uses the swapchain clock.
+++    */
+++   if (id->timing_serial) {
+++      uint64_t completion_time =
+++         wsi_wl_convert_wayland_to_swapchain_time(chain, presentation_time, false);
+++      wsi_swapchain_present_timing_notify_completion(&chain->base, id->timing_serial,
+++                                                      completion_time, id->img);
+++   }
++ 
++    mtx_lock(&chain->present_ids.lock);
++    chain->present_ids.refresh_nsec = refresh;
+diff --git a/debian/patches/series b/debian/patches/series
+index c923ad4..2467594 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -2,3 +2,4 @@ path_max.diff
+ src_glx_dri_common.h.diff
+ lp2143073.patch
+ rog-wsi-optional-hdr.patch
++rog-wsi-presentation-clock.patch
+diff --git a/src/vulkan/wsi/wsi_common_wayland.c b/src/vulkan/wsi/wsi_common_wayland.c
+index c8ce390..3a5a318 100644
+--- a/src/vulkan/wsi/wsi_common_wayland.c
++++ b/src/vulkan/wsi/wsi_common_wayland.c
+@@ -2713,7 +2713,8 @@ wsi_wl_swapchain_set_timing_request(struct wsi_swapchain *wsi_chain,
+    chain->timing_request = *request;
+ 
+    /* Convert absolute target time from swapchain time domain to whatever Wayland natively expects. */
+-   if (!(chain->timing_request.flags & VK_PRESENT_TIMING_INFO_PRESENT_AT_RELATIVE_TIME_BIT_EXT)) {
++   if (chain->timing_request.time &&
++       !(chain->timing_request.flags & VK_PRESENT_TIMING_INFO_PRESENT_AT_RELATIVE_TIME_BIT_EXT)) {
+       chain->timing_request.time =
+          wsi_wl_convert_wayland_to_swapchain_time(chain, chain->timing_request.time, true);
+    }
+@@ -3115,13 +3116,15 @@ presentation_handle_presented(void *data,
+     * Knowing VRR or FRR is not mission critical for most use cases, so just report "Unknown" for now. */
+    wsi_swapchain_present_timing_update_refresh_rate(&chain->base, refresh, 0, 0);
+ 
+-   /* Convert whatever Wayland provides to swapchain time domain. */
+-   presentation_time = wsi_wl_convert_wayland_to_swapchain_time(chain, presentation_time, false);
+-
+-   /* Notify this before present wait to reduce latency of presentation timing requests
+-    * if the application is driving its queries based off present waits. */
+-   if (id->timing_serial)
+-      wsi_swapchain_present_timing_notify_completion(&chain->base, id->timing_serial, presentation_time, id->img);
++   /* FIFO pacing and Wayland commit timestamps use the compositor clock.
++    * Only the completion timestamp returned to Vulkan uses the swapchain clock.
++    */
++   if (id->timing_serial) {
++      uint64_t completion_time =
++         wsi_wl_convert_wayland_to_swapchain_time(chain, presentation_time, false);
++      wsi_swapchain_present_timing_notify_completion(&chain->base, id->timing_serial,
++                                                      completion_time, id->img);
++   }
+ 
+    mtx_lock(&chain->present_ids.lock);
+    chain->present_ids.refresh_nsec = refresh;

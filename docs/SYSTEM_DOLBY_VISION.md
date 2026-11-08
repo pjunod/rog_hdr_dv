@@ -35,6 +35,10 @@ Keep the seven files, the four original Ubuntu packages and their hashes togethe
 
 The ROG now has the seven verified packages. The normal system FFmpeg binary mapped a genuine, nonblack Profile 5 frame at 30 seconds on the integrated Intel GPU, with a target of 0.0004–616 cd/m² and P3-D65 primaries. Normal mpv loaded the system libraries and mapped the same title on Intel through a private Wayland compositor reproducing the panel declaration. The trace shows BT.2020/PQ and a rounded maximum of 881 cd/m². This confirms the automatic target discrepancy on the installed player. The GNOME session stayed open throughout.
 
+### Vulkan presentation timing on Intel
+
+With a compositor using a raw monotonic clock, the installed Intel driver used presentation feedback converted to the Vulkan clock when scheduling its next Wayland FIFO commit. On the ROG the two clocks differed by about 4.1 seconds. The driver queued deadlines seconds in the future, and mpv blocked acquiring a reusable swapchain image. Keeping the Wayland scheduler in the compositor clock reduced the median deadline from 4,124 ms to 16.17 ms at 60 Hz. The 4K FEL sample then played to EOF in real time, with eight output drops on Intel. NVIDIA played the same sample with zero drops. These were private hardware-backed compositor runs. [Wire and playback measurements](../evidence/mesa-wsi-presentation-clock.json).
+
 ### Physical trim selection and the staged dual-layer player
 
 The reviewed mpv 0.41 `+rogdv4` passes the compositor's physical peak and black level to the creative mapper. For the laptop declaration, it chooses the trim at 616 cd/m², then scales linear light by 203/142 for the compositor encoding. A change of physical target invalidates cached mappings even when the desktop reports the same normalized headroom. Explicit targets and native exports retain their own target rules. The private rollback restores the installed `+rogdv2`. [Runtime qualification](../packaging/system-dv/physical-target-runtime-receipt.json) · [Package hashes](../packaging/system-dv/physical-target-package-receipt.json).
