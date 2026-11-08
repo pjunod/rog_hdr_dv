@@ -1,15 +1,8 @@
 # GNOME image colour — preserve tagged photographs through the desktop
 
-Companion to [software delivery](SOFTWARE_DELIVERY.md) and the
-[GTK display target](GDK_DISPLAY_TARGET.md): this document owns the ordinary
-GNOME Image Viewer colour path, its Ubuntu source packages and recovery.
+**November 8, 2026.** The staged Loupe and Glycin packages preserve wide-gamut color in the ordinary GNOME Image Viewer and retain embedded color profiles in small TIFFs. On the ROG’s isolated HDR display, six Adobe RGB patches matched an independent BT.2020 reference within one 10-bit code value per channel. The normal distribution compositor reproduced the same values. The ROG desktop still runs the earlier packages. Optical calibration remains open.
 
-**November 8, 2026: package candidates, not installed.** Loupe's embedded glycin
-library now converts ICC-tagged images into a floating-point, linear BT.2020
-working texture. The sandboxed TIFF decoder also preserves valid ICC metadata
-on small images. Software readback has been qualified against independently
-computed colour values. This establishes the digital path; it does not establish
-panel calibration or optical colour accuracy.
+This document covers the image viewer, its Ubuntu source packages and recovery. [Software delivery](SOFTWARE_DELIVERY.md) · [GTK display targets](GDK_DISPLAY_TARGET.md).
 
 ## Why the photograph lost colour
 

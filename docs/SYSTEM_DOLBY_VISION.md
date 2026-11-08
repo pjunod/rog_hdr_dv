@@ -75,6 +75,14 @@ python3 tools/qualify-ubuntu-bundle.py /path/to/candidate /path/to/rollback /pat
 
 The tool runs APT in simulation mode against a copy of the installed package database and empty repository lists. It rejects extra installations and removals. It then builds a package-state snapshot representing the upgrade and checks the inverse transaction against the supplied rollback archives. It records both solver logs and archive SHA-256 hashes. Preserve the receipt privately because its starting snapshot lists all installed packages. The simulations cover dependency resolution. Maintainer scripts, live-session changes and optical behavior require their own checks.
 
+On the ROG, the configured archive has priority 1001. After projecting the local Mutter upgrade, normal APT policy selected the older archive version for all five Mutter packages. A version-specific preference at the same priority selected the new version for all five while allowing later, higher-version archive updates at priority 1001. The coordinated local install needs the following preference until its reviewed version is available in the configured archive. Include this file in the rollback inventory and remove it when reverting. The rehearsal used a private preference file.
+
+```text
+Package: gir1.2-mutter-51 libmutter-51-0 mutter mutter-common mutter-common-bin
+Pin: version 51.0-1ubuntu3+nativehdr15
+Pin-Priority: 1001
+```
+
 ### Vulkan presentation timing on Intel
 
 With a compositor using a raw monotonic clock, the installed Intel driver used presentation feedback converted to the Vulkan clock when scheduling its next Wayland FIFO commit. On the ROG the two clocks differed by about 4.1 seconds. The driver queued deadlines seconds in the future, and mpv blocked acquiring a reusable swapchain image. Keeping the Wayland scheduler in the compositor clock reduced the median deadline from 4,124 ms to 16.17 ms at 60 Hz. The first corrected Intel build played the 4K FEL sample to EOF with eight output drops. With the normal amd64 Ubuntu driver package, 2.25 seconds of media took 2.26 seconds, with 17 output drops over the clip during concurrent builds. Both runs had zero decoder drops. NVIDIA played the same sample with zero drops. These were private hardware-backed compositor runs. [Wire and playback measurements](../evidence/mesa-wsi-presentation-clock.json).
