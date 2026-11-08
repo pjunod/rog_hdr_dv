@@ -1,0 +1,915 @@
+From 95f13db2dfdd60262210ec7858cda98413bd86eb Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sat, 7 Nov 2026 18:00:00 -0500
+Subject: [PATCH] Attach frame-owned Dolby metadata and dispatch the shared
+ display mapper
+
+---
+ src/include/libplacebo/config.h.in            |   2 +
+ src/include/libplacebo/namespace.h            | 509 ++++++++++++++++++
+ src/include/libplacebo/renderer.h             |  22 +
+ src/include/libplacebo/utils/libav_internal.h |  15 +
+ src/meson.build                               |   3 +-
+ src/renderer.c                                | 152 +++++-
+ 6 files changed, 691 insertions(+), 12 deletions(-)
+ create mode 100644 src/include/libplacebo/namespace.h
+
+diff --git a/src/include/libplacebo/config.h.in b/src/include/libplacebo/config.h.in
+index 5279f3c..8025b56 100644
+--- a/src/include/libplacebo/config.h.in
++++ b/src/include/libplacebo/config.h.in
+@@ -18,6 +18,8 @@
+ #ifndef LIBPLACEBO_CONFIG_H_
+ #define LIBPLACEBO_CONFIG_H_
+ 
++#include <libplacebo/namespace.h>
++
+ // Increased any time the library changes in a fundamental/major way.
+ #define PL_MAJOR_VER @majorver@
+ 
+diff --git a/src/include/libplacebo/namespace.h b/src/include/libplacebo/namespace.h
+new file mode 100644
+index 0000000..0db285d
+--- /dev/null
++++ b/src/include/libplacebo/namespace.h
+@@ -0,0 +1,509 @@
++/* Isolate the experimental renderer from stock transitive consumers. */
++#ifndef LIBPLACEBO_ROG_NAMESPACE_H_
++#define LIBPLACEBO_ROG_NAMESPACE_H_
++#define pl_alpha_overlay pl_rog1_alpha_overlay
++#define pl_bit_encoding_equal pl_rog1_bit_encoding_equal
++#define pl_blackbody_from_temp pl_rog1_blackbody_from_temp
++#define pl_buf_copy pl_rog1_buf_copy
++#define pl_buf_create pl_rog1_buf_create
++#define pl_buf_destroy pl_rog1_buf_destroy
++#define pl_buf_dummy_data pl_rog1_buf_dummy_data
++#define pl_buf_export pl_rog1_buf_export
++#define pl_buf_poll pl_rog1_buf_poll
++#define pl_buf_read pl_rog1_buf_read
++#define pl_buf_recreate pl_rog1_buf_recreate
++#define pl_buf_write pl_rog1_buf_write
++#define pl_cache_create pl_rog1_cache_create
++#define pl_cache_default_params pl_rog1_cache_default_params
++#define pl_cache_destroy pl_rog1_cache_destroy
++#define pl_cache_get pl_rog1_cache_get
++#define pl_cache_get_file pl_rog1_cache_get_file
++#define pl_cache_iterate pl_rog1_cache_iterate
++#define pl_cache_load pl_rog1_cache_load
++#define pl_cache_load_ex pl_rog1_cache_load_ex
++#define pl_cache_objects pl_rog1_cache_objects
++#define pl_cache_reset pl_rog1_cache_reset
++#define pl_cache_save pl_rog1_cache_save
++#define pl_cache_save_ex pl_rog1_cache_save_ex
++#define pl_cache_set pl_rog1_cache_set
++#define pl_cache_set_file pl_rog1_cache_set_file
++#define pl_cache_signature pl_rog1_cache_signature
++#define pl_cache_size pl_rog1_cache_size
++#define pl_cache_try_set pl_rog1_cache_try_set
++#define pl_chroma_location_offset pl_rog1_chroma_location_offset
++#define pl_color_adjustment_neutral pl_rog1_color_adjustment_neutral
++#define pl_color_delinearize pl_rog1_color_delinearize
++#define pl_color_levels_guess pl_rog1_color_levels_guess
++#define pl_color_linearize pl_rog1_color_linearize
++#define pl_color_map_default_params pl_rog1_color_map_default_params
++#define pl_color_map_high_quality_params pl_rog1_color_map_high_quality_params
++#define pl_color_primaries_guess pl_rog1_color_primaries_guess
++#define pl_color_primaries_is_wide_gamut pl_rog1_color_primaries_is_wide_gamut
++#define pl_color_primaries_name pl_rog1_color_primaries_name
++#define pl_color_primaries_names pl_rog1_color_primaries_names
++#define pl_color_repr_decode pl_rog1_color_repr_decode
++#define pl_color_repr_equal pl_rog1_color_repr_equal
++#define pl_color_repr_hdtv pl_rog1_color_repr_hdtv
++#define pl_color_repr_jpeg pl_rog1_color_repr_jpeg
++#define pl_color_repr_merge pl_rog1_color_repr_merge
++#define pl_color_repr_normalize pl_rog1_color_repr_normalize
++#define pl_color_repr_rgb pl_rog1_color_repr_rgb
++#define pl_color_repr_sdtv pl_rog1_color_repr_sdtv
++#define pl_color_repr_uhdtv pl_rog1_color_repr_uhdtv
++#define pl_color_repr_unknown pl_rog1_color_repr_unknown
++#define pl_color_space_bt2020_hlg pl_rog1_color_space_bt2020_hlg
++#define pl_color_space_bt709 pl_rog1_color_space_bt709
++#define pl_color_space_equal pl_rog1_color_space_equal
++#define pl_color_space_hdr10 pl_rog1_color_space_hdr10
++#define pl_color_space_infer pl_rog1_color_space_infer
++#define pl_color_space_infer_map pl_rog1_color_space_infer_map
++#define pl_color_space_infer_ref pl_rog1_color_space_infer_ref
++#define pl_color_space_is_black_scaled pl_rog1_color_space_is_black_scaled
++#define pl_color_space_is_hdr pl_rog1_color_space_is_hdr
++#define pl_color_space_merge pl_rog1_color_space_merge
++#define pl_color_space_monitor pl_rog1_color_space_monitor
++#define pl_color_space_nominal_luma_ex pl_rog1_color_space_nominal_luma_ex
++#define pl_color_space_srgb pl_rog1_color_space_srgb
++#define pl_color_space_unknown pl_rog1_color_space_unknown
++#define pl_color_system_guess_ycbcr pl_rog1_color_system_guess_ycbcr
++#define pl_color_system_is_linear pl_rog1_color_system_is_linear
++#define pl_color_system_is_ycbcr_like pl_rog1_color_system_is_ycbcr_like
++#define pl_color_system_name pl_rog1_color_system_name
++#define pl_color_system_names pl_rog1_color_system_names
++#define pl_color_transfer_name pl_rog1_color_transfer_name
++#define pl_color_transfer_names pl_rog1_color_transfer_names
++#define pl_color_transfer_nominal_peak pl_rog1_color_transfer_nominal_peak
++#define pl_daylight_from_temp pl_rog1_daylight_from_temp
++#define pl_deband_default_params pl_rog1_deband_default_params
++#define pl_deinterlace_default_params pl_rog1_deinterlace_default_params
++#define pl_desc_access_glsl_name pl_rog1_desc_access_glsl_name
++#define pl_desc_namespace pl_rog1_desc_namespace
++#define pl_dispatch_abort pl_rog1_dispatch_abort
++#define pl_dispatch_begin pl_rog1_dispatch_begin
++#define pl_dispatch_callback pl_rog1_dispatch_callback
++#define pl_dispatch_compute pl_rog1_dispatch_compute
++#define pl_dispatch_create pl_rog1_dispatch_create
++#define pl_dispatch_destroy pl_rog1_dispatch_destroy
++#define pl_dispatch_finish pl_rog1_dispatch_finish
++#define pl_dispatch_load pl_rog1_dispatch_load
++#define pl_dispatch_reset_frame pl_rog1_dispatch_reset_frame
++#define pl_dispatch_save pl_rog1_dispatch_save
++#define pl_dispatch_vertex pl_rog1_dispatch_vertex
++#define pl_distort_default_params pl_rog1_distort_default_params
++#define pl_dither_default_params pl_rog1_dither_default_params
++#define pl_error_diffusion_atkinson pl_rog1_error_diffusion_atkinson
++#define pl_error_diffusion_burkes pl_rog1_error_diffusion_burkes
++#define pl_error_diffusion_false_fs pl_rog1_error_diffusion_false_fs
++#define pl_error_diffusion_floyd_steinberg pl_rog1_error_diffusion_floyd_steinberg
++#define pl_error_diffusion_jarvis_judice_ninke pl_rog1_error_diffusion_jarvis_judice_ninke
++#define pl_error_diffusion_kernels pl_rog1_error_diffusion_kernels
++#define pl_error_diffusion_shmem_req pl_rog1_error_diffusion_shmem_req
++#define pl_error_diffusion_sierra2 pl_rog1_error_diffusion_sierra2
++#define pl_error_diffusion_sierra3 pl_rog1_error_diffusion_sierra3
++#define pl_error_diffusion_sierra_lite pl_rog1_error_diffusion_sierra_lite
++#define pl_error_diffusion_simple pl_rog1_error_diffusion_simple
++#define pl_error_diffusion_stucki pl_rog1_error_diffusion_stucki
++#define pl_filter_bicubic pl_rog1_filter_bicubic
++#define pl_filter_bilinear pl_rog1_filter_bilinear
++#define pl_filter_box pl_rog1_filter_box
++#define pl_filter_catmull_rom pl_rog1_filter_catmull_rom
++#define pl_filter_config_eq pl_rog1_filter_config_eq
++#define pl_filter_configs pl_rog1_filter_configs
++#define pl_filter_ewa_ginseng pl_rog1_filter_ewa_ginseng
++#define pl_filter_ewa_hann pl_rog1_filter_ewa_hann
++#define pl_filter_ewa_jinc pl_rog1_filter_ewa_jinc
++#define pl_filter_ewa_lanczos pl_rog1_filter_ewa_lanczos
++#define pl_filter_ewa_lanczos4sharpest pl_rog1_filter_ewa_lanczos4sharpest
++#define pl_filter_ewa_lanczossharp pl_rog1_filter_ewa_lanczossharp
++#define pl_filter_ewa_robidoux pl_rog1_filter_ewa_robidoux
++#define pl_filter_ewa_robidouxsharp pl_rog1_filter_ewa_robidouxsharp
++#define pl_filter_free pl_rog1_filter_free
++#define pl_filter_function_bcspline pl_rog1_filter_function_bcspline
++#define pl_filter_function_bicubic pl_rog1_filter_function_bicubic
++#define pl_filter_function_blackman pl_rog1_filter_function_blackman
++#define pl_filter_function_bohman pl_rog1_filter_function_bohman
++#define pl_filter_function_box pl_rog1_filter_function_box
++#define pl_filter_function_catmull_rom pl_rog1_filter_function_catmull_rom
++#define pl_filter_function_cosine pl_rog1_filter_function_cosine
++#define pl_filter_function_cubic pl_rog1_filter_function_cubic
++#define pl_filter_function_eq pl_rog1_filter_function_eq
++#define pl_filter_function_gaussian pl_rog1_filter_function_gaussian
++#define pl_filter_function_hamming pl_rog1_filter_function_hamming
++#define pl_filter_function_hann pl_rog1_filter_function_hann
++#define pl_filter_function_hermite pl_rog1_filter_function_hermite
++#define pl_filter_function_jinc pl_rog1_filter_function_jinc
++#define pl_filter_function_kaiser pl_rog1_filter_function_kaiser
++#define pl_filter_function_mitchell pl_rog1_filter_function_mitchell
++#define pl_filter_function_oversample pl_rog1_filter_function_oversample
++#define pl_filter_function_presets pl_rog1_filter_function_presets
++#define pl_filter_function_quadratic pl_rog1_filter_function_quadratic
++#define pl_filter_function_robidoux pl_rog1_filter_function_robidoux
++#define pl_filter_function_robidouxsharp pl_rog1_filter_function_robidouxsharp
++#define pl_filter_function_sinc pl_rog1_filter_function_sinc
++#define pl_filter_function_sphinx pl_rog1_filter_function_sphinx
++#define pl_filter_function_spline16 pl_rog1_filter_function_spline16
++#define pl_filter_function_spline36 pl_rog1_filter_function_spline36
++#define pl_filter_function_spline64 pl_rog1_filter_function_spline64
++#define pl_filter_function_triangle pl_rog1_filter_function_triangle
++#define pl_filter_function_welch pl_rog1_filter_function_welch
++#define pl_filter_functions pl_rog1_filter_functions
++#define pl_filter_gaussian pl_rog1_filter_gaussian
++#define pl_filter_generate pl_rog1_filter_generate
++#define pl_filter_ginseng pl_rog1_filter_ginseng
++#define pl_filter_hermite pl_rog1_filter_hermite
++#define pl_filter_lanczos pl_rog1_filter_lanczos
++#define pl_filter_mitchell pl_rog1_filter_mitchell
++#define pl_filter_mitchell_clamp pl_rog1_filter_mitchell_clamp
++#define pl_filter_nearest pl_rog1_filter_nearest
++#define pl_filter_oversample pl_rog1_filter_oversample
++#define pl_filter_presets pl_rog1_filter_presets
++#define pl_filter_robidoux pl_rog1_filter_robidoux
++#define pl_filter_robidouxsharp pl_rog1_filter_robidouxsharp
++#define pl_filter_sample pl_rog1_filter_sample
++#define pl_filter_sinc pl_rog1_filter_sinc
++#define pl_filter_spline16 pl_rog1_filter_spline16
++#define pl_filter_spline36 pl_rog1_filter_spline36
++#define pl_filter_spline64 pl_rog1_filter_spline64
++#define pl_find_error_diffusion_kernel pl_rog1_find_error_diffusion_kernel
++#define pl_find_filter_config pl_rog1_find_filter_config
++#define pl_find_filter_function pl_rog1_find_filter_function
++#define pl_find_filter_function_preset pl_rog1_find_filter_function_preset
++#define pl_find_filter_preset pl_rog1_find_filter_preset
++#define pl_find_fmt pl_rog1_find_fmt
++#define pl_find_fourcc pl_rog1_find_fourcc
++#define pl_find_gamut_map_function pl_rog1_find_gamut_map_function
++#define pl_find_named_fmt pl_rog1_find_named_fmt
++#define pl_find_option pl_rog1_find_option
++#define pl_find_tone_map_function pl_rog1_find_tone_map_function
++#define pl_find_vertex_fmt pl_rog1_find_vertex_fmt
++#define pl_fix_ver pl_rog1_fix_ver
++#define pl_fmt_has_modifier pl_rog1_fmt_has_modifier
++#define pl_fmt_is_float pl_rog1_fmt_is_float
++#define pl_fmt_is_ordered pl_rog1_fmt_is_ordered
++#define pl_frame_clear_rgba pl_rog1_frame_clear_rgba
++#define pl_frame_clear_tiles pl_rog1_frame_clear_tiles
++#define pl_frame_from_swapchain pl_rog1_frame_from_swapchain
++#define pl_frame_is_cropped pl_rog1_frame_is_cropped
++#define pl_frame_mix_current pl_rog1_frame_mix_current
++#define pl_frame_mix_nearest pl_rog1_frame_mix_nearest
++#define pl_frame_mixers pl_rog1_frame_mixers
++#define pl_frame_set_chroma_location pl_rog1_frame_set_chroma_location
++#define pl_frames_infer pl_rog1_frames_infer
++#define pl_frames_infer_mix pl_rog1_frames_infer_mix
++#define pl_gamut_map_absolute pl_rog1_gamut_map_absolute
++#define pl_gamut_map_clip pl_rog1_gamut_map_clip
++#define pl_gamut_map_darken pl_rog1_gamut_map_darken
++#define pl_gamut_map_desaturate pl_rog1_gamut_map_desaturate
++#define pl_gamut_map_functions pl_rog1_gamut_map_functions
++#define pl_gamut_map_generate pl_rog1_gamut_map_generate
++#define pl_gamut_map_highlight pl_rog1_gamut_map_highlight
++#define pl_gamut_map_linear pl_rog1_gamut_map_linear
++#define pl_gamut_map_params_equal pl_rog1_gamut_map_params_equal
++#define pl_gamut_map_params_noop pl_rog1_gamut_map_params_noop
++#define pl_gamut_map_perceptual pl_rog1_gamut_map_perceptual
++#define pl_gamut_map_relative pl_rog1_gamut_map_relative
++#define pl_gamut_map_sample pl_rog1_gamut_map_sample
++#define pl_gamut_map_saturation pl_rog1_gamut_map_saturation
++#define pl_gamut_map_softclip pl_rog1_gamut_map_softclip
++#define pl_generate_bayer_matrix pl_rog1_generate_bayer_matrix
++#define pl_generate_blue_noise pl_rog1_generate_blue_noise
++#define pl_get_adaptation_matrix pl_rog1_get_adaptation_matrix
++#define pl_get_color_mapping_matrix pl_rog1_get_color_mapping_matrix
++#define pl_get_cone_matrix pl_rog1_get_cone_matrix
++#define pl_get_detected_hdr_metadata pl_rog1_get_detected_hdr_metadata
++#define pl_get_rgb2xyz_matrix pl_rog1_get_rgb2xyz_matrix
++#define pl_get_xyz2rgb_matrix pl_rog1_get_xyz2rgb_matrix
++#define pl_gpu_dummy_create pl_rog1_gpu_dummy_create
++#define pl_gpu_dummy_default_params pl_rog1_gpu_dummy_default_params
++#define pl_gpu_dummy_destroy pl_rog1_gpu_dummy_destroy
++#define pl_gpu_finish pl_rog1_gpu_finish
++#define pl_gpu_flush pl_rog1_gpu_flush
++#define pl_gpu_is_failed pl_rog1_gpu_is_failed
++#define pl_gpu_set_cache pl_rog1_gpu_set_cache
++#define pl_hdr_metadata_contains pl_rog1_hdr_metadata_contains
++#define pl_hdr_metadata_empty pl_rog1_hdr_metadata_empty
++#define pl_hdr_metadata_equal pl_rog1_hdr_metadata_equal
++#define pl_hdr_metadata_from_dovi_rpu pl_rog1_hdr_metadata_from_dovi_rpu
++#define pl_hdr_metadata_hdr10 pl_rog1_hdr_metadata_hdr10
++#define pl_hdr_metadata_merge pl_rog1_hdr_metadata_merge
++#define pl_hdr_rescale pl_rog1_hdr_rescale
++#define pl_icc_close pl_rog1_icc_close
++#define pl_icc_decode pl_rog1_icc_decode
++#define pl_icc_default_params pl_rog1_icc_default_params
++#define pl_icc_encode pl_rog1_icc_encode
++#define pl_icc_open pl_rog1_icc_open
++#define pl_icc_profile_compute_signature pl_rog1_icc_profile_compute_signature
++#define pl_icc_profile_equal pl_rog1_icc_profile_equal
++#define pl_icc_update pl_rog1_icc_update
++#define pl_ipt_ipt2lms pl_rog1_ipt_ipt2lms
++#define pl_ipt_lms2ipt pl_rog1_ipt_lms2ipt
++#define pl_ipt_lms2rgb pl_rog1_ipt_lms2rgb
++#define pl_ipt_rgb2lms pl_rog1_ipt_rgb2lms
++#define pl_log_color pl_rog1_log_color
++#define pl_log_create_360 pl_rog1_log_create_360
++#define pl_log_default_params pl_rog1_log_default_params
++#define pl_log_destroy pl_rog1_log_destroy
++#define pl_log_level_update pl_rog1_log_level_update
++#define pl_log_simple pl_rog1_log_simple
++#define pl_log_update pl_rog1_log_update
++#define pl_lut_free pl_rog1_lut_free
++#define pl_lut_parse_cube pl_rog1_lut_parse_cube
++#define pl_matrix2x2_apply pl_rog1_matrix2x2_apply
++#define pl_matrix2x2_apply_rc pl_rog1_matrix2x2_apply_rc
++#define pl_matrix2x2_identity pl_rog1_matrix2x2_identity
++#define pl_matrix2x2_invert pl_rog1_matrix2x2_invert
++#define pl_matrix2x2_mul pl_rog1_matrix2x2_mul
++#define pl_matrix2x2_rmul pl_rog1_matrix2x2_rmul
++#define pl_matrix2x2_rotation pl_rog1_matrix2x2_rotation
++#define pl_matrix2x2_scale pl_rog1_matrix2x2_scale
++#define pl_matrix3x3_apply pl_rog1_matrix3x3_apply
++#define pl_matrix3x3_apply_rc pl_rog1_matrix3x3_apply_rc
++#define pl_matrix3x3_identity pl_rog1_matrix3x3_identity
++#define pl_matrix3x3_invert pl_rog1_matrix3x3_invert
++#define pl_matrix3x3_mul pl_rog1_matrix3x3_mul
++#define pl_matrix3x3_rmul pl_rog1_matrix3x3_rmul
++#define pl_matrix3x3_scale pl_rog1_matrix3x3_scale
++#define pl_mpv_user_shader_destroy pl_rog1_mpv_user_shader_destroy
++#define pl_mpv_user_shader_parse pl_rog1_mpv_user_shader_parse
++#define pl_needs_film_grain pl_rog1_needs_film_grain
++#define pl_num_error_diffusion_kernels pl_rog1_num_error_diffusion_kernels
++#define pl_num_filter_configs pl_rog1_num_filter_configs
++#define pl_num_filter_function_presets pl_rog1_num_filter_function_presets
++#define pl_num_filter_functions pl_rog1_num_filter_functions
++#define pl_num_filter_presets pl_rog1_num_filter_presets
++#define pl_num_frame_mixers pl_rog1_num_frame_mixers
++#define pl_num_gamut_map_functions pl_rog1_num_gamut_map_functions
++#define pl_num_scale_filters pl_rog1_num_scale_filters
++#define pl_num_tone_map_functions pl_rog1_num_tone_map_functions
++#define pl_opengl_create pl_rog1_opengl_create
++#define pl_opengl_create_swapchain pl_rog1_opengl_create_swapchain
++#define pl_opengl_default_params pl_rog1_opengl_default_params
++#define pl_opengl_destroy pl_rog1_opengl_destroy
++#define pl_opengl_get pl_rog1_opengl_get
++#define pl_opengl_swapchain_update_fb pl_rog1_opengl_swapchain_update_fb
++#define pl_opengl_unwrap pl_rog1_opengl_unwrap
++#define pl_opengl_wrap pl_rog1_opengl_wrap
++#define pl_option_count pl_rog1_option_count
++#define pl_option_list pl_rog1_option_list
++#define pl_options_add_hook pl_rog1_options_add_hook
++#define pl_options_alloc pl_rog1_options_alloc
++#define pl_options_free pl_rog1_options_free
++#define pl_options_get pl_rog1_options_get
++#define pl_options_insert_hook pl_rog1_options_insert_hook
++#define pl_options_iterate pl_rog1_options_iterate
++#define pl_options_load pl_rog1_options_load
++#define pl_options_remove_hook_at pl_rog1_options_remove_hook_at
++#define pl_options_reset pl_rog1_options_reset
++#define pl_options_save pl_rog1_options_save
++#define pl_options_set_str pl_rog1_options_set_str
++#define pl_pass_create pl_rog1_pass_create
++#define pl_pass_destroy pl_rog1_pass_destroy
++#define pl_pass_run pl_rog1_pass_run
++#define pl_peak_detect_default_params pl_rog1_peak_detect_default_params
++#define pl_peak_detect_high_quality_params pl_rog1_peak_detect_high_quality_params
++#define pl_plane_data_align pl_rog1_plane_data_align
++#define pl_plane_data_from_comps pl_rog1_plane_data_from_comps
++#define pl_plane_data_from_mask pl_rog1_plane_data_from_mask
++#define pl_plane_find_fmt pl_rog1_plane_find_fmt
++#define pl_primaries_clip pl_rog1_primaries_clip
++#define pl_primaries_compatible pl_rog1_primaries_compatible
++#define pl_primaries_superset pl_rog1_primaries_superset
++#define pl_primaries_valid pl_rog1_primaries_valid
++#define pl_queue_create pl_rog1_queue_create
++#define pl_queue_destroy pl_rog1_queue_destroy
++#define pl_queue_estimate_fps pl_rog1_queue_estimate_fps
++#define pl_queue_estimate_vps pl_rog1_queue_estimate_vps
++#define pl_queue_num_frames pl_rog1_queue_num_frames
++#define pl_queue_peek pl_rog1_queue_peek
++#define pl_queue_pts_offset pl_rog1_queue_pts_offset
++#define pl_queue_push pl_rog1_queue_push
++#define pl_queue_push_block pl_rog1_queue_push_block
++#define pl_queue_reset pl_rog1_queue_reset
++#define pl_queue_update pl_rog1_queue_update
++#define pl_raw_primaries_equal pl_rog1_raw_primaries_equal
++#define pl_raw_primaries_get pl_rog1_raw_primaries_get
++#define pl_raw_primaries_merge pl_rog1_raw_primaries_merge
++#define pl_raw_primaries_similar pl_rog1_raw_primaries_similar
++#define pl_recreate_plane pl_rog1_recreate_plane
++#define pl_rect2d_normalize pl_rog1_rect2d_normalize
++#define pl_rect2df_aspect pl_rog1_rect2df_aspect
++#define pl_rect2df_aspect_fit pl_rog1_rect2df_aspect_fit
++#define pl_rect2df_aspect_set pl_rog1_rect2df_aspect_set
++#define pl_rect2df_normalize pl_rog1_rect2df_normalize
++#define pl_rect2df_offset pl_rog1_rect2df_offset
++#define pl_rect2df_rotate pl_rog1_rect2df_rotate
++#define pl_rect2df_round pl_rog1_rect2df_round
++#define pl_rect2df_stretch pl_rog1_rect2df_stretch
++#define pl_rect3d_normalize pl_rog1_rect3d_normalize
++#define pl_rect3df_normalize pl_rog1_rect3df_normalize
++#define pl_rect3df_round pl_rog1_rect3df_round
++#define pl_render_default_params pl_rog1_render_default_params
++#define pl_render_fast_params pl_rog1_render_fast_params
++#define pl_render_high_quality_params pl_rog1_render_high_quality_params
++#define pl_render_image pl_rog1_render_image
++#define pl_render_image_mix pl_rog1_render_image_mix
++#define pl_renderer_create pl_rog1_renderer_create
++#define pl_renderer_destroy pl_rog1_renderer_destroy
++#define pl_renderer_flush_cache pl_rog1_renderer_flush_cache
++#define pl_renderer_get_errors pl_rog1_renderer_get_errors
++#define pl_renderer_get_hdr_metadata pl_rog1_renderer_get_hdr_metadata
++#define pl_renderer_load pl_rog1_renderer_load
++#define pl_renderer_reset_errors pl_rog1_renderer_reset_errors
++#define pl_renderer_save pl_rog1_renderer_save
++#define pl_reset_detected_peak pl_rog1_reset_detected_peak
++#define pl_scale_filters pl_rog1_scale_filters
++#define pl_shader_alloc pl_rog1_shader_alloc
++#define pl_shader_color_map pl_rog1_shader_color_map
++#define pl_shader_color_map_ex pl_rog1_shader_color_map_ex
++#define pl_shader_cone_distort pl_rog1_shader_cone_distort
++#define pl_shader_custom pl_rog1_shader_custom
++#define pl_shader_custom_lut pl_rog1_shader_custom_lut
++#define pl_shader_deband pl_rog1_shader_deband
++#define pl_shader_decode_color pl_rog1_shader_decode_color
++#define pl_shader_deinterlace pl_rog1_shader_deinterlace
++#define pl_shader_delinearize pl_rog1_shader_delinearize
++#define pl_shader_detect_peak pl_rog1_shader_detect_peak
++#define pl_shader_distort pl_rog1_shader_distort
++#define pl_shader_dither pl_rog1_shader_dither
++#define pl_shader_dovi_reshape pl_rog1_shader_dovi_reshape
++#define pl_shader_encode_color pl_rog1_shader_encode_color
++#define pl_shader_error_diffusion pl_rog1_shader_error_diffusion
++#define pl_shader_extract_features pl_rog1_shader_extract_features
++#define pl_shader_film_grain pl_rog1_shader_film_grain
++#define pl_shader_finalize pl_rog1_shader_finalize
++#define pl_shader_free pl_rog1_shader_free
++#define pl_shader_info_deref pl_rog1_shader_info_deref
++#define pl_shader_info_ref pl_rog1_shader_info_ref
++#define pl_shader_is_compute pl_rog1_shader_is_compute
++#define pl_shader_is_failed pl_rog1_shader_is_failed
++#define pl_shader_linearize pl_rog1_shader_linearize
++#define pl_shader_obj_destroy pl_rog1_shader_obj_destroy
++#define pl_shader_output_size pl_rog1_shader_output_size
++#define pl_shader_reset pl_rog1_shader_reset
++#define pl_shader_sample_bicubic pl_rog1_shader_sample_bicubic
++#define pl_shader_sample_bilinear pl_rog1_shader_sample_bilinear
++#define pl_shader_sample_direct pl_rog1_shader_sample_direct
++#define pl_shader_sample_gaussian pl_rog1_shader_sample_gaussian
++#define pl_shader_sample_hermite pl_rog1_shader_sample_hermite
++#define pl_shader_sample_nearest pl_rog1_shader_sample_nearest
++#define pl_shader_sample_ortho2 pl_rog1_shader_sample_ortho2
++#define pl_shader_sample_oversample pl_rog1_shader_sample_oversample
++#define pl_shader_sample_polar pl_rog1_shader_sample_polar
++#define pl_shader_set_alpha pl_rog1_shader_set_alpha
++#define pl_shader_sigmoidize pl_rog1_shader_sigmoidize
++#define pl_shader_unsigmoidize pl_rog1_shader_unsigmoidize
++#define pl_sigmoid_default_params pl_rog1_sigmoid_default_params
++#define pl_std140_layout pl_rog1_std140_layout
++#define pl_std430_layout pl_rog1_std430_layout
++#define pl_swapchain_colorspace_hint pl_rog1_swapchain_colorspace_hint
++#define pl_swapchain_destroy pl_rog1_swapchain_destroy
++#define pl_swapchain_latency pl_rog1_swapchain_latency
++#define pl_swapchain_resize pl_rog1_swapchain_resize
++#define pl_swapchain_start_frame pl_rog1_swapchain_start_frame
++#define pl_swapchain_submit_frame pl_rog1_swapchain_submit_frame
++#define pl_swapchain_swap_buffers pl_rog1_swapchain_swap_buffers
++#define pl_tex_blit pl_rog1_tex_blit
++#define pl_tex_clear pl_rog1_tex_clear
++#define pl_tex_clear_ex pl_rog1_tex_clear_ex
++#define pl_tex_create pl_rog1_tex_create
++#define pl_tex_destroy pl_rog1_tex_destroy
++#define pl_tex_download pl_rog1_tex_download
++#define pl_tex_dummy_create pl_rog1_tex_dummy_create
++#define pl_tex_dummy_data pl_rog1_tex_dummy_data
++#define pl_tex_invalidate pl_rog1_tex_invalidate
++#define pl_tex_poll pl_rog1_tex_poll
++#define pl_tex_recreate pl_rog1_tex_recreate
++#define pl_tex_upload pl_rog1_tex_upload
++#define pl_timer_create pl_rog1_timer_create
++#define pl_timer_destroy pl_rog1_timer_destroy
++#define pl_timer_query pl_rog1_timer_query
++#define pl_tone_map_bt2390 pl_rog1_tone_map_bt2390
++#define pl_tone_map_bt2446a pl_rog1_tone_map_bt2446a
++#define pl_tone_map_clip pl_rog1_tone_map_clip
++#define pl_tone_map_functions pl_rog1_tone_map_functions
++#define pl_tone_map_gamma pl_rog1_tone_map_gamma
++#define pl_tone_map_generate pl_rog1_tone_map_generate
++#define pl_tone_map_hable pl_rog1_tone_map_hable
++#define pl_tone_map_linear pl_rog1_tone_map_linear
++#define pl_tone_map_linear_light pl_rog1_tone_map_linear_light
++#define pl_tone_map_mobius pl_rog1_tone_map_mobius
++#define pl_tone_map_params_equal pl_rog1_tone_map_params_equal
++#define pl_tone_map_params_infer pl_rog1_tone_map_params_infer
++#define pl_tone_map_params_noop pl_rog1_tone_map_params_noop
++#define pl_tone_map_reinhard pl_rog1_tone_map_reinhard
++#define pl_tone_map_sample pl_rog1_tone_map_sample
++#define pl_tone_map_spline pl_rog1_tone_map_spline
++#define pl_tone_map_st2094_10 pl_rog1_tone_map_st2094_10
++#define pl_tone_map_st2094_40 pl_rog1_tone_map_st2094_40
++#define pl_transform2x2_apply pl_rog1_transform2x2_apply
++#define pl_transform2x2_apply_rc pl_rog1_transform2x2_apply_rc
++#define pl_transform2x2_bounds pl_rog1_transform2x2_bounds
++#define pl_transform2x2_identity pl_rog1_transform2x2_identity
++#define pl_transform2x2_invert pl_rog1_transform2x2_invert
++#define pl_transform2x2_mul pl_rog1_transform2x2_mul
++#define pl_transform2x2_rmul pl_rog1_transform2x2_rmul
++#define pl_transform2x2_scale pl_rog1_transform2x2_scale
++#define pl_transform3x3_apply pl_rog1_transform3x3_apply
++#define pl_transform3x3_apply_rc pl_rog1_transform3x3_apply_rc
++#define pl_transform3x3_identity pl_rog1_transform3x3_identity
++#define pl_transform3x3_invert pl_rog1_transform3x3_invert
++#define pl_transform3x3_scale pl_rog1_transform3x3_scale
++#define pl_upload_plane pl_rog1_upload_plane
++#define pl_var_float pl_rog1_var_float
++#define pl_var_from_fmt pl_rog1_var_from_fmt
++#define pl_var_glsl_type_name pl_rog1_var_glsl_type_name
++#define pl_var_glsl_types pl_rog1_var_glsl_types
++#define pl_var_host_layout pl_rog1_var_host_layout
++#define pl_var_int pl_rog1_var_int
++#define pl_var_ivec2 pl_rog1_var_ivec2
++#define pl_var_ivec3 pl_rog1_var_ivec3
++#define pl_var_ivec4 pl_rog1_var_ivec4
++#define pl_var_mat2 pl_rog1_var_mat2
++#define pl_var_mat2x3 pl_rog1_var_mat2x3
++#define pl_var_mat2x4 pl_rog1_var_mat2x4
++#define pl_var_mat3 pl_rog1_var_mat3
++#define pl_var_mat3x4 pl_rog1_var_mat3x4
++#define pl_var_mat4 pl_rog1_var_mat4
++#define pl_var_mat4x2 pl_rog1_var_mat4x2
++#define pl_var_mat4x3 pl_rog1_var_mat4x3
++#define pl_var_type_size pl_rog1_var_type_size
++#define pl_var_uint pl_rog1_var_uint
++#define pl_var_uvec2 pl_rog1_var_uvec2
++#define pl_var_uvec3 pl_rog1_var_uvec3
++#define pl_var_uvec4 pl_rog1_var_uvec4
++#define pl_var_vec2 pl_rog1_var_vec2
++#define pl_var_vec3 pl_rog1_var_vec3
++#define pl_var_vec4 pl_rog1_var_vec4
++#define pl_version pl_rog1_version
++#define pl_vision_achromatopsia pl_rog1_vision_achromatopsia
++#define pl_vision_deuteranomaly pl_rog1_vision_deuteranomaly
++#define pl_vision_deuteranopia pl_rog1_vision_deuteranopia
++#define pl_vision_monochromacy pl_rog1_vision_monochromacy
++#define pl_vision_normal pl_rog1_vision_normal
++#define pl_vision_protanomaly pl_rog1_vision_protanomaly
++#define pl_vision_protanopia pl_rog1_vision_protanopia
++#define pl_vision_tritanomaly pl_rog1_vision_tritanomaly
++#define pl_vision_tritanopia pl_rog1_vision_tritanopia
++#define pl_vk_inst_create pl_rog1_vk_inst_create
++#define pl_vk_inst_default_params pl_rog1_vk_inst_default_params
++#define pl_vk_inst_destroy pl_rog1_vk_inst_destroy
++#define pl_vulkan_choose_device pl_rog1_vulkan_choose_device
++#define pl_vulkan_create pl_rog1_vulkan_create
++#define pl_vulkan_create_swapchain pl_rog1_vulkan_create_swapchain
++#define pl_vulkan_default_params pl_rog1_vulkan_default_params
++#define pl_vulkan_destroy pl_rog1_vulkan_destroy
++#define pl_vulkan_get pl_rog1_vulkan_get
++#define pl_vulkan_hold_ex pl_rog1_vulkan_hold_ex
++#define pl_vulkan_import pl_rog1_vulkan_import
++#define pl_vulkan_num_recommended_extensions pl_rog1_vulkan_num_recommended_extensions
++#define pl_vulkan_recommended_extensions pl_rog1_vulkan_recommended_extensions
++#define pl_vulkan_recommended_features pl_rog1_vulkan_recommended_features
++#define pl_vulkan_release_ex pl_rog1_vulkan_release_ex
++#define pl_vulkan_required_features pl_rog1_vulkan_required_features
++#define pl_vulkan_sem_create pl_rog1_vulkan_sem_create
++#define pl_vulkan_sem_destroy pl_rog1_vulkan_sem_destroy
++#define pl_vulkan_swapchain_suboptimal pl_rog1_vulkan_swapchain_suboptimal
++#define pl_vulkan_unwrap pl_rog1_vulkan_unwrap
++#define pl_vulkan_wrap pl_rog1_vulkan_wrap
++#define pl_white_from_temp pl_rog1_white_from_temp
++#endif
+diff --git a/src/include/libplacebo/renderer.h b/src/include/libplacebo/renderer.h
+index 18c0c5e..6fb271d 100644
+--- a/src/include/libplacebo/renderer.h
++++ b/src/include/libplacebo/renderer.h
+@@ -357,6 +357,20 @@ struct pl_render_params {
+     void (*info_callback)(void *priv, const struct pl_render_info *info);
+     void *info_priv;
+ 
++    // Optional display-management provider. Input is reconstructed full-range
++    // RGB BT.2020/PQ before scaling. The provider owns its returned texture until
++    // the next call; output color describes the actual mapped signal. A failure
++    // fails the render rather than silently presenting unprocessed Dolby Vision.
++    // Return 1 when mapped, 0 for inapplicable targets (ordinary rendering),
++    // or -1 on eligible-input processing failure.
++    int (*dovi_map)(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t rpu_size,
++                     const struct pl_color_space *target, pl_tex master,
++                     pl_tex *mapped, struct pl_color_space *mapped_color);
++    void (*dovi_reset)(void *priv);
++    void *dovi_priv;
++    // Change when provider configuration or output target policy changes.
++    uint64_t dovi_signature;
++
+     // --- Deprecated/removed fields
+     PL_DEPRECATED_IN(v6.254) bool allow_delayed_peak_detect; // moved to pl_peak_detect_params
+     PL_DEPRECATED_IN(v6.327) const struct pl_icc_params *icc_params; // use pl_frame.icc
+@@ -642,6 +656,14 @@ struct pl_frame {
+     // un-applying grain makes little sense.
+     struct pl_film_grain_data film_grain;
+ 
++    // Original per-frame Dolby Vision RPU, including all target trims. Caller
++    // retains immutable backing storage through the entire render/mix lifetime.
++    // An absent RPU means absent metadata; never inherit another frame's RPU.
++    const uint8_t *dovi_rpu;
++    size_t dovi_rpu_size;
++    // Native visible master size, independent of crop/zoom and texture padding.
++    int dovi_master_width, dovi_master_height;
++
+     // Ignored by libplacebo. May be useful for users.
+     void *user_data;
+ };
+diff --git a/src/include/libplacebo/utils/libav_internal.h b/src/include/libplacebo/utils/libav_internal.h
+index 13a21d2..dd8275b 100644
+--- a/src/include/libplacebo/utils/libav_internal.h
++++ b/src/include/libplacebo/utils/libav_internal.h
+@@ -1286,6 +1286,11 @@ PL_LIBAV_API bool pl_map_avframe_ex(pl_gpu gpu, struct pl_frame *out,
+     pl_frame_from_avframe(out, frame);
+     priv->avframe = av_frame_clone(frame);
+     out->user_data = priv;
++    if (!priv->avframe) {
++        free(priv);
++        out->user_data = NULL;
++        goto error;
++    }
+ 
+ #ifdef PL_HAVE_LAV_DOLBY_VISION
+     if (params->map_dovi) {
+@@ -1298,6 +1303,16 @@ PL_LIBAV_API bool pl_map_avframe_ex(pl_gpu gpu, struct pl_frame *out,
+                 pl_map_avdovi_metadata(&out->color, &out->repr, &priv->dovi, metadata);
+         }
+ 
++        // Borrow from the retained clone, whose AVBufferRef keeps the original
++        // bytes alive even when the decoder reuses or frees its input AVFrame.
++        sd = av_frame_get_side_data(priv->avframe, AV_FRAME_DATA_DOVI_RPU_BUFFER);
++        if (sd && out->repr.sys == PL_COLOR_SYSTEM_DOLBYVISION) {
++            out->dovi_rpu = sd->data;
++            out->dovi_rpu_size = sd->size;
++            out->dovi_master_width = frame->width;
++            out->dovi_master_height = frame->height;
++        }
++
+ #ifdef PL_HAVE_LIBDOVI
+         sd = av_frame_get_side_data(frame, AV_FRAME_DATA_DOVI_RPU_BUFFER);
+         if (sd)
+diff --git a/src/meson.build b/src/meson.build
+index ea5d9b4..d0dc3eb 100644
+--- a/src/meson.build
++++ b/src/meson.build
+@@ -53,6 +53,7 @@ endif
+ 
+ ### Common source files
+ headers = [
++  'namespace.h',
+   'cache.h',
+   'colorspace.h',
+   'common.h',
+@@ -248,7 +249,7 @@ lib = library('placebo', sources,
+   c_args: ['-DPL_EXPORT'],
+   install: true,
+   dependencies: build_deps + glad_dep,
+-  soversion: apiver,
++  soversion: apiver + 'rog1',
+   include_directories: [ inc, inc_dirs ],
+   link_args: link_args,
+   link_depends: link_depends,
+diff --git a/src/renderer.c b/src/renderer.c
+index 576528b..46e980d 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -86,6 +86,7 @@ struct pl_renderer_t {
+ 
+     // For debugging / logging purposes
+     int prev_dither;
++    bool dovi_override_warned;
+ 
+     // For backwards compatibility
+     struct icc_state icc_fallback[2];
+@@ -372,6 +373,9 @@ struct pass_state {
+     pl_fmt fbofmt[5];
+     bool *fbos_used;
+     bool need_peak_fbo; // need indirection for peak detection
++    bool dovi_mapped; // already target-referred; encoding conversion only
++    bool dovi_fatal; // provider failures must never become mixer fallback
++    bool dovi_full_read; // restored crop requires explicit texture sampling
+ 
+     // Map of acquired frames
+     struct {
+@@ -1183,7 +1187,8 @@ static void hdr_update_peak(struct pass_state *pass)
+ {
+     const struct pl_render_params *params = pass->params;
+     pl_renderer rr = pass->rr;
+-    if (!params->peak_detect_params || !pl_color_space_is_hdr(&pass->img.color))
++    if (pass->dovi_mapped || !params->peak_detect_params ||
++        !pl_color_space_is_hdr(&pass->img.color))
+         goto cleanup;
+ 
+     if (rr->errors & PL_RENDER_ERR_PEAK_DETECT)
+@@ -1609,6 +1614,27 @@ static bool pass_read_image(struct pass_state *pass)
+ 
+     // Original ref texture, even after preprocessing
+     pl_tex ref_tex = ref->plane.texture;
++    // Reconstruct the full visible master before display management. Its native
++    // extent is independent of the user's crop and of allocated texture padding.
++    pl_rect2df read_crop = image->crop;
++    enum pl_lut_type source_lut = guess_frame_lut_type(image, false);
++    bool full_dovi_master = params->dovi_map && image->dovi_rpu &&
++        image->dovi_rpu_size && !image->icc &&
++        source_lut != PL_LUT_NATIVE && source_lut != PL_LUT_CONVERSION &&
++        !params->deband_params &&
++        !(image->field != PL_FIELD_NONE && params->deinterlace_params) &&
++        image->dovi_master_width > 0 && image->dovi_master_height > 0 &&
++        image->dovi_master_width <= ref_tex->params.w &&
++        image->dovi_master_height <= ref_tex->params.h;
++    for (int i = 0; i < params->num_hooks; i++)
++        full_dovi_master &= !(params->hooks[i]->stages & (PL_HOOK_RGB - 1));
++    if (full_dovi_master) {
++        read_crop = (pl_rect2df) {
++            .x1 = image->dovi_master_width,
++            .y1 = image->dovi_master_height,
++        };
++    }
++
+ 
+     // Merge all compatible planes into 'combined' shaders
+     for (int i = 0; i < image->num_planes; i++) {
+@@ -1735,10 +1761,10 @@ static bool pass_read_image(struct pass_state *pass)
+               sy = st->plane.shift_y;
+ 
+         st->img.rect = (pl_rect2df) {
+-            .x0 = (image->crop.x0 - sx) * rrx,
+-            .y0 = (image->crop.y0 - sy) * rry,
+-            .x1 = (image->crop.x1 - sx) * rrx,
+-            .y1 = (image->crop.y1 - sy) * rry,
++            .x0 = (read_crop.x0 - sx) * rrx,
++            .y0 = (read_crop.y0 - sy) * rry,
++            .x1 = (read_crop.x1 - sx) * rrx,
++            .y1 = (read_crop.y1 - sy) * rry,
+         };
+ 
+         st->plane_w = ref_tex->params.w * rrx;
+@@ -1930,12 +1956,82 @@ static bool pass_read_image(struct pass_state *pass)
+         }
+     }
+ 
++    bool map_dovi = params->dovi_map && image->dovi_rpu && image->dovi_rpu_size;
++    // This first integration only maps a complete native master. Cropping before
++    // the provider would change its whole-frame analysis and spatial filter.
++    bool complete_master = full_dovi_master;
++    bool source_override = !complete_master || !needs_conversion ||
++        lut_type == PL_LUT_NATIVE || image->icc || params->deband_params ||
++        (image->field != PL_FIELD_NONE && params->deinterlace_params);
++    for (int i = 0; i < params->num_hooks; i++)
++        source_override |= (params->hooks[i]->stages & (PL_HOOK_RGB - 1)) != 0;
++    bool supported_master = pass->img.color.primaries == PL_COLOR_PRIM_BT_2020 &&
++                            pass->img.color.transfer == PL_COLOR_TRC_PQ &&
++                            pass->img.comps == 3;
++    if (map_dovi && (source_override || !supported_master)) {
++        if (!rr->dovi_override_warned) {
++            PL_WARN(rr, "Shared Dolby display management unavailable for modified "
++                        "cropped or unsupported master; using ordinary rendering");
++            rr->dovi_override_warned = true;
++        }
++        map_dovi = false;
++    }
++
+     if (needs_conversion) {
+         if (pass->img.repr.sys == PL_COLOR_SYSTEM_XYZ) {
+             pl_shader_linearize(sh, &pass->img.color);
+             pass->img.color.transfer = PL_COLOR_TRC_LINEAR;
+         }
++        pl_shader_decode_color(sh, &pass->img.repr,
++                               map_dovi ? NULL : params->color_adjustment);
++    }
++
++    if (map_dovi) {
++        pl_tex master = img_tex(pass, &pass->img);
++        pl_tex mapped = NULL;
++        struct pl_color_space mapped_color = {0};
++        if (!master) {
++            pass->dovi_fatal = true;
++            return false;
++        }
++        int mapped_status = params->dovi_map(params->dovi_priv, rr->gpu,
++                image->dovi_rpu, image->dovi_rpu_size, &pass->target.color,
++                master, &mapped, &mapped_color);
++        if (mapped_status < 0 || (mapped_status > 0 && (!mapped ||
++            mapped->params.w != master->params.w ||
++            mapped->params.h != master->params.h || !mapped->params.sampleable ||
++            mapped_color.primaries != PL_COLOR_PRIM_BT_2020 ||
++            mapped_color.transfer != PL_COLOR_TRC_PQ))) {
++            PL_ERR(rr, "Dolby display management failed");
++            pass->dovi_fatal = true;
++            return false;
++        }
++        // Consume the provider-owned texture immediately into a renderer FBO.
++        // This keeps mixer-cache entries independent of provider scratch reuse.
++        if (mapped_status > 0) {
++            pass->dovi_mapped = true;
++            pass->img.tex = mapped;
++            pass->img.color = mapped_color;
++            pass->image.color = mapped_color;
++        }
++        sh = img_sh(pass, &pass->img);
++        if (!img_tex(pass, &pass->img)) {
++            pass->dovi_fatal = true;
++            return false;
++        }
++        sh = img_sh(pass, &pass->img);
++        // User grading belongs after display management, never in the master
++        // texture used for analysis and the deployed mapping arithmetic.
+         pl_shader_decode_color(sh, &pass->img.repr, params->color_adjustment);
++    } else if (params->dovi_reset) {
++        params->dovi_reset(params->dovi_priv);
++    }
++
++    if (full_dovi_master) {
++        // The provider has consumed a complete master. Resume the original
++        // fractional crop/zoom only for downstream sampling and composition.
++        pass->img.rect = image->crop;
++        pass->ref_rect = image->crop;
+     }
+ 
+     if (lut_type == PL_LUT_NORMALIZED)
+@@ -1953,6 +2049,15 @@ static bool pass_read_image(struct pass_state *pass)
+     pl_shader_set_alpha(sh, &pass->img.repr, PL_ALPHA_PREMULTIPLIED);
+ 
+     pass_hook(pass, &pass->img, PL_HOOK_RGB);
++    if (full_dovi_master) {
++        // The restored crop is metadata for a full-sized texture, not a shader
++        // resize request. Materialize before the main scaler consumes it.
++        if (!img_tex(pass, &pass->img)) {
++            pass->dovi_fatal = true;
++            return false;
++        }
++        pass->dovi_full_read = true;
++    }
+     sh = NULL;
+     return true;
+ }
+@@ -1982,7 +2087,9 @@ static bool pass_scale_main(struct pass_state *pass)
+     };
+ 
+     const struct pl_frame *image = &pass->image;
+-    bool need_fbo = false;
++    // Full-master reconstruction deliberately deferred crop until here. The
++    // no-op/free-resize shortcuts assume img.w/h already describe that crop.
++    bool need_fbo = pass->dovi_full_read;
+ 
+     // Force FBO indirection if this shader is non-resizable
+     int out_w, out_h;
+@@ -2082,6 +2189,8 @@ done:
+ 
+ static pl_tex get_feature_map(struct pass_state *pass)
+ {
++    if (pass->dovi_mapped)
++        return NULL;
+     const struct pl_render_params *params = pass->params;
+     pl_renderer rr = pass->rr;
+     const struct pl_color_map_params *cparams = params->color_map_params;
+@@ -2151,6 +2260,16 @@ error:
+ static void pass_convert_colors(struct pass_state *pass)
+ {
+     const struct pl_render_params *params = pass->params;
++    // The provider already performed display management into the target volume.
++    // Preserve signal encoding/ICC conversion and user grading, but never run
++    // adaptive/perceptual mapping or detected-peak state over that result.
++    const struct pl_color_map_params mapped_params = {
++        .tone_mapping_function = &pl_tone_map_clip,
++        .gamut_mapping = &pl_gamut_map_clip,
++        .metadata = PL_HDR_METADATA_HDR10,
++    };
++    const struct pl_color_map_params *color_map = pass->dovi_mapped
++        ? &mapped_params : params->color_map_params;
+     const struct pl_frame *image = &pass->image;
+     const struct pl_frame *target = &pass->target;
+     pl_renderer rr = pass->rr;
+@@ -2214,7 +2333,7 @@ static void pass_convert_colors(struct pass_state *pass)
+             break;
+         }
+ 
+-        pl_shader_color_map_ex(sh, params->color_map_params, pl_color_map_args(
++        pl_shader_color_map_ex(sh, color_map, pl_color_map_args(
+             .src = image->color,
+             .dst = lut_in,
+             .prelinearized = prelinearized,
+@@ -2233,7 +2352,7 @@ static void pass_convert_colors(struct pass_state *pass)
+         }
+ 
+         if (params->lut_type != PL_LUT_CONVERSION) {
+-            pl_shader_color_map_ex(sh, params->color_map_params, pl_color_map_args(
++            pl_shader_color_map_ex(sh, color_map, pl_color_map_args(
+                 .src = lut_out,
+                 .dst = img->color,
+             ));
+@@ -2253,11 +2372,11 @@ static void pass_convert_colors(struct pass_state *pass)
+         sh = img_sh(pass, img); // `get_feature_map` dispatches previous shader
+ 
+         // current -> target
+-        pl_shader_color_map_ex(sh, params->color_map_params, pl_color_map_args(
++        pl_shader_color_map_ex(sh, color_map, pl_color_map_args(
+             .src           = image->color,
+             .dst           = target_csp,
+             .prelinearized = prelinearized,
+-            .state         = &rr->tone_map_state,
++            .state         = pass->dovi_mapped ? NULL : &rr->tone_map_state,
+             .feature_map   = feature_map,
+         ));
+ 
+@@ -3737,6 +3856,9 @@ bool pl_render_image_mix(pl_renderer rr, const struct pl_frame_mix *images,
+ retry:
+     for (int i = 0; i < images->num_frames; i++) {
+         uint64_t sig = images->signatures[i];
++        if (params->dovi_map && images->frames[i]->dovi_rpu)
++            pl_hash_merge(&sig, pl_mem_hash(images->frames[i]->dovi_rpu,
++                                           images->frames[i]->dovi_rpu_size));
+         float rts = images->timestamps[i];
+         const struct pl_frame *img = images->frames[i];
+         PL_TRACE(rr, "Considering image with signature 0x%llx, rts %f",
+@@ -3836,7 +3958,7 @@ retry:
+         // Check to see if we can blindly reuse this cache entry. This is the
+         // case if either the params are compatible, or the user doesn't care
+         bool can_reuse = f->tex;
+-        bool strict_reuse = skip_cache || single_frame ||
++        bool strict_reuse = skip_cache || single_frame || params->dovi_map ||
+                             !params->preserve_mixing_cache;
+         if (can_reuse && strict_reuse) {
+             can_reuse = f->tex->params.w == out_w &&
+@@ -3945,6 +4067,14 @@ retry:
+ inter_pass_error:
+             inter_pass.acquired.target = false; // don't release target
+             pass_uninit(&inter_pass);
++            if (inter_pass.dovi_fatal) {
++                // A failure on any contributing frame is fatal, including a
++                // non-reference frame. Never retry just the reference image.
++                pl_tex_destroy(rr->gpu, &f->tex);
++                f->params_hash = 0;
++                pass_uninit(&pass);
++                return false;
++            }
+             if (!ok)
+                 goto fail;
+         }

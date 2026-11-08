@@ -5,6 +5,10 @@ userspace and signed kernel `nativehdr3` are installed. External plurx Player
 owns the playback product. The [software install/rollback handoff](SOFTWARE_DELIVERY.md)
 records exact package hashes and remaining acceptance; no reinstall is needed.
 
+## Shared Dolby Vision renderer — November 7
+
+Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Both Vulkan driver architectures built. APT simulated the seven-package installation and its exact stock rollback offline. Host installation and physical-target trim tuning remain open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
+
 ## Kernel security rebase — 2026-10-29
 
 The signed `7.3.0-nativehdr3` was installed and booted in the owner-authorized
@@ -56,8 +60,10 @@ log states retained. Renderer-relative 880.6 nits at reference white 142 corresp
 to firmware-declared 616 via `616 × 203 / 142`; neither is optical measurement.
 [Target receipt](../evidence/local-video-target-20261107.json). The separate
 nativehdr3 animation correction is built with all 28 packaged JavaScript files
-matching replay and the exact five-path stock payload delta; it is not installed.
-Nativehdr2 runtime errors remain open on the target.
+matching replay and the exact five-path stock payload delta. Version
+`51.26.10.6ubuntu+nativehdr3` was installed and package-verified November 7.
+The existing Shell session continued running. A normal new login is needed
+to observe centering with the corrected code.
 [Build receipt](../evidence/tiling-animation-nativehdr3-build-20261107.json).
 
 **Remaining.**
@@ -74,7 +80,8 @@ Nativehdr2 runtime errors remain open on the target.
 - Animation continuation on November 7: center, reduced motion, extension
   INACTIVE → ACTIVE, restored enablement/settings and normal application close
   passed visibly. Two centering JS TypeErrors at `windowAnimation.js:185`
-  (`actor.ease(...)` returned undefined before `.catch`) require a separate fix.
+  (`actor.ease(...)` returned undefined before `.catch`) were fixed in the
+  installed nativehdr3 package. Runtime confirmation awaits a new login.
   Fullscreen transitions and cross-mode SDR/HDR remain unverified; the harness
   saw no F11 callbacks and only current eDP color-mode 1 was observed mid-run.
   Retain the 35 inherited offline passes and twelve packaging guards separately.

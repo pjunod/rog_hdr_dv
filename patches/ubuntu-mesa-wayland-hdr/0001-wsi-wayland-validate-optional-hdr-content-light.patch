@@ -1,0 +1,412 @@
+From 2705c1c780362ab887e4359b2990d0e67b2e5a3b Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 00:12:00 +0000
+Subject: [PATCH] Omit unavailable optional content light levels at the Vulkan
+ Wayland boundary
+
+---
+ debian/changelog                          |   7 +
+ debian/patches/rog-wsi-optional-hdr.patch | 183 ++++++++++++++++++++++
+ debian/patches/series                     |   1 +
+ src/vulkan/wsi/wsi_common_wayland.c       | 141 ++++++++++++-----
+ 4 files changed, 289 insertions(+), 43 deletions(-)
+ create mode 100644 debian/patches/rog-wsi-optional-hdr.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index 02020e3..642ef83 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++mesa (26.2.4-1ubuntu1+rogwsi1) stonking; urgency=medium
++
++  * Omit undefined or invalid optional Wayland Vulkan HDR light metadata.
++  * Validate encoded luminances with overflow-safe version-one bounds.
++
++ -- Local HDR integration <operator@localhost>  Sat, 07 Nov 2026 21:00:00 +0000
++
+ mesa (26.2.4-1ubuntu1) stonking; urgency=medium
+ 
+   * Merge from Debian.
+diff --git a/debian/patches/rog-wsi-optional-hdr.patch b/debian/patches/rog-wsi-optional-hdr.patch
+new file mode 100644
+index 0000000..05b0376
+--- /dev/null
++++ b/debian/patches/rog-wsi-optional-hdr.patch
+@@ -0,0 +1,183 @@
++--- a/src/vulkan/wsi/wsi_common_wayland.c
+++++ b/src/vulkan/wsi/wsi_common_wayland.c
++@@ -1274,32 +1274,71 @@ struct wayland_hdr_metadata {
++ #define MIN_LUM_FACTOR 10000
++ 
++ static bool
++-is_hdr_metadata_legal(struct wayland_hdr_metadata *l)
+++quantize_hdr_luminance(float value, double scale, uint32_t *encoded)
++ {
++-   if (l->max_cll != 0) {
++-      if (l->max_cll * MIN_LUM_FACTOR < l->min_luminance)
++-         return false;
++-      if (l->max_luminance != 0 && l->max_cll > l->max_luminance)
++-         return false;
++-   }
++-   if (l->max_fall != 0) {
++-      if (l->max_fall * MIN_LUM_FACTOR < l->min_luminance)
++-         return false;
++-      if (l->max_luminance != 0 && l->max_fall > l->max_luminance)
++-         return false;
++-      if (l->max_cll != 0 && l->max_fall > l->max_cll) {
+++   *encoded = 0;
+++   if (!isfinite(value) || value < 0.0f)
+++      return false;
+++
+++   double rounded = round((double)value * scale);
+++   if (rounded > UINT32_MAX)
+++      return false;
+++
+++   *encoded = (uint32_t)rounded;
+++   return true;
+++}
+++
+++static bool
+++is_hdr_metadata_legal(struct wayland_hdr_metadata *l, bool mastering_luminance,
+++                      bool protocol_v1_bounds, uint32_t transfer_function)
+++{
+++   if (mastering_luminance &&
+++       (uint64_t)l->max_luminance * MIN_LUM_FACTOR <= l->min_luminance)
+++      return false;
+++
+++   /* Without a mastering request the target volume defaults to the selected
+++    * TF's primary volume. These are validation bounds, never transmitted data.
+++    * WSI currently binds color-manager version 1, whose optional light levels
+++    * must be strictly above the target minimum and no higher than its maximum.
+++    */
+++   uint32_t min_luminance = l->min_luminance;
+++   uint32_t max_luminance = l->max_luminance;
+++   if (!mastering_luminance) {
+++      switch (transfer_function) {
+++      case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ:
+++         min_luminance = 50;
+++         max_luminance = 10000;
+++         break;
+++      case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG:
+++         min_luminance = 50;
+++         max_luminance = 1000;
+++         break;
+++      case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR:
+++         min_luminance = 2000;
+++         max_luminance = 80;
+++         break;
+++      default:
++          return false;
++       }
++    }
+++   if (protocol_v1_bounds) {
+++      if (l->max_cll != 0 &&
+++          ((uint64_t)l->max_cll * MIN_LUM_FACTOR <= min_luminance ||
+++           l->max_cll > max_luminance))
+++         l->max_cll = 0;
+++      if (l->max_fall != 0 &&
+++          ((uint64_t)l->max_fall * MIN_LUM_FACTOR <= min_luminance ||
+++           l->max_fall > max_luminance))
+++         l->max_fall = 0;
+++   }
++ 
++-   /* Be lenient here for a zero (=undefined) max_luminance and handle
++-    * this in the calling code instead, by not sending min/max mastering
++-    * luminance data to Wayland, thereby avoiding protocol errors.
+++   /* An invalid optional field must not suppress valid mastering metadata or
+++    * its valid sibling. Preserve a valid content peak if the average conflicts.
++     */
++-   if (l->max_luminance == 0)
++-      return true;
+++   if (l->max_cll != 0 && l->max_fall > l->max_cll)
+++      l->max_fall = 0;
++ 
++-   return l->max_luminance * MIN_LUM_FACTOR > l->min_luminance;
+++   return true;
++ }
++ 
++ static bool
++@@ -1335,25 +1374,45 @@ wsi_wl_swapchain_update_colorspace(struc
++    if (!display->color_manager)
++       return VK_ERROR_SURFACE_LOST_KHR;
++ 
++-   struct wayland_hdr_metadata wayland_hdr_metadata = {
++-      .min_luminance = round(MIN_LUM_FACTOR * chain->color.pending.hdr_metadata.minLuminance),
++-      .max_luminance = round(chain->color.pending.hdr_metadata.maxLuminance),
++-      .max_fall = round(chain->color.pending.hdr_metadata.maxFrameAverageLightLevel),
++-      .max_cll = round(chain->color.pending.hdr_metadata.maxContentLightLevel),
++-   };
++-   bool should_use_hdr_metadata = chain->color.pending.has_hdr_metadata;
++-   if (should_use_hdr_metadata) {
++-      should_use_hdr_metadata &= is_hdr_metadata_legal(&wayland_hdr_metadata);
++-      if (!should_use_hdr_metadata)
++-         mesa_log_once(MESA_LOG_WARN, "Not using HDR metadata to avoid protocol errors");
++-   }
+++   unsigned int primaries = 0;
+++   unsigned int tf = 0;
+++   bool colorspace_uses_hdr_metadata = false;
++    for (int i = 0; i < ARRAY_SIZE(colorspace_mapping); i++) {
++       if (colorspace_mapping[i].colorspace == chain->color.colorspace) {
++-         should_use_hdr_metadata &= colorspace_mapping[i].should_use_hdr_metadata;
+++         primaries = colorspace_mapping[i].primaries;
+++         tf = colorspace_mapping[i].tf;
+++         colorspace_uses_hdr_metadata = colorspace_mapping[i].should_use_hdr_metadata;
++          break;
++       }
++    }
++ 
+++   struct wayland_hdr_metadata wayland_hdr_metadata = {0};
+++   const VkHdrMetadataEXT *hdr = &chain->color.pending.hdr_metadata;
+++   bool legal_mastering_luminance =
+++      quantize_hdr_luminance(hdr->minLuminance, MIN_LUM_FACTOR,
+++                             &wayland_hdr_metadata.min_luminance) &&
+++      quantize_hdr_luminance(hdr->maxLuminance, 1.0,
+++                             &wayland_hdr_metadata.max_luminance);
+++   /* Zero denotes undefined optional metadata. Invalid or unrepresentable
+++    * optional values also remain absent, independently of their sibling.
+++    */
+++   quantize_hdr_luminance(hdr->maxFrameAverageLightLevel, 1.0,
+++                          &wayland_hdr_metadata.max_fall);
+++   quantize_hdr_luminance(hdr->maxContentLightLevel, 1.0,
+++                          &wayland_hdr_metadata.max_cll);
+++   bool mastering_luminance = display->color_features.mastering_display_primaries &&
+++                              wayland_hdr_metadata.max_luminance != 0;
+++   bool should_use_hdr_metadata = chain->color.pending.has_hdr_metadata &&
+++                                  colorspace_uses_hdr_metadata;
+++   if (should_use_hdr_metadata) {
+++      should_use_hdr_metadata &= legal_mastering_luminance &&
+++         is_hdr_metadata_legal(&wayland_hdr_metadata, mastering_luminance,
+++            wp_color_manager_v1_get_version(display->color_manager) == 1,
+++            tf);
+++      if (!should_use_hdr_metadata)
+++         mesa_log_once(MESA_LOG_WARN, "Not using HDR metadata to avoid protocol errors");
+++   }
+++
++    /* the image description needs to be updated at least once even without metadata */
++    if (chain->color.color_surface && chain->color.current.applied_colorspace &&
++        chain->color.current.has_hdr_metadata == should_use_hdr_metadata &&
++@@ -1377,23 +1436,19 @@ wsi_wl_swapchain_update_colorspace(struc
++    if (!creator)
++       return VK_ERROR_SURFACE_LOST_KHR;
++ 
++-   unsigned int primaries = 0;
++-   unsigned int tf = 0;
++-   for (int i = 0; i < ARRAY_SIZE(colorspace_mapping); i++) {
++-      if (colorspace_mapping[i].colorspace == chain->color.colorspace) {
++-         primaries = colorspace_mapping[i].primaries;
++-         tf = colorspace_mapping[i].tf;
++-      }
++-   }
++-
++    if (!primaries)
++       return VK_ERROR_SURFACE_LOST_KHR;
++ 
++    wp_image_description_creator_params_v1_set_primaries_named(creator, primaries);
++    wp_image_description_creator_params_v1_set_tf_named(creator, tf);
++    if (should_use_hdr_metadata) {
++-      wp_image_description_creator_params_v1_set_max_cll(creator, wayland_hdr_metadata.max_cll);
++-      wp_image_description_creator_params_v1_set_max_fall(creator, wayland_hdr_metadata.max_fall);
+++      /* Undefined light levels are represented by omitting their requests,
+++       * not by sending zero, which is invalid on protocol version 1.
+++       */
+++      if (wayland_hdr_metadata.max_cll != 0)
+++         wp_image_description_creator_params_v1_set_max_cll(creator, wayland_hdr_metadata.max_cll);
+++      if (wayland_hdr_metadata.max_fall != 0)
+++         wp_image_description_creator_params_v1_set_max_fall(creator, wayland_hdr_metadata.max_fall);
++       if (display->color_features.mastering_display_primaries) {
++          uint32_t red_x = round(chain->color.current.hdr_metadata.displayPrimaryRed.x * 1000000);
++          uint32_t red_y = round(chain->color.current.hdr_metadata.displayPrimaryRed.y * 1000000);
+diff --git a/debian/patches/series b/debian/patches/series
+index 43b233c..c923ad4 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -1,3 +1,4 @@
+ path_max.diff
+ src_glx_dri_common.h.diff
+ lp2143073.patch
++rog-wsi-optional-hdr.patch
+diff --git a/src/vulkan/wsi/wsi_common_wayland.c b/src/vulkan/wsi/wsi_common_wayland.c
+index 33a4059..c8ce390 100644
+--- a/src/vulkan/wsi/wsi_common_wayland.c
++++ b/src/vulkan/wsi/wsi_common_wayland.c
+@@ -1274,32 +1274,71 @@ struct wayland_hdr_metadata {
+ #define MIN_LUM_FACTOR 10000
+ 
+ static bool
+-is_hdr_metadata_legal(struct wayland_hdr_metadata *l)
++quantize_hdr_luminance(float value, double scale, uint32_t *encoded)
+ {
+-   if (l->max_cll != 0) {
+-      if (l->max_cll * MIN_LUM_FACTOR < l->min_luminance)
+-         return false;
+-      if (l->max_luminance != 0 && l->max_cll > l->max_luminance)
+-         return false;
+-   }
+-   if (l->max_fall != 0) {
+-      if (l->max_fall * MIN_LUM_FACTOR < l->min_luminance)
+-         return false;
+-      if (l->max_luminance != 0 && l->max_fall > l->max_luminance)
+-         return false;
+-      if (l->max_cll != 0 && l->max_fall > l->max_cll) {
++   *encoded = 0;
++   if (!isfinite(value) || value < 0.0f)
++      return false;
++
++   double rounded = round((double)value * scale);
++   if (rounded > UINT32_MAX)
++      return false;
++
++   *encoded = (uint32_t)rounded;
++   return true;
++}
++
++static bool
++is_hdr_metadata_legal(struct wayland_hdr_metadata *l, bool mastering_luminance,
++                      bool protocol_v1_bounds, uint32_t transfer_function)
++{
++   if (mastering_luminance &&
++       (uint64_t)l->max_luminance * MIN_LUM_FACTOR <= l->min_luminance)
++      return false;
++
++   /* Without a mastering request the target volume defaults to the selected
++    * TF's primary volume. These are validation bounds, never transmitted data.
++    * WSI currently binds color-manager version 1, whose optional light levels
++    * must be strictly above the target minimum and no higher than its maximum.
++    */
++   uint32_t min_luminance = l->min_luminance;
++   uint32_t max_luminance = l->max_luminance;
++   if (!mastering_luminance) {
++      switch (transfer_function) {
++      case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ:
++         min_luminance = 50;
++         max_luminance = 10000;
++         break;
++      case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG:
++         min_luminance = 50;
++         max_luminance = 1000;
++         break;
++      case WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR:
++         min_luminance = 2000;
++         max_luminance = 80;
++         break;
++      default:
+          return false;
+       }
+    }
++   if (protocol_v1_bounds) {
++      if (l->max_cll != 0 &&
++          ((uint64_t)l->max_cll * MIN_LUM_FACTOR <= min_luminance ||
++           l->max_cll > max_luminance))
++         l->max_cll = 0;
++      if (l->max_fall != 0 &&
++          ((uint64_t)l->max_fall * MIN_LUM_FACTOR <= min_luminance ||
++           l->max_fall > max_luminance))
++         l->max_fall = 0;
++   }
+ 
+-   /* Be lenient here for a zero (=undefined) max_luminance and handle
+-    * this in the calling code instead, by not sending min/max mastering
+-    * luminance data to Wayland, thereby avoiding protocol errors.
++   /* An invalid optional field must not suppress valid mastering metadata or
++    * its valid sibling. Preserve a valid content peak if the average conflicts.
+     */
+-   if (l->max_luminance == 0)
+-      return true;
++   if (l->max_cll != 0 && l->max_fall > l->max_cll)
++      l->max_fall = 0;
+ 
+-   return l->max_luminance * MIN_LUM_FACTOR > l->min_luminance;
++   return true;
+ }
+ 
+ static bool
+@@ -1335,25 +1374,45 @@ wsi_wl_swapchain_update_colorspace(struct wsi_wl_swapchain *chain)
+    if (!display->color_manager)
+       return VK_ERROR_SURFACE_LOST_KHR;
+ 
+-   struct wayland_hdr_metadata wayland_hdr_metadata = {
+-      .min_luminance = round(MIN_LUM_FACTOR * chain->color.pending.hdr_metadata.minLuminance),
+-      .max_luminance = round(chain->color.pending.hdr_metadata.maxLuminance),
+-      .max_fall = round(chain->color.pending.hdr_metadata.maxFrameAverageLightLevel),
+-      .max_cll = round(chain->color.pending.hdr_metadata.maxContentLightLevel),
+-   };
+-   bool should_use_hdr_metadata = chain->color.pending.has_hdr_metadata;
+-   if (should_use_hdr_metadata) {
+-      should_use_hdr_metadata &= is_hdr_metadata_legal(&wayland_hdr_metadata);
+-      if (!should_use_hdr_metadata)
+-         mesa_log_once(MESA_LOG_WARN, "Not using HDR metadata to avoid protocol errors");
+-   }
++   unsigned int primaries = 0;
++   unsigned int tf = 0;
++   bool colorspace_uses_hdr_metadata = false;
+    for (int i = 0; i < ARRAY_SIZE(colorspace_mapping); i++) {
+       if (colorspace_mapping[i].colorspace == chain->color.colorspace) {
+-         should_use_hdr_metadata &= colorspace_mapping[i].should_use_hdr_metadata;
++         primaries = colorspace_mapping[i].primaries;
++         tf = colorspace_mapping[i].tf;
++         colorspace_uses_hdr_metadata = colorspace_mapping[i].should_use_hdr_metadata;
+          break;
+       }
+    }
+ 
++   struct wayland_hdr_metadata wayland_hdr_metadata = {0};
++   const VkHdrMetadataEXT *hdr = &chain->color.pending.hdr_metadata;
++   bool legal_mastering_luminance =
++      quantize_hdr_luminance(hdr->minLuminance, MIN_LUM_FACTOR,
++                             &wayland_hdr_metadata.min_luminance) &&
++      quantize_hdr_luminance(hdr->maxLuminance, 1.0,
++                             &wayland_hdr_metadata.max_luminance);
++   /* Zero denotes undefined optional metadata. Invalid or unrepresentable
++    * optional values also remain absent, independently of their sibling.
++    */
++   quantize_hdr_luminance(hdr->maxFrameAverageLightLevel, 1.0,
++                          &wayland_hdr_metadata.max_fall);
++   quantize_hdr_luminance(hdr->maxContentLightLevel, 1.0,
++                          &wayland_hdr_metadata.max_cll);
++   bool mastering_luminance = display->color_features.mastering_display_primaries &&
++                              wayland_hdr_metadata.max_luminance != 0;
++   bool should_use_hdr_metadata = chain->color.pending.has_hdr_metadata &&
++                                  colorspace_uses_hdr_metadata;
++   if (should_use_hdr_metadata) {
++      should_use_hdr_metadata &= legal_mastering_luminance &&
++         is_hdr_metadata_legal(&wayland_hdr_metadata, mastering_luminance,
++            wp_color_manager_v1_get_version(display->color_manager) == 1,
++            tf);
++      if (!should_use_hdr_metadata)
++         mesa_log_once(MESA_LOG_WARN, "Not using HDR metadata to avoid protocol errors");
++   }
++
+    /* the image description needs to be updated at least once even without metadata */
+    if (chain->color.color_surface && chain->color.current.applied_colorspace &&
+        chain->color.current.has_hdr_metadata == should_use_hdr_metadata &&
+@@ -1377,23 +1436,19 @@ wsi_wl_swapchain_update_colorspace(struct wsi_wl_swapchain *chain)
+    if (!creator)
+       return VK_ERROR_SURFACE_LOST_KHR;
+ 
+-   unsigned int primaries = 0;
+-   unsigned int tf = 0;
+-   for (int i = 0; i < ARRAY_SIZE(colorspace_mapping); i++) {
+-      if (colorspace_mapping[i].colorspace == chain->color.colorspace) {
+-         primaries = colorspace_mapping[i].primaries;
+-         tf = colorspace_mapping[i].tf;
+-      }
+-   }
+-
+    if (!primaries)
+       return VK_ERROR_SURFACE_LOST_KHR;
+ 
+    wp_image_description_creator_params_v1_set_primaries_named(creator, primaries);
+    wp_image_description_creator_params_v1_set_tf_named(creator, tf);
+    if (should_use_hdr_metadata) {
+-      wp_image_description_creator_params_v1_set_max_cll(creator, wayland_hdr_metadata.max_cll);
+-      wp_image_description_creator_params_v1_set_max_fall(creator, wayland_hdr_metadata.max_fall);
++      /* Undefined light levels are represented by omitting their requests,
++       * not by sending zero, which is invalid on protocol version 1.
++       */
++      if (wayland_hdr_metadata.max_cll != 0)
++         wp_image_description_creator_params_v1_set_max_cll(creator, wayland_hdr_metadata.max_cll);
++      if (wayland_hdr_metadata.max_fall != 0)
++         wp_image_description_creator_params_v1_set_max_fall(creator, wayland_hdr_metadata.max_fall);
+       if (display->color_features.mastering_display_primaries) {
+          uint32_t red_x = round(chain->color.current.hdr_metadata.displayPrimaryRed.x * 1000000);
+          uint32_t red_y = round(chain->color.current.hdr_metadata.displayPrimaryRed.y * 1000000);

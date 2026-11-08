@@ -104,7 +104,9 @@ def ubuntu(component, entry, work):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("component", choices=["libdisplay-info", "mutter", "wine",
-                                              "ubuntu-libdisplay-info", "ubuntu-mutter"])
+                                              "ubuntu-libdisplay-info", "ubuntu-mutter",
+                                              "ubuntu-libplacebo-system-dv", "ubuntu-mpv-system-dv",
+                                              "ubuntu-ffmpeg-system-dv", "ubuntu-mesa-wayland-hdr"])
     parser.add_argument("workdir", type=pathlib.Path, help="Disposable directory outside this repository")
     args = parser.parse_args()
     work = args.workdir.resolve()
