@@ -1,0 +1,532 @@
+diff --git a/debian/changelog b/debian/changelog
+index 98087db8d126760049de6f7950eae42893dae64e..35ea7042c8305ffdfc926213bb2351126e358223 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,5 +1,6 @@
+-gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv1) stonking; urgency=medium
++gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv2) stonking; urgency=medium
+ 
++  * Add picture-owned strict Dolby metadata on the normal NVIDIA HEVC decoder.
+   * Carry matched original RPU and owned decode-order Dolby pictures in normal parser/VA plugins.
+   * Require the explicit private base/strict runtime ABI where consumed.
+ 
+diff --git a/debian/control b/debian/control
+index 5dbc4af62a42b79fea59add3c4218038f7e5e73b..1d6ca01ad6c08412e673627569ff430c8dc450f0 100644
+--- a/debian/control
++++ b/debian/control
+@@ -146,7 +146,9 @@ Description: GStreamer helper programs from the "bad" set
+ Package: gstreamer1.0-plugins-bad
+ Architecture: any
+ Multi-Arch: same
+-Depends: rog-gstreamer-dovi-base-api (= 1), gstreamer1.0-plugins-base (>= 1.28.0),
++Depends: rog-dv-hevc-runtime (>= 2),
++         libgstdovipicture-1.0-0 (>= 0.2.0+rogdv1),
++         rog-gstreamer-dovi-base-api (= 1), gstreamer1.0-plugins-base (>= 1.28.0),
+          gstreamer1.0-plugins-good (>= 1.28.0-1ubuntu3),
+          libgstreamer-plugins-bad1.0-0 (= ${binary:Version}),
+          gstreamer1.0-plugins-extra (= ${binary:Version}),
+diff --git a/sys/nvcodec/gstnvdecoder.cpp b/sys/nvcodec/gstnvdecoder.cpp
+index 0f252b6001181d3304ca451f2ec10c23eabb2384..7706cf677e07a34a3f5bf044d2528448f9b17fd1 100644
+--- a/sys/nvcodec/gstnvdecoder.cpp
++++ b/sys/nvcodec/gstnvdecoder.cpp
+@@ -62,6 +62,7 @@
+ #include <gst/cuda/gstcuda.h>
+ #include <gst/cuda/gstcuda-private.h>
+ #include "gstnvdecoder.h"
++#include <gstdovipicture.h>
+ #include "gstcudaconverter.h"
+ #include "gstnvcodecutils.h"
+ #include <string.h>
+@@ -293,10 +294,22 @@ gst_nv_decoder_is_configured (GstNvDecoder * decoder)
+ }
+ 
+ gboolean
+-gst_nv_decoder_configure (GstNvDecoder * decoder, cudaVideoCodec codec,
+-    GstVideoInfo * info, gint coded_width, gint coded_height,
++gst_nv_decoder_configure (GstNvDecoder *decoder, cudaVideoCodec codec,
++    GstVideoInfo *info, gint coded_width, gint coded_height,
+     guint coded_bitdepth, guint pool_size, gboolean alloc_aux_frame,
+     guint num_output_surfaces, guint init_max_width, guint init_max_height)
++{
++  return gst_nv_decoder_configure_with_crop (decoder, codec, info, coded_width,
++      coded_height, coded_bitdepth, pool_size, alloc_aux_frame,
++      num_output_surfaces, init_max_width, init_max_height, 0, 0);
++}
++
++gboolean
++gst_nv_decoder_configure_with_crop (GstNvDecoder * decoder, cudaVideoCodec codec,
++    GstVideoInfo * info, gint coded_width, gint coded_height,
++    guint coded_bitdepth, guint pool_size, gboolean alloc_aux_frame,
++    guint num_output_surfaces, guint init_max_width, guint init_max_height,
++    guint crop_x, guint crop_y)
+ {
+   CUVIDDECODECREATEINFO create_info = { 0, };
+   GstVideoFormat format, prev_format = GST_VIDEO_FORMAT_UNKNOWN;
+@@ -307,6 +320,10 @@ gst_nv_decoder_configure (GstNvDecoder * decoder, cudaVideoCodec codec,
+   g_return_val_if_fail (info != nullptr, FALSE);
+   g_return_val_if_fail (coded_width >= GST_VIDEO_INFO_WIDTH (info), FALSE);
+   g_return_val_if_fail (coded_height >= GST_VIDEO_INFO_HEIGHT (info), FALSE);
++  g_return_val_if_fail (crop_x <= (guint) coded_width - GST_VIDEO_INFO_WIDTH (info), FALSE);
++  g_return_val_if_fail (crop_y <= (guint) coded_height - GST_VIDEO_INFO_HEIGHT (info), FALSE);
++  g_return_val_if_fail (crop_x + GST_VIDEO_INFO_WIDTH (info) <= G_MAXINT16 &&
++      crop_y + GST_VIDEO_INFO_HEIGHT (info) <= G_MAXINT16, FALSE);
+   g_return_val_if_fail (coded_bitdepth >= 8, FALSE);
+   g_return_val_if_fail (pool_size > 0, FALSE);
+ 
+@@ -361,8 +378,10 @@ gst_nv_decoder_configure (GstNvDecoder * decoder, cudaVideoCodec codec,
+       reconfig_info.ulTargetWidth = decoder->aligned_info.width;
+       reconfig_info.ulTargetHeight = decoder->aligned_info.height;
+       reconfig_info.ulNumDecodeSurfaces = alloc_size;
+-      reconfig_info.display_area.right = GST_VIDEO_INFO_WIDTH (info);
+-      reconfig_info.display_area.bottom = GST_VIDEO_INFO_HEIGHT (info);
++      reconfig_info.display_area.left = crop_x;
++      reconfig_info.display_area.top = crop_y;
++      reconfig_info.display_area.right = crop_x + GST_VIDEO_INFO_WIDTH (info);
++      reconfig_info.display_area.bottom = crop_y + GST_VIDEO_INFO_HEIGHT (info);
+       reconfig_info.target_rect.right = GST_VIDEO_INFO_WIDTH (info);
+       reconfig_info.target_rect.bottom = GST_VIDEO_INFO_HEIGHT (info);
+ 
+@@ -395,10 +414,10 @@ gst_nv_decoder_configure (GstNvDecoder * decoder, cudaVideoCodec codec,
+   create_info.bitDepthMinus8 = coded_bitdepth - 8;
+   create_info.ulIntraDecodeOnly = 0;
+ 
+-  create_info.display_area.left = 0;
+-  create_info.display_area.top = 0;
+-  create_info.display_area.right = GST_VIDEO_INFO_WIDTH (info);
+-  create_info.display_area.bottom = GST_VIDEO_INFO_HEIGHT (info);
++  create_info.display_area.left = crop_x;
++  create_info.display_area.top = crop_y;
++  create_info.display_area.right = crop_x + GST_VIDEO_INFO_WIDTH (info);
++  create_info.display_area.bottom = crop_y + GST_VIDEO_INFO_HEIGHT (info);
+   create_info.OutputFormat = output_format_from_video_format (format);
+   create_info.DeinterlaceMode = cudaVideoDeinterlaceMode_Weave;
+ 
+@@ -895,9 +914,19 @@ done:
+ }
+ 
+ GstFlowReturn
+-gst_nv_decoder_output_picture (GstNvDecoder * decoder,
++gst_nv_decoder_output_picture (GstNvDecoder *decoder,
++    GstVideoDecoder *videodec, GstVideoCodecFrame *frame,
++    GstCodecPicture *picture, guint buffer_flags)
++{
++  return gst_nv_decoder_output_picture_with_notify (decoder, videodec, frame,
++      picture, buffer_flags, nullptr);
++}
++
++GstFlowReturn
++gst_nv_decoder_output_picture_with_notify (GstNvDecoder * decoder,
+     GstVideoDecoder * videodec, GstVideoCodecFrame * frame,
+-    GstCodecPicture * picture, guint buffer_flags)
++    GstCodecPicture * picture, guint buffer_flags,
++    void (*output_notify) (GstVideoDecoder *, GstVideoCodecFrame *, GstCodecPicture *))
+ {
+   GstFlowReturn ret = GST_FLOW_OK;
+   GstNvDecSurface *surface;
+@@ -1070,6 +1099,8 @@ gst_nv_decoder_output_picture (GstNvDecoder * decoder,
+   }
+ 
+   GST_BUFFER_FLAG_SET (frame->output_buffer, buffer_flags);
++  if (output_notify)
++    output_notify (videodec, frame, picture);
+   gst_codec_picture_unref (picture);
+ 
+   return gst_video_decoder_finish_frame (videodec, frame);
+@@ -2035,6 +2066,13 @@ gst_nv_decoder_negotiate (GstNvDecoder * decoder,
+   }
+ 
+   state->caps = gst_video_info_to_caps (&state->info);
++  {
++    AVDOVIDecoderConfigurationRecord config;
++    GBytes *bytes = nullptr;
++    gst_dovi_caps_get_stream_config (input_state->caps, &config, &bytes);
++    gst_dovi_caps_apply_stream_config (state->caps, bytes);
++    g_clear_pointer (&bytes, g_bytes_unref);
++  }
+ 
+   switch (decoder->output_type) {
+     case GST_NV_DECODER_OUTPUT_TYPE_CUDA:
+diff --git a/sys/nvcodec/gstnvdecoder.h b/sys/nvcodec/gstnvdecoder.h
+index 70636c4ee8ded31f84578aa69feb47f0c5f26052..a8d84f0ffd2c3f77a98b5b414a22e46e56eb3142 100644
+--- a/sys/nvcodec/gstnvdecoder.h
++++ b/sys/nvcodec/gstnvdecoder.h
+@@ -66,6 +66,19 @@ gboolean       gst_nv_decoder_configure (GstNvDecoder * decoder,
+                                          guint init_max_width,
+                                          guint init_max_height);
+ 
++gboolean       gst_nv_decoder_configure_with_crop (GstNvDecoder * decoder,
++                                         cudaVideoCodec codec,
++                                         GstVideoInfo * info,
++                                         gint coded_width,
++                                         gint coded_height,
++                                         guint coded_bitdepth,
++                                         guint pool_size,
++                                         gboolean alloc_aux_frame,
++                                         guint num_output_surfaces,
++                                         guint init_max_width,
++                                         guint init_max_height,
++                                         guint crop_x, guint crop_y);
++
+ GstFlowReturn  gst_nv_decoder_new_picture (GstNvDecoder * decoder,
+                                            GstCodecPicture * picture);
+ 
+@@ -78,6 +91,14 @@ GstFlowReturn  gst_nv_decoder_output_picture (GstNvDecoder * decoder,
+                                               GstCodecPicture * picture,
+                                               guint buffer_flags);
+ 
++GstFlowReturn  gst_nv_decoder_output_picture_with_notify (GstNvDecoder * decoder,
++                                              GstVideoDecoder * videodec,
++                                              GstVideoCodecFrame * frame,
++                                              GstCodecPicture * picture,
++                                              guint buffer_flags,
++                                              void (*output_notify) (GstVideoDecoder *,
++                                                GstVideoCodecFrame *, GstCodecPicture *));
++
+ void           gst_nv_decoder_set_flushing   (GstNvDecoder * decoder,
+                                               gboolean flushing);
+ 
+diff --git a/sys/nvcodec/gstnvh265dec.cpp b/sys/nvcodec/gstnvh265dec.cpp
+index e2a37b958993b03489a72a0a3bcbbe6dc3bd38bc..3753b91934772f3a57697d302e2b69e61bea83fc 100644
+--- a/sys/nvcodec/gstnvh265dec.cpp
++++ b/sys/nvcodec/gstnvh265dec.cpp
+@@ -92,6 +92,7 @@
+ #include <gst/cuda/gstcudautils.h>
+ #include "gstnvh265dec.h"
+ #include "gstnvdecoder.h"
++#include <gstdovipicture.h>
+ 
+ #include <string.h>
+ 
+@@ -128,6 +129,10 @@ typedef struct _GstNvH265Dec
+   GstH265Decoder parent;
+ 
+   GstNvDecoder *decoder;
++  GstDoviResolver *dovi_resolver;
++  guint64 dovi_generation;
++  gboolean dovi_config_ready, dovi_new_stream;
++  guint crop_x, crop_y;
+   CUVIDPICPARAMS params;
+ 
+   /* slice buffer which will be passed to CUVIDPICPARAMS::pBitstreamData */
+@@ -195,6 +200,107 @@ static void gst_nv_h265_dec_set_context (GstElement * element,
+ static gboolean gst_nv_h265_dec_open (GstVideoDecoder * decoder);
+ static gboolean gst_nv_h265_dec_close (GstVideoDecoder * decoder);
+ static gboolean gst_nv_h265_dec_start (GstVideoDecoder * decoder);
++typedef struct {
++  GstDoviPicture *picture;
++  guint64 generation;
++} GstNvDoviSnapshot;
++
++static GQuark
++dovi_snapshot_quark (void)
++{
++  return g_quark_from_static_string ("gst-nv-h265-owned-dovi-picture");
++}
++
++static void
++dovi_snapshot_free (gpointer data)
++{
++  GstNvDoviSnapshot *snapshot = static_cast<GstNvDoviSnapshot *> (data);
++  gst_dovi_picture_unref (snapshot->picture);
++  g_free (snapshot);
++}
++
++static void
++dovi_reset (GstNvH265Dec *self)
++{
++  if (self->dovi_resolver)
++    gst_dovi_resolver_reset (self->dovi_resolver);
++  self->dovi_generation++;
++}
++
++static gboolean
++gst_nv_h265_dec_flush (GstVideoDecoder *decoder)
++{
++  GstVideoDecoderClass *parent = GST_VIDEO_DECODER_CLASS (parent_class);
++  GST_NV_H265_DEC (decoder)->dovi_config_ready = FALSE;
++  dovi_reset (GST_NV_H265_DEC (decoder));
++  return !parent->flush || parent->flush (decoder);
++}
++
++static void
++dovi_configure_from_caps (GstNvH265Dec *self)
++{
++  GstH265Decoder *decoder = GST_H265_DECODER (self);
++  AVDOVIDecoderConfigurationRecord config;
++  GBytes *bytes = NULL;
++  gboolean known = self->dovi_config_ready && decoder->input_state &&
++      gst_dovi_caps_get_stream_config (decoder->input_state->caps, &config, &bytes);
++  if (self->dovi_resolver)
++    gst_dovi_resolver_configure (self->dovi_resolver, known ? &config : NULL,
++        known ? sizeof (config) : 0, NULL);
++  g_clear_pointer (&bytes, g_bytes_unref);
++}
++static gboolean
++dovi_sink_event (GstVideoDecoder *decoder, GstEvent *event)
++{
++  GstNvH265Dec *self = GST_NV_H265_DEC (decoder);
++  GstH265Decoder *h265 = GST_H265_DECODER (decoder);
++  GstVideoDecoderClass *parent = GST_VIDEO_DECODER_CLASS (parent_class);
++  GstEventType type = GST_EVENT_TYPE (event);
++  if (type == GST_EVENT_CAPS) {
++    AVDOVIDecoderConfigurationRecord ignored;
++    GBytes *before = NULL, *after = NULL;
++    gboolean was_ready = self->dovi_config_ready && !self->dovi_new_stream;
++    if (h265->input_state)
++      gst_dovi_caps_get_stream_config (h265->input_state->caps, &ignored, &before);
++    gboolean accepted = !parent->sink_event || parent->sink_event (decoder, event);
++    if (accepted && h265->input_state)
++      gst_dovi_caps_get_stream_config (h265->input_state->caps, &ignored, &after);
++    gboolean changed = (!before != !after) ||
++        (before && after && !g_bytes_equal (before, after));
++    self->dovi_new_stream = FALSE;
++    self->dovi_config_ready = accepted && h265->input_state != NULL;
++    if (!accepted || changed || !was_ready) {
++      dovi_reset (self);
++      dovi_configure_from_caps (self);
++    }
++    if (accepted)
++      gst_pad_mark_reconfigure (GST_VIDEO_DECODER_SRC_PAD (decoder));
++    g_clear_pointer (&before, g_bytes_unref);
++    g_clear_pointer (&after, g_bytes_unref);
++    return accepted;
++  }
++  if (type == GST_EVENT_STREAM_START) {
++    self->dovi_new_stream = TRUE;
++    self->dovi_config_ready = FALSE;
++    dovi_reset (self);
++  } else if (type == GST_EVENT_SEGMENT && !self->dovi_new_stream) {
++    self->dovi_config_ready = TRUE;
++    dovi_configure_from_caps (self);
++  }
++  /* FLUSH_START is not serialized. Derived state is invalidated exclusively
++   * in the serialized flush callback, never by racing streaming state here. */
++  return !parent->sink_event || parent->sink_event (decoder, event);
++}
++
++static gboolean
++dovi_stop (GstVideoDecoder *decoder)
++{
++  GstVideoDecoderClass *parent = GST_VIDEO_DECODER_CLASS (parent_class);
++  dovi_reset (GST_NV_H265_DEC (decoder));
++  return !parent->stop || parent->stop (decoder);
++}
++
++
+ static gboolean gst_nv_h265_dec_stop (GstVideoDecoder * decoder);
+ static gboolean gst_nv_h265_dec_negotiate (GstVideoDecoder * decoder);
+ static gboolean gst_nv_h265_dec_decide_allocation (GstVideoDecoder *
+@@ -337,6 +443,7 @@ gst_nv_h265_dec_class_init (GstNvH265DecClass * klass,
+   decoder_class->open = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_open);
+   decoder_class->close = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_close);
+   decoder_class->start = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_start);
++  decoder_class->flush = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_flush);
+   decoder_class->stop = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_stop);
+   decoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_negotiate);
+   decoder_class->decide_allocation =
+@@ -375,6 +482,7 @@ gst_nv_h265_dec_init (GstNvH265Dec * self)
+ {
+   GstNvH265DecClass *klass = GST_NV_H265_DEC_GET_CLASS (self);
+ 
++  self->dovi_resolver = gst_dovi_resolver_new ();
+   self->decoder =
+       gst_nv_decoder_new (klass->cuda_device_id, klass->adapter_luid);
+ 
+@@ -387,6 +495,7 @@ gst_nv_h265_dec_finalize (GObject * object)
+ {
+   GstNvH265Dec *self = GST_NV_H265_DEC (object);
+ 
++  g_clear_pointer (&self->dovi_resolver, gst_dovi_resolver_free);
+   gst_object_unref (self->decoder);
+ 
+   G_OBJECT_CLASS (parent_class)->finalize (object);
+@@ -459,6 +568,10 @@ gst_nv_h265_dec_set_context (GstElement * element, GstContext * context)
+ static void
+ gst_nv_h265_dec_reset (GstNvH265Dec * self)
+ {
++  dovi_reset (self);
++  self->dovi_config_ready = FALSE;
++  self->dovi_new_stream = TRUE;
++  self->crop_x = self->crop_y = 0;
+   self->width = 0;
+   self->height = 0;
+   self->coded_width = 0;
+@@ -497,6 +610,7 @@ gst_nv_h265_dec_start (GstVideoDecoder * decoder)
+ {
+   GstNvH265Dec *self = GST_NV_H265_DEC (decoder);
+ 
++  self->crop_x = self->crop_y = 0;
+   self->width = 0;
+   self->height = 0;
+   self->coded_width = 0;
+@@ -515,7 +629,7 @@ gst_nv_h265_dec_stop (GstVideoDecoder * decoder)
+   GstNvH265Dec *self = GST_NV_H265_DEC (decoder);
+   gboolean ret;
+ 
+-  ret = GST_VIDEO_DECODER_CLASS (parent_class)->stop (decoder);
++  ret = dovi_stop (decoder);
+ 
+   gst_nv_decoder_reset (self->decoder);
+ 
+@@ -588,7 +702,7 @@ gst_nv_h265_dec_sink_event (GstVideoDecoder * decoder, GstEvent * event)
+       break;
+   }
+ 
+-  return GST_VIDEO_DECODER_CLASS (parent_class)->sink_event (decoder, event);
++  return dovi_sink_event (decoder, event);
+ }
+ 
+ static GstFlowReturn
+@@ -606,6 +720,8 @@ gst_nv_h265_dec_new_sequence (GstH265Decoder * decoder, const GstH265SPS * sps,
+   const GstH265VUIParams *vui = &sps->vui_params;
+ 
+   GST_LOG_OBJECT (self, "new sequence");
++  dovi_reset (self);
++  dovi_configure_from_caps (self);
+ 
+   if (sps->conformance_window_flag) {
+     crop_width = sps->crop_rect_width;
+@@ -615,6 +731,11 @@ gst_nv_h265_dec_new_sequence (GstH265Decoder * decoder, const GstH265SPS * sps,
+     crop_height = sps->height;
+   }
+ 
++  guint crop_x = sps->conformance_window_flag ? sps->crop_rect_x : 0;
++  guint crop_y = sps->conformance_window_flag ? sps->crop_rect_y : 0;
++  if (self->crop_x != crop_x || self->crop_y != crop_y) {
++    self->crop_x = crop_x; self->crop_y = crop_y; modified = TRUE;
++  }
+   if (self->width != crop_width || self->height != crop_height ||
+       self->coded_width != (guint) sps->width ||
+       self->coded_height != (guint) sps->height) {
+@@ -727,10 +848,10 @@ gst_nv_h265_dec_new_sequence (GstH265Decoder * decoder, const GstH265SPS * sps,
+     max_height = gst_nv_decoder_get_max_output_size (self->coded_height,
+         self->init_max_height, klass->max_height);
+ 
+-    if (!gst_nv_decoder_configure (self->decoder,
++    if (!gst_nv_decoder_configure_with_crop (self->decoder,
+             cudaVideoCodec_HEVC, &info, self->coded_width, self->coded_height,
+             self->bitdepth, max_dpb_size, FALSE, self->num_output_surfaces,
+-            max_width, max_height)) {
++            max_width, max_height, self->crop_x, self->crop_y)) {
+       GST_ERROR_OBJECT (self, "Failed to configure decoder");
+       return GST_FLOW_NOT_NEGOTIATED;
+     }
+@@ -752,8 +873,35 @@ gst_nv_h265_dec_new_picture (GstH265Decoder * decoder,
+ {
+   GstNvH265Dec *self = GST_NV_H265_DEC (decoder);
+ 
+-  return gst_nv_decoder_new_picture (self->decoder,
++  GstFlowReturn ret = gst_nv_decoder_new_picture (self->decoder,
+       GST_CODEC_PICTURE (picture));
++  if (ret != GST_FLOW_OK)
++    dovi_reset (self);
++  return ret;
++}
++
++static void
++dovi_output_picture (GstVideoDecoder *decoder, GstVideoCodecFrame *frame,
++    GstCodecPicture *picture)
++{
++  GstNvH265Dec *self = GST_NV_H265_DEC (decoder);
++  auto snapshot = static_cast<GstNvDoviSnapshot *> (
++      gst_mini_object_get_qdata (GST_MINI_OBJECT (picture), dovi_snapshot_quark ()));
++  frame->output_buffer = gst_buffer_make_writable (frame->output_buffer);
++  GstDoviPictureMeta *old;
++  while ((old = gst_buffer_get_dovi_picture_meta (frame->output_buffer)))
++    gst_buffer_remove_meta (frame->output_buffer, &old->meta);
++  if (!snapshot || snapshot->generation != self->dovi_generation)
++    return;
++  const GstDoviGeometry *g = gst_dovi_picture_get_geometry (snapshot->picture);
++  GstVideoMeta *video = gst_buffer_get_video_meta (frame->output_buffer);
++  GstVideoCropMeta *crop = gst_buffer_get_video_crop_meta (frame->output_buffer);
++  /* CUVID display_area materializes the active SPS window at origin zero. */
++  if (g->width == self->width && g->height == self->height &&
++      (!video || (video->width == g->width && video->height == g->height)) &&
++      (!crop || (!crop->x && !crop->y && crop->width == g->width &&
++          crop->height == g->height)))
++    gst_buffer_add_dovi_picture_meta (frame->output_buffer, snapshot->picture);
+ }
+ 
+ static GstFlowReturn
+@@ -762,9 +910,12 @@ gst_nv_h265_dec_output_picture (GstH265Decoder * decoder,
+ {
+   GstNvH265Dec *self = GST_NV_H265_DEC (decoder);
+ 
+-  return gst_nv_decoder_output_picture (self->decoder,
++  GstFlowReturn ret = gst_nv_decoder_output_picture_with_notify (self->decoder,
+       GST_VIDEO_DECODER (decoder), frame, GST_CODEC_PICTURE (picture),
+-      picture->buffer_flags);
++      picture->buffer_flags, dovi_output_picture);
++  if (ret != GST_FLOW_OK)
++    dovi_reset (self);
++  return ret;
+ }
+ 
+ static GstNvDecSurface *
+@@ -990,6 +1141,45 @@ gst_nv_h265_dec_start_picture (GstH265Decoder * decoder,
+   pps = slice_header->pps;
+   sps = pps->sps;
+ 
++  /* new/start_picture run in decode order. Resolve now, then keep this owned
++   * immutable snapshot on the exact picture through display-order output. */
++  {
++    GstVideoCodecFrame *frame = gst_video_decoder_get_frame (
++        GST_VIDEO_DECODER (decoder), GST_CODEC_PICTURE (picture)->system_frame_number);
++    GBytes *rpu = NULL;
++    int extracted = frame ? gst_dovi_extract_hevc_rpu (frame->input_buffer,
++        decoder->input_state, &rpu, NULL) : -1;
++    if (extracted < 0 || (frame &&
++            GST_BUFFER_FLAG_IS_SET (frame->input_buffer, GST_BUFFER_FLAG_DISCONT)))
++      dovi_reset (self);
++    if (extracted > 0 && self->dovi_resolver) {
++      GstDoviGeometry geometry = { (guint) sps->width, (guint) sps->height, 0, 0,
++        (guint) sps->width, (guint) sps->height };
++      if (sps->conformance_window_flag) {
++        geometry.x = sps->crop_rect_x; geometry.y = sps->crop_rect_y;
++        geometry.width = sps->crop_rect_width; geometry.height = sps->crop_rect_height;
++      }
++      GstDoviPicture *resolved = gst_dovi_resolver_resolve_geometry (self->dovi_resolver,
++          rpu, &geometry, GST_CODEC_PICTURE (picture)->system_frame_number, NULL);
++      if (!resolved) {
++        dovi_reset (self);
++      } else if (sps->chroma_format_idc == 1 && !(geometry.x & 1) && !(geometry.y & 1) &&
++          !(geometry.width & 1) && !(geometry.height & 1) && !sps->vui_params.field_seq_flag &&
++          !sps->vui_params.default_display_window_flag) {
++        GstNvDoviSnapshot *snapshot = g_new0 (GstNvDoviSnapshot, 1);
++        snapshot->picture = resolved;
++        snapshot->generation = self->dovi_generation;
++        gst_mini_object_set_qdata (GST_MINI_OBJECT (picture),
++            dovi_snapshot_quark (), snapshot, dovi_snapshot_free);
++      } else {
++        gst_dovi_picture_unref (resolved);
++      }
++    }
++    g_clear_pointer (&rpu, g_bytes_unref);
++    if (frame)
++      gst_video_codec_frame_unref (frame);
++  }
++
+   /* FIXME: update sps/pps related params only when it's required */
+   params->PicWidthInMbs = sps->pic_width_in_luma_samples / 16;
+   params->FrameHeightInMbs = sps->pic_height_in_luma_samples / 16;
+@@ -1205,6 +1395,7 @@ gst_nv_h265_dec_end_picture (GstH265Decoder * decoder, GstH265Picture * picture)
+   ret = gst_nv_decoder_decode (self->decoder, &self->params);
+ 
+   if (!ret) {
++    dovi_reset (self);
+     GST_ERROR_OBJECT (self, "Failed to decode picture");
+     return GST_FLOW_ERROR;
+   }
+diff --git a/sys/nvcodec/meson.build b/sys/nvcodec/meson.build
+index 5010795da2b7791518c9cc2affd1ec09188f3272..d64268e5e597083849bdf6856333375c4851974f 100644
+--- a/sys/nvcodec/meson.build
++++ b/sys/nvcodec/meson.build
+@@ -137,7 +137,7 @@ gstnvcodec = library('gstnvcodec',
+   include_directories : plugin_incdirs,
+   dependencies : [gstbase_dep, gstvideo_dep, gstpbutils_dep, gstgl_dep,
+                   gstglproto_dep, gmodule_dep, gstcodecs_dep,
+-                  gstd3d11_dep, gstcuda_dep] + extra_deps,
++                  gstd3d11_dep, gstcuda_dep, dependency('gstdovipicture-1.0', version: '=0.2.0')] + extra_deps,
+   override_options : ['cpp_std=c++14'],
+   install : true,
+   install_dir : plugins_install_dir,

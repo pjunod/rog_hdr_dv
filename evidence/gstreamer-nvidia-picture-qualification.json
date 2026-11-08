@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "scope": "Cumulative public Ubuntu bad package revision; source and producer runtime controls, no display qualification",
+  "origin": {
+    "package": "gst-plugins-bad1.0",
+    "version": "1.28.6-1ubuntu1",
+    "signed_dsc_sha256": "8352f9eb7efde49ca339552f0c914739aabea3b4fb468070cfb9963a41162b73",
+    "archive_checksums_match_preserved_descriptor": true,
+    "new_signature_verification": false
+  },
+  "base_package_version": "1.28.6-1ubuntu1+rogdv1",
+  "base_tree": "ab6b63c8c3b8a9824248337cb3c51f24e54ef522",
+  "candidate_package_version": "1.28.6-1ubuntu1+rogdv2",
+  "candidate_commit": "6a95f6a8aee5d1fb1e01b7033bba92d1953a5f7f",
+  "candidate_tree": "d3775948a231a9dada3e51541aee7e97db34167f",
+  "patch_file": "patches/ubuntu-gst-plugins-bad-rpu/0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch",
+  "patch_sha256": "d7c49219291b618f0c8210daca6ac7b06f7c48493493839c6d5135207be4ee81",
+  "index_replay_tree": "d3775948a231a9dada3e51541aee7e97db34167f",
+  "index_replay_pass": true,
+  "source_delta": "Normal nvh265dec strict decode-order owned pictures; exact CUVID SPS conformance origin; copied explicit stream config; serialized lifecycle and pre-finish output geometry validation. No rank changes.",
+  "dependencies": [
+    "rog-gstreamer-dovi-base-api (= 1)",
+    "rog-dv-hevc-runtime (>= 2)",
+    "libgstdovipicture-1.0-0 (>= 0.2.0+rogdv1)"
+  ],
+  "native_regressions": {
+    "nvidia": {
+      "source_commit": "0a9c872f3508abaafaf0bfc5319b93e8f47261d7",
+      "normal_and_crop": "PASS:30before/60after flushing seek; gaps12, reorder, retained lifetime and changed generation",
+      "config_only_control_and_transition": "PASS:95inputs/95outputs each; same normalized pixels ecb9d0983344583e08b0b3d98d60be2864157a443bcf66b75c5f1686ee06d551",
+      "crop_active_pixels": "PASS:95frames match avdec; normalized SHA1c2d8f3010995f46eac38d02316b2e49eef4a97564b7cd671a7bb350acc6da28; cropped remux has unknown container config",
+      "transform": "PASS:P010180degree rotation rejects source metadata;88transformed buffers"
+    },
+    "intel_va_and_avdec": "Previously independently reviewed exact producer3f6398f/a5e4ff1 pass gap/reorder/seek/lifetime/conformance/config matrix; source unchanged in this NV delta."
+  },
+  "qualification_limits": [
+    "Formal complete-change source review pending",
+    "No calibrated display or final GTK window qualification",
+    "No user desktop install",
+    "New NV normal distro package build in progress; original +rogdv1 rollback packages preserved"
+  ]
+}
