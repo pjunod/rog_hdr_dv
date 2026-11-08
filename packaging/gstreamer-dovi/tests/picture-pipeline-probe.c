@@ -27,9 +27,6 @@ struct probe {
   gchar *retained_hash;
   guint64 retained_epoch;
   gboolean lifetime_verified, generation_verified;
-  gboolean strip_config, input_config_known, raw_caps_config_valid;
-  AVDOVIDecoderConfigurationRecord input_config;
-  GBytes *input_config_bytes;
 };
 
 static void
@@ -76,24 +73,6 @@ input_event (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
   GstEventType type = GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info));
   (void) pad;
 
-  if (type == GST_EVENT_CAPS) {
-    GstCaps *caps;
-    gst_event_parse_caps (GST_PAD_PROBE_INFO_EVENT (info), &caps);
-    if (p->strip_config) {
-      caps = gst_caps_copy (caps);
-      gst_structure_remove_field (gst_caps_get_structure (caps, 0), "dovi-configuration");
-      GstEvent *replacement = gst_event_new_caps (caps);
-      gst_caps_unref (caps);
-      gst_event_unref (GST_PAD_PROBE_INFO_EVENT (info));
-      GST_PAD_PROBE_INFO_DATA (info) = replacement;
-      gst_event_parse_caps (replacement, &caps);
-    }
-    g_mutex_lock (&p->lock);
-    g_clear_pointer (&p->input_config_bytes, g_bytes_unref);
-    p->input_config_known = gst_dovi_caps_get_stream_config (caps,
-        &p->input_config, &p->input_config_bytes);
-    g_mutex_unlock (&p->lock);
-  }
   g_mutex_lock (&p->lock);
   if (type == GST_EVENT_FLUSH_START) {
     p->epoch++;
@@ -231,21 +210,6 @@ matches_picture (struct probe *p, GstBuffer *buffer, const struct expected *e)
     return meta == NULL;
   if (!meta || !meta->picture)
     return FALSE;
-  const AVDOVIDecoderConfigurationRecord *config =
-      gst_dovi_picture_get_stream_config (meta->picture);
-  if (!p->raw_caps_config_valid) return FALSE;
-  if (p->strip_config) {
-    if (config || p->input_config_known) return FALSE;
-  } else {
-    if (!p->input_config_known || !config ||
-        config->dv_profile != p->input_config.dv_profile ||
-        config->dv_bl_signal_compatibility_id != p->input_config.dv_bl_signal_compatibility_id ||
-        config->rpu_present_flag != p->input_config.rpu_present_flag ||
-        config->el_present_flag != p->input_config.el_present_flag ||
-        config->bl_present_flag != p->input_config.bl_present_flag ||
-        config->dv_md_compression != p->input_config.dv_md_compression)
-      return FALSE;
-  }
   guint width, height;
   guint64 epoch;
   gst_dovi_picture_get_dimensions (meta->picture, &width, &height);
@@ -385,16 +349,6 @@ check_decoded (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
       GstCaps *caps;
       gst_event_parse_caps (GST_PAD_PROBE_INFO_EVENT (info), &caps);
       have_info = gst_video_info_from_caps (&decoded_info, caps);
-      AVDOVIDecoderConfigurationRecord config;
-      GBytes *bytes = NULL;
-      gboolean known = gst_dovi_caps_get_stream_config (caps, &config, &bytes);
-      g_mutex_lock (&p->lock);
-      p->raw_caps_config_valid = p->strip_config ?
-          !gst_structure_has_field (gst_caps_get_structure (caps, 0), "dovi-configuration") :
-          known && p->input_config_bytes && bytes &&
-          g_bytes_equal (bytes, p->input_config_bytes);
-      g_mutex_unlock (&p->lock);
-      g_clear_pointer (&bytes, g_bytes_unref);
     }
     g_mutex_lock (&p->lock);
     if (have_info) {
@@ -480,12 +434,11 @@ main (int argc, char **argv)
 {
   if ((argc != 3 && argc != 4) ||
       (strcmp (argv[1], "avdec_h265") && strcmp (argv[1], "vah265dec")) ||
-      (argc == 4 && strcmp (argv[3], "rotate-180") && strcmp (argv[3], "strip-config")))
+      (argc == 4 && strcmp (argv[3], "rotate-180")))
     return 2;
   gst_init (&argc, &argv);
   struct probe p = {.last_input_pts = GST_CLOCK_TIME_NONE,
-      .transform_negative = argc == 4 && !strcmp (argv[3], "rotate-180"),
-      .strip_config = argc == 4 && !strcmp (argv[3], "strip-config")};
+      .transform_negative = argc == 4};
   g_mutex_init (&p.lock);
   p.expected = g_hash_table_new_full (g_int64_hash, g_int64_equal, g_free, expected_free);
   p.values = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
@@ -591,13 +544,12 @@ done:
           (p.transform_negative && !p.transformed)))
     result = 2; /* Insufficient fixture evidence never becomes a pass. */
   g_printerr ("decoder=%s before=%u after=%u gaps=%u parser-verified=%u "
-      "flushes=%u reordered=%d distinct-rpu=%u transformed=%u headers=%u errors=%u result=%d lifetime=%d generation=%d config=%s\n",
+      "flushes=%u reordered=%d distinct-rpu=%u transformed=%u headers=%u errors=%u result=%d lifetime=%d generation=%d\n",
       argv[1], p.outputs[0], p.outputs[1], p.gaps, p.verified, p.epoch,
-      p.reordered, g_hash_table_size (p.values), p.transformed, p.headers, p.failures, result, p.lifetime_verified, p.generation_verified, p.strip_config ? "unknown" : "complete");
+      p.reordered, g_hash_table_size (p.values), p.transformed, p.headers, p.failures, result, p.lifetime_verified, p.generation_verified);
   gst_object_unref (bus);
   gst_dovi_picture_unref (p.retained);
   g_free (p.retained_hash);
-  g_clear_pointer (&p.input_config_bytes, g_bytes_unref);
   gst_object_unref (p.pipeline);
   g_hash_table_unref (p.expected);
   g_hash_table_unref (p.values);

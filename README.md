@@ -20,11 +20,8 @@ repository owns the operating-system display work.
 
 ## What works today (2026-11-07)
 
-Installed on the laptop: APT libdisplay-info `0.3.0-1+nativehdr13` (amd64
-and i386), Mutter `51.0-1ubuntu3+nativehdr13`, kernel
-`7.3.0-nativehdr3`, and external plurx Player `0.4.1` for Dolby Vision.
-The [software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) binds the
-exact versions, package hashes and retained receipts. No reinstall is needed.
+The ROG runs the seven-package mpv, FFmpeg and Mesa playback update alongside Mutter and libdisplay-info `nativehdr13` and the `nativehdr3` kernel. The separate mpv 0.42 release reconstructed a genuine 4K Dolby Vision Profile 7 full enhancement layer on the laptop, selected the CM v4 grade for 616 cd/m², and ran with the existing file associations and video settings. That ten-package upgrade is staged. [Playback release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop and kernel handoff](docs/SOFTWARE_DELIVERY.md).
+
 The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
 the fix and retains Ubuntu security policies; see the

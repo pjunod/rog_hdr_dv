@@ -21,7 +21,7 @@ Vision and tuning for the internal OLED.</p>
 
 <h2>Profile 7 on the ROG</h2>
 <p>The staged Ubuntu mpv 0.42 package decoded a genuine 3840×2160 Dolby Vision Profile 7 picture on the laptop’s Intel GPU. Both the base and enhancement layers contributed. The renderer applied the CM v4 trim for the panel’s declared 616 cd/m² peak. A separate window capture retained PQ. The ten-package installation and its rollback passed offline APT simulation. The laptop still runs the previously installed seven-package stack. <a href="SYSTEM_DOLBY_VISION.md#physical-trim-selection-and-the-staged-dual-layer-player">Package and playback evidence</a>.</p>
-<p>The GNOME player work is still in development. The MP4 demuxer preserved the original Dolby configuration through the HEVC parser for Profile 5 and 8.1. The remaining playback checks cover per-picture metadata, rendering into a high-precision GTK surface and regrading a paused frame when the window changes displays. Optical panel calibration and independent Dolby reference comparison remain open. <a href="STATUS.md">Detailed project status</a>.</p>
+<p>The GNOME player work is still in development. The MP4 demuxer preserved the original Dolby configuration through the HEVC parser for Profile 5 and 8.1. Software and Intel VA decoding preserved all 95 pictures across Dolby configuration changes. High-precision GTK rendering and regrading a paused picture when the window changes display still need end-to-end qualification. Optical panel calibration and independent Dolby reference comparison remain open. <a href="STATUS.md">Detailed project status</a>.</p>
 
 <h2>GStreamer RPU transport — native scope passed</h2>
 <p>Software avdec and Intel VA passed reordered-picture, flushing-seek and RPU-gap

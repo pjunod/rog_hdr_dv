@@ -1,0 +1,35 @@
+diff --git a/debian/changelog b/debian/changelog
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++mpv (0.42.0-0ubuntu0+rogdv3) stonking; urgency=medium
++
++  * Recognize the versioned dual-layer and live metadata capability of newer
++    decoder builds while retaining the previously qualified decoder alternative.
++
++ -- ROG HDR contributors <noreply@rog-hdr-dv.invalid>  Sun, 08 Nov 2026 04:26:00 +0000
++
+ mpv (0.42.0-0ubuntu0+rogdv2) stonking; urgency=medium
+ 
+   * Require the matching decoder build for the HEVC enhancement-layer API.
+diff --git a/debian/control b/debian/control
+--- a/debian/control
++++ b/debian/control
+@@ -64,7 +64,7 @@
+ 
+ Package: mpv
+ Architecture: any
+-Depends: libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv2) | libavcodec-extra62 (= 7:8.1.2-2ubuntu2+rogdv2), ${shlibs:Depends}, ${misc:Depends}
++Depends: libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv2) | libavcodec-extra62 (= 7:8.1.2-2ubuntu2+rogdv2) | rog-dv-hevc-runtime (>= 2), ${shlibs:Depends}, ${misc:Depends}
+ Recommends: xdg-utils, yt-dlp
+ Suggests: libcuda1 [amd64 arm64 i386]
+ Multi-Arch: foreign
+@@ -87,7 +87,7 @@
+ Package: libmpv2
+ Section: libs
+ Architecture: any
+-Depends: libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv2) | libavcodec-extra62 (= 7:8.1.2-2ubuntu2+rogdv2), ${shlibs:Depends}, ${misc:Depends}
++Depends: libavcodec62 (= 7:8.1.2-2ubuntu2+rogdv2) | libavcodec-extra62 (= 7:8.1.2-2ubuntu2+rogdv2) | rog-dv-hevc-runtime (>= 2), ${shlibs:Depends}, ${misc:Depends}
+ Recommends: yt-dlp
+ Pre-Depends: ${misc:Pre-Depends}
+ Multi-Arch: same

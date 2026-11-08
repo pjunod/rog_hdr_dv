@@ -1,9 +1,6 @@
 # Status — what is working and what remains
 
-**Updated:** 2026-11-07 (America/New_York) · **Current:** APT `nativehdr13`
-userspace and signed kernel `nativehdr3` are installed. External plurx Player
-owns the playback product. The [software install/rollback handoff](SOFTWARE_DELIVERY.md)
-records exact package hashes and remaining acceptance; no reinstall is needed.
+**Updated November 7, 2026.** The ROG runs the seven-package playback update, nativehdr13 desktop and nativehdr3 kernel. Normal mpv opens MP4 and Matroska by default. The newer Profile 7 player has passed on the ROG using its existing video settings. Its ten-package installation is pending. [Player release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop and kernel versions](SOFTWARE_DELIVERY.md).
 
 ## Shared Dolby Vision renderer — November 7
 
@@ -23,7 +20,7 @@ The 32-bit decoder retained all 544 stock decoders, 218 encoders and 67 hardware
 
 Ubuntu's MP4 demuxer now carries the sample description's Dolby configuration through `h265parse`. Genuine Profile 5 and synthetic 8.1 preserved all 24 bytes. Plain HDR10, duplicate boxes and invalid fields carried no Dolby configuration. A four-byte legacy record retained its explicit unknown base compatibility. GTK player rendering remains a separate work item. [Demux and parser controls](../evidence/gstreamer-dovi-isobmff-controls.json).
 
-The corrected packaged player also ran with the laptop’s existing mpv video options. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. This correction passed its native headless test and awaits packaging. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
+The corrected packaged player also ran with the laptop’s existing mpv video options. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. The five normal Ubuntu compositor packages built, and their upgrade and exact five-package rollback passed offline simulation. The running compositor still uses its previous version. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
 
 ## GStreamer RPU transport — native scope passed, November 7
 
