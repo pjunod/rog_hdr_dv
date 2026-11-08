@@ -15,6 +15,10 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 | Staged GNOME Showtime | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
 | FFmpeg 8.1.2, libplacebo video filter | Explicit export target, because a filter graph can run without a display | Example below |
 
+### Paused GNOME playback
+
+On the ROG, the packaged Showtime client retained one decoded Profile 5 picture while a private GNOME monitor changed from 616 to 308 cd/m² and back. The mapper received both peaks with an unchanged 203 cd/m² reference white. GNOME’s 1280×800 PipeWire capture changed over 375,877 pixels inside the movie rectangle. The last capture matched the first byte for byte. The monitor advertised synthetic HDR capabilities, with the normal Mutter configuration, renderer and capture code. An independent late-HDR window also updated correctly on installed GNOME Shell. [Methods and measured differences](../evidence/gnome-showtime-paused-retarget.json).
+
 ### Browser playback on the ROG
 
 Stock Chrome 156.0.8078.47 and Firefox 159.0 both presented a local AVC control frame. Both rejected the same local unencrypted Profile 8.1 MP4 with media error 4 (`MEDIA_ERR_SRC_NOT_SUPPORTED`). The chart has matched Dolby configuration and RPU data and plays through the native consumer pipeline. Each browser used a fresh profile. Chrome ran on its own NVIDIA-backed Wayland display and Firefox ran headless.

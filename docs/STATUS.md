@@ -5,7 +5,7 @@
 | On the laptop today | Current development result |
 |---|---|
 | mpv 0.41, FFmpeg filter and the installed Vulkan update | Staged mpv 0.42 played the 4K FEL sample at 24 fps on NVIDIA. |
-| GNOME uses Mutter nativehdr13 and the existing GTK runtime | The updated GTK runtime fixes black Showtime output. A paused pure GTK window updated from 400 nits to black and back. Its 8-bit compositor capture could not distinguish 400 from 100 nits. The real player’s target-change check is still open. |
+| GNOME uses Mutter nativehdr13 and the existing GTK runtime | The updated GTK runtime fixes black Showtime output. The staged player regraded the same paused Profile 5 picture when a virtual GNOME monitor changed from 616 to 308 cd/m². Returning to 616 restored the exact original screen pixels. [GNOME capture](../evidence/gnome-showtime-paused-retarget.json). |
 | Firmware provides panel color and luminance data | The staged player scored mean ΔE ITP 0.651 and p95 1.274 on one chart at the panel target. The current mapper approximates the gamut as P3-D65. Optical calibration is pending. |
 
 **Movie-frame quality.** At 600 cd/m² the staged Intel filter measured mean ΔE ITP 2.61 and p95 7.20 on one 4K *Sol Levante* frame against Dolby’s render of the original master. The published 1080p Profile 5 release measured 9.21 and 26.31 against the downsampled reference. When the official processor received the same decoded base and a private XML copy carrying the three brightness values actually present in the stream, the Linux filter measured mean 0.65 and p95 1.60. [Source, individual controls and interpretation](../evidence/dolby-sol-levante-frame714.json).
