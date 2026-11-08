@@ -32,5 +32,23 @@
     "output_drops": 8,
     "eof": true
   },
-  "definition": "The wire delta is wp_commit_timer_v1.set_timestamp minus the most recent wp_presentation_feedback.presented timestamp observed by the client. The run did not install a driver on the host."
+  "definition": "The wire delta is wp_commit_timer_v1.set_timestamp minus the most recent wp_presentation_feedback.presented timestamp observed by the client. The run did not install a driver on the host.",
+  "explicit_timing_control": {
+    "driver": "+rogwsi2 private Intel ICD",
+    "display": "dedicated hardware-backed Wayland compositor, fixed 60 Hz",
+    "client": "Ubuntu Vulkan Tools 1.4.341.0 C cube with a fixed request schedule and completion logging",
+    "extension": "VK_GOOGLE_display_timing, enabled for this process via the Mesa Wayland opt-in",
+    "schedule": "72 FIFO frames, requested time CLOCK_MONOTONIC + 20 ms except for IDs congruent to 4 modulo 8, which request 0",
+    "reported_completions": 69,
+    "reported_absolute_requests": 60,
+    "reported_zero_requests": 9,
+    "client_minus_actual_ms": {
+      "minimum": 10.307,
+      "median": 10.723,
+      "maximum": 11.106
+    },
+    "sampled_monotonic_minus_monotonic_raw_ms": 4115.506,
+    "elapsed_s": 1.27,
+    "scope": "The final three submitted frames were outside the polling interval. Completion time is compared to the client clock at query; this measures the reporting time domain, not physical presentation latency."
+  }
 }
