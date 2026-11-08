@@ -1,0 +1,46 @@
+{
+  "status": "Implementation and focused native qualification passed; normal all-feature Ubuntu package build in progress",
+  "native_source": "4f554c9",
+  "native_base": "5e672e3",
+  "package_version": "1.28.7-1build1+rogdv2",
+  "specification": "https://www.matroska.org/technical/block_additional_mappings.html",
+  "scope": "Authoritative bounded track-local configuration transport only; no profile inference, residual reconstruction or mapped FEL success claim",
+  "controls": {
+    "passed": 25,
+    "stock_negative": "Correctly rejects expected Dolby configuration",
+    "coverage": [
+      "type/data child orders",
+      "mapping before codec identification",
+      "duplicate mappings and duplicate fields",
+      "missing/type-width/conflicting declarations",
+      "0/3/4/23/25/1048576-byte payloads",
+      "bad version and reserved bits",
+      "type/profile mismatch",
+      "unknown mapping without inference",
+      "independent two-track state",
+      "non-HEVC baseline"
+    ]
+  },
+  "native": {
+    "p5": {
+      "exit": 0,
+      "stdout": "DECODER factory=nvh265dec\nCAPS pad=video_0 media=video/x-raw bytes=24 exact=yes\nRESULT exit=0 decoded=3 resolved=3\n",
+      "log_sha256": "5855274fb55f2c5805859f1e0140c7d5d4a6a7d17ee727ca681fe9e253f681aa",
+      "input_sha256": "aa04d81c64fa9ddfda6c2fe75d4fcb1688f7d809729e8232a784a9b6f819c11b"
+    },
+    "p7_caps_only": {
+      "exit": 0,
+      "stdout": "CAPS pad=video_0 media=video/x-h265 bytes=24 exact=yes\nRESULT exit=0 decoded=0 resolved=0\n",
+      "input_sha256": "9af1d8aa98784d4c3ec64981948e14ef210751a0d7aa78414b83fd170693dd63",
+      "scope": "Authoritative P7 track configuration only; no decode, residual reconstruction or mapped FEL claim"
+    },
+    "plugin_sha256": "eac129f0b8e68c7f8b0446897a5a919d4d0a49ee072b5a96d35d9804fe1a2346",
+    "probe_sha256": "8220ec22bd151b23d169ed732a116697504591779355ef7da3798ed3fde01be9"
+  },
+  "build_limits": "Normal distro features preserved; outer parallel1 nocheck; existing LTO2. No host installs or display interaction.",
+  "sources": {
+    "0001-track-local-dovi-configuration.patch": "63c296f8886c2e771f7976b4945229b475aa7b99cc71b1fdc353342a5a7c9151",
+    "track-config-probe.c": "ea47af668a0826bb116767e54517aa52324fc0b0d99fb5f781e8fa1c6a6a2e90",
+    "make-track-controls.py": "cb51f8cc7b0b88018f66d0c36395932699b953cc06f64f5cea78bac6be46c48a"
+  }
+}
