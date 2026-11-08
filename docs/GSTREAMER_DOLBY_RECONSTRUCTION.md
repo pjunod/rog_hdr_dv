@@ -5,6 +5,10 @@ VA checks; unshipped. This qualification covers source metadata ownership,
 configuration transitions and conformance geometry. It establishes no normal
 player rendering, image-grade accuracy, package release or host installation.
 
+## Normal GNOME playback
+
+The staged Showtime, GTK4 paintable sink and shared mapper compiled on Ubuntu. Ordinary Showtime opened a genuine Profile 5 title and selected NVIDIA's HEVC decoder on the ROG. That decoder omitted the Dolby configuration at its output after the upstream MP4 demuxer and HEVC parser had carried it correctly. The player used its ordinary rendering path. The separate software decoder kept the configuration. A rendered-grade claim requires the default decoder to preserve its own decoded picture and the authored change to reach the measured window. [Implementation and build evidence](../evidence/gstreamer-gtk-consumer-source-freeze-20261108.json).
+
 ## What the producer publishes
 
 `packaging/gstreamer-dovi/bridge` owns immutable `GstDoviPicture` values. Public
