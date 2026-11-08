@@ -9,6 +9,20 @@ player rendering, image-grade accuracy, package release or host installation.
 
 The staged Showtime, GTK4 paintable sink and shared mapper compiled on Ubuntu. Ordinary Showtime opened a genuine Profile 5 title and selected NVIDIA's HEVC decoder on the ROG. That decoder omitted the Dolby configuration at its output after the upstream MP4 demuxer and HEVC parser had carried it correctly. The player used its ordinary rendering path. The separate software decoder kept the configuration. The corrected NVIDIA producer subsequently retained all 95 decoded pictures across configuration changes, matched software decode for the crop control and reached the mapper through ordinary Showtime’s default decoder selection. [NVIDIA controls](../evidence/gstreamer-nvidia-picture-qualification.json). A rendered-grade claim requires the default decoder to preserve its own decoded picture and the authored change to reach the measured window. [Implementation and build evidence](../evidence/gstreamer-gtk-consumer-source-freeze-20261108.json).
 
+### Rebuild the GNOME consumers
+
+Use fresh Ubuntu source extractions for `rust-gst-plugin-gtk4` and `showtime`. The pinned input inventory records the exact Ubuntu versions and hashes of their source descriptors. Put the extracted Rust source at `source/` and Showtime at `showtime-50.0/` under one build directory. [Pinned Ubuntu metadata](../packaging/gstreamer-gtk-dovi/package-inputs/provenance.json).
+
+From each extracted source root, import each listed patch into its Debian quilt series and apply it with `QUILT_PATCHES=debian/patches quilt push`. The ordering below matters because the paused-frame code builds on the paintable’s native-picture support.
+
+| Source | Patches in application order |
+|---|---|
+| Rust GTK4 paintable sink | [16-bit textures](../packaging/gstreamer-gtk-dovi/0002-gtk4paintablesink-preserve-16bit-rgba.patch), [native-picture retargeting](../packaging/gstreamer-gtk-dovi/0003-gtk4paintablesink-retarget-visible-native-pictures.patch), [visible overlay compositions](../packaging/gstreamer-gtk-dovi/0005-gtk4paintablesink-retain-visible-overlay-compositions.patch) |
+| Showtime | [Bind the surface target before conversion](../packaging/gstreamer-gtk-dovi/0001-showtime-bind-native-target-before-gl-conversion.patch) |
+
+Run `python3 packaging/gstreamer-gtk-dovi/prepare-ubuntu-packages.py BUILD_DIRECTORY` from this repository. It derives the control, rules and changelog files from the pinned inputs. Build the native mapping core and development package first, then build the sink and Showtime with their declared dependencies and `dpkg-buildpackage`. The mapper and the sink must use the same core ABI. The mapper accepts eleven system-memory pixel formats. On the ROG it also reads NV12 and P010 through GStreamer’s CUDA and VA allocators. Both accelerator paths produce full-range RGBA64 BT.2020/PQ in system memory. [Native mapper package and GPU checks](../evidence/gstreamer-gtk-mapper-negotiation.json).
+
+
 ## What the producer publishes
 
 `packaging/gstreamer-dovi/bridge` owns immutable `GstDoviPicture` values. Public
