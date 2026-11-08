@@ -1,0 +1,300 @@
+rust-gst-plugin-gtk4 (0.15.2-1ubuntu2) stonking; urgency=medium
+
+  * d/rules: Enable the v1_28 cargo feature (LP: #2168747). This builds
+    in the udmabuf allocator, allowing zero-copy buffer sharing between
+    CPU and GPU - notably speeding up video playback with software
+    decoders. Matches GNOME (gnome-build-meta MR 5039) and Fedora.
+
+ -- Charles <charles05@canonical.com>  Mon, 28 Sep 2026 13:05:31 +0100
+
+rust-gst-plugin-gtk4 (0.15.2-1ubuntu1) stonking; urgency=medium
+
+  * Sync with Debian (LP: #2154448). Remaining changes:
+    - Run debian/rules vendor to:
+      + Update vendored rust crates
+      + Update debian/source/include-binaries
+      + Update XS-Vendored-Sources-Rust field
+    - d/control: Update maintainer, add missing quilt B-D.
+    - d/s/lintian-overrides: Ignore irrelevant nags.
+    - d/patches/bump-target-lexicon-riscv64a23.patch: bump cfg-expr to 0.20.8
+      in Cargo.lock, pulling target-lexicon 0.13.5. The previously-vendored
+      0.12.16 (pinned transitively via system-deps -> cfg-expr 0.17.2) does
+      not recognise the riscv64a23-unknown-linux-gnu triple, so its build
+      script panics with "Invalid target name:
+      'riscv64a23-unknown-linux-gnu'" and FTBFS on riscv64. Only required for
+      the Ubuntu vendored build, which resolves crates from Cargo.lock; Debian
+      builds against the packaged target-lexicon (>= 0.13.4).
+    - d/patches/require-gtk-v4_10.patch: pin the base gtk dependency to the
+      v4_10 feature. gst-plugin-gtk4 0.15.2 unconditionally compiles the
+      render widget which needs GTK 4.10 API (upstream default =
+      ["gtk_v4_10"]), so building against the gtk4-rs v4_6 baseline FTBFS
+      (gtk::Accessible not found). Dependency features are always on
+      regardless of --no-default-features, so this makes every feature
+      combination - including the per-feature autopkgtests - build against
+      GTK 4.10 and pass.
+
+ -- Charles <charles05@canonical.com>  Mon, 20 Jul 2026 18:16:29 +0100
+
+rust-gst-plugin-gtk4 (0.15.2-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.15.2 from crates.io using debcargo 2.8.2
+  * Update overlayed d/control
+  * Refresh patches
+
+ -- Matthias Geiger <werdahias@debian.org>  Thu, 21 May 2026 22:09:30 +0200
+
+rust-gst-plugin-gtk4 (0.15.0-1) experimental; urgency=medium
+
+  * Package gst-plugin-gtk4 0.15.0 from crates.io using debcargo 2.8.2
+  * Rebase patches for new upstream release
+  * Update overlayed d/control
+
+ -- Matthias Geiger <werdahias@debian.org>  Thu, 07 May 2026 11:34:01 +0200
+
+rust-gst-plugin-gtk4 (0.14.4-1ubuntu1) resolute; urgency=medium
+
+  * Sync with Debian (LP: #2137027). Remaining changes:
+    - Run debian/rules vendor to:
+      + Update vendored rust crates
+      + Update debian/source/include-binaries
+      + Update XS-Vendored-Sources-Rust field
+  * The following changes were incorporated into the Debian packaging
+    since the last Ubuntu upload.
+    - Don't fail if debian/source/include-binaries doesn't already exist
+    - Automate using new dh-cargo-vendored-sources --output-expected
+    - Ignore dh-cargo-vendored-sources failure during dh_auto_configure
+
+ -- Charles <charles05@canonical.com>  Mon, 19 Jan 2026 22:40:20 +0000
+
+rust-gst-plugin-gtk4 (0.14.4-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.14.4 from crates.io using debcargo 2.7.11
+  * d/control: Bump S-V to 4.7.3; drop Priority: optional
+  * Update overlayed d/control
+
+ -- Matthias Geiger <werdahias@debian.org>  Mon, 29 Dec 2025 14:17:43 +0100
+
+rust-gst-plugin-gtk4 (0.14.3-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.14.3 from crates.io using debcargo 2.7.11
+  * d/rules: Enable gtk_v4_20 feature (Closes: #1119880)
+  * d/control: Drop Rules-Requires-Root field
+
+ -- Matthias Geiger <werdahias@debian.org>  Sun, 02 Nov 2025 00:32:36 +0100
+
+rust-gst-plugin-gtk4 (0.14.2-1) unstable; urgency=medium
+
+  * Team upload
+  * Package gst-plugin-gtk4 0.14.2 from crates.io using debcargo 2.7.10
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Thu, 25 Sep 2025 20:23:03 -0400
+
+rust-gst-plugin-gtk4 (0.14.0-4) unstable; urgency=medium
+
+  * Team upload
+  * Package gst-plugin-gtk4 0.14.0 from crates.io using debcargo 2.7.10
+  * Upload to unstable
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Sat, 06 Sep 2025 19:20:08 -0400
+
+rust-gst-plugin-gtk4 (0.14.0-3ubuntu1) questing; urgency=medium
+
+  * Sync with Debian. Remaining changes:
+    - Run  debian/rules vendor  to:
+      + Update vendored rust crates
+      + Update debian/source/include-binaries
+      + Update XS-Vendored-Sources-Rust field
+  * Don't fail if debian/source/include-binaries doesn't already exist
+  * Automate using new dh-cargo-vendored-sources --output-expected
+  * Ignore dh-cargo-vendored-sources failure during dh_auto_configure
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Tue, 26 Aug 2025 14:11:04 -0400
+
+rust-gst-plugin-gtk4 (0.14.0-3) experimental; urgency=medium
+
+  * Fix build
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Mon, 25 Aug 2025 17:44:42 -0400
+
+rust-gst-plugin-gtk4 (0.14.0-2) experimental; urgency=medium
+
+  * Add debian/upstream/metadata
+  * Add symbols file
+  * Set CARGO_HOME once
+  * Use feature wayland instead of deprecated waylandegl
+  * Fix minor Lintian warnings
+  * Copy vendoring rule & README.source from Ubuntu (unused in Debian)
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Mon, 25 Aug 2025 14:54:27 -0400
+
+rust-gst-plugin-gtk4 (0.14.0-1) experimental; urgency=medium
+
+  * Package gst-plugin-gtk4 0.14.0 from crates.io using debcargo 2.7.8
+  * Refresh patches
+  * Update overlayed d/control for new upstream release
+  * debcargo.toml: Updated source deps
+  * Mark gtk_v4_20 feature as broken; stop marking dmabuf feature as
+    broken
+
+ -- Matthias Geiger <werdahias@debian.org>  Thu, 07 Aug 2025 22:51:32 +0200
+
+rust-gst-plugin-gtk4 (0.13.5-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.13.5 from crates.io using debcargo 2.7.8
+  * Refresh patches
+  * Update overlayed d/control for new upstream release
+  * Bump S-V to 4.7.2, no changes needed
+
+ -- Matthias Geiger <werdahias@debian.org>  Tue, 18 Mar 2025 20:44:51 +0100
+
+rust-gst-plugin-gtk4 (0.13.4-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.13.4 from crates.io using debcargo 2.7.7
+  * Update d/rules to work around dh-cargo bug
+  * Update overlayed d/control for new upstream release
+  * Refresh patches
+
+ -- Matthias Geiger <werdahias@debian.org>  Mon, 24 Feb 2025 19:56:22 +0100
+
+rust-gst-plugin-gtk4 (0.13.3-2) unstable; urgency=medium
+
+  * Mark dmabuf feature as broken, too
+
+ -- Matthias Geiger <werdahias@debian.org>  Sat, 07 Dec 2024 01:16:57 +0100
+
+rust-gst-plugin-gtk4 (0.13.3-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.13.3 from crates.io using debcargo 2.7.5
+  * Stop using <!nocheck> in d/control (Closes: #1088250)
+  * Update d/control for new upstream
+  * Refresh patches
+
+ -- Matthias Geiger <werdahias@debian.org>  Thu, 05 Dec 2024 10:35:50 +0100
+
+rust-gst-plugin-gtk4 (0.13.1-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.13.1 from crates.io using debcargo 2.7.0
+  * d/control: Update to S-V 4.7.0; switch to dh-compat; updated
+    Provides and Depends
+  * remove-windows-deps.diff: Refresh for new upstream
+  * d/copyright: Update for new upstream
+
+ -- Matthias Geiger <werdahias@debian.org>  Mon, 23 Sep 2024 01:12:57 +0200
+
+rust-gst-plugin-gtk4 (0.13.0-4) unstable; urgency=medium
+
+  * Team upload
+  * Package gst-plugin-gtk4 0.13.0 from crates.io using debcargo 2.6.1
+  * Stop ignoring gtk 4.14 & dmabuf test failures
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Mon, 02 Sep 2024 16:54:14 -0400
+
+rust-gst-plugin-gtk4 (0.13.0-3) unstable; urgency=medium
+
+  * Team upload.
+  * Package gst-plugin-gtk4 0.13.0 from crates.io using debcargo 2.6.1
+  * Release to unstable
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Tue, 27 Aug 2024 14:48:57 -0400
+
+rust-gst-plugin-gtk4 (0.13.0-2) experimental; urgency=medium
+
+  * d/control: Updated for new upstream release
+
+ -- Matthias Geiger <werdahias@debian.org>  Thu, 22 Aug 2024 15:04:39 +0200
+
+rust-gst-plugin-gtk4 (0.13.0-1) experimental; urgency=medium
+
+  * Team upload.
+  * Package gst-plugin-gtk4 0.13.0 from crates.io using debcargo 2.6.1
+  * Mark v1_26 feature as broken
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Wed, 21 Aug 2024 19:37:13 -0400
+
+rust-gst-plugin-gtk4 (0.12.7-5) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Matthias Geiger <werdahias@debian.org>  Sun, 04 Aug 2024 14:27:35 +0200
+
+rust-gst-plugin-gtk4 (0.12.7-4) experimental; urgency=medium
+
+  * Build gstreamer1.0-gtk4 package (Closes: #1070646)
+
+ -- Matthias Geiger <werdahias@debian.org>  Fri, 02 Aug 2024 18:17:14 +0200
+
+rust-gst-plugin-gtk4 (0.12.7-3) unstable; urgency=medium
+
+  * Drop gst-allocators patch since this dependency is now in Debian
+  * Add patch to disable static feature
+  * Mark dmabuf feature as flaky, too
+
+ -- Matthias Geiger <werdahias@riseup.net>  Sun, 21 Jul 2024 16:55:49 +0200
+
+rust-gst-plugin-gtk4 (0.12.7-2) unstable; urgency=medium
+
+  * Upload to unstable
+
+ -- Matthias Geiger <werdahias@riseup.net>  Sun, 14 Jul 2024 15:17:07 +0200
+
+rust-gst-plugin-gtk4 (0.12.7-1) experimental; urgency=medium
+
+  * Package gst-plugin-gtk4 0.12.7 from crates.io using debcargo 2.6.1
+  * Stop patching async-channel dependency
+
+ -- Matthias Geiger <werdahias@riseup.net>  Mon, 24 Jun 2024 20:24:30 +0200
+
+rust-gst-plugin-gtk4 (0.12.5-2) unstable; urgency=medium
+
+  * Add patch to disable gst-allocator dependency (and subsequent dmabuf
+    feature)
+
+ -- Matthias Geiger <werdahias@riseup.net>  Mon, 06 May 2024 12:23:59 +0200
+
+rust-gst-plugin-gtk4 (0.12.5-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.12.5 from crates.io using debcargo 2.6.1
+  * Updated copyright years
+  * New upstream release (Closes: #1070191)
+
+ -- Matthias Geiger <werdahias@riseup.net>  Sun, 05 May 2024 15:32:05 +0200
+
+rust-gst-plugin-gtk4 (0.12.3-1) experimental; urgency=medium
+
+  * Team upload
+  * Package gst-plugin-gtk4 0.12.3 from crates.io using debcargo 2.6.1
+
+ -- Jeremy Bícha <jbicha@ubuntu.com>  Wed, 17 Apr 2024 17:30:57 -0400
+
+rust-gst-plugin-gtk4 (0.12.1-2) experimental; urgency=medium
+
+  * Mark gtk_v4_14 and gst-gl features as broken
+
+ -- Matthias Geiger <werdahias@riseup.net>  Sat, 09 Mar 2024 20:06:15 +0100
+
+rust-gst-plugin-gtk4 (0.12.1-1) experimental; urgency=medium
+
+  * Package gst-plugin-gtk4 0.12.1 from crates.io using debcargo 2.6.1
+  * Rebased patches for new upstream
+
+ -- Matthias Geiger <werdahias@riseup.net>  Tue, 27 Feb 2024 18:58:20 +0100
+
+rust-gst-plugin-gtk4 (0.11.3-2) unstable; urgency=medium
+
+  * Mark gst_gl feature as flaky
+
+ -- Matthias Geiger <werdahias@riseup.net>  Sun, 14 Jan 2024 15:25:27 +0100
+
+rust-gst-plugin-gtk4 (0.11.3-1) unstable; urgency=medium
+
+  * Package gst-plugin-gtk4 0.11.3 from crates.io using debcargo 2.6.1
+  * Rebased patch for new upstream; relaxed async-channel dependency
+  * Upload to unstable
+
+ -- Matthias Geiger <werdahias@riseup.net>  Sat, 13 Jan 2024 18:50:20 +0100
+
+rust-gst-plugin-gtk4 (0.11.2-1) experimental; urgency=medium
+
+  * Package gst-plugin-gtk4 0.11.2 from crates.io using debcargo 2.6.1
+
+ -- Matthias Geiger <werdahias@riseup.net>  Tue, 09 Jan 2024 16:53:15 -0500

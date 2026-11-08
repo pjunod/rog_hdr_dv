@@ -1,0 +1,79 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/architecture.mk
+include /usr/share/rustc/architecture.mk
+
+export CARGO = /usr/share/cargo/bin/cargo
+export CARGO_HOME = $(CURDIR)/debian/cargo_home
+export CARGO_VENDOR_DIR = debian/missing-sources
+export DEB_HOST_RUST_TYPE DEB_HOST_GNU_TYPE
+export DEB_CARGO_CRATE=$(DEB_SOURCE)_$(DEB_VERSION_UPSTREAM)
+export DPKG_GENSYMBOLS_CHECK_LEVEL = 4
+
+ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+else
+	NUMJOBS = 1
+endif
+
+CARGO_C_FLAGS = --release \
+	--destdir=debian/tmp \
+	--prefix=/usr \
+	--libdir=/usr/lib/${DEB_HOST_MULTIARCH} \
+	--offline \
+    --features gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28 \
+	-v \
+	-j $(NUMJOBS)
+
+%:
+	dh $@ --buildsystem cargo
+
+execute_after_dh_auto_clean:
+	rm -rf $(CARGO_HOME)
+
+override_dh_auto_configure:
+ifeq ($(shell dpkg-vendor --query vendor),Ubuntu)
+	$(CARGO) prepare-debian $(CARGO_VENDOR_DIR)
+# Ubuntu's dh-cargo-vendored-sources isn't working correctly here
+	-dh_auto_configure
+else
+	dh_auto_configure
+endif
+
+execute_after_dh_auto_build:
+	/usr/share/cargo/bin/cargo cbuild $(CARGO_C_FLAGS)
+
+override_dh_auto_install:
+	# will fail after installing the librust-XX package, since there is no binpkg
+	# but dh-cargo thinks there is
+	dh_auto_install || true
+	/usr/share/cargo/bin/cargo cinstall $(CARGO_C_FLAGS)
+
+execute_after_dh_install:
+	find debian -name Cargo.lock -delete
+
+# Used by Ubuntu
+vendor:
+	dh_quilt_patch
+	rm -rf $(CARGO_VENDOR_DIR)
+	CARGO_HOME= $(CARGO) vendor-filterer --platform='*-*-linux-gnu' --platform '*-*-linux-gnueabi' \
+	  --exclude-crate-path system-deps#src/tests/lib/libteststatic.a --all-features \
+	 $(CARGO_VENDOR_DIR)
+	git add -f $(CARGO_VENDOR_DIR)
+	git commit -m "Update vendored rust crates" || true
+	git reset --hard && git clean -fdx
+
+	uscan --download-current-version --destdir=..
+	rm -f debian/source/include-binaries
+	dpkg-source --include-binaries -b .
+	git add debian/source/include-binaries
+	git commit -m "Update debian/source/include-binaries" || true
+	git reset --hard && git clean -fdx
+ifneq (0,$(shell grep -q XS-Vendored-Sources-Rust debian/control && echo 0))
+	sed -i "s/X-Cargo-Crate: gst-plugin-gtk4/X-Cargo-Crate: gst-plugin-gtk4\nXS-Vendored-Sources-Rust/" debian/control
+endif
+	sed -i \
+	"s/^XS-Vendored-Sources-Rust.*/XS-Vendored-Sources-Rust: $$(/usr/share/cargo/bin/dh-cargo-vendored-sources --output-expected)/" \
+	debian/control
+	git add -f debian/control
+	git commit -m "Update XS-Vendored-Sources-Rust field" || true
