@@ -22,7 +22,7 @@ guint width, height;    /* native visible picture dimensions */
 
 The add function copies the original bytes. Whole-buffer copies retain the
 immutable `GBytes`; partial-buffer copies and non-copy transformations drop the
-meta. Its colorspace and size tags allow pixel-changing converters to remove
+meta. Its colorspace, size and orientation tags allow pixel-changing converters to remove
 instructions that no longer describe their output. The decoder explicitly
 accepts this one tagged meta when its output dimensions match the source.
 Low-resolution decoder output does not receive it.
@@ -109,16 +109,31 @@ examples, introspection and documentation execution were disabled. The
 records this narrow evidence and output hashes. Patch hashes were added to
 `SHA256SUMS` deliberately for the two new series.
 
+Independent review found two defects in the first proposal: the probe waited
+for a parser's queued SEGMENT before admitting the buffer that releases it,
+and the raw meta omitted its orientation tag. The
+[correction receipt](../evidence/gstreamer-rpu-corrections-compile-20261107.json)
+records corrected source and probe compilation. The original compile receipt
+retains its original candidate identity. Fresh review remains pending.
+
 The [native pipeline probe](../packaging/gstreamer-rpu/rpu-pipeline-probe.c) is
 written and compiled, not executed. Review it and the source before running it.
 It accepts `avdec_h265` or `vah265dec` plus a real MP4 HEVC fixture. Its two normal
 `h265parse` stages surround an injection that removes selected RPU NALs while
 retaining the old meta deliberately. An independent Annex-B scanner records the
 expected remaining RPU. The second parser and decoded buffers must match it by
-PTS. After 30 output pictures the probe performs a flushing seek; it requires
-60 further pictures, observed coded-order PTS reordering, RPU gaps and at least
+PTS. After 30 output pictures the probe performs a flushing seek. Its input epoch
+advances at the upstream flush boundary; input reopens at FLUSH_STOP, while
+decoder output remains excluded until the decoder's new SEGMENT. This allows
+the parser to receive the first new buffer before releasing its queued segment.
+The probe requires 60 further pictures, observed coded-order PTS reordering, RPU gaps and at least
 two distinct original RPU values. A missing element or insufficient fixture is
-inconclusive, not a pass. This is a test instrument, not a product launch path.
+inconclusive, not a pass. Optional `rotate-180` mode inserts the normal native
+`vapostproc`, verifies its 180-degree direction setting, requires the same pixel
+format and visible dimensions, and asserts that its output has no original RPU
+meta. A negotiated conversion or resize is inconclusive for that orientation
+negative because it could remove the meta for another reason. This is a test
+instrument, not a product launch path.
 
 After independent review, record these checks before merge:
 
@@ -137,3 +152,42 @@ After independent review, record these checks before merge:
 Rendering, optical agreement, protected streaming and system-wide application
 coverage require their own later phase evidence. No source equation or private
 mapper arithmetic is part of this transport change.
+
+## 5. Durable packaging preserves the signed Ubuntu feature floor
+
+This is a packaging scope, not a package-delivery receipt. The minimal feature
+build establishes a compiler loop only and must not become a replacement for
+Ubuntu's normal feature configuration.
+
+| Source package | Planned candidate artifacts | Compatibility obligation |
+|---|---|---|
+| `gst-plugins-base1.0 1.28.7-1` | Normal base runtime/development packages, including additive GstVideo meta API | Keep the stock SONAME and all existing exported symbols/features; add the three new API symbols to the candidate symbols file |
+| `gst-plugins-bad1.0 1.28.6-1ubuntu1` | Normal bad plugin packages, with the native HEVC parser change | Build and run against the exact matching candidate base runtime/development package |
+
+The unpublished API creates an exact-version dependency between candidate bad
+and base packages. A later stock base version cannot be assumed to contain it.
+Declare that dependency in packaging; a global APT pin or forced plugin rank
+is not a substitute. Preserve the exact signed stock `.deb` files, complete
+source archives, build options, hashes and rollback transaction in durable
+private output storage. Do not commit signed packages or signing material.
+
+If the host co-installs a `Multi-Arch: same` base runtime for i386, qualification
+and compatible candidate packages for both architectures are needed before a
+transaction can replace it. Removing the other architecture to make an amd64
+package install is not within this proposal. Simulate the eventual exact
+transaction and inspect reverse dependencies before any host install.
+
+Before packaging, perform a clean native source replay with the pinned archives
+and both exported patch series. Require the base and candidate trees recorded
+in the registry, then compile that exact replay. Preserve the source replay and
+runtime qualification receipts with the packages. Runtime tests must identify
+the actual loaded candidate GstVideo/parser and signed native decoder binaries;
+plugin discovery or a successful compiler exit alone is insufficient.
+
+The later reconstruction phase must consume the GTK owner's existing preferred
+surface feedback snapshot and generation. Use the raw physical declared black,
+peak, reference-white luminance and xy data coherently for pre-mapping and
+output signalling. For example, a physical 616 cd/m² target at 142 cd/m²
+reference white is not the normalized 880.6 cd/m² value another consumer might
+report. Neither normalization nor a generic HDR default may replace the actual
+physical target. This transport phase does not yet consume that bridge.

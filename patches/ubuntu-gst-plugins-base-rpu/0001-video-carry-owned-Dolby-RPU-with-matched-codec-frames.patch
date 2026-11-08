@@ -1,4 +1,4 @@
-From 906fd88fde0187ec51baeea28bc7ddda90969226 Mon Sep 17 00:00:00 2001
+From 23a21d1f6a8b6c263006aef993e4073b5476c126 Mon Sep 17 00:00:00 2001
 From: ROG HDR contributors <rog-hdr@invalid>
 Date: Sat, 7 Nov 2026 19:23:23 -0500
 Subject: [PATCH] feat(video): carry owned Dolby RPU with matched codec frames
@@ -44,7 +44,7 @@ index 78febe2..b8a5a2c 100644
    if (!tags)
 diff --git a/gst-libs/gst/video/gstvideodovirpumeta.c b/gst-libs/gst/video/gstvideodovirpumeta.c
 new file mode 100644
-index 0000000..265b9cf
+index 0000000..c8fb422
 --- /dev/null
 +++ b/gst-libs/gst/video/gstvideodovirpumeta.c
 @@ -0,0 +1,115 @@
@@ -80,7 +80,7 @@ index 0000000..265b9cf
 +  static GType type = 0;
 +  static const gchar *tags[] = {
 +    GST_META_TAG_VIDEO_STR, GST_META_TAG_VIDEO_COLORSPACE_STR,
-+    GST_META_TAG_VIDEO_SIZE_STR, NULL
++    GST_META_TAG_VIDEO_SIZE_STR, GST_META_TAG_VIDEO_ORIENTATION_STR, NULL
 +  };
 +
 +  if (g_once_init_enter (&type)) {
@@ -165,7 +165,7 @@ index 0000000..265b9cf
 +}
 diff --git a/gst-libs/gst/video/gstvideodovirpumeta.h b/gst-libs/gst/video/gstvideodovirpumeta.h
 new file mode 100644
-index 0000000..b98f7eb
+index 0000000..8cd354e
 --- /dev/null
 +++ b/gst-libs/gst/video/gstvideodovirpumeta.h
 @@ -0,0 +1,74 @@
@@ -217,8 +217,8 @@ index 0000000..b98f7eb
 + * In particular, a base-layer-only FEL decode is never a reconstructed master.
 + *
 + * Read fields only. Whole-buffer copies retain the immutable bytes; region
-+ * copies and non-copy transforms do not preserve this meta. The colorspace
-+ * and size tags allow pixel-changing transforms to discard it. Decoders may
++ * copies and non-copy transforms do not preserve this meta. The colorspace,
++ * size and orientation tags allow pixel-changing transforms to discard it. Decoders may
 + * transport it through their matched #GstVideoCodecFrame, without changing the
 + * visible dimensions. Consuming display management must remove it.
 + */

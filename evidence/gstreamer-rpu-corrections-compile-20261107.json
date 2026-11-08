@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "state": "CORRECTIONS_COMPILED_PENDING_FRESH_REVIEW",
+  "prior_repository_candidate": "8cbc058",
+  "corrections": [
+    "P1: injector input epoch advances on upstream FLUSH_START and input admission resumes on FLUSH_STOP; decoder output resumes only at its own new SEGMENT",
+    "P2: raw RPU meta has orientation tag so same-size rotation/flip invalidates it",
+    "Probe optional rotate-180 mode uses actual native vapostproc, requires unchanged format/dimensions and absent output RPU meta"
+  ],
+  "source_package": {
+    "component": "ubuntu-gst-plugins-base-rpu",
+    "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
+    "candidate_commit": "23a21d1f6a8b6c263006aef993e4073b5476c126",
+    "candidate_tree": "9d9a28d60ebaf12902679c01da767ceab2902948"
+  },
+  "compile_output_sha256": {
+    "libgstvideo-1.0.so.0.2807.0": "30607768fd7f43662b3d3bc40d52ca719de0989808fb8b079dc7ef3762016cd6",
+    "rpu-pipeline-probe": "e35c77b5e99e672283ac91ed41a9b72073142fa52457f9b51ba007fb84db163e"
+  },
+  "warning_policy": [
+    "meson -Dwerror=true",
+    "probe cc -Wall -Wextra -Werror"
+  ],
+  "runtime_tests_executed": 0,
+  "host_installation": false,
+  "container_installation": false
+}

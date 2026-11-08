@@ -5,6 +5,7 @@
  */
 #include <gst/gst.h>
 #include <gst/video/gstvideodovirpumeta.h>
+#include <gst/video/video.h>
 #include <string.h>
 
 struct expected { gchar *hash; };
@@ -12,9 +13,12 @@ struct probe {
   GstElement *pipeline;
   GMutex lock;
   GHashTable *expected, *values;
-  guint epoch, inputs, outputs[2], gaps, verified, failures;
+  guint epoch, inputs, outputs[2], gaps, verified, failures, transformed;
   GstClockTime last_input_pts;
-  gboolean reordered, seek_requested, done_requested, flushing;
+  GstVideoInfo decoded_info;
+  gboolean have_decoded_info;
+  gboolean reordered, seek_requested, done_requested;
+  gboolean input_flushing, output_flushing, transform_negative;
 };
 
 static void
@@ -55,6 +59,29 @@ start_code (const guint8 *data, gsize size, gsize from, gsize *header)
 }
 
 static GstPadProbeReturn
+input_event (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
+{
+  struct probe *p = opaque;
+  GstEventType type = GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info));
+  (void) pad;
+
+  g_mutex_lock (&p->lock);
+  if (type == GST_EVENT_FLUSH_START) {
+    p->epoch++;
+    p->input_flushing = p->output_flushing = TRUE;
+    p->inputs = 0;
+    p->last_input_pts = GST_CLOCK_TIME_NONE;
+    g_hash_table_remove_all (p->expected);
+  } else if (type == GST_EVENT_FLUSH_STOP) {
+    /* A base parser may queue SEGMENT until it sees the first new buffer.
+     * Input admission must never depend on that downstream segment event. */
+    p->input_flushing = FALSE;
+  }
+  g_mutex_unlock (&p->lock);
+  return GST_PAD_PROBE_OK;
+}
+
+static GstPadProbeReturn
 inject (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
 {
   struct probe *p = opaque;
@@ -69,7 +96,7 @@ inject (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
   (void) pad;
 
   g_mutex_lock (&p->lock);
-  if (p->flushing) {
+  if (p->input_flushing) {
     g_mutex_unlock (&p->lock);
     g_byte_array_unref (bytes);
     return GST_PAD_PROBE_DROP;
@@ -128,7 +155,7 @@ inject (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
   guint64 *key = g_new (guint64, 1);
   *key = pts;
   g_mutex_lock (&p->lock);
-  if (p->flushing || p->epoch != epoch) {
+  if (p->input_flushing || p->epoch != epoch) {
     g_mutex_unlock (&p->lock);
     g_free (key);
     expected_free (e);
@@ -170,27 +197,11 @@ check_parser (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
 {
   struct probe *p = opaque;
   (void) pad;
-  if (GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) {
-    if (GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info)) == GST_EVENT_FLUSH_START) {
-      g_mutex_lock (&p->lock);
-      p->epoch++;
-      p->flushing = TRUE;
-      p->inputs = 0;
-      p->last_input_pts = GST_CLOCK_TIME_NONE;
-      g_hash_table_remove_all (p->expected);
-      g_mutex_unlock (&p->lock);
-    } else if (GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info)) == GST_EVENT_SEGMENT) {
-      g_mutex_lock (&p->lock);
-      p->flushing = FALSE;
-      g_mutex_unlock (&p->lock);
-    }
-    return GST_PAD_PROBE_OK;
-  }
   GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER (info);
   guint64 pts = GST_BUFFER_PTS (buffer);
   gboolean good;
   g_mutex_lock (&p->lock);
-  if (p->flushing) {
+  if (p->input_flushing) {
     g_mutex_unlock (&p->lock);
     return GST_PAD_PROBE_OK;
   }
@@ -210,12 +221,33 @@ static GstPadProbeReturn
 check_decoded (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
 {
   struct probe *p = opaque;
+  if (GST_PAD_PROBE_INFO_TYPE (info) & GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM) {
+    GstEventType type = GST_EVENT_TYPE (GST_PAD_PROBE_INFO_EVENT (info));
+    GstVideoInfo decoded_info;
+    gboolean have_info = FALSE;
+    if (type == GST_EVENT_CAPS) {
+      GstCaps *caps;
+      gst_event_parse_caps (GST_PAD_PROBE_INFO_EVENT (info), &caps);
+      have_info = gst_video_info_from_caps (&decoded_info, caps);
+    }
+    g_mutex_lock (&p->lock);
+    if (have_info) {
+      p->decoded_info = decoded_info;
+      p->have_decoded_info = TRUE;
+    }
+    if (type == GST_EVENT_FLUSH_START)
+      p->output_flushing = TRUE;
+    else if (type == GST_EVENT_SEGMENT)
+      p->output_flushing = FALSE;
+    g_mutex_unlock (&p->lock);
+    return GST_PAD_PROBE_OK;
+  }
   GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER (info);
   guint64 pts = GST_BUFFER_PTS (buffer);
   gboolean good, request_seek = FALSE, done = FALSE;
   (void) pad;
   g_mutex_lock (&p->lock);
-  if (p->flushing) {
+  if (p->output_flushing) {
     g_mutex_unlock (&p->lock);
     return GST_PAD_PROBE_OK;
   }
@@ -243,13 +275,49 @@ check_decoded (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
   return GST_PAD_PROBE_OK;
 }
 
+static GstPadProbeReturn
+check_transformed (GstPad *pad, GstPadProbeInfo *info, gpointer opaque)
+{
+  struct probe *p = opaque;
+  GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER (info);
+  gboolean failed = FALSE, comparable = TRUE;
+  GstCaps *caps = gst_pad_get_current_caps (pad);
+  GstVideoInfo info_out;
+  gboolean have_info = caps && gst_video_info_from_caps (&info_out, caps);
+  gst_clear_caps (&caps);
+
+  g_mutex_lock (&p->lock);
+  if (!p->output_flushing) {
+    comparable = have_info && p->have_decoded_info &&
+        GST_VIDEO_INFO_FORMAT (&info_out) == GST_VIDEO_INFO_FORMAT (&p->decoded_info) &&
+        GST_VIDEO_INFO_WIDTH (&info_out) == GST_VIDEO_INFO_WIDTH (&p->decoded_info) &&
+        GST_VIDEO_INFO_HEIGHT (&info_out) == GST_VIDEO_INFO_HEIGHT (&p->decoded_info);
+    if (comparable) {
+      p->transformed++;
+      failed = gst_buffer_get_video_dovi_rpu_meta (buffer) != NULL;
+      p->failures += failed;
+    }
+  }
+  g_mutex_unlock (&p->lock);
+  if (failed)
+    post (p, "probe-error");
+  else if (!comparable) {
+    g_printerr ("orientation negative requires unchanged format and dimensions\n");
+    post (p, "probe-inconclusive");
+  }
+  return GST_PAD_PROBE_OK;
+}
+
 int
 main (int argc, char **argv)
 {
-  if (argc != 3 || (strcmp (argv[1], "avdec_h265") && strcmp (argv[1], "vah265dec")))
+  if ((argc != 3 && argc != 4) ||
+      (strcmp (argv[1], "avdec_h265") && strcmp (argv[1], "vah265dec")) ||
+      (argc == 4 && strcmp (argv[3], "rotate-180")))
     return 2;
   gst_init (&argc, &argv);
-  struct probe p = {.last_input_pts = GST_CLOCK_TIME_NONE};
+  struct probe p = {.last_input_pts = GST_CLOCK_TIME_NONE,
+      .transform_negative = argc == 4};
   g_mutex_init (&p.lock);
   p.expected = g_hash_table_new_full (g_int64_hash, g_int64_equal, g_free, expected_free);
   p.values = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
@@ -257,8 +325,8 @@ main (int argc, char **argv)
   gchar *description = g_strdup_printf (
       "filesrc location=\"%s\" ! qtdemux ! h265parse name=au ! "
       "video/x-h265,stream-format=byte-stream,alignment=au ! identity name=inject ! "
-      "h265parse name=check ! %s name=decoder ! identity sleep-time=2000 ! fakesink sync=false",
-      file, argv[1]);
+      "h265parse name=check ! %s name=decoder ! %s identity sleep-time=2000 ! fakesink sync=false",
+      file, argv[1], p.transform_negative ? "vapostproc name=transform !" : "");
   GError *error = NULL;
   p.pipeline = gst_parse_launch (description, &error);
   g_free (description);
@@ -271,15 +339,37 @@ main (int argc, char **argv)
   GstElement *parser = gst_bin_get_by_name (GST_BIN (p.pipeline), "check");
   GstElement *decoder = gst_bin_get_by_name (GST_BIN (p.pipeline), "decoder");
   GstPad *pad = gst_element_get_static_pad (injection, "src");
+  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM |
+      GST_PAD_PROBE_TYPE_EVENT_FLUSH, input_event, &p, NULL);
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, inject, &p, NULL);
   gst_object_unref (pad);
   pad = gst_element_get_static_pad (parser, "src");
-  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM |
-      GST_PAD_PROBE_TYPE_EVENT_FLUSH, check_parser, &p, NULL);
+  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, check_parser, &p, NULL);
   gst_object_unref (pad);
   pad = gst_element_get_static_pad (decoder, "src");
-  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, check_decoded, &p, NULL);
+  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM |
+      GST_PAD_PROBE_TYPE_EVENT_FLUSH, check_decoded, &p, NULL);
   gst_object_unref (pad);
+  if (p.transform_negative) {
+    GstElement *transform = gst_bin_get_by_name (GST_BIN (p.pipeline), "transform");
+    GParamSpec *property = g_object_class_find_property (
+        G_OBJECT_GET_CLASS (transform), "video-direction");
+    gint configured = GST_VIDEO_ORIENTATION_IDENTITY;
+    if (!property) {
+      g_printerr ("native vapostproc has no video-direction property\n");
+      return 2;
+    }
+    g_object_set (transform, "video-direction", GST_VIDEO_ORIENTATION_180, NULL);
+    g_object_get (transform, "video-direction", &configured, NULL);
+    if (configured != GST_VIDEO_ORIENTATION_180) {
+      g_printerr ("native vapostproc rejected 180-degree rotation\n");
+      return 2;
+    }
+    pad = gst_element_get_static_pad (transform, "src");
+    gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_BUFFER, check_transformed, &p, NULL);
+    gst_object_unref (pad);
+    gst_object_unref (transform);
+  }
   gst_object_unref (injection);
   gst_object_unref (parser);
   gst_object_unref (decoder);
@@ -315,6 +405,9 @@ main (int argc, char **argv)
       } else if (!strcmp (name, "probe-error")) {
         result = 1;
         stop = TRUE;
+      } else if (!strcmp (name, "probe-inconclusive")) {
+        result = 2;
+        stop = TRUE;
       }
     } else {
       stop = TRUE;
@@ -326,12 +419,13 @@ main (int argc, char **argv)
 done:
   gst_element_set_state (p.pipeline, GST_STATE_NULL);
   if (!result && (p.failures || !p.reordered || !p.epoch || !p.gaps ||
-          p.outputs[0] < 30 || p.outputs[1] < 60 || g_hash_table_size (p.values) < 2))
+          p.outputs[0] < 30 || p.outputs[1] < 60 || g_hash_table_size (p.values) < 2 ||
+          (p.transform_negative && !p.transformed)))
     result = 2; /* Insufficient fixture evidence never becomes a pass. */
   g_printerr ("decoder=%s before=%u after=%u gaps=%u parser-verified=%u "
-      "flushes=%u reordered=%d distinct-rpu=%u errors=%u result=%d\n",
+      "flushes=%u reordered=%d distinct-rpu=%u transformed=%u errors=%u result=%d\n",
       argv[1], p.outputs[0], p.outputs[1], p.gaps, p.verified, p.epoch,
-      p.reordered, g_hash_table_size (p.values), p.failures, result);
+      p.reordered, g_hash_table_size (p.values), p.transformed, p.failures, result);
   gst_object_unref (bus);
   gst_object_unref (p.pipeline);
   g_hash_table_unref (p.expected);
