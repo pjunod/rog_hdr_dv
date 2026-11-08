@@ -1,7 +1,7 @@
 # GStreamer Dolby transport — keep each RPU with its decoded picture
 
-**Status:** compile-only candidate; independent review and runtime qualification
-pending · **Written:** 2026-11-07.
+**Status:** native metadata-transport checks passed; unshipped, reconstruction
+and normal-player rendering remain open · **Written:** 2026-11-07.
 
 Companion to [shared display management](SYSTEM_DOLBY_VISION.md), which describes
 the working consumer interfaces. This proposal carries original metadata through
@@ -40,7 +40,7 @@ seek or dropped picture cannot select a metadata predecessor. The copy path is
 `GstVideoDecoder::finish_frame`. Software avdec associates its output through
 FFmpeg's `opaque_ref`; Intel VA uses the reordered picture's codec frame before
 calling the same finish function. Neither family overrides the meta-copy hook
-on the pinned floor. This is source evidence; runtime association remains open.
+on the pinned floor. The native qualification below verifies association through both decoder families.
 
 The parser must be in the actual pipeline. This phase does not add a decoder
 fallback extractor for an application that directly connects a demuxer to a
@@ -113,11 +113,13 @@ Independent review found two defects in the first proposal: the probe waited
 for a parser's queued SEGMENT before admitting the buffer that releases it,
 and the raw meta omitted its orientation tag. The
 [correction receipt](../evidence/gstreamer-rpu-corrections-compile-20261107.json)
-records corrected source and probe compilation. The original compile receipt
-retains its original candidate identity. Fresh review remains pending.
+records corrected source and probe compilation. Independent follow-up approved
+those corrections for scoped runtime. The original compile receipt retains its
+original candidate identity.
 
 The [native pipeline probe](../packaging/gstreamer-rpu/rpu-pipeline-probe.c) is
-written and compiled, not executed. Review it and the source before running it.
+executed after independent source and correction review. The final narrow
+parameter-set HEADER classifier was independently reviewed as well.
 It accepts `avdec_h265` or `vah265dec` plus a real MP4 HEVC fixture. Its two normal
 `h265parse` stages surround an injection that removes selected RPU NALs while
 retaining the old meta deliberately. An independent Annex-B scanner records the
@@ -135,19 +137,36 @@ meta. A negotiated conversion or resize is inconclusive for that orientation
 negative because it could remove the meta for another reason. This is a test
 instrument, not a product launch path.
 
-After independent review, record these checks before merge:
+The completed [native receipt](../evidence/gstreamer-rpu-transport-native-20261107.json)
+records the following observed results:
 
-1. Run the probe against the exact candidate parser/video library and each
-   native decoder, with no fallback decoder substitution. Record loaded library
-   identities, source/fixture hashes, commands and full logs.
-2. Observe both reorder and flush/gap negatives passing, including the retained
-   stale upstream meta being removed from an AU with no RPU.
-3. Check NAL-aligned output, duplicate/oversize RPUs, copied regions and
+| Native decoder/path | Matched pictures before/after flushing seek | RPU gaps | Other observations |
+|---|---|---|---|
+| `avdec_h265` | 30 / 60 | 12 | Reordered coded PTS; eight distinct original RPU values; no mismatches |
+| Intel `vah265dec` | 30 / 60 | 12 | Same reorder/ownership contract; actual Intel i915/iHD path; no mismatches |
+| Intel VA plus native `vapostproc` 180-degree rotation | 30 / 60 | 12 | 90 transformed buffers with unchanged format/dimensions and no original RPU meta |
+
+A legitimate, separately emitted VPS/SPS/PPS HEADER exposed a probe defect on
+the first software run. The final classifier accepts only no-PTS, explicitly
+HEADER-marked, nonempty parameter-set-only buffers without RPU meta. Picture,
+RPU-bearing or unknown untimestamped buffers still fail. Failed runs are
+preserved in private receipts. This changed the probe, not the transport code.
+
+Both source series also replayed cleanly from the authenticated, pinned Ubuntu
+archives, reproduced their base and candidate trees and compiled from those
+exact replay trees. Loaded runtime objects and the signed native package floor
+were recorded; package file verification reported no differences. Tests used
+isolated library/plugin staging and no display or host installation.
+
+The following merge/release evidence remains required beyond this scoped run:
+
+1. Check NAL-aligned output, duplicate/oversize RPUs, copied regions and
    dimension-changing output explicitly. Those paths must not publish a
-   misleading per-picture meta.
-4. Reconstruct both patch series from the signed artifacts and run the
-   repository fast lane after review. Do not convert compile-only receipts into
-   runtime acceptance.
+   misleading per-picture meta; this supplementary matrix has not run.
+2. Complete the normal-feature packaging, symbol and multiarch obligations
+   below before treating this compiler/runtime candidate as an installable
+   system update. Preserve the transport and its independent review when
+   adding the reconstruction phase.
 
 Rendering, optical agreement, protected streaming and system-wide application
 coverage require their own later phase evidence. No source equation or private
@@ -191,3 +210,65 @@ output signalling. For example, a physical 616 cd/m² target at 142 cd/m²
 reference white is not the normalized 880.6 cd/m² value another consumer might
 report. Neither normalization nor a generic HDR default may replace the actual
 physical target. This transport phase does not yet consume that bridge.
+
+## 6. The next normal-player hook is reconstruction before conversion
+
+Use the compatible floor already inspected: GStreamer core/base/libav
+`1.28.7-1`, bad/extra `1.28.6-1ubuntu1`, FFmpeg `8.1.2-2ubuntu2`,
+`libdovi3 3.3.2-3`, GTK `4.24.1+ds-1` plus the independently qualified target
+snapshot extension, and `rust-gst-plugin-gtk4 0.15.2-1ubuntu2`. The latter builds
+`gstreamer1.0-gtk4` with `gtk_v4_20`, Wayland EGL, DMA-BUF and GStreamer 1.28
+features enabled in its normal Debian rules.
+
+The next atomic source phase should publish a complete owned reconstruction
+snapshot per codec frame, separate from the original raw RPU meta:
+
+1. In `gst-libav/ext/libav/gstavviddec.c::gst_ffmpegviddec_video_frame`, capture
+   the public decoder-resolved `AVDOVIMetadata` before `av_frame_unref`, using
+   that output picture's existing `opaque_ref` association. Preserve canonical
+   public values, not a private context dump or a borrowed `AVFrame`.
+2. For native VA, resolve source mapping and static/reference metadata in
+   decode order in the `GstH265Decoder` picture path, then retain that complete
+   snapshot through the existing picture/codec-frame association and DPB reorder.
+   Validate the public parser/header ABI against the exact libdovi source;
+   raw parsing alone does not resolve inherited mapping or compressed/indirected
+   DM state. Compare its snapshots with the software decoder on the same input
+   and require explicit flush/missing-reference negatives. Neither native stock
+   decoder is evidence that a FEL enhancement residual has been reconstructed.
+3. A downstream renderer must negotiate both this resolved source contract and
+   an available actual-surface target. Select the insertion point from the
+   negotiated memory/format path. Do not blindly force `glcolorconvert` or assume
+   a late RGBA buffer still contains the original coded Dolby signal.
+
+The existing normal GTK sink entry is
+`src/sink/imp.rs::PaintableSink::show_frame` (around line 786), which constructs
+`Frame::new`. Its `src/sink/frame.rs::videoinfo_to_color_state` (around line 319)
+sets only CICP range, matrix, transfer and primaries. GL, memory and DMA-BUF
+texture builders later use that color state. A resolved Dolby master and a
+correct target are required before those ordinary conversions/scales consume
+or discard the coded signal. A matching output color-state/reference-white
+contract is also required; the inspected CICP-only helper does not supply it.
+
+The target extension is declared in `<gdk/wayland/gdkwayland.h>` through
+`gdkwaylandsurface.h`:
+
+```c
+gboolean gdk_wayland_surface_get_color_target (GdkSurface *surface,
+                                               GdkWaylandColorTarget *target);
+```
+
+Its caller-owned snapshot contains `generation`, `identity`, physical xy
+primaries/white and black, peak and reference-white luminance in cd/m². Read it
+on GTK's main context, then copy values into synchronized sink state. Handle
+every `color-target-changed` signal: invalidation and subsequent ready state
+can share a generation. When unavailable, only generation is meaningful.
+
+Two GTK limits are prerequisites for an ordinary default player path. The
+inspected stock GTK backend enables color-manager binding only under its
+`color-mgmt` debug setting, so default target availability requires a separately
+reviewed default/target-only binding policy; a user debug variable is not the
+product solution. Also, DMA-BUF offload uses a private subsurface with another
+`wl_surface`. Negotiate that actual owner or use normal composition for the
+affected mapped frames. The parent surface's target cannot be assumed to apply,
+and globally disabling offload is outside the contract. No host app has been
+installed to claim normal Showtime playback from this transport work.
