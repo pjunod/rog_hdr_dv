@@ -76,6 +76,8 @@ The current player and filter both processed a Profile 8.1 carrier derived from 
 
 All four comparisons cover all 3,276,800 pixels. The largest errors for both candidates and the codec control were near a source color transition. The mpv window’s maximum in patch interiors was 4.107. The reference target carries neutral Level 8 controls, so agreement here leaves creative-trim fidelity on other content open. The separate frame-local trim tests below verify that authored changes affect the intended frames. [Inputs, output encoding, metric and edge populations](../evidence/dolby-official-chart-consumer.json).
 
+At the chart’s second target, Dolby CM Offline 5.6.4 rendered the unchanged frame and original XML for target 28 (BT.2020/PQ, 0–600 cd/m²). At the same physical target the mpv window’s mean ΔE ITP was 0.578 and p95 was 1.057. FFmpeg measured 0.834 and 1.431. Leaving the decoded base ungraded measured 47.13 and 124.57. The chart contains nonneutral Level 2 fields for this target; a matched render by itself cannot attribute the result to a particular trim field. Both targets use the same source scene. [Complete second-target results](../evidence/dolby-official-chart-consumer.json).
+
 ## Digital qualification
 
 | Check | Result |
