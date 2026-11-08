@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "scope": "Normal packaged GTK sink on isolated native headless compositor; no optical claim",
+  "result": "pass",
+  "sink_version": "0.15.2-1ubuntu2+rogdv3.1",
+  "sink_deb_sha256": "1e3c0af60e722193837d2e8344e1a4d5febf7730eedc33aa02dd12cacf712999",
+  "source_dsc_sha256": "769e2e960631ecd12d1e7170dad960c603f5b16748d5f12340ac92c9d5896714",
+  "fixture_commit": "a9bd37a",
+  "cases": [
+    "downstream add: three ordered compositions, six rectangles",
+    "downstream replace: two ordered compositions, four rectangles",
+    "downstream remove: explicit empty composition list",
+    "ordinary paused frame unchanged"
+  ],
+  "assertions": [
+    "real surface target616 to308 to616 changes underlying frame then restores exact pixels",
+    "overlay pixels/order/rectangle bounds/global alpha unchanged",
+    "paused source timestamp unchanged",
+    "owned downstream composition refs remain live across redraw and retire on source replacement",
+    "supplemental composed=false context clears pixels then real surface binding restores retained frame and overlays"
+  ],
+  "supplemental_scope": "Unavailable-composition input copies actual target and only denies composed/hdr-ready. Invalid target and pending readiness may baseline-reencode; no hidden-output claim for those inputs.",
+  "unit_suites_executed": false,
+  "cleanup": "all owned app/compositor processes exited",
+  "private_result_sha256": "a87eca62bd24067b90c6196cb4bf3819c18f122210e248a815e5e912cea2e5b7"
+}
