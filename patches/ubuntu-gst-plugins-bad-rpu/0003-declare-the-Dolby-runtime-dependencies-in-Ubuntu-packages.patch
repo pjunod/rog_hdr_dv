@@ -1,0 +1,67 @@
+diff --git a/debian/changelog b/debian/changelog
+index 0079aec..98087db 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv1) stonking; urgency=medium
++
++  * Carry matched original RPU and owned decode-order Dolby pictures in normal parser/VA plugins.
++  * Require the explicit private base/strict runtime ABI where consumed.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 04:35:49 +0000
++
+ gst-plugins-bad1.0 (1.28.6-1ubuntu1) stonking; urgency=medium
+ 
+   * Merge with Debian (LP: #2161854). Remaining changes:
+diff --git a/debian/control b/debian/control
+index 676b9c6..5dbc4af 100644
+--- a/debian/control
++++ b/debian/control
+@@ -5,7 +5,8 @@ XSBC-Original-Maintainer: Maintainers of GStreamer packages <gst-plugins-bad1.0@
+ Uploaders: Sebastian Dröge <slomo@debian.org>,
+            Sjoerd Simons <sjoerd@debian.org>,
+            Marc Leeman <marc.leeman@gmail.com>,
+-Build-Depends: debhelper-compat (= 13),
++Build-Depends: libgstdovipicture-1.0-dev (>= 0.2.0+rogdv1),
++               rog-dv-hevc-runtime (>= 2), rog-gstreamer-dovi-base-api (= 1), debhelper-compat (= 13),
+                dh-sequence-gir,
+                flite-dev,
+                gir1.2-gobject-2.0-dev,
+@@ -145,7 +146,7 @@ Description: GStreamer helper programs from the "bad" set
+ Package: gstreamer1.0-plugins-bad
+ Architecture: any
+ Multi-Arch: same
+-Depends: gstreamer1.0-plugins-base (>= 1.28.0),
++Depends: rog-gstreamer-dovi-base-api (= 1), gstreamer1.0-plugins-base (>= 1.28.0),
+          gstreamer1.0-plugins-good (>= 1.28.0-1ubuntu3),
+          libgstreamer-plugins-bad1.0-0 (= ${binary:Version}),
+          gstreamer1.0-plugins-extra (= ${binary:Version}),
+@@ -312,7 +313,9 @@ Description: GObject introspection data for the GStreamer libraries from the "ba
+ Package: gstreamer1.0-plugins-extra
+ Architecture: any
+ Multi-Arch: same
+-Depends: gstreamer1.0-plugins-base (>= 1.28.0),
++Depends: rog-gstreamer-dovi-base-api (= 1),
++         rog-dv-hevc-runtime (>= 2),
++         libgstdovipicture-1.0-0 (>= 0.2.0+rogdv1), gstreamer1.0-plugins-base (>= 1.28.0),
+          gstreamer1.0-plugins-good (>= 1.28.0-1ubuntu3),
+          libgstreamer-plugins-extra1.0-0 (= ${binary:Version}),
+          ${misc:Depends},
+diff --git a/debian/rules b/debian/rules
+index cc04a68..0864f29 100755
+--- a/debian/rules
++++ b/debian/rules
+@@ -5,6 +5,13 @@ include /usr/share/dpkg/pkg-info.mk
+ 
+ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+ export DEB_LDFLAGS_MAINT_APPEND = -Wl,-O1 -Wl,-z,defs
++
++# Bound native GCC LTO workers independently of the outer job count.
++ifeq ($(DEB_HOST_ARCH),amd64)
++export DEB_CFLAGS_MAINT_APPEND += -flto=2
++export DEB_CXXFLAGS_MAINT_APPEND += -flto=2
++export DEB_LDFLAGS_MAINT_APPEND += -flto=2
++endif
+ export HOME=$(CURDIR)/fake-home
+ 
+ # Prevent slower builds from hitting the default 20s test timeout
