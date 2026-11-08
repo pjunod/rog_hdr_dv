@@ -1,0 +1,132 @@
+From 482d246e5e4c5878f8179820a12fffc01b794873 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sun, 8 Nov 2026 09:00:00 +0000
+Subject: [PATCH] icc: unassociate supported alpha layouts before colour
+ conversion
+
+---
+ debian/changelog                              |  6 ++
+ .../glycin/.cargo-checksum.json               |  2 +-
+ debian/missing-sources/glycin/src/icc.rs      | 63 ++++++++++++++++++-
+ 3 files changed, 68 insertions(+), 3 deletions(-)
+
+diff --git a/debian/changelog b/debian/changelog
+index c582c0d..869c6c8 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,9 @@
++loupe (50.0-0ubuntu2+rogcolor2) stonking; urgency=medium
++
++  * Explicitly unassociate integer and float alpha before ICC conversion.
++
++ -- ROG HDR contributors <maintainers@invalid.example>  Sun, 08 Nov 2026 09:00:00 +0000
++
+ loupe (50.0-0ubuntu2+rogcolor1) stonking; urgency=medium
+ 
+   * Preserve embedded ICC gamut in floating-point GTK textures.
+diff --git a/debian/missing-sources/glycin/.cargo-checksum.json b/debian/missing-sources/glycin/.cargo-checksum.json
+index 22d1892..0da84c2 100644
+--- a/debian/missing-sources/glycin/.cargo-checksum.json
++++ b/debian/missing-sources/glycin/.cargo-checksum.json
+@@ -1 +1 @@
+-{"files":{".cargo_vcs_info.json":"1581dc560b6233074e8e8758ceb0b8e5e6ecfa3688feae74f553e61d3e2c00a9","Cargo.lock":"ba1a5b616656fc0a78bc3f701ff461c6c04def8a904d03a166fc88c1f3b2f404","Cargo.toml":"ed232ed560406e98876b202c0f3729c735ac7609ac7b582e955fbdd6cdbcb90f","Cargo.toml.orig":"91bb5baf6c20e5ef023d16e149e6daa7fa7b5847f808999ea6344786b5bb7536","LICENSE":"3afb0531be0b931d8f3ce912a71a7093396fa095c8329f5460a6e85d320b1cf9","LICENSE-LGPL-2.1":"386cfa46dae08ff4a5d8c8c1ad37487aa49f6815147d0350561f313aa0ac4a7a","LICENSE-MPL-2.0":"3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04","README.md":"8f6c5cf1b8178c63fb40e9c96c54c3371d899d6705d4a912eec209570c7906e6","src/api_common.rs":"822cec90c2152141cbbd905635429de0d95f83a030c1e56ac58ebfdacfdba1fb","src/api_creator.rs":"f23c6716865a4cbb9f537213dad0bc69189baa1495dc1033604e1c346801dbed","src/api_editor.rs":"c031b2cd2cb7624e3d5e21dba78df1a65e7dff96eff7915fdc78592968ed4ee3","src/api_loader.rs":"c2f285991c8432054c3894e19ff5f13a29857ef02b950ba6062e96d92a8e3fde","src/config.rs":"04b68a0c222dc447b3b980693cd0b5542808f8bc83051cfa53f8d0618bc849c5","src/dbus.rs":"a085588cd6eb848a713740765934bb70d9f0e68c99a66a45180030c0ce04d302","src/error.rs":"21d558a4b703e22af0e585259b0ae299afdddc07acde03ef91c3aa43d39bfc1e","src/fontconfig.rs":"075b9168aac1aed31d7b3a14f51c64db2b820064c417a7b1839fb4c9329cded4","src/gobject.rs":"d9cd200ad04bc64ad9c33d3b1581de5541e2ab0b0fc4693f55b56b8fbfd8a76a","src/gobject/creator.rs":"32faf14b3fccf61606398210aa76ef6c4806ed2ddc833b4b1bbadf196a536102","src/gobject/encoded_image.rs":"8b2c945a487fa9c2a81a873a3c2f95fd19b943ba0e12ce9c29fc99cdfa7c3bee","src/gobject/frame.rs":"be224209489e4dcf87b303db4f9d4be9d4053ba980c619e756343f5a4eb1b109","src/gobject/frame_request.rs":"432c76696ae02668353bb62df2b4e1bc9a70c616e6f52ab398c7d3e10e1a29f1","src/gobject/image.rs":"a7b07cfc63ee60c973f776aad4f98f1eb494c930d9dd5f12b79c8d87eb2f9b9f","src/gobject/loader.rs":"9c980b371b074453cc7fc78faa5c78e59ee0cddcbd2f59d9a48098689fa0f4ed","src/gobject/new_frame.rs":"99aaf89493c75b0037ffb5aeafe850a722b1f3021f71ac53b0347d15eb9a786f","src/icc.rs":"2eec44af90ce5797af453656eecd24f0f42006a12fa019e370a2041395e823cd","src/lib.rs":"1e693b1c4aa0a2e0ffd3de4070d16aa3a09eba3995e9e35f44a870b2758c1cbe","src/orientation.rs":"150707ada686677f446bb02f7d6309ddf90a671a20ba2a00bab64c553971b3aa","src/pool.rs":"f5f9604244242cf9d3df7c021ec5e27b71b3e4aaf76356e4662c490bf3ac746a","src/sandbox.rs":"3a67bccccf76029d006e645c4f2ed29a7f1a301458d8fcfefa2ffedc6098bb62","src/util.rs":"b409a15e61a41992b2f63c7b04e6f6a13e926d724d258d2ce30e7539ce9ceb43"},"package":"923674c1f2b1a28f69ebdc0f572672e63874e17ce0e60c96b8bfaff47a8ef4e9"}
+\ No newline at end of file
++{"files":{".cargo_vcs_info.json":"1581dc560b6233074e8e8758ceb0b8e5e6ecfa3688feae74f553e61d3e2c00a9","Cargo.lock":"ba1a5b616656fc0a78bc3f701ff461c6c04def8a904d03a166fc88c1f3b2f404","Cargo.toml":"ed232ed560406e98876b202c0f3729c735ac7609ac7b582e955fbdd6cdbcb90f","Cargo.toml.orig":"91bb5baf6c20e5ef023d16e149e6daa7fa7b5847f808999ea6344786b5bb7536","LICENSE":"3afb0531be0b931d8f3ce912a71a7093396fa095c8329f5460a6e85d320b1cf9","LICENSE-LGPL-2.1":"386cfa46dae08ff4a5d8c8c1ad37487aa49f6815147d0350561f313aa0ac4a7a","LICENSE-MPL-2.0":"3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04","README.md":"8f6c5cf1b8178c63fb40e9c96c54c3371d899d6705d4a912eec209570c7906e6","src/api_common.rs":"822cec90c2152141cbbd905635429de0d95f83a030c1e56ac58ebfdacfdba1fb","src/api_creator.rs":"f23c6716865a4cbb9f537213dad0bc69189baa1495dc1033604e1c346801dbed","src/api_editor.rs":"c031b2cd2cb7624e3d5e21dba78df1a65e7dff96eff7915fdc78592968ed4ee3","src/api_loader.rs":"c2f285991c8432054c3894e19ff5f13a29857ef02b950ba6062e96d92a8e3fde","src/config.rs":"04b68a0c222dc447b3b980693cd0b5542808f8bc83051cfa53f8d0618bc849c5","src/dbus.rs":"a085588cd6eb848a713740765934bb70d9f0e68c99a66a45180030c0ce04d302","src/error.rs":"21d558a4b703e22af0e585259b0ae299afdddc07acde03ef91c3aa43d39bfc1e","src/fontconfig.rs":"075b9168aac1aed31d7b3a14f51c64db2b820064c417a7b1839fb4c9329cded4","src/gobject.rs":"d9cd200ad04bc64ad9c33d3b1581de5541e2ab0b0fc4693f55b56b8fbfd8a76a","src/gobject/creator.rs":"32faf14b3fccf61606398210aa76ef6c4806ed2ddc833b4b1bbadf196a536102","src/gobject/encoded_image.rs":"8b2c945a487fa9c2a81a873a3c2f95fd19b943ba0e12ce9c29fc99cdfa7c3bee","src/gobject/frame.rs":"be224209489e4dcf87b303db4f9d4be9d4053ba980c619e756343f5a4eb1b109","src/gobject/frame_request.rs":"432c76696ae02668353bb62df2b4e1bc9a70c616e6f52ab398c7d3e10e1a29f1","src/gobject/image.rs":"a7b07cfc63ee60c973f776aad4f98f1eb494c930d9dd5f12b79c8d87eb2f9b9f","src/gobject/loader.rs":"9c980b371b074453cc7fc78faa5c78e59ee0cddcbd2f59d9a48098689fa0f4ed","src/gobject/new_frame.rs":"99aaf89493c75b0037ffb5aeafe850a722b1f3021f71ac53b0347d15eb9a786f","src/icc.rs":"48c8c3aeb3fb4b4ba93c6ebac6b82310a085fe48aeaee28506b5af905a158aab","src/lib.rs":"1e693b1c4aa0a2e0ffd3de4070d16aa3a09eba3995e9e35f44a870b2758c1cbe","src/orientation.rs":"150707ada686677f446bb02f7d6309ddf90a671a20ba2a00bab64c553971b3aa","src/pool.rs":"f5f9604244242cf9d3df7c021ec5e27b71b3e4aaf76356e4662c490bf3ac746a","src/sandbox.rs":"3a67bccccf76029d006e645c4f2ed29a7f1a301458d8fcfefa2ffedc6098bb62","src/util.rs":"b409a15e61a41992b2f63c7b04e6f6a13e926d724d258d2ce30e7539ce9ceb43"},"package":"923674c1f2b1a28f69ebdc0f572672e63874e17ce0e60c96b8bfaff47a8ef4e9"}
+\ No newline at end of file
+diff --git a/debian/missing-sources/glycin/src/icc.rs b/debian/missing-sources/glycin/src/icc.rs
+index e956585..142571d 100644
+--- a/debian/missing-sources/glycin/src/icc.rs
++++ b/debian/missing-sources/glycin/src/icc.rs
+@@ -31,9 +31,22 @@ pub fn apply_transformation(
+     };
+     let source = lcms2::Profile::new_icc(profile)?;
+     let target = linear_rec2020()?;
++    // Little CMS does not provide every integer-premultiplied formatter.
++    // Normalize and unassociate these rows explicitly before colour conversion.
++    let associated = lcms_pixel_format(input).premultiplied();
++    let source_format = if associated {
++        if input.n_channels() == 2 {
++            // Little CMS EXTRA_SH(1): one alpha sample after grayscale.
++            lcms2::PixelFormat(lcms2::PixelFormat::GRAY_FLT.0 | (1 << 7))
++        } else {
++            lcms2::PixelFormat::RGBA_FLT
++        }
++    } else {
++        lcms_pixel_format(input)
++    };
+     let transform = lcms2::Transform::<u8, u8>::new_flags(
+         &source,
+-        lcms_pixel_format(input),
++        source_format,
+         &target,
+         lcms_pixel_format(output),
+         lcms2::Intent::Perceptual,
+@@ -54,11 +67,25 @@ pub fn apply_transformation(
+         .map_err(|_| Error::TextureTooLarge)?;
+     converted.resize(len, 0);
+     let source_width = frame.width as usize * input.n_bytes().usize();
++    let mut unassociated = Vec::new();
++    if associated {
++        let row_bytes = (frame.width as usize)
++            .checked_mul(usize::from(input.n_channels()) * 4)
++            .ok_or(Error::TextureTooLarge)?;
++        unassociated
++            .try_reserve_exact(row_bytes)
++            .map_err(|_| Error::TextureTooLarge)?;
++    }
+     for (src, dst) in pixels
+         .chunks(frame.stride as usize)
+         .zip(converted.chunks_exact_mut(stride as usize))
+     {
+-        transform.transform_pixels(&src[..source_width], dst);
++        if associated {
++            unassociate_row(input, &src[..source_width], &mut unassociated);
++            transform.transform_pixels(&unassociated, dst);
++        } else {
++            transform.transform_pixels(&src[..source_width], dst);
++        }
+     }
+     frame.stride = stride;
+     frame.memory_format = output;
+@@ -68,6 +95,38 @@ pub fn apply_transformation(
+     ))
+ }
+ 
++/// Produce canonical, unassociated GrayA/RGBA f32 pixels. A zero-alpha
++/// pixel has no defined colour and is represented as transparent black.
++fn unassociate_row(format: MemoryFormat, source: &[u8], output: &mut Vec<u8>) {
++    output.clear();
++    let (order, alpha): (&[usize], usize) = match format {
++        MemoryFormat::B8g8r8a8Premultiplied => (&[2, 1, 0], 3),
++        MemoryFormat::A8r8g8b8Premultiplied => (&[1, 2, 3], 0),
++        MemoryFormat::G8a8Premultiplied | MemoryFormat::G16a16Premultiplied => (&[0], 1),
++        _ => (&[0, 1, 2], 3),
++    };
++    for pixel in source.chunks_exact(format.n_bytes().usize()) {
++        let component = |index: usize| match format.channel_type() {
++            ChannelType::U8 => pixel[index] as f32 / 255.0,
++            ChannelType::U16 => {
++                f32::from(u16::from_ne_bytes(
++                    pixel[index * 2..index * 2 + 2].try_into().unwrap(),
++                )) / 65535.0
++            }
++            ChannelType::F32 => {
++                f32::from_ne_bytes(pixel[index * 4..index * 4 + 4].try_into().unwrap())
++            }
++            _ => unreachable!("premultiplied formats only support U8/U16/F32"),
++        };
++        let a = component(alpha);
++        for &index in order {
++            let value = if a == 0.0 { 0.0 } else { component(index) / a };
++            output.extend_from_slice(&value.to_ne_bytes());
++        }
++        output.extend_from_slice(&a.to_ne_bytes());
++    }
++}
++
+ const fn lcms_pixel_format(format: MemoryFormat) -> lcms2::PixelFormat {
+     match format {
+         MemoryFormat::B8g8r8a8Premultiplied => premul(lcms2::PixelFormat::BGRA_8),
+-- 
+2.55.0
+

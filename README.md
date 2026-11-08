@@ -150,6 +150,7 @@ has the remote and branch rules.
 
 | Document | Answers |
 |---|---|
+| [GNOME image colour](docs/GNOME_IMAGE_COLOUR.md) | Ordinary Image Viewer ICC gamut, precision, sandboxed TIFF metadata, package source and recovery |
 | [GStreamer resolved Dolby pictures](docs/GSTREAMER_DOLBY_RECONSTRUCTION.md) | Decoder-owned frame state, native software and Intel controls, and the ABI for renderers |
 | [Status](docs/STATUS.md) · [status page](docs/STATUS.html) | What is proven, what is installed, what remains |
 | [Hardware](docs/HARDWARE.md) | Exactly which panel this is and what its firmware declares |

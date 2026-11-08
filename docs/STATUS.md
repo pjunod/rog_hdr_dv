@@ -10,6 +10,8 @@
 
 **GNOME screen capture.** Mutter wrote 8-bit pixels into shared-memory buffers advertised as 10-bit HDR. With the corrected writer, two 10-bit channel layouts reproduced identical colors across six patches. The half-float capture agreed to within 0.58 of a 10-bit code value. The same paused Dolby movie changed across 397,853 native 10-bit pixels when retargeted from 616 to 308 cd/m². Restoring 616 reproduced the original capture byte for byte. Both checks used a private GNOME monitor on the ROG GPU. [Format and pixel evidence](../evidence/mutter-shared-memory-color-formats.json).
 
+**Photographs.** The staged GNOME Image Viewer preserves Adobe RGB color on the HDR desktop. Across six patches its output matched an independent BT.2020 reference within one 10-bit value per channel. The normal loader also retained the embedded color profile in small TIFFs. [Image viewer, package versions and qualification](GNOME_IMAGE_COLOUR.md).
+
 **Movie-frame quality.** At 600 cd/m² the staged Intel filter measured mean ΔE ITP 2.61 and p95 7.20 on one 4K *Sol Levante* frame against Dolby’s render of the original master. The published 1080p Profile 5 release measured 9.21 and 26.31 against the downsampled reference. When the official processor received the same decoded base and a private XML copy carrying the three brightness values actually present in the stream, the Linux filter measured mean 0.65 and p95 1.60. [Source, individual controls and interpretation](../evidence/dolby-sol-levante-frame714.json).
 
 **Browser coverage.** Stock Chrome and Firefox on the laptop played the AVC control and rejected the clear Dolby Vision chart. Firefox accepted ordinary HEVC capability queries. [Browser versions, codec queries and playback conditions](SYSTEM_DOLBY_VISION.md#browser-playback-on-the-rog).
@@ -21,6 +23,19 @@
 The Intel pacing fault was traced to Mesa comparing two different clocks. On a 60 Hz compositor advertising `CLOCK_MONOTONIC_RAW`, the installed driver requested the next frame about 4,124 ms after presentation. The source fix keeps Wayland deadlines in the compositor clock and converts completion timestamps only when reporting them to Vulkan. The corrected private driver requested a median of 16.17 ms. The full three-second clip reached EOF at playback speed with eight output drops and zero decoder drops. A separate Vulkan client requested both absolute and unspecified presentation times. All 69 returned timestamps were within 12 ms of its monotonic clock while the two clocks differed by 4.12 s. Distribution package qualification is in progress. [Timing and wire evidence](../evidence/mesa-wsi-presentation-clock.json).
 
 The mpv 0.42 `+rogdv4` package and updated decoder played the complete three-second genuine 4K Profile 7 FEL fixture and a nine-second native Profile 5 interval at 24 fps with zero decoder or output drops on the default NVIDIA GPU. Its ten-package upgrade and exact rollback passed offline simulation and were backed up privately. It also preserves the displayed grade in a tagged window screenshot. Its saved PNG carries BT.2020/PQ. A Level 8 trim edit changed the intended frame, and an untouched frame plus ordinary HDR10 controls matched exactly. [File-level evidence](../evidence/mpv-window-grade-capture.json).
+
+### GNOME still-image colour in development
+
+The ordinary Image Viewer candidate preserves ICC-tagged photographs as linear
+BT.2020 floating-point textures. Native analytic controls retained 256 gray
+levels and adjacent 16-bit midtones, and verified alpha and metadata precedence.
+A separate sandboxed decoder correction preserves valid ICC metadata in small
+TIFF files. The ordinary candidate and an independently encoded reference agreed
+within one 10-bit PQ code on six synthetic patches in an isolated compositor;
+stock materially clipped wide colour. Both normal Ubuntu packages built from
+reconstructed DSC source; the exact two-package offline upgrade and rollback
+passed with zero removals. Nothing is installed, and physical
+panel accuracy remains unmeasured. [Source, digital controls and recovery](GNOME_IMAGE_COLOUR.md).
 
 ### GNOME playback in development
 
