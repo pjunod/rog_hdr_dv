@@ -1,0 +1,49 @@
+{
+  "scope": "Private development presentation localization; no production change or formal acceptance claim",
+  "source_commit_before_probe": "6854c2e",
+  "backend": "Default GskVulkanRenderer on actual NVIDIA; controlled GL comparison separately",
+  "gtk_runtime": "4.24.1+ds-1+rogdv3, final extracted Ubuntu-style package",
+  "target": {
+    "peak_nits": 616,
+    "reference_nits": 142
+  },
+  "inputs": "Public synthetic immutable 1x1 RGBA16 PQ textures; absolute nit levels400,0,.001,.01,.1,1,10,100,400 plus SDR white control",
+  "early_lease": {
+    "result": "Distinct compositor values0,0,3,13,34,69,120,157 across0..400nit; SDR control139",
+    "lease_timing": "Before first paint"
+  },
+  "late_lease": {
+    "lease_timing": "Idle after first SDR after-paint",
+    "submitted_frames": "New texture object, snapshot, full-surface wl_buffer attach/damage/commit and presented feedback at each level",
+    "actual_framebuffer": "Unchanged initial white139 across complete widget for all nine levels",
+    "backend_control": "Same unchanged-output symptom with explicit GL renderer",
+    "vulkan_pre_present_readback": {
+      "source": "Stock Mesa screenshot layer, per-process only, 8-bit UNORM conversion of actual swapchain",
+      "frame0": {
+        "scene": "Initial SDR400nit",
+        "pixels": {
+          "white255": 230400
+        }
+      },
+      "frame2": {
+        "scene": "Post-lease0nit",
+        "pixels": {
+          "black": 228800,
+          "SDRcontrol148": 1600
+        }
+      },
+      "frame7": {
+        "scene": "Post-lease10nit",
+        "pixels": {
+          "gray76": 228800,
+          "SDRcontrol148": 1600
+        }
+      }
+    }
+  },
+  "interpretation": "GTK renders the changing late-lease scene into the actual Vulkan swapchain. Compositor output retains initial SDR frame. No GTK cache or shader fix justified by this evidence. Compositor import/presentation boundary remains open.",
+  "source_sha256": {
+    "hdr-calibration-late.c": "3d0c9a89fcc47b842baa1bbef74b3e2004b0236fd22ea19fe68df0e434c9184e",
+    "hdr-calibration-early.c": "d6b96b00e54ab20f220589f278ea6c228179abc5efcfff1836d18442d3934fd8"
+  }
+}
