@@ -1,0 +1,268 @@
+From 906fd88fde0187ec51baeea28bc7ddda90969226 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Sat, 7 Nov 2026 19:23:23 -0500
+Subject: [PATCH] feat(video): carry owned Dolby RPU with matched codec frames
+
+---
+ gst-libs/gst/video/gstvideodecoder.c     |  12 +++
+ gst-libs/gst/video/gstvideodovirpumeta.c | 115 +++++++++++++++++++++++
+ gst-libs/gst/video/gstvideodovirpumeta.h |  74 +++++++++++++++
+ gst-libs/gst/video/meson.build           |   2 +
+ 4 files changed, 203 insertions(+)
+ create mode 100644 gst-libs/gst/video/gstvideodovirpumeta.c
+ create mode 100644 gst-libs/gst/video/gstvideodovirpumeta.h
+
+diff --git a/gst-libs/gst/video/gstvideodecoder.c b/gst-libs/gst/video/gstvideodecoder.c
+index 78febe2..b8a5a2c 100644
+--- a/gst-libs/gst/video/gstvideodecoder.c
++++ b/gst-libs/gst/video/gstvideodecoder.c
+@@ -297,6 +297,7 @@
+ #include <gst/video/video-event.h>
+ #include <gst/video/gstvideopool.h>
+ #include <gst/video/gstvideometa.h>
++#include "gstvideodovirpumeta.h"
+ #include <string.h>
+ 
+ GST_DEBUG_CATEGORY (videodecoder_debug);
+@@ -3354,6 +3355,17 @@ gst_video_decoder_transform_meta_default (GstVideoDecoder *
+     NULL,
+   };
+ 
++  /* RPU instructions still describe the coded signal after decoding. Copy
++   * from this exact codec frame, never a parser-global "latest RPU". Unlike
++   * an ordinary color conversion, decoding does not consume the RPU. Refuse
++   * low-resolution or dimension-changing decoder output. */
++  if (info->api == GST_VIDEO_DOVI_RPU_META_API_TYPE) {
++    const GstVideoDoviRpuMeta *dovi = (const GstVideoDoviRpuMeta *) meta;
++    const GstVideoCodecState *state = decoder->priv->output_state;
++    return state && dovi->width == (guint) GST_VIDEO_INFO_WIDTH (&state->info) &&
++        dovi->height == (guint) GST_VIDEO_INFO_HEIGHT (&state->info);
++  }
++
+   tags = gst_meta_api_type_get_tags (info->api);
+ 
+   if (!tags)
+diff --git a/gst-libs/gst/video/gstvideodovirpumeta.c b/gst-libs/gst/video/gstvideodovirpumeta.c
+new file mode 100644
+index 0000000..265b9cf
+--- /dev/null
++++ b/gst-libs/gst/video/gstvideodovirpumeta.c
+@@ -0,0 +1,115 @@
++/* GStreamer
++ * Copyright (C) 2026 ROG HDR contributors
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Library General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * Library General Public License for more details.
++ *
++ * You should have received a copy of the GNU Library General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
++ * Boston, MA 02110-1301, USA.
++ */
++
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++
++#include "gstvideodovirpumeta.h"
++#include "video.h"
++
++GType
++gst_video_dovi_rpu_meta_api_get_type (void)
++{
++  static GType type = 0;
++  static const gchar *tags[] = {
++    GST_META_TAG_VIDEO_STR, GST_META_TAG_VIDEO_COLORSPACE_STR,
++    GST_META_TAG_VIDEO_SIZE_STR, NULL
++  };
++
++  if (g_once_init_enter (&type)) {
++    GType api = gst_meta_api_type_register ("GstVideoDoviRpuMetaAPI", tags);
++    g_once_init_leave (&type, api);
++  }
++  return type;
++}
++
++static gboolean
++gst_video_dovi_rpu_meta_init (GstMeta * meta, gpointer params,
++    GstBuffer * buffer)
++{
++  GstVideoDoviRpuMeta *dovi = (GstVideoDoviRpuMeta *) meta;
++  dovi->rpu = NULL;
++  dovi->width = dovi->height = 0;
++  return TRUE;
++}
++
++static void
++gst_video_dovi_rpu_meta_free (GstMeta * meta, GstBuffer * buffer)
++{
++  GstVideoDoviRpuMeta *dovi = (GstVideoDoviRpuMeta *) meta;
++  g_clear_pointer (&dovi->rpu, g_bytes_unref);
++}
++
++static gboolean
++gst_video_dovi_rpu_meta_transform (GstBuffer * dest, GstMeta * meta,
++    GstBuffer * buffer, GQuark type, gpointer data)
++{
++  GstVideoDoviRpuMeta *src = (GstVideoDoviRpuMeta *) meta;
++  GstVideoDoviRpuMeta *out;
++  const GstMetaTransformCopy *copy = data;
++
++  if (!GST_META_TRANSFORM_IS_COPY (type) || !src->rpu ||
++      (copy && copy->region) || gst_buffer_get_video_dovi_rpu_meta (dest))
++    return FALSE;
++  out = (GstVideoDoviRpuMeta *) gst_buffer_add_meta (dest,
++      GST_VIDEO_DOVI_RPU_META_INFO, NULL);
++  if (!out)
++    return FALSE;
++  out->rpu = g_bytes_ref (src->rpu);
++  out->width = src->width;
++  out->height = src->height;
++  return TRUE;
++}
++
++const GstMetaInfo *
++gst_video_dovi_rpu_meta_get_info (void)
++{
++  static const GstMetaInfo *info = NULL;
++  if (g_once_init_enter ((GstMetaInfo **) &info)) {
++    const GstMetaInfo *registered = gst_meta_register (
++        GST_VIDEO_DOVI_RPU_META_API_TYPE, "GstVideoDoviRpuMeta",
++        sizeof (GstVideoDoviRpuMeta), gst_video_dovi_rpu_meta_init,
++        gst_video_dovi_rpu_meta_free, gst_video_dovi_rpu_meta_transform);
++    g_once_init_leave ((GstMetaInfo **) &info, (GstMetaInfo *) registered);
++  }
++  return info;
++}
++
++GstVideoDoviRpuMeta *
++gst_buffer_add_video_dovi_rpu_meta (GstBuffer * buffer, const guint8 * rpu,
++    gsize size, guint width, guint height)
++{
++  GstVideoDoviRpuMeta *meta;
++
++  g_return_val_if_fail (GST_IS_BUFFER (buffer), NULL);
++  g_return_val_if_fail (gst_buffer_is_writable (buffer), NULL);
++  g_return_val_if_fail (rpu && size && size <= GST_VIDEO_DOVI_RPU_MAX_SIZE, NULL);
++  g_return_val_if_fail (width && width <= G_MAXINT && height && height <= G_MAXINT, NULL);
++  g_return_val_if_fail (!gst_buffer_get_video_dovi_rpu_meta (buffer), NULL);
++
++  meta = (GstVideoDoviRpuMeta *) gst_buffer_add_meta (buffer,
++      GST_VIDEO_DOVI_RPU_META_INFO, NULL);
++  if (meta) {
++    meta->rpu = g_bytes_new (rpu, size);
++    meta->width = width;
++    meta->height = height;
++  }
++  return meta;
++}
+diff --git a/gst-libs/gst/video/gstvideodovirpumeta.h b/gst-libs/gst/video/gstvideodovirpumeta.h
+new file mode 100644
+index 0000000..b98f7eb
+--- /dev/null
++++ b/gst-libs/gst/video/gstvideodovirpumeta.h
+@@ -0,0 +1,74 @@
++/* GStreamer
++ * Copyright (C) 2026 ROG HDR contributors
++ *
++ * This library is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Library General Public
++ * License as published by the Free Software Foundation; either
++ * version 2 of the License, or (at your option) any later version.
++ *
++ * This library is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
++ * Library General Public License for more details.
++ *
++ * You should have received a copy of the GNU Library General Public
++ * License along with this library; if not, write to the
++ * Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
++ * Boston, MA 02110-1301, USA.
++ */
++
++#ifndef __GST_VIDEO_DOVI_RPU_META_H__
++#define __GST_VIDEO_DOVI_RPU_META_H__
++
++#include <gst/gst.h>
++#include <gst/video/video-prelude.h>
++
++G_BEGIN_DECLS
++
++/* Private proposed API. This is raw transport, not a Dolby processing claim. */
++#define GST_VIDEO_DOVI_RPU_MAX_SIZE 65536
++#define GST_VIDEO_DOVI_RPU_META_API_TYPE (gst_video_dovi_rpu_meta_api_get_type ())
++#define GST_VIDEO_DOVI_RPU_META_INFO (gst_video_dovi_rpu_meta_get_info ())
++
++/**
++ * GstVideoDoviRpuMeta:
++ * @meta: parent #GstMeta
++ * @rpu: (transfer none): immutable original RPU bytes, without the two-byte
++ *   HEVC NAL header or the start code / length prefix
++ * @width: native visible picture width before scaling
++ * @height: native visible picture height before scaling
++ *
++ * One access unit's original Dolby Vision RPU, owned by its picture buffer.
++ * The bytes are not inherited from another picture. This does not assert
++ * that profile-specific reshaping, temporal metadata resolution or enhancement
++ * layer reconstruction has taken place. A downstream consumer must resolve
++ * those requirements using a public parser before interpreting the pixels.
++ * In particular, a base-layer-only FEL decode is never a reconstructed master.
++ *
++ * Read fields only. Whole-buffer copies retain the immutable bytes; region
++ * copies and non-copy transforms do not preserve this meta. The colorspace
++ * and size tags allow pixel-changing transforms to discard it. Decoders may
++ * transport it through their matched #GstVideoCodecFrame, without changing the
++ * visible dimensions. Consuming display management must remove it.
++ */
++typedef struct _GstVideoDoviRpuMeta {
++  GstMeta meta;
++  GBytes *rpu;
++  guint width;
++  guint height;
++} GstVideoDoviRpuMeta;
++
++GST_VIDEO_API
++GType gst_video_dovi_rpu_meta_api_get_type (void);
++GST_VIDEO_API
++const GstMetaInfo *gst_video_dovi_rpu_meta_get_info (void);
++
++#define gst_buffer_get_video_dovi_rpu_meta(b) \
++  ((GstVideoDoviRpuMeta *) gst_buffer_get_meta ((b), GST_VIDEO_DOVI_RPU_META_API_TYPE))
++
++GST_VIDEO_API
++GstVideoDoviRpuMeta *gst_buffer_add_video_dovi_rpu_meta (GstBuffer * buffer,
++    const guint8 * rpu, gsize size, guint width, guint height);
++
++G_END_DECLS
++#endif
+diff --git a/gst-libs/gst/video/meson.build b/gst-libs/gst/video/meson.build
+index 6eff585..018d1da 100644
+--- a/gst-libs/gst/video/meson.build
++++ b/gst-libs/gst/video/meson.build
+@@ -6,6 +6,7 @@ video_sources = files([
+   'gstvideocodecalphameta.c',
+   'gstvideoaggregator.c',
+   'gstvideodecoder.c',
++  'gstvideodovirpumeta.c',
+   'gstvideodmabufpool.c',
+   'gstvideoencoder.c',
+   'gstvideofilter.c',
+@@ -47,6 +48,7 @@ video_headers = files([
+   'gstvideocodecalphameta.h',
+   'gstvideoaggregator.h',
+   'gstvideodecoder.h',
++  'gstvideodovirpumeta.h',
+   'gstvideodmabufpool.h',
+   'gstvideoencoder.h',
+   'gstvideofilter.h',
+-- 
+2.54.0 (Apple Git-157)
+

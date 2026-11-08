@@ -9,6 +9,17 @@ records exact package hashes and remaining acceptance; no reinstall is needed.
 
 Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Both Vulkan driver architectures built. APT simulated the seven-package installation and its exact stock rollback offline. Host installation and physical-target trim tuning remain open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
 
+## GStreamer RPU transport — compile-only proposal, November 7
+
+The proposed native HEVC transport keeps immutable original RPU bytes with the
+matched decoded codec frame. Exact Ubuntu base `1.28.7-1` and bad
+`1.28.6-1ubuntu1` source targets compiled with warnings as errors; the native
+reorder/flush/gap probe compiled but has not run. Independent source/probe review
+and both avdec/Intel VA runtime receipts are required before merge. No packages
+or applications were installed and no defaults changed. Parsed reconstruction,
+FEL residual reconstruction and actual native-surface target delivery are still
+separate dependencies. [Contract and phase boundaries](GSTREAMER_DOLBY_TRANSPORT.md).
+
 ## Kernel security rebase — 2026-10-29
 
 The signed `7.3.0-nativehdr3` was installed and booted in the owner-authorized
