@@ -1,15 +1,8 @@
 # Linux display quality — full Dolby Vision and a calibrated laptop pipeline
 
-**Status:** open; hardware/OEM investigation recorded, implementation and
-physical acceptance outstanding · **Written:** 2026-10-08.
+**Updated November 8, 2026.** System mpv and FFmpeg on the ROG use the shared Dolby Vision mapper. The staged GNOME player renders content using the current display target, and staged mpv composes both layers of 4K Profile 7 FEL. The panel’s firmware supplies the current target. Optical calibration, broader content comparisons and browser playback remain open. [Current project status](STATUS.md).
 
-This is the investigation ledger and staged plan for general Linux display
-quality, the ASUS GU605MZ internal OLED, and Plurx playback on that machine.
-The user wants actual Dolby Vision and macOS-like colour consistency and
-ease of use. Both are requirements. The existing
-Plurx DV-to-HDR10 processing project has a separate
-HDR10 output contract; it does not satisfy this project's Dolby Vision goal.
-Plurx remains an independent consumer of this stack.
+This plan covers Linux display quality, the ASUS GU605MZ internal OLED, and applications that consume the display pipeline. The usability target is consistent color across applications and an automatic choice of the correct display target. Plurx maintains its application integration separately.
 
 ## 1. The outcome to build
 

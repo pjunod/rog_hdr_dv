@@ -1,13 +1,8 @@
 # GStreamer Dolby transport — keep each RPU with its decoded picture
 
-**Status:** native metadata-transport checks passed; unshipped, reconstruction
-and normal-player rendering remain open · **Written:** 2026-11-07.
+**Updated November 8, 2026.** The native software, Intel VA and NVIDIA paths carried picture-owned data through the normal staged GNOME player. Packaged Showtime regraded a paused Profile 5 picture when the virtual monitor target changed. The distribution packages are staged for installation. [Normal package controls](../evidence/gstreamer-gtk-final-packages-20261108.json) · [Paused-frame capture](../evidence/gnome-showtime-paused-retarget.json).
 
-Companion to [shared display management](SYSTEM_DOLBY_VISION.md), which describes
-the working consumer interfaces. This proposal carries original metadata through
-GStreamer's native HEVC parser and decoder boundary. It changes no pixels and
-provides no new playback route. Read the phase boundaries before connecting it
-to a renderer: raw RPU presence does not establish reconstructed Dolby pixels.
+The sections below record the original transport design and the evidence available at each development stage. The decoder associates the RPU with its picture, the renderer reconstructs and grades that picture, and the GTK surface supplies the current display target. [Current consumer behavior](SYSTEM_DOLBY_VISION.md).
 
 ## 1. Transport owns the bytes, never a previous picture
 
