@@ -1,0 +1,37 @@
+diff --git a/debian/changelog b/debian/changelog
+index 0b235f10d24f4791440bff560cc84ebda81409ca..1d1efffbf68f2ce5ba6ff3d1287ecaa4c68438e0 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++mpv (0.42.0-0ubuntu0+rogdv5) stonking; urgency=medium
++
++  * Use validated physical display xy through the optional provider v2 API.
++    Preserve named fallback, FEL, live configuration and tagged captures.
++
++ -- Display Pipeline Maintainers <display-pipeline@example.invalid>  Sun, 08 Nov 2026 12:00:00 +0000
++
+ mpv (0.42.0-0ubuntu0+rogdv4) stonking; urgency=medium
+ 
+   * Preserve the physical Dolby grade in tagged window screenshots.
+diff --git a/debian/control b/debian/control
+index 0419b92673de27f84552208c7ef3ff5b3120b4b5..4f3a9f6cc3a830b3d1034e74d27e93ea5f68d7a5 100644
+--- a/debian/control
++++ b/debian/control
+@@ -33,7 +33,7 @@ Build-Depends:
+  liblua5.2-dev,
+  libmujs-dev,
+  libpipewire-0.3-dev [linux-any],
+- librog-dv-provider387-dev,
++ librog-dv-provider387-dev (>= 1.0.0+private20261108-5),
+  libpulse-dev,
+  librubberband-dev,
+  libsixel-dev,
+@@ -127,7 +127,7 @@ Depends:
+  liblua5.2-dev,
+  libmujs-dev,
+  libpipewire-0.3-dev [linux-any],
+- librog-dv-provider387-dev,
++ librog-dv-provider387-dev (>= 1.0.0+private20261108-5),
+  libpulse-dev,
+  librubberband-dev,
+  libsixel-dev,

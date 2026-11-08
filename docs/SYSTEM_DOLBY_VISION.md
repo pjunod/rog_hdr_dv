@@ -176,3 +176,30 @@ A read-only query returned a firmware-derived target of 0.0004–616 cd/m², wit
 ## Other GStreamer desktop players
 
 The normal GNOME Showtime package uses the GTK GStreamer sink. The staged software, Intel VA and NVIDIA decoders keep reconstruction data and the raw RPU with each reordered picture. The sink grades that picture for its GTK surface before ordinary color conversion. Other GStreamer applications choose their own decoders, sinks and presentation paths. [Native metadata transport](GSTREAMER_DOLBY_TRANSPORT.md) · [Qualified app and plugin revisions](../evidence/gstreamer-gtk-final-packages-20261108.json).
+
+## Physical xy target candidate
+
+The separate raw-xy candidate adds an optional target-v2 API to the shared
+provider. The existing target structure, ABI number, named options and entry
+points stay unchanged. The public headers and adapters are reconstructible
+from this repository and the pinned upstream sources; the private mapping
+implementation and SDK payload remain outside the repository.
+
+Normal mpv passes the preferred Wayland surface target through its physical
+auto-target branch. The GTK mapper passes the surface target already retained
+in its frame/cache context. FFmpeg accepts an explicit
+`target_xy=rx/ry/gx/gy/bx/by/wx/wy` with `target_peak`; `target_gamut` supplies
+the complete named fallback. The adapters discover the additive symbols at
+runtime, so an older provider remains usable and reports named fallback.
+
+Raw xy currently applies to neutral creative-colour fields in CM4. Creative
+colour trims, unsupported models and invalid raw coordinates retain the full
+named mapping. Diagnostics distinguish these choices. This does not establish
+arbitrary-xy creative-gamut weighting or optical accuracy.
+
+The source candidate targets mpv `+rogdv5`, FFmpeg `+rogdv4`, GTK mapping core
+`+rogdv3`, and the GTK sink and Showtime `+rogdv4`. Existing exact package
+relations are retained together. Source replay, focused compilation and
+private development controls, including the live GTK adapter, passed; package
+qualification and the final review remain separate acceptance work. The frozen preceding
+package closure remains the rollback.

@@ -1,3 +1,32 @@
+diff --git a/debian/changelog b/debian/changelog
+index a06de33732185b5ef92ed953cfeca309c7b83d42..50b4d67d3475f07231ca62e0bb31cb97ea0d2531 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,11 @@
++ffmpeg (7:8.1.2-2ubuntu2+rogdv4) stonking; urgency=medium
++
++  * Accept validated explicit physical xy targets through the optional
++    additive provider v2 API; preserve named defaults and v1 runtime fallback.
++  * Keep the reviewed codec, metadata and multiarch SDK source unchanged.
++
++ -- Display Pipeline Maintainers <display-pipeline@example.invalid>  Sun, 08 Nov 2026 12:00:00 +0000
++
+ ffmpeg (7:8.1.2-2ubuntu2+rogdv3) stonking; urgency=medium
+ 
+   * Reset strict Dolby metadata on packet configuration changes without
+diff --git a/debian/control b/debian/control
+index 490ab3c77ebeaba1337213840e26b37cd2f4f44b..d8b782b8828487cc9dd897fab8e2ae71719d45c6 100644
+--- a/debian/control
++++ b/debian/control
+@@ -107,7 +107,7 @@ Build-Depends:
+ # --enable-libopus
+  libopus-dev,
+ # --enable-libplacebo
+- librog-dv-provider-dev (>= 1) [linux-any] <!pkg.ffmpeg.stage1>,
++ librog-dv-provider-dev (>= 1.0.0+private20261108-5) [linux-any] <!pkg.ffmpeg.stage1>,
+ # --enable-libpulse
+  libpulse-dev <!pkg.ffmpeg.stage1>,
+ # --enable-librabbitmq
 diff --git a/libavfilter/vf_libplacebo.c b/libavfilter/vf_libplacebo.c
 index 8ee8b1c9f13ad01abf281ff10103c14db39c206c..2edf6d556043c1d461dc9c0188b9b1156a54815b 100644
 --- a/libavfilter/vf_libplacebo.c
