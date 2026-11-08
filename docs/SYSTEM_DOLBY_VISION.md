@@ -15,6 +15,16 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 | Staged GNOME Showtime | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
 | FFmpeg 8.1.2, libplacebo video filter | Explicit export target, because a filter graph can run without a display | Example below |
 
+### Browser playback on the ROG
+
+Stock Chrome 156.0.8078.47 and Firefox 159.0 both presented a local AVC control frame. Both rejected the same local unencrypted Profile 8.1 MP4 with media error 4 (`MEDIA_ERR_SRC_NOT_SUPPORTED`). The chart has matched Dolby configuration and RPU data and plays through the native consumer pipeline. Each browser used a fresh profile. Chrome ran on its own NVIDIA-backed Wayland display and Firefox ran headless.
+
+For ordinary MP4 files and Media Source Extensions, both browsers declined `dvh1.05.06`, `dvhe.05.06`, `dvhe.07.06`, `dvh1.08.06` and `dvhe.08.06`. Firefox accepted the Main and Main 10 HEVC capability queries. Chrome declined those queries in this configuration. This result covers clear content on these builds. A streaming service's protected playback requires separate evidence.
+
+Chromium's public media configuration controls Dolby demuxing and leaves decoding to the platform. Its demuxer switches to the Dolby codec only when the requested type is supported. A Linux integration needs a decoder and renderer that retain the frame's metadata through composition, followed by a capability declaration for the supported profiles. [Chromium media build configuration](https://chromium.googlesource.com/chromium/src/+/cb3d3d1c5e989cc6792773dc6b1e46cefe68efb7/media/media_options.gni) · [Demuxer codec selection](https://chromium.googlesource.com/chromium/src/media/+/b677a686cfbe98c4b504845a15c2dfc046d2836a/ffmpeg/ffmpeg_common.cc).
+
+### FFmpeg export
+
 For a 600 cd/m² P3-D65 mastering display, the filter accepts the following invocation. This example stores the resulting 10-bit PQ video losslessly. Select the peak, black level and primaries for the **destination** you intend to reproduce.
 
 ```sh

@@ -5,8 +5,10 @@
 | On the laptop today | Current development result |
 |---|---|
 | mpv 0.41, FFmpeg filter and the installed Vulkan update | Staged mpv 0.42 played the 4K FEL sample at 24 fps on NVIDIA. |
-| GNOME uses Mutter nativehdr13 and the existing GTK runtime | The updated GTK runtime fixes black Showtime output. The remaining paused-frame issue is downstream of a verified change in the GTK texture. |
+| GNOME uses Mutter nativehdr13 and the existing GTK runtime | The updated GTK runtime fixes black Showtime output. A pure GTK window reproduces the paused-frame issue. Wayland confirms presentation of the new buffers while the captured output stays unchanged. |
 | Firmware provides panel color and luminance data | The staged player scored mean ΔE ITP 0.651 and p95 1.274 on one chart at the panel target. The current mapper approximates the gamut as P3-D65. Optical calibration is pending. |
+
+**Browser coverage.** Stock Chrome and Firefox on the laptop played the AVC control and rejected the clear Dolby Vision chart. Firefox accepted ordinary HEVC capability queries. [Browser versions, codec queries and playback conditions](SYSTEM_DOLBY_VISION.md#browser-playback-on-the-rog).
 
 **The normal player was compared with Dolby’s reference output.** On one 2560×1280 Profile 8.1 chart at a matched 1,000 cd/m² BT.2020 target, the staged NVIDIA mpv window had mean ΔE ITP 0.62 and p95 1.12 over all pixels. At a second 600 cd/m² target, the corresponding mean was 0.58 and p95 was 1.06. The maximum at 1,000 cd/m² was 56.49 at a color boundary. The 10-bit 4:2:0 transport control also showed much larger errors at boundaries than within patches. The 1,000 cd/m² target has neutral Level 8 trims. Moving-content, nonneutral-trim and optical comparisons remain open. [Methods, population and controls](../evidence/dolby-official-chart-consumer.json).
 
