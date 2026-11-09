@@ -7,7 +7,7 @@
 #include <gst/base/gstbasetransform.h>
 #define TYPE_GTK_DOVI_MAP (gtk_dovi_map_get_type ())
 typedef struct { GstBaseTransform parent; GMutex lock; GstGtkDoviTarget target;
-  guint64 target_serial; gboolean known_stream; GstVideoInfo info, output_info; GstGtkDoviMapper *mapper; } GtkDoviMap;
+  guint64 target_serial; guint destination_kind; gboolean known_stream; GstVideoInfo info, output_info; GstGtkDoviMapper *mapper; } GtkDoviMap;
 typedef struct { GstBaseTransformClass parent; } GtkDoviMapClass;
 G_DEFINE_TYPE (GtkDoviMap, gtk_dovi_map, GST_TYPE_BASE_TRANSFORM)
 /* Copy a caller-owned Structure natively into one immutable Context. Python
@@ -76,22 +76,75 @@ static gboolean native_input_memory (const GstCapsFeatures *features)
       (gst_caps_features_contains (features, GTK_DOVI_CUDA_MEMORY_FEATURE) ||
        gst_caps_features_contains (features, GTK_DOVI_VA_MEMORY_FEATURE)));
 }
-static GstCaps *graded_output_caps (void)
+static GstCaps *graded_output_caps (GtkDoviMap *self)
 {
   GstVideoColorimetry pq = {GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB,
       GST_VIDEO_TRANSFER_SMPTE2084, GST_VIDEO_COLOR_PRIMARIES_BT2020};
+  gboolean sdr = self->destination_kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
+  if (sdr) {
+    pq.transfer = GST_VIDEO_TRANSFER_SRGB;
+    pq.primaries = GST_VIDEO_COLOR_PRIMARIES_BT709;
+  }
   gchar *color = gst_video_colorimetry_to_string (&pq);
   GstCaps *caps = gst_caps_new_simple ("video/x-raw", "format", G_TYPE_STRING,
-      "RGBA64_LE", "colorimetry", G_TYPE_STRING, color,
+      sdr ? "RGBA" : "RGBA64_LE", "colorimetry", G_TYPE_STRING, color,
       "gtk-dovi-preconverted", G_TYPE_BOOLEAN, TRUE, NULL);
   g_free (color);
   return caps;
 }
 static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection direction,
+    GstCaps *caps, GstCaps *filter);
+
+/* A peer can normalize away stream-only fields from a filtered output answer.
+ * Invert each marked input candidate through its own real graded output before
+ * intersecting it with the peer. An unmarked identity answer must never acquire
+ * a Dolby marker merely because the caller supplied a marked input filter. */
+static GstCaps *marked_filter_preimage (GstBaseTransform *base,
+    GstCaps *peer_output, GstCaps *filter)
+{
+  GstCaps *result = gst_caps_new_empty ();
+  GstCaps *identity = NULL;
+  for (guint i = 0; i < gst_caps_get_size (filter); i++) {
+    GstCaps *input = gst_caps_copy_nth (filter, i);
+    if (!gtk_dovi_stream_profile (gst_caps_get_structure (input, 0))) {
+      if (!identity)
+        identity = transform_caps (base, GST_PAD_SRC, peer_output, NULL);
+      GstCaps *plain = gst_caps_intersect_full (input, identity,
+          GST_CAPS_INTERSECT_FIRST);
+      gst_caps_append (result, plain);
+    } else {
+      GstCaps *native = native_input_caps ();
+      GstCaps *allowed = gst_caps_intersect_full (input, native,
+          GST_CAPS_INTERSECT_FIRST);
+      GstCaps *graded = transform_caps (base, GST_PAD_SINK, allowed, NULL);
+      GstCaps *actual = gst_caps_intersect_full (graded, peer_output,
+          GST_CAPS_INTERSECT_FIRST);
+      GstCaps *reverse = transform_caps (base, GST_PAD_SRC, actual, NULL);
+      GstCaps *accepted = gst_caps_intersect_full (allowed, reverse,
+          GST_CAPS_INTERSECT_FIRST);
+      gst_caps_append (result, accepted);
+      gst_caps_unref (reverse);
+      gst_caps_unref (actual);
+      gst_caps_unref (graded);
+      gst_caps_unref (allowed);
+      gst_caps_unref (native);
+    }
+    gst_caps_unref (input);
+  }
+  gst_clear_caps (&identity);
+  return result;
+}
+static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection direction,
     GstCaps *caps, GstCaps *filter)
 {
+  if (direction == GST_PAD_SRC && filter) {
+    for (guint i = 0; i < gst_caps_get_size (filter); i++) {
+      if (gtk_dovi_stream_profile (gst_caps_get_structure (filter, i)))
+        return marked_filter_preimage (base, caps, filter);
+    }
+  }
   GstCaps *result = gst_caps_is_any (caps) ? gst_caps_copy (caps) : gst_caps_new_empty ();
-  (void) base;
+  GtkDoviMap *self = (GtkDoviMap *) base;
   for (guint i = 0; i < gst_caps_get_size (caps); i++) {
     const GstStructure *st = gst_caps_get_structure (caps, i);
     if (!gtk_dovi_stream_profile (st)) {
@@ -100,7 +153,7 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
       continue;
     }
     GstCaps *one = gst_caps_copy_nth (caps, i);
-    GstCaps *constraint = direction == GST_PAD_SINK ? native_input_caps () : graded_output_caps ();
+    GstCaps *constraint = direction == GST_PAD_SINK ? native_input_caps () : graded_output_caps (self);
     GstCaps *allowed = gst_caps_intersect_full (one, constraint, GST_CAPS_INTERSECT_FIRST);
     gst_caps_unref (one);
     gst_caps_unref (constraint);
@@ -114,7 +167,7 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
       gst_caps_set_features (allowed, j, direction == GST_PAD_SINK ?
           gst_caps_features_new_empty () : gst_caps_features_new_any ());
     }
-    constraint = direction == GST_PAD_SINK ? graded_output_caps () : native_input_caps ();
+    constraint = direction == GST_PAD_SINK ? graded_output_caps (self) : native_input_caps ();
     one = gst_caps_intersect_full (allowed, constraint, GST_CAPS_INTERSECT_FIRST);
     gst_caps_unref (allowed);
     gst_caps_unref (constraint);
@@ -129,6 +182,7 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
 static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *output)
 {
   GtkDoviMap *s = (GtkDoviMap *) base;
+  gboolean sdr = s->destination_kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
   guint profile = 0;
   for (guint i = 0; i < gst_caps_get_size (input) && !profile; i++)
     profile = gtk_dovi_stream_profile (gst_caps_get_structure (input, i));
@@ -155,9 +209,9 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
         !gst_video_info_from_caps (&output_info, output) ||
         GST_VIDEO_INFO_WIDTH (&info) != GST_VIDEO_INFO_WIDTH (&output_info) ||
         GST_VIDEO_INFO_HEIGHT (&info) != GST_VIDEO_INFO_HEIGHT (&output_info) ||
-        GST_VIDEO_INFO_FORMAT (&output_info) != GST_VIDEO_FORMAT_RGBA64_LE ||
-        output_info.colorimetry.transfer != GST_VIDEO_TRANSFER_SMPTE2084 ||
-        output_info.colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT2020 ||
+        GST_VIDEO_INFO_FORMAT (&output_info) != (sdr ? GST_VIDEO_FORMAT_RGBA : GST_VIDEO_FORMAT_RGBA64_LE) ||
+        output_info.colorimetry.transfer != (sdr ? GST_VIDEO_TRANSFER_SRGB : GST_VIDEO_TRANSFER_SMPTE2084) ||
+        output_info.colorimetry.primaries != (sdr ? GST_VIDEO_COLOR_PRIMARIES_BT709 : GST_VIDEO_COLOR_PRIMARIES_BT2020) ||
         output_info.colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
         output_info.colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255)
       return FALSE;
@@ -193,8 +247,8 @@ static GstFlowReturn prepare (GstBaseTransform *base, GstBuffer *input, GstBuffe
    * baseline. Private mapping requires both witnesses inside the shared core. */
   GstVideoInfo result_info = s->output_info;
   GError *error = NULL;
-  int result = gst_gtk_dovi_mapper_render (s->mapper, input, &s->info,
-      &target, output, &result_info, &error);
+  int result = gst_gtk_dovi_mapper_render_destination (s->mapper, input, &s->info,
+      s->destination_kind, &target, output, &result_info, &error);
   if (result < 1 || !*output) {
     GST_ELEMENT_ERROR (s, STREAM, FAILED, ("%s", error ? error->message : "Dolby map failed"), (NULL));
     g_clear_error (&error); return GST_FLOW_ERROR;
@@ -245,11 +299,48 @@ static void finalize (GObject *object)
   gst_gtk_dovi_mapper_free (s->mapper); g_mutex_clear (&s->lock);
   G_OBJECT_CLASS (gtk_dovi_map_parent_class)->finalize (object);
 }
+static void set_property (GObject *object, guint property,
+    const GValue *value, GParamSpec *spec)
+{
+  GtkDoviMap *self = (GtkDoviMap *) object;
+  if (property != 1) {
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property, spec); return;
+  }
+  GST_STATE_LOCK (self);
+  if (GST_STATE (self) <= GST_STATE_READY)
+    self->destination_kind = g_value_get_uint (value);
+  else
+    GST_WARNING_OBJECT (self, "Destination can only change before PAUSED");
+  GST_STATE_UNLOCK (self);
+}
+static void get_property (GObject *object, guint property,
+    GValue *value, GParamSpec *spec)
+{
+  GtkDoviMap *self = (GtkDoviMap *) object;
+  if (property == 2) {
+    g_value_set_uint (value, GST_GTK_DOVI_DESTINATION_ABI); return;
+  }
+  if (property != 1) {
+    G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property, spec); return;
+  }
+  g_value_set_uint (value, self->destination_kind);
+}
 static void gtk_dovi_map_class_init (GtkDoviMapClass *klass)
 {
   GstElementClass *element = GST_ELEMENT_CLASS (klass);
   GstBaseTransformClass *base = GST_BASE_TRANSFORM_CLASS (klass);
   G_OBJECT_CLASS (klass)->finalize = finalize;
+  G_OBJECT_CLASS (klass)->set_property = set_property;
+  G_OBJECT_CLASS (klass)->get_property = get_property;
+  g_object_class_install_property (G_OBJECT_CLASS (klass), 1,
+      g_param_spec_uint ("destination-kind", "Destination kind",
+        "0: witnessed native display PQ;1: logical100nit BT709 standard SDR sRGB",
+        0, 1, 0, G_PARAM_READWRITE | GST_PARAM_MUTABLE_READY | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (G_OBJECT_CLASS (klass), 2,
+      g_param_spec_uint ("destination-abi", "Destination ABI",
+        "Explicit destination-kind contract version",
+        GST_GTK_DOVI_DESTINATION_ABI, GST_GTK_DOVI_DESTINATION_ABI,
+        GST_GTK_DOVI_DESTINATION_ABI, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
   element->set_context = set_context;
   g_signal_new_class_handler ("create-target-context", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION, G_CALLBACK (create_target_context),

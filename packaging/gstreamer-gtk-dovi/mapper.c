@@ -38,7 +38,8 @@ struct GstGtkDoviMapper {
   struct pl_color_space physical;
   float transport_gain;
   struct dv_provider387 *provider;
-  pl_tex source[4], enhancement[4], output[4];
+  pl_tex source[4], enhancement[4], output[4], sdr_output[4];
+  gboolean has_destination, last_sdr_destination;
   gboolean requires_fel;
   int mapped;
   guint warned;
@@ -120,6 +121,7 @@ void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
       pl_tex_destroy (s->vk->gpu, &s->source[i]);
       pl_tex_destroy (s->vk->gpu, &s->enhancement[i]);
       pl_tex_destroy (s->vk->gpu, &s->output[i]);
+      pl_tex_destroy (s->vk->gpu, &s->sdr_output[i]);
     }
     pl_vulkan_destroy (&s->vk);
   }
@@ -134,9 +136,9 @@ static enum AVPixelFormat input_format (GstVideoFormat f)
     default: return AV_PIX_FMT_NONE;
   }
 }
-int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
+static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     const GstVideoInfo *info, const GstGtkDoviTarget *t,
-    GstBuffer **output, GstVideoInfo *output_info, GError **error)
+    GstBuffer **output, GstVideoInfo *output_info, GError **error, gboolean sdr)
 {
   *output = NULL;
   GstDoviPictureMeta *meta = gst_buffer_get_dovi_picture_meta (input);
@@ -146,11 +148,11 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
   guint width = GST_VIDEO_INFO_WIDTH (info), height = GST_VIDEO_INFO_HEIGHT (info);
   GstVideoCropMeta *crop = gst_buffer_get_video_crop_meta (input);
   enum AVPixelFormat format = input_format (GST_VIDEO_INFO_FORMAT (info));
-  if (format == AV_PIX_FMT_NONE || GST_VIDEO_INFO_FORMAT (output_info) != GST_VIDEO_FORMAT_RGBA64_LE) {
+  if (format == AV_PIX_FMT_NONE || GST_VIDEO_INFO_FORMAT (output_info) != (sdr ? GST_VIDEO_FORMAT_RGBA : GST_VIDEO_FORMAT_RGBA64_LE)) {
     g_set_error_literal (error, mapper_error (), 1, "Unsupported native plane import"); return -1;
   }
   GstVideoFrame mapped = {0};
-  AVFrame *src = av_frame_alloc (), *dst = av_frame_alloc ();
+  AVFrame *src = av_frame_alloc (), *dst = av_frame_alloc (), *converted = NULL;
   struct pl_frame source = {0}, enhancement = {0}, destination = {0};
   const AVFrame *fel = gst_dovi_picture_meta_get_fel (meta);
   gboolean el_uploaded = FALSE;
@@ -163,7 +165,8 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
       crop->width > storage_width - crop->x || crop->height > storage_height - crop->y)) goto done;
   gboolean native_yuv = format == AV_PIX_FMT_NV12 || format == AV_PIX_FMT_P010LE ||
       format == AV_PIX_FMT_YUV420P || format == AV_PIX_FMT_YUV420P10LE;
-  gboolean apply_dovi = native_yuv && resolved && raw && t && t->valid && t->render_ready && t->composed &&
+  gboolean apply_dovi = native_yuv && resolved && raw && t &&
+      (sdr || (t->valid && t->render_ready && t->composed)) &&
       GST_VIDEO_INFO_INTERLACE_MODE (info) == GST_VIDEO_INTERLACE_MODE_PROGRESSIVE &&
       !GST_BUFFER_FLAG_IS_SET (input, GST_VIDEO_BUFFER_FLAG_INTERLACED) &&
       !GST_BUFFER_FLAG_IS_SET (input, GST_BUFFER_FLAG_CORRUPTED) &&
@@ -203,7 +206,7 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
     if (!apply_dovi) decline (s, 2, "per-picture metadata/geometry/enhancement unqualified; baseline conversion");
   }
   if (apply_dovi && (!isfinite (t->max_nits) || !isfinite (t->min_nits) ||
-      t->max_nits <= 203 || t->min_nits < 0 || t->min_nits >= t->max_nits)) {
+      t->max_nits <= (sdr ? 0 : 203) || t->min_nits < 0 || t->min_nits >= t->max_nits)) {
     apply_dovi = FALSE; decline (s, 32, "invalid/non-HDR surface target; baseline conversion");
   }
   /* Reuse the reviewed mpv physical transport law only for an actual PQ
@@ -342,7 +345,48 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
     destination.color = baseline_destination;
     if (!pl_render_image (s->renderer, &baseline, &destination, &params)) goto done;
   }
-  if (s->mapped < 0 || !pl_download_avframe (s->vk->gpu, &destination, dst)) goto done;
+  if (s->mapped < 0) goto done;
+  AVFrame *final = dst;
+  enum AVPixelFormat output_format = AV_PIX_FMT_RGBA64LE;
+  if (sdr) {
+    converted = av_frame_alloc ();
+    if (!converted) goto done;
+    converted->format = AV_PIX_FMT_RGBA;
+    converted->width = dst->width; converted->height = dst->height;
+    converted->color_range = AVCOL_RANGE_JPEG; converted->colorspace = AVCOL_SPC_RGB;
+    converted->color_primaries = AVCOL_PRI_BT709;
+    converted->color_trc = AVCOL_TRC_IEC61966_2_1;
+    struct pl_frame sdr_destination = {0};
+    if (av_frame_get_buffer (converted, 32) < 0 ||
+        !pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
+            s->sdr_output, converted)) goto done;
+    pl_shader sh = pl_dispatch_begin (s->dispatch);
+    if (!pl_shader_sample_direct (sh,
+        pl_sample_src (.tex = destination.planes[0].texture))) {
+      pl_dispatch_abort (s->dispatch, &sh); goto done;
+    }
+    const struct pl_color_space pq = {
+      .primaries = PL_COLOR_PRIM_BT_2020, .transfer = PL_COLOR_TRC_PQ};
+    const struct pl_color_space srgb = {
+      .primaries = PL_COLOR_PRIM_BT_709, .transfer = PL_COLOR_TRC_SRGB};
+    /* Public D65 Rec.2020 -> Rec.709 linear matrix. The explicit100nit target
+     * is normalized by the existing PQ transport law; gamut conversion occurs
+     * before clipping and the sRGB transfer is applied exactly once. */
+    pl_shader_linearize (sh, &pq);
+    if (!pl_shader_custom (sh, &(struct pl_custom_shader) {
+        .description = "explicit100nit BT709 SDR video destination",
+        .body = "color.rgb = clamp(mat3(1.6604910021, -0.1245504745, -0.0181507634, "
+                "-0.5876411388, 1.1328998971, -0.1005788980, "
+                "-0.0728498633, -0.0083494226, 1.1187296614) * color.rgb, 0.0, 1.0);",
+        .input = PL_SHADER_SIG_COLOR, .output = PL_SHADER_SIG_COLOR})) {
+      pl_dispatch_abort (s->dispatch, &sh); goto done;
+    }
+    pl_shader_delinearize (sh, &srgb);
+    if (!pl_dispatch_finish (s->dispatch, pl_dispatch_params (
+        .shader = &sh, .target = sdr_destination.planes[0].texture)) ||
+        !pl_download_avframe (s->vk->gpu, &sdr_destination, converted)) goto done;
+    final = converted; output_format = AV_PIX_FMT_RGBA;
+  } else if (!pl_download_avframe (s->vk->gpu, &destination, dst)) goto done;
   result = gst_buffer_new_allocate (NULL, output_info->size, NULL);
   GstVideoFrame out = {0};
   if (!result || !gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) goto done;
@@ -351,8 +395,8 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
     out_planes[i] = GST_VIDEO_FRAME_PLANE_DATA (&out, i);
     out_strides[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
   }
-  av_image_copy (out_planes, out_strides, (const uint8_t **) dst->data,
-      dst->linesize, AV_PIX_FMT_RGBA64LE, dst->width, dst->height);
+  av_image_copy (out_planes, out_strides, (const uint8_t **) final->data,
+      final->linesize, output_format, final->width, final->height);
   gst_video_frame_unmap (&out);
   gst_buffer_copy_into (result, input, GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS, 0, -1);
   *output = result; result = NULL; success = TRUE;
@@ -360,10 +404,56 @@ done:
   if (el_uploaded) pl_unmap_avframe (s->vk->gpu, &enhancement);
   if (uploaded) pl_unmap_avframe (s->vk->gpu, &source);
   if (mapped.buffer) gst_video_frame_unmap (&mapped);
-  gst_clear_buffer (&result); av_frame_free (&src); av_frame_free (&dst);
+  gst_clear_buffer (&result); av_frame_free (&src); av_frame_free (&dst); av_frame_free (&converted);
   if (!success) {
     g_set_error_literal (error, mapper_error (), 1, "Eligible Dolby frame normalization/mapping failed");
     return -1;
   }
   return s->mapped == 1 ? 1 : 2;
+}
+
+int gst_gtk_dovi_mapper_render_destination (GstGtkDoviMapper *self,
+    GstBuffer *input, const GstVideoInfo *info, GstGtkDoviDestinationKind kind,
+    const GstGtkDoviTarget *physical, GstBuffer **output,
+    GstVideoInfo *output_info, GError **error)
+{
+  *output = NULL;
+  gboolean sdr = kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
+  if (!sdr && kind != GST_GTK_DOVI_DESTINATION_DISPLAY_PQ) {
+    g_set_error_literal (error, mapper_error (), 1, "Unsupported destination kind");
+    return -1;
+  }
+  if (sdr && (GST_VIDEO_INFO_FORMAT (output_info) != GST_VIDEO_FORMAT_RGBA ||
+      output_info->colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255 ||
+      output_info->colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
+      output_info->colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT709 ||
+      output_info->colorimetry.transfer != GST_VIDEO_TRANSFER_SRGB)) {
+    g_set_error_literal (error, mapper_error (), 1, "Invalid standard SDR output declaration");
+    return -1;
+  }
+  if (self->has_destination && self->last_sdr_destination != sdr &&
+      self->renderer)
+    pl_renderer_flush_cache (self->renderer);
+  self->has_destination = TRUE;
+  self->last_sdr_destination = sdr;
+  if (!sdr)
+    return render_destination (self, input, info, physical, output,
+        output_info, error, FALSE);
+  /* An explicit logical destination, independent of native surface feedback.
+   * Native validity/composition/readiness fields deliberately remain false. */
+  const GstGtkDoviTarget logical = {
+    .generation = 1, .primaries = {.64,.33,.30,.60,.15,.06,.3127,.3290},
+    .min_nits = 0, .max_nits = 100, .reference_nits = 100,
+    .encoding_reference_nits = 203, .encoding_max_nits = 10000,
+  };
+  return render_destination (self, input, info, &logical, output,
+      output_info, error, TRUE);
+}
+
+int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *self, GstBuffer *input,
+    const GstVideoInfo *info, const GstGtkDoviTarget *physical,
+    GstBuffer **output, GstVideoInfo *output_info, GError **error)
+{
+  return gst_gtk_dovi_mapper_render_destination (self, input, info,
+      GST_GTK_DOVI_DESTINATION_DISPLAY_PQ, physical, output, output_info, error);
 }

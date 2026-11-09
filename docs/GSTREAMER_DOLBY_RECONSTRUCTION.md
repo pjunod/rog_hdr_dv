@@ -2,6 +2,23 @@
 
 **Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
 
+## Browser destination interface in development
+
+The source candidate adds an explicit logical100nit BT709/sRGB destination
+without changing the native DISPLAY_PQ witness requirement. The additive
+destination API preserves the existing core ABI and legacy entry points.
+Retained pictures keep their original dimensions and picture identity when a
+later destination requests a different output layout. The marked reverse caps
+query now derives each input candidate through its actual graded output before
+intersecting downstream constraints; unmarked passthrough remains unchanged.
+
+The extended negotiation probe exercises actual linked pad queries, normalized
+peer answers, output format/memory/width restrictions, and separate marked
+configurations. Runtime and normal-package qualification of this new source
+remain pending. These source changes do not grant native HDR browser delivery
+or physical panel acceptance. Browser source/track/CDM lifecycle qualification
+and stream-qualified VA selection are separate required parts of that work.
+
 ## Normal GNOME playback
 
 The staged Showtime, GTK4 paintable sink and shared mapper compiled on Ubuntu. Ordinary Showtime opened a genuine Profile 5 title and selected NVIDIA's HEVC decoder on the ROG. That decoder omitted the Dolby configuration at its output after the upstream MP4 demuxer and HEVC parser had carried it correctly. The player used its ordinary rendering path. The separate software decoder kept the configuration. The corrected NVIDIA producer subsequently retained all 95 decoded pictures across configuration changes, matched software decode for the crop control and reached the mapper through ordinary Showtime’s default decoder selection. [NVIDIA controls](../evidence/gstreamer-nvidia-picture-qualification.json). A rendered-grade claim requires the default decoder to preserve its own decoded picture and the authored change to reach the measured window. [Implementation and build evidence](../evidence/gstreamer-gtk-consumer-source-freeze-20261108.json).

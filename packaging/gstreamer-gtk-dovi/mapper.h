@@ -3,10 +3,15 @@
 #define GST_GTK_DOVI_MAPPER_H
 #include <gst/video/video.h>
 #define GST_GTK_DOVI_CORE_ABI 1
+#define GST_GTK_DOVI_DESTINATION_ABI 1
 #define GST_GTK_DOVI_API __attribute__((visibility("default")))
 extern GST_GTK_DOVI_API GstDebugCategory *gtk_dovi_map_debug;
 #define GST_CAT_DEFAULT gtk_dovi_map_debug
 typedef struct GstGtkDoviMapper GstGtkDoviMapper;
+typedef enum {
+  GST_GTK_DOVI_DESTINATION_DISPLAY_PQ = 0,
+  GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB = 1,
+} GstGtkDoviDestinationKind;
 /* Caller serializes mapper on the streaming thread. Target is a copied GDK
  * snapshot, never a GdkSurface dereferenced from the streaming thread. */
 typedef struct {
@@ -24,7 +29,22 @@ GST_GTK_DOVI_API void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *self);
 GST_GTK_DOVI_API int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *self, GstBuffer *input,
     const GstVideoInfo *info, const GstGtkDoviTarget *target,
     GstBuffer **output, GstVideoInfo *output_info, GError **error);
+/* Additive destination API. DISPLAY_PQ requires the actual per-view native
+ * render witness. STANDARD_SDR_SRGB grades once to logical100nit BT709 and
+ * emits full-range RGBA/sRGB without claiming a native HDR surface. */
+GST_GTK_DOVI_API int gst_gtk_dovi_mapper_render_destination (
+    GstGtkDoviMapper *self, GstBuffer *input, const GstVideoInfo *info,
+    GstGtkDoviDestinationKind kind, const GstGtkDoviTarget *physical,
+    GstBuffer **output, GstVideoInfo *output_info, GError **error);
 typedef struct GstGtkDoviNativeFrame GstGtkDoviNativeFrame;
+/* Render the retained original picture into the selected destination layout.
+ * Successful output retains authoritative original epoch/picture identity.
+ * A prior SDR attachment does not constrain a later native PQ regrade. */
+GST_GTK_DOVI_API int gst_gtk_dovi_native_frame_render_destination (
+    GstGtkDoviNativeFrame *frame, GstGtkDoviMapper *mapper,
+    GstGtkDoviDestinationKind kind, const GstContext *context,
+    GstBuffer **output, GstVideoInfo *output_info, guint64 *epoch,
+    guint64 *picture_id, GError **error);
 GST_GTK_DOVI_API void gst_gtk_dovi_debug_init (void);
 GST_GTK_DOVI_API guint gst_gtk_dovi_core_abi (void);
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_target_from_context (const GstContext *context, GstGtkDoviTarget *target);
