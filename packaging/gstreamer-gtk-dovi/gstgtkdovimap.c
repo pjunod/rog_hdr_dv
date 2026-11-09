@@ -405,8 +405,12 @@ static GstFlowReturn prepare (GstBaseTransform *base, GstBuffer *input, GstBuffe
       target.reference_nits, target.render_ready);
   gboolean attached = gst_gtk_dovi_native_frame_attach_source (*output, input,
       &s->info, &result_info, target.generation, require_clear ? lease : NULL);
+  gboolean revoked = require_clear && !gst_gtk_dovi_source_lease_is_valid (lease);
   gst_gtk_dovi_source_lease_unref (lease);
-  if (!attached) { gst_clear_buffer (output); return GST_FLOW_ERROR; }
+  if (!attached) {
+    gst_clear_buffer (output);
+    return revoked ? GST_BASE_TRANSFORM_FLOW_DROPPED : GST_FLOW_ERROR;
+  }
   GstBaseTransformClass *klass = GST_BASE_TRANSFORM_GET_CLASS (base);
   if (!klass->copy_metadata (base, input, *output)) {
     gst_clear_buffer (output); return GST_FLOW_ERROR;
