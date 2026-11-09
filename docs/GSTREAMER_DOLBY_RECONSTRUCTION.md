@@ -45,6 +45,14 @@ reordering. Its snapshot is attached only after output geometry is validated.
 An RPU gap emits no snapshot. Neither constructor claims verified FEL residual
 participation; consumers must decline an unreconstructed residual.
 
+## Profile 7 enhancement layer candidate
+
+The [NVIDIA producer patch](../wip/gstreamer-fel/0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch) applies after the four published patches. Its local bridge and GTK mapper changes target progressive, single-track Profile 7 with a half-resolution Main10 enhancement layer and compatibility ID 6. The package registry still identifies the qualified four-patch source.
+
+The decoder sends each extracted enhancement AU with a reference to the exact resolved base picture. FFmpeg returns that reference through picture reordering. The producer retains decoded planes on the output buffer and full-buffer copies. Flush, discontinuity and configuration changes release pending references. Default file playback reserves one 16-picture HEVC reorder window and drains the secondary decoder at EOS. An explicit NVIDIA display-delay setting or live input retains the requested latency.
+
+The GTK mapper uploads both layers. The renderer must report completed residual composition before the mapping provider can grade the picture. An absent enhancement frame yields the ordinary base interpretation. The earlier independent decode probe observed matching presentation times before and after a seek. Native pair counts, pixel contribution, baseline controls, paused-frame retention and normal package playback still require verification.
+
 ## Which geometry reaches the mapper
 
 `GstDoviGeometry` contains coded width/height and active x/y/width/height in luma

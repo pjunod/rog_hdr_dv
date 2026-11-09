@@ -16,6 +16,9 @@ typedef struct {
   GstClockTime last_pts;
   gboolean have_last;
   GstDoviPicture *retained;
+  GstBuffer *fel_copy;
+  gchar *fel_digest;
+  guint paired[2], phase_frames[2];
   GHashTable *decoders, *identities;
 } State;
 
@@ -119,6 +122,24 @@ static void element_setup (GstBin *bin, GstBin *sub_bin, GstElement *element, gp
   }
 }
 
+/* The staged decoder supports planar 10-bit 4:2:0. Hash active samples only,
+ * so the retained full-buffer-copy control is independent of stride/padding. */
+static gchar *digest_fel (const AVFrame *frame)
+{
+  if (!frame || frame->format != AV_PIX_FMT_YUV420P10LE ||
+      frame->width <= 0 || frame->height <= 0) return NULL;
+  GChecksum *sum = g_checksum_new (G_CHECKSUM_SHA256);
+  for (guint i = 0; i < 3; i++) {
+    gint rows = i ? (frame->height + 1) / 2 : frame->height;
+    gint bytes = 2 * (i ? (frame->width + 1) / 2 : frame->width);
+    for (gint y = 0; y < rows; y++)
+      g_checksum_update (sum, frame->data[i] + (gssize) y * frame->linesize[i], bytes);
+  }
+  gchar *digest = g_strdup (g_checksum_get_string (sum));
+  g_checksum_free (sum);
+  return digest;
+}
+
 static GstFlowReturn new_sample (GstAppSink *sink, gpointer opaque)
 {
   State *s = opaque;
@@ -134,6 +155,15 @@ static GstFlowReturn new_sample (GstAppSink *sink, gpointer opaque)
   g_mutex_lock (&s->lock);
   s->frames++; s->width = info.width; s->height = info.height;
   guint64 epoch = 0, id = 0;
+  s->phase_frames[s->phases]++;
+  const AVFrame *fel = gst_dovi_picture_meta_get_fel (meta);
+  if (fel) {
+    s->paired[s->phases]++;
+    if (!s->fel_copy) {
+      s->fel_digest = digest_fel (fel);
+      s->fel_copy = gst_buffer_copy (buffer);
+    }
+  }
   if (meta && meta->picture) {
     s->pictures++;
     gst_dovi_picture_get_identity (meta->picture, &epoch, &id);
@@ -179,7 +209,8 @@ static void pad_added (GstElement *decode, GstPad *pad, gpointer pipeline)
 int main (int argc, char **argv)
 {
   gst_init (&argc, &argv);
-  if (argc != 3) return 2;
+  gboolean require_fel = argc == 4 && !strcmp (argv[3], "--require-fel");
+  if (argc != 3 && !require_fel) return 2;
   State s = {0}; g_mutex_init (&s.lock); s.last_pts = GST_CLOCK_TIME_NONE;
   s.trace = fopen (argv[2], "wx"); if (!s.trace) return 2;
   s.decoders = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
@@ -218,7 +249,21 @@ int main (int argc, char **argv)
         gst_dovi_picture_get_rpu (s.retained) &&
         g_bytes_get_size (gst_dovi_picture_get_rpu (s.retained)) > 0;
   }
-  printf ("{\"pipeline_ok\":%s,\"frames\":%u,\"pictures\":%u,\"profile7\":%u,"
+  const AVFrame *copied_fel = s.fel_copy ? gst_dovi_picture_meta_get_fel (
+      gst_buffer_get_dovi_picture_meta (s.fel_copy)) : NULL;
+  gchar *copied_digest = digest_fel (copied_fel);
+  gboolean retained_fel_ok = copied_digest && !g_strcmp0 (copied_digest, s.fel_digest);
+  g_free (copied_digest); g_free (s.fel_digest);
+  gst_clear_buffer (&s.fel_copy);
+  if (require_fel)
+    ok = ok && s.seek_success && retained_ok && retained_fel_ok && !s.identity_errors &&
+        !s.pts_errors && !s.verified && s.residual_pending == s.frames &&
+        s.paired[0] && s.paired[1] && s.paired[0] == s.phase_frames[0] &&
+        s.paired[1] == s.phase_frames[1];
+  printf ("{\"paired_before_seek\":%u,\"paired_after_seek\":%u,"
+      "\"copied_fel_pixels_retained\":%s,", s.paired[0], s.paired[1],
+      retained_fel_ok ? "true" : "false");
+  printf ("\"pipeline_ok\":%s,\"frames\":%u,\"pictures\":%u,\"profile7\":%u,"
       "\"known_profile7_EL_config\":%u,\"unreconstructed\":%u,\"verified\":%u,"
       "\"width\":%u,\"height\":%u,\"aus\":%u,\"BL_AUs\":%u,\"RPU_AUs\":%u,"
       "\"EL_AUs\":%u,\"malformed_AUs\":%u,\"identity_errors\":%u,\"PTS_errors\":%u,"

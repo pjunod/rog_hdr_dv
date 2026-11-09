@@ -38,7 +38,8 @@ struct GstGtkDoviMapper {
   struct pl_color_space physical;
   float transport_gain;
   struct dv_provider387 *provider;
-  pl_tex source[4], output[4];
+  pl_tex source[4], enhancement[4], output[4];
+  gboolean requires_fel;
   int mapped;
   guint warned;
   guint target_strategy_witness;
@@ -54,6 +55,7 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
     pl_tex *mapped, struct pl_color_space *color)
 {
   GstGtkDoviMapper *s = priv;
+  if (s->requires_fel && !composed) return s->mapped = 0;
   guint strategy = 4; /* v1 runtime: complete named mapping */
   if (dv_provider387_map_v2) {
     s->mapped = dv_provider387_map_v2 (s->provider, gpu, rpu, size, composed,
@@ -72,6 +74,9 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
     s->target_strategy_witness = strategy + 1;
   }
   if (s->mapped != 1) return s->mapped;
+  if (s->requires_fel)
+    GST_LOG ("Profile 7 provider accepted composed %dx%d master",
+        master->params.w, master->params.h);
   if (s->transport_gain != 1.0f) {
     pl_fmt fmt = pl_find_fmt (gpu, PL_FMT_FLOAT, 4, 32, 0,
         PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_SAMPLEABLE | PL_FMT_CAP_HOST_READABLE);
@@ -113,6 +118,7 @@ void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
     pl_tex_destroy (s->vk->gpu, &s->transport);
     for (unsigned i = 0; i < 4; i++) {
       pl_tex_destroy (s->vk->gpu, &s->source[i]);
+      pl_tex_destroy (s->vk->gpu, &s->enhancement[i]);
       pl_tex_destroy (s->vk->gpu, &s->output[i]);
     }
     pl_vulkan_destroy (&s->vk);
@@ -145,7 +151,9 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
   }
   GstVideoFrame mapped = {0};
   AVFrame *src = av_frame_alloc (), *dst = av_frame_alloc ();
-  struct pl_frame source = {0}, destination = {0};
+  struct pl_frame source = {0}, enhancement = {0}, destination = {0};
+  const AVFrame *fel = gst_dovi_picture_meta_get_fel (meta);
+  gboolean el_uploaded = FALSE;
   gboolean uploaded = FALSE, success = FALSE;
   GstBuffer *result = NULL;
   if (!src || !dst || !gst_video_frame_map (&mapped, info, input, GST_MAP_READ)) goto done;
@@ -181,12 +189,17 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
     }
     guint profile = gst_dovi_picture_get_profile (meta->picture);
     const AVDOVIDecoderConfigurationRecord *config = gst_dovi_picture_get_stream_config (meta->picture);
-    apply_dovi = gst_dovi_picture_get_enhancement (meta->picture) == GST_DOVI_ENHANCEMENT_NOT_REQUIRED &&
-        geometry_ok && config && config->dv_version_major == 1 && config->dv_version_minor == 0 &&
-        config->dv_profile == profile && config->bl_present_flag && config->rpu_present_flag &&
-        !config->el_present_flag && config->dv_md_compression == AV_DOVI_COMPRESSION_NONE &&
+    GstDoviEnhancement residual = gst_dovi_picture_get_enhancement (meta->picture);
+    gboolean paired_fel = profile == 7 && config && config->el_present_flag &&
+        config->dv_bl_signal_compatibility_id == 6 &&
+        residual == GST_DOVI_ENHANCEMENT_UNRECONSTRUCTED && fel;
+    gboolean single_layer = config && !config->el_present_flag &&
+        residual == GST_DOVI_ENHANCEMENT_NOT_REQUIRED &&
         ((profile == 5 && config->dv_bl_signal_compatibility_id == 0) ||
          (profile == 8 && config->dv_bl_signal_compatibility_id == 1));
+    apply_dovi = (paired_fel || single_layer) && geometry_ok && config && config->dv_version_major == 1 && config->dv_version_minor == 0 &&
+        config->dv_profile == profile && config->bl_present_flag && config->rpu_present_flag &&
+        config->dv_md_compression == AV_DOVI_COMPRESSION_NONE;
     if (!apply_dovi) decline (s, 2, "per-picture metadata/geometry/enhancement unqualified; baseline conversion");
   }
   if (apply_dovi && (!isfinite (t->max_nits) || !isfinite (t->min_nits) ||
@@ -275,6 +288,19 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
   struct pl_dovi_metadata dovi;
   if (apply_dovi) {
     pl_map_avdovi_metadata (&source.color, &source.repr, &dovi, resolved);
+    if (fel) {
+      if (dovi.nlq_active && pl_map_avframe_ex (s->vk->gpu, &enhancement,
+          pl_avframe_params (.frame = fel, .tex = s->enhancement, .map_dovi = false))) {
+        el_uploaded = TRUE;
+        source.enhancement_layer = &enhancement;
+      } else {
+        apply_dovi = FALSE;
+        source = baseline;
+        decline (s, 256, "matched enhancement planes or NLQ unavailable");
+      }
+    }
+  }
+  if (apply_dovi) {
     gsize raw_size;
     source.dovi_rpu = g_bytes_get_data (raw, &raw_size);
     source.dovi_rpu_size = raw_size;
@@ -304,6 +330,7 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
     params.dovi_map = provider_map; params.dovi_priv = s;
     params.dovi_signature = t->generation;
   }
+  s->requires_fel = apply_dovi && fel;
   s->mapped = 0;
   if (!pl_render_image (s->renderer, &source, &destination, &params)) goto done;
   if (apply_dovi && s->mapped == 0) {
@@ -330,6 +357,7 @@ int gst_gtk_dovi_mapper_render (GstGtkDoviMapper *s, GstBuffer *input,
   gst_buffer_copy_into (result, input, GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS, 0, -1);
   *output = result; result = NULL; success = TRUE;
 done:
+  if (el_uploaded) pl_unmap_avframe (s->vk->gpu, &enhancement);
   if (uploaded) pl_unmap_avframe (s->vk->gpu, &source);
   if (mapped.buffer) gst_video_frame_unmap (&mapped);
   gst_clear_buffer (&result); av_frame_free (&src); av_frame_free (&dst);

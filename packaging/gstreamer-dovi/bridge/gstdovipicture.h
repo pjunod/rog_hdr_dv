@@ -89,5 +89,21 @@ GST_DOVI_API const GstMetaInfo *gst_dovi_picture_meta_get_info (void);
 #define gst_buffer_get_dovi_picture_meta(b) ((GstDoviPictureMeta *) gst_buffer_get_meta ((b), GST_DOVI_PICTURE_META_API_TYPE))
 GST_DOVI_API GstDoviPictureMeta *gst_buffer_add_dovi_picture_meta (GstBuffer *buffer,
     GstDoviPicture *picture);
+/* Serialized on the producer decoder stream lock. Submit the exact encoded
+ * AU and resolved base picture together in decode order. Reset at a gap,
+ * discontinuity, stream/configuration change, flush or failed decode.
+ * Drain before the base decoder outputs its delayed pictures at EOS. */
+typedef struct _GstDoviFelDecoder GstDoviFelDecoder;
+GST_DOVI_API GstDoviFelDecoder *gst_dovi_fel_decoder_new (void);
+GST_DOVI_API void gst_dovi_fel_decoder_free (GstDoviFelDecoder *decoder);
+GST_DOVI_API void gst_dovi_fel_decoder_reset (GstDoviFelDecoder *decoder);
+GST_DOVI_API void gst_dovi_fel_decoder_submit (GstDoviFelDecoder *decoder,
+    GstBuffer *au, const GstVideoCodecState *state, GstDoviPicture *picture);
+GST_DOVI_API void gst_dovi_fel_decoder_drain (GstDoviFelDecoder *decoder);
+GST_DOVI_API GstDoviPictureMeta *gst_dovi_fel_decoder_add_picture_meta (
+    GstDoviFelDecoder *decoder, GstBuffer *buffer, GstDoviPicture *picture);
+/* Borrowed read-only decoded EL planes, owned by this exact meta. A matched
+ * layer remains unreconstructed until the renderer samples it. */
+GST_DOVI_API const AVFrame *gst_dovi_picture_meta_get_fel (const GstDoviPictureMeta *meta);
 G_END_DECLS
 #endif
