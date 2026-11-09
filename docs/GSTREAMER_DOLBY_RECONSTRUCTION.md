@@ -1,6 +1,6 @@
 # GStreamer resolved Dolby pictures
 
-**Updated November 8, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The staged GNOME consumers also graded a paused Profile 5 picture with embedded text and restored the original image after a display-target round trip. Profile 7 enhancement-layer composition is qualified separately in mpv. The producer evidence below covers metadata ownership, configuration changes and conformance geometry. [GNOME playback results](../evidence/gnome-embedded-dolby-subtitles.json) · [Current installation status](STATUS.md).
+**Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. Normal candidate package builds and deployment remain separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
 
 ## Normal GNOME playback
 
@@ -45,13 +45,17 @@ reordering. Its snapshot is attached only after output geometry is validated.
 An RPU gap emits no snapshot. Neither constructor claims verified FEL residual
 participation; consumers must decline an unreconstructed residual.
 
-## Profile 7 enhancement layer candidate
+## Profile 7 native source and digital qualification
 
-The [NVIDIA producer patch](../wip/gstreamer-fel/0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch) applies after the four published patches. Its local bridge and GTK mapper changes target progressive, single-track Profile 7 with a half-resolution Main10 enhancement layer and compatibility ID 6. The package registry still identifies the qualified four-patch source.
+The active [NVIDIA producer patch](../patches/ubuntu-gst-plugins-bad-rpu/0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch) follows the four existing patches. The bridge and GTK mapper support progressive, single-track Profile 7 with a half-resolution Main10 enhancement layer and compatibility ID 6. The full Ubuntu source import reproduces the pinned base and preceding four-patch tree. [Source pins](../sources.json) identify all five patches and the complete resulting source tree; they do not advertise the local import commit as a fetchable upstream revision.
 
-The decoder sends each extracted enhancement AU with a reference to the exact resolved base picture. FFmpeg returns that reference through picture reordering. The producer retains decoded planes on the output buffer and full-buffer copies. Flush, discontinuity and configuration changes release pending references. Default file playback reserves one 16-picture HEVC reorder window and drains the secondary decoder at EOS. An explicit NVIDIA display-delay setting or live input retains the requested latency.
+The decoder sends each extracted enhancement AU with a reference to the exact resolved base picture. FFmpeg returns that reference through picture reordering. The producer retains decoded planes on the output buffer and full-buffer copies, while still reporting the residual as unreconstructed. Flush, discontinuity and configuration changes release pending references. Default file playback reserves one 16-picture HEVC reorder window and drains the secondary decoder at EOS. An explicit NVIDIA display-delay setting or live input retains the requested latency.
 
-The GTK mapper uploads both layers. The renderer must report completed residual composition before the mapping provider can grade the picture. An absent enhancement frame yields the ordinary base interpretation. The earlier independent decode probe observed matching presentation times before and after a seek. Native pair counts, pixel contribution, baseline controls, paused-frame retention and normal package playback still require verification.
+Ordinary decodebin selected the candidate NVIDIA decoder and paired all 70 pictures before and all 70 after a flushing seek. Full-buffer copies retained their decoded enhancement pixels. Direct bridge controls preserved all 70 per-picture pixel hashes with duplicate or absent presentation timestamps. A missing enhancement AU and an invalid enhancement NAL header each left the affected picture unpaired. Resetting with ten pending pictures produced no stale pairs, and replay restored all 70 expected hashes.
+
+The actual GTK path uploaded both layers, and the provider accepted a composed 3840×2160 master at a declared 616 cd/m² destination. At the same one-second picture, a flush seek preserved both the RGBA64 output and the independent ten-bit PQ compositor capture byte for byte. The missing-EL control retained all 70 original coded base pictures, RPU bytes and timestamps; only enhancement NALs were removed. It reached ordinary base conversion without provider mapping. FEL and missing-EL output differed across 2,667,662 of 2,764,800 visible channel samples. Profile 5 still mapped without an enhancement layer, and SDR selected no Dolby mapping. [Aggregate digital receipt and limitations](../evidence/gstreamer-native-fel-20261109.json).
+
+These runs used private process overlays and an owned GPU-backed virtual monitor, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. The bridge, core and mapper passed their normal Meson build entry points. Candidate Ubuntu package builds, coherent sink/Showtime dependency updates and installation remain open; the installed 45-package release is unchanged.
 
 ## Which geometry reaches the mapper
 

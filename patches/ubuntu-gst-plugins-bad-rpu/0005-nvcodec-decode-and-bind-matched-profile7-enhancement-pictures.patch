@@ -1,6 +1,61 @@
+diff --git a/debian/changelog b/debian/changelog
+index 35ea7042c8305ffdfc926213bb2351126e358223..a04eaf99aac21d2345ff5afad593d9df94ff459b 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,9 @@
++gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv3) UNRELEASED; urgency=medium
++
++  * Decode and retain matched half-resolution Profile 7 enhancement pictures.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Mon, 09 Nov 2026 12:00:00 +0000
++
+ gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv2) stonking; urgency=medium
+ 
+   * Add picture-owned strict Dolby metadata on the normal NVIDIA HEVC decoder.
+diff --git a/debian/control b/debian/control
+index 1d6ca01ad6c08412e673627569ff430c8dc450f0..e11b6ebade84c7f93814aa138ac6864ba4918416 100644
+--- a/debian/control
++++ b/debian/control
+@@ -5,7 +5,7 @@ XSBC-Original-Maintainer: Maintainers of GStreamer packages <gst-plugins-bad1.0@
+ Uploaders: Sebastian Dröge <slomo@debian.org>,
+            Sjoerd Simons <sjoerd@debian.org>,
+            Marc Leeman <marc.leeman@gmail.com>,
+-Build-Depends: libgstdovipicture-1.0-dev (>= 0.2.0+rogdv1),
++Build-Depends: libgstdovipicture-1.0-dev (>= 0.2.0+rogdv2),
+                rog-dv-hevc-runtime (>= 2), rog-gstreamer-dovi-base-api (= 1), debhelper-compat (= 13),
+                dh-sequence-gir,
+                flite-dev,
+@@ -147,7 +147,7 @@ Package: gstreamer1.0-plugins-bad
+ Architecture: any
+ Multi-Arch: same
+ Depends: rog-dv-hevc-runtime (>= 2),
+-         libgstdovipicture-1.0-0 (>= 0.2.0+rogdv1),
++         libgstdovipicture-1.0-0 (>= 0.2.0+rogdv2),
+          rog-gstreamer-dovi-base-api (= 1), gstreamer1.0-plugins-base (>= 1.28.0),
+          gstreamer1.0-plugins-good (>= 1.28.0-1ubuntu3),
+          libgstreamer-plugins-bad1.0-0 (= ${binary:Version}),
+diff --git a/sys/nvcodec/gstnvdecoder.cpp b/sys/nvcodec/gstnvdecoder.cpp
+index 7706cf677e07a34a3f5bf044d2528448f9b17fd1..6f1eed6c5d39fc89c96142db2649646751adb1ff 100644
+--- a/sys/nvcodec/gstnvdecoder.cpp
++++ b/sys/nvcodec/gstnvdecoder.cpp
+@@ -2069,7 +2069,11 @@ gst_nv_decoder_negotiate (GstNvDecoder * decoder,
+   {
+     AVDOVIDecoderConfigurationRecord config;
+     GBytes *bytes = nullptr;
+-    gst_dovi_caps_get_stream_config (input_state->caps, &config, &bytes);
++    if (gst_dovi_caps_get_stream_config (input_state->caps, &config, &bytes) &&
++        config.dv_profile == 7 && config.el_present_flag &&
++        gst_structure_has_name (gst_caps_get_structure (input_state->caps, 0),
++            "video/x-h265"))
++      gst_caps_set_simple (state->caps, "dovi-fel-decoder", G_TYPE_BOOLEAN, TRUE, nullptr);
+     gst_dovi_caps_apply_stream_config (state->caps, bytes);
+     g_clear_pointer (&bytes, g_bytes_unref);
+   }
+diff --git a/sys/nvcodec/gstnvh265dec.cpp b/sys/nvcodec/gstnvh265dec.cpp
+index 3753b91934772f3a57697d302e2b69e61bea83fc..78c33c1885b829d240f89146e6444322d58aa0f3 100644
 --- a/sys/nvcodec/gstnvh265dec.cpp
 +++ b/sys/nvcodec/gstnvh265dec.cpp
-@@ -130,6 +130,7 @@
+@@ -130,6 +130,7 @@ typedef struct _GstNvH265Dec
  
    GstNvDecoder *decoder;
    GstDoviResolver *dovi_resolver;
@@ -8,7 +63,7 @@
    guint64 dovi_generation;
    gboolean dovi_config_ready, dovi_new_stream;
    guint crop_x, crop_y;
-@@ -222,6 +223,7 @@
+@@ -222,6 +223,7 @@ dovi_snapshot_free (gpointer data)
  static void
  dovi_reset (GstNvH265Dec *self)
  {
@@ -16,7 +71,7 @@
    if (self->dovi_resolver)
      gst_dovi_resolver_reset (self->dovi_resolver);
    self->dovi_generation++;
-@@ -292,6 +294,20 @@
+@@ -292,6 +294,20 @@ dovi_sink_event (GstVideoDecoder *decoder, GstEvent *event)
    return !parent->sink_event || parent->sink_event (decoder, event);
  }
  
@@ -37,7 +92,7 @@
  static gboolean
  dovi_stop (GstVideoDecoder *decoder)
  {
-@@ -444,6 +460,8 @@
+@@ -444,6 +460,8 @@ gst_nv_h265_dec_class_init (GstNvH265DecClass * klass,
    decoder_class->close = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_close);
    decoder_class->start = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_start);
    decoder_class->flush = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_flush);
@@ -46,7 +101,7 @@
    decoder_class->stop = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_stop);
    decoder_class->negotiate = GST_DEBUG_FUNCPTR (gst_nv_h265_dec_negotiate);
    decoder_class->decide_allocation =
-@@ -483,6 +501,7 @@
+@@ -483,6 +501,7 @@ gst_nv_h265_dec_init (GstNvH265Dec * self)
    GstNvH265DecClass *klass = GST_NV_H265_DEC_GET_CLASS (self);
  
    self->dovi_resolver = gst_dovi_resolver_new ();
@@ -54,7 +109,7 @@
    self->decoder =
        gst_nv_decoder_new (klass->cuda_device_id, klass->adapter_luid);
  
-@@ -495,6 +514,7 @@
+@@ -495,6 +514,7 @@ gst_nv_h265_dec_finalize (GObject * object)
  {
    GstNvH265Dec *self = GST_NV_H265_DEC (object);
  
@@ -62,7 +117,7 @@
    g_clear_pointer (&self->dovi_resolver, gst_dovi_resolver_free);
    gst_object_unref (self->decoder);
  
-@@ -901,7 +921,8 @@
+@@ -901,7 +921,8 @@ dovi_output_picture (GstVideoDecoder *decoder, GstVideoCodecFrame *frame,
        (!video || (video->width == g->width && video->height == g->height)) &&
        (!crop || (!crop->x && !crop->y && crop->width == g->width &&
            crop->height == g->height)))
@@ -72,7 +127,7 @@
  }
  
  static GstFlowReturn
-@@ -1152,6 +1173,7 @@
+@@ -1152,6 +1173,7 @@ gst_nv_h265_dec_start_picture (GstH265Decoder * decoder,
      if (extracted < 0 || (frame &&
              GST_BUFFER_FLAG_IS_SET (frame->input_buffer, GST_BUFFER_FLAG_DISCONT)))
        dovi_reset (self);
@@ -80,7 +135,7 @@
      if (extracted > 0 && self->dovi_resolver) {
        GstDoviGeometry geometry = { (guint) sps->width, (guint) sps->height, 0, 0,
          (guint) sps->width, (guint) sps->height };
-@@ -1168,6 +1190,7 @@
+@@ -1168,6 +1190,7 @@ gst_nv_h265_dec_start_picture (GstH265Decoder * decoder,
            !sps->vui_params.default_display_window_flag) {
          GstNvDoviSnapshot *snapshot = g_new0 (GstNvDoviSnapshot, 1);
          snapshot->picture = resolved;
@@ -88,7 +143,7 @@
          snapshot->generation = self->dovi_generation;
          gst_mini_object_set_qdata (GST_MINI_OBJECT (picture),
              dovi_snapshot_quark (), snapshot, dovi_snapshot_free);
-@@ -1175,6 +1198,11 @@
+@@ -1175,6 +1198,11 @@ gst_nv_h265_dec_start_picture (GstH265Decoder * decoder,
          gst_dovi_picture_unref (resolved);
        }
      }
@@ -100,7 +155,7 @@
      g_clear_pointer (&rpu, g_bytes_unref);
      if (frame)
        gst_video_codec_frame_unref (frame);
-@@ -1416,7 +1444,16 @@
+@@ -1416,7 +1444,16 @@ gst_nv_h265_dec_get_preferred_output_delay (GstH265Decoder * decoder,
    if (live)
      return 0;
  
@@ -118,47 +173,3 @@
  }
  
  void
---- a/sys/nvcodec/gstnvdecoder.cpp
-+++ b/sys/nvcodec/gstnvdecoder.cpp
-@@ -2069,7 +2069,11 @@
-   {
-     AVDOVIDecoderConfigurationRecord config;
-     GBytes *bytes = nullptr;
--    gst_dovi_caps_get_stream_config (input_state->caps, &config, &bytes);
-+    if (gst_dovi_caps_get_stream_config (input_state->caps, &config, &bytes) &&
-+        config.dv_profile == 7 && config.el_present_flag &&
-+        gst_structure_has_name (gst_caps_get_structure (input_state->caps, 0),
-+            "video/x-h265"))
-+      gst_caps_set_simple (state->caps, "dovi-fel-decoder", G_TYPE_BOOLEAN, TRUE, nullptr);
-     gst_dovi_caps_apply_stream_config (state->caps, bytes);
-     g_clear_pointer (&bytes, g_bytes_unref);
-   }
---- a/debian/control
-+++ b/debian/control
-@@ -8,4 +8,4 @@
--Build-Depends: libgstdovipicture-1.0-dev (>= 0.2.0+rogdv1),
-+Build-Depends: libgstdovipicture-1.0-dev (>= 0.2.0+rogdv2),
-                rog-dv-hevc-runtime (>= 2), rog-gstreamer-dovi-base-api (= 1), debhelper-compat (= 13),
-                dh-sequence-gir,
-                flite-dev,
-@@ -148,7 +148,7 @@
- Architecture: any
- Multi-Arch: same
- Depends: rog-dv-hevc-runtime (>= 2),
--         libgstdovipicture-1.0-0 (>= 0.2.0+rogdv1),
-+         libgstdovipicture-1.0-0 (>= 0.2.0+rogdv2),
-          rog-gstreamer-dovi-base-api (= 1), gstreamer1.0-plugins-base (>= 1.28.0),
-          gstreamer1.0-plugins-good (>= 1.28.0-1ubuntu3),
-          libgstreamer-plugins-bad1.0-0 (= ${binary:Version}),
---- a/debian/changelog
-+++ b/debian/changelog
-@@ -1,3 +1,9 @@
-+gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv3~fel1) UNRELEASED; urgency=medium
-+
-+  * Decode and retain matched half-resolution Profile 7 enhancement pictures.
-+
-+ -- ROG HDR contributors <rog-hdr@invalid>  Mon, 09 Nov 2026 12:00:00 +0000
-+
- gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv2) stonking; urgency=medium
- 
-   * Add picture-owned strict Dolby metadata on the normal NVIDIA HEVC decoder.
