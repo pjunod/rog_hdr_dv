@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-09",
+  "scope": "Software colour conversion and private compositor readback",
+  "loader": {
+    "source": "Native macOS CoreGraphics Display P3 to extended linear Rec.2020 numerical reference",
+    "patches": 16,
+    "channels": 48,
+    "mean_absolute_linear_channel_error": 0.00012436,
+    "max_absolute_linear_channel_error": 0.0004883,
+    "negative_and_above_one_components_preserved": true,
+    "installed_loader_matches_staged": true
+  },
+  "compositor": {
+    "application": "Staged Loupe using the reviewed image-colour package source",
+    "compositor": "Private headless Mutter",
+    "target_peak_cd_m2": 616,
+    "monitor_size": [
+      1280,
+      800
+    ],
+    "capture": "XR30 BT.2020 SMPTE ST 2084",
+    "reference": "Float32 TIFF with linear Rec.2020 ICC containing the native macOS numerical reference",
+    "patches": 16,
+    "sample_region_per_patch": [
+      32,
+      32
+    ],
+    "sampled_channels": 49152,
+    "maximum_absolute_pq10_code_error": 1,
+    "mean_absolute_pq10_code_error": 0.041666666666666664
+  },
+  "controls": [
+    "The float TIFF preserves the extended reference components; a PNG reference clipped them and produced a misleading 17-code saturated-red discrepancy.",
+    "The installed Loupe AppArmor profile rejected the isolated Wayland socket, so compositor readback uses the staged executable.",
+    "The comparison samples patch interiors with identical layout and excludes interface pixels."
+  ],
+  "acceptance_limits": [
+    "Physical panel output is unmeasured.",
+    "The image-loader comparison covers installed software; the Loupe compositor comparison covers a private staged executable.",
+    "These synthetic patches do not establish accuracy for all image formats and colours."
+  ]
+}

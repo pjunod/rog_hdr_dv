@@ -1,6 +1,8 @@
 # GNOME image colour — preserve tagged photographs through the desktop
 
-**November 8, 2026.** The staged Loupe and Glycin packages preserve wide-gamut color in the ordinary GNOME Image Viewer and retain embedded color profiles in small TIFFs. On the ROG’s isolated HDR display, six Adobe RGB patches matched an independent BT.2020 reference within one 10-bit code value per channel. The normal distribution compositor reproduced the same values. The ROG desktop still runs the earlier packages. Optical calibration remains open.
+**November 9, 2026.** The reviewed Loupe and Glycin packages are installed. The installed loader preserved 16 Display P3 colours against native macOS CoreGraphics, with maximum absolute linear-channel error 0.0004883 and mean 0.00012436. A private Mutter comparison of staged Loupe against the unclipped float reference matched within one ten-bit PQ code across 49,152 channel samples. The installed Loupe AppArmor profile rejected the private test socket, so this compositor result uses the staged executable. [Method and controls](../evidence/display-p3-macos-software-comparison.json).
+
+The prior six Adobe RGB patches matched an independent BT.2020 reference within one ten-bit code per channel. Embedded profiles survived in small TIFFs. Physical panel accuracy remains unmeasured.
 
 This document covers the image viewer, its Ubuntu source packages and recovery. [Software delivery](SOFTWARE_DELIVERY.md) · [GTK display targets](GDK_DISPLAY_TARGET.md).
 
