@@ -18,6 +18,7 @@
 #include <libplacebo/utils/libav.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
+#include <gst/video/gstvideopool.h>
 #include <math.h>
 GST_DEBUG_CATEGORY (gtk_dovi_map_debug);
 void gst_gtk_dovi_debug_init (void) {
@@ -40,6 +41,8 @@ struct GstGtkDoviMapper {
   struct dv_provider387 *provider;
   pl_tex source[4], enhancement[4], output[4], sdr_output[4];
   gboolean has_destination, last_sdr_destination;
+  GstBufferPool *output_pool;
+  GstVideoInfo pool_info;
   gboolean requires_fel;
   int mapped;
   guint warned;
@@ -109,9 +112,66 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
   return s->mapped;
 }
 GstGtkDoviMapper *gst_gtk_dovi_mapper_new (void) { gst_gtk_dovi_debug_init (); return g_new0 (GstGtkDoviMapper, 1); }
+static void clear_output_pool (GstGtkDoviMapper *s)
+{
+  if (!s->output_pool) return;
+  /* Outstanding buffers keep the retired pool alive until their final unref. */
+  gst_buffer_pool_set_active (s->output_pool, FALSE);
+  gst_clear_object (&s->output_pool);
+  gst_video_info_init (&s->pool_info);
+}
+static gboolean same_output_layout (const GstVideoInfo *a, const GstVideoInfo *b)
+{
+  if (!gst_video_info_is_equal (a, b) || a->size != b->size) return FALSE;
+  for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (a); i++)
+    if (a->offset[i] != b->offset[i] || a->stride[i] != b->stride[i]) return FALSE;
+  return TRUE;
+}
+static GstBuffer *acquire_output_buffer (GstGtkDoviMapper *s, const GstVideoInfo *info)
+{
+  if (info->size > G_MAXUINT) return NULL;
+  if (s->output_pool && !same_output_layout (&s->pool_info, info))
+    clear_output_pool (s);
+  if (!s->output_pool) {
+    GstCaps *caps = gst_video_info_to_caps (info);
+    if (!caps) return NULL;
+    GstBufferPool *pool = gst_video_buffer_pool_new ();
+    GstStructure *config = gst_buffer_pool_get_config (pool);
+    /* No maximum: a held consumer buffer must never stall the view thread.
+     * This pool owns one output layout and grows only with outstanding refs. */
+    gst_buffer_pool_config_set_params (config, caps, info->size, 2, 0);
+    gst_caps_unref (caps);
+    if (!gst_buffer_pool_set_config (pool, config) ||
+        !gst_buffer_pool_set_active (pool, TRUE)) {
+      gst_object_unref (pool);
+      return NULL;
+    }
+    s->output_pool = pool;
+    s->pool_info = *info;
+  }
+  GstBuffer *buffer = NULL;
+  if (gst_buffer_pool_acquire_buffer (s->output_pool, &buffer, NULL) != GST_FLOW_OK)
+    return NULL;
+  /* Caps do not describe custom strides. Keep the pool's inferred VideoMeta
+   * disabled and publish the exact negotiated layout on each acquired buffer.
+   * Normal pool reset removes this and the picture's other transient metas. */
+  gsize offsets[GST_VIDEO_MAX_PLANES] = {0};
+  gint strides[GST_VIDEO_MAX_PLANES] = {0};
+  for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (info); i++) {
+    offsets[i] = info->offset[i]; strides[i] = info->stride[i];
+  }
+  if (!gst_buffer_add_video_meta_full (buffer, GST_VIDEO_FRAME_FLAG_NONE,
+          GST_VIDEO_INFO_FORMAT (info), GST_VIDEO_INFO_WIDTH (info),
+          GST_VIDEO_INFO_HEIGHT (info), GST_VIDEO_INFO_N_PLANES (info), offsets, strides)) {
+    gst_buffer_unref (buffer);
+    return NULL;
+  }
+  return buffer;
+}
 void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
 {
   if (!s) return;
+  clear_output_pool (s);
   if (s->vk) {
     dv_provider387_destroy (&s->provider);
     pl_renderer_destroy (&s->renderer);
@@ -151,12 +211,12 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   if (format == AV_PIX_FMT_NONE || GST_VIDEO_INFO_FORMAT (output_info) != (sdr ? GST_VIDEO_FORMAT_RGBA : GST_VIDEO_FORMAT_RGBA64_LE)) {
     g_set_error_literal (error, mapper_error (), 1, "Unsupported native plane import"); return -1;
   }
-  GstVideoFrame mapped = {0};
+  GstVideoFrame mapped = {0}, out = {0};
   AVFrame *src = av_frame_alloc (), *dst = av_frame_alloc (), *converted = NULL;
   struct pl_frame source = {0}, enhancement = {0}, destination = {0};
   const AVFrame *fel = gst_dovi_picture_meta_get_fel (meta);
   gboolean el_uploaded = FALSE;
-  gboolean uploaded = FALSE, success = FALSE;
+  gboolean uploaded = FALSE, success = FALSE, output_mapped = FALSE;
   GstBuffer *result = NULL;
   if (!src || !dst || !gst_video_frame_map (&mapped, info, input, GST_MAP_READ)) goto done;
   guint storage_width = GST_VIDEO_FRAME_WIDTH (&mapped), storage_height = GST_VIDEO_FRAME_HEIGHT (&mapped);
@@ -313,8 +373,21 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   dst->color_range = output_info->colorimetry.range == GST_VIDEO_COLOR_RANGE_0_255 ? AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
   dst->colorspace = AVCOL_SPC_RGB;
   dst->color_primaries = AVCOL_PRI_BT2020; dst->color_trc = AVCOL_TRC_SMPTE2084;
-  if (av_frame_get_buffer (dst, 32) < 0 ||
-      !pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
+  if (sdr) {
+    /* The intermediate remains PQ16. Its layout must never borrow the final
+     * eight-bit SDR pool, whose authoritative output_info is different. */
+    if (av_frame_get_buffer (dst, 32) < 0) goto done;
+  } else {
+    result = acquire_output_buffer (s, output_info);
+    if (!result || !gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) goto done;
+    output_mapped = TRUE;
+    /* Borrow the owned output memory; dst has no AVBufferRefs to free it. */
+    for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (output_info); i++) {
+      dst->data[i] = GST_VIDEO_FRAME_PLANE_DATA (&out, i);
+      dst->linesize[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
+    }
+  }
+  if (!pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
   for (int i = 0; i < destination.num_planes; i++) {
     const float zero[4] = {0}; pl_tex_clear (s->vk->gpu, destination.planes[i].texture, zero);
   }
@@ -346,8 +419,6 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     if (!pl_render_image (s->renderer, &baseline, &destination, &params)) goto done;
   }
   if (s->mapped < 0) goto done;
-  AVFrame *final = dst;
-  enum AVPixelFormat output_format = AV_PIX_FMT_RGBA64LE;
   if (sdr) {
     converted = av_frame_alloc ();
     if (!converted) goto done;
@@ -357,8 +428,14 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     converted->color_primaries = AVCOL_PRI_BT709;
     converted->color_trc = AVCOL_TRC_IEC61966_2_1;
     struct pl_frame sdr_destination = {0};
-    if (av_frame_get_buffer (converted, 32) < 0 ||
-        !pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
+    result = acquire_output_buffer (s, output_info);
+    if (!result || !gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) goto done;
+    output_mapped = TRUE;
+    for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (output_info); i++) {
+      converted->data[i] = GST_VIDEO_FRAME_PLANE_DATA (&out, i);
+      converted->linesize[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
+    }
+    if (!pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
             s->sdr_output, converted)) goto done;
     pl_shader sh = pl_dispatch_begin (s->dispatch);
     if (!pl_shader_sample_direct (sh,
@@ -385,22 +462,16 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     if (!pl_dispatch_finish (s->dispatch, pl_dispatch_params (
         .shader = &sh, .target = sdr_destination.planes[0].texture)) ||
         !pl_download_avframe (s->vk->gpu, &sdr_destination, converted)) goto done;
-    final = converted; output_format = AV_PIX_FMT_RGBA;
   } else if (!pl_download_avframe (s->vk->gpu, &destination, dst)) goto done;
-  result = gst_buffer_new_allocate (NULL, output_info->size, NULL);
-  GstVideoFrame out = {0};
-  if (!result || !gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) goto done;
-  uint8_t *out_planes[4] = {0}; int out_strides[4] = {0};
-  for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (output_info); i++) {
-    out_planes[i] = GST_VIDEO_FRAME_PLANE_DATA (&out, i);
-    out_strides[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
-  }
-  av_image_copy (out_planes, out_strides, (const uint8_t **) final->data,
-      final->linesize, output_format, final->width, final->height);
-  gst_video_frame_unmap (&out);
+  /* Download blocks until the borrowed output write is complete. */
+  gst_video_frame_unmap (&out); output_mapped = FALSE;
+
   gst_buffer_copy_into (result, input, GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS, 0, -1);
+  /* Source allocator tracking must not make the pool discard unchanged memory. */
+  GST_BUFFER_FLAG_UNSET (result, GST_BUFFER_FLAG_TAG_MEMORY);
   *output = result; result = NULL; success = TRUE;
 done:
+  if (output_mapped) gst_video_frame_unmap (&out);
   if (el_uploaded) pl_unmap_avframe (s->vk->gpu, &enhancement);
   if (uploaded) pl_unmap_avframe (s->vk->gpu, &source);
   if (mapped.buffer) gst_video_frame_unmap (&mapped);
