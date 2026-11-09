@@ -259,6 +259,18 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
 {
   GtkDoviMap *s = (GtkDoviMap *) base;
   gboolean sdr = s->destination_kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
+  if (s->require_clear_source) {
+    g_mutex_lock (&s->lock);
+    if (!s->stream_id) {
+      GstEvent *start = gst_pad_get_sticky_event (GST_BASE_TRANSFORM_SINK_PAD (base), GST_EVENT_STREAM_START, 0);
+      if (start) {
+        const gchar *id = NULL; gst_event_parse_stream_start (start, &id);
+        s->stream_id = g_strdup (id); gst_event_unref (start);
+        select_source_locked (s);
+      }
+    }
+    g_mutex_unlock (&s->lock);
+  }
   guint profile = 0;
   for (guint i = 0; i < gst_caps_get_size (input) && !profile; i++)
     if (qualified_structure (s, gst_caps_get_structure (input, i)))
