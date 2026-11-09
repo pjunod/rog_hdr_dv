@@ -20,6 +20,7 @@
 #include <libavutil/pixdesc.h>
 #include <gst/video/gstvideopool.h>
 #include <math.h>
+#include <string.h>
 GST_DEBUG_CATEGORY (gtk_dovi_map_debug);
 void gst_gtk_dovi_debug_init (void) {
   static gsize initialized;
@@ -127,9 +128,47 @@ static gboolean same_output_layout (const GstVideoInfo *a, const GstVideoInfo *b
     if (a->offset[i] != b->offset[i] || a->stride[i] != b->stride[i]) return FALSE;
   return TRUE;
 }
+static gboolean valid_output_span (const GstVideoInfo *info)
+{
+  /* The supported outputs are packed RGBA; custom padding and bottom-up rows
+   * are valid, but every active byte must remain inside the owned buffer. */
+  gint width = GST_VIDEO_INFO_WIDTH (info), height = GST_VIDEO_INFO_HEIGHT (info);
+  if (width <= 0 || height <= 0 || GST_VIDEO_INFO_N_PLANES (info) != 1 ||
+      !info->size || info->size > G_MAXUINT) return FALSE;
+  guint pixel_stride = GST_VIDEO_INFO_COMP_PSTRIDE (info, 0);
+  if (!pixel_stride || (gsize) width > G_MAXSIZE / pixel_stride) return FALSE;
+  gsize row_bytes = (gsize) width * pixel_stride;
+  gint64 stride = info->stride[0];
+  guint64 step = stride < 0 ? -stride : stride;
+  gsize rows = height - 1;
+  if ((rows && step < row_bytes) || (rows && step > G_MAXSIZE / rows)) return FALSE;
+  gsize span = rows * step, offset = info->offset[0];
+  if (offset > info->size || row_bytes > info->size - offset) return FALSE;
+  if (stride < 0) return span <= offset;
+  return span <= info->size - offset - row_bytes;
+}
+static gboolean download_row_pitch_ok (gint stride, gsize texel_align, gsize row_bytes)
+{
+  /* libplacebo's transfer API consumes an unsigned, texel-aligned row pitch. */
+  return stride > 0 && (gsize) stride >= row_bytes && texel_align &&
+      (gsize) stride % texel_align == 0;
+}
+static gboolean direct_output_layout (const GstVideoFrame *out,
+    const struct pl_frame *destination)
+{
+  if ((guint) destination->num_planes != GST_VIDEO_FRAME_N_PLANES (out)) return FALSE;
+  for (guint i = 0; i < GST_VIDEO_FRAME_N_PLANES (out); i++) {
+    pl_tex tex = destination->planes[i].texture;
+    if (!tex || !tex->params.format ||
+        !download_row_pitch_ok (GST_VIDEO_FRAME_PLANE_STRIDE (out, i),
+            tex->params.format->texel_align, (gsize) GST_VIDEO_FRAME_WIDTH (out) *
+                GST_VIDEO_INFO_COMP_PSTRIDE (&out->info, 0))) return FALSE;
+  }
+  return TRUE;
+}
 static GstBuffer *acquire_output_buffer (GstGtkDoviMapper *s, const GstVideoInfo *info)
 {
-  if (info->size > G_MAXUINT) return NULL;
+  if (!valid_output_span (info)) return NULL;
   if (s->output_pool && !same_output_layout (&s->pool_info, info))
     clear_output_pool (s);
   if (!s->output_pool) {
@@ -216,7 +255,7 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   struct pl_frame source = {0}, enhancement = {0}, destination = {0};
   const AVFrame *fel = gst_dovi_picture_meta_get_fel (meta);
   gboolean el_uploaded = FALSE;
-  gboolean uploaded = FALSE, success = FALSE, output_mapped = FALSE;
+  gboolean uploaded = FALSE, success = FALSE, output_mapped = FALSE, direct_output = FALSE;
   GstBuffer *result = NULL;
   if (!src || !dst || !gst_video_frame_map (&mapped, info, input, GST_MAP_READ)) goto done;
   guint storage_width = GST_VIDEO_FRAME_WIDTH (&mapped), storage_height = GST_VIDEO_FRAME_HEIGHT (&mapped);
@@ -388,6 +427,19 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     }
   }
   if (!pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
+  direct_output = !sdr && direct_output_layout (&out, &destination);
+  if (!sdr && !direct_output) {
+    /* Keep valid bottom-up or GPU-incompatible custom rows on the existing
+     * canonical download-and-copy path. Never pass a signed pitch as size_t. */
+    memset (dst->data, 0, sizeof (dst->data));
+    memset (dst->linesize, 0, sizeof (dst->linesize));
+    if (av_frame_get_buffer (dst, 32) < 0 ||
+        !pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
+    for (guint i = 0; i < GST_VIDEO_FRAME_N_PLANES (&out); i++)
+      if (!download_row_pitch_ok (dst->linesize[i],
+              destination.planes[i].texture->params.format->texel_align, (gsize) dst->width *
+                  GST_VIDEO_INFO_COMP_PSTRIDE (output_info, 0))) goto done;
+  }
   for (int i = 0; i < destination.num_planes; i++) {
     const float zero[4] = {0}; pl_tex_clear (s->vk->gpu, destination.planes[i].texture, zero);
   }
@@ -437,6 +489,18 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     }
     if (!pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
             s->sdr_output, converted)) goto done;
+    direct_output = direct_output_layout (&out, &sdr_destination);
+    if (!direct_output) {
+      memset (converted->data, 0, sizeof (converted->data));
+      memset (converted->linesize, 0, sizeof (converted->linesize));
+      if (av_frame_get_buffer (converted, 32) < 0 ||
+          !pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
+              s->sdr_output, converted)) goto done;
+      for (guint i = 0; i < GST_VIDEO_FRAME_N_PLANES (&out); i++)
+        if (!download_row_pitch_ok (converted->linesize[i],
+                sdr_destination.planes[i].texture->params.format->texel_align,
+                (gsize) converted->width * GST_VIDEO_INFO_COMP_PSTRIDE (output_info, 0))) goto done;
+    }
     pl_shader sh = pl_dispatch_begin (s->dispatch);
     if (!pl_shader_sample_direct (sh,
         pl_sample_src (.tex = destination.planes[0].texture))) {
@@ -464,11 +528,22 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
         !pl_download_avframe (s->vk->gpu, &sdr_destination, converted)) goto done;
   } else if (!pl_download_avframe (s->vk->gpu, &destination, dst)) goto done;
   /* Download blocks until the borrowed output write is complete. */
+  if (!direct_output) {
+    AVFrame *final = sdr ? converted : dst;
+    uint8_t *planes[GST_VIDEO_MAX_PLANES] = {0};
+    int strides[GST_VIDEO_MAX_PLANES] = {0};
+    for (guint i = 0; i < GST_VIDEO_FRAME_N_PLANES (&out); i++) {
+      planes[i] = GST_VIDEO_FRAME_PLANE_DATA (&out, i);
+      strides[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
+    }
+    av_image_copy (planes, strides, (const uint8_t **) final->data, final->linesize,
+        (enum AVPixelFormat) final->format, final->width, final->height);
+  }
+
   gst_video_frame_unmap (&out); output_mapped = FALSE;
 
   gst_buffer_copy_into (result, input, GST_BUFFER_COPY_FLAGS | GST_BUFFER_COPY_TIMESTAMPS, 0, -1);
-  /* Source allocator tracking must not make the pool discard unchanged memory. */
-  GST_BUFFER_FLAG_UNSET (result, GST_BUFFER_FLAG_TAG_MEMORY);
+  /* GST_BUFFER_COPY_FLAGS preserves destination memory tracking itself. */
   *output = result; result = NULL; success = TRUE;
 done:
   if (output_mapped) gst_video_frame_unmap (&out);
