@@ -93,22 +93,56 @@ gboolean gst_gtk_dovi_target_from_context (const GstContext *context, GstGtkDovi
   gst_structure_get_double (st, "encoding-max-nits", &target->encoding_max_nits);
   return TRUE;
 }
-int gst_gtk_dovi_native_frame_render (GstGtkDoviNativeFrame *frame, GstGtkDoviMapper *mapper,
-    const GstContext *context, GstBuffer **output, GstVideoInfo *output_info, GError **error)
+int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
+    GstGtkDoviMapper *mapper, GstGtkDoviDestinationKind kind, const GstContext *context,
+    GstBuffer **output, GstVideoInfo *output_info, guint64 *epoch_out,
+    guint64 *picture_id_out, GError **error)
 {
-  GstGtkDoviTarget target;
+  GstGtkDoviTarget target = {0};
   *output = NULL;
-  if (!gst_gtk_dovi_target_from_context (context, &target) || !target.composed) return 0;
+  gst_video_info_init (output_info);
+  if (epoch_out) *epoch_out = 0;
+  if (picture_id_out) *picture_id_out = 0;
+  gboolean sdr = kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
+  if (!sdr && kind != GST_GTK_DOVI_DESTINATION_DISPLAY_PQ) {
+    g_set_error_literal (error, GST_CORE_ERROR, GST_CORE_ERROR_NEGOTIATION,
+        "Unknown native frame destination");
+    return -1;
+  }
+  if (!sdr && (!gst_gtk_dovi_target_from_context (context, &target) || !target.composed))
+    return 0;
+
+  /* Retained frames own the decoder input. A prior SDR presentation may have
+   * an eight-bit row layout, even when this redraw requests native HDR. */
+  GstVideoFormat format = sdr ? GST_VIDEO_FORMAT_RGBA : GST_VIDEO_FORMAT_RGBA64_LE;
   *output_info = frame->output_info;
-  int result = gst_gtk_dovi_mapper_render (mapper, frame->source,
-      &frame->input_info, &target, output, output_info, error);
+  if (GST_VIDEO_INFO_FORMAT (output_info) != format) {
+    GstCaps *caps = gst_video_info_to_caps (&frame->input_info);
+    if (!caps) return -1;
+    GstVideoColorimetry color = {GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB,
+        sdr ? GST_VIDEO_TRANSFER_SRGB : GST_VIDEO_TRANSFER_SMPTE2084,
+        sdr ? GST_VIDEO_COLOR_PRIMARIES_BT709 : GST_VIDEO_COLOR_PRIMARIES_BT2020};
+    gchar *encoded = gst_video_colorimetry_to_string (&color);
+    gst_structure_remove_field (gst_caps_get_structure (caps, 0), "chroma-site");
+    gst_caps_set_simple (caps, "format", G_TYPE_STRING, gst_video_format_to_string (format),
+        "colorimetry", G_TYPE_STRING, encoded, NULL);
+    g_free (encoded);
+    gboolean complete = gst_video_info_from_caps (output_info, caps);
+    gst_caps_unref (caps);
+    if (!complete) return -1;
+  }
+  int result = gst_gtk_dovi_mapper_render_destination (mapper, frame->source,
+      &frame->input_info, kind, &target, output, output_info, error);
   if (result > 0) {
     GstVideoOverlayCompositionMeta *overlay = gst_buffer_get_video_overlay_composition_meta (frame->source);
     if (overlay) gst_buffer_add_video_overlay_composition_meta (*output, overlay->overlay);
-    if (gst_debug_category_get_threshold (gtk_dovi_map_debug) >= GST_LEVEL_LOG) {
-      GstDoviPictureMeta *picture = gst_buffer_get_dovi_picture_meta (frame->source);
-      guint64 epoch = 0, id = 0;
-      if (picture && picture->picture) gst_dovi_picture_get_identity (picture->picture, &epoch, &id);
+    GstDoviPictureMeta *picture = gst_buffer_get_dovi_picture_meta (frame->source);
+    guint64 epoch = 0, id = 0;
+    if (picture && picture->picture)
+      gst_dovi_picture_get_identity (picture->picture, &epoch, &id);
+    if (epoch_out) *epoch_out = epoch;
+    if (picture_id_out) *picture_id_out = id;
+    if (!sdr && gst_debug_category_get_threshold (gtk_dovi_map_debug) >= GST_LEVEL_LOG) {
       GstMapInfo pixels;
       if (gst_buffer_map (*output, &pixels, GST_MAP_READ)) {
         gchar *sha = g_compute_checksum_for_data (G_CHECKSUM_SHA256, pixels.data, pixels.size);
@@ -134,4 +168,10 @@ int gst_gtk_dovi_native_frame_render (GstGtkDoviNativeFrame *frame, GstGtkDoviMa
     }
   }
   return result;
+}
+int gst_gtk_dovi_native_frame_render (GstGtkDoviNativeFrame *frame, GstGtkDoviMapper *mapper,
+    const GstContext *context, GstBuffer **output, GstVideoInfo *output_info, GError **error)
+{
+  return gst_gtk_dovi_native_frame_render_destination (frame, mapper,
+      GST_GTK_DOVI_DESTINATION_DISPLAY_PQ, context, output, output_info, NULL, NULL, error);
 }
