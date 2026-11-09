@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "mapper.h"
+#include "source-lease-private.h"
 #include "native-input-formats.h"
 #include "stream.h"
 #include "gstdovipicture.h"
@@ -7,7 +8,7 @@
 #include <gst/base/gstbasetransform.h>
 #define TYPE_GTK_DOVI_MAP (gtk_dovi_map_get_type ())
 typedef struct { GstBaseTransform parent; GMutex lock; GstGtkDoviTarget target;
-  guint64 target_serial, source_revision;
+  guint64 target_serial, source_revision, source_selection_serial;
   guint destination_kind;
   gboolean require_clear_source, source_blocked;
   gchar *stream_id;
@@ -47,8 +48,24 @@ static void select_source_locked (GtkDoviMap *s)
   if (!s->source_blocked && coded && gst_gtk_dovi_source_lease_matches (
           s->source_lease, s->stream_id, coded)) return;
   revoke_source_locked (s);
-  if (!s->source_blocked && coded)
-    s->source_lease = gst_gtk_dovi_source_lease_new (coded, s->stream_id, s->source_revision);
+  if (!s->source_blocked && coded && s->source_selection_serial != G_MAXUINT64)
+    s->source_lease = _gst_gtk_dovi_source_lease_new_selected (coded, s->stream_id,
+        s->source_revision, ++s->source_selection_serial);
+}
+typedef struct { guint64 revision, selection; } SourceSelection;
+static SourceSelection source_selection_locked (GtkDoviMap *s)
+{
+  SourceSelection state = {s->source_revision,
+      _gst_gtk_dovi_source_lease_selection (s->source_lease)};
+  return state;
+}
+static void emit_selection_change (GtkDoviMap *s, SourceSelection old, SourceSelection current)
+{
+  if (old.revision == current.revision && old.selection == current.selection) return;
+  if (old.selection)
+    g_signal_emit_by_name (s, "source-selection-revoked", old.revision, old.selection);
+  if (current.selection)
+    g_signal_emit_by_name (s, "source-selection-activated", current.revision, current.selection);
 }
 static gboolean qualified_structure (GtkDoviMap *s, const GstStructure *st)
 {
@@ -64,7 +81,7 @@ static gboolean qualified_structure (GtkDoviMap *s, const GstStructure *st)
 }
 static void update_source_context (GtkDoviMap *s, const GstStructure *st)
 {
-  guint64 revision = 0, revoked = 0;
+  guint64 revision = 0;
   gboolean blocked = FALSE;
   if (!gst_structure_get_uint64 (st, "source-revision", &revision) || !revision) return;
   gst_structure_get_boolean (st, "blocked", &blocked);
@@ -73,30 +90,26 @@ static void update_source_context (GtkDoviMap *s, const GstStructure *st)
   const GstCaps *coded = value && GST_VALUE_HOLDS_CAPS (value) ? gst_value_get_caps (value) : NULL;
   GstGtkDoviSourceLease *proof = coded ? gst_gtk_dovi_source_lease_new (coded, id, revision) : NULL;
   g_mutex_lock (&s->lock);
-  if (revision < s->source_revision) goto done;
-  if (revision > s->source_revision) {
-    revoked = s->source_revision;
-    revoke_source_locked (s); g_hash_table_remove_all (s->clear_sources);
-    g_clear_pointer (&s->stream_id, g_free);
-    s->source_revision = revision; s->source_blocked = FALSE;
-  }
-  if (blocked) {
-    revoked = s->source_revision;
-    s->source_blocked = TRUE;
-    revoke_source_locked (s); g_hash_table_remove_all (s->clear_sources);
-  } else if (!s->source_blocked && id && *id) {
-    if (proof) g_hash_table_replace (s->clear_sources, g_strdup (id), gst_caps_ref ((GstCaps *) coded));
-    else g_hash_table_remove (s->clear_sources, id);
-    if (!g_strcmp0 (id, s->stream_id)) {
-      if (s->source_lease && !gst_gtk_dovi_source_lease_matches (s->source_lease, id, coded))
-        revoked = s->source_revision;
-      select_source_locked (s);
+  SourceSelection old = source_selection_locked (s);
+  if (revision >= s->source_revision) {
+    if (revision > s->source_revision) {
+      revoke_source_locked (s); g_hash_table_remove_all (s->clear_sources);
+      g_clear_pointer (&s->stream_id, g_free);
+      s->source_revision = revision; s->source_blocked = FALSE;
+    }
+    if (blocked) {
+      s->source_blocked = TRUE;
+      revoke_source_locked (s); g_hash_table_remove_all (s->clear_sources);
+    } else if (!s->source_blocked && id && *id) {
+      if (proof) g_hash_table_replace (s->clear_sources, g_strdup (id), gst_caps_ref ((GstCaps *) coded));
+      else g_hash_table_remove (s->clear_sources, id);
+      if (!g_strcmp0 (id, s->stream_id)) select_source_locked (s);
     }
   }
-done:
+  SourceSelection current = source_selection_locked (s);
   g_mutex_unlock (&s->lock);
   gst_gtk_dovi_source_lease_unref (proof);
-  if (revoked) g_signal_emit_by_name (s, "source-revision-revoked", revoked);
+  emit_selection_change (s, old, current);
   gst_base_transform_reconfigure_sink (GST_BASE_TRANSFORM (s));
   gst_base_transform_reconfigure_src (GST_BASE_TRANSFORM (s));
 }
@@ -261,6 +274,7 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
   gboolean sdr = s->destination_kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
   if (s->require_clear_source) {
     g_mutex_lock (&s->lock);
+    SourceSelection old = source_selection_locked (s);
     if (!s->stream_id) {
       GstEvent *start = gst_pad_get_sticky_event (GST_BASE_TRANSFORM_SINK_PAD (base), GST_EVENT_STREAM_START, 0);
       if (start) {
@@ -269,7 +283,9 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
         select_source_locked (s);
       }
     }
+    SourceSelection current = source_selection_locked (s);
     g_mutex_unlock (&s->lock);
+    emit_selection_change (s, old, current);
   }
   guint profile = 0;
   for (guint i = 0; i < gst_caps_get_size (input) && !profile; i++)
@@ -318,18 +334,18 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
 static gboolean sink_event (GstBaseTransform *base, GstEvent *event)
 {
   GtkDoviMap *s = (GtkDoviMap *) base;
-  guint64 revoked = 0;
   if (s->require_clear_source) {
     g_mutex_lock (&s->lock);
+    SourceSelection old = source_selection_locked (s);
     switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_STREAM_START: {
       const gchar *id = NULL; gst_event_parse_stream_start (event, &id);
-      revoked = s->source_revision; revoke_source_locked (s);
+      revoke_source_locked (s);
       g_free (s->stream_id); s->stream_id = g_strdup (id);
       select_source_locked (s); break;
     }
     case GST_EVENT_FLUSH_START:
-      revoked = s->source_revision; revoke_source_locked (s); break;
+      revoke_source_locked (s); break;
     case GST_EVENT_FLUSH_STOP: {
       GstEvent *start = gst_pad_get_sticky_event (GST_BASE_TRANSFORM_SINK_PAD (base), GST_EVENT_STREAM_START, 0);
       if (start) {
@@ -341,8 +357,9 @@ static gboolean sink_event (GstBaseTransform *base, GstEvent *event)
     }
     default: break;
     }
+    SourceSelection current = source_selection_locked (s);
     g_mutex_unlock (&s->lock);
-    if (revoked) g_signal_emit_by_name (s, "source-revision-revoked", revoked);
+    emit_selection_change (s, old, current);
     if (GST_EVENT_TYPE (event) == GST_EVENT_STREAM_START || GST_EVENT_TYPE (event) == GST_EVENT_FLUSH_STOP) {
       gst_base_transform_reconfigure_sink (base); gst_base_transform_reconfigure_src (base);
     }
@@ -353,9 +370,12 @@ static gboolean stop (GstBaseTransform *base)
 {
   GtkDoviMap *s = (GtkDoviMap *) base;
   g_mutex_lock (&s->lock);
+  SourceSelection old = source_selection_locked (s);
   revoke_source_locked (s); g_hash_table_remove_all (s->clear_sources);
   g_clear_pointer (&s->stream_id, g_free);
+  SourceSelection current = source_selection_locked (s);
   g_mutex_unlock (&s->lock);
+  emit_selection_change (s, old, current);
   if (s->known_stream) {
     s->known_stream = FALSE;
     gst_element_post_message (GST_ELEMENT (s), gst_message_new_element (GST_OBJECT (s),
@@ -462,6 +482,12 @@ static void get_property (GObject *object, guint property,
     GValue *value, GParamSpec *spec)
 {
   GtkDoviMap *self = (GtkDoviMap *) object;
+  if (property == 5 || property == 6) {
+    g_mutex_lock (&self->lock);
+    SourceSelection state = source_selection_locked (self);
+    g_value_set_uint64 (value, property == 5 ? state.revision : state.selection);
+    g_mutex_unlock (&self->lock); return;
+  }
   if (property == 3) { g_value_set_boolean (value, self->require_clear_source); return; }
   if (property == 4) { g_value_set_uint (value, GST_GTK_DOVI_SOURCE_LEASE_ABI); return; }
   if (property == 2) {
@@ -494,10 +520,19 @@ static void gtk_dovi_map_class_init (GtkDoviMapClass *klass)
         FALSE, G_PARAM_READWRITE | GST_PARAM_MUTABLE_READY | G_PARAM_STATIC_STRINGS));
   g_object_class_install_property (G_OBJECT_CLASS (klass), 4,
       g_param_spec_uint ("source-policy-abi", "Source policy ABI",
-        "Revision-fenced clear source context contract", 1, 1, 1,
+        "Revision-fenced selected clear source contract", 2, 2, 2,
         G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-  g_signal_new ("source-revision-revoked", G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
-      0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_UINT64);
+  g_object_class_install_property (G_OBJECT_CLASS (klass), 5,
+      g_param_spec_uint64 ("active-source-revision", "Active source revision",
+        "Current origin source revision", 0, G_MAXUINT64, 0, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+  g_object_class_install_property (G_OBJECT_CLASS (klass), 6,
+      g_param_spec_uint64 ("active-source-selection", "Active source selection",
+        "Current live selected lease serial, zero when revoked", 0, G_MAXUINT64, 0,
+        G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+  g_signal_new ("source-selection-revoked", G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
+      0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_UINT64, G_TYPE_UINT64);
+  g_signal_new ("source-selection-activated", G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
+      0, NULL, NULL, NULL, G_TYPE_NONE, 2, G_TYPE_UINT64, G_TYPE_UINT64);
   element->set_context = set_context;
   g_signal_new_class_handler ("create-target-context", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION, G_CALLBACK (create_target_context),

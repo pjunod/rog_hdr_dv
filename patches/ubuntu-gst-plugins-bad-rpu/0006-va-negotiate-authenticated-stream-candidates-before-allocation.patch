@@ -298,7 +298,7 @@
        &capsfeatures, &modifier);
 --- /dev/null
 +++ b/sys/va/gstvabasedecdovi.h
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,141 @@
 +/* SPDX-License-Identifier: LGPL-2.1-or-later */
 +#ifndef GST_VA_BASE_DEC_DOVI_H
 +#define GST_VA_BASE_DEC_DOVI_H
@@ -316,6 +316,7 @@
 +  if (!coded || !gst_caps_is_fixed (coded) ||
 +      gst_caps_get_size (coded) != 1 ||
 +      !gst_structure_has_name (gst_caps_get_structure (coded, 0), "video/x-h265") ||
++      gst_structure_has_field (gst_caps_get_structure (coded, 0), "protection-system") ||
 +      !gst_dovi_caps_get_stream_config (coded, &config, &bytes) ||
 +      g_bytes_get_size (bytes) != 24 ||
 +      !config.rpu_present_flag || !config.bl_present_flag ||

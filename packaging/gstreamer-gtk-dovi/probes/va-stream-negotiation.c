@@ -158,6 +158,12 @@ int main (int argc, char **argv)
   GstCaps *absent = gst_caps_new_empty_simple ("video/x-h265");
   unknown = gst_va_dovi_qualified_configuration (absent);
   require (!unknown, "absent config stays unqualified"); gst_caps_unref (absent);
+  GstCaps *protected_caps = gst_caps_copy (encoded);
+  gst_caps_set_simple (protected_caps, "protection-system", G_TYPE_STRING,
+      "synthetic-protected-route", NULL);
+  unknown = gst_va_dovi_qualified_configuration (protected_caps);
+  require (!unknown, "HEVC with protection-system is not a clear coded route");
+  gst_caps_unref (protected_caps);
   GstCaps *encrypted = gst_caps_copy (encoded);
   gst_structure_set_name (gst_caps_get_structure (encrypted, 0), "application/x-cenc");
   unknown = gst_va_dovi_qualified_configuration (encrypted);

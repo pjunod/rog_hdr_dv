@@ -1,19 +1,20 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "mapper.h"
+#include "source-lease-private.h"
 #include "gstdovipicture.h"
 struct GstGtkDoviSourceLease {
   gint refs, revoked;
-  guint64 revision;
+  guint64 revision, selection;
   gchar *stream_id;
   GBytes *configuration;
 };
-GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_new (const GstCaps *caps,
-    const gchar *stream_id, guint64 revision)
+GstGtkDoviSourceLease *_gst_gtk_dovi_source_lease_new_selected (const GstCaps *caps,
+    const gchar *stream_id, guint64 revision, guint64 selection)
 {
   AVDOVIDecoderConfigurationRecord config;
   GBytes *bytes = NULL;
   if (!caps || !gst_caps_is_fixed (caps) || gst_caps_get_size (caps) != 1 ||
-      !stream_id || !*stream_id || !revision) return NULL;
+      !stream_id || !*stream_id || !revision || !selection) return NULL;
   const GstStructure *st = gst_caps_get_structure (caps, 0);
   gboolean known = gst_structure_has_name (st, "video/x-h265") &&
       !gst_structure_has_field (st, "protection-system") &&
@@ -31,10 +32,15 @@ GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_new (const GstCaps *caps,
     g_clear_pointer (&bytes, g_bytes_unref); return NULL;
   }
   GstGtkDoviSourceLease *lease = g_new0 (GstGtkDoviSourceLease, 1);
-  lease->refs = 1; lease->revision = revision;
+  lease->refs = 1; lease->revision = revision; lease->selection = selection;
   lease->stream_id = g_strdup (stream_id); lease->configuration = bytes;
   return lease;
 }
+GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_new (const GstCaps *caps,
+    const gchar *stream_id, guint64 revision)
+{ return _gst_gtk_dovi_source_lease_new_selected (caps, stream_id, revision, 1); }
+guint64 _gst_gtk_dovi_source_lease_selection (const GstGtkDoviSourceLease *lease)
+{ return gst_gtk_dovi_source_lease_is_valid (lease) ? lease->selection : 0; }
 GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_ref (GstGtkDoviSourceLease *lease)
 { if (lease) g_atomic_int_inc (&lease->refs); return lease; }
 void gst_gtk_dovi_source_lease_unref (GstGtkDoviSourceLease *lease)
@@ -119,6 +125,8 @@ GstGtkDoviNativeFrame *gst_gtk_dovi_native_frame_from_buffer (GstBuffer *buffer,
 }
 guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame)
 { return frame && gst_gtk_dovi_source_lease_is_valid (frame->lease) ? frame->lease->revision : 0; }
+guint64 gst_gtk_dovi_native_frame_source_selection (GstGtkDoviNativeFrame *frame)
+{ return frame ? _gst_gtk_dovi_source_lease_selection (frame->lease) : 0; }
 gboolean gst_gtk_dovi_native_frame_attach_source (GstBuffer *output, GstBuffer *input,
     const GstVideoInfo *input_info, const GstVideoInfo *output_info, guint64 generation,
     GstGtkDoviSourceLease *lease)

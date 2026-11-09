@@ -4,7 +4,7 @@
 #include <gst/video/video.h>
 #define GST_GTK_DOVI_CORE_ABI 1
 #define GST_GTK_DOVI_DESTINATION_ABI 1
-#define GST_GTK_DOVI_SOURCE_LEASE_ABI 1
+#define GST_GTK_DOVI_SOURCE_LEASE_ABI 2
 #define GST_GTK_DOVI_API __attribute__((visibility("default")))
 extern GST_GTK_DOVI_API GstDebugCategory *gtk_dovi_map_debug;
 #define GST_CAT_DEFAULT gtk_dovi_map_debug
@@ -51,6 +51,7 @@ GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_is_valid (const GstGtkDoviSo
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_matches (
     const GstGtkDoviSourceLease *lease, const gchar *stream_id, const GstCaps *caps);
 GST_GTK_DOVI_API guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame);
+GST_GTK_DOVI_API guint64 gst_gtk_dovi_native_frame_source_selection (GstGtkDoviNativeFrame *frame);
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_native_frame_attach_source (
     GstBuffer *output, GstBuffer *input, const GstVideoInfo *input_info,
     const GstVideoInfo *output_info, guint64 generation, GstGtkDoviSourceLease *lease);
