@@ -258,6 +258,73 @@ linked_query_controls (GstElement *element, GstBaseTransformClass *klass,
   gst_object_unref (src);
 }
 
+static void
+source_context (GstElement *map, guint64 revision, gboolean blocked,
+    const gchar *stream_id, GstCaps *coded)
+{
+  GstContext *context = gst_context_new ("gst.webkit.dovi.source.v1", FALSE);
+  GstStructure *st = gst_context_writable_structure (context);
+  gst_structure_set (st, "source-revision", G_TYPE_UINT64, revision,
+      "blocked", G_TYPE_BOOLEAN, blocked, NULL);
+  if (stream_id) gst_structure_set (st, "stream-id", G_TYPE_STRING, stream_id, NULL);
+  if (coded) gst_structure_set (st, "clear-coded-caps", GST_TYPE_CAPS, coded, NULL);
+  gst_element_set_context (map, context); gst_context_unref (context);
+}
+static void
+source_gate_check (GstElement *map, GstCaps *input, gboolean graded, const gchar *name)
+{
+  GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+  GstCaps *out = GST_BASE_TRANSFORM_GET_CLASS (base)->transform_caps (base,
+      GST_PAD_SINK, input, NULL);
+  gboolean mapped = !gst_caps_is_empty (out) && !gst_caps_is_equal (input, out) &&
+      !g_strcmp0 (gst_structure_get_string (gst_caps_get_structure (out, 0), "format"), "RGBA");
+  require (graded ? mapped : gst_caps_is_equal (input, out), name);
+  gst_caps_unref (out);
+}
+static void
+source_lifecycle_controls (void)
+{
+  GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
+  g_object_set (map, "destination-kind", 1u, "require-clear-source", TRUE, NULL);
+  GstPad *sink = gst_element_get_static_pad (map, "sink");
+  GstPad *src = gst_element_get_static_pad (map, "src");
+  gst_pad_set_active (sink, TRUE); gst_pad_set_active (src, TRUE);
+  GstCaps *input = caps_for ("P010_10LE", NULL, TRUE);
+  GstCaps *coded = gst_caps_copy (input);
+  gst_structure_set_name (gst_caps_get_structure (coded, 0), "video/x-h265");
+  source_gate_check (map, input, FALSE, "browser unknown source uses exact identity caps");
+  source_context (map, 1, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "coded proof alone cannot authorize a prior or unknown raw stream");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
+  source_gate_check (map, input, FALSE, "another stream cannot borrow a clear configuration");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
+  source_gate_check (map, input, TRUE, "matching raw stream and original coded proof enable grade");
+  GstCaps *wrong = gst_caps_copy (input);
+  guint8 record[24] = {1, 0, 16, 29, 16};
+  GstBuffer *config = gst_buffer_new_memdup (record, sizeof (record));
+  gst_caps_set_simple (wrong, "dovi-configuration", GST_TYPE_BUFFER, config, NULL);
+  gst_buffer_unref (config);
+  source_gate_check (map, wrong, FALSE, "different coded configuration cannot borrow source proof");
+  gst_caps_unref (wrong);
+  source_context (map, 1, TRUE, NULL, NULL);
+  source_gate_check (map, input, FALSE, "CDM/source revoke restores identity negotiation");
+  source_context (map, 1, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "same-revision late callback cannot undo protection revocation");
+  source_context (map, 2, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "new source revision requires its own raw stream start");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
+  source_gate_check (map, input, TRUE, "new clear source revision qualifies independently");
+  source_context (map, 1, TRUE, NULL, NULL);
+  source_gate_check (map, input, TRUE, "older callback cannot revoke the newer source revision");
+  GstCaps *protected = gst_caps_copy (coded);
+  gst_structure_set_name (gst_caps_get_structure (protected, 0), "application/x-cenc");
+  source_context (map, 2, FALSE, "clear/video0", protected);
+  source_gate_check (map, input, FALSE, "protected replacement cannot retain clear source proof");
+  gst_caps_unref (protected); gst_caps_unref (coded); gst_caps_unref (input);
+  gst_pad_set_active (sink, FALSE); gst_pad_set_active (src, FALSE);
+  gst_object_unref (sink); gst_object_unref (src); gst_object_unref (map);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -380,6 +447,7 @@ main (int argc, char **argv)
     gst_caps_unref (result);
   }
   linked_query_controls (element, klass, output);
+  source_lifecycle_controls ();
   gst_caps_unref (reverse);
   gst_caps_unref (output);
   gst_caps_unref (nv12);

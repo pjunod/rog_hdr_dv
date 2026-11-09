@@ -48,6 +48,8 @@ GST_GTK_DOVI_API GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_ref (GstGtkDov
 GST_GTK_DOVI_API void gst_gtk_dovi_source_lease_unref (GstGtkDoviSourceLease *lease);
 GST_GTK_DOVI_API void gst_gtk_dovi_source_lease_revoke (GstGtkDoviSourceLease *lease);
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_is_valid (const GstGtkDoviSourceLease *lease);
+GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_matches (
+    const GstGtkDoviSourceLease *lease, const gchar *stream_id, const GstCaps *caps);
 GST_GTK_DOVI_API guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame);
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_native_frame_attach_source (
     GstBuffer *output, GstBuffer *input, const GstVideoInfo *input_info,

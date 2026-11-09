@@ -47,6 +47,17 @@ void gst_gtk_dovi_source_lease_revoke (GstGtkDoviSourceLease *lease)
 { if (lease) g_atomic_int_set (&lease->revoked, TRUE); }
 gboolean gst_gtk_dovi_source_lease_is_valid (const GstGtkDoviSourceLease *lease)
 { return lease && !g_atomic_int_get (&lease->revoked); }
+gboolean gst_gtk_dovi_source_lease_matches (const GstGtkDoviSourceLease *lease,
+    const gchar *stream_id, const GstCaps *caps)
+{
+  if (!caps || !gst_gtk_dovi_source_lease_is_valid (lease) || !stream_id ||
+      g_strcmp0 (lease->stream_id, stream_id)) return FALSE;
+  AVDOVIDecoderConfigurationRecord config;
+  GBytes *bytes = NULL;
+  gboolean known = gst_dovi_caps_get_stream_config (caps, &config, &bytes);
+  gboolean same = known && bytes && g_bytes_equal (bytes, lease->configuration);
+  g_clear_pointer (&bytes, g_bytes_unref); return same;
+}
 struct GstGtkDoviNativeFrame {
   gint refs;
   GstBuffer *source;
