@@ -4,6 +4,7 @@
 #include <gst/video/video.h>
 #define GST_GTK_DOVI_CORE_ABI 1
 #define GST_GTK_DOVI_DESTINATION_ABI 1
+#define GST_GTK_DOVI_SOURCE_LEASE_ABI 1
 #define GST_GTK_DOVI_API __attribute__((visibility("default")))
 extern GST_GTK_DOVI_API GstDebugCategory *gtk_dovi_map_debug;
 #define GST_CAT_DEFAULT gtk_dovi_map_debug
@@ -37,6 +38,21 @@ GST_GTK_DOVI_API int gst_gtk_dovi_mapper_render_destination (
     GstGtkDoviDestinationKind kind, const GstGtkDoviTarget *physical,
     GstBuffer **output, GstVideoInfo *output_info, GError **error);
 typedef struct GstGtkDoviNativeFrame GstGtkDoviNativeFrame;
+typedef struct GstGtkDoviSourceLease GstGtkDoviSourceLease;
+/* The browser supplies original demuxer caps, before any decryption, and the
+ * exact selected stream identity. This validates coded configuration only;
+ * per-picture metadata and decoded FEL participation remain independent. */
+GST_GTK_DOVI_API GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_new (
+    const GstCaps *clear_coded_caps, const gchar *stream_id, guint64 revision);
+GST_GTK_DOVI_API GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_ref (GstGtkDoviSourceLease *lease);
+GST_GTK_DOVI_API void gst_gtk_dovi_source_lease_unref (GstGtkDoviSourceLease *lease);
+GST_GTK_DOVI_API void gst_gtk_dovi_source_lease_revoke (GstGtkDoviSourceLease *lease);
+GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_is_valid (const GstGtkDoviSourceLease *lease);
+GST_GTK_DOVI_API guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame);
+GST_GTK_DOVI_API gboolean gst_gtk_dovi_native_frame_attach_source (
+    GstBuffer *output, GstBuffer *input, const GstVideoInfo *input_info,
+    const GstVideoInfo *output_info, guint64 generation, GstGtkDoviSourceLease *lease);
+
 /* Render the retained original picture into the selected destination layout.
  * Successful output retains authoritative original epoch/picture identity.
  * A prior SDR attachment does not constrain a later native PQ regrade. */

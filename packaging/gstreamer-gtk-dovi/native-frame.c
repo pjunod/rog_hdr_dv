@@ -1,10 +1,57 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "mapper.h"
 #include "gstdovipicture.h"
+struct GstGtkDoviSourceLease {
+  gint refs, revoked;
+  guint64 revision;
+  gchar *stream_id;
+  GBytes *configuration;
+};
+GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_new (const GstCaps *caps,
+    const gchar *stream_id, guint64 revision)
+{
+  AVDOVIDecoderConfigurationRecord config;
+  GBytes *bytes = NULL;
+  if (!caps || !gst_caps_is_fixed (caps) || gst_caps_get_size (caps) != 1 ||
+      !stream_id || !*stream_id || !revision) return NULL;
+  const GstStructure *st = gst_caps_get_structure (caps, 0);
+  gboolean known = gst_structure_has_name (st, "video/x-h265") &&
+      !gst_structure_has_field (st, "protection-system") &&
+      gst_dovi_caps_get_stream_config (caps, &config, &bytes);
+  if (!known || !bytes || g_bytes_get_size (bytes) != 24 ||
+      config.dv_version_major != 1 || config.dv_version_minor != 0 ||
+      !config.rpu_present_flag || !config.bl_present_flag ||
+      config.dv_md_compression != AV_DOVI_COMPRESSION_NONE ||
+      !((!config.el_present_flag && config.dv_profile == 5 &&
+          config.dv_bl_signal_compatibility_id == 0) ||
+        (!config.el_present_flag && config.dv_profile == 8 &&
+          config.dv_bl_signal_compatibility_id == 1) ||
+        (config.el_present_flag && config.dv_profile == 7 &&
+          config.dv_bl_signal_compatibility_id == 6))) {
+    g_clear_pointer (&bytes, g_bytes_unref); return NULL;
+  }
+  GstGtkDoviSourceLease *lease = g_new0 (GstGtkDoviSourceLease, 1);
+  lease->refs = 1; lease->revision = revision;
+  lease->stream_id = g_strdup (stream_id); lease->configuration = bytes;
+  return lease;
+}
+GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_ref (GstGtkDoviSourceLease *lease)
+{ if (lease) g_atomic_int_inc (&lease->refs); return lease; }
+void gst_gtk_dovi_source_lease_unref (GstGtkDoviSourceLease *lease)
+{
+  if (lease && g_atomic_int_dec_and_test (&lease->refs)) {
+    g_free (lease->stream_id); g_bytes_unref (lease->configuration); g_free (lease);
+  }
+}
+void gst_gtk_dovi_source_lease_revoke (GstGtkDoviSourceLease *lease)
+{ if (lease) g_atomic_int_set (&lease->revoked, TRUE); }
+gboolean gst_gtk_dovi_source_lease_is_valid (const GstGtkDoviSourceLease *lease)
+{ return lease && !g_atomic_int_get (&lease->revoked); }
 struct GstGtkDoviNativeFrame {
   gint refs;
   GstBuffer *source;
   GstVideoInfo input_info, output_info;
+  GstGtkDoviSourceLease *lease;
 };
 typedef struct { GstMeta meta; GstGtkDoviNativeFrame *frame; guint64 generation; } NativeMeta;
 static const GstMetaInfo *native_meta_info (void);
@@ -22,7 +69,7 @@ static GType native_meta_api (void)
 GstGtkDoviNativeFrame *gst_gtk_dovi_native_frame_ref (GstGtkDoviNativeFrame *f)
 { g_atomic_int_inc (&f->refs); return f; }
 void gst_gtk_dovi_native_frame_unref (GstGtkDoviNativeFrame *f)
-{ if (f && g_atomic_int_dec_and_test (&f->refs)) { gst_buffer_unref (f->source); g_free (f); } }
+{ if (f && g_atomic_int_dec_and_test (&f->refs)) { gst_buffer_unref (f->source); gst_gtk_dovi_source_lease_unref (f->lease); g_free (f); } }
 static gboolean meta_init (GstMeta *meta, gpointer params, GstBuffer *buffer)
 { (void) params; (void) buffer; ((NativeMeta *) meta)->frame = NULL; return TRUE; }
 static void meta_free (GstMeta *meta, GstBuffer *buffer)
@@ -59,18 +106,33 @@ GstGtkDoviNativeFrame *gst_gtk_dovi_native_frame_from_buffer (GstBuffer *buffer,
   if (generation) *generation = meta ? meta->generation : 0;
   return meta && meta->frame ? gst_gtk_dovi_native_frame_ref (meta->frame) : NULL;
 }
-gboolean gst_gtk_dovi_native_frame_attach (GstBuffer *output, GstBuffer *input,
-    const GstVideoInfo *input_info, const GstVideoInfo *output_info, guint64 generation)
+guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame)
+{ return frame && gst_gtk_dovi_source_lease_is_valid (frame->lease) ? frame->lease->revision : 0; }
+gboolean gst_gtk_dovi_native_frame_attach_source (GstBuffer *output, GstBuffer *input,
+    const GstVideoInfo *input_info, const GstVideoInfo *output_info, guint64 generation,
+    GstGtkDoviSourceLease *lease)
 {
   g_return_val_if_fail (output != input && gst_buffer_is_writable (output), FALSE);
+  if (lease && !gst_gtk_dovi_source_lease_is_valid (lease)) return FALSE;
   GstGtkDoviNativeFrame *frame = gst_gtk_dovi_native_frame_from_buffer (input, NULL);
+  if (frame && ((lease && frame->lease != lease) ||
+      (frame->lease && !gst_gtk_dovi_source_lease_is_valid (frame->lease)))) {
+    gst_gtk_dovi_native_frame_unref (frame); return FALSE;
+  }
   if (!frame) {
     frame = g_new0 (GstGtkDoviNativeFrame, 1); frame->refs = 1;
     frame->source = gst_buffer_ref (input);
     frame->input_info = *input_info; frame->output_info = *output_info;
+    frame->lease = gst_gtk_dovi_source_lease_ref (lease);
   }
   gboolean success = attach (output, frame, generation);
   gst_gtk_dovi_native_frame_unref (frame); return success;
+}
+gboolean gst_gtk_dovi_native_frame_attach (GstBuffer *output, GstBuffer *input,
+    const GstVideoInfo *input_info, const GstVideoInfo *output_info, guint64 generation)
+{
+  return gst_gtk_dovi_native_frame_attach_source (output, input, input_info,
+      output_info, generation, NULL);
 }
 gboolean gst_gtk_dovi_target_from_context (const GstContext *context, GstGtkDoviTarget *target)
 {
@@ -103,6 +165,7 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
   gst_video_info_init (output_info);
   if (epoch_out) *epoch_out = 0;
   if (picture_id_out) *picture_id_out = 0;
+  if (frame->lease && !gst_gtk_dovi_source_lease_is_valid (frame->lease)) return 0;
   gboolean sdr = kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
   if (!sdr && kind != GST_GTK_DOVI_DESTINATION_DISPLAY_PQ) {
     g_set_error_literal (error, GST_CORE_ERROR, GST_CORE_ERROR_NEGOTIATION,
@@ -131,6 +194,9 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
   if (!complete) return -1;
   int result = gst_gtk_dovi_mapper_render_destination (mapper, frame->source,
       &frame->input_info, kind, &target, output, &dest_info, error);
+  if (frame->lease && !gst_gtk_dovi_source_lease_is_valid (frame->lease)) {
+    gst_clear_buffer (output); return 0;
+  }
   if (result > 0) {
     GstVideoOverlayCompositionMeta *overlay = gst_buffer_get_video_overlay_composition_meta (frame->source);
     if (overlay) gst_buffer_add_video_overlay_composition_meta (*output, overlay->overlay);
@@ -161,6 +227,9 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
     }
     if (!attach (*output, frame, target.generation)) {
       gst_clear_buffer (output); return -1;
+    }
+    if (frame->lease && !gst_gtk_dovi_source_lease_is_valid (frame->lease)) {
+      gst_clear_buffer (output); return 0;
     }
     *output_info = dest_info;
     if (epoch_out) *epoch_out = epoch;
