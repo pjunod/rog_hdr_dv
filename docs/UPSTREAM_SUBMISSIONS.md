@@ -1,8 +1,18 @@
 # Upstream submissions — material, evidence and remaining decisions
 
-**Updated:** 2026-10-28 · **Scope:** the handoff's 85 original entries across
-20 upstream projects, plus four previously unlisted mobile/converter
-observations. Nothing has been submitted to a third-party upstream.
+**Updated:** 2026-11-09 · **Scope:** 124 inventory entries: the original 85,
+four mobile/converter observations, and 35 additions from the November audit.
+The original inventory covered 20 upstream projects; seven new destinations
+bring that coverage to 27, plus local converter observations. No submission
+is performed by this inventory refresh.
+
+The [November review](../upstream/november-2026/README.md) audits public
+source through `ac82059` and the recorded Runner and Plurx source heads. It
+adds
+18 held candidates, 15 discussion drafts and two upstream backport groups.
+Those backports retain their original authors; they are not new submissions.
+The 43 prepared patch units from October retain their exact historical
+qualification. This pass does not rerun native suites or advance helper bases.
 
 Start with the [submission commands](../upstream/README.md). Each linked kit
 records its exact base, exported material, tests and limits. The
@@ -43,6 +53,8 @@ Venue: gitlab.gnome.org/GNOME/mutter · MR. No written AI rule; GNOME-wide polic
 | MUT-K | Colour device / colord lifecycle robustness | rog_hdr_dv | Held | [kit](../upstream/mutter/README.md) · Units 03,15; Obsolete if !5177 lands; 84/85 (teardown) could go alone; see current stack/design dependencies in the kit. |
 | MUT-L | Offscreen buffer reuse across colour-state changes | rog_hdr_dv | Ready for human review | [kit](../upstream/mutter/README.md) · Units 02; see current stack/design dependencies in the kit. |
 | MUT-0 | Design-discussion issue for the whole series | rog_hdr_dv | Discussion draft | Prepared design issue; open before the stacked colour proposals. |
+| MUT-N | Compare client mastering peaks at Wayland integer wire precision | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · Avoid double mapping from rounded client declarations while preserving exact native declarations and mapping curve. Native /color-hdr/mapping/wire-peak control distinguishes 880/881/882; fixture display 616 at reference 142, client reference 203. Existing target-volume implementation is a prerequisite. Extract/rebase onto agreed current upstream design; no new standalone submission port is prepared. |
+| MUT-O | Write shared-memory screen captures in the negotiated pixel format | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · Monitor, area and virtual paths had hard-coded ARGB readback despite negotiated ten-bit/float layouts. Digital controls cover XR30/XB30/half-float/BGRx and same-stream format changes; XR30/XB30 agree exactly and half-float differs at most0.574 ten-bit code. MemFd evidence, not DMA-BUF or optical qualification. Upstream extraction/current base and focused native regression still required. |
 
 ## libdisplay-info
 
@@ -63,9 +75,9 @@ Venue: dri-devel, intel-gfx · email (b4). Tool use must be disclosed; AI may no
 
 | Unit | Change | From | Status | Notes |
 |---|---|---|---|---|
-| LNX-1 | drm/edid: DisplayID 2.0 luminance range; i915 accepts any source | rog_hdr_dv | Third-party work | [kit](../upstream/linux/README.md) · unit 01: needs-human-hardware-evidence; Fresh hardware scope/reproduction and latest-thread verification are not established. |
-| LNX-2 | Bounded physical-range validation + KUnit coverage | rog_hdr_dv | Ready for human review | [kit](../upstream/linux/README.md) · unit 02: ready-for-human-review; Confirm latest original-thread Message-ID and owner DCO/mail setup before email delivery. |
-| LNX-3 | i915: SCL lost when VRR toggles with PSR (Wa_14015401596) | rog_hdr_dv | Held | [kit](../upstream/linux/README.md) · unit 03: needs-human-hardware-evidence; Fresh hardware scope/reproduction and latest-thread verification are not established. |
+| LNX-1 | drm/edid: DisplayID 2.0 luminance range; i915 accepts any source | rog_hdr_dv | Third-party work | Retain Cristian authorship of firsttwo DisplayID prerequisites; newer Ubuntu build/install evidence never makes them our original work. [November review](../upstream/november-2026/README.md). |
+| LNX-2 | Bounded physical-range validation + KUnit coverage | rog_hdr_dv | Ready for human review | Retain the October28 upstream outgoing two-patch source qualification at its exactbase65ba8f34 separately from later Ubuntu release replay. Firstfour Ubuntu patches have unchanged stable patch IDs. Do not silently advance upstream helper base from the downstream deployment evidence; do not count CVE security backport as our new contribution. [November review](../upstream/november-2026/README.md). |
+| LNX-3 | i915: SCL lost when VRR toggles with PSR (Wa_14015401596) | rog_hdr_dv | Held | A real Ubuntu 7.3 i915 patch and bounded November 2 owner-attended VRR 0→1→0 pass now exist. Hold for a current-upstream port, focused qualification and owner DCO/mail route; broader mode/optical acceptance remains separate. [November review](../upstream/november-2026/README.md). |
 
 ## Proton (ValveSoftware/wine)
 
@@ -96,6 +108,8 @@ Venue: github.com/ikatson/rqbit · PR. AI_POLICY: disclose; human must explain e
 | R11 | SessionOptions::disable_pex | Runner | Discussion draft | Prepared issue draft and one-command issue helper; no code PR until the design is agreed. Needs a port to main; later |
 | R4 | Pending-handshake cap | Runner | Superseded upstream | Upstream main has max_pending_incoming_handshake_checks |
 | R12 | Test-only DHT bootstrap feature | Runner | Not for upstream | Runner-specific test hook |
+| R14 | Read-only selected-piece verification over caller-owned storage | Runner | Discussion draft | [November material](../upstream/november-2026/OTHER_PROJECTS.md) · New public verify_selected_piece_ranges API reuses rqbit piece verification against callback-backed read-only storage, merges selected piece ranges, verifies neighboring boundary bytes and supports cancellation checkpoints. Existing source regression covers neighboring-file boundary bytes, corrupt payload and Interrupted callback. Discuss API shape first; export standalone current-upstream port and move tests into upstream before preparing a PR. Downstream stable delta alone is not an upstream kit. |
+| R15 | Locate the first intersecting file before verifying a piece | Runner | Held | [November material](../upstream/november-2026/OTHER_PROJECTS.md) · The same maintained patch replaces a scan over every preceding torrent file with partition_point and skips directly to the first intersecting file. This generic FileOps optimization can be split from the new API. Needs current-upstream check, isolated export and dedicated boundary/zero-length-file/performance regression; inspected source test is not sufficient proof of lookup behavior or speed. |
 
 ## hiqlite
 
@@ -117,6 +131,7 @@ Venue: github.com/sebadob/hiqlite · PR. Has an AI-contribution policy — discl
 | WAL-2 | Atomic meta.hql replacement | cinema | Superseded upstream | Upstream #357 |
 | HQ-2 | Split-brain probe TLS policy | cinema | Superseded upstream | Upstream removed the check (#385) |
 | HQ-POL | 21 plurx-policy changes in the vendored copy | cinema | Not for upstream | cinema-specific behaviour |
+| HQ-27 | Close upgraded API streams when their Raft group terminates | Runner | Held | [November material](../upstream/november-2026/OTHER_PROJECTS.md) · An upgraded API WebSocket can outlive the listener and keep returning stopped-leader errors to survivors. Watch the corresponding Raft group metrics and stop the existing writer loop on shutdown, fatal running_state or a closed watch channel. Focused source test covers live updates and all three terminal cases; Makefile names it. Split the generic library fix from Runner minority-shutdown adapter changes, reconcile with current upstream socket lifecycle and produce an independently qualified port before PR preparation. |
 
 ## mpv
 
@@ -124,11 +139,14 @@ Venue: github.com/mpv-player/mpv · PR. Allowed; name model + tool in PR text on
 
 | Unit | Change | From | Status | Notes |
 |---|---|---|---|---|
-| MPV-1 | wayland: don't send unknown MaxCLL/MaxFALL | cinema | Ready for human review | [kit](../upstream/mpv/README.md) · unit 01: ready-for-human-review |
-| MPV-2 | demux/dovi_split: split the P7 enhancement layer without FFmpeg 9's BSF | cinema | Ready for human review | [kit](../upstream/mpv/README.md) · unit 02: draft PR; ready-for-human-review |
+| MPV-1 | wayland: don't send unknown MaxCLL/MaxFALL | cinema | Ready for human review | unit 01: ready-for-human-review November 9 review: Same omit-unknown MaxCLL/MaxFALL correction now in Ubuntu mpv and native 0.42 with extra finite/quantized protocol-v1 bounds. Do not duplicate or imply newer bytes are in the October kit. [November review](../upstream/november-2026/README.md). |
+| MPV-2 | demux/dovi_split: split the P7 enhancement layer without FFmpeg 9's BSF | cinema | Ready for human review | unit 02: draft PR; ready-for-human-review November 9 review: Native 0.42 and an explicit upstream FFmpeg dovi_split backport now exist. Review October fallback against current upstream before sending; source inspection alone does not prove the entire fallback superseded. [November review](../upstream/november-2026/README.md). |
 | MPV-4 | vulkan/context: Wayland swapchains start in pass-through colour space | cinema | Ready for human review | [kit](../upstream/mpv/README.md) · unit 04: draft PR; ready-for-human-review |
 | MPV-5 | osc.lua: whole-film timeline for embedders | cinema | Held | [kit](../upstream/mpv/README.md) · unit 05: design-hold; Maintainer agreement on the embedding interface; propose the design before a merge request |
-| MPV-3 | vo_gpu_next: plurx closed-form DV mapping | cinema | Not for upstream | Embeds plurx's own display-management code |
+| MPV-3 | vo_gpu_next: plurx closed-form DV mapping | cinema | Not for upstream | Embeds plurx's own display-management code November 9 review: Private closed-form renderer is excluded. Public generic hooks/target lifecycle proposals do not authorize private code. The custom reconstruction/cache source remains excluded from direct submission. New public upload/quantization candidates do not authorize private mapper implementation or equations. [November review](../upstream/november-2026/README.md). |
+| MPV-6 | Preserve raw RPU ownership when inheriting matched enhancement-layer metadata | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · f_enhancement_pair refs raw RPU from matched EL onto BL, removes stale BL RPU and handles allocation failure. Distinct from October MPV-2 split fallback. Split this hunk from private provider/Wayland/build glue and add focused current-upstream pairing/lifetime regression. Staged 4K FEL and flip/failure controls are downstream evidence. |
+| MPV-7 | Separate physical targets from PQ transport and retain mapped cached-capture state | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · Physical min/max/xy and reference-white transport are separate; paused/cache window captures preserve displayed grade and invalidate state on source/target change. Tagged PNG tests changed only authored edited frames; ordinary HDR10/native-source controls byte-equal. Generic target/capture lifecycle proposal requires agreement and extraction from optional private provider integration. No optical claim. |
+| MPV-8 | Preserve planar 10-bit software upload precision and required enhancement-layer cleanup | cinema | Held | [November material](../upstream/november-2026/OTHER_PROJECTS.md) · Owned high-aligned UNORM16 staging preserves low-aligned planar 10-bit software filtering for Dolby and limited BT.2020/PQ, including ordinary HDR10. Hardware/P010/integer paths retain their behavior; required enhancement mapping failures clean partially owned resources. Source controls cover code values, strides, eligibility and lifetimes. No new execution, generalized native-build or GPU-performance claim. Extract the generic upload/cleanup change from private consumer glue and qualify against current mpv before submission. |
 
 ## FFmpeg
 
@@ -140,6 +158,9 @@ Venue: code.ffmpeg.org · PR, or ffmpeg-devel. No ban found; human review standa
 | FF-2 | configure: static Vulkan probe via pkg-config | cinema | Ready for human review | [kit](../upstream/ffmpeg/README.md) · unit 02: ready-for-human-review |
 | FF-3 | hevcdec: skip suppressed RASL before PPS lookup (frame threads) | cinema | Superseded upstream | [kit](../upstream/ffmpeg/README.md) · unit 03: superseded |
 | FF-POL | 2 Dolby-state policy patches | cinema | Not for upstream | cinema-specific |
+| FF-4 | Authoritative frame-owned Dolby metadata and a bounded public RPU resolver | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · New public resolver/strictness API: authoritative SPS rectangle, invalid-RPU withholding, bounded/reserved config rejection, reset metadata on live config change without resetting normal HEVC references. Native reorder/gap/flush/lifetime/conformance/config and pixel controls exist. Discuss upstream parser/side-data API, isolate local symbol/runtime plumbing. Follow-up config checks repair the proposed resolver, not independent preexisting upstream bugs. |
+| FF-5 | Explicit display-target mapping hook and export metadata replacement | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · Public adapter selects physical xy/luminance before generic conversion, replaces obsolete source Dolby/HDR10+ side data with destination metadata and keeps named fallback. Export/trim/crop and native chart controls exist. Current implementation depends on private provider and private renderer namespace: discuss/extract generic contract; private mapper equations and SDK implementation remain excluded. |
+| FF-BACKPORT | Imported dovi_split, split-NAL length validation and HEVC EL configuration | rog_hdr_dv | Superseded upstream | [November material](../upstream/november-2026/MEDIA.md) · These are explicit upstream backports, not novel patches to send. Preserve original Kacper Michajlow and Michael Niedermayer attribution/signoffs. Packet identity is adapted from upstream 5f6dff5e7dbd9b1f3221f7c37225365dbf1e1038. Local version/build glue is excluded. |
 
 ## jellyfin-ffmpeg
 
@@ -162,6 +183,7 @@ Venue: github.com/quietvoid/dovi_tool · PR. Check before sending; GitHub.
 |---|---|---|---|---|
 | DV-5 | Mixed mapping_idc no longer panics | cinema | Ready for human review | [kit](../upstream/dovi_tool/README.md) · unit 01: ready-for-human-review |
 | DV-1-4,6 | Other parser bounds fixes | cinema | Superseded upstream | Upstream PR #430 (Oct 23) or moot |
+| DV-BACKPORT | Imported C-FFI ownership, recoverable parser errors and pivot bounds | rog_hdr_dv | Superseded upstream | [November material](../upstream/november-2026/MEDIA.md) · Patch bodies explicitly backport upstream commits 4e6b263c35f08bca9efe919effac9c09c26fba70, 73daa31a8ecc76a4eedff8cb8f6197a3d66c3b3c and f41b2809cd00f41118248fcd8a1a3dff6216efcf. Preserve Nomis101/quietvoid authors. CRC-valid unsupported RPU aborts stock but patched parser returns error and accepts subsequent valid input. Do not resubmit or conflate with DV-5 mixed mapping. |
 
 ## bitvec_helpers
 
@@ -222,7 +244,10 @@ Venue: code.videolan.org/videolan/libplacebo · MR. VideoLAN account (needs appr
 
 | Unit | Change | From | Status | Notes |
 |---|---|---|---|---|
-| LP-DM | Dolby Vision display-management API (5 WIP patches) | rog_hdr_dv | Not for upstream | Private by policy; your call if any part should ever go |
+| LP-DM | Dolby Vision display-management API (5 WIP patches) | rog_hdr_dv | Not for upstream | Private by policy; your call if any part should ever go November 9 review: Private display-management equations remain excluded; LP-1 is public renderer-hook discussion only. [November review](../upstream/november-2026/README.md). |
+| LP-1 | Frame-owned display-mapping hook before ordinary scaling and conversion | rog_hdr_dv | Discussion draft | Public renderer callback receives authoritative frame metadata and reconstructed native master; propagates mapper failure before generic conversion. Discuss generic hook/lifetime design and exclude private ABI namespace/build glue. LP-DM private equation work remains excluded; no private provider implementation is proposed. New Plurx patch0006 normalizes only local reconstruction color metadata before the existing private display mapper. It is context for the public hook/contract discussion, not a new baseline upstream defect. [November review](../upstream/november-2026/README.md). |
+| LP-2 | Honor flipped enhancement planes and contributing-frame failure/target ownership | rog_hdr_dv | Held | Source honors vertical flip, rejects failed contributing-frame acquisition and avoids double release of borrowed mixer target. Native flip: three composed/mapped frames; failing non-reference acquisition correctly fails rendering. Extract upstream-generic fixes from the new hook fatal-state behavior; add current-upstream regression. New Plurx patch0006 checks renderer error/disabled-hook state after the local reconstruction pass. Retain as contributing-frame failure context; do not duplicate it as another independent upstream unit. [November review](../upstream/november-2026/README.md). |
+| LP-3 | Discuss reusable exact binary32-to-UNORM16 ties-to-even quantization | cinema | Discussion draft | [November material](../upstream/november-2026/OTHER_PROJECTS.md) · Public integer GLSL helper rounds the exact binary32 input times65535 with ties-to-even rather than rounding a prior float product. Its actual consumer is the custom Vulkan mapped UNORM16 cache, not a generic stock libplacebo correction. Test source compiles the extracted shader as a CPU control against an independent rational oracle; expected exhaustive totals are assertions, not newly run results. Discuss the reusable quantizer API/placement and add native GPU validation; private mapping equations remain excluded. |
 
 ## WineHQ
 
@@ -260,3 +285,72 @@ not newly established upstream defects.
 | EX-4 | Unexplained uuid override | Curator/Runner | Not for upstream | [material](../upstream/expo/README.md) · Inventory E4: uuid override has no documented upstream defect; recover its local rationale. |
 | ST-1 | Channel normalization semantics | rog_audio | Not for upstream | [material](../upstream/speaker-tuning-to-easyeffects/README.md) · unit 01: excluded |
 | ST-2 | All-cut normalization semantics | rog_audio | Not for upstream | [material](../upstream/speaker-tuning-to-easyeffects/README.md) · unit 01: excluded |
+
+## Tiling Assistant
+
+Venue: https://github.com/ubuntu/Tiling-Assistant · PR to the actual upstream subproject; extract the six-patch source series before proposing it.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| TA-1 | Own synthetic tiling animations without consuming native Shell completion accounting | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · Six patches on actual upstream v56. Keep ownership, cancellation, overlays, finite geometry and Shell callback ease correction together. Historical first-five source has35 distinct valid offline passes from26 initial+9 failed-only retries, not a new full clean35 run. Sixth callback-API patch has source/package proof; no invented fresh full-suite or broad fullscreen/cross-mode acceptance. Current upstream port, candidate commit explanatory bodies/attribution and latest six-patch focused qualification remain before submission. |
+
+## GTK / GDK
+
+Venue: https://gitlab.gnome.org/GNOME/gtk · GNOME MR; public API contracts need maintainer discussion.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| GTK-1 | Expose immutable per-surface preferred display targets with lifecycle invalidation | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md) · Existing shared Wayland color manager owns feedback; default target discovery remains separate from experimental content rendering. Copies physical primaries/black/peak/reference and rejects invalid generations. Native startup, late-manager and reentrant destruction controls passed on pinned Ubuntu source. Agree GTK public API, per-output move/spanning/hotplug coverage and current upstream port. Split unrelated coordinate fix GTK-2 out of the combined source patch. |
+| GTK-2 | Store green, blue and white Y coordinates in their own Wayland fields | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · Three listener paths (explicit primaries, named primaries, target primaries) overwrote red Y instead of setting g_y/b_y/w_y. It is embedded in GTK-1 patch, but independently upstreamable. Extract minimal baseline correction and focused listener regression, verify current upstream still affected; existing combined compilation/replay is not that standalone proof. |
+| GTK-3 | Track a per-surface HDR rendering lease and actual presentation precision | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md) · Demand-scoped HDR lease invalidates target/draw-context/precision witnesses and returns to SDR when released. Native EGL four-patch PQ samples, normal Vulkan/introspection and lease lifecycle have scoped evidence. Public API and renderer/offload semantics require maintainer discussion; package symbol/changelog patches are distribution delivery only. |
+| GTK-4 | Query implementation read format/type using GLES-supported framebuffer state | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · A one-pixel normalized16-bit PQ source reproduced transparent black under the normal Vulkan GTK consumer when NVIDIA rejected EGL export. glGetFramebufferParameteriv generated GL_INVALID_ENUM; glGetIntegerv recovered the exact four stored16-bit words. Correction also gates desktop GL at4.5. Extract/rebase minimal generic fix and add upstream regression; combined package/player controls do not substitute for standalone current-upstream proof. |
+| GTK-5 | Bind original video pictures and asynchronous target regrading to each GtkVideo view | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md) · Each realized view has copied target, lease and mapper; original pictures retained before playsink and stale stream/caps/view/target generations rejected. Default Vulkan two-view paused616→308→616 exact-return, source replacement, one-view destruction and absent/incompatible/incomplete SDK SDR startup pass. Agree generic upstream mapper/destination integration rather than sending the private provider or distribution SDK coupling. No private mapper equations or implementation belong in submission. |
+
+## Glycin
+
+Venue: https://gitlab.gnome.org/GNOME/glycin · GNOME MR; Loupe is the delivery carrier for this vendored code.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| GLY-1 | Preserve ICC gamut and precision in floating-point textures, with alpha and stride correctness | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · Actual code belongs to Glycin3.1 embedded in Loupe50, not a Loupe application patch. Convert ICC into linear BT.2020 float16/32 instead of clipping/quantizing into source integer sRGB; preserve CICP precedence, invalid-profile fallback, alpha, source row stride and transactional failure. Alpha correction folds into this unit because it repairs the new conversion path. Digital fixtures cover256gray levels, RGB/RGBA8/16, associatedU8/U16/F32, padded rows and malformed data; optical/external monitor scope open. Extract vendor-independent current Glycin port/tests; omit Cargo overrides, Debian metadata and vendored checksums. |
+
+## TIFF (Rust)
+
+Venue: https://github.com/image-rs/image-tiff · Rust TIFF crate; Glycin is the delivery carrier, not the fix destination.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| TIFF-1 | Read BYTE and UNDEFINED metadata under the actual byte budget | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · Actual code belongs to tiff0.11.3 at image-rs/image-tiff, carried inside Ubuntu glycin-loaders2.2.1. Read byte fields without allocating per-element Value objects; bound total metadata and grow only after successful reads.21,012-byte ICC fixture at80/320/1024pixels with BYTE/UNDEFINED and bad offset/excess count controls passes ordinary sandbox loader. Extract current TIFF crate change with crate-local regression; omit distribution overrides and checksum churn. |
+
+## WebKitGTK
+
+Venue: https://github.com/WebKit/WebKit · WebKit contribution workflow; only the public browser baseline and a design discussion are inventoried here.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| WK-1 | Honor an explicit SDR destination when grading clear Dolby video into ordinary GTK browser pages | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md) · Public baseline WebKitGTK2.52.6 controls show identical output with/without Dolby carrier metadata. Active implementation is private, not a public patch kit. November9 handoff reports guarded full build resumed after memory stop; native SDR adapter evidence is not finished browser product acceptance. Keep discussion scoped to clear/unprotected SDR page output. Full high-precision HDR page composition, per-view typed target lifecycle, protected services and final browser comparison remain open. Do not publish private source/header or inference equations. |
+
+## Mesa
+
+Venue: https://gitlab.freedesktop.org/mesa/mesa · MR; separate WSI fixes from Ubuntu packaging.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| MESA-1 | Validate and omit unavailable optional Wayland HDR metadata | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · Separate producer from MPV-1: Vulkan WSI emitted MaxFALL=0, rejected by Weston. Source adds finite/quantized unsigned luminance bounds and optional-request omission. Corrected driver accepted. Extract from Debian quilt/changelog, port to current Mesa, add source regressions before submission. |
+| MESA-2 | Keep Wayland FIFO deadlines in the compositor clock domain | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · About 4.1 seconds of false deadlines from CLOCK_MONOTONIC_RAW versus swapchain clock. Separate internal deadline and public completion domains; retain zero-time sentinel. Native timing controls and amd64/i386 packages qualified; player output drops retained. Needs current upstream port/test/description. |
+
+## GStreamer
+
+Venue: https://gitlab.freedesktop.org/gstreamer/gstreamer · MR; keep per-library source ownership and public API discussion explicit.
+
+| Unit | Change | From | Status | Notes |
+|---|---|---|---|---|
+| GST-1 | Picture-owned original RPU metadata across reordering and flushes | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · New GstVideo meta owns AU bytes and uses matched GstVideoCodecFrame rather than last-picture state; only identity-compatible copies retain it. Native avdec/VA gap/reorder/seek/lifetime/transform controls exist. New meta/tag/copy API needs upstream agreement. Transport is not resolved metadata or FEL reconstruction. |
+| GST-2 | Attach original HEVC RPU only from completed access units | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · h265parse owns completed-AU bytes with parser/reset/flush safety; scoped positive/negative transport controls exist. Depends on proposed GstVideo meta API; requires upstream source port and native test harness. |
+| GST-3 | Bounded reusable HEVC Dolby configuration parser in pbutils | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · Reusable dvcC/dvvC parser validates version/flags/profiles/length and writes output only on success; missing compatibility does not infer color space. New public API needs upstream agreement; exclude distro ABI metapackage/symbol packaging. |
+| GST-4 | Preserve authoritative Dolby configuration per MP4 sample entry | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · qtdemux retains bounded sample-entry configuration with correct stream/caps transition and shared validation. Native no-config/replacement controls exist. Depends on pbutils API; compare current upstream and extract source-only patch from packaging. |
+| GST-5 | Preserve bounded track-local Dolby configuration in Matroska | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · Validates bounded BlockAdditionMapping payload/type, duplicates/conflicts and independent track state. 25 focused controls pass; stock negative rejects expected config; native P5 resolved 3 pictures. P7 check is config-only with no residual/reconstruction claim. Prepare current upstream patch/test/description. |
+| GST-6 | Bind software libav decoder Dolby state to each decoded picture | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · avdec consumes authoritative strict frame metadata, conformance geometry and live config transitions without resetting ordinary video; transforms discard stale provenance. Native mid-GOP/reset/equal-pixel controls pass. Current gstdovipicture helper and FFmpeg resolver are local: agree upstream owned snapshot API/dependencies first. |
+| GST-7 | Associate native VA Dolby state with the decode-order surface | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · Owned resolved snapshot follows VA surface through reordering, flush/config generations and visible crop. Native gap/reorder/seek/lifetime/conformance and transform controls exist. Depends on proposed public snapshot/resolver API; does not itself establish mapped FEL output. |
+| GST-8 | Keep picture-owned Dolby provenance and conformance geometry in NVDEC | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/MEDIA.md) · Nine producer controls cover avdec/VA/NV; 95-picture config transitions retain normalized pixels; ordinary HEVC gains no Dolby metadata; transformations drop stale provenance. Depends on upstream snapshot/resolver design. Strip dependency/quilt wrappers. Native GStreamer P7 FEL reconstruction remains unfinished separately. |
+| GST-9 | Preserve high precision through GL balance and invalidate changed color provenance | rog_hdr_dv | Held | [November material](../upstream/november-2026/MEDIA.md) · glcolorbalance accepts RGBA64_LE; neutral passthrough retains input, transformed pixels discard color-sensitive provenance. Saved patch mixes full Debian quilt export/autogenerated placeholder metadata with 11 source lines: extract generic source fix and add upstream precision/meta tests. |

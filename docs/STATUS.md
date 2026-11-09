@@ -198,35 +198,31 @@ to observe centering with the corrected code.
 - Panel measurement and calibration (needs a colourimeter); the Windows
   trace of the OEM pipeline (needs a Windows boot).
 
-## Upstream preparation — 2026-10-28
+## Upstream preparation — 2026-11-09
 
-The [submission ledger](UPSTREAM_SUBMISSIONS.md) accounts for all 85 handoff
-entries and four mobile/converter observations omitted from that snapshot.
-[Per-project commands](../upstream/README.md) and the
-[catalog](../upstream/catalog.json) separate review-ready material, design
-questions, missing evidence, superseded fixes and excluded local work.
-These are preparation states; nothing has been submitted to a third-party
-upstream.
+The [submission ledger](UPSTREAM_SUBMISSIONS.md) now accounts for 124 entries
+across 27 upstream destinations, plus local converter observations. The
+[November audit](../upstream/november-2026/README.md) adds 35 entries to the
+original 89: 30 from the Linux display effort, three from Runner and two from
+Plurx. It inspects public source through `ac82059`, the recorded Runner and
+Plurx source heads, and existing receipts. Active source/build work is identified separately.
 
-Independent review corrected a protocol luminance overflow in the Mutter
-kit and moved teardown cleanup into the first commit that needs it. The
-[fresh receipt](../evidence/upstream-saved-review.json) records exact source
-trees, builds, tests and inherited limits. Runner's saved rqbit kit also
-received an atomic peer-cleanup race fix with a failing-before regression,
-177 passing upstream tests, formatting and Clippy; its source stays in
-[Runner PR #257](https://github.com/pjunod/runner/pull/257).
+The additions are 18 held candidates, 15 discussion drafts and two groups
+of imported upstream fixes. They cover Mesa, Mutter, Tiling Assistant,
+GTK/GDK, GStreamer, FFmpeg, mpv, libplacebo, Glycin, the Rust TIFF crate,
+WebKit's public baseline and Runner's library changes. Original authorship
+is retained; private mapping code and distribution-only glue stay outside
+submission scope. LNX-3 now records its real downstream fix and bounded
+November 2 VRR pass instead of claiming that no patch or hardware evidence
+exists. The newer MPV-1 delivery is context for the existing item.
 
-Other kits retain their exact upstream bases and scoped evidence. Existing
-gemm proposals receive a validation reply rather than a duplicate patch;
-the old FFmpeg RASL issue is already fixed upstream. The converter's
-normalization observations match its documented default and existing
-`--enable level-restore` option. Private display-management code, physical
-captures and credentials remain outside the submission material.
-
-The owner still reviews and edits descriptions, supplies project account
-tokens and a kernel mail route, and resolves the explicitly held design or
-physical-evidence items. Preparation does not change the installed display
-stack or establish new hardware acceptance.
+The 43 October patch units retain their exact source qualifications and
+[submission commands](../upstream/README.md). This inventory pass does not
+advance those bases or claim newly run native tests. New candidates need
+the source extraction, upstream design agreement and focused qualifications
+listed in their notes before acquiring a submission helper. The owner still
+reviews descriptions, supplies sign-offs/accounts/mail setup and resolves
+named holds. No upstream submission or display change is performed here.
 
 ## Snapshot — 2026-10-18
 

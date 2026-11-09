@@ -1,15 +1,20 @@
 # Upstream preparation — choose the project, then the unit
 
-**Status:** preparation complete; contributor review and listed holds remain
-· **Updated:** 2026-10-28.
+**Status:** October kits retained; November additions inventoried with explicit
+preparation holds · **Updated:** 2026-11-09.
 
 Start with the [submission ledger](../docs/UPSTREAM_SUBMISSIONS.md), which
-covers the original 85 tracked entries across 20 projects. The
+covers 124 entries across 27 upstream destinations, plus local converter
+observations. The [November review](november-2026/README.md) adds 35 entries
+from the newer Linux display and Runner work. The
 [catalog](catalog.json) connects each entry to its preparation material.
 The ledger includes grouped changes, design questions, resolved items and
 work that stays local; those counts do not describe ready pull requests.
 
-Each project's README gives the exact source base, unit order, overlap with
+The existing kits retain 43 prepared patch units from October; newly
+inventoried work is held or a discussion draft until independently prepared.
+
+Each kit's README gives the exact source base, unit order, overlap with
 existing work, commands and evidence limits. A prepared patch still needs
 the contributor's review. A held item needs its stated evidence or design
 decision before it can become a submission.

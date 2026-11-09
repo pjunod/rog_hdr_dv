@@ -208,7 +208,7 @@ has the remote and branch rules.
 | Document | Answers |
 |---|---|
 | [Development](docs/DEVELOPMENT.md) | Reconstructing source, proving changes, remotes and branches |
-| [Upstream submissions](docs/UPSTREAM_SUBMISSIONS.md) · [submission kits](upstream/README.md) | Every upstream item's disposition, evidence, submission order and remaining prerequisites |
+| [Upstream submissions](docs/UPSTREAM_SUBMISSIONS.md) · [November review](upstream/november-2026/README.md) · [submission kits](upstream/README.md) | 124 tracked entries across 27 upstream destinations, source/evidence boundaries and remaining preparation |
 | [Operations](docs/OPERATIONS.md) | Inspecting the laptop safely and keeping recovery possible |
 | [Review](docs/REVIEW.md) | Adversarial review findings and their dispositions |
 | [Provenance](docs/PROVENANCE.md) | Where imported work came from and how to read its evidence |

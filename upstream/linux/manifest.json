@@ -64,12 +64,29 @@
       ],
       "title": "i915: VRR page flip loses PSR set-context latency on display 13/14",
       "type": "issue",
-      "status": "needs-human-hardware-evidence",
+      "status": "held-upstream-preparation",
       "blockers": [
-        "Fresh hardware scope/reproduction and latest-thread verification are not established."
+        "Extract and qualify the implemented downstream correction on the selected current upstream source.",
+        "Update the scoped report, verify current recipients and relevant threads, and obtain the owner's reviewed DCO and mail setup before delivery."
       ],
       "patches": [],
-      "tests": []
+      "tests": [],
+      "downstream_source": {
+        "patch": "patches/linux/0005-drm-i915-psr-keep-Wa_14015401596-s-set-context-laten.patch",
+        "package": "linux-source-7.3.0",
+        "version": "7.3.0-10.10",
+        "base_commit": "0edb54d9220da4f863845a1d1cfdfcf652db51e1",
+        "candidate_tree": "b76fb4d9e81f5b44a840810ffbb341929b765c8d",
+        "scope": "Repository-relative paths identify downstream evidence; these are not outgoing patches or a newly qualified upstream unit."
+      },
+      "retained_validation": {
+        "repository_receipts": [
+          "evidence/kernel-7.3-rebase.json",
+          "evidence/software-delivery-20261102.json"
+        ],
+        "bounded_target": "November 2 owner-attended stock-mpv fullscreen/windowed fixture: live VRR_ENABLED 0\u21921\u21920; zero page-flip errors; normal visible output.",
+        "limits": "No optical, long-duration, suspend/resume, other-GPU/mode or external-monitor acceptance. Parser KUnit passes qualify DisplayID source, not a dedicated VRR regression."
+      }
     }
   ]
 }

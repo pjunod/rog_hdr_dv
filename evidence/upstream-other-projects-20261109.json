@@ -1,0 +1,359 @@
+{
+  "schema_version": 1,
+  "recorded": "2026-11-09",
+  "kind": "upstream-inventory-source-audit",
+  "scope": "Other projects: new Runner dependency changes and bounded plurx, Curator and rog_audio coverage since October 28.",
+  "runner_source_head": "6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e",
+  "coverage": [
+    {
+      "repository": "plurx",
+      "head": "4ddbf122972613de623a14e4d92f63d480eb5924",
+      "examined": "Bounded post-2026-10-28 log; complete date-filtered path history for vendor/contrib/patches and named patch paths; docs references.",
+      "finding": "The initial local head had no vendor-tree changes after October 28. Complete remote-head inspection additionally found three mpv patch exports and their production-source controls. The exports are recorded below for integration review; no current-upstream qualification is inferred.",
+      "limit": "Local source inspection is supplemented by complete immutable remote-tree path coverage and exact-head reads of relevant patches/tests. No third-party upstream-head comparison, native execution or live-runtime measurement performed.",
+      "initial_source_head": "4ddbf122972613de623a14e4d92f63d480eb5924",
+      "remote_head": "8ab61a77989c8200af8db6f060328192e47ee16f",
+      "remote_delta_check": {
+        "checked": "2026-11-09",
+        "base": "4ddbf122972613de623a14e4d92f63d480eb5924",
+        "head": "8ab61a77989c8200af8db6f060328192e47ee16f",
+        "status": "ahead",
+        "ahead_commits": 246,
+        "comparison_url": "https://github.com/pjunod/plurx/compare/4ddbf122972613de623a14e4d92f63d480eb5924...8ab61a77989c8200af8db6f060328192e47ee16f",
+        "initial_compare_file_count": 300,
+        "method": "Complete non-truncated recursive Git trees; compare endpoint capped at 300 files.",
+        "changed_files": 318,
+        "base_tree": "4ddbf122972613de623a14e4d92f63d480eb5924",
+        "head_tree": "8ab61a77989c8200af8db6f060328192e47ee16f",
+        "tree_truncated": false
+      }
+    },
+    {
+      "repository": "runner",
+      "head": "6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e",
+      "examined": "Complete date-filtered vendor/contrib/patches history since October 28; new patch bodies and focused test source.",
+      "finding": "The initial source supplies the three inventoried candidates. The complete later remote delta changes no vendor/contrib/patch paths, so those source hashes remain pinned to the initial inspected head. Mobile package metadata changes only the app version.",
+      "limit": "Remote head checked for changed-path coverage; candidate files retain their initial exact-source hashes because no candidate path changed. Existing rqbit kits are not requalified.",
+      "initial_source_head": "6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e",
+      "remote_head": "30f4a1a8e68317cad4ca9cd71773557ef812f0e4",
+      "remote_delta_check": {
+        "checked": "2026-11-09",
+        "base": "6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e",
+        "head": "30f4a1a8e68317cad4ca9cd71773557ef812f0e4",
+        "status": "ahead",
+        "ahead_commits": 176,
+        "comparison_url": "https://github.com/pjunod/runner/compare/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e...30f4a1a8e68317cad4ca9cd71773557ef812f0e4",
+        "initial_compare_file_count": 170,
+        "method": "Complete GitHub compare changed-file list below 300-file cap.",
+        "changed_files": 170,
+        "vendor_contrib_patch_changes": 0,
+        "mobile_dependency_change": "Own app version only: 1.1.4 to 1.1.7."
+      }
+    },
+    {
+      "repository": "curator",
+      "head": "b271ea401dfb0fcf5e0650c1a20da3597b0d454f",
+      "examined": "Bounded post-October-28 history and complete date-filtered plugin/package/patch/vendor path history.",
+      "finding": "No new upstream library or plugin implementation identified. The later remote delta changes mobile dependency patch versions and own application behavior; this does not establish that the earlier Expo candidate is fixed or obsolete.",
+      "limit": "Full changed-file delta inspected at immutable remote head; mobile manifests read at both ends. No Expo upstream source or installed package implementation requalification.",
+      "initial_source_head": "b271ea401dfb0fcf5e0650c1a20da3597b0d454f",
+      "remote_head": "ae26882cae67edfedd2b7395c53158448261f9b4",
+      "remote_delta_check": {
+        "checked": "2026-11-09",
+        "base": "b271ea401dfb0fcf5e0650c1a20da3597b0d454f",
+        "head": "ae26882cae67edfedd2b7395c53158448261f9b4",
+        "status": "ahead",
+        "ahead_commits": 101,
+        "comparison_url": "https://github.com/pjunod/curator/compare/b271ea401dfb0fcf5e0650c1a20da3597b0d454f...ae26882cae67edfedd2b7395c53158448261f9b4",
+        "initial_compare_file_count": 272,
+        "method": "Complete GitHub compare changed-file list below 300-file cap.",
+        "changed_files": 272,
+        "vendor_contrib_patch_plugin_changes": 0,
+        "mobile_dependency_change": "Expo SDK 57 package patch-version alignment plus own app version 0.27.0 to 0.28.0; no plugin source change."
+      }
+    },
+    {
+      "repository": "rog_audio",
+      "source": "https://github.com/pjunod/rog_audio",
+      "head": "ee47f81460169ec3dd3ddb7126110ca635cd81cf",
+      "comparison_base": "25ccbf0984d95db19d9ab0d473c8bef3d9f64f45",
+      "examined": "GitHub API read-only full file delta for all commits since October 28; latest commit and service patch.",
+      "finding": "Post-October-28 work is owned systemd service ordering and bounded BPF/realtime/SIGKILL diagnostics. No changed upstream Cavern or EasyEffects source in that delta. Do not invent PipeWire upstream patch from own service Wants/After/BindsTo/PartOf changes.",
+      "changed_source_paths": [
+        "systemd/rog-audio-speaker.service",
+        "scripts/observe_speaker_runnable.py",
+        "scripts/trace_speaker_runnable.bt",
+        "scripts/trace_speaker_signals.bt",
+        "tests/speaker_runnable_fixture.c"
+      ],
+      "limit": "No local rog_audio checkout found in bounded owner/external roots; remote API supplied actual source delta. Existing audio candidates remain; this does not prove remote non-submission."
+    }
+  ],
+  "entries": [
+    {
+      "id": "R14",
+      "project": "rqbit",
+      "effort": "Runner",
+      "title": "Read-only selected-piece verification over caller-owned storage",
+      "disposition": "discussion-draft",
+      "source_base": "rqbit v8.1.1 00b97485160ff5b5aa2b379ea0815d568ec665f0 plus maintained series",
+      "artifacts": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/contrib/rqbit/0022-read-only-piece-verifier.patch",
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/contrib/rqbit/README.md"
+      ],
+      "evidence": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/crates/nzbd-torrent/src/lib.rs"
+      ],
+      "test_names": [
+        "nzbd-torrent::tests::selected_piece_verification_checks_neighbor_boundary_and_changed_payload"
+      ],
+      "notes": "New public verify_selected_piece_ranges API reuses rqbit piece verification against callback-backed read-only storage, merges selected piece ranges, verifies neighboring boundary bytes and supports cancellation checkpoints. Existing source regression covers neighboring-file boundary bytes, corrupt payload and Interrupted callback. Discuss API shape first; export standalone current-upstream port and move tests into upstream before preparing a PR. Downstream stable delta alone is not an upstream kit.",
+      "rationale": "Added by Runner 0af6210 on November 1, absent from original R1\u2013R13. Separate from session restore, tracker, peer/discovery budgets and existing design issues.",
+      "evidence_kind": "source assertions inspected; no newly executed qualification",
+      "source_files": [
+        {
+          "path": "contrib/rqbit/0022-read-only-piece-verifier.patch",
+          "sha256": "95ed15251cfd266e50acb88c3b4bc85fb0044f3febbb5b4f31a0a1e5b1d3d95f"
+        },
+        {
+          "path": "contrib/rqbit/vendor/crates/librqbit/src/file_ops.rs",
+          "sha256": "499326ce39b1a61744e3443d4bc331035d35b957c2901ebeb764093e9c31b15d"
+        },
+        {
+          "path": "contrib/rqbit/vendor/crates/librqbit/src/lib.rs",
+          "sha256": "f09230c0d5e8b7698cc008c9ec0f1d61e078c8493c40c4be248c450565a39116"
+        }
+      ],
+      "source_commit": "0af6210fd0cbaa6f2cdd08421e02eb70f7364e1a"
+    },
+    {
+      "id": "R15",
+      "project": "rqbit",
+      "effort": "Runner",
+      "title": "Locate the first intersecting file before verifying a piece",
+      "disposition": "held",
+      "source_base": "rqbit v8.1.1 plus maintained series",
+      "artifacts": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/contrib/rqbit/0022-read-only-piece-verifier.patch"
+      ],
+      "evidence": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/crates/nzbd-torrent/src/lib.rs"
+      ],
+      "notes": "The same maintained patch replaces a scan over every preceding torrent file with partition_point and skips directly to the first intersecting file. This generic FileOps optimization can be split from the new API. Needs current-upstream check, isolated export and dedicated boundary/zero-length-file/performance regression; inspected source test is not sufficient proof of lookup behavior or speed.",
+      "rationale": "Distinct change to existing piece verification, separable from new API and absent from prior catalog; do not count it as a qualified code submission yet.",
+      "evidence_kind": "source assertions inspected; no newly executed qualification",
+      "source_files": [
+        {
+          "path": "contrib/rqbit/0022-read-only-piece-verifier.patch",
+          "sha256": "95ed15251cfd266e50acb88c3b4bc85fb0044f3febbb5b4f31a0a1e5b1d3d95f"
+        },
+        {
+          "path": "contrib/rqbit/vendor/crates/librqbit/src/file_ops.rs",
+          "sha256": "499326ce39b1a61744e3443d4bc331035d35b957c2901ebeb764093e9c31b15d"
+        }
+      ],
+      "source_commit": "0af6210fd0cbaa6f2cdd08421e02eb70f7364e1a"
+    },
+    {
+      "id": "HQ-27",
+      "project": "hiqlite",
+      "effort": "Runner",
+      "title": "Close upgraded API streams when their Raft group terminates",
+      "disposition": "held",
+      "source_base": "Runner hiqlite fork provenance points at plurx 8663d6c0e7d4a8242cd1b6c6d385cecd72c7d176; current upstream port missing",
+      "source_commit": "14f283c6acd719cabcf5c99fda85675fca8b160d",
+      "artifacts": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/vendor/hiqlite/src/network/api.rs",
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/vendor/README.md"
+      ],
+      "evidence": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/Makefile"
+      ],
+      "test_names": [
+        "api_stream_stop_watch_ignores_live_updates_and_observes_terminal_states"
+      ],
+      "notes": "An upgraded API WebSocket can outlive the listener and keep returning stopped-leader errors to survivors. Watch the corresponding Raft group metrics and stop the existing writer loop on shutdown, fatal running_state or a closed watch channel. Focused source test covers live updates and all three terminal cases; Makefile names it. Split the generic library fix from Runner minority-shutdown adapter changes, reconcile with current upstream socket lifecycle and produce an independently qualified port before PR preparation.",
+      "rationale": "Added November 3; not HQ-10 task supervisor joining or HQ-11 dropped-RPC manager notification. It concerns terminal Raft group lifetime of already established server API streams.",
+      "evidence_kind": "source assertions inspected; no newly executed qualification",
+      "source_files": [
+        {
+          "path": "vendor/hiqlite/src/network/api.rs",
+          "sha256": "e81131283d29f6bac3cb8dcff50fd52f9d84ffee6014f620b0ed6e6528600154"
+        },
+        {
+          "path": "vendor/README.md",
+          "sha256": "e42650cabc981db5b0c5636c0792f0a905725be47efd09db3b174e72d20c36b2"
+        },
+        {
+          "path": "Makefile",
+          "sha256": "8bd9d4915ad9a9f63d3aec043378cd5fcbf866a4336cae0f56a4ff605100c601"
+        }
+      ]
+    },
+    {
+      "id": "MPV-8",
+      "project": "mpv",
+      "effort": "cinema",
+      "title": "Preserve planar 10-bit software upload precision and required enhancement-layer cleanup",
+      "disposition": "held",
+      "source_repository": "pjunod/plurx",
+      "source_commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+      "source_base": "Downstream mpv export in the pinned Plurx source; a standalone current-upstream base is not qualified.",
+      "artifacts": [
+        "upstream/november-2026/OTHER_PROJECTS.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0007-vo_gpu_next-preserve-DV-software-sampling-precision.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/test_dv_render_precision.py"
+      ],
+      "test_names": [
+        "DvRenderPrecision.test_production_upload_lifetime_and_required_el_cleanup"
+      ],
+      "notes": "Owned high-aligned UNORM16 staging preserves low-aligned planar 10-bit software filtering for Dolby and limited BT.2020/PQ, including ordinary HDR10. Hardware/P010/integer paths retain their behavior; required enhancement mapping failures clean partially owned resources. Source controls cover code values, strides, eligibility and lifetimes. No new execution, generalized native-build or GPU-performance claim. Extract the generic upload/cleanup change from private consumer glue and qualify against current mpv before submission.",
+      "rationale": "New patch0007 after the local inspected head; distinct from MPV-1 optional metadata and MPV-6 raw-RPU ownership.",
+      "evidence_kind": "source assertions inspected; no newly executed qualification",
+      "source_files": [
+        {
+          "repository": "pjunod/plurx",
+          "commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+          "path": "clients/linux-player/packaging/patches/mpv/0007-vo_gpu_next-preserve-DV-software-sampling-precision.patch",
+          "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0007-vo_gpu_next-preserve-DV-software-sampling-precision.patch",
+          "sha256": "b8e440ebd7cea59e590546947a7d3bc596bf1d4ac348f0f4eb25e72bf6fe796b"
+        },
+        {
+          "repository": "pjunod/plurx",
+          "commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+          "path": "clients/linux-player/tests/test_dv_render_precision.py",
+          "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/test_dv_render_precision.py",
+          "sha256": "fe91bc500c1f0fbc4cae3a44f28a6ad22abc468936c9e58ae9af7700fec1362b"
+        }
+      ]
+    },
+    {
+      "id": "LP-3",
+      "project": "libplacebo",
+      "effort": "cinema",
+      "title": "Discuss reusable exact binary32-to-UNORM16 ties-to-even quantization",
+      "disposition": "discussion-draft",
+      "source_repository": "pjunod/plurx",
+      "source_commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+      "source_base": "A public helper in the custom mapped-cache path; no current libplacebo defect or qualified upstream port asserted.",
+      "artifacts": [
+        "upstream/november-2026/OTHER_PROJECTS.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0008-vo_gpu_next-round-the-final-DV-UNORM16-cache-exactly.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/test_dv_unorm16.py"
+      ],
+      "test_names": [
+        "DvUnorm16.test_exact_terminal_shader_against_rational_reference"
+      ],
+      "notes": "Public integer GLSL helper rounds the exact binary32 input times65535 with ties-to-even rather than rounding a prior float product. Its actual consumer is the custom Vulkan mapped UNORM16 cache, not a generic stock libplacebo correction. Test source compiles the extracted shader as a CPU control against an independent rational oracle; expected exhaustive totals are assertions, not newly run results. Discuss the reusable quantizer API/placement and add native GPU validation; private mapping equations remain excluded.",
+      "rationale": "New patch0008 public conversion helper; separate from public mapping-hook design and contributing-frame lifetime/error handling.",
+      "evidence_kind": "source assertions inspected; no newly executed qualification",
+      "source_files": [
+        {
+          "repository": "pjunod/plurx",
+          "commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+          "path": "clients/linux-player/packaging/patches/mpv/0008-vo_gpu_next-round-the-final-DV-UNORM16-cache-exactly.patch",
+          "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0008-vo_gpu_next-round-the-final-DV-UNORM16-cache-exactly.patch",
+          "sha256": "98f3e488d51e5d5c0116e7605be17615c35002490ffcb10b0b19ed4a0d7e327e"
+        },
+        {
+          "repository": "pjunod/plurx",
+          "commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+          "path": "clients/linux-player/tests/test_dv_unorm16.py",
+          "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/test_dv_unorm16.py",
+          "sha256": "f453dce24f1f5e901e5d357c93b780ff09c7f799bb47da2559e333443b2830f4"
+        },
+        {
+          "repository": "pjunod/plurx",
+          "commit": "8ab61a77989c8200af8db6f060328192e47ee16f",
+          "path": "clients/linux-player/tests/dv_unorm16_controls.c",
+          "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/dv_unorm16_controls.c",
+          "sha256": "e321611101e6feb92d1da57ea22470098fc62a46dabc328737f7d3eb2e3352c4"
+        }
+      ]
+    }
+  ],
+  "execution": {
+    "tests_run": false,
+    "compilation_run": false,
+    "upstream_head_checked": false,
+    "existing_ready_kits_requalified": false,
+    "upstream_communication_performed": false,
+    "remote_delta_checks_performed": true
+  },
+  "interpretation": "Test source presence and a named command establish inspectable behavior checks, not a passing execution receipt or an upstream-ready port.",
+  "remote_source_material": {
+    "repository": "pjunod/plurx",
+    "head": "8ab61a77989c8200af8db6f060328192e47ee16f",
+    "patches": [
+      {
+        "path": "clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch",
+        "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch",
+        "sha256": "a92fcd49dbf58d4732b4cd12559aa7cbc63b5db75b54a21500fe64789846fc5c"
+      },
+      {
+        "path": "clients/linux-player/packaging/patches/mpv/0007-vo_gpu_next-preserve-DV-software-sampling-precision.patch",
+        "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0007-vo_gpu_next-preserve-DV-software-sampling-precision.patch",
+        "sha256": "b8e440ebd7cea59e590546947a7d3bc596bf1d4ac348f0f4eb25e72bf6fe796b"
+      },
+      {
+        "path": "clients/linux-player/packaging/patches/mpv/0008-vo_gpu_next-round-the-final-DV-UNORM16-cache-exactly.patch",
+        "url": "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0008-vo_gpu_next-round-the-final-DV-UNORM16-cache-exactly.patch",
+        "sha256": "98f3e488d51e5d5c0116e7605be17615c35002490ffcb10b0b19ed4a0d7e327e"
+      }
+    ],
+    "source_tests": [
+      {
+        "path": "clients/linux-player/tests/test_dv_render_precision.py",
+        "test": "DvRenderPrecision.test_production_upload_lifetime_and_required_el_cleanup",
+        "scope": "Extracts the actual added production headers/functions and compiles a CPU boundary-control harness; source inspected, test not run during audit."
+      },
+      {
+        "path": "clients/linux-player/tests/test_dv_unorm16.py",
+        "test": "DvUnorm16.test_exact_terminal_shader_against_rational_reference",
+        "scope": "Source expects 142606336 cases, zero mismatches and 16320 float-product errors on either side against a rational reference; these are assertions, not newly executed totals."
+      }
+    ],
+    "classification_limit": "Current source extraction and upstream destination/design review remain required. The custom reconstruction/cache call sites do not make private display-mapping implementation publishable or prove an unmodified upstream defect."
+  },
+  "existing_entry_context_updates": [
+    {
+      "id": "LP-1",
+      "action": "retain existing disposition; add remote source context",
+      "notes": "New Plurx patch0006 normalizes only local reconstruction color metadata before the existing private display mapper. It is context for the public hook/contract discussion, not a new baseline upstream defect.",
+      "artifacts": [
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json"
+      ]
+    },
+    {
+      "id": "LP-2",
+      "action": "retain existing disposition; add remote source context",
+      "notes": "New Plurx patch0006 checks renderer error/disabled-hook state after the local reconstruction pass. Retain as contributing-frame failure context; do not duplicate it as another independent upstream unit.",
+      "artifacts": [
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json"
+      ]
+    },
+    {
+      "id": "MPV-3",
+      "action": "retain existing disposition; add remote source context",
+      "notes": "The custom reconstruction/cache source remains excluded from direct submission. New public upload/quantization candidates do not authorize private mapper implementation or equations.",
+      "artifacts": [
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json"
+      ]
+    }
+  ]
+}
