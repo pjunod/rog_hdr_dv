@@ -1,28 +1,32 @@
 # Status — what is working and what remains
 
-**Updated November 8, 2026.** The ROG runs the seven-package playback update, nativehdr13 desktop and nativehdr3 kernel. Normal mpv opens MP4 and Matroska by default. The staged player graded the complete three-second 4K Profile 7 FEL clip at 24 fps with zero decoder or output drops on the default NVIDIA path in a private hardware-backed compositor. The corrected distribution driver advanced 2.25 seconds of media in 2.26 seconds on Intel. It reported 17 output drops over the clip while package builds were active. [Player release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop and kernel versions](SOFTWARE_DELIVERY.md).
+**Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. The existing session therefore does not establish that the new compositor is active; normal next-login acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
+
+After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; compositor acceptance after normal login and optical measurement remain pending.
+
+A fresh installed `/usr/bin/mpv` played the genuine 3840×2160 Profile 7 FEL clip on a private native GPU-backed Weston compositor. The run requested 24 frames, reported `EL composed=1`, selected the 616 cd/m² target and logged zero Vulkan errors. A separate software-rendered Weston harness could not create a Vulkan swapchain and was inconclusive. These are private-compositor software checks; normal desktop and optical acceptance remain pending.
 
 | On the laptop today | Current development result |
 |---|---|
-| mpv 0.41, FFmpeg filter and the installed Vulkan update | Staged mpv 0.42 played the 4K FEL sample at 24 fps on NVIDIA. |
-| GNOME uses Mutter nativehdr13 and the existing GTK runtime | The updated GTK runtime fixes black Showtime output. The staged player regraded the same paused Profile 5 picture when a virtual GNOME monitor changed from 616 to 308 cd/m². Returning to 616 restored the exact original screen pixels. [GNOME capture](../evidence/gnome-showtime-paused-retarget.json). |
+| mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and the installed Vulkan update | Before installation, mpv 0.42 played the 4K FEL sample at 24 fps on NVIDIA. |
+| Mutter nativehdr15 and the updated GTK runtime are installed; next-login acceptance pending | The updated GTK runtime fixes black Showtime output. The staged player regraded the same paused Profile 5 picture when a virtual GNOME monitor changed from 616 to 308 cd/m². Returning to 616 restored the exact original screen pixels. [GNOME capture](../evidence/gnome-showtime-paused-retarget.json). |
 | Firmware provides panel color and luminance data | On the neutral CM4 chart, using the panel's actual primary coordinates reduced mean ΔE ITP from 0.650 to 0.578. Creative-colour trims still use the named target. Optical calibration is pending. |
 
 **GNOME screen capture.** Mutter wrote 8-bit pixels into shared-memory buffers advertised as 10-bit HDR. With the corrected writer, two 10-bit channel layouts reproduced identical colors across six patches. The half-float capture agreed to within 0.58 of a 10-bit code value. The same paused Dolby movie changed across 397,853 native 10-bit pixels when retargeted from 616 to 308 cd/m². Restoring 616 reproduced the original capture byte for byte. Both checks used a private GNOME monitor on the ROG GPU. [Format and pixel evidence](../evidence/mutter-shared-memory-color-formats.json).
 
-**GtkVideo +4 staged.** Normal Ubuntu packages preserve a separate target and
+**GtkVideo +4 installed; next-login acceptance pending.** Normal Ubuntu packages preserve a separate target and
 retained native picture for each realized video view. Package-extracted
 Profile 5 passed paused 616→308→616 cd/m² retargeting on default Vulkan:
 both video bytes and independent ten-bit PQ compositor output returned exactly
 to A. Five source/offload/view lifecycle controls and four optional-SDK startup
 controls passed. Upgrading the six GTK packages alone would remove the two
 older playback clients. The matched 45-package upgrade preserves them both.
-These GtkVideo checks cover Profile 5. The release is staged on the ROG.
+These pre-install GtkVideo checks cover Profile 5. The release is installed on the ROG; normal next-login acceptance remains pending.
 [Combined package rehearsal](../evidence/panel-desktop-release-bundle.json).
 [View contract](GDK_DISPLAY_TARGET.md#gtkvideo-owns-the-view-target) ·
 [Source and product receipt](../evidence/gtkvideo-view-normal-packages-20261108.json).
 
-**Photographs.** The staged GNOME Image Viewer preserves Adobe RGB color on the HDR desktop. Across six patches its output matched an independent BT.2020 reference within one 10-bit value per channel. The normal loader also retained the embedded color profile in small TIFFs. [Image viewer, package versions and qualification](GNOME_IMAGE_COLOUR.md).
+**Photographs, pre-install qualification.** The candidate GNOME Image Viewer preserved Adobe RGB color on the HDR desktop. Across six patches its output matched an independent BT.2020 reference within one 10-bit value per channel. The normal loader also retained the embedded color profile in small TIFFs. [Image viewer, package versions and qualification](GNOME_IMAGE_COLOUR.md).
 
 **Release rehearsal.** The corrected 45-package candidate completed its upgrade and rollback rehearsal after review. The corrected GTK mapper passed 65 negotiation checks and graded real Dolby frames on both the NVIDIA and Intel decoders. The second fix preserves subtitles changed downstream when the display target changes during pause. Its normal distribution package built and replayed from source. The packaged sink preserved added, replaced and removed subtitles across a paused 616→308→616 cd/m² target change. Video pixels returned exactly to their original values, and subtitle order, alpha, bounds and the paused timestamp stayed correct. [Paused subtitle controls](../packaging/gstreamer-gtk-dovi/probes/paused-overlay-product-receipt.json). [Mapper source, packages and hardware results](../evidence/gstreamer-gtk-mapper-negotiation.json). Offline APT accepted the complete upgrade and an inverse transaction restoring 36 previous packages and removing the nine additions. Normal APT policy selected all 45 intended versions with the five-package compositor preference applied in the simulation. The running desktop still uses the installed versions listed above. [Versions and solver results](../evidence/gnome-desktop-release-bundle.json).
 
@@ -85,7 +89,7 @@ The 32-bit decoder retained all 544 stock decoders, 218 encoders and 67 hardware
 
 Ubuntu's MP4 demuxer now carries the sample description's Dolby configuration through `h265parse`. Genuine Profile 5 and synthetic 8.1 preserved all 24 bytes. Plain HDR10, duplicate boxes and invalid fields carried no Dolby configuration. A four-byte legacy record retained its explicit unknown base compatibility. GTK player rendering remains a separate work item. [Demux and parser controls](../evidence/gstreamer-dovi-isobmff-controls.json).
 
-The corrected packaged player also ran with the laptop’s existing mpv video options and the Intel Vulkan ICD selected by the test environment. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. The five normal Ubuntu compositor packages built, and their upgrade and exact five-package rollback passed offline simulation. The running compositor still uses its previous version. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
+The corrected packaged player also ran with the laptop’s existing mpv video options and the Intel Vulkan ICD selected by the test environment. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. The five normal Ubuntu compositor packages built, and their upgrade and exact five-package rollback passed offline simulation. That observation predates the November 9 installation; next-login compositor acceptance remains pending. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
 
 ## GStreamer RPU transport — native scope passed, November 7
 
