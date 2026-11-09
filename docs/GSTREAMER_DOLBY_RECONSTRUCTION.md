@@ -1,6 +1,6 @@
 # GStreamer resolved Dolby pictures
 
-**Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. Normal candidate package builds and deployment remain separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
+**Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
 
 ## Normal GNOME playback
 
@@ -55,7 +55,11 @@ Ordinary decodebin selected the candidate NVIDIA decoder and paired all 70 pictu
 
 The actual GTK path uploaded both layers, and the provider accepted a composed 3840×2160 master at a declared 616 cd/m² destination. At the same one-second picture, a flush seek preserved both the RGBA64 output and the independent ten-bit PQ compositor capture byte for byte. The missing-EL control retained all 70 original coded base pictures, RPU bytes and timestamps; only enhancement NALs were removed. It reached ordinary base conversion without provider mapping. FEL and missing-EL output differed across 2,667,662 of 2,764,800 visible channel samples. Profile 5 still mapped without an enhancement layer, and SDR selected no Dolby mapping. [Aggregate digital receipt and limitations](../evidence/gstreamer-native-fel-20261109.json).
 
-These runs used private process overlays and an owned GPU-backed virtual monitor, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. The bridge, core and mapper passed their normal Meson build entry points. Candidate Ubuntu package builds, coherent sink/Showtime dependency updates and installation remain open; the installed 45-package release is unchanged.
+The normal Ubuntu builds produced 18 amd64/all packages: bridge `0.2.0+rogdv2`, core/mapper `0.1.0+rogdv4`, bad plugins `1.28.6-1ubuntu1+rogdv3`, sink `0.15.2-1ubuntu2+rogdv4.2` and Showtime `50.0-2+rogdv4.2`. The normal public package preparer uses the actual bad/extra outputs and advances the exact client dependencies together. Complete private rollback archives preserve the prior build slots and package outputs.
+
+A separate GtkVideo trial used the extracted bridge/core/bad packages and reached its 2.999666-second EOS in 3.069 seconds after explicit play. Visible native redraws mapped pictures from the beginning through the end of the clip. This diagnostic rendered seven sink frames and dropped thirteen while LOG-level code hashed and scanned every visible 4K frame. It establishes clock progression and no delayed-output hang, not clean 24 fps. The upstream per-stream baseline conversion is expected before each view applies its own grade. Normal-logging throughput and runtime qualification of the matching rebuilt clients remain open; further GPU trials are stopped.
+
+These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
 
 ## Which geometry reaches the mapper
 
