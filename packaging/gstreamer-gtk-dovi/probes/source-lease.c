@@ -44,6 +44,9 @@ int main (int argc, char **argv)
   GstCaps *caps = coded (24);
   GstGtkDoviSourceLease *lease = gst_gtk_dovi_source_lease_new (caps, "source/video0", 17);
   require (lease && gst_gtk_dovi_source_lease_is_valid (lease), "complete original coded configuration qualifies");
+  require (gst_gtk_dovi_source_lease_matches (lease, "source/video0", caps), "exact original stream/configuration match");
+  require (!gst_gtk_dovi_source_lease_matches (lease, "source/video1", caps), "different stream cannot borrow the lease");
+  require (!gst_gtk_dovi_source_lease_matches (lease, "source/video0", NULL), "missing configuration cannot borrow the lease");
   require (!gst_gtk_dovi_source_lease_new (caps, "", 17), "missing stream identity is rejected");
   require (!gst_gtk_dovi_source_lease_new (caps, "source/video0", 0), "zero source revision is rejected");
   GstCaps *invalid = coded (23);

@@ -318,8 +318,15 @@ static gboolean sink_event (GstBaseTransform *base, GstEvent *event)
     }
     case GST_EVENT_FLUSH_START:
       revoked = s->source_revision; revoke_source_locked (s); break;
-    case GST_EVENT_FLUSH_STOP:
+    case GST_EVENT_FLUSH_STOP: {
+      GstEvent *start = gst_pad_get_sticky_event (GST_BASE_TRANSFORM_SINK_PAD (base), GST_EVENT_STREAM_START, 0);
+      if (start) {
+        const gchar *id = NULL; gst_event_parse_stream_start (start, &id);
+        g_free (s->stream_id); s->stream_id = g_strdup (id);
+        gst_event_unref (start);
+      }
       select_source_locked (s); break;
+    }
     default: break;
     }
     g_mutex_unlock (&s->lock);

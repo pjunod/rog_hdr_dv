@@ -314,11 +314,16 @@ source_lifecycle_controls (void)
   source_gate_check (map, input, FALSE, "new source revision requires its own raw stream start");
   gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
   source_gate_check (map, input, TRUE, "new clear source revision qualifies independently");
+  gst_pad_send_event (sink, gst_event_new_flush_start ());
+  source_gate_check (map, input, FALSE, "flush revokes the retained source lease immediately");
+  source_context (map, 3, FALSE, "clear/video0", coded);
+  gst_pad_send_event (sink, gst_event_new_flush_stop (TRUE));
+  source_gate_check (map, input, TRUE, "flush stop restores exact sticky stream identity under the new proof");
   source_context (map, 1, TRUE, NULL, NULL);
   source_gate_check (map, input, TRUE, "older callback cannot revoke the newer source revision");
   GstCaps *protected = gst_caps_copy (coded);
   gst_structure_set_name (gst_caps_get_structure (protected, 0), "application/x-cenc");
-  source_context (map, 2, FALSE, "clear/video0", protected);
+  source_context (map, 3, FALSE, "clear/video0", protected);
   source_gate_check (map, input, FALSE, "protected replacement cannot retain clear source proof");
   gst_caps_unref (protected); gst_caps_unref (coded); gst_caps_unref (input);
   gst_pad_set_active (sink, FALSE); gst_pad_set_active (src, FALSE);
