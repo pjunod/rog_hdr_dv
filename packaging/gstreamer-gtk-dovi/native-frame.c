@@ -115,24 +115,22 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
   /* Retained frames own the decoder input. A prior SDR presentation may have
    * an eight-bit row layout, even when this redraw requests native HDR. */
   GstVideoFormat format = sdr ? GST_VIDEO_FORMAT_RGBA : GST_VIDEO_FORMAT_RGBA64_LE;
-  *output_info = frame->output_info;
-  if (GST_VIDEO_INFO_FORMAT (output_info) != format) {
-    GstCaps *caps = gst_video_info_to_caps (&frame->input_info);
-    if (!caps) return -1;
-    GstVideoColorimetry color = {GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB,
-        sdr ? GST_VIDEO_TRANSFER_SRGB : GST_VIDEO_TRANSFER_SMPTE2084,
-        sdr ? GST_VIDEO_COLOR_PRIMARIES_BT709 : GST_VIDEO_COLOR_PRIMARIES_BT2020};
-    gchar *encoded = gst_video_colorimetry_to_string (&color);
-    gst_structure_remove_field (gst_caps_get_structure (caps, 0), "chroma-site");
-    gst_caps_set_simple (caps, "format", G_TYPE_STRING, gst_video_format_to_string (format),
-        "colorimetry", G_TYPE_STRING, encoded, NULL);
-    g_free (encoded);
-    gboolean complete = gst_video_info_from_caps (output_info, caps);
-    gst_caps_unref (caps);
-    if (!complete) return -1;
-  }
+  GstCaps *caps = gst_video_info_to_caps (&frame->input_info);
+  if (!caps) return -1;
+  GstVideoColorimetry color = {GST_VIDEO_COLOR_RANGE_0_255, GST_VIDEO_COLOR_MATRIX_RGB,
+      sdr ? GST_VIDEO_TRANSFER_SRGB : GST_VIDEO_TRANSFER_SMPTE2084,
+      sdr ? GST_VIDEO_COLOR_PRIMARIES_BT709 : GST_VIDEO_COLOR_PRIMARIES_BT2020};
+  gchar *encoded = gst_video_colorimetry_to_string (&color);
+  gst_structure_remove_field (gst_caps_get_structure (caps, 0), "chroma-site");
+  gst_caps_set_simple (caps, "format", G_TYPE_STRING, gst_video_format_to_string (format),
+      "colorimetry", G_TYPE_STRING, encoded, NULL);
+  g_free (encoded);
+  GstVideoInfo dest_info;
+  gboolean complete = gst_video_info_from_caps (&dest_info, caps);
+  gst_caps_unref (caps);
+  if (!complete) return -1;
   int result = gst_gtk_dovi_mapper_render_destination (mapper, frame->source,
-      &frame->input_info, kind, &target, output, output_info, error);
+      &frame->input_info, kind, &target, output, &dest_info, error);
   if (result > 0) {
     GstVideoOverlayCompositionMeta *overlay = gst_buffer_get_video_overlay_composition_meta (frame->source);
     if (overlay) gst_buffer_add_video_overlay_composition_meta (*output, overlay->overlay);
@@ -140,8 +138,6 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
     guint64 epoch = 0, id = 0;
     if (picture && picture->picture)
       gst_dovi_picture_get_identity (picture->picture, &epoch, &id);
-    if (epoch_out) *epoch_out = epoch;
-    if (picture_id_out) *picture_id_out = id;
     if (!sdr && gst_debug_category_get_threshold (gtk_dovi_map_debug) >= GST_LEVEL_LOG) {
       GstMapInfo pixels;
       if (gst_buffer_map (*output, &pixels, GST_MAP_READ)) {
@@ -166,6 +162,9 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
     if (!attach (*output, frame, target.generation)) {
       gst_clear_buffer (output); return -1;
     }
+    *output_info = dest_info;
+    if (epoch_out) *epoch_out = epoch;
+    if (picture_id_out) *picture_id_out = id;
   }
   return result;
 }
