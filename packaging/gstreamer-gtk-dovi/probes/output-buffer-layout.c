@@ -34,6 +34,18 @@ static void checked_spans (void)
   info = layout (GST_VIDEO_FORMAT_RGBA, 16, 0, 48);
   g_assert_true (valid_output_span (&info));
 }
+static void single_row_stride (void)
+{
+  GstVideoInfo info = layout (GST_VIDEO_FORMAT_RGBA64_LE, 0, 0, 32);
+  info.height = 1;
+  g_assert_false (valid_output_span (&info));
+  info.stride[0] = 16;
+  g_assert_false (valid_output_span (&info));
+  info.stride[0] = 32;
+  g_assert_true (valid_output_span (&info));
+  info.stride[0] = -32;
+  g_assert_true (valid_output_span (&info));
+}
 static void gpu_pitch_selection (void)
 {
   g_assert_true (download_row_pitch_ok (32, 8, 32));
@@ -77,6 +89,60 @@ static void fallback_pixels (void)
   }
   clear_output_pool (&mapper); av_frame_free (&source);
 }
+static void pool_destroyed (gpointer data, GObject *object)
+{
+  (void) object; *(gboolean *) data = TRUE;
+}
+static void assert_pattern (GstBuffer *buffer, guint8 value)
+{
+  GstMapInfo map;
+  g_assert_true (gst_buffer_map (buffer, &map, GST_MAP_READ));
+  for (gsize i = 0; i < map.size; i++) g_assert_cmpuint (map.data[i], ==, value);
+  gst_buffer_unmap (buffer, &map);
+}
+static void held_buffers_and_layout_switch (void)
+{
+  GstGtkDoviMapper mapper = {0};
+  GstVideoInfo info = layout (GST_VIDEO_FORMAT_RGBA64_LE, 32, 0, 96);
+  GstBuffer *a = acquire_output_buffer (&mapper, &info);
+  GstBuffer *b = acquire_output_buffer (&mapper, &info);
+  GstBuffer *c = acquire_output_buffer (&mapper, &info);
+  g_assert_nonnull (a); g_assert_nonnull (b); g_assert_nonnull (c);
+  g_assert_true (a != b && a != c && b != c);
+  gst_buffer_memset (a, 0, 0x11, info.size);
+  gst_buffer_memset (b, 0, 0x22, info.size);
+  gst_buffer_memset (c, 0, 0x33, info.size);
+  GstBuffer *released = b;
+  gst_buffer_add_video_crop_meta (b);
+  gst_buffer_unref (b);
+  b = acquire_output_buffer (&mapper, &info);
+  g_assert_true (b == released);
+  g_assert_null (gst_buffer_get_video_crop_meta (b));
+  gst_buffer_memset (b, 0, 0x44, info.size);
+  assert_pattern (a, 0x11); assert_pattern (c, 0x33);
+  gboolean first_retired = FALSE, second_retired = FALSE, final_retired = FALSE;
+  g_object_weak_ref (G_OBJECT (mapper.output_pool), pool_destroyed, &first_retired);
+  info = layout (GST_VIDEO_FORMAT_RGBA64_LE, 40, 8, 120);
+  GstBuffer *d = acquire_output_buffer (&mapper, &info);
+  g_assert_nonnull (d); g_assert_false (first_retired);
+  g_assert_cmpint (gst_buffer_get_video_meta (d)->stride[0], ==, 40);
+  g_assert_cmpuint (gst_buffer_get_video_meta (d)->offset[0], ==, 8);
+  gst_buffer_memset (d, 0, 0x55, info.size);
+  g_object_weak_ref (G_OBJECT (mapper.output_pool), pool_destroyed, &second_retired);
+  info = layout (GST_VIDEO_FORMAT_RGBA, 16, 0, 48);
+  GstBuffer *e = acquire_output_buffer (&mapper, &info);
+  g_assert_nonnull (e); g_assert_false (second_retired);
+  gst_buffer_memset (e, 0, 0x66, info.size);
+  g_object_weak_ref (G_OBJECT (mapper.output_pool), pool_destroyed, &final_retired);
+  clear_output_pool (&mapper);
+  g_assert_false (final_retired);
+  assert_pattern (a, 0x11); assert_pattern (b, 0x44); assert_pattern (c, 0x33);
+  assert_pattern (d, 0x55); assert_pattern (e, 0x66);
+  gst_buffer_unref (a); gst_buffer_unref (b); gst_buffer_unref (c);
+  g_assert_true (first_retired);
+  gst_buffer_unref (d); g_assert_true (second_retired);
+  gst_buffer_unref (e); g_assert_true (final_retired);
+}
 static void destination_memory_flag (void)
 {
   GstBuffer *source = gst_buffer_new (), *destination = gst_buffer_new ();
@@ -93,8 +159,10 @@ int main (int argc, char **argv)
 {
   gst_init (&argc, &argv); g_test_init (&argc, &argv, NULL);
   g_test_add_func ("/output/checked-spans", checked_spans);
+  g_test_add_func ("/output/single-row-stride", single_row_stride);
   g_test_add_func ("/output/gpu-pitch-selection", gpu_pitch_selection);
   g_test_add_func ("/output/fallback-pixels", fallback_pixels);
+  g_test_add_func ("/output/held-buffers-and-layout-switch", held_buffers_and_layout_switch);
   g_test_add_func ("/output/destination-memory-flag", destination_memory_flag);
   return g_test_run ();
 }

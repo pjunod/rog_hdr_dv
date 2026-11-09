@@ -141,7 +141,7 @@ static gboolean valid_output_span (const GstVideoInfo *info)
   gint64 stride = info->stride[0];
   guint64 step = stride < 0 ? -stride : stride;
   gsize rows = height - 1;
-  if ((rows && step < row_bytes) || (rows && step > G_MAXSIZE / rows)) return FALSE;
+  if (step < row_bytes || (rows && step > G_MAXSIZE / rows)) return FALSE;
   gsize span = rows * step, offset = info->offset[0];
   if (offset > info->size || row_bytes > info->size - offset) return FALSE;
   if (stride < 0) return span <= offset;
