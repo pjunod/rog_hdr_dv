@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-28",
+  "updated": "2026-11-09",
   "original_inventory_entries": 85,
   "addenda_entries": 4,
   "items": [
@@ -216,7 +216,7 @@
       "evidence": [
         "evidence/upstream-saved-review.json"
       ],
-      "notes": "Unit 04; New public API \u2014 needs a design nod"
+      "notes": "Unit 04; New public API — needs a design nod"
     },
     {
       "id": "LDI-5",
@@ -254,7 +254,8 @@
         "upstream/linux/evidence.json",
         "evidence/upstream-cinema/validation.json"
       ],
-      "notes": "unit 01: needs-human-hardware-evidence; Fresh hardware scope/reproduction and latest-thread verification are not established."
+      "notes": "Retain Cristian authorship of firsttwo DisplayID prerequisites; newer Ubuntu build/install evidence never makes them our original work.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "LNX-2",
@@ -262,13 +263,17 @@
       "artifacts": [
         "upstream/linux/manifest.json",
         "upstream/linux/02-luminance-validation/DESCRIPTION.md",
-        "upstream/linux/README.md"
+        "upstream/linux/README.md",
+        "patches/linux/series",
+        "docs/KERNEL_REBASE.md"
       ],
       "evidence": [
         "upstream/linux/evidence.json",
-        "evidence/upstream-cinema/validation.json"
+        "evidence/upstream-cinema/validation.json",
+        "evidence/kernel-7.3-rebase.json"
       ],
-      "notes": "unit 02: ready-for-human-review; Confirm latest original-thread Message-ID and owner DCO/mail setup before email delivery."
+      "notes": "Retain the October28 upstream outgoing two-patch source qualification at its exactbase65ba8f34 separately from later Ubuntu release replay. Firstfour Ubuntu patches have unchanged stable patch IDs. Do not silently advance upstream helper base from the downstream deployment evidence; do not count CVE security backport as our new contribution.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "LNX-3",
@@ -276,13 +281,19 @@
       "artifacts": [
         "upstream/linux/manifest.json",
         "upstream/linux/03-vrr-psr-report/DESCRIPTION.md",
-        "upstream/linux/README.md"
+        "upstream/linux/README.md",
+        "patches/linux/0005-drm-i915-psr-keep-Wa_14015401596-s-set-context-laten.patch",
+        "docs/I915_VRR_FASTSET.md",
+        "docs/KERNEL_REBASE.md"
       ],
       "evidence": [
         "upstream/linux/evidence.json",
-        "evidence/upstream-cinema/validation.json"
+        "evidence/upstream-cinema/validation.json",
+        "evidence/kernel-7.3-rebase.json",
+        "evidence/software-delivery-20261102.json"
       ],
-      "notes": "unit 03: needs-human-hardware-evidence; Fresh hardware scope/reproduction and latest-thread verification are not established."
+      "notes": "A real Ubuntu 7.3 i915 patch and bounded November 2 owner-attended VRR 0→1→0 pass now exist. Hold for a current-upstream port, focused qualification and owner DCO/mail route; broader mode/optical acceptance remains separate.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "PR-1",
@@ -336,7 +347,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "PR 01 \u00b7 full cargo test 169/0 \u00b7 send first; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "PR 01 · full cargo test 169/0 · send first; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R9",
@@ -348,7 +359,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "PR 02 \u00b7 170/0 \u00b7 send first; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "PR 02 · 170/0 · send first; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R2",
@@ -360,7 +371,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "PR 03 \u00b7 170/0 \u00b7 behaviour change, ask maintainer; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "PR 03 · 170/0 · behaviour change, ask maintainer; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R1",
@@ -372,7 +383,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "PR 04 \u00b7 169/0; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "PR 04 · 169/0; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R3",
@@ -384,7 +395,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "PR 05 \u00b7 171/0; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "PR 05 · 171/0; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R6",
@@ -396,7 +407,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "PR 06 \u00b7 170/0 \u00b7 budget now follows max_request_window; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "PR 06 · 170/0 · budget now follows max_request_window; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R5",
@@ -423,7 +434,7 @@
       "evidence": [
         "evidence/upstream-runner-validation.json"
       ],
-      "notes": "169/0 and 170/0 \u00b7 overlaps open #706 / #708; read PR 08 hardest; original native suites are inherited, with log hashes inspected; helper previews are new."
+      "notes": "169/0 and 170/0 · overlaps open #706 / #708; read PR 08 hardest; original native suites are inherited, with log hashes inspected; helper previews are new."
     },
     {
       "id": "R10",
@@ -645,12 +656,15 @@
       "artifacts": [
         "upstream/mpv/manifest.json",
         "upstream/mpv/01-unknown-light-levels/DESCRIPTION.md",
-        "upstream/mpv/README.md"
+        "upstream/mpv/README.md",
+        "patches/ubuntu-mpv-system-dv/0002-mpv-wayland-optional-content-light.patch"
       ],
       "evidence": [
-        "evidence/upstream-cinema/validation.json"
+        "evidence/upstream-cinema/validation.json",
+        "evidence/shared-display-management-20261107.json"
       ],
-      "notes": "unit 01: ready-for-human-review"
+      "notes": "unit 01: ready-for-human-review November 9 review: Same omit-unknown MaxCLL/MaxFALL correction now in Ubuntu mpv and native 0.42 with extra finite/quantized protocol-v1 bounds. Do not duplicate or imply newer bytes are in the October kit.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "MPV-2",
@@ -663,7 +677,8 @@
       "evidence": [
         "evidence/upstream-cinema/validation.json"
       ],
-      "notes": "unit 02: draft PR; ready-for-human-review"
+      "notes": "unit 02: draft PR; ready-for-human-review November 9 review: Native 0.42 and an explicit upstream FFmpeg dovi_split backport now exist. Review October fallback against current upstream before sending; source inspection alone does not prove the entire fallback superseded.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "MPV-4",
@@ -695,10 +710,14 @@
       "id": "MPV-3",
       "disposition": "excluded",
       "artifacts": [
-        "docs/UPSTREAM_SUBMISSIONS.md"
+        "docs/UPSTREAM_SUBMISSIONS.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch"
       ],
-      "evidence": [],
-      "notes": "Embeds plurx's own display-management code"
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json"
+      ],
+      "notes": "Embeds plurx's own display-management code November 9 review: Private closed-form renderer is excluded. Public generic hooks/target lifecycle proposals do not authorize private code. The custom reconstruction/cache source remains excluded from direct submission. New public upload/quantization candidates do not authorize private mapper implementation or equations.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "FF-1",
@@ -998,7 +1017,8 @@
         "docs/UPSTREAM_SUBMISSIONS.md"
       ],
       "evidence": [],
-      "notes": "Private by policy; your call if any part should ever go"
+      "notes": "Private by policy; your call if any part should ever go November 9 review: Private display-management equations remain excluded; LP-1 is public renderer-hook discussion only.",
+      "reviewed": "2026-11-09"
     },
     {
       "id": "WINE",
@@ -1007,7 +1027,7 @@
         "docs/UPSTREAM_SUBMISSIONS.md"
       ],
       "evidence": [],
-      "notes": "WineHQ bans LLM-generated code \u2014 rerouted to Proton"
+      "notes": "WineHQ bans LLM-generated code — rerouted to Proton"
     },
     {
       "id": "RD-1",
@@ -1077,6 +1097,662 @@
         "evidence/upstream-cinema/validation.json"
       ],
       "notes": "unit 01: excluded"
+    },
+    {
+      "id": "MUT-N",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-mutter/0106-color-compare-client-mastering-peaks-at-their-wire-precision.patch",
+        "docs/SYSTEM_DOLBY_VISION.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/mutter-wire-peak-qualification.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Avoid double mapping from rounded client declarations while preserving exact native declarations and mapping curve. Native /color-hdr/mapping/wire-peak control distinguishes 880/881/882; fixture display 616 at reference 142, client reference 203. Existing target-volume implementation is a prerequisite. Extract/rebase onto agreed current upstream design; no new standalone submission port is prepared.",
+      "project": "Mutter (GNOME)",
+      "title": "Compare client mastering peaks at Wayland integer wire precision",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "MUT-O",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-mutter/0107-screencast-memory-format.patch",
+        "docs/SYSTEM_DOLBY_VISION.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/mutter-shared-memory-color-formats.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Monitor, area and virtual paths had hard-coded ARGB readback despite negotiated ten-bit/float layouts. Digital controls cover XR30/XB30/half-float/BGRx and same-stream format changes; XR30/XB30 agree exactly and half-float differs at most0.574 ten-bit code. MemFd evidence, not DMA-BUF or optical qualification. Upstream extraction/current base and focused native regression still required.",
+      "project": "Mutter (GNOME)",
+      "title": "Write shared-memory screen captures in the negotiated pixel format",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "TA-1",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-tiling-assistant/series",
+        "docs/TILING_ANIMATION_OWNERSHIP.md",
+        "tests/tiling-animation-ownership.mjs",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/tiling-animation-qualification.json",
+        "evidence/tiling-animation-nativehdr3-build-20261107.json",
+        "evidence/tiling-animation-target-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Six patches on actual upstream v56. Keep ownership, cancellation, overlays, finite geometry and Shell callback ease correction together. Historical first-five source has35 distinct valid offline passes from26 initial+9 failed-only retries, not a new full clean35 run. Sixth callback-API patch has source/package proof; no invented fresh full-suite or broad fullscreen/cross-mode acceptance. Current upstream port, candidate commit explanatory bodies/attribution and latest six-patch focused qualification remain before submission.",
+      "project": "Tiling Assistant",
+      "title": "Own synthetic tiling animations without consuming native Shell completion accounting",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GTK-1",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gtk4-display-target/0001-wayland-expose-preferred-color-target-snapshots.patch",
+        "docs/GDK_DISPLAY_TARGET.md",
+        "packaging/system-dv/gdk-display-target-probe.c",
+        "packaging/system-dv/gdk-display-target-reentrancy.c",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gdk-display-target-build-20261107.json",
+        "evidence/gdk-display-target-runtime-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Existing shared Wayland color manager owns feedback; default target discovery remains separate from experimental content rendering. Copies physical primaries/black/peak/reference and rejects invalid generations. Native startup, late-manager and reentrant destruction controls passed on pinned Ubuntu source. Agree GTK public API, per-output move/spanning/hotplug coverage and current upstream port. Split unrelated coordinate fix GTK-2 out of the combined source patch.",
+      "project": "GTK / GDK",
+      "title": "Expose immutable per-surface preferred display targets with lifecycle invalidation",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GTK-2",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-gtk4-display-target/0001-wayland-expose-preferred-color-target-snapshots.patch",
+        "docs/GDK_DISPLAY_TARGET.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gdk-display-target-build-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Three listener paths (explicit primaries, named primaries, target primaries) overwrote red Y instead of setting g_y/b_y/w_y. It is embedded in GTK-1 patch, but independently upstreamable. Extract minimal baseline correction and focused listener regression, verify current upstream still affected; existing combined compilation/replay is not that standalone proof.",
+      "project": "GTK / GDK",
+      "title": "Store green, blue and white Y coordinates in their own Wayland fields",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GTK-3",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gtk4-display-target/0003-wayland-track-native-HDR-presentation-per-surface.patch",
+        "docs/GDK_DISPLAY_TARGET.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gdk-display-target-build-20261107.json",
+        "evidence/gdk-display-target-runtime-20261107.json",
+        "evidence/gtkvideo-view-normal-packages-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Demand-scoped HDR lease invalidates target/draw-context/precision witnesses and returns to SDR when released. Native EGL four-patch PQ samples, normal Vulkan/introspection and lease lifecycle have scoped evidence. Public API and renderer/offload semantics require maintainer discussion; package symbol/changelog patches are distribution delivery only.",
+      "project": "GTK / GDK",
+      "title": "Track a per-surface HDR rendering lease and actual presentation precision",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GTK-4",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-gtk4-display-target/0005-gdk-query-the-bound-read-framebuffer-format.patch",
+        "docs/GDK_DISPLAY_TARGET.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gtkvideo-view-normal-packages-20261108.json",
+        "evidence/gtkvideo-final-combined-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "A one-pixel normalized16-bit PQ source reproduced transparent black under the normal Vulkan GTK consumer when NVIDIA rejected EGL export. glGetFramebufferParameteriv generated GL_INVALID_ENUM; glGetIntegerv recovered the exact four stored16-bit words. Correction also gates desktop GL at4.5. Extract/rebase minimal generic fix and add upstream regression; combined package/player controls do not substitute for standalone current-upstream proof.",
+      "project": "GTK / GDK",
+      "title": "Query implementation read format/type using GLES-supported framebuffer state",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GTK-5",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gtk4-display-target/0008-gtkvideo-bind-native-pictures-to-each-realized-view.patch",
+        "patches/ubuntu-gtk4-display-target/0009-gtkvideo-capture-original-pictures-before-playsink.patch",
+        "patches/ubuntu-gtk4-display-target/0010-gtkvideo-load-the-optional-sdk-through-a-checked-abi.patch",
+        "patches/ubuntu-gtk4-display-target/0011-gtkvideo-match-the-native-frame-context-signature.patch",
+        "docs/GDK_DISPLAY_TARGET.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gtkvideo-view-normal-packages-20261108.json",
+        "evidence/gtkvideo-final-combined-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Each realized view has copied target, lease and mapper; original pictures retained before playsink and stale stream/caps/view/target generations rejected. Default Vulkan two-view paused616→308→616 exact-return, source replacement, one-view destruction and absent/incompatible/incomplete SDK SDR startup pass. Agree generic upstream mapper/destination integration rather than sending the private provider or distribution SDK coupling. No private mapper equations or implementation belong in submission.",
+      "project": "GTK / GDK",
+      "title": "Bind original video pictures and asynchronous target regrading to each GtkVideo view",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GLY-1",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-loupe-image-colour/series",
+        "docs/GNOME_IMAGE_COLOUR.md",
+        "packaging/image-colour/qualify.py",
+        "packaging/image-colour/icc-layout.rs",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gnome-image-colour-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Actual code belongs to Glycin3.1 embedded in Loupe50, not a Loupe application patch. Convert ICC into linear BT.2020 float16/32 instead of clipping/quantizing into source integer sRGB; preserve CICP precedence, invalid-profile fallback, alpha, source row stride and transactional failure. Alpha correction folds into this unit because it repairs the new conversion path. Digital fixtures cover256gray levels, RGB/RGBA8/16, associatedU8/U16/F32, padded rows and malformed data; optical/external monitor scope open. Extract vendor-independent current Glycin port/tests; omit Cargo overrides, Debian metadata and vendored checksums.",
+      "project": "Glycin",
+      "title": "Preserve ICC gamut and precision in floating-point textures, with alpha and stride correctness",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "TIFF-1",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-glycin-image-colour/0001-read-TIFF-byte-tags-under-the-metadata-budget.patch",
+        "docs/GNOME_IMAGE_COLOUR.md",
+        "packaging/image-colour/qualify.py",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/gnome-image-colour-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Actual code belongs to tiff0.11.3 at image-rs/image-tiff, carried inside Ubuntu glycin-loaders2.2.1. Read byte fields without allocating per-element Value objects; bound total metadata and grow only after successful reads.21,012-byte ICC fixture at80/320/1024pixels with BYTE/UNDEFINED and bad offset/excess count controls passes ordinary sandbox loader. Extract current TIFF crate change with crate-local regression; omit distribution overrides and checksum churn.",
+      "project": "TIFF (Rust)",
+      "title": "Read BYTE and UNDEFINED metadata under the actual byte budget",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "WK-1",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "evidence/webkit-clear-dolby-base-comparison.json",
+        "docs/SYSTEM_DOLBY_VISION.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "evidence/webkit-clear-dolby-base-comparison.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Public baseline WebKitGTK2.52.6 controls show identical output with/without Dolby carrier metadata. Active implementation is private, not a public patch kit. November9 handoff reports guarded full build resumed after memory stop; native SDR adapter evidence is not finished browser product acceptance. Keep discussion scoped to clear/unprotected SDR page output. Full high-precision HDR page composition, per-view typed target lifecycle, protected services and final browser comparison remain open. Do not publish private source/header or inference equations.",
+      "project": "WebKitGTK",
+      "title": "Honor an explicit SDR destination when grading clear Dolby video into ordinary GTK browser pages",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "MESA-1",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-mesa-wayland-hdr/0001-wsi-wayland-validate-optional-hdr-content-light.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/shared-display-management-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Separate producer from MPV-1: Vulkan WSI emitted MaxFALL=0, rejected by Weston. Source adds finite/quantized unsigned luminance bounds and optional-request omission. Corrected driver accepted. Extract from Debian quilt/changelog, port to current Mesa, add source regressions before submission.",
+      "project": "Mesa",
+      "title": "Validate and omit unavailable optional Wayland HDR metadata",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "MESA-2",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-mesa-wayland-hdr/0002-pace-FIFO-in-the-compositor-presentation-clock.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/mesa-wsi-presentation-clock.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "About 4.1 seconds of false deadlines from CLOCK_MONOTONIC_RAW versus swapchain clock. Separate internal deadline and public completion domains; retain zero-time sentinel. Native timing controls and amd64/i386 packages qualified; player output drops retained. Needs current upstream port/test/description.",
+      "project": "Mesa",
+      "title": "Keep Wayland FIFO deadlines in the compositor clock domain",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "FF-4",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-ffmpeg-system-dv/0005-provide-strict-frame-owned-Dolby-metadata.patch",
+        "patches/ubuntu-ffmpeg-system-dv/0007-bind-strict-RPU-state-to-the-SPS-visible-rectangle.patch",
+        "patches/ubuntu-ffmpeg-system-dv/0009-reject-reserved-Dolby-compression.patch",
+        "patches/ubuntu-ffmpeg-system-dv/0011-preserve-video-references-on-Dolby-configuration-change.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-dovi-producers-native-20261107.json",
+        "evidence/gstreamer-nvidia-picture-qualification.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "New public resolver/strictness API: authoritative SPS rectangle, invalid-RPU withholding, bounded/reserved config rejection, reset metadata on live config change without resetting normal HEVC references. Native reorder/gap/flush/lifetime/conformance/config and pixel controls exist. Discuss upstream parser/side-data API, isolate local symbol/runtime plumbing. Follow-up config checks repair the proposed resolver, not independent preexisting upstream bugs.",
+      "project": "FFmpeg",
+      "title": "Authoritative frame-owned Dolby metadata and a bounded public RPU resolver",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "FF-5",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-ffmpeg-system-dv/0001-ffmpeg-shared-display-management.patch",
+        "patches/ubuntu-ffmpeg-system-dv/0014-accept-physical-xy-with-an-optional-provider-v2.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/shared-display-management-20261107.json",
+        "evidence/ffmpeg-panel-xy-release.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Public adapter selects physical xy/luminance before generic conversion, replaces obsolete source Dolby/HDR10+ side data with destination metadata and keeps named fallback. Export/trim/crop and native chart controls exist. Current implementation depends on private provider and private renderer namespace: discuss/extract generic contract; private mapper equations and SDK implementation remain excluded.",
+      "project": "FFmpeg",
+      "title": "Explicit display-target mapping hook and export metadata replacement",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "MPV-6",
+      "disposition": "held",
+      "artifacts": [
+        "patches/mpv-fel-system-dv/0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/profile7-intel-dual-layer.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "f_enhancement_pair refs raw RPU from matched EL onto BL, removes stale BL RPU and handles allocation failure. Distinct from October MPV-2 split fallback. Split this hunk from private provider/Wayland/build glue and add focused current-upstream pairing/lifetime regression. Staged 4K FEL and flip/failure controls are downstream evidence.",
+      "project": "mpv",
+      "title": "Preserve raw RPU ownership when inheriting matched enhancement-layer metadata",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "MPV-7",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/mpv-fel-system-dv/0002-target-the-physical-display-and-retain-cached-PQ-signals.patch",
+        "patches/mpv-fel-system-dv/0003-retain-displayed-grade-in-tagged-window-captures.patch",
+        "patches/mpv-fel-system-dv/0004-map-validated-physical-xy-with-optional-provider-v2.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/mpv-window-grade-capture.json",
+        "evidence/sdk-api-v2-normal-products.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Physical min/max/xy and reference-white transport are separate; paused/cache window captures preserve displayed grade and invalidate state on source/target change. Tagged PNG tests changed only authored edited frames; ordinary HDR10/native-source controls byte-equal. Generic target/capture lifecycle proposal requires agreement and extraction from optional private provider integration. No optical claim.",
+      "project": "mpv",
+      "title": "Separate physical targets from PQ transport and retain mapped cached-capture state",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "LP-1",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/libplacebo-fel-system-dv/0001-map-the-native-reconstructed-dolby-master.patch",
+        "upstream/november-2026/MEDIA.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch"
+      ],
+      "evidence": [
+        "evidence/shared-display-management-20261107.json",
+        "evidence/profile7-intel-dual-layer.json",
+        "evidence/upstream-refresh-20261109.json",
+        "evidence/upstream-other-projects-20261109.json"
+      ],
+      "notes": "Public renderer callback receives authoritative frame metadata and reconstructed native master; propagates mapper failure before generic conversion. Discuss generic hook/lifetime design and exclude private ABI namespace/build glue. LP-DM private equation work remains excluded; no private provider implementation is proposed. New Plurx patch0006 normalizes only local reconstruction color metadata before the existing private display mapper. It is context for the public hook/contract discussion, not a new baseline upstream defect.",
+      "project": "libplacebo",
+      "title": "Frame-owned display-mapping hook before ordinary scaling and conversion",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09",
+      "reviewed": "2026-11-09"
+    },
+    {
+      "id": "LP-2",
+      "disposition": "held",
+      "artifacts": [
+        "patches/libplacebo-fel-system-dv/0002-propagate-flipped-planes-and-contributing-frame-errors.patch",
+        "upstream/november-2026/MEDIA.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0006-vo_gpu_next-normalize-DV-reconstruction-metadata.patch"
+      ],
+      "evidence": [
+        "evidence/profile7-intel-dual-layer.json",
+        "evidence/upstream-refresh-20261109.json",
+        "evidence/upstream-other-projects-20261109.json"
+      ],
+      "notes": "Source honors vertical flip, rejects failed contributing-frame acquisition and avoids double release of borrowed mixer target. Native flip: three composed/mapped frames; failing non-reference acquisition correctly fails rendering. Extract upstream-generic fixes from the new hook fatal-state behavior; add current-upstream regression. New Plurx patch0006 checks renderer error/disabled-hook state after the local reconstruction pass. Retain as contributing-frame failure context; do not duplicate it as another independent upstream unit.",
+      "project": "libplacebo",
+      "title": "Honor flipped enhancement planes and contributing-frame failure/target ownership",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09",
+      "reviewed": "2026-11-09"
+    },
+    {
+      "id": "GST-1",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-base-rpu/0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-rpu-transport-native-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "New GstVideo meta owns AU bytes and uses matched GstVideoCodecFrame rather than last-picture state; only identity-compatible copies retain it. Native avdec/VA gap/reorder/seek/lifetime/transform controls exist. New meta/tag/copy API needs upstream agreement. Transport is not resolved metadata or FEL reconstruction.",
+      "project": "GStreamer",
+      "title": "Picture-owned original RPU metadata across reordering and flushes",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-2",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-bad-rpu/0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-rpu-transport-native-20261107.json",
+        "evidence/gstreamer-rpu-supplementary-va-run-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "h265parse owns completed-AU bytes with parser/reset/flush safety; scoped positive/negative transport controls exist. Depends on proposed GstVideo meta API; requires upstream source port and native test harness.",
+      "project": "GStreamer",
+      "title": "Attach original HEVC RPU only from completed access units",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-3",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-base-rpu/0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-dovi-isobmff-controls.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Reusable dvcC/dvvC parser validates version/flags/profiles/length and writes output only on success; missing compatibility does not infer color space. New public API needs upstream agreement; exclude distro ABI metapackage/symbol packaging.",
+      "project": "GStreamer",
+      "title": "Bounded reusable HEVC Dolby configuration parser in pbutils",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-4",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-good-dovi/0001-carry-Dolby-configuration-per-sample-entry.patch",
+        "patches/ubuntu-gst-plugins-good-dovi/0002-use-the-shared-HEVC-configuration-parser.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-dovi-isobmff-controls.json",
+        "evidence/gstreamer-dovi-live-clear-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "qtdemux retains bounded sample-entry configuration with correct stream/caps transition and shared validation. Native no-config/replacement controls exist. Depends on pbutils API; compare current upstream and extract source-only patch from packaging.",
+      "project": "GStreamer",
+      "title": "Preserve authoritative Dolby configuration per MP4 sample entry",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-5",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-good-dovi/0004-matroska-preserve-bounded-track-Dolby-configuration.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-matroska-track-config-20261108.json",
+        "evidence/gstreamer-matroska-distribution-replay-20261108.json",
+        "evidence/gstreamer-matroska-normal-packages-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Validates bounded BlockAdditionMapping payload/type, duplicates/conflicts and independent track state. 25 focused controls pass; stock negative rejects expected config; native P5 resolved 3 pictures. P7 check is config-only with no residual/reconstruction claim. Prepare current upstream patch/test/description.",
+      "project": "GStreamer",
+      "title": "Preserve bounded track-local Dolby configuration in Matroska",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-6",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gst-libav-dovi-picture/0001-bind-strict-Dolby-metadata-to-the-decoded-picture.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-dovi-producers-native-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "avdec consumes authoritative strict frame metadata, conformance geometry and live config transitions without resetting ordinary video; transforms discard stale provenance. Native mid-GOP/reset/equal-pixel controls pass. Current gstdovipicture helper and FFmpeg resolver are local: agree upstream owned snapshot API/dependencies first.",
+      "project": "GStreamer",
+      "title": "Bind software libav decoder Dolby state to each decoded picture",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-7",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-bad-rpu/0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-dovi-producers-native-20261107.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Owned resolved snapshot follows VA surface through reordering, flush/config generations and visible crop. Native gap/reorder/seek/lifetime/conformance and transform controls exist. Depends on proposed public snapshot/resolver API; does not itself establish mapped FEL output.",
+      "project": "GStreamer",
+      "title": "Associate native VA Dolby state with the decode-order surface",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-8",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-bad-rpu/0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-nvidia-picture-qualification.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Nine producer controls cover avdec/VA/NV; 95-picture config transitions retain normalized pixels; ordinary HEVC gains no Dolby metadata; transformations drop stale provenance. Depends on upstream snapshot/resolver design. Strip dependency/quilt wrappers. Native GStreamer P7 FEL reconstruction remains unfinished separately.",
+      "project": "GStreamer",
+      "title": "Keep picture-owned Dolby provenance and conformance geometry in NVDEC",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "GST-9",
+      "disposition": "held",
+      "artifacts": [
+        "patches/ubuntu-gst-plugins-base-rpu/0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/gstreamer-gtk-mapper-negotiation.json",
+        "evidence/gstreamer-gtk-final-packages-20261108.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "glcolorbalance accepts RGBA64_LE; neutral passthrough retains input, transformed pixels discard color-sensitive provenance. Saved patch mixes full Debian quilt export/autogenerated placeholder metadata with 11 source lines: extract generic source fix and add upstream precision/meta tests.",
+      "project": "GStreamer",
+      "title": "Preserve high precision through GL balance and invalidate changed color provenance",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "FF-BACKPORT",
+      "disposition": "superseded",
+      "artifacts": [
+        "patches/ubuntu-ffmpeg-system-dv/0002-backport-dovi-split-bitstream-filter.patch",
+        "patches/ubuntu-ffmpeg-system-dv/0003-check-length-of-split-NAL-units.patch",
+        "patches/ubuntu-ffmpeg-system-dv/0004-use-upstream-HEVC-configuration-packet-side-data.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/profile7-intel-dual-layer.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "These are explicit upstream backports, not novel patches to send. Preserve original Kacper Michajlow and Michael Niedermayer attribution/signoffs. Packet identity is adapted from upstream 5f6dff5e7dbd9b1f3221f7c37225365dbf1e1038. Local version/build glue is excluded.",
+      "project": "FFmpeg",
+      "title": "Imported dovi_split, split-NAL length validation and HEVC EL configuration",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "DV-BACKPORT",
+      "disposition": "superseded",
+      "artifacts": [
+        "patches/ubuntu-libdovi-ffi/0001-backport-upstream-C-FFI-ownership-fixes.patch",
+        "patches/ubuntu-libdovi-ffi/0002-return-parser-errors-for-unsupported-interpolation.patch",
+        "patches/ubuntu-libdovi-ffi/0003-validate-reshaping-pivot-counts.patch",
+        "upstream/november-2026/MEDIA.md"
+      ],
+      "evidence": [
+        "evidence/libdovi-unsupported-interpolation.json",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Patch bodies explicitly backport upstream commits 4e6b263c35f08bca9efe919effac9c09c26fba70, 73daa31a8ecc76a4eedff8cb8f6197a3d66c3b3c and f41b2809cd00f41118248fcd8a1a3dff6216efcf. Preserve Nomis101/quietvoid authors. CRC-valid unsupported RPU aborts stock but patched parser returns error and accepts subsequent valid input. Do not resubmit or conflate with DV-5 mixed mapping.",
+      "project": "dovi_tool (dolby_vision)",
+      "title": "Imported C-FFI ownership, recoverable parser errors and pivot bounds",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "R14",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/contrib/rqbit/0022-read-only-piece-verifier.patch",
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/contrib/rqbit/README.md",
+        "upstream/november-2026/OTHER_PROJECTS.md"
+      ],
+      "evidence": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/crates/nzbd-torrent/src/lib.rs",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "New public verify_selected_piece_ranges API reuses rqbit piece verification against callback-backed read-only storage, merges selected piece ranges, verifies neighboring boundary bytes and supports cancellation checkpoints. Existing source regression covers neighboring-file boundary bytes, corrupt payload and Interrupted callback. Discuss API shape first; export standalone current-upstream port and move tests into upstream before preparing a PR. Downstream stable delta alone is not an upstream kit.",
+      "project": "rqbit",
+      "title": "Read-only selected-piece verification over caller-owned storage",
+      "effort": "Runner",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "R15",
+      "disposition": "held",
+      "artifacts": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/contrib/rqbit/0022-read-only-piece-verifier.patch",
+        "upstream/november-2026/OTHER_PROJECTS.md"
+      ],
+      "evidence": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/crates/nzbd-torrent/src/lib.rs",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "The same maintained patch replaces a scan over every preceding torrent file with partition_point and skips directly to the first intersecting file. This generic FileOps optimization can be split from the new API. Needs current-upstream check, isolated export and dedicated boundary/zero-length-file/performance regression; inspected source test is not sufficient proof of lookup behavior or speed.",
+      "project": "rqbit",
+      "title": "Locate the first intersecting file before verifying a piece",
+      "effort": "Runner",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "HQ-27",
+      "disposition": "held",
+      "artifacts": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/vendor/hiqlite/src/network/api.rs",
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/vendor/README.md",
+        "upstream/november-2026/OTHER_PROJECTS.md"
+      ],
+      "evidence": [
+        "https://github.com/pjunod/runner/blob/6a6ff9d3a12f2def82e7ebbc33280ce47cf3c48e/Makefile",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "An upgraded API WebSocket can outlive the listener and keep returning stopped-leader errors to survivors. Watch the corresponding Raft group metrics and stop the existing writer loop on shutdown, fatal running_state or a closed watch channel. Focused source test covers live updates and all three terminal cases; Makefile names it. Split the generic library fix from Runner minority-shutdown adapter changes, reconcile with current upstream socket lifecycle and produce an independently qualified port before PR preparation.",
+      "project": "hiqlite",
+      "title": "Close upgraded API streams when their Raft group terminates",
+      "effort": "Runner",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "MPV-8",
+      "disposition": "held",
+      "artifacts": [
+        "upstream/november-2026/OTHER_PROJECTS.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0007-vo_gpu_next-preserve-DV-software-sampling-precision.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/test_dv_render_precision.py",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Owned high-aligned UNORM16 staging preserves low-aligned planar 10-bit software filtering for Dolby and limited BT.2020/PQ, including ordinary HDR10. Hardware/P010/integer paths retain their behavior; required enhancement mapping failures clean partially owned resources. Source controls cover code values, strides, eligibility and lifetimes. No new execution, generalized native-build or GPU-performance claim. Extract the generic upload/cleanup change from private consumer glue and qualify against current mpv before submission.",
+      "project": "mpv",
+      "title": "Preserve planar 10-bit software upload precision and required enhancement-layer cleanup",
+      "effort": "cinema",
+      "added": "2026-11-09"
+    },
+    {
+      "id": "LP-3",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "upstream/november-2026/OTHER_PROJECTS.md",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/packaging/patches/mpv/0008-vo_gpu_next-round-the-final-DV-UNORM16-cache-exactly.patch"
+      ],
+      "evidence": [
+        "evidence/upstream-other-projects-20261109.json",
+        "https://github.com/pjunod/plurx/blob/8ab61a77989c8200af8db6f060328192e47ee16f/clients/linux-player/tests/test_dv_unorm16.py",
+        "evidence/upstream-refresh-20261109.json"
+      ],
+      "notes": "Public integer GLSL helper rounds the exact binary32 input times65535 with ties-to-even rather than rounding a prior float product. Its actual consumer is the custom Vulkan mapped UNORM16 cache, not a generic stock libplacebo correction. Test source compiles the extracted shader as a CPU control against an independent rational oracle; expected exhaustive totals are assertions, not newly run results. Discuss the reusable quantizer API/placement and add native GPU validation; private mapping equations remain excluded.",
+      "project": "libplacebo",
+      "title": "Discuss reusable exact binary32-to-UNORM16 ties-to-even quantization",
+      "effort": "cinema",
+      "added": "2026-11-09"
     }
-  ]
+  ],
+  "refresh_entries": 35,
+  "prepared_patch_units": 43,
+  "qualification_note": "43 patch units retain their October 28 source qualification. The November 9 inventory audit adds 35 entries; it does not qualify new upstream ports or refresh prior native tests.",
+  "audit_source_commit": "ac82059c3ce8262689e8179436fcf2aeda2b62aa"
 }
