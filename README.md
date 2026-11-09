@@ -18,13 +18,13 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-11-08)
+## What works today (2026-11-09)
 
-The ROG runs the seven-package mpv, FFmpeg and Mesa playback update alongside Mutter and libdisplay-info `nativehdr13` and the `nativehdr3` kernel. The separate mpv 0.42 release reconstructed a genuine 4K Dolby Vision Profile 7 full enhancement layer on the laptop, selected the CM v4 grade for 616 cd/m², and ran with the existing mpv video settings on the explicitly selected Intel Vulkan driver. With automatic GPU selection on a hardware-backed private compositor, NVIDIA played the full three-second clip at 24 fps with zero drops. A staged Mesa clock correction restored playback speed on Intel with eight output drops. The running desktop still uses the seven-package stack. [Playback release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop and kernel handoff](docs/SOFTWARE_DELIVERY.md).
+The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. The existing session therefore does not establish that the new compositor is active; normal next-login acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop handoff](docs/SOFTWARE_DELIVERY.md).
 
-The staged 45-package panel release extends target-aware Dolby playback to ordinary GTK video widgets. Two views sharing a movie retained their own display state. A 616→308→616 cd/m² round trip changed 194,000 ten-bit compositor pixels and returned exactly to the original frame. APT rehearsed the full install and exact rollback. [Current status and held-out quality measurements](docs/STATUS.md).
+The installed 45-package panel release extends target-aware Dolby playback to ordinary GTK video widgets. In pre-install qualification, two views sharing a movie retained their own display state. A 616→308→616 cd/m² round trip changed 194,000 ten-bit compositor pixels and returned exactly to the original frame. APT rehearsed the full install and exact rollback. [Current status and held-out quality measurements](docs/STATUS.md).
 
-The staged player also ran a genuine movie-frame comparison against Dolby's render of the original master. The published 1080p Profile 5 release and the 4K master differ in resolution and delivered metadata. The controls quantify both effects. The project provides an offline APT rehearsal for testing a candidate and its exact rollback on the destination system. [Movie-frame comparison](evidence/dolby-sol-levante-frame714.json) · [Package rehearsal](docs/SYSTEM_DOLBY_VISION.md#rehearse-a-local-package-bundle).
+Before installation, the candidate player also ran a genuine movie-frame comparison against Dolby's render of the original master. The published 1080p Profile 5 release and the 4K master differ in resolution and delivered metadata. The controls quantify both effects. The project provides an offline APT rehearsal for testing a candidate and its exact rollback on the destination system. [Movie-frame comparison](evidence/dolby-sol-levante-frame714.json) · [Package rehearsal](docs/SYSTEM_DOLBY_VISION.md#rehearse-a-local-package-bundle).
 
 The running kernel is build-ID verified to contain CVE-2026-98432's fix. The five display patches
 are rebased onto Ubuntu `7.3.0-10.10` (released Linux 7.3), which includes
@@ -38,7 +38,7 @@ the fix and retains Ubuntu security policies; see the
 | HDR desktop session | **Installed** | Current effective range about 0.0005–616 cd/m² (firmware values) and primaries are reported separately from the BT.2020/PQ encoding |
 | HLG, highlight mapping, gamut compression | **Installed** | The compositor maps highlights to the panel and compresses out-of-gamut colour toward it |
 | HDR targets on external CTA monitors and native SDR panels | **Installed** (in `nativehdr10`) | Not yet tried on an external monitor |
-| Night Light in HDR, per-monitor overrides | **Installed** (since `nativehdr10`, now APT `nativehdr13`) | October 15 warm HDR/SDR observations and persistence accepted; no post-update acceptance inferred |
+| Night Light in HDR, per-monitor overrides | **Installed** (since `nativehdr10`, now installed `nativehdr15`; next-login acceptance pending) | October 15 warm HDR/SDR observations and persistence accepted; no post-update acceptance inferred |
 | Ubuntu packages | **APT repository** (2026-10-27) | Rebuilt from Ubuntu's current source whenever Ubuntu updates it; one command sets a machine up ([APT repository](docs/UBUNTU_APT_REPOSITORY.md)) |
 | Private package output retention | **Implemented** | Exclusive durable run directories preserve future source/build/rollback outputs without destructive reuse; existing nativehdr13 original-record recovery is separate ([retention](docs/UBUNTU_APT_REPOSITORY.md#private-source-and-recovery-output-retention)) |
 | Dolby Vision display mapping | **Reference comparison on four titles** | The private CM v4.0 and CM v2.9 implementation achieved mean ΔE_ITP of 0.0036–0.0055 on selected frames at 600 cd/m². At the firmware-declared panel target, the staged mpv window had mean ΔE ITP 0.651 and p95 1.274 on one full-raster chart, after decoding the window’s reference-white gain. Optical calibration remains open. |
@@ -107,7 +107,7 @@ development](docs/MEASUREMENT_DRIVEN_DEVELOPMENT.md)):
   helper and **plurx Player**, an mpv build launched from the plurx web app
   that maps each frame on the laptop's GPU at the panel's own peak, and
   combines Profile 7's full enhancement layer itself. The separate system
-  packages bring the mapper to ordinary mpv and FFmpeg. The staged mpv 0.42
+  packages bring the mapper to ordinary mpv and FFmpeg. The pre-install mpv 0.42 candidate
   build supports the matched enhancement layer. [System playback](docs/SYSTEM_DOLBY_VISION.md).
 - **What stays private:** the derivations and Dolby's measured outputs live on
   a private branch, never on `main` or its mirror.

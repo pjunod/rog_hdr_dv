@@ -1,16 +1,24 @@
 # Software delivery — current install and rollback handoff
 
-Reconciled 2026-11-07 against repository main `663a0a2`. This is a software
+Installed-release update 2026-11-09; earlier observations below retain their dates. This is a software
 handoff, not a new display trial, optical measurement or Dolby certification.
 The [APT guide](UBUNTU_APT_REPOSITORY.md), [operations](OPERATIONS.md) and
 [kernel ledger](KERNEL_REBASE.md) own the actual procedures. Historical
 experimental player bundles are not the current product install path.
 
+## November 9 installed release
+
+The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. The existing session therefore does not establish that the new compositor is active; normal next-login acceptance remains pending. Historical private-compositor playback receipts retain their original scope. The exact rollback remains retained and unexecuted. Installation does not extend the earlier playback or display acceptance.
+
+After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; compositor acceptance after normal login and optical measurement remain pending.
+
+A fresh installed `/usr/bin/mpv` played the genuine 3840×2160 Profile 7 FEL clip on a private native GPU-backed Weston compositor. The run requested 24 frames, reported `EL composed=1`, selected the 616 cd/m² target and logged zero Vulkan errors. A separate software-rendered Weston harness could not create a Vulkan swapchain and was inconclusive. These are private-compositor software checks; normal desktop and optical acceptance remain pending.
+
 ## Installed, published and retained are different states
 
 | Component | Current disposition | Provenance and limits |
 |---|---|---|
-| Mutter | APT `51.0-1ubuntu3+nativehdr13`, installed on the ROG | Ubuntu `51.0-1ubuntu3` plus 105 patches; downloaded package changelog names `479d61de3f78` |
+| Mutter | `51.0-1ubuntu3+nativehdr15`, installed on the ROG | Next-login runtime and display acceptance pending; the pre-install Shell process continued running |
 | libdisplay-info | APT `0.3.0-1+nativehdr13`, installed as amd64 and i386 | Ubuntu `0.3.0-1` plus 23 patches; changelog names the same repository commit; retain matching versions on both architectures |
 | Kernel | Signed `7.3.0-nativehdr3`, installed and running | Ubuntu `7.3.0-10.10` plus five display patches; October 29 build-ID, CVE, Secure Boot and driver checks retained, not repeated |
 | Dolby Vision player | External plurx Player, installed version `0.4.1+lp7.387.0.mpv0.41.0+git20261026.e59d90c-1` | Product source, packaging, upgrades and acceptance belong to plurx; not rebuilt or qualified by this documentation change |
