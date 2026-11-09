@@ -1,0 +1,441 @@
+--- a/sys/va/gstvabasedec.c
++++ b/sys/va/gstvabasedec.c
+@@ -20,6 +20,7 @@
+ 
+ #include <gstdovipicture.h>
+ #include "gstvabasedec.h"
++#include "gstvabasedecdovi.h"
+ 
+ #include <gst/va/gstva.h>
+ #include <gst/va/gstvavideoformat.h>
+@@ -30,6 +31,63 @@
+ 
+ #define GST_CAT_DEFAULT (base->debug_category)
+ #define GST_VA_BASE_DEC_GET_PARENT_CLASS(obj) (GST_VA_BASE_DEC_GET_CLASS(obj)->parent_decoder_class)
++
++static GBytes *
++_dovi_qualified_configuration (GstVaBaseDec *base)
++{
++  return gst_va_dovi_qualified_configuration (
++      base->input_state ? base->input_state->caps : NULL);
++}
++
++static gboolean
++_dovi_configuration_changed (GstVaBaseDec *base)
++{
++  AVDOVIDecoderConfigurationRecord ignored;
++  GBytes *input = NULL, *output = NULL;
++  if (base->input_state)
++    gst_dovi_caps_get_stream_config (base->input_state->caps, &ignored, &input);
++  if (base->output_state)
++    gst_dovi_caps_get_stream_config (base->output_state->caps, &ignored, &output);
++  gboolean changed = (input || output) &&
++      (!input || !output || !g_bytes_equal (input, output));
++  g_clear_pointer (&input, g_bytes_unref);
++  g_clear_pointer (&output, g_bytes_unref);
++  return changed;
++}
++
++static GstCaps *
++_dovi_allowed_caps (GstVaBaseDec *base, GBytes *configuration)
++{
++  /* The local half of src_query, without a stale FIXED_CAPS shortcut or an
++   * unqualified peer intersection. This is the real device/profile export set. */
++  GstCaps *real = base->decoder ?
++      gst_va_decoder_get_srcpad_caps (base->decoder) :
++      gst_pad_query_caps (GST_VIDEO_DECODER_SRC_PAD (base), NULL);
++  GstVideoInfo geometry = base->input_state ?
++      base->input_state->info : base->output_info;
++  geometry.width = GST_VIDEO_INFO_WIDTH (&base->output_info);
++  geometry.height = GST_VIDEO_INFO_HEIGHT (&base->output_info);
++  GstCaps *allowed = gst_va_dovi_query_allowed (
++      GST_VIDEO_DECODER_SRC_PAD (base), real, &geometry, configuration);
++  gst_clear_caps (&real);
++  return allowed;
++}
++
++static gboolean
++gst_va_base_dec_src_event (GstVideoDecoder *decoder, GstEvent *event)
++{
++  GstVaBaseDec *base = GST_VA_BASE_DEC (decoder);
++  if (GST_EVENT_TYPE (event) == GST_EVENT_RECONFIGURE) {
++    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
++    GBytes *configuration = _dovi_qualified_configuration (base);
++    if (configuration || _dovi_configuration_changed (base))
++      base->need_negotiation = TRUE;
++    g_clear_pointer (&configuration, g_bytes_unref);
++    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
++  }
++  return GST_VIDEO_DECODER_CLASS (GST_VA_BASE_DEC_GET_PARENT_CLASS (decoder))->
++      src_event (decoder, event);
++}
+ 
+ static void
+ gst_va_base_dec_get_property (GObject * object, guint prop_id,
+@@ -485,6 +543,23 @@
+   gboolean has_videometa, has_video_crop_meta;
+   gboolean dont_use_other_pool = FALSE, ret = FALSE;
+ 
++  GBytes *configuration = _dovi_qualified_configuration (base);
++  if (configuration) {
++    GstCaps *final_caps = NULL;
++    gst_query_parse_allocation (query, &final_caps, NULL);
++    gboolean accepted = final_caps && gst_caps_is_fixed (final_caps) &&
++        gst_va_dovi_same_configuration (final_caps, configuration) &&
++        (!gst_pad_is_linked (GST_VIDEO_DECODER_SRC_PAD (decoder)) ||
++        gst_pad_peer_query_accept_caps (GST_VIDEO_DECODER_SRC_PAD (decoder),
++            final_caps));
++    g_bytes_unref (configuration);
++    if (!accepted) {
++      base->need_negotiation = TRUE;
++      GST_DEBUG_OBJECT (base, "Marked output rejected before allocation");
++      return FALSE;
++    }
++  }
++
+   if (base->min_buffers == 0) {
+     GST_DEBUG_OBJECT (base,
+         "Don't know minimum number of required buffers yet");
+@@ -676,9 +751,53 @@
+ }
+ 
+ static gboolean
++gst_va_base_dec_negotiate_dovi (GstVideoDecoder *decoder)
++{
++  GstVaBaseDec *base = GST_VA_BASE_DEC (decoder);
++  GstVideoDecoderClass *parent =
++      GST_VIDEO_DECODER_CLASS (GST_VA_BASE_DEC_GET_PARENT_CLASS (decoder));
++  for (guint attempt = 0; attempt < 2; attempt++) {
++    if (base->need_negotiation || !base->output_state) {
++      /* A downstream reconfigure can change memory without changing the coded
++       * profile or dimensions; do not reopen matching hardware. */
++      if (!gst_va_decoder_config_is_equal (base->decoder, base->profile,
++              base->rt_format, base->width, base->height)) {
++        if (gst_va_decoder_is_open (base->decoder) &&
++            !gst_va_decoder_close (base->decoder))
++          return FALSE;
++        if (!gst_va_decoder_open (base->decoder, base->profile, base->rt_format) ||
++            !gst_va_decoder_set_frame_size (base->decoder, base->width,
++                base->height))
++          return FALSE;
++      }
++      if (!gst_va_base_dec_set_output_state (base)) {
++        base->need_negotiation = TRUE;
++        return FALSE;
++      }
++      base->need_negotiation = FALSE;
++    }
++    if (parent->negotiate (decoder))
++      return TRUE;
++    /* Initial decodebin exposure may only have seen a provisional template
++     * peer. Retry once against the now-linked chain, before any allocation. */
++    base->need_negotiation = TRUE;
++    if (!gst_pad_is_linked (GST_VIDEO_DECODER_SRC_PAD (decoder)))
++      break;
++  }
++  return FALSE;
++}
++
++static gboolean
+ gst_va_base_dec_negotiate (GstVideoDecoder * decoder)
+ {
+   GstVaBaseDec *base = GST_VA_BASE_DEC (decoder);
++  if (_dovi_configuration_changed (base))
++    base->need_negotiation = TRUE;
++  GBytes *configuration = _dovi_qualified_configuration (base);
++  if (configuration) {
++    g_bytes_unref (configuration);
++    return gst_va_base_dec_negotiate_dovi (decoder);
++  }
+ 
+   /* Do not (re-)open the decoder in case the input state hasn't changed. */
+   if (!base->need_negotiation) {
+@@ -766,6 +885,7 @@
+   decoder_class->stop = GST_DEBUG_FUNCPTR (gst_va_base_dec_stop);
+   decoder_class->getcaps = GST_DEBUG_FUNCPTR (gst_va_base_dec_getcaps);
+   decoder_class->src_query = GST_DEBUG_FUNCPTR (gst_va_base_dec_src_query);
++  decoder_class->src_event = GST_DEBUG_FUNCPTR (gst_va_base_dec_src_event);
+   decoder_class->sink_query = GST_DEBUG_FUNCPTR (gst_va_base_dec_sink_query);
+   decoder_class->decide_allocation =
+       GST_DEBUG_FUNCPTR (gst_va_base_dec_decide_allocation);
+@@ -854,6 +974,33 @@
+   return GST_VIDEO_FORMAT_UNKNOWN;
+ }
+ 
++typedef struct {
++  GstVaBaseDec *base;
++  GstVideoFormat *format;
++  GstCapsFeatures **features;
++  guint64 *modifier;
++} DoviSelect;
++
++static gboolean
++_dovi_select_fields (GstCaps *candidate, gpointer data)
++{
++  DoviSelect *select = data;
++  GstCapsFeatures *features = gst_caps_get_features (candidate, 0);
++  gboolean dma = gst_caps_features_contains (features,
++      GST_CAPS_FEATURE_MEMORY_DMABUF);
++  const GValue *value = gst_structure_get_value (
++      gst_caps_get_structure (candidate, 0), dma ? "drm-format" : "format");
++  guint64 modifier = 0;
++  GstVideoFormat format = _find_video_format_from_chroma (value,
++      select->base->rt_format, dma, &modifier);
++  if (format == GST_VIDEO_FORMAT_UNKNOWN)
++    return FALSE;
++  if (select->format) *select->format = format;
++  if (select->features) *select->features = gst_caps_features_copy (features);
++  if (select->modifier) *select->modifier = modifier;
++  return TRUE;
++}
++
+ /* ordered list of capsfeature preference */
+ enum
+ { VA, DMABUF, SYSMEM };
+@@ -876,6 +1023,18 @@
+   gst_id_str_set_static_str (&va, GST_CAPS_FEATURE_MEMORY_VA);
+ 
+   g_return_if_fail (base);
++
++  GBytes *configuration = _dovi_qualified_configuration (base);
++  if (configuration) {
++    GstCaps *qualified = _dovi_allowed_caps (base, configuration);
++    DoviSelect select = {base, format, capsfeatures, modifier};
++    if (format) *format = GST_VIDEO_FORMAT_UNKNOWN;
++    if (capsfeatures) *capsfeatures = NULL;
++    gst_va_dovi_foreach_candidate (qualified, _dovi_select_fields, &select);
++    gst_caps_unref (qualified);
++    g_bytes_unref (configuration);
++    return;
++  }
+ 
+   /* verify if peer caps is any */
+   {
+@@ -1143,6 +1302,61 @@
+   return GST_FLOW_OK;
+ }
+ 
++typedef struct {
++  GstVaBaseDec *base;
++  GBytes *configuration;
++} DoviOutput;
++
++static gboolean
++_dovi_try_output_state (GstCaps *candidate, gpointer data)
++{
++  DoviOutput *output = data;
++  GstVaBaseDec *base = output->base;
++  GstVideoDecoder *decoder = GST_VIDEO_DECODER (base);
++  GstVideoFormat format = GST_VIDEO_FORMAT_UNKNOWN;
++  GstCapsFeatures *features = NULL;
++  guint64 modifier = 0;
++  DoviSelect select = {base, &format, &features, &modifier};
++  if (!_dovi_select_fields (candidate, &select))
++    return FALSE;
++  if (base->output_state) {
++    gst_video_codec_state_unref (base->output_state);
++    base->output_state = NULL;
++  }
++  base->output_state = gst_video_decoder_set_interlaced_output_state (decoder,
++      format, GST_VIDEO_INFO_INTERLACE_MODE (&base->output_info),
++      GST_VIDEO_INFO_WIDTH (&base->output_info),
++      GST_VIDEO_INFO_HEIGHT (&base->output_info), base->input_state);
++  if (!base->output_state) {
++    gst_caps_features_free (features);
++    return FALSE;
++  }
++  base->output_state->caps = gst_caps_features_contains (features,
++      GST_CAPS_FEATURE_MEMORY_DMABUF) ?
++      gst_va_video_info_to_dma_caps (&base->output_state->info, modifier) :
++      gst_video_info_to_caps (&base->output_state->info);
++  if (!base->output_state->caps) {
++    gst_caps_features_free (features);
++    goto reject;
++  }
++  gst_caps_set_features_simple (base->output_state->caps, features);
++  gst_dovi_caps_apply_stream_config (base->output_state->caps,
++      output->configuration);
++  if (!gst_caps_is_subset (base->output_state->caps, candidate))
++    goto reject;
++  if (gst_pad_is_linked (GST_VIDEO_DECODER_SRC_PAD (decoder)) &&
++      !gst_pad_peer_query_accept_caps (GST_VIDEO_DECODER_SRC_PAD (decoder),
++          base->output_state->caps))
++    goto reject;
++  GST_INFO_OBJECT (base, "Negotiated marked caps %" GST_PTR_FORMAT,
++      base->output_state->caps);
++  return TRUE;
++reject:
++  gst_video_codec_state_unref (base->output_state);
++  base->output_state = NULL;
++  return FALSE;
++}
++
+ gboolean
+ gst_va_base_dec_set_output_state (GstVaBaseDec * base)
+ {
+@@ -1152,8 +1366,21 @@
+   GstCapsFeatures *capsfeatures = NULL;
+   GstVideoInfo *info = &base->output_info;
+ 
+-  if (base->output_state)
++  if (base->output_state) {
+     gst_video_codec_state_unref (base->output_state);
++    base->output_state = NULL;
++  }
++
++  GBytes *configuration = _dovi_qualified_configuration (base);
++  if (configuration) {
++    GstCaps *qualified = _dovi_allowed_caps (base, configuration);
++    DoviOutput output = {base, configuration};
++    gboolean accepted = gst_va_dovi_foreach_candidate (qualified,
++        _dovi_try_output_state, &output);
++    gst_caps_unref (qualified);
++    g_bytes_unref (configuration);
++    return accepted;
++  }
+ 
+   gst_va_base_dec_get_preferred_format_and_caps_features (base, &format,
+       &capsfeatures, &modifier);
+--- /dev/null
++++ b/sys/va/gstvabasedecdovi.h
+@@ -0,0 +1,140 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef GST_VA_BASE_DEC_DOVI_H
++#define GST_VA_BASE_DEC_DOVI_H
++
++#include <gst/video/video.h>
++#include <gstdovipicture.h>
++
++/* This selects only clear coded single-layer HEVC routes understood by the VA
++ * producer. It does not qualify a picture, invent an RPU or certify an EL. */
++static inline GBytes *
++gst_va_dovi_qualified_configuration (const GstCaps *coded)
++{
++  AVDOVIDecoderConfigurationRecord config;
++  GBytes *bytes = NULL;
++  if (!coded || !gst_caps_is_fixed (coded) ||
++      gst_caps_get_size (coded) != 1 ||
++      !gst_structure_has_name (gst_caps_get_structure (coded, 0), "video/x-h265") ||
++      !gst_dovi_caps_get_stream_config (coded, &config, &bytes) ||
++      g_bytes_get_size (bytes) != 24 ||
++      !config.rpu_present_flag || !config.bl_present_flag ||
++      config.el_present_flag ||
++      config.dv_md_compression != AV_DOVI_COMPRESSION_NONE ||
++      !((config.dv_profile == 5 && config.dv_bl_signal_compatibility_id == 0) ||
++        (config.dv_profile == 8 && config.dv_bl_signal_compatibility_id == 1))) {
++    g_clear_pointer (&bytes, g_bytes_unref);
++    return NULL;
++  }
++  return bytes;
++}
++
++/* Preserve the decoder's real formats, features and DRM modifier alternatives.
++ * Only the exact parser-transmitted configuration is added before querying a
++ * consumer. In particular, this VA producer never manufactures a FEL marker. */
++static inline GstCaps *
++gst_va_dovi_query_allowed (GstPad *src, const GstCaps *real,
++    const GstVideoInfo *geometry, GBytes *configuration)
++{
++  GstCaps *peer, *allowed;
++  if (!real || gst_caps_is_any (real))
++    return gst_caps_new_empty ();
++  GstCaps *marked = gst_caps_copy (real);
++  for (guint i = gst_caps_get_size (marked); i > 0; i--) {
++    if (gst_caps_features_is_any (gst_caps_get_features (marked, i - 1)) ||
++        !gst_structure_has_name (gst_caps_get_structure (marked, i - 1),
++            "video/x-raw"))
++      gst_caps_remove_structure (marked, i - 1);
++  }
++  if (geometry) {
++    GstCaps *bounds = gst_caps_new_empty_simple ("video/x-raw");
++    GstStructure *st = gst_caps_get_structure (bounds, 0);
++    gst_caps_set_features_simple (bounds, gst_caps_features_new_any ());
++    if (GST_VIDEO_INFO_WIDTH (geometry) > 0)
++      gst_structure_set (st, "width", G_TYPE_INT,
++          GST_VIDEO_INFO_WIDTH (geometry), NULL);
++    if (GST_VIDEO_INFO_HEIGHT (geometry) > 0)
++      gst_structure_set (st, "height", G_TYPE_INT,
++          GST_VIDEO_INFO_HEIGHT (geometry), NULL);
++    if (GST_VIDEO_INFO_FPS_N (geometry) > 0 && GST_VIDEO_INFO_FPS_D (geometry) > 0)
++      gst_structure_set (st, "framerate", GST_TYPE_FRACTION,
++          GST_VIDEO_INFO_FPS_N (geometry), GST_VIDEO_INFO_FPS_D (geometry), NULL);
++    if (GST_VIDEO_INFO_PAR_N (geometry) > 0 && GST_VIDEO_INFO_PAR_D (geometry) > 0)
++      gst_structure_set (st, "pixel-aspect-ratio", GST_TYPE_FRACTION,
++          GST_VIDEO_INFO_PAR_N (geometry), GST_VIDEO_INFO_PAR_D (geometry), NULL);
++    allowed = gst_caps_intersect_full (marked, bounds, GST_CAPS_INTERSECT_FIRST);
++    gst_caps_unref (marked);
++    gst_caps_unref (bounds);
++    marked = allowed;
++  }
++  gst_dovi_caps_apply_stream_config (marked, configuration);
++  for (guint i = 0; i < gst_caps_get_size (marked); i++)
++    gst_structure_remove_field (gst_caps_get_structure (marked, i),
++        "dovi-fel-decoder");
++  if (gst_pad_is_linked (src)) {
++    peer = gst_pad_peer_query_caps (src, marked);
++    allowed = peer ? gst_caps_intersect_full (marked, peer,
++        GST_CAPS_INTERSECT_FIRST) : gst_caps_new_empty ();
++    gst_clear_caps (&peer);
++  } else {
++    /* Decodebin may expose a pad before its final filter chain is linked.
++     * This remains provisional and is revalidated before allocation. */
++    allowed = gst_caps_ref (marked);
++  }
++  gst_caps_unref (marked);
++  return allowed;
++}
++
++static inline gboolean
++gst_va_dovi_same_configuration (const GstCaps *caps, GBytes *configuration)
++{
++  AVDOVIDecoderConfigurationRecord ignored;
++  GBytes *actual = NULL;
++  gboolean known = gst_dovi_caps_get_stream_config (caps, &ignored, &actual);
++  gboolean same = known && actual && configuration &&
++      g_bytes_equal (actual, configuration);
++  g_clear_pointer (&actual, g_bytes_unref);
++  return same;
++}
++
++typedef gboolean (*GstVaDoviCandidateFunc) (GstCaps *candidate, gpointer data);
++
++/* Walk every actual alternative in the decoder's existing domain order. A
++ * rejected fixed modifier/format does not prevent trying the remaining ones. */
++static inline gboolean
++gst_va_dovi_foreach_candidate (const GstCaps *allowed,
++    GstVaDoviCandidateFunc accept, gpointer data)
++{
++  const gchar *domains[] = {
++    "memory:VAMemory", "memory:DMABuf", GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY
++  };
++  for (guint domain = 0; domain < G_N_ELEMENTS (domains); domain++) {
++    for (guint i = 0; i < gst_caps_get_size (allowed); i++) {
++      const GstCapsFeatures *features = gst_caps_get_features (allowed, i);
++      if (gst_caps_features_is_any (features) ||
++          !gst_caps_features_contains (features, domains[domain]))
++        continue;
++      const gchar *field = domain == 1 ? "drm-format" : "format";
++      const GValue *formats = gst_structure_get_value (
++          gst_caps_get_structure (allowed, i), field);
++      if (!formats)
++        continue;
++      guint count = GST_VALUE_HOLDS_LIST (formats) ?
++          gst_value_list_get_size (formats) : 1;
++      for (guint j = 0; j < count; j++) {
++        const GValue *value = GST_VALUE_HOLDS_LIST (formats) ?
++            gst_value_list_get_value (formats, j) : formats;
++        if (!G_VALUE_HOLDS_STRING (value))
++          continue;
++        GstCaps *candidate = gst_caps_copy_nth (allowed, i);
++        gst_structure_set_value (gst_caps_get_structure (candidate, 0),
++            field, value);
++        gboolean accepted = accept (candidate, data);
++        gst_caps_unref (candidate);
++        if (accepted)
++          return TRUE;
++      }
++    }
++  }
++  return FALSE;
++}
++#endif
