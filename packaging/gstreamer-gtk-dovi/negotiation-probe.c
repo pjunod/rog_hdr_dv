@@ -281,11 +281,22 @@ source_gate_check (GstElement *map, GstCaps *input, gboolean graded, const gchar
   require (graded ? mapped : gst_caps_is_equal (input, out), name);
   gst_caps_unref (out);
 }
+typedef struct { guint64 revoked_revision, revoked_selection; guint revokes; } SelectionEvents;
+static void source_selection_revoked (GstElement *map, guint64 revision,
+    guint64 selection, gpointer data)
+{
+  (void) map;
+  SelectionEvents *events = data;
+  events->revoked_revision = revision; events->revoked_selection = selection;
+  events->revokes++;
+}
 static void
 source_lifecycle_controls (void)
 {
   GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
   g_object_set (map, "destination-kind", 1u, "require-clear-source", TRUE, NULL);
+  SelectionEvents selections = {0};
+  g_signal_connect (map, "source-selection-revoked", G_CALLBACK (source_selection_revoked), &selections);
   GstPad *sink = gst_element_get_static_pad (map, "sink");
   GstPad *src = gst_element_get_static_pad (map, "src");
   gst_pad_set_active (sink, TRUE); gst_pad_set_active (src, TRUE);
@@ -299,6 +310,19 @@ source_lifecycle_controls (void)
   source_gate_check (map, input, FALSE, "another stream cannot borrow a clear configuration");
   gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
   source_gate_check (map, input, TRUE, "matching raw stream and original coded proof enable grade");
+  guint64 revision_a = 0, selection_a = 0, revision_b = 0, selection_b = 0;
+  g_object_get (map, "active-source-revision", &revision_a,
+      "active-source-selection", &selection_a, NULL);
+  source_context (map, 1, FALSE, "clear/video1", coded);
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video1"));
+  g_object_get (map, "active-source-revision", &revision_b,
+      "active-source-selection", &selection_b, NULL);
+  require (revision_a == 1 && revision_b == revision_a && selection_a && selection_b > selection_a,
+      "downstream-only STREAM_START rotates the selected lease within the same origin");
+  require (selections.revokes && selections.revoked_revision == revision_a && selections.revoked_selection == selection_a,
+      "held A export receives exact selected-lease revocation before B");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
+
   GstCaps *wrong = gst_caps_copy (input);
   guint8 record[24] = {1, 0, 16, 29, 16};
   GstBuffer *config = gst_buffer_new_memdup (record, sizeof (record));
@@ -314,7 +338,11 @@ source_lifecycle_controls (void)
   source_gate_check (map, input, FALSE, "new source revision requires its own raw stream start");
   gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
   source_gate_check (map, input, TRUE, "new clear source revision qualifies independently");
+  g_object_get (map, "active-source-selection", &selection_a, NULL);
   gst_pad_send_event (sink, gst_event_new_flush_start ());
+  g_object_get (map, "active-source-selection", &selection_b, NULL);
+  require (!selection_b && selections.revoked_selection == selection_a,
+      "filter-local flush revokes and clears the actual selected lease");
   source_gate_check (map, input, FALSE, "flush revokes the retained source lease immediately");
   source_context (map, 3, FALSE, "clear/video0", coded);
   gst_pad_send_event (sink, gst_event_new_flush_stop (TRUE));
