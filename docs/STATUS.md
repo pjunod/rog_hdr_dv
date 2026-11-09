@@ -1,27 +1,29 @@
 # Status — what is working and what remains
 
-**Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. The existing session therefore does not establish that the new compositor is active; normal next-login acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
+**Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
 
-After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; compositor acceptance after normal login and optical measurement remain pending.
+After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; post-login visual acceptance and optical measurement remain pending.
 
-A fresh installed `/usr/bin/mpv` played the genuine 3840×2160 Profile 7 FEL clip on a private native GPU-backed Weston compositor. The run requested 24 frames, reported `EL composed=1`, selected the 616 cd/m² target and logged zero Vulkan errors. A separate software-rendered Weston harness could not create a Vulkan swapchain and was inconclusive. These are private-compositor software checks; normal desktop and optical acceptance remain pending.
+A fresh installed `/usr/bin/mpv` played the genuine 3840×2160 Profile 7 FEL clip on a private native GPU-backed Weston compositor. The run requested 24 frames, reported `EL composed=1`, selected the 616 cd/m² target and logged zero Vulkan errors. A separate software-rendered Weston harness could not create a Vulkan swapchain and was inconclusive. These are private-compositor software checks; post-login visual and optical acceptance remain pending.
+
+The installed image loader and staged Loupe now have a native macOS Display P3 software comparison. Sixteen colours preserved extended linear values, and private HDR compositor readback matched the unclipped reference within one ten-bit PQ code across 49,152 channel samples. [Image colour scope and controls](GNOME_IMAGE_COLOUR.md).
 
 | On the laptop today | Current development result |
 |---|---|
 | mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and the installed Vulkan update | Before installation, mpv 0.42 played the 4K FEL sample at 24 fps on NVIDIA. |
-| Mutter nativehdr15 and the updated GTK runtime are installed; next-login acceptance pending | The updated GTK runtime fixes black Showtime output. The staged player regraded the same paused Profile 5 picture when a virtual GNOME monitor changed from 616 to 308 cd/m². Returning to 616 restored the exact original screen pixels. [GNOME capture](../evidence/gnome-showtime-paused-retarget.json). |
+| Mutter nativehdr15 and the updated GTK runtime are installed; post-login visual acceptance pending | The updated GTK runtime fixes black Showtime output. The staged player regraded the same paused Profile 5 picture when a virtual GNOME monitor changed from 616 to 308 cd/m². Returning to 616 restored the exact original screen pixels. [GNOME capture](../evidence/gnome-showtime-paused-retarget.json). |
 | Firmware provides panel color and luminance data | On the neutral CM4 chart, using the panel's actual primary coordinates reduced mean ΔE ITP from 0.650 to 0.578. Creative-colour trims still use the named target. Optical calibration is pending. |
 
 **GNOME screen capture.** Mutter wrote 8-bit pixels into shared-memory buffers advertised as 10-bit HDR. With the corrected writer, two 10-bit channel layouts reproduced identical colors across six patches. The half-float capture agreed to within 0.58 of a 10-bit code value. The same paused Dolby movie changed across 397,853 native 10-bit pixels when retargeted from 616 to 308 cd/m². Restoring 616 reproduced the original capture byte for byte. Both checks used a private GNOME monitor on the ROG GPU. [Format and pixel evidence](../evidence/mutter-shared-memory-color-formats.json).
 
-**GtkVideo +4 installed; next-login acceptance pending.** Normal Ubuntu packages preserve a separate target and
+**GtkVideo +4 installed; post-login visual acceptance pending.** Normal Ubuntu packages preserve a separate target and
 retained native picture for each realized video view. Package-extracted
 Profile 5 passed paused 616→308→616 cd/m² retargeting on default Vulkan:
 both video bytes and independent ten-bit PQ compositor output returned exactly
 to A. Five source/offload/view lifecycle controls and four optional-SDK startup
 controls passed. Upgrading the six GTK packages alone would remove the two
 older playback clients. The matched 45-package upgrade preserves them both.
-These pre-install GtkVideo checks cover Profile 5. The release is installed on the ROG; normal next-login acceptance remains pending.
+These pre-install GtkVideo checks cover Profile 5. The release is installed on the ROG; post-login visual acceptance remains pending.
 [Combined package rehearsal](../evidence/panel-desktop-release-bundle.json).
 [View contract](GDK_DISPLAY_TARGET.md#gtkvideo-owns-the-view-target) ·
 [Source and product receipt](../evidence/gtkvideo-view-normal-packages-20261108.json).
@@ -89,7 +91,7 @@ The 32-bit decoder retained all 544 stock decoders, 218 encoders and 67 hardware
 
 Ubuntu's MP4 demuxer now carries the sample description's Dolby configuration through `h265parse`. Genuine Profile 5 and synthetic 8.1 preserved all 24 bytes. Plain HDR10, duplicate boxes and invalid fields carried no Dolby configuration. A four-byte legacy record retained its explicit unknown base compatibility. GTK player rendering remains a separate work item. [Demux and parser controls](../evidence/gstreamer-dovi-isobmff-controls.json).
 
-The corrected packaged player also ran with the laptop’s existing mpv video options and the Intel Vulkan ICD selected by the test environment. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. The five normal Ubuntu compositor packages built, and their upgrade and exact five-package rollback passed offline simulation. That observation predates the November 9 installation; next-login compositor acceptance remains pending. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
+The corrected packaged player also ran with the laptop’s existing mpv video options and the Intel Vulkan ICD selected by the test environment. Both HEVC layers selected NVDEC copy-back, the Intel GPU performed the grade, and the captured picture matched the explicit-renderer check. The compositor source now preserves the correct 616 cd/m² grade where integer Wayland peak rounding had triggered extra highlight mapping. The five normal Ubuntu compositor packages built, and their upgrade and exact five-package rollback passed offline simulation. That observation predates the November 9 installation; post-login visual acceptance remains pending. [Compositor decision and controls](MUTTER_TARGET_LUMINANCE.md#integer-client-peak-declarations).
 
 ## GStreamer RPU transport — native scope passed, November 7
 

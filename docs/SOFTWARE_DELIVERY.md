@@ -8,17 +8,17 @@ experimental player bundles are not the current product install path.
 
 ## November 9 installed release
 
-The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. The existing session therefore does not establish that the new compositor is active; normal next-login acceptance remains pending. Historical private-compositor playback receipts retain their original scope. The exact rollback remains retained and unexecuted. Installation does not extend the earlier playback or display acceptance.
+The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance remains pending. Historical private-compositor playback receipts retain their original scope. The exact rollback remains retained and unexecuted. Installation does not extend the earlier playback or display acceptance.
 
-After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; compositor acceptance after normal login and optical measurement remain pending.
+After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; post-login visual acceptance and optical measurement remain pending.
 
-A fresh installed `/usr/bin/mpv` played the genuine 3840×2160 Profile 7 FEL clip on a private native GPU-backed Weston compositor. The run requested 24 frames, reported `EL composed=1`, selected the 616 cd/m² target and logged zero Vulkan errors. A separate software-rendered Weston harness could not create a Vulkan swapchain and was inconclusive. These are private-compositor software checks; normal desktop and optical acceptance remain pending.
+A fresh installed `/usr/bin/mpv` played the genuine 3840×2160 Profile 7 FEL clip on a private native GPU-backed Weston compositor. The run requested 24 frames, reported `EL composed=1`, selected the 616 cd/m² target and logged zero Vulkan errors. A separate software-rendered Weston harness could not create a Vulkan swapchain and was inconclusive. These are private-compositor software checks; post-login visual and optical acceptance remain pending.
 
 ## Installed, published and retained are different states
 
 | Component | Current disposition | Provenance and limits |
 |---|---|---|
-| Mutter | `51.0-1ubuntu3+nativehdr15`, installed on the ROG | Next-login runtime and display acceptance pending; the pre-install Shell process continued running |
+| Mutter | `51.0-1ubuntu3+nativehdr15`, installed on the ROG | Loaded after normal login; internal mode 2560×1600 at 240 Hz and colour mode 1; visual acceptance pending |
 | libdisplay-info | APT `0.3.0-1+nativehdr13`, installed as amd64 and i386 | Ubuntu `0.3.0-1` plus 23 patches; changelog names the same repository commit; retain matching versions on both architectures |
 | Kernel | Signed `7.3.0-nativehdr3`, installed and running | Ubuntu `7.3.0-10.10` plus five display patches; October 29 build-ID, CVE, Secure Boot and driver checks retained, not repeated |
 | Dolby Vision player | External plurx Player, installed version `0.4.1+lp7.387.0.mpv0.41.0+git20261026.e59d90c-1` | Product source, packaging, upgrades and acceptance belong to plurx; not rebuilt or qualified by this documentation change |
