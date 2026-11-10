@@ -304,12 +304,28 @@ source_lifecycle_controls (void)
   GstCaps *coded = gst_caps_copy (input);
   gst_structure_set_name (gst_caps_get_structure (coded, 0), "video/x-h265");
   source_gate_check (map, input, FALSE, "browser unknown source uses exact identity caps");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
+  gst_pad_send_event (sink, gst_event_new_caps (input));
+  GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+  GstBaseTransformClass *klass = GST_BASE_TRANSFORM_GET_CLASS (base);
+  require (klass->set_caps (base, input, input), "unknown source establishes original identity contract");
+  GstBuffer *pending = gst_buffer_new_allocate (NULL, 768, NULL), *prepared = NULL;
+  require (klass->prepare_output_buffer (base, pending, &prepared) == GST_FLOW_OK && prepared == pending,
+      "unknown source preserves the exact original buffer");
+  gst_clear_buffer (&prepared);
+
   source_context (map, 1, FALSE, "clear/video0", coded);
   source_gate_check (map, input, FALSE, "coded proof alone cannot authorize a prior or unknown raw stream");
   gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
   source_gate_check (map, input, FALSE, "another stream cannot borrow a clear configuration");
   gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
   source_gate_check (map, input, TRUE, "matching raw stream and original coded proof enable grade");
+  require (klass->prepare_output_buffer (base, pending, &prepared) == GST_BASE_TRANSFORM_FLOW_DROPPED && !prepared,
+      "positive STREAM_START lease drops old marked identity buffers pending graded renegotiation");
+  GstCaps *fresh = klass->transform_caps (base, GST_PAD_SINK, input, NULL);
+  require (klass->set_caps (base, input, fresh), "fresh graded caps resume the matched lease contract");
+  gst_caps_unref (fresh); gst_buffer_unref (pending);
+
   guint64 revision_a = 0, selection_a = 0, revision_b = 0, selection_b = 0;
   g_object_get (map, "active-source-revision", &revision_a,
       "active-source-selection", &selection_a, NULL);

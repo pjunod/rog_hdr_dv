@@ -392,11 +392,29 @@ static GstFlowReturn prepare (GstBaseTransform *base, GstBuffer *input, GstBuffe
   GstGtkDoviSourceLease *lease = gst_gtk_dovi_source_lease_ref (s->source_lease);
   gboolean require_clear = s->require_clear_source;
   g_mutex_unlock (&s->lock);
+  *output = NULL;
+  gboolean live = gst_gtk_dovi_source_lease_is_valid (lease);
+  gboolean marked = FALSE, matching = FALSE;
+  if (require_clear && (live || s->known_stream)) {
+    GstCaps *caps = gst_pad_get_current_caps (GST_BASE_TRANSFORM_SINK_PAD (base));
+    if (caps && gst_caps_get_size (caps) == 1) {
+      marked = gtk_dovi_stream_profile (gst_caps_get_structure (caps, 0)) != 0;
+      g_mutex_lock (&s->lock);
+      matching = lease == s->source_lease && gst_gtk_dovi_source_lease_matches (
+          lease, s->stream_id, caps);
+      g_mutex_unlock (&s->lock);
+    }
+    gst_clear_caps (&caps);
+  }
+  /* STREAM_START can qualify a new lease while the previous identity caps
+   * are still current. A marked raw picture must wait for graded set_caps;
+   * an established graded contract must also match the exact live lease. */
+  if (require_clear && ((!s->known_stream && live && marked) ||
+          (s->known_stream && (!live || !matching)))) {
+    gst_gtk_dovi_source_lease_unref (lease); return GST_BASE_TRANSFORM_FLOW_DROPPED;
+  }
   if (!s->known_stream || gst_buffer_n_memory (input) == 0) {
     gst_gtk_dovi_source_lease_unref (lease); *output = gst_buffer_ref (input); return GST_FLOW_OK;
-  }
-  if (require_clear && !gst_gtk_dovi_source_lease_is_valid (lease)) {
-    gst_gtk_dovi_source_lease_unref (lease); return GST_BASE_TRANSFORM_FLOW_DROPPED;
   }
   /* Before the composition/HDR witness is ready, re-encode the ordinary
    * baseline. Private mapping requires both witnesses inside the shared core. */
