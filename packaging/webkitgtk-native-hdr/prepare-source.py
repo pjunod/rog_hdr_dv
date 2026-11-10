@@ -110,11 +110,34 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     # series and .pc state. This supports both a freshly patched extraction
     # and the identical source that produced a retained external object cache.
     mtimes = source_mtimes(source)
+    receipt = Path(os.environ.get('ROG_WEBKIT_SOURCE_MTIME_RECEIPT',
+                                  str(source.parent / (source.name + '.source-mtimes.private.json'))))
+    if not receipt.is_absolute() or receipt.resolve().is_relative_to(source):
+        raise verify.VerificationError('keep the source-mtime recovery receipt outside the source')
+    with receipt.open('x') as handle:
+        json.dump({'schema': 'rog-webkit-source-mtimes-v1', 'source_directory': str(source),
+                   'candidate_commit': pin['candidate_commit'], 'mtimes_ns': mtimes}, handle,
+                  indent=2, sort_keys=True)
+        handle.write('\n')
     env = dict(os.environ, EDITOR='true', VISUAL='true')
     ignore = r'(^|/)(__pycache__(/|$)|[^/]+[.]pyc$|build-gtk4(/|$))'
     run(['dpkg-source', '--extend-diff-ignore=' + ignore, '--commit', '.', 'rog-native-hdr.patch'], source, env=env)
+    # dpkg-source normalizes patched file timestamps while recording the
+    # quilt delta. Prove unchanged bytes/modes before restoring only that
+    # metadata, so the completed warm graph does not rebuild identical inputs.
+    verify.verify_source(source, pin)
+    current = source_mtimes(source)
+    if set(current) != set(mtimes):
+        raise verify.VerificationError('dpkg-source changed the public source inventory')
+    restored = 0
+    for name, mtime in mtimes.items():
+        if current[name] != mtime:
+            file = source / name
+            os.utime(file, ns=(file.lstat().st_atime_ns, mtime), follow_symlinks=False)
+            restored += 1
     if source_mtimes(source) != mtimes:
-        raise verify.VerificationError('dpkg-source changed a product source mtime; retain this failed preparation')
+        raise verify.VerificationError('could not restore source timestamps; retain the private recovery receipt')
+    print(f'Restored dpkg-source timestamp metadata on {restored} byte-identical source files.')
     recorded = source / 'debian/patches/rog-native-hdr.patch'
     body = recorded.read_text()
     validate_recorded_patch(body, pin['product_paths'])
