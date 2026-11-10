@@ -27,6 +27,7 @@ class WebKitPackagingTests(unittest.TestCase):
         self.build = self.root / 'build'
         self.build.mkdir()
         self.profile = json.loads((RECIPE / 'cmake-profile.json').read_text())
+        self.features = json.loads((RECIPE / 'cmake-features.json').read_text())['feature_map']
         self.cache = dict(self.profile, CMAKE_HOME_DIRECTORY=str(self.source),
                           CMAKE_GENERATOR='Ninja',
                           GTK_DOVI_SDK_ROOT='/usr/include',
@@ -39,7 +40,8 @@ class WebKitPackagingTests(unittest.TestCase):
 
     def save_cache(self):
         (self.build / 'CMakeCache.txt').write_text(''.join(
-            f'{key}:STRING={value}\n' for key, value in self.cache.items()))
+            f'{key}:{"BOOL" if key in self.features or key == "ENABLE_UNREVIEWED_FEATURE" else "STRING"}={value}\n'
+            for key, value in self.cache.items()))
 
     def test_cache_accepts_compiler_discovery_and_ignores_gi_search_roots(self):
         self.cache.update(CMAKE_C_COMPILER='/usr/bin/clang',
@@ -58,6 +60,12 @@ class WebKitPackagingTests(unittest.TestCase):
                 with self.assertRaisesRegex(verify.VerificationError, key):
                     verify.verify_cache(self.source, self.build, self.profile)
                 self.cache[key] = value
+
+    def test_rejects_new_unreviewed_boolean_feature(self):
+        self.cache['ENABLE_UNREVIEWED_FEATURE'] = 'ON'
+        self.save_cache()
+        with self.assertRaisesRegex(verify.VerificationError, 'ENABLE_UNREVIEWED_FEATURE'):
+            verify.verify_cache(self.source, self.build, self.profile)
 
     def test_rejects_old_usr_local_helper_path(self):
         self.cache['LIBEXEC_INSTALL_DIR'] = '/usr/local/libexec/webkitgtk-6.0'

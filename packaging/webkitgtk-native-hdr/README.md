@@ -19,7 +19,8 @@ present in an owned warm compiler slot. The retained
 fixtures pinned by SHA256; preparation verifies the entire original
 `debian/` tree against the distribution import. The [cache verifier](verify-build.py)
 checks source contents and modes against Git tree IDs without requiring Git
-metadata. Read [the explicit CMake profile](cmake-profile.json) before use.
+metadata. Read [the explicit CMake profile](cmake-profile.json) and the complete
+[Boolean feature receipt](cmake-features.json) before use.
 This is an amd64 clang `Release` derivative with empty C/C++ base flags,
 `-O2 -DNDEBUG -g0` release flags and empty linker flags. It does not claim
 Ubuntu's default compiler or hardening flags.
@@ -27,7 +28,11 @@ Ubuntu's default compiler or hardening flags.
 ## Prepare authenticated distribution source
 
 Use an owned task directory on the configured external storage volume and
-Ubuntu's authenticated source metadata. Set the absolute paths below before
+Ubuntu's authenticated source metadata. The
+[official source descriptor](https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.dsc)
+names the exact archives and hashes recorded in [the pin](source-pin.json).
+Verify the descriptor through your authenticated Ubuntu source setup; the
+recipe's hash check does not replace archive signature verification. Set the absolute paths below before
 running these commands; no helper downloads source or allocates a second
 compiler slot.
 
@@ -114,7 +119,9 @@ DEB_BUILD_OPTIONS='parallel=2 nocheck nodoc' dpkg-buildpackage -b -nc -us -uc
 ```
 
 The gate refuses a changed source, build source pathname, generator, compiler,
-flags, feature, output directory or SDK search root. `GI_GIRDIR` and
+flags, feature, output directory or SDK search root. The complete
+`ENABLE_*`/`USE_*` Boolean map must match, including key presence; a new or
+missing option also fails. The feature receipt has its own canonical SHA256. `GI_GIRDIR` and
 `GI_TYPELIBDIR` are SDK search inputs and are deliberately not interpreted as
 installation paths. It does not rewrite them. Source/header compile checks
 must separately establish that the actual compiler selected the declared

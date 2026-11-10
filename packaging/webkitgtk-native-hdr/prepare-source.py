@@ -26,8 +26,12 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     pin = json.loads((HERE / 'source-pin.json').read_text())
     if hashlib.sha256(patch.read_bytes()).hexdigest() != pin['product_patch_sha256']:
         raise verify.VerificationError('product patch differs from reviewed source pin')
-    if not (source.parent / 'webkit2gtk_2.52.6.orig.tar.xz').is_file():
+    original = source.parent / 'webkit2gtk_2.52.6.orig.tar.xz'
+    expected = pin['ubuntu_source_archives'][original.name]
+    if not original.is_file():
         raise verify.VerificationError('keep the authenticated webkit2gtk_2.52.6.orig.tar.xz next to the source')
+    if original.stat().st_size != expected['size'] or hashlib.sha256(original.read_bytes()).hexdigest() != expected['sha256']:
+        raise verify.VerificationError('original source archive differs from the Ubuntu descriptor')
     if (source / 'debian/rog-native-hdr').exists():
         raise verify.VerificationError('source already prepared; use a fresh source extraction')
     # The original Debian files must be exact in either mode. Product code can
@@ -75,7 +79,7 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     run(['patch', '--batch', '--forward', '-p1', '-i', str(HERE / 'ubuntu-packaging.diff')], source)
     target = source / 'debian/rog-native-hdr'
     target.mkdir()
-    for name in ('verify-build.py', 'source-pin.json', 'cmake-profile.json'):
+    for name in ('verify-build.py', 'source-pin.json', 'cmake-profile.json', 'cmake-features.json'):
         shutil.copy2(HERE / name, target / name)
     old = source / 'debian/changelog'
     old.write_text('webkit2gtk (' + pin['package_version'] + ') stonking; urgency=medium\n\n'

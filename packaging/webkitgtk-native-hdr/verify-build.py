@@ -83,6 +83,23 @@ def build_path(source, value):
 
 def verify_cache(source, build, profile):
     cache = read_cache(build / 'CMakeCache.txt')
+    feature_file = Path(__file__).with_name('cmake-features.json')
+    feature_receipt = json.loads(feature_file.read_text())
+    wanted_features = feature_receipt['feature_map']
+    canonical = json.dumps(wanted_features, sort_keys=True, separators=(',', ':')).encode()
+    if hashlib.sha256(canonical).hexdigest() != feature_receipt['feature_map_sha256']:
+        raise VerificationError('feature profile fingerprint is inconsistent')
+    actual_features = {}
+    for line in (build / 'CMakeCache.txt').read_text().splitlines():
+        if '=' not in line or ':BOOL=' not in line:
+            continue
+        key, value = line.split(':BOOL=', 1)
+        if key.startswith(('ENABLE_', 'USE_')):
+            actual_features[key] = value
+    if actual_features != wanted_features:
+        changed = sorted(key for key in set(actual_features) | set(wanted_features)
+                         if actual_features.get(key) != wanted_features.get(key))
+        raise VerificationError('CMake feature map differs: ' + ', '.join(changed))
     if 'ENABLE_LTO' in cache:
         raise VerificationError('ENABLE_LTO was absent in the reviewed profile')
     expected = dict(profile, CMAKE_HOME_DIRECTORY=str(source), CMAKE_GENERATOR='Ninja',
@@ -90,10 +107,6 @@ def verify_cache(source, build, profile):
                     GTK_NATIVE_VIDEO_GDK_SDK_ROOT=os.environ.get('ROG_WEBKIT_GDK_SDK_ROOT', '/usr/include/gtk-4.0'))
     for key, wanted in expected.items():
         actual = cache.get(key)
-        # Compiler discovery usually stores the absolute path. No other values
-        # are normalized: /usr/local is not interchangeable with /usr.
-        if key in ('CMAKE_C_COMPILER', 'CMAKE_CXX_COMPILER') and actual:
-            actual = Path(actual).name
         if actual != wanted:
             raise VerificationError(f'{key}: expected {wanted!r}, found {actual!r}')
     if not (build / 'build.ninja').is_file():
