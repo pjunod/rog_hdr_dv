@@ -338,6 +338,10 @@ class WebKitPackagingTests(unittest.TestCase):
                  if line.startswith('Package: ')]
         pin = json.loads((RECIPE / 'source-pin.json').read_text())
         self.assertEqual(names, pin['binary_packages'])
+        parsed = subprocess.run(['dh_listpackages'], cwd=self.source,
+                                capture_output=True, text=True)
+        self.assertEqual(parsed.returncode, 0, parsed.stderr)
+        self.assertEqual(parsed.stdout.splitlines(), pin['binary_packages'])
         self.assertNotIn('libwebkit2gtk-4.1-0', control)
         self.assertNotIn('webkitgtk-webdriver', control)
         self.assertIn('${shlibs:Depends}', control)
