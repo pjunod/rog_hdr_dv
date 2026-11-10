@@ -176,7 +176,7 @@
              }
              self.queue_native_redraw();
          }
-@@ -926,187 +934,117 @@
+@@ -926,187 +934,125 @@
          let source = state.source.take();
          state.stream_epoch = state.stream_epoch.wrapping_add(1);
          state.frame_serial = state.frame_serial.wrapping_add(1);
@@ -340,8 +340,8 @@
 -                    .as_ref()
 -                    .and_then(|c| c.structure().get::<u64>("generation").ok())
 -                    .unwrap_or(0);
-+                self.native_publication.complete_without_pixels(job.key);
-+                self.queue_native_redraw();
++                self.native_publication.complete_without_pixels(job.key,
++                    || self.queue_native_redraw());
              }
              Ok(Some((buffer, info, mapped))) => {
 +                let kind = super::native::pixel_destination(&info);
@@ -351,15 +351,22 @@
 +                    self.clear_native_visible(); return;
 +                }
                  let config = self.config.lock().unwrap();
--                let Some(current) = config.info.as_ref() else {
--                    return;
--                };
+                 let Some(current) = config.info.as_ref() else {
++                    drop(config);
++                    self.native_publication.complete_without_pixels(job.key,
++                        || self.queue_native_redraw());
+                     return;
+                 };
 -                if current.width() != info.width()
 -                    || current.height() != info.height()
 -                    || current.format() != info.format()
 -                {
--                    return;
--                }
++                if current.width() != info.width() || current.height() != info.height() {
++                    drop(config);
++                    self.native_publication.complete_without_pixels(job.key,
++                        || self.queue_native_redraw());
+                     return;
+                 }
 -                let orientation = config
 -                    .stream_orientation
 -                    .unwrap_or(config.global_orientation);
@@ -371,10 +378,6 @@
 -                    None,
 -                    overlays,
 -                );
-+                let Some(current) = config.info.as_ref() else { return; };
-+                if current.width() != info.width() || current.height() != info.height() {
-+                    self.native_publication.complete_without_pixels(job.key); return;
-+                }
 +                let orientation = config.stream_orientation.unwrap_or(config.global_orientation);
 +                let frame = Frame::new_with_overlays(self, &buffer,
 +                    &super::frame::VideoInfo::VideoInfo(info), orientation, None,
@@ -427,7 +430,7 @@
              }
          }
      }
-@@ -1131,13 +1069,26 @@
+@@ -1131,13 +1077,26 @@
                      return glib::ControlFlow::Continue;
                  }
                  gst::trace!(CAT, imp = self, "Frame changed");
@@ -462,7 +465,7 @@
  
 --- /dev/null
 +++ b/src/sink/native_publication.rs
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,227 @@
 +// SPDX-License-Identifier: MPL-2.0
 +// Shared production publication boundary. No GTK/GStreamer dependency: tests
 +// drive the same offer/completion/paint callbacks used by the live sink.
@@ -515,8 +518,12 @@
 +    pub(crate) fn accepts(&self, key: PictureKey, live: bool) -> bool {
 +        live && self.state.lock().unwrap().accepts(key)
 +    }
-+    pub(crate) fn complete_without_pixels(&self, key: PictureKey) {
-+        let mut s = self.state.lock().unwrap(); if s.current(key) { s.completed = Some(key); }
++    pub(crate) fn complete_without_pixels(&self, key: PictureKey, dispatch_latest: impl FnOnce()) {
++        {
++            let mut s = self.state.lock().unwrap();
++            if s.current(key) { s.completed = Some(key); }
++        }
++        dispatch_latest();
 +    }
 +    pub(crate) fn offer(
 +        &self, offer: Offer, live: impl Fn() -> bool,
@@ -624,6 +631,24 @@
 +        c.set_view(2, 4, 0);
 +        assert_eq!(c.complete(key(3, 3), 0, || true, || panic!("old source"), || {}), Outcome::Dropped);
 +        assert_eq!(*painted.borrow(), [(2, 1), (2, 0)]);
++    }
++    #[test]
++    fn size_rejected_job_dispatches_latest_paused_picture() {
++        let c = Coordinator::default(); c.set_view(1, 1, 0);
++        let a = key(1, 1); let b = key(2, 1);
++        for key in [a, b] {
++            assert_eq!(c.offer(Offer { key, pixels: Some(1), native: true,
++                generation_matches: false }, || true, || panic!("HDR baseline"), || {}), Outcome::Held);
++        }
++        let painted = RefCell::new(Vec::new());
++        // The actual no-pixel completion boundary dispatches B after A's
++        // old-size result is rejected, even if input has now paused.
++        c.complete_without_pixels(a, || {
++            assert!(!c.needs_redraw(a)); assert!(c.needs_redraw(b));
++            assert_eq!(c.complete(b, 0, || true,
++                || { painted.borrow_mut().push((b.frame, 0)); true }, || {}), Outcome::Published);
++        });
++        assert_eq!(*painted.borrow(), [(2, 0)]);
 +    }
 +    #[test]
 +    fn revoked_before_first_observation_never_paints_direct_sdr_or_pq() {
