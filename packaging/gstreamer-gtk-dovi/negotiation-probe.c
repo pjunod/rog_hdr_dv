@@ -345,6 +345,14 @@ source_lifecycle_controls (void)
   gst_caps_set_simple (wrong, "dovi-configuration", GST_TYPE_BUFFER, config, NULL);
   gst_buffer_unref (config);
   source_gate_check (map, wrong, FALSE, "different coded configuration cannot borrow source proof");
+  gst_pad_send_event (sink, gst_event_new_caps (wrong));
+  require (klass->set_caps (base, wrong, wrong), "distinct valid B config under A proof negotiates original identity");
+  GstBuffer *other = gst_buffer_new_allocate (NULL, 768, NULL);
+  prepared = NULL;
+  require (klass->prepare_output_buffer (base, other, &prepared) == GST_FLOW_OK && prepared == other,
+      "same stream ID with unmatched valid B configuration preserves exact buffer identity");
+  gst_clear_buffer (&prepared); gst_buffer_unref (other);
+
   gst_caps_unref (wrong);
   source_context (map, 1, TRUE, NULL, NULL);
   source_gate_check (map, input, FALSE, "CDM/source revoke restores identity negotiation");

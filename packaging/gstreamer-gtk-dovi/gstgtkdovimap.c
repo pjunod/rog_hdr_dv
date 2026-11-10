@@ -409,7 +409,7 @@ static GstFlowReturn prepare (GstBaseTransform *base, GstBuffer *input, GstBuffe
   /* STREAM_START can qualify a new lease while the previous identity caps
    * are still current. A marked raw picture must wait for graded set_caps;
    * an established graded contract must also match the exact live lease. */
-  if (require_clear && ((!s->known_stream && live && marked) ||
+  if (require_clear && ((!s->known_stream && live && marked && matching) ||
           (s->known_stream && (!live || !matching)))) {
     gst_gtk_dovi_source_lease_unref (lease); return GST_BASE_TRANSFORM_FLOW_DROPPED;
   }
