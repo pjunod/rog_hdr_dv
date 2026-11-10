@@ -110,14 +110,17 @@ Only the owner of an idle, stopped compiler slot should prepare its source.
 An active compiler continues to own its source and headers. Add
 `--already-patched` to preparation when that source already matches the
 reviewed product tree. Preparation records the quilt delta using normal `dpkg-source --commit`.
-That tool normalizes patched source timestamps. The helper first proves all
-public source bytes and modes still match the pin, then restores only changed
+That tool normalizes patched source timestamps. The helper snapshots every
+public path, content identity, exact permission mode and timestamp. After the
+commit it proves the closed source inventory, pinned trees, exact 39 patch
+paths and all per-file identities still match, then restores only changed
 mtime metadata from its pre-commit snapshot. Final timestamps must equal the
 original snapshot, preserving completed objects. It does not alter the compiler cache. Before recording the delta it writes an
 exclusive private timestamp recovery receipt next to the source, named
 `<source-name>.source-mtimes.private.json`. You can instead set absolute
 `ROG_WEBKIT_SOURCE_MTIME_RECEIPT` outside the source. Preserve this receipt
-with failed attempts and never publish it with the source package. Keep the exact
+with failed attempts and never publish it with the source package. It also
+records the actual normalized/restored path lists and counts. Keep the exact
 Ubuntu original tarball next to that source. A source-only Git archive may
 lack quilt's `.pc` directory: in that case also pass
 `--quilt-state-from "$ubuntu_clean_source"`, naming a separate authenticated
