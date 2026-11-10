@@ -89,7 +89,7 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     # already be present in the active warm source: do not rewrite its mtimes.
     phase = 'candidate' if already_patched else 'base'
     verify.verify_source(source, pin, phase, packaging=True)
-    if verify.object_id(source / 'debian') != pin['base']['debian']:
+    if verify.object_id(source / 'debian', ignore_python=False) != pin['base']['debian']:
         raise verify.VerificationError('Ubuntu debian/ differs from source pin')
     series = [line.split()[0] for line in (source / 'debian/patches/series').read_text().splitlines()
               if line.strip() and not line.lstrip().startswith('#')]
@@ -126,7 +126,10 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
                         'Forwarded: no\nLast-Update: 2026-11-09\n' + body[marker:])
     verify.verify_source(source, pin)
     run(['patch', '--batch', '--forward', '-p1', '-i', str(HERE / 'ubuntu-packaging.diff')], source)
-    (source / 'debian/source/options').write_text('extend-diff-ignore = "' + ignore + '"\n')
+    (source / 'debian/source/options').write_text(
+        'extend-diff-ignore = "' + ignore + '"\n'
+        'tar-ignore = "__pycache__"\n'
+        'tar-ignore = "*.pyc"\n')
     target = source / 'debian/rog-native-hdr'
     target.mkdir()
     for name in ('verify-build.py', 'source-pin.json', 'cmake-profile.json', 'cmake-features.json'):

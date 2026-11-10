@@ -54,7 +54,10 @@ Preparation refuses a different product patch digest, source tree, executable
 mode or Ubuntu `debian/` input. Its full top-level inventory permits only the
 six distribution roots plus unexported `.git` and `.pc` metadata. Unknown
 files, including private notes at the source root, fail before quilt records
-a delta. The recorded patch must touch exactly the 39 pinned regular product
+a delta. Original `debian/` identity is byte-closed: its Python caches are
+not ignored during pin verification. Explicit tar exclusions also prevent
+Python caches from entering the generated Debian source archive. The
+recorded patch must touch exactly the 39 pinned regular product
 paths, with no binary patch, traversal, deletion or rename. Quilt metadata
 cannot contain symlinks or special files. Generated Python caches are excluded
 from source diffs explicitly; they never enter the public source package. It prints success only after generated control

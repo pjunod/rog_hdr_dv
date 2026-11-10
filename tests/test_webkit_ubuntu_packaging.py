@@ -147,6 +147,18 @@ class WebKitPackagingTests(unittest.TestCase):
             verify.verify_source(self.source, pin, packaging=True)
         self.assertEqual(sentinel.read_text(), 'private evidence')
 
+    def test_private_sentinel_in_debian_python_cache_fails_strict_packaging_identity(self):
+        debian = self.source / 'debian'
+        debian.mkdir()
+        (debian / 'control').write_text('Source: fixture\n')
+        pin = {'common': {}, 'base': {'debian': verify.object_id(debian, ignore_python=False)}}
+        verify.verify_source(self.source, pin, 'base', packaging=True)
+        cache = debian / '__pycache__'
+        cache.mkdir()
+        (cache / 'qualification.private.json').write_text('private operator note')
+        with self.assertRaisesRegex(verify.VerificationError, 'debian'):
+            verify.verify_source(self.source, pin, 'base', packaging=True)
+
     def test_quilt_metadata_rejects_root_links_descendant_links_and_special_files(self):
         quilt = self.root / 'quilt'
         quilt.mkdir()

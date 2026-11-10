@@ -19,7 +19,7 @@ def git_object(kind, data):
     return hashlib.sha1(kind.encode() + b' ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 
 
-def object_id(path):
+def object_id(path, ignore_python=True):
     """Reproduce Git trees without a Git checkout, including executable modes."""
     mode = path.lstat().st_mode
     if stat.S_ISLNK(mode):
@@ -31,7 +31,7 @@ def object_id(path):
     entries = []
     for child in path.iterdir():
         # Python's generated cache is never a source input in this distribution.
-        if child.name == '__pycache__' or child.name.endswith('.pyc'):
+        if ignore_python and (child.name == '__pycache__' or child.name.endswith('.pyc')):
             continue
         child_mode = child.lstat().st_mode
         directory = stat.S_ISDIR(child_mode)
@@ -39,7 +39,7 @@ def object_id(path):
                     else '100755' if child_mode & 0o111 else '100644')
         name = os.fsencode(child.name)
         entries.append((name + (b'/' if directory else b''),
-                        git_mode.encode() + b' ' + name + b'\0' + bytes.fromhex(object_id(child))))
+                        git_mode.encode() + b' ' + name + b'\0' + bytes.fromhex(object_id(child, ignore_python=ignore_python))))
     return git_object('tree', b''.join(value for _, value in sorted(entries)))
 
 
@@ -55,7 +55,7 @@ def verify_source(source, pin, phase='candidate', packaging=False):
     if not packaging:
         expected.pop('debian', None)
     for name, expected_id in expected.items():
-        if object_id(source / name) != expected_id:
+        if object_id(source / name, ignore_python=(name != 'debian')) != expected_id:
             raise VerificationError(f'{name}: source differs from pinned {phase}')
 
 
