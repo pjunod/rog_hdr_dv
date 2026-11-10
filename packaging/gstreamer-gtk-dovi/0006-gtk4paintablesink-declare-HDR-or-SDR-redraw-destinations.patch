@@ -465,7 +465,7 @@
  
 --- /dev/null
 +++ b/src/sink/native_publication.rs
-@@ -0,0 +1,227 @@
+@@ -0,0 +1,229 @@
 +// SPDX-License-Identifier: MPL-2.0
 +// Shared production publication boundary. No GTK/GStreamer dependency: tests
 +// drive the same offer/completion/paint callbacks used by the live sink.
@@ -590,6 +590,8 @@
 +    #[test]
 +    fn delayed_streaming_completion_paints_pq_without_sdr_pulses() {
 +        let c = Coordinator::default(); c.set_view(1, 1, 0);
++        assert!(c.accepts(key(1, 1), true));
++        assert!(!c.accepts(key(1, 1), false));
 +        let painted = RefCell::new(Vec::new());
 +        // A begins work, then B/C arrive before A completes. These calls are
 +        // exactly the production offer boundary, with actual paint callbacks.
