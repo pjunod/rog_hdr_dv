@@ -71,6 +71,27 @@ int main (int argc, char **argv)
   require (!gst_gtk_dovi_native_frame_from_buffer (p5_output, NULL), "rejected P5 attachment exposes no retained frame");
   gst_buffer_unref (p5_output); gst_buffer_unref (p5_input);
   gst_gtk_dovi_source_lease_unref (p5_lease); gst_caps_unref (p5_caps);
+  GstGtkDoviSourceLease *late_lease = gst_gtk_dovi_source_lease_new (caps, "source/late", 100);
+  GstVideoInfo late_info; gst_video_info_set_format (&late_info, GST_VIDEO_FORMAT_RGBA, 4, 4);
+  GstBuffer *late_input = gst_buffer_new_allocate (NULL, late_info.size, NULL);
+  GstBuffer *late_output = gst_buffer_new_allocate (NULL, late_info.size, NULL);
+  require (gst_gtk_dovi_native_frame_attach_source (late_output, late_input,
+      &late_info, &late_info, 100, late_lease), "initial SDR output retains a live source lease");
+  gst_gtk_dovi_source_lease_revoke (late_lease);
+  GstGtkDoviNativeFrame *late = gst_gtk_dovi_native_frame_from_buffer (late_output, NULL);
+  require (late && !gst_gtk_dovi_native_frame_source_revision (late) &&
+      !gst_gtk_dovi_native_frame_source_selection (late) && !gst_gtk_dovi_native_frame_is_valid (late),
+      "revoked-before-first-observation zero identity remains explicitly invalid");
+  gst_gtk_dovi_native_frame_unref (late); gst_buffer_unref (late_output);
+  late_output = gst_buffer_new_allocate (NULL, late_info.size, NULL);
+  require (gst_gtk_dovi_native_frame_attach_source (late_output, late_input,
+      &late_info, &late_info, 100, NULL), "explicit unleased legacy SDR attachment remains supported");
+  late = gst_gtk_dovi_native_frame_from_buffer (late_output, NULL);
+  require (late && !gst_gtk_dovi_native_frame_source_revision (late) &&
+      !gst_gtk_dovi_native_frame_source_selection (late) && gst_gtk_dovi_native_frame_is_valid (late),
+      "unleased legacy zero identity remains distinct from a revoked source");
+  gst_gtk_dovi_native_frame_unref (late); gst_buffer_unref (late_output);
+  gst_buffer_unref (late_input); gst_gtk_dovi_source_lease_unref (late_lease);
   GstGtkDoviNativeFrame *f = frame (lease);
   require (gst_gtk_dovi_native_frame_source_revision (f) == 17, "revision belongs to retained frame");
   GstBuffer *output = NULL; GstVideoInfo info; guint64 epoch = 99, picture = 99;

@@ -127,6 +127,8 @@ GstGtkDoviNativeFrame *gst_gtk_dovi_native_frame_from_buffer (GstBuffer *buffer,
   if (generation) *generation = meta ? meta->generation : 0;
   return meta && meta->frame ? gst_gtk_dovi_native_frame_ref (meta->frame) : NULL;
 }
+gboolean gst_gtk_dovi_native_frame_is_valid (GstGtkDoviNativeFrame *frame)
+{ return frame && (!frame->lease || gst_gtk_dovi_source_lease_is_valid (frame->lease)); }
 guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame)
 { return frame && gst_gtk_dovi_source_lease_is_valid (frame->lease) ? frame->lease->revision : 0; }
 guint64 gst_gtk_dovi_native_frame_source_selection (GstGtkDoviNativeFrame *frame)

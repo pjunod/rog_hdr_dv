@@ -50,6 +50,9 @@ GST_GTK_DOVI_API void gst_gtk_dovi_source_lease_revoke (GstGtkDoviSourceLease *l
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_is_valid (const GstGtkDoviSourceLease *lease);
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_source_lease_matches (
     const GstGtkDoviSourceLease *lease, const gchar *stream_id, const GstCaps *caps);
+/* Distinguishes an explicitly unleased legacy frame from a revoked lease,
+ * including revocation before a consumer first observes source identifiers. */
+GST_GTK_DOVI_API gboolean gst_gtk_dovi_native_frame_is_valid (GstGtkDoviNativeFrame *frame);
 GST_GTK_DOVI_API guint64 gst_gtk_dovi_native_frame_source_revision (GstGtkDoviNativeFrame *frame);
 GST_GTK_DOVI_API guint64 gst_gtk_dovi_native_frame_source_selection (GstGtkDoviNativeFrame *frame);
 GST_GTK_DOVI_API gboolean gst_gtk_dovi_native_frame_attach_source (
