@@ -70,6 +70,12 @@ Keep the original `.orig.tar.xz` next to the prepared source. The resulting
 on a fresh Ubuntu builder. The product patch, packaging files, profile and
 verifier travel in the Debian source archive. No Git checkout, symlink to an
 external source directory, provider payload or private builder path is needed.
+The official archive contains both `register_custom_URL_scheme.html` and
+`register_custom_url_scheme.html` documentation siblings. The Git import on a
+case-insensitive filesystem omitted the uppercase sibling. Packaging requires
+the complete official documentation tree, as recorded separately in the pin;
+the reviewed product `Source` and `Tools` tree identities are unchanged.
+Use a case-sensitive Ubuntu source extraction so neither document is lost.
 Source package generation does not establish binary or runtime acceptance.
 
 ## Build a clean extraction with the declared SDKs
