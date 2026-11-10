@@ -120,7 +120,9 @@ exclusive private timestamp recovery receipt next to the source, named
 `<source-name>.source-mtimes.private.json`. You can instead set absolute
 `ROG_WEBKIT_SOURCE_MTIME_RECEIPT` outside the source. Preserve this receipt
 with failed attempts and never publish it with the source package. It also
-records the actual normalized/restored path lists and counts. Keep the exact
+keeps the initial snapshot immutable and writes separate normalized/restored
+stage receipts with path lists and counts. All three files use mode `0600`
+and are flushed and synced before the next mutation. Keep the exact
 Ubuntu original tarball next to that source. A source-only Git archive may
 lack quilt's `.pc` directory: in that case also pass
 `--quilt-state-from "$ubuntu_clean_source"`, naming a separate authenticated

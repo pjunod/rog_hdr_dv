@@ -78,6 +78,20 @@ def source_file_identities(source, names):
             for name in names}
 
 
+def write_private_json(path, value):
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, 'w') as handle:
+        json.dump(value, handle, indent=2, sort_keys=True)
+        handle.write('\n')
+        handle.flush()
+        os.fsync(handle.fileno())
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+
+
 def prepare(source, patch, already_patched=False, quilt_state_from=None):
     source = source.resolve()
     pin = json.loads((HERE / 'source-pin.json').read_text())
@@ -124,9 +138,7 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     recovery = {'schema': 'rog-webkit-source-mtimes-v1', 'source_directory': str(source),
                 'candidate_commit': pin['candidate_commit'], 'mtimes_ns': mtimes,
                 'source_file_identities': identities}
-    with receipt.open('x') as handle:
-        json.dump(recovery, handle, indent=2, sort_keys=True)
-        handle.write('\n')
+    write_private_json(receipt, recovery)
     env = dict(os.environ, EDITOR='true', VISUAL='true')
     ignore = r'(^|/)(__pycache__(/|$)|[^/]+[.]pyc$|build-gtk4(/|$))'
     run(['dpkg-source', '--extend-diff-ignore=' + ignore, '--commit', '.', 'rog-native-hdr.patch'], source, env=env)
@@ -142,9 +154,11 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
         raise verify.VerificationError('dpkg-source changed the public source inventory')
     if source_file_identities(source, current) != identities:
         raise verify.VerificationError('dpkg-source changed public source bytes or exact permission modes')
-    recovery['normalized_paths'] = [name for name, mtime in mtimes.items() if current[name] != mtime]
-    recovery['normalized_count'] = len(recovery['normalized_paths'])
-    receipt.write_text(json.dumps(recovery, indent=2, sort_keys=True) + '\n')
+    normalized = [name for name, mtime in mtimes.items() if current[name] != mtime]
+    write_private_json(Path(str(receipt) + '.normalized.private.json'),
+                       {'schema': 'rog-webkit-source-mtimes-normalized-v1',
+                        'recovery_receipt': str(receipt), 'normalized_paths': normalized,
+                        'normalized_count': len(normalized)})
     restored = 0
     for name, mtime in mtimes.items():
         if current[name] != mtime:
@@ -156,10 +170,11 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     verify.verify_source(source, pin)
     if source_file_identities(source, mtimes) != identities:
         raise verify.VerificationError('public source identity changed during timestamp restoration')
-    recovery['restored_paths'] = recovery['normalized_paths']
-    recovery['restored_count'] = restored
-    recovery['net_source_identity_and_mtimes_preserved'] = True
-    receipt.write_text(json.dumps(recovery, indent=2, sort_keys=True) + '\n')
+    write_private_json(Path(str(receipt) + '.restored.private.json'),
+                       {'schema': 'rog-webkit-source-mtimes-restored-v1',
+                        'recovery_receipt': str(receipt), 'restored_paths': normalized,
+                        'restored_count': restored,
+                        'net_source_identity_and_mtimes_preserved': True})
     print(f'Restored dpkg-source timestamp metadata on {restored} byte-identical source files.')
     marker = body.find('\n--- ')
     if marker < 0:
