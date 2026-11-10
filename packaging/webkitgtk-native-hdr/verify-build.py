@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 
 
@@ -43,6 +44,13 @@ def object_id(path):
 
 
 def verify_source(source, pin, phase='candidate', packaging=False):
+    expected_names = set(pin['common']) | {'Source', 'Tools', 'debian'}
+    allowed_metadata = {'.pc', '.git'}
+    if not packaging:
+        allowed_metadata.add('build-gtk4')
+    unknown = {path.name for path in source.iterdir()} - expected_names - allowed_metadata
+    if unknown:
+        raise VerificationError('unexpected top-level source input: ' + ', '.join(sorted(unknown)))
     expected = dict(pin['common'], **pin[phase])
     if not packaging:
         expected.pop('debian', None)
@@ -102,16 +110,80 @@ def verify_cache(source, build, profile):
         raise VerificationError('CMake feature map differs: ' + ', '.join(changed))
     if 'ENABLE_LTO' in cache:
         raise VerificationError('ENABLE_LTO was absent in the reviewed profile')
-    expected = dict(profile, CMAKE_HOME_DIRECTORY=str(source), CMAKE_GENERATOR='Ninja',
+    expected = dict(profile, CMAKE_HOME_DIRECTORY=str(source), CMAKE_CACHEFILE_DIR=str(build), CMAKE_GENERATOR='Ninja',
                     GTK_DOVI_SDK_ROOT=os.environ.get('ROG_WEBKIT_DOVI_SDK_ROOT', '/usr/include'),
                     GTK_NATIVE_VIDEO_GDK_SDK_ROOT=os.environ.get('ROG_WEBKIT_GDK_SDK_ROOT', '/usr/include/gtk-4.0'))
     for key, wanted in expected.items():
         actual = cache.get(key)
         if actual != wanted:
             raise VerificationError(f'{key}: expected {wanted!r}, found {actual!r}')
-    if not (build / 'build.ninja').is_file():
-        raise VerificationError('missing configured Ninja graph')
+    for path in (build / 'build.ninja', build / 'CMakeFiles/rules.ninja'):
+        if not path.is_file() or path.is_symlink() or not path.read_bytes().startswith(b'# CMAKE generated file:'):
+            raise VerificationError('missing or invalid configured Ninja graph/rules')
     return cache
+
+
+def sha256_file(path):
+    with path.open('rb') as handle:
+        return hashlib.file_digest(handle, 'sha256').hexdigest()
+
+
+def bound_file(record, expected_path=None):
+    if set(record) != {'path', 'sha256'}:
+        raise VerificationError('producer file record needs path and sha256')
+    path = Path(record['path'])
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise VerificationError('producer reference must be an absolute regular file')
+    if expected_path is not None and path != expected_path:
+        raise VerificationError('producer reference names a different file')
+    if sha256_file(path) != record['sha256']:
+        raise VerificationError('producer referenced file identity differs')
+
+
+def verify_producer(source, build, profile, pin, receipt_path):
+    """Validate a local operator's retained producer input, not a CI attestation."""
+    if receipt_path is None:
+        raise VerificationError('external reuse requires ROG_WEBKIT_REUSE_RECEIPT from the completed guarded producer')
+    path = Path(receipt_path)
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise VerificationError('producer receipt must be an absolute regular file')
+    if path.resolve().is_relative_to(source) or path.resolve().is_relative_to(build):
+        raise VerificationError('keep the private producer receipt outside source and build')
+    receipt = json.loads(path.read_text())
+    feature_hash = json.loads(Path(__file__).with_name('cmake-features.json').read_text())['feature_map_sha256']
+    expected = {
+        'schema': 'rog-webkit-local-producer-v1', 'trust': 'local-operator',
+        'source_directory': str(source), 'build_directory': str(build),
+        'candidate_commit': pin['candidate_commit'], 'feature_map_sha256': feature_hash,
+        'cmake_profile_sha256': hashlib.sha256(json.dumps(profile, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+        'completed_guard': True,
+        'sdk_compile_checks': {'gdk_native_hdr': True, 'mapper_destination_abi': True, 'mapper_source_lease_abi': True},
+    }
+    for key, value in expected.items():
+        if receipt.get(key) != value:
+            raise VerificationError('local producer receipt differs: ' + key)
+    file_names = {'cache': build / 'CMakeCache.txt', 'graph': build / 'build.ninja',
+                  'rules': build / 'CMakeFiles/rules.ninja'}
+    if set(receipt.get('files', {})) != set(file_names):
+        raise VerificationError('producer must bind cache, graph and rules')
+    for key, file_path in file_names.items():
+        bound_file(receipt['files'][key], file_path)
+    if set(receipt.get('inputs', {})) != {'guard', 'source_archive', 'sdk_controls'}:
+        raise VerificationError('producer must retain guard, source archive and SDK control evidence')
+    for record in receipt['inputs'].values():
+        bound_file(record)
+    headers = {
+        'mapper': Path(os.environ.get('ROG_WEBKIT_DOVI_SDK_ROOT', '/usr/include')) / 'gst-gtk-dovi-1.0/mapper.h',
+        'gdkwayland': Path(os.environ.get('ROG_WEBKIT_GDK_SDK_ROOT', '/usr/include/gtk-4.0')) / 'gdk/wayland/gdkwaylandsurface.h',
+    }
+    if set(receipt.get('sdk_headers', {})) != set(headers):
+        raise VerificationError('producer must bind both selected native SDK headers')
+    for key, header in headers.items():
+        bound_file(receipt['sdk_headers'][key], header.resolve())
+    commands = subprocess.check_output(['/usr/bin/ninja', '-C', str(build), '-t', 'commands'])
+    if not commands.strip() or hashlib.sha256(commands).hexdigest() != receipt.get('ninja_commands_sha256'):
+        raise VerificationError('producer Ninja command identity differs')
+    print('External reuse matches the retained local operator producer input; this is not CI authentication.')
 
 
 def main():
@@ -126,13 +198,17 @@ def main():
         print(build)
         return
     here = Path(__file__).resolve().parent
-    verify_source(source, json.loads((here / 'source-pin.json').read_text()))
-    verify_cache(source, build, json.loads((here / 'cmake-profile.json').read_text()))
+    pin = json.loads((here / 'source-pin.json').read_text())
+    profile = json.loads((here / 'cmake-profile.json').read_text())
+    verify_source(source, pin)
+    verify_cache(source, build, profile)
+    if args.build_dir != 'build-gtk4':
+        verify_producer(source, build, profile, pin, os.environ.get('ROG_WEBKIT_REUSE_RECEIPT'))
     print('Reviewed source and GTK4 distro-path CMake profile match; cache may be reused.')
 
 
 if __name__ == '__main__':
     try:
         main()
-    except (VerificationError, OSError, ValueError) as error:
+    except (VerificationError, OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError) as error:
         sys.exit(f'WebKit packaging refused: {error}')

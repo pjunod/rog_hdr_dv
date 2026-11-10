@@ -215,14 +215,12 @@
  
  # Disable commands and binary packages of the builds that we don't want
  ifneq ($(ENABLE_GTK3),YES)
-@@ -247,6 +446,19 @@
+@@ -247,6 +446,23 @@
  	dh_gencontrol -- $(DH_GENCONTROL_ARGS)
  
  override_dh_auto_configure:
 +	python3 debian/rog-native-hdr/verify-build.py --path-only
-+ifneq ($(ROG_WEBKIT_BUILD_DIR),build-gtk4)
-+	$(error Use dpkg-buildpackage -b -nc for a verified external cache; configure is refused)
-+endif
++ifeq ($(ROG_WEBKIT_BUILD_DIR),build-gtk4)
 +	$(MAKE) -f debian/rules rog-native-manifests
 +	$(GTK3_BUILD) dh_auto_configure -Bbuild-gtk3 -- \
 +		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
@@ -230,12 +228,18 @@
 +	$(GTK4_BUILD) dh_auto_configure -B"$(ROG_WEBKIT_BUILD_DIR)" -- \
 +		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) -DENABLE_WEBDRIVER=OFF \
 +		$(EXTRA_CMAKE_ARGUMENTS)
++else
++	# -nc skips clean, not dh's configure stage in an unstamped manual cache.
++	# Verify the existing graph and generate package metadata only.
++	python3 debian/rog-native-hdr/verify-build.py
++	$(MAKE) -f debian/rules rog-native-manifests
++endif
 +
 +rog-native-manifests:
  	echo debian/clean > debian/clean
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
-@@ -255,24 +467,25 @@
+@@ -255,24 +471,26 @@
  			echo debian/$$dst >> debian/clean ; \
  		done ; \
  	fi
@@ -261,6 +265,7 @@
 +	$(GTK4_BUILD) dh_auto_install -B"$(ROG_WEBKIT_BUILD_DIR)"
  
  override_dh_auto_clean: debian/control
++	python3 debian/rog-native-hdr/verify-build.py --path-only
 +ifneq ($(ROG_WEBKIT_BUILD_DIR),build-gtk4)
 +	$(error External warm cache clean is refused; unset ROG_WEBKIT_BUILD_DIR for source-owned clean)
 +endif

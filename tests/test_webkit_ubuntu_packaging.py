@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +16,9 @@ RECIPE = ROOT / 'packaging/webkitgtk-native-hdr'
 spec = importlib.util.spec_from_file_location('webkit_verify', RECIPE / 'verify-build.py')
 verify = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(verify)
+prep_spec = importlib.util.spec_from_file_location('webkit_prepare', RECIPE / 'prepare-source.py')
+prepare = importlib.util.module_from_spec(prep_spec)
+prep_spec.loader.exec_module(prepare)
 
 
 class WebKitPackagingTests(unittest.TestCase):
@@ -28,7 +32,7 @@ class WebKitPackagingTests(unittest.TestCase):
         self.build.mkdir()
         self.profile = json.loads((RECIPE / 'cmake-profile.json').read_text())
         self.features = json.loads((RECIPE / 'cmake-features.json').read_text())['feature_map']
-        self.cache = dict(self.profile, CMAKE_HOME_DIRECTORY=str(self.source),
+        self.cache = dict(self.profile, CMAKE_HOME_DIRECTORY=str(self.source), CMAKE_CACHEFILE_DIR=str(self.build),
                           CMAKE_GENERATOR='Ninja',
                           GTK_DOVI_SDK_ROOT='/usr/include',
                           GTK_NATIVE_VIDEO_GDK_SDK_ROOT='/usr/include/gtk-4.0')
@@ -36,7 +40,9 @@ class WebKitPackagingTests(unittest.TestCase):
                               ROG_WEBKIT_GDK_SDK_ROOT='/usr/include/gtk-4.0')
         self.env.start()
         self.addCleanup(self.env.stop)
-        (self.build / 'build.ninja').touch()
+        (self.build / 'build.ninja').write_text('# CMAKE generated file: DO NOT EDIT!\ninclude CMakeFiles/rules.ninja\nbuild fixture: phony\n')
+        (self.build / 'CMakeFiles').mkdir()
+        (self.build / 'CMakeFiles/rules.ninja').write_text('# CMAKE generated file: DO NOT EDIT!\nrule fixture\n  command = true\n')
 
     def save_cache(self):
         (self.build / 'CMakeCache.txt').write_text(''.join(
@@ -121,6 +127,163 @@ class WebKitPackagingTests(unittest.TestCase):
         self.assertEqual(verify.build_path(self.source, str(self.build)), self.build)
         self.assertEqual(sentinel.read_bytes(), b'retain')
 
+
+    def test_rejects_copied_cache_empty_graph_and_alien_graph(self):
+        self.save_cache()
+        other = self.root / 'copied-build'
+        shutil.copytree(self.build, other)
+        with self.assertRaisesRegex(verify.VerificationError, 'CMAKE_CACHEFILE_DIR'):
+            verify.verify_cache(self.source, other, self.profile)
+        for graph in ('', 'build default: injected-rule\n'):
+            (self.build / 'build.ninja').write_text(graph)
+            with self.assertRaisesRegex(verify.VerificationError, 'Ninja graph'):
+                verify.verify_cache(self.source, self.build, self.profile)
+
+    def test_unexpected_private_top_level_aborts_before_recording(self):
+        sentinel = self.source / 'qualification.private.json'
+        sentinel.write_text('private evidence')
+        pin = {'common': {}, 'candidate': {}}
+        with self.assertRaisesRegex(verify.VerificationError, 'unexpected top-level'):
+            verify.verify_source(self.source, pin, packaging=True)
+        self.assertEqual(sentinel.read_text(), 'private evidence')
+
+    def test_quilt_metadata_rejects_root_links_descendant_links_and_special_files(self):
+        quilt = self.root / 'quilt'
+        quilt.mkdir()
+        (quilt / 'applied-patches').write_text('ubuntu.patch\n')
+        link = self.root / '.pc'
+        link.symlink_to(quilt, target_is_directory=True)
+        with self.assertRaises(prepare.verify.VerificationError):
+            prepare.verify_quilt(link, ['ubuntu.patch'])
+        nested = quilt / 'redirect'
+        nested.symlink_to(self.build, target_is_directory=True)
+        with self.assertRaises(prepare.verify.VerificationError):
+            prepare.verify_quilt(quilt, ['ubuntu.patch'])
+        nested.unlink()
+        os.mkfifo(nested)
+        with self.assertRaises(prepare.verify.VerificationError):
+            prepare.verify_quilt(quilt, ['ubuntu.patch'])
+
+    def test_recorded_patch_rejects_extra_private_paths_and_renames(self):
+        valid = '--- source.orig/Source/code.cpp\n+++ source/Source/code.cpp\n@@ -1 +1 @@\n-old\n+new\n'
+        prepare.validate_recorded_patch(valid, ['Source/code.cpp'])
+        for addition in ('--- source.orig/private.json\n+++ source/private.json\n',
+                         '--- /etc/private\n+++ source/Source/code.cpp\n',
+                         '--- source/../private\n+++ source/Source/code.cpp\n',
+                         'GIT binary patch\n'):
+            with self.subTest(addition=addition), self.assertRaises(prepare.verify.VerificationError):
+                prepare.validate_recorded_patch(valid + addition, ['Source/code.cpp'])
+        with self.assertRaises(prepare.verify.VerificationError):
+            prepare.validate_recorded_patch(valid.replace('+++ source/Source/code.cpp', '+++ /dev/null'), ['Source/code.cpp'])
+
+    def producer_fixture(self):
+        pin = json.loads((RECIPE / 'source-pin.json').read_text())
+        def record(path):
+            return {'path': str(path), 'sha256': verify.sha256_file(path)}
+        controls = self.root / 'retained'
+        controls.mkdir()
+        inputs = {}
+        for name in ('guard', 'source_archive', 'sdk_controls'):
+            file = controls / name
+            file.write_text('retained trusted local operator input: ' + name)
+            inputs[name] = record(file)
+        sdk = self.root / 'sdk'
+        mapper = sdk / 'gst-gtk-dovi-1.0/mapper.h'
+        gdk = sdk / 'gdk/wayland/gdkwaylandsurface.h'
+        for file in (mapper, gdk):
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text('public SDK header fixture')
+        os.environ['ROG_WEBKIT_DOVI_SDK_ROOT'] = str(sdk)
+        os.environ['ROG_WEBKIT_GDK_SDK_ROOT'] = str(sdk)
+        receipt = {'schema': 'rog-webkit-local-producer-v1', 'trust': 'local-operator',
+                   'source_directory': str(self.source), 'build_directory': str(self.build),
+                   'candidate_commit': pin['candidate_commit'],
+                   'feature_map_sha256': json.loads((RECIPE / 'cmake-features.json').read_text())['feature_map_sha256'],
+                   'cmake_profile_sha256': hashlib.sha256(json.dumps(self.profile, sort_keys=True, separators=(',', ':')).encode()).hexdigest(),
+                   'completed_guard': True,
+                   'sdk_compile_checks': dict(gdk_native_hdr=True, mapper_destination_abi=True, mapper_source_lease_abi=True),
+                   'files': {key: record(path) for key, path in dict(cache=self.build / 'CMakeCache.txt', graph=self.build / 'build.ninja', rules=self.build / 'CMakeFiles/rules.ninja').items()},
+                   'inputs': inputs, 'sdk_headers': {'mapper': record(mapper), 'gdkwayland': record(gdk)},
+                   'ninja_commands_sha256': hashlib.sha256(b'reviewed producer commands\n').hexdigest()}
+        file = self.root / 'producer.private.json'
+        file.write_text(json.dumps(receipt))
+        return pin, receipt, file, gdk
+
+    def test_external_producer_binds_guard_graph_commands_and_headers(self):
+        self.save_cache()
+        pin, receipt, file, header = self.producer_fixture()
+        with patch.object(verify.subprocess, 'check_output', return_value=b'reviewed producer commands\n'):
+            verify.verify_producer(self.source, self.build, self.profile, pin, file)
+            for mutate in ('guard', 'graph', 'header', 'commands'):
+                with self.subTest(mutate=mutate):
+                    changed = (Path(receipt['inputs']['guard']['path']) if mutate == 'guard' else
+                               self.build / 'build.ninja' if mutate == 'graph' else header)
+                    saved = changed.read_bytes()
+                    if mutate == 'commands':
+                        receipt['ninja_commands_sha256'] = '0' * 64
+                        file.write_text(json.dumps(receipt))
+                    else:
+                        changed.write_bytes(saved + b'changed')
+                    with self.assertRaises(verify.VerificationError):
+                        verify.verify_producer(self.source, self.build, self.profile, pin, file)
+                    changed.write_bytes(saved)
+
+    def populate_manifest_inputs(self, debian):
+        for name in ('gir1.2-javascriptcoregtk-4.1.install', 'gir1.2-webkit2-4.1.install',
+                     'libjavascriptcoregtk-4.1-0.install', 'libjavascriptcoregtk-4.1-dev.install',
+                     'libwebkit2gtk-4.1-0.docs', 'libwebkit2gtk-4.1-0.install',
+                     'libwebkit2gtk-4.1-0.symbols', 'libwebkit2gtk-4.1-dev.install'):
+            (debian / name).write_text('usr/lib/*/webkit2gtk-4.1/fixture\n')
+        (debian / 'control-transitional.in').touch()
+
+    @unittest.skipUnless(Path('/usr/share/dpkg/architecture.mk').exists(),
+                         'actual make/debhelper lifecycle requires Ubuntu')
+    def test_unstamped_external_configure_only_verifies_and_generates_manifests(self):
+        debian = self.overlay()
+        self.populate_manifest_inputs(debian)
+        tools = debian / 'rog-native-hdr'
+        tools.mkdir()
+        (tools / 'verify-build.py').write_text(
+            'from pathlib import Path\nimport sys\n'
+            'with Path("verify.calls").open("a") as f: f.write(repr(sys.argv[1:])+"\\n")\n')
+        sentinel = self.build / 'completed.o'
+        sentinel.write_bytes(b'retain')
+        stamp = sentinel.stat().st_mtime_ns
+        env = dict(os.environ, ROG_WEBKIT_BUILD_DIR=str(self.build))
+        result = subprocess.run(['make', '-f', 'debian/rules', 'override_dh_auto_configure'],
+                                cwd=self.source, env=env, check=True, capture_output=True, text=True)
+        self.assertNotIn('dh_auto_configure -B', result.stdout)
+        self.assertEqual((self.source / 'verify.calls').read_text().splitlines(), ["['--path-only']", '[]'])
+        self.assertTrue((debian / 'libwebkitgtk-6.0-4.install').is_file())
+        self.assertEqual(sentinel.read_bytes(), b'retain')
+        self.assertEqual(sentinel.stat().st_mtime_ns, stamp)
+        self.assertFalse((debian / 'debhelper-build-stamp').exists())
+        sequence = subprocess.run(['dh', 'build', '--no-act', '--with', 'gir', '--buildsystem=cmake+ninja'],
+                                  cwd=self.source, env=env, check=True, capture_output=True, text=True)
+        self.assertIn('override_dh_auto_configure', sequence.stdout)
+        self.assertIn('override_dh_auto_build', sequence.stdout)
+
+    @unittest.skipUnless(Path('/usr/share/dpkg/architecture.mk').exists(),
+                         'actual make lifecycle requires Ubuntu')
+    def test_default_clean_refuses_symlink_before_any_clean_tool(self):
+        debian = self.overlay()
+        tools = debian / 'rog-native-hdr'
+        tools.mkdir()
+        for name in ('verify-build.py', 'cmake-features.json'):
+            shutil.copy2(RECIPE / name, tools / name)
+        self.populate_manifest_inputs(debian)
+        (self.source / 'build-gtk4').symlink_to(self.build, target_is_directory=True)
+        sentinel = self.build / 'completed.o'
+        sentinel.write_bytes(b'retain')
+        env = dict(os.environ)
+        env.pop('ROG_WEBKIT_BUILD_DIR', None)
+        result = subprocess.run(['make', '-f', 'debian/rules', 'override_dh_auto_clean'],
+                                cwd=self.source, env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('symlink', result.stderr)
+        self.assertNotIn('dh_auto_clean -B', result.stdout)
+        self.assertEqual(sentinel.read_bytes(), b'retain')
+
     def overlay(self):
         debian = self.source / 'debian'
         debian.mkdir()
@@ -142,7 +305,7 @@ class WebKitPackagingTests(unittest.TestCase):
         self.assertIn('dh_makeshlibs -plibwebkitgtk-6.0-4', rules)
         self.assertIn('dh_makeshlibs -plibjavascriptcoregtk-6.0-1', rules)
         self.assertIn('WEBKIT_DH_CONVERT_GTK4', rules)
-        self.assertIn('Use dpkg-buildpackage -b -nc', rules)
+        self.assertIn('Verify the existing graph and generate package metadata only', rules)
         self.assertIn('External warm cache clean is refused', rules)
         self.assertEqual((debian / 'control.in').read_text().count('\nPackage:'), 0)
 
