@@ -1,6 +1,6 @@
 # WebKitGTK packages — replay the reviewed GTK4 source on Ubuntu
 
-**Status:** source recipe; package replay and runtime qualification pending ·
+**Status:** source preparation/replay qualified; binary/runtime qualification pending ·
 **Updated:** 2026-11-09
 
 This recipe prepares Ubuntu `webkit2gtk 2.52.6-1ubuntu1` plus the reviewed
@@ -207,6 +207,24 @@ identity, stop and establish a new producer receipt from its completed guarded
 build before package acceptance. Do not manufacture a receipt merely to
 silence a refusal. Private receipts and source archives stay outside Git.
 
+## Source replay qualification
+
+The [source-only qualification receipt](source-replay-receipt.json) records
+17 covered focused cases and a normal source-package roundtrip on an owned
+Ubuntu extraction. All 34,386 public source files and modes matched after
+fresh `.dsc` extraction. The generated control parsed as exactly the six GTK4
+packages; the Debian source archive had 55 members and no Python cache or
+private members. Actual negative source controls rejected both a private
+source-root note and one hidden under `debian/__pycache__` before recording.
+
+Normal quilt recording normalized 39 file timestamps in each of the clean
+and already-patched preparation paths. After full source and patch identity
+proofs, all 39 were restored; every public source mtime remained unchanged.
+The subsequent normal source-package command also preserved those mtimes,
+and the private mode-`0600` recovery snapshot stayed immutable. These checks
+compiled nothing and did not operate on the active browser compiler slot.
+Original failures and their affected retries are retained privately.
+
 ## Package and qualification boundary
 
 | Package | Installed content |
@@ -227,7 +245,7 @@ GTK3-dependent WebDriver, documentation or transitional package in this
 source profile. Existing GTK3 packages on the destination are separate.
 Debhelper may additionally generate ordinary debug symbol packages.
 
-Before installation, qualify the `.dsc` replay, final package payload and
+Before installation, qualify the final package payload and
 control dependencies, `dh_shlibdeps`/symbols, GIR import and normal inner
 sandbox helper lookup on the exact candidate. Retain the original package
 archives and rehearse the actual upgrade and rollback with zero unexpected
