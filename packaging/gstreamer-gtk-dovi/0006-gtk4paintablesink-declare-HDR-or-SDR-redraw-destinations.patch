@@ -10,7 +10,7 @@
  
 --- a/src/sink/native.rs
 +++ b/src/sink/native.rs
-@@ -13,41 +13,49 @@
+@@ -13,41 +13,75 @@
      ) -> *mut c_void;
      fn gst_gtk_dovi_native_frame_ref(frame: *mut c_void) -> *mut c_void;
      fn gst_gtk_dovi_native_frame_unref(frame: *mut c_void);
@@ -32,18 +32,24 @@
  }
  #[derive(Debug)]
 -pub(crate) struct NativeFrame(NonNull<c_void>);
-+pub(crate) struct NativeFrame { ptr: NonNull<c_void>, identity: (u64, u64) }
++pub(crate) struct NativeFrame {
++    ptr: NonNull<c_void>,
++    identity: (u64, u64),
++}
  // The immutable C snapshot holds atomic GstBuffer/GBytes/picture references.
  unsafe impl Send for NativeFrame {}
  unsafe impl Sync for NativeFrame {}
  impl Clone for NativeFrame {
      fn clone(&self) -> Self {
--        unsafe {
+         unsafe {
 -            Self(NonNull::new_unchecked(gst_gtk_dovi_native_frame_ref(
 -                self.0.as_ptr(),
 -            )))
--        }
-+        unsafe { Self { ptr: NonNull::new_unchecked(gst_gtk_dovi_native_frame_ref(self.ptr.as_ptr())), identity: self.identity } }
++            Self {
++                ptr: NonNull::new_unchecked(gst_gtk_dovi_native_frame_ref(self.ptr.as_ptr())),
++                identity: self.identity,
++            }
+         }
      }
  }
  impl Drop for NativeFrame {
@@ -57,7 +63,14 @@
 +        // Positive leased identity is captured before work and rechecked at
 +        // publication. The C renderer separately refuses already revoked
 +        // zero-identity frames, while preserving unleased legacy GTK inputs.
-+        unsafe { gst_gtk_dovi_native_frame_is_valid(self.ptr.as_ptr()) != 0 && self.identity == (gst_gtk_dovi_native_frame_source_revision(self.ptr.as_ptr()), gst_gtk_dovi_native_frame_source_selection(self.ptr.as_ptr())) }
++        unsafe {
++            gst_gtk_dovi_native_frame_is_valid(self.ptr.as_ptr()) != 0
++                && self.identity
++                    == (
++                        gst_gtk_dovi_native_frame_source_revision(self.ptr.as_ptr()),
++                        gst_gtk_dovi_native_frame_source_selection(self.ptr.as_ptr()),
++                    )
++        }
 +    }
      pub(crate) fn from_buffer(buffer: &gst::Buffer) -> (Option<Self>, u64) {
          let mut generation = 0;
@@ -65,11 +78,22 @@
              gst_gtk_dovi_native_frame_from_buffer(buffer.to_glib_none().0, &mut generation)
          };
 -        (NonNull::new(frame).map(Self), generation)
-+        (NonNull::new(frame).map(|ptr| Self { ptr, identity: unsafe { (gst_gtk_dovi_native_frame_source_revision(ptr.as_ptr()), gst_gtk_dovi_native_frame_source_selection(ptr.as_ptr())) } }), generation)
++        (
++            NonNull::new(frame).map(|ptr| Self {
++                ptr,
++                identity: unsafe {
++                    (
++                        gst_gtk_dovi_native_frame_source_revision(ptr.as_ptr()),
++                        gst_gtk_dovi_native_frame_source_selection(ptr.as_ptr()),
++                    )
++                },
++            }),
++            generation,
++        )
      }
  }
  pub(crate) struct Mapper(NonNull<c_void>);
-@@ -76,12 +84,15 @@
+@@ -76,12 +110,15 @@
          let mut info = std::mem::MaybeUninit::<gst_video::ffi::GstVideoInfo>::uninit();
          let mut error = std::ptr::null_mut();
          let status = unsafe {
@@ -87,7 +111,7 @@
                  &mut error,
              )
          };
-@@ -111,3 +122,33 @@
+@@ -111,3 +148,43 @@
          }))
      }
  }
@@ -98,14 +122,21 @@
 +}
 +pub(crate) fn requested_destination(context: &gst::Context) -> i32 {
 +    let s = context.structure();
-+    destination_kind(s.get::<bool>("valid").unwrap_or(false),
++    destination_kind(
++        s.get::<bool>("valid").unwrap_or(false),
 +        s.get::<bool>("hdr-ready").unwrap_or(false),
-+        s.get::<bool>("composed").unwrap_or(false))
++        s.get::<bool>("composed").unwrap_or(false),
++    )
 +}
 +pub(crate) fn pixel_destination(info: &gst_video::VideoInfo) -> Option<i32> {
-+    use gst_video::{VideoColorMatrix as M, VideoColorPrimaries as P, VideoColorRange as R, VideoTransferFunction as T};
++    use gst_video::{
++        VideoColorMatrix as M, VideoColorPrimaries as P, VideoColorRange as R,
++        VideoTransferFunction as T,
++    };
 +    let c = info.colorimetry();
-+    if c.matrix() != M::Rgb || c.range() != R::Range0_255 { return None; }
++    if c.matrix() != M::Rgb || c.range() != R::Range0_255 {
++        return None;
++    }
 +    match (c.primaries(), c.transfer(), info.format()) {
 +        (P::Bt709, T::Srgb, gst_video::VideoFormat::Rgba) => Some(1),
 +        (P::Bt2020, T::Smpte2084, gst_video::VideoFormat::Rgba64Le) => Some(0),
@@ -117,28 +148,13 @@
 +    #[test]
 +    fn destination_requires_all_witnesses() {
 +        for flags in 0..8 {
-+            assert_eq!(super::destination_kind(flags & 1 != 0, flags & 2 != 0, flags & 4 != 0), if flags == 7 { 0 } else { 1 });
++            assert_eq!(
++                super::destination_kind(flags & 1 != 0, flags & 2 != 0, flags & 4 != 0),
++                if flags == 7 { 0 } else { 1 }
++            );
 +        }
 +    }
 +}
---- a/src/sink/frame.rs
-+++ b/src/sink/frame.rs
-@@ -147,6 +147,7 @@
-     pub(crate) native_source: Option<super::native::NativeFrame>,
-     pub(crate) native_generation: u64,
-     pub(crate) native_epoch: u64,
-+    pub(crate) native_destination: Option<i32>,
- }
- 
- #[derive(Debug, Default, glib::Enum, PartialEq, Eq, Copy, Clone)]
-@@ -943,6 +944,7 @@
-             native_source,
-             native_generation,
-             native_epoch: 0,
-+            native_destination: super::native::pixel_destination(info),
-         };
- 
-         frame.overlays = frame
 --- a/src/sink/imp.rs
 +++ b/src/sink/imp.rs
 @@ -84,11 +84,16 @@
@@ -167,25 +183,32 @@
      native_mapper: Mutex<Option<super::native::Mapper>>,
      cached_caps: Mutex<Option<gst::Caps>>,
      settings: Mutex<Settings>,
-@@ -283,6 +289,8 @@
+@@ -283,6 +289,11 @@
                  let mut state = self.native_visible.lock().unwrap();
                  state.context = Some(context.clone());
                  state.context_serial = state.context_serial.wrapping_add(1);
-+                self.native_publication.set_view(state.stream_epoch, state.context_serial,
-+                    super::native::requested_destination(context));
++                self.native_publication.set_view(
++                    state.stream_epoch,
++                    state.context_serial,
++                    super::native::requested_destination(context),
++                );
              }
              self.queue_native_redraw();
          }
-@@ -926,187 +934,125 @@
+@@ -926,32 +937,41 @@
          let source = state.source.take();
          state.stream_epoch = state.stream_epoch.wrapping_add(1);
          state.frame_serial = state.frame_serial.wrapping_add(1);
 -        state.generation = 0;
--        drop(state);
--        drop(source);
-+        let wanted = state.context.as_ref().map(super::native::requested_destination).unwrap_or(1);
-+        self.native_publication.set_view(state.stream_epoch, state.context_serial, wanted);
-+        drop(state); drop(source);
++        let wanted = state
++            .context
++            .as_ref()
++            .map(super::native::requested_destination)
++            .unwrap_or(1);
++        self.native_publication
++            .set_view(state.stream_epoch, state.context_serial, wanted);
+         drop(state);
+         drop(source);
          self.pending_frame.lock().unwrap().take();
      }
  
@@ -202,51 +225,51 @@
 -        let previous = {
 +        let (previous, key) = {
              let mut state = self.native_visible.lock().unwrap();
--            if state.stream_epoch != epoch {
+             if state.stream_epoch != epoch {
 -                return;
--            }
-+            if state.stream_epoch != epoch { return None; }
++                return None;
+             }
              let previous = std::mem::replace(&mut state.source, visible);
              state.frame_serial = state.frame_serial.wrapping_add(1);
 -            state.generation = generation;
 -            previous
 +            let key = super::native_publication::PictureKey {
-+                epoch, frame: state.frame_serial, context: state.context_serial,
++                epoch,
++                frame: state.frame_serial,
++                context: state.context_serial,
 +            };
 +            (previous, key)
          };
--        drop(previous);
+         drop(previous);
 -        self.queue_native_redraw();
-+        drop(previous); Some(key)
++        Some(key)
      }
  
      fn queue_native_redraw(&self) {
-         let job = {
-             let mut state = self.native_visible.lock().unwrap();
--            if state.job_running {
--                return;
--            }
--            let Some(context) = state.context.clone() else {
--                return;
-+            if state.job_running { return; }
-+            let Some(context) = state.context.clone() else { return; };
-+            let Some(source) = state.source.clone() else { return; };
-+            if !source.native.is_live() { return; }
-+            let key = super::native_publication::PictureKey {
-+                epoch: state.stream_epoch, frame: state.frame_serial,
-+                context: state.context_serial,
+@@ -966,70 +986,53 @@
+             let Some(source) = state.source.clone() else {
+                 return;
              };
--            let Some(source) = state.source.clone() else {
--                return;
--            };
 -            let generation = context.structure().get::<u64>("generation").unwrap_or(0);
 -            if state.generation == generation {
--                return;
--            }
-+            if !self.native_publication.needs_redraw(key) { return; }
++            if !source.native.is_live() {
+                 return;
+             }
++            let key = super::native_publication::PictureKey {
++                epoch: state.stream_epoch,
++                frame: state.frame_serial,
++                context: state.context_serial,
++            };
++            if !self.native_publication.needs_redraw(key) {
++                return;
++            }
              state.job_running = true;
 -            (source, context, state.frame_serial, state.context_serial)
-+            NativeRedrawJob { source, context, key }
++            NativeRedrawJob {
++                source,
++                context,
++                key,
++            }
          };
          self.obj().call_async(move |obj| {
 -            let (source, context, frame_serial, context_serial) = job;
@@ -267,12 +290,16 @@
 -                            });
 -                            return;
 -                        }
--                    }
++                (|| {
++                    if mapper.is_none() {
++                        *mapper = Some(super::native::Mapper::new()?);
+                     }
 -                }
 -                mapper.as_mut().unwrap().render(&source.native, &context)
-+                (|| {
-+                    if mapper.is_none() { *mapper = Some(super::native::Mapper::new()?); }
-+                    mapper.as_mut().unwrap().render(&job.source.native, &job.context)
++                    mapper
++                        .as_mut()
++                        .unwrap()
++                        .render(&job.source.native, &job.context)
 +                })()
              };
              let object = obj.clone();
@@ -311,23 +338,16 @@
 -        // A scheduled streaming frame takes precedence. Its normal visible
 -        // publication will reconsider the newest target if required.
 -        if self.pending_frame.lock().unwrap().is_some() {
--            return;
 +        self.native_visible.lock().unwrap().job_running = false;
-+        if !self.native_publication.accepts(job.key, job.source.native.is_live()) {
-+            self.queue_native_redraw(); return;
++        if !self
++            .native_publication
++            .accepts(job.key, job.source.native.is_live())
++        {
++            self.queue_native_redraw();
+             return;
          }
          match result {
-             Err(error) => {
--                gst::element_error!(
--                    self.obj(),
--                    gst::StreamError::Failed,
--                    ("Native Dolby redraw failed: {error}")
--                );
-+                gst::element_error!(self.obj(), gst::StreamError::Failed,
-+                    ("Native Dolby redraw failed: {error}"));
-                 self.clear_native_visible();
-                 if let Some(paintable) = &*self.paintable.lock().unwrap() {
-                     paintable.get_ref().handle_flush_frames();
+@@ -1045,25 +1048,31 @@
                  }
              }
              Ok(None) => {
@@ -340,21 +360,25 @@
 -                    .as_ref()
 -                    .and_then(|c| c.structure().get::<u64>("generation").ok())
 -                    .unwrap_or(0);
-+                self.native_publication.complete_without_pixels(job.key,
-+                    || self.queue_native_redraw());
++                self.native_publication
++                    .complete_without_pixels(job.key, || self.queue_native_redraw());
              }
              Ok(Some((buffer, info, mapped))) => {
 +                let kind = super::native::pixel_destination(&info);
 +                if kind != Some(super::native::requested_destination(&job.context)) {
-+                    gst::element_error!(self.obj(), gst::StreamError::Format,
-+                        ("Native redraw returned a different destination declaration"));
-+                    self.clear_native_visible(); return;
++                    gst::element_error!(
++                        self.obj(),
++                        gst::StreamError::Format,
++                        ("Native redraw returned a different destination declaration")
++                    );
++                    self.clear_native_visible();
++                    return;
 +                }
                  let config = self.config.lock().unwrap();
                  let Some(current) = config.info.as_ref() else {
 +                    drop(config);
-+                    self.native_publication.complete_without_pixels(job.key,
-+                        || self.queue_native_redraw());
++                    self.native_publication
++                        .complete_without_pixels(job.key, || self.queue_native_redraw());
                      return;
                  };
 -                if current.width() != info.width()
@@ -363,40 +387,28 @@
 -                {
 +                if current.width() != info.width() || current.height() != info.height() {
 +                    drop(config);
-+                    self.native_publication.complete_without_pixels(job.key,
-+                        || self.queue_native_redraw());
++                    self.native_publication
++                        .complete_without_pixels(job.key, || self.queue_native_redraw());
                      return;
                  }
--                let orientation = config
--                    .stream_orientation
--                    .unwrap_or(config.global_orientation);
--                let frame = Frame::new_with_overlays(
--                    self,
--                    &buffer,
--                    &super::frame::VideoInfo::VideoInfo(info),
--                    orientation,
--                    None,
+                 let orientation = config
+@@ -1075,7 +1084,7 @@
+                     &super::frame::VideoInfo::VideoInfo(info),
+                     orientation,
+                     None,
 -                    overlays,
--                );
-+                let orientation = config.stream_orientation.unwrap_or(config.global_orientation);
-+                let frame = Frame::new_with_overlays(self, &buffer,
-+                    &super::frame::VideoInfo::VideoInfo(info), orientation, None,
-+                    job.source.overlays.clone());
++                    job.source.overlays.clone(),
+                 );
                  drop(config);
                  let Ok(mut frame) = frame else {
--                    gst::element_error!(
--                        self.obj(),
--                        gst::StreamError::Failed,
--                        ("Failed mapping native Dolby redraw")
--                    );
--                    self.clear_native_visible();
+@@ -1085,28 +1094,28 @@
+                         ("Failed mapping native Dolby redraw")
+                     );
+                     self.clear_native_visible();
 -                    if let Some(paintable) = &*self.paintable.lock().unwrap() {
 -                        paintable.get_ref().handle_flush_frames();
 -                    }
--                    return;
-+                    gst::element_error!(self.obj(), gst::StreamError::Failed,
-+                        ("Failed mapping native Dolby redraw"));
-+                    self.clear_native_visible(); return;
+                     return;
                  };
 -                frame.native_epoch = epoch;
 -                let source = frame.native_source.clone();
@@ -409,20 +421,23 @@
 -                        paintable.get_ref().handle_flush_frames();
 -                        return;
 -                    }
--                    gst::info!(
--                        CAT,
--                        imp = self,
--                        "Retargeted visible native picture without seek: frame-serial={frame_serial} context-serial={context_serial} mapped={mapped}"
--                    );
--                    self.native_became_visible(source, overlays, generation, epoch);
--                }
-+                    let outcome = self.native_publication.complete(job.key, kind.unwrap(),
++                    let outcome = self.native_publication.complete(
++                        job.key,
++                        kind.unwrap(),
 +                        || job.source.native.is_live(),
 +                        || paintable.get_ref().handle_frame_changed(&self.obj(), frame),
-+                        || paintable.get_ref().handle_flush_frames());
-+                    gst::info!(CAT, imp = self,
++                        || paintable.get_ref().handle_flush_frames(),
++                    );
+                     gst::info!(
+                         CAT,
+                         imp = self,
+-                        "Retargeted visible native picture without seek: frame-serial={frame_serial} context-serial={context_serial} mapped={mapped}"
 +                        "Native presentation frame={} context={} mapped={mapped} outcome={outcome:?}",
-+                        job.key.frame, job.key.context);
++                        job.key.frame,
++                        job.key.context
+                     );
+-                    self.native_became_visible(source, overlays, generation, epoch);
+-                }
 +                }
 +                // Completion does not replace the newest retained source or
 +                // advance its serial. At most one job runs; coalesce to latest.
@@ -430,49 +445,86 @@
              }
          }
      }
-@@ -1131,13 +1077,26 @@
+@@ -1131,13 +1140,41 @@
                      return glib::ControlFlow::Continue;
                  }
                  gst::trace!(CAT, imp = self, "Frame changed");
 -                let source = frame.native_source.clone();
 +                let observed = frame.native_source.clone();
-+                let source = observed.clone().filter(|_| frame.native_destination.is_some());
++                let source = observed
++                    .clone()
++                    .filter(|_| frame.native_destination.is_some());
                  let overlays = frame.overlay_compositions.clone();
 -                let generation = frame.native_generation;
 -                let epoch = frame.native_epoch;
 -                if paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
 -                    self.native_became_visible(source, overlays, generation, epoch);
 -                }
-+                let Some(key) = self.retain_native_candidate(source.clone(), overlays, frame.native_epoch) else {
++                let Some(key) =
++                    self.retain_native_candidate(source.clone(), overlays, frame.native_epoch)
++                else {
 +                    return glib::ControlFlow::Continue;
 +                };
 +                let generation_matches = {
 +                    let state = self.native_visible.lock().unwrap();
-+                    state.context.as_ref().and_then(|c| c.structure().get::<u64>("generation").ok())
++                    state
++                        .context
++                        .as_ref()
++                        .and_then(|c| c.structure().get::<u64>("generation").ok())
 +                        == Some(frame.native_generation)
 +                };
 +                let offer = super::native_publication::Offer {
-+                    key, pixels: frame.native_destination,
-+                    native: source.is_some(), generation_matches,
++                    key,
++                    pixels: frame.native_destination,
++                    native: source.is_some(),
++                    generation_matches,
 +                };
-+                self.native_publication.offer(offer,
-+                    || observed.as_ref().is_none_or(super::native::NativeFrame::is_live),
++                self.native_publication.offer(
++                    offer,
++                    || {
++                        observed
++                            .as_ref()
++                            .is_none_or(super::native::NativeFrame::is_live)
++                    },
 +                    || paintable.get_ref().handle_frame_changed(&self.obj(), frame),
-+                    || paintable.get_ref().handle_flush_frames());
++                    || paintable.get_ref().handle_flush_frames(),
++                );
 +                self.queue_native_redraw();
              }
          }
  
+--- a/src/sink/frame.rs
++++ b/src/sink/frame.rs
+@@ -147,6 +147,7 @@
+     pub(crate) native_source: Option<super::native::NativeFrame>,
+     pub(crate) native_generation: u64,
+     pub(crate) native_epoch: u64,
++    pub(crate) native_destination: Option<i32>,
+ }
+ 
+ #[derive(Debug, Default, glib::Enum, PartialEq, Eq, Copy, Clone)]
+@@ -943,6 +944,7 @@
+             native_source,
+             native_generation,
+             native_epoch: 0,
++            native_destination: super::native::pixel_destination(info),
+         };
+ 
+         frame.overlays = frame
 --- /dev/null
 +++ b/src/sink/native_publication.rs
-@@ -0,0 +1,229 @@
+@@ -0,0 +1,515 @@
 +// SPDX-License-Identifier: MPL-2.0
 +// Shared production publication boundary. No GTK/GStreamer dependency: tests
 +// drive the same offer/completion/paint callbacks used by the live sink.
 +use std::sync::Mutex;
 +
 +#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-+pub(crate) struct PictureKey { pub epoch: u64, pub frame: u64, pub context: u64 }
++pub(crate) struct PictureKey {
++    pub epoch: u64,
++    pub frame: u64,
++    pub context: u64,
++}
 +#[derive(Clone, Copy)]
 +pub(crate) struct Offer {
 +    pub key: PictureKey,
@@ -481,39 +533,73 @@
 +    pub generation_matches: bool,
 +}
 +#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-+pub(crate) enum Outcome { Held, Published, Dropped, Retracted, Superseded, Failed }
++pub(crate) enum Outcome {
++    Held,
++    Published,
++    Dropped,
++    Retracted,
++    Superseded,
++    Failed,
++}
 +struct State {
-+    epoch: u64, context: u64, wanted: i32,
-+    completed: Option<PictureKey>, published: Option<PictureKey>,
-+    ordinary_barrier: u64, next_paint: u64, image_token: u64,
++    epoch: u64,
++    context: u64,
++    wanted: i32,
++    completed: Option<PictureKey>,
++    published: Option<PictureKey>,
++    ordinary_barrier: u64,
++    next_paint: u64,
++    image_token: u64,
 +}
 +impl Default for State {
 +    fn default() -> Self {
-+        Self { epoch: 0, context: 0, wanted: 1, completed: None,
-+            published: None, ordinary_barrier: 0, next_paint: 0, image_token: 0 }
++        Self {
++            epoch: 0,
++            context: 0,
++            wanted: 1,
++            completed: None,
++            published: None,
++            ordinary_barrier: 0,
++            next_paint: 0,
++            image_token: 0,
++        }
 +    }
 +}
 +impl State {
-+    fn current(&self, key: PictureKey) -> bool { key.epoch == self.epoch && key.context == self.context }
++    fn current(&self, key: PictureKey) -> bool {
++        key.epoch == self.epoch && key.context == self.context
++    }
 +    fn accepts(&self, key: PictureKey) -> bool {
-+        self.current(key) && key.frame >= self.ordinary_barrier &&
-+            self.published.is_none_or(|old| old.epoch != key.epoch || key.frame > old.frame ||
-+                (key.frame == old.frame && key.context != old.context))
++        self.current(key)
++            && key.frame >= self.ordinary_barrier
++            && self.published.is_none_or(|old| {
++                old.epoch != key.epoch
++                    || key.frame > old.frame
++                    || (key.frame == old.frame && key.context != old.context)
++            })
 +    }
 +}
 +#[derive(Default)]
-+pub(crate) struct Coordinator { state: Mutex<State> }
++pub(crate) struct Coordinator {
++    state: Mutex<State>,
++}
 +impl Coordinator {
 +    pub(crate) fn set_view(&self, epoch: u64, context: u64, wanted: i32) {
 +        let mut s = self.state.lock().unwrap();
-+        if epoch != s.epoch { s.ordinary_barrier = 0; s.completed = None; }
-+        s.epoch = epoch; s.context = context; s.wanted = wanted;
++        if epoch != s.epoch {
++            s.ordinary_barrier = 0;
++            s.completed = None;
++        }
++        s.epoch = epoch;
++        s.context = context;
++        s.wanted = wanted;
 +        // Keep the actual image token. An in-progress paint must still retract
 +        // itself after source/context revocation, even with an older published
 +        // key in bookkeeping. Only another actual paint may replace its token.
 +    }
 +    pub(crate) fn needs_redraw(&self, key: PictureKey) -> bool {
-+        let s = self.state.lock().unwrap(); s.accepts(key) && s.completed != Some(key)
++        let s = self.state.lock().unwrap();
++        s.accepts(key) && s.completed != Some(key)
 +    }
 +    pub(crate) fn accepts(&self, key: PictureKey, live: bool) -> bool {
 +        live && self.state.lock().unwrap().accepts(key)
@@ -521,47 +607,80 @@
 +    pub(crate) fn complete_without_pixels(&self, key: PictureKey, dispatch_latest: impl FnOnce()) {
 +        {
 +            let mut s = self.state.lock().unwrap();
-+            if s.current(key) { s.completed = Some(key); }
++            if s.current(key) {
++                s.completed = Some(key);
++            }
 +        }
 +        dispatch_latest();
 +    }
 +    pub(crate) fn offer(
-+        &self, offer: Offer, live: impl Fn() -> bool,
-+        paint: impl FnOnce() -> bool, retract: impl FnOnce(),
++        &self,
++        offer: Offer,
++        live: impl Fn() -> bool,
++        paint: impl FnOnce() -> bool,
++        retract: impl FnOnce(),
 +    ) -> Outcome {
 +        let immediate = {
 +            let mut s = self.state.lock().unwrap();
-+            if !s.current(offer.key) { return Outcome::Dropped; }
-+            if !offer.native { s.ordinary_barrier = s.ordinary_barrier.max(offer.key.frame); }
-+            !offer.native || (offer.pixels == Some(s.wanted) &&
-+                (s.wanted == 1 || offer.generation_matches))
++            if !s.current(offer.key) {
++                return Outcome::Dropped;
++            }
++            if !offer.native {
++                s.ordinary_barrier = s.ordinary_barrier.max(offer.key.frame);
++            }
++            !offer.native
++                || (offer.pixels == Some(s.wanted) && (s.wanted == 1 || offer.generation_matches))
 +        };
-+        if !live() { return Outcome::Dropped; }
-+        if !immediate { return Outcome::Held; }
++        if !live() {
++            return Outcome::Dropped;
++        }
++        if !immediate {
++            return Outcome::Held;
++        }
 +        self.publish(offer.key, live, paint, retract)
 +    }
 +    pub(crate) fn complete(
-+        &self, key: PictureKey, pixels: i32, live: impl Fn() -> bool,
-+        paint: impl FnOnce() -> bool, retract: impl FnOnce(),
++        &self,
++        key: PictureKey,
++        pixels: i32,
++        live: impl Fn() -> bool,
++        paint: impl FnOnce() -> bool,
++        retract: impl FnOnce(),
 +    ) -> Outcome {
-+        if self.state.lock().unwrap().wanted != pixels { return Outcome::Dropped; }
++        if self.state.lock().unwrap().wanted != pixels {
++            return Outcome::Dropped;
++        }
 +        self.publish(key, live, paint, retract)
 +    }
 +    fn publish(
-+        &self, key: PictureKey, live: impl Fn() -> bool,
-+        paint: impl FnOnce() -> bool, retract: impl FnOnce(),
++        &self,
++        key: PictureKey,
++        live: impl Fn() -> bool,
++        paint: impl FnOnce() -> bool,
++        retract: impl FnOnce(),
 +    ) -> Outcome {
-+        if !live() { return Outcome::Dropped; }
++        if !live() {
++            return Outcome::Dropped;
++        }
 +        let (token, previous) = {
 +            let mut s = self.state.lock().unwrap();
-+            if !s.accepts(key) { return Outcome::Dropped; }
-+            s.next_paint = s.next_paint.checked_add(1).expect("native paint token exhausted");
-+            let token = s.next_paint; let previous = s.image_token;
-+            s.image_token = token; (token, previous)
++            if !s.accepts(key) {
++                return Outcome::Dropped;
++            }
++            s.next_paint = s
++                .next_paint
++                .checked_add(1)
++                .expect("native paint token exhausted");
++            let token = s.next_paint;
++            let previous = s.image_token;
++            s.image_token = token;
++            (token, previous)
 +        };
 +        if !live() {
 +            let mut s = self.state.lock().unwrap();
-+            if s.image_token == token { s.image_token = previous; }
++            if s.image_token == token {
++                s.image_token = previous;
++            }
 +            return Outcome::Dropped;
 +        }
 +        // No coordinator mutex is held through GTK or user callbacks. Nested
@@ -569,15 +688,25 @@
 +        let painted = paint();
 +        let live_after = live();
 +        let mut s = self.state.lock().unwrap();
-+        if s.image_token != token { return Outcome::Superseded; }
++        if s.image_token != token {
++            return Outcome::Superseded;
++        }
 +        if painted && live_after && s.accepts(key) {
-+            s.published = Some(key); s.completed = Some(key);
++            s.published = Some(key);
++            s.completed = Some(key);
 +            return Outcome::Published;
 +        }
 +        s.image_token = 0;
-+        if !painted && s.current(key) { s.completed = Some(key); }
-+        drop(s); retract();
-+        if painted { Outcome::Retracted } else { Outcome::Failed }
++        if !painted && s.current(key) {
++            s.completed = Some(key);
++        }
++        drop(s);
++        retract();
++        if painted {
++            Outcome::Retracted
++        } else {
++            Outcome::Failed
++        }
 +    }
 +}
 +
@@ -586,112 +715,317 @@
 +    use super::*;
 +    use std::cell::RefCell;
 +    use std::sync::atomic::{AtomicBool, Ordering};
-+    fn key(frame: u64, context: u64) -> PictureKey { PictureKey { epoch: 1, frame, context } }
++    fn key(frame: u64, context: u64) -> PictureKey {
++        PictureKey {
++            epoch: 1,
++            frame,
++            context,
++        }
++    }
 +    #[test]
 +    fn delayed_streaming_completion_paints_pq_without_sdr_pulses() {
-+        let c = Coordinator::default(); c.set_view(1, 1, 0);
++        let c = Coordinator::default();
++        c.set_view(1, 1, 0);
 +        assert!(c.accepts(key(1, 1), true));
 +        assert!(!c.accepts(key(1, 1), false));
 +        let painted = RefCell::new(Vec::new());
 +        // A begins work, then B/C arrive before A completes. These calls are
 +        // exactly the production offer boundary, with actual paint callbacks.
 +        for frame in 1..=3 {
-+            assert_eq!(c.offer(Offer { key: key(frame, 1), pixels: Some(1), native: true,
-+                generation_matches: true }, || true,
-+                || { painted.borrow_mut().push((frame, 1)); true }, || panic!("no paint to retract")), Outcome::Held);
++            assert_eq!(
++                c.offer(
++                    Offer {
++                        key: key(frame, 1),
++                        pixels: Some(1),
++                        native: true,
++                        generation_matches: true
++                    },
++                    || true,
++                    || {
++                        painted.borrow_mut().push((frame, 1));
++                        true
++                    },
++                    || panic!("no paint to retract")
++                ),
++                Outcome::Held
++            );
 +        }
 +        assert!(painted.borrow().is_empty());
 +        for frame in [1, 3] {
-+            assert_eq!(c.complete(key(frame, 1), 0, || true,
-+                || { painted.borrow_mut().push((frame, 0)); true }, || panic!("valid current PQ")), Outcome::Published);
++            assert_eq!(
++                c.complete(
++                    key(frame, 1),
++                    0,
++                    || true,
++                    || {
++                        painted.borrow_mut().push((frame, 0));
++                        true
++                    },
++                    || panic!("valid current PQ")
++                ),
++                Outcome::Published
++            );
 +        }
 +        assert_eq!(*painted.borrow(), [(1, 0), (3, 0)]);
 +        assert!(!c.needs_redraw(key(3, 1)));
-+        assert_eq!(c.complete(key(2, 1), 0, || true, || panic!("older completion"), || {}), Outcome::Dropped);
++        assert_eq!(
++            c.complete(key(2, 1), 0, || true, || panic!("older completion"), || {}),
++            Outcome::Dropped
++        );
 +        // A newer ordinary/non-native frame, even within the same source epoch,
 +        // publishes immediately and prevents an older PQ job overwriting it.
-+        assert_eq!(c.offer(Offer { key: key(4, 1), pixels: Some(1), native: false,
-+            generation_matches: false }, || true,
-+            || { painted.borrow_mut().push((4, 1)); true }, || {}), Outcome::Published);
-+        assert_eq!(c.complete(key(3, 1), 0, || true, || panic!("ordinary barrier"), || {}), Outcome::Dropped);
++        assert_eq!(
++            c.offer(
++                Offer {
++                    key: key(4, 1),
++                    pixels: Some(1),
++                    native: false,
++                    generation_matches: false
++                },
++                || true,
++                || {
++                    painted.borrow_mut().push((4, 1));
++                    true
++                },
++                || {}
++            ),
++            Outcome::Published
++        );
++        assert_eq!(
++            c.complete(key(3, 1), 0, || true, || panic!("ordinary barrier"), || {}),
++            Outcome::Dropped
++        );
 +    }
 +    #[test]
 +    fn target_source_and_pause_changes_drive_real_publication_callbacks() {
-+        let c = Coordinator::default(); let painted = RefCell::new(Vec::new());
++        let c = Coordinator::default();
++        let painted = RefCell::new(Vec::new());
 +        c.set_view(1, 1, 0);
 +        // Rendered for old HDR, then target changes before main publication.
 +        c.set_view(1, 2, 1);
-+        assert_eq!(c.complete(key(1, 1), 0, || true, || panic!("stale target"), || {}), Outcome::Dropped);
-+        assert_eq!(c.offer(Offer { key: key(2, 2), pixels: Some(1), native: true,
-+            generation_matches: false }, || true,
-+            || { painted.borrow_mut().push((2, 1)); true }, || {}), Outcome::Published);
++        assert_eq!(
++            c.complete(key(1, 1), 0, || true, || panic!("stale target"), || {}),
++            Outcome::Dropped
++        );
++        assert_eq!(
++            c.offer(
++                Offer {
++                    key: key(2, 2),
++                    pixels: Some(1),
++                    native: true,
++                    generation_matches: false
++                },
++                || true,
++                || {
++                    painted.borrow_mut().push((2, 1));
++                    true
++                },
++                || {}
++            ),
++            Outcome::Published
++        );
 +        c.set_view(1, 3, 0);
 +        assert!(c.needs_redraw(key(2, 3)));
-+        assert_eq!(c.complete(key(2, 3), 0, || true,
-+            || { painted.borrow_mut().push((2, 0)); true }, || {}), Outcome::Published);
++        assert_eq!(
++            c.complete(
++                key(2, 3),
++                0,
++                || true,
++                || {
++                    painted.borrow_mut().push((2, 0));
++                    true
++                },
++                || {}
++            ),
++            Outcome::Published
++        );
 +        assert!(!c.needs_redraw(key(2, 3)));
 +        c.set_view(2, 4, 0);
-+        assert_eq!(c.complete(key(3, 3), 0, || true, || panic!("old source"), || {}), Outcome::Dropped);
++        assert_eq!(
++            c.complete(key(3, 3), 0, || true, || panic!("old source"), || {}),
++            Outcome::Dropped
++        );
 +        assert_eq!(*painted.borrow(), [(2, 1), (2, 0)]);
 +    }
 +    #[test]
 +    fn size_rejected_job_dispatches_latest_paused_picture() {
-+        let c = Coordinator::default(); c.set_view(1, 1, 0);
-+        let a = key(1, 1); let b = key(2, 1);
++        let c = Coordinator::default();
++        c.set_view(1, 1, 0);
++        let a = key(1, 1);
++        let b = key(2, 1);
 +        for key in [a, b] {
-+            assert_eq!(c.offer(Offer { key, pixels: Some(1), native: true,
-+                generation_matches: false }, || true, || panic!("HDR baseline"), || {}), Outcome::Held);
++            assert_eq!(
++                c.offer(
++                    Offer {
++                        key,
++                        pixels: Some(1),
++                        native: true,
++                        generation_matches: false
++                    },
++                    || true,
++                    || panic!("HDR baseline"),
++                    || {}
++                ),
++                Outcome::Held
++            );
 +        }
 +        let painted = RefCell::new(Vec::new());
 +        // The actual no-pixel completion boundary dispatches B after A's
 +        // old-size result is rejected, even if input has now paused.
 +        c.complete_without_pixels(a, || {
-+            assert!(!c.needs_redraw(a)); assert!(c.needs_redraw(b));
-+            assert_eq!(c.complete(b, 0, || true,
-+                || { painted.borrow_mut().push((b.frame, 0)); true }, || {}), Outcome::Published);
++            assert!(!c.needs_redraw(a));
++            assert!(c.needs_redraw(b));
++            assert_eq!(
++                c.complete(
++                    b,
++                    0,
++                    || true,
++                    || {
++                        painted.borrow_mut().push((b.frame, 0));
++                        true
++                    },
++                    || {}
++                ),
++                Outcome::Published
++            );
 +        });
 +        assert_eq!(*painted.borrow(), [(2, 0)]);
 +    }
 +    #[test]
 +    fn revoked_before_first_observation_never_paints_direct_sdr_or_pq() {
 +        for destination in [0, 1] {
-+            let c = Coordinator::default(); c.set_view(1, 1, destination);
-+            assert_eq!(c.offer(Offer { key: key(1, 1), pixels: Some(destination), native: true,
-+                generation_matches: true }, || false, || panic!("revoked initial image"), || {}), Outcome::Dropped);
++            let c = Coordinator::default();
++            c.set_view(1, 1, destination);
++            assert_eq!(
++                c.offer(
++                    Offer {
++                        key: key(1, 1),
++                        pixels: Some(destination),
++                        native: true,
++                        generation_matches: true
++                    },
++                    || false,
++                    || panic!("revoked initial image"),
++                    || {}
++                ),
++                Outcome::Dropped
++            );
 +        }
-+        let c = Coordinator::default(); c.set_view(1, 1, 1);
-+        assert_eq!(c.offer(Offer { key: key(1, 1), pixels: Some(1), native: false,
-+            generation_matches: false }, || true, || true, || {}), Outcome::Published);
++        let c = Coordinator::default();
++        c.set_view(1, 1, 1);
++        assert_eq!(
++            c.offer(
++                Offer {
++                    key: key(1, 1),
++                    pixels: Some(1),
++                    native: false,
++                    generation_matches: false
++                },
++                || true,
++                || true,
++                || {}
++            ),
++            Outcome::Published
++        );
 +    }
 +    #[test]
 +    fn revoke_during_paint_retracts_new_image_despite_older_pq_bookkeeping() {
-+        let c = Coordinator::default(); c.set_view(1, 1, 0);
-+        let current = RefCell::new(None); let live = AtomicBool::new(true);
-+        assert_eq!(c.complete(key(1, 1), 0, || true,
-+            || { *current.borrow_mut() = Some(1); true }, || {}), Outcome::Published);
-+        assert_eq!(c.complete(key(2, 1), 0, || live.load(Ordering::Acquire),
-+            || { *current.borrow_mut() = Some(2); live.store(false, Ordering::Release); true },
-+            || { *current.borrow_mut() = None; }), Outcome::Retracted);
++        let c = Coordinator::default();
++        c.set_view(1, 1, 0);
++        let current = RefCell::new(None);
++        let live = AtomicBool::new(true);
++        assert_eq!(
++            c.complete(
++                key(1, 1),
++                0,
++                || true,
++                || {
++                    *current.borrow_mut() = Some(1);
++                    true
++                },
++                || {}
++            ),
++            Outcome::Published
++        );
++        assert_eq!(
++            c.complete(
++                key(2, 1),
++                0,
++                || live.load(Ordering::Acquire),
++                || {
++                    *current.borrow_mut() = Some(2);
++                    live.store(false, Ordering::Release);
++                    true
++                },
++                || {
++                    *current.borrow_mut() = None;
++                }
++            ),
++            Outcome::Retracted
++        );
 +        assert_eq!(*current.borrow(), None);
 +    }
 +    #[test]
 +    fn context_change_during_paint_retracts_only_its_own_image() {
-+        let c = Coordinator::default(); c.set_view(1, 1, 0);
++        let c = Coordinator::default();
++        c.set_view(1, 1, 0);
 +        let current = RefCell::new(None);
-+        assert_eq!(c.complete(key(1, 1), 0, || true,
-+            || { *current.borrow_mut() = Some(1); c.set_view(1, 2, 1); true },
-+            || { *current.borrow_mut() = None; }), Outcome::Retracted);
++        assert_eq!(
++            c.complete(
++                key(1, 1),
++                0,
++                || true,
++                || {
++                    *current.borrow_mut() = Some(1);
++                    c.set_view(1, 2, 1);
++                    true
++                },
++                || {
++                    *current.borrow_mut() = None;
++                }
++            ),
++            Outcome::Retracted
++        );
 +        assert_eq!(*current.borrow(), None);
 +        c.set_view(1, 3, 0);
-+        assert_eq!(c.complete(key(2, 3), 0, || true,
-+            || {
-+                *current.borrow_mut() = Some(2); c.set_view(2, 4, 1);
-+                let new = PictureKey { epoch: 2, frame: 1, context: 4 };
-+                assert_eq!(c.offer(Offer { key: new, pixels: Some(1), native: false,
-+                    generation_matches: false }, || true,
-+                    || { *current.borrow_mut() = Some(99); true }, || {}), Outcome::Published);
-+                true
-+            }, || { *current.borrow_mut() = None; }), Outcome::Superseded);
++        assert_eq!(
++            c.complete(
++                key(2, 3),
++                0,
++                || true,
++                || {
++                    *current.borrow_mut() = Some(2);
++                    c.set_view(2, 4, 1);
++                    let new = PictureKey {
++                        epoch: 2,
++                        frame: 1,
++                        context: 4,
++                    };
++                    assert_eq!(
++                        c.offer(
++                            Offer {
++                                key: new,
++                                pixels: Some(1),
++                                native: false,
++                                generation_matches: false
++                            },
++                            || true,
++                            || {
++                                *current.borrow_mut() = Some(99);
++                                true
++                            },
++                            || {}
++                        ),
++                        Outcome::Published
++                    );
++                    true
++                },
++                || {
++                    *current.borrow_mut() = None;
++                }
++            ),
++            Outcome::Superseded
++        );
 +        assert_eq!(*current.borrow(), Some(99));
 +    }
 +}
