@@ -723,15 +723,17 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "245873a2752a1891857850db265f296ff017310a",
-      "candidate_tree": "0c3b13cfcb8a1dc2be9eb4bf1ccbd2078de1b8c6",
-      "patch_count": 5,
+      "candidate_commit": "dc6ab20bf049ac5d534f0b22fff24b65db9e83c3",
+      "candidate_tree": "0659fe2008e4b42a3cf2a72725ad90dc4b35681e",
+      "patch_count": 7,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
         "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
         "0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch",
-        "0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch"
+        "0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch",
+        "0006-va-negotiate-authenticated-stream-candidates-before-allocation.patch",
+        "0007-debian-version-the-stream-qualified-VA-producer.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -760,15 +762,18 @@
           }
         ]
       },
-      "candidate_status": "Full Ubuntu import plus five patches; native NVIDIA/GTK FEL source passed paired-picture, exact-pixel, negative, seek and private-compositor controls. The coherent 18-package amd64/all candidate family built normally and remains uninstalled; clean full-rate playback and rebuilt-client runtime qualification remain open."
+      "candidate_status": "Seven-patch source candidate includes stream-qualified VA negotiation and package versioning. Prior five-patch FEL qualification is retained separately. New normal package build and normal-sandbox browser runtime qualification remain pending; no installation.",
+      "previous_candidate_commit": "245873a2752a1891857850db265f296ff017310a",
+      "previous_candidate_tree": "0c3b13cfcb8a1dc2be9eb4bf1ccbd2078de1b8c6",
+      "candidate_package_version": "1.28.6-1ubuntu1+rogdv4"
     },
     {
       "component": "ubuntu-gtk4-display-target",
       "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
       "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
-      "candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
-      "candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980",
-      "patch_count": 12,
+      "candidate_commit": "c2b3073d7529e20e419169a3f60bb1f9d1f03747",
+      "candidate_tree": "a36f7cc81e801c7644876caef7adc1e1e73ce31c",
+      "patch_count": 14,
       "patch_order": [
         "0001-wayland-expose-preferred-color-target-snapshots.patch",
         "0002-debian-stage-preferred-target-snapshots.patch",
@@ -781,7 +786,9 @@
         "0009-gtkvideo-capture-original-pictures-before-playsink.patch",
         "0010-gtkvideo-load-the-optional-sdk-through-a-checked-abi.patch",
         "0011-gtkvideo-match-the-native-frame-context-signature.patch",
-        "0012-debian-package-gtkvideo-view-binding-as-rogdv4.patch"
+        "0012-debian-package-gtkvideo-view-binding-as-rogdv4.patch",
+        "0013-gtkvideo-grade-each-view-to-its-declared-HDR-or-SDR-destination.patch",
+        "0014-debian-package-destination-aware-GtkVideo-as-rogdv5.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -814,10 +821,10 @@
           "include_ignored": true
         }
       },
-      "candidate_status": "Normal +rogdv4 source-package replay and package-extracted GtkVideo Profile 5 default Vulkan, paused retarget, independent-view/source lifecycle and optional-SDK startup controls pass. Matched release-bundle qualification and independent merge review remain separate. No installation.",
-      "candidate_package_version": "4.24.1+ds-1+rogdv4",
-      "previous_candidate_commit": "4157e3268bda91bde231545033fc08954b7e5e77",
-      "previous_candidate_tree": "770b82e3cb6b16cb120a07570ca223ee1c03b2ec"
+      "candidate_status": "Fourteen-patch source candidate declares each GtkVideo HDR or SDR destination and consumes authoritative output layout/color state. Prior twelve-patch per-view qualification is retained separately. New normal package build and HDR/SDR retarget runtime qualification remain pending; no installation.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv5",
+      "previous_candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
+      "previous_candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980"
     },
     {
       "component": "libplacebo-fel-system-dv",
