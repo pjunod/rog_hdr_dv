@@ -270,8 +270,12 @@ class WebKitPackagingTests(unittest.TestCase):
         self.assertEqual(sentinel.read_bytes(), b'retain')
         self.assertEqual(sentinel.stat().st_mtime_ns, stamp)
         self.assertFalse((debian / 'debhelper-build-stamp').exists())
+        (debian / 'changelog').write_text('webkit2gtk (2.52.6-1ubuntu1+rogdv1) stonking; urgency=medium\n\n  * Packaging lifecycle fixture.\n\n -- ROG HDR contributors <rog-hdr@example.invalid>  Mon, 09 Nov 2026 00:00:00 +0000\n')
+        subprocess.run(['make', '-f', 'debian/rules', 'debian/control'],
+                       cwd=self.source, env=env, check=True, capture_output=True, text=True)
         sequence = subprocess.run(['dh', 'build', '--no-act', '--with', 'gir', '--buildsystem=cmake+ninja'],
-                                  cwd=self.source, env=env, check=True, capture_output=True, text=True)
+                                  cwd=self.source, env=env, capture_output=True, text=True)
+        self.assertEqual(sequence.returncode, 0, sequence.stderr)
         self.assertIn('override_dh_auto_configure', sequence.stdout)
         self.assertIn('override_dh_auto_build', sequence.stdout)
 
