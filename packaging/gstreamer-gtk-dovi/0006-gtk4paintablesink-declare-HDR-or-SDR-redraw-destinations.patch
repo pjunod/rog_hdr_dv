@@ -1,10 +1,12 @@
 --- a/src/sink/native.rs
 +++ b/src/sink/native.rs
-@@ -13,12 +13,15 @@
+@@ -13,41 +13,48 @@
      ) -> *mut c_void;
      fn gst_gtk_dovi_native_frame_ref(frame: *mut c_void) -> *mut c_void;
      fn gst_gtk_dovi_native_frame_unref(frame: *mut c_void);
 -    fn gst_gtk_dovi_native_frame_render(
++    fn gst_gtk_dovi_native_frame_source_revision(frame: *mut c_void) -> u64;
++    fn gst_gtk_dovi_native_frame_source_selection(frame: *mut c_void) -> u64;
 +    fn gst_gtk_dovi_native_frame_render_destination(
          frame: *mut c_void,
          mapper: *mut c_void,
@@ -17,19 +19,55 @@
          error: *mut *mut glib::ffi::GError,
      ) -> i32;
  }
-@@ -76,12 +79,19 @@
+ #[derive(Debug)]
+-pub(crate) struct NativeFrame(NonNull<c_void>);
++pub(crate) struct NativeFrame { ptr: NonNull<c_void>, identity: (u64, u64) }
+ // The immutable C snapshot holds atomic GstBuffer/GBytes/picture references.
+ unsafe impl Send for NativeFrame {}
+ unsafe impl Sync for NativeFrame {}
+ impl Clone for NativeFrame {
+     fn clone(&self) -> Self {
+-        unsafe {
+-            Self(NonNull::new_unchecked(gst_gtk_dovi_native_frame_ref(
+-                self.0.as_ptr(),
+-            )))
+-        }
++        unsafe { Self { ptr: NonNull::new_unchecked(gst_gtk_dovi_native_frame_ref(self.ptr.as_ptr())), identity: self.identity } }
+     }
+ }
+ impl Drop for NativeFrame {
+     fn drop(&mut self) {
+-        unsafe { gst_gtk_dovi_native_frame_unref(self.0.as_ptr()) }
++        unsafe { gst_gtk_dovi_native_frame_unref(self.ptr.as_ptr()) }
+     }
+ }
+ impl NativeFrame {
++    pub(crate) fn is_live(&self) -> bool {
++        // Positive leased identity is captured before work and rechecked at
++        // publication. The C renderer separately refuses already revoked
++        // zero-identity frames, while preserving unleased legacy GTK inputs.
++        unsafe { self.identity == (gst_gtk_dovi_native_frame_source_revision(self.ptr.as_ptr()), gst_gtk_dovi_native_frame_source_selection(self.ptr.as_ptr())) }
++    }
+     pub(crate) fn from_buffer(buffer: &gst::Buffer) -> (Option<Self>, u64) {
+         let mut generation = 0;
+         let frame = unsafe {
+             gst_gtk_dovi_native_frame_from_buffer(buffer.to_glib_none().0, &mut generation)
+         };
+-        (NonNull::new(frame).map(Self), generation)
++        (NonNull::new(frame).map(|ptr| Self { ptr, identity: unsafe { (gst_gtk_dovi_native_frame_source_revision(ptr.as_ptr()), gst_gtk_dovi_native_frame_source_selection(ptr.as_ptr())) } }), generation)
+     }
+ }
+ pub(crate) struct Mapper(NonNull<c_void>);
+@@ -76,12 +83,15 @@
          let mut info = std::mem::MaybeUninit::<gst_video::ffi::GstVideoInfo>::uninit();
          let mut error = std::ptr::null_mut();
          let status = unsafe {
 -            gst_gtk_dovi_native_frame_render(
+-                source.0.as_ptr(),
 +            gst_gtk_dovi_native_frame_render_destination(
-                 source.0.as_ptr(),
++                source.ptr.as_ptr(),
                  self.0.as_ptr(),
-+                destination_kind(
-+                    context.structure().get::<bool>("valid").unwrap_or(false),
-+                    context.structure().get::<bool>("hdr-ready").unwrap_or(false),
-+                    context.structure().get::<bool>("composed").unwrap_or(false),
-+                ),
++                requested_destination(context),
                  context.to_glib_none().0,
                  &mut output,
                  info.as_mut_ptr(),
@@ -38,95 +76,438 @@
                  &mut error,
              )
          };
-@@ -111,3 +121,40 @@
+@@ -111,3 +121,87 @@
          }))
      }
  }
 +
-+// Public destination ABI1: only a complete current view witness selects PQ.
++// Public destination ABI1. Every missing physical witness selects real SDR.
 +fn destination_kind(valid: bool, ready: bool, composed: bool) -> i32 {
 +    if valid && ready && composed { 0 } else { 1 }
 +}
-+
-+// Completion belongs to this exact visible source and context, not the
-+// producer baseline's physical target generation or a returned buffer tag.
-+pub(crate) fn redraw_needed(completed: Option<(u64, u64)>, frame: u64, context: u64) -> bool {
-+    completed != Some((frame, context))
++pub(crate) fn requested_destination(context: &gst::Context) -> i32 {
++    let s = context.structure();
++    destination_kind(s.get::<bool>("valid").unwrap_or(false),
++        s.get::<bool>("hdr-ready").unwrap_or(false),
++        s.get::<bool>("composed").unwrap_or(false))
 +}
-+
++pub(crate) fn pixel_destination(info: &gst_video::VideoInfo) -> Option<i32> {
++    use gst_video::{VideoColorMatrix as M, VideoColorPrimaries as P, VideoColorRange as R, VideoTransferFunction as T};
++    let c = info.colorimetry();
++    if c.matrix() != M::Rgb || c.range() != R::Range0_255 { return None; }
++    match (c.primaries(), c.transfer(), info.format()) {
++        (P::Bt709, T::Srgb, gst_video::VideoFormat::Rgba) => Some(1),
++        (P::Bt2020, T::Smpte2084, gst_video::VideoFormat::Rgba64Le) => Some(0),
++        _ => None,
++    }
++}
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(crate) struct PictureKey { pub epoch: u64, pub frame: u64, pub context: u64 }
++#[derive(Default)]
++pub(crate) struct PublicationState {
++    completed: Option<PictureKey>,
++    published: Option<PictureKey>,
++    ordinary_barrier: u64,
++}
++impl PublicationState {
++    pub(crate) fn has_current_pixels(&self, epoch: u64, context: u64) -> bool {
++        self.published.is_some_and(|p| p.epoch == epoch && p.context == context)
++    }
++    pub(crate) fn needs_redraw(&self, key: PictureKey) -> bool { self.completed != Some(key) }
++    pub(crate) fn complete_without_pixels(&mut self, key: PictureKey) { self.completed = Some(key); }
++    pub(crate) fn record_published(&mut self, key: PictureKey, ordinary: bool) {
++        if ordinary { self.ordinary_barrier = self.ordinary_barrier.max(key.frame); }
++        self.completed = Some(key); self.published = Some(key);
++    }
++    pub(crate) fn can_publish(&self, key: PictureKey, epoch: u64, context: u64, source_live: bool) -> bool {
++        source_live && key.epoch == epoch && key.context == context && key.frame >= self.ordinary_barrier &&
++            self.published.is_none_or(|old| old.epoch != key.epoch || key.frame > old.frame ||
++                (key.frame == old.frame && key.context != old.context))
++    }
++}
 +#[cfg(test)]
 +mod tests {
++    use super::{PictureKey as K, PublicationState as S};
 +    #[test]
 +    fn destination_requires_all_witnesses() {
-+        for flags in 0..8 {
-+            let actual = super::destination_kind(flags & 1 != 0, flags & 2 != 0, flags & 4 != 0);
-+            assert_eq!(actual, if flags == 7 { 0 } else { 1 });
-+        }
++        for f in 0..8 { assert_eq!(super::destination_kind(f & 1 != 0, f & 2 != 0, f & 4 != 0), if f == 7 { 0 } else { 1 }); }
 +    }
-+
 +    #[test]
-+    fn streaming_and_paused_redraws_complete_once_per_picture_and_context() {
-+        let mut completed = None;
-+        let mut renders = 0;
-+        // HDR streaming A, same paused A, streaming B on the same target,
-+        // paused B on SDR, duplicate SDR notification, restored HDR.
-+        for (frame, context) in [(1, 1), (1, 1), (2, 1), (2, 2), (2, 2), (2, 3)] {
-+            if super::redraw_needed(completed, frame, context) {
-+                renders += 1;
-+                completed = Some((frame, context));
-+            }
++    fn delayed_publications_keep_hdr_streaming_and_reject_old_context_or_source() {
++        let mut state = S::default(); let mut painted = Vec::new();
++        let a = K { epoch: 1, frame: 1, context: 1 };
++        let c = K { frame: 3, ..a };
++        // A is in flight while B and C replace the bounded latest eligible
++        // source. None of their SDR baselines is published on the HDR route.
++        for key in [a, c] {
++            assert!(state.can_publish(key, 1, 1, true));
++            state.record_published(key, false); painted.push((key.frame, "PQ"));
 +        }
-+        assert_eq!(renders, 4);
++        assert_eq!(painted, [(1, "PQ"), (3, "PQ")]);
++        assert!(!state.can_publish(a, 1, 1, true));
++        // Target changes after render but before its main-context callback.
++        assert!(!state.can_publish(c, 1, 2, true));
++        let d = K { frame: 4, context: 2, ..a };
++        state.record_published(d, true); painted.push((4, "SDR"));
++        assert!(!state.can_publish(c, 1, 2, true));
++        let restored = K { context: 3, ..d };
++        assert!(state.can_publish(restored, 1, 3, true));
++        state.record_published(restored, false); painted.push((4, "PQ"));
++        assert!(!state.needs_redraw(restored));
++        // A newer ordinary/non-native picture is a publication barrier even
++        // within one epoch; a late PQ completion cannot overwrite it.
++        let ordinary = K { frame: 5, ..restored };
++        state.record_published(ordinary, true); painted.push((5, "SDR"));
++        assert!(!state.can_publish(restored, 1, 3, true));
++        assert!(!state.can_publish(ordinary, 2, 3, true));
++        assert!(!state.can_publish(K { frame: 6, ..ordinary }, 1, 3, false));
++        assert_eq!(painted, [(1, "PQ"), (3, "PQ"), (4, "SDR"), (4, "PQ"), (5, "SDR")]);
 +    }
 +}
+--- a/src/sink/frame.rs
++++ b/src/sink/frame.rs
+@@ -147,6 +147,7 @@
+     pub(crate) native_source: Option<super::native::NativeFrame>,
+     pub(crate) native_generation: u64,
+     pub(crate) native_epoch: u64,
++    pub(crate) native_destination: Option<i32>,
+ }
+ 
+ #[derive(Debug, Default, glib::Enum, PartialEq, Eq, Copy, Clone)]
+@@ -943,6 +944,7 @@
+             native_source,
+             native_generation,
+             native_epoch: 0,
++            native_destination: super::native::pixel_destination(info),
+         };
+ 
+         frame.overlays = frame
 --- a/src/sink/imp.rs
 +++ b/src/sink/imp.rs
-@@ -90,2 +90,2 @@
+@@ -84,11 +84,17 @@
+     overlays: Vec<gst_video::VideoOverlayComposition>,
+ }
+ 
++struct NativeRedrawJob {
++    source: VisibleNativeFrame,
++    context: gst::Context,
++    key: super::native::PictureKey,
++}
++
+ #[derive(Default)]
+ struct NativeVisible {
+     source: Option<VisibleNativeFrame>,
+     context: Option<gst::Context>,
 -    generation: u64,
-+    completed_redraw: Option<(u64, u64)>,
++    publication: super::native::PublicationState,
      frame_serial: u64,
-@@ -925,2 +925,2 @@
+     stream_epoch: u64,
+     context_serial: u64,
+@@ -926,187 +932,153 @@
+         let source = state.source.take();
+         state.stream_epoch = state.stream_epoch.wrapping_add(1);
+         state.frame_serial = state.frame_serial.wrapping_add(1);
 -        state.generation = 0;
-+        state.completed_redraw = None;
++        state.publication = Default::default();
          drop(state);
-@@ -935,2 +935,2 @@
+         drop(source);
+         self.pending_frame.lock().unwrap().take();
+     }
+ 
+-    fn native_became_visible(
++    fn offer_native_frame(
+         &self,
+         source: Option<super::native::NativeFrame>,
+         overlays: Vec<gst_video::VideoOverlayComposition>,
 -        generation: u64,
-+        _generation: u64,
          epoch: u64,
-@@ -950,2 +950,2 @@
++        published: bool,
+     ) {
+         let visible = source.map(|native| VisibleNativeFrame { native, overlays });
+         let previous = {
+             let mut state = self.native_visible.lock().unwrap();
+-            if state.stream_epoch != epoch {
+-                return;
+-            }
++            if state.stream_epoch != epoch { return; }
++            let ordinary = visible.is_none();
+             let previous = std::mem::replace(&mut state.source, visible);
+             state.frame_serial = state.frame_serial.wrapping_add(1);
 -            state.generation = generation;
-+            state.completed_redraw = None;
-         }
-@@ -970,4 +970,5 @@
++            if published {
++                let key = super::native::PictureKey {
++                    epoch, frame: state.frame_serial, context: state.context_serial,
++                };
++                state.publication.record_published(key, ordinary);
++            }
+             previous
+         };
+         drop(previous);
+         self.queue_native_redraw();
+     }
+ 
++    fn has_ordinary_pending_frame(&self) -> bool {
++        self.pending_frame.lock().unwrap().as_ref().is_some_and(|frame|
++            frame.native_source.is_none() || frame.native_destination.is_none())
++    }
++
+     fn queue_native_redraw(&self) {
++        // A newer ordinary frame must not be overwritten by an older PQ job.
++        if self.has_ordinary_pending_frame() { return; }
+         let job = {
+             let mut state = self.native_visible.lock().unwrap();
+-            if state.job_running {
+-                return;
+-            }
+-            let Some(context) = state.context.clone() else {
+-                return;
++            if state.job_running { return; }
++            let Some(context) = state.context.clone() else { return; };
++            let Some(source) = state.source.clone() else { return; };
++            if !source.native.is_live() { return; }
++            let key = super::native::PictureKey {
++                epoch: state.stream_epoch, frame: state.frame_serial,
++                context: state.context_serial,
+             };
+-            let Some(source) = state.source.clone() else {
+-                return;
+-            };
 -            let generation = context.structure().get::<u64>("generation").unwrap_or(0);
 -            if state.generation == generation {
-+            if !super::native::redraw_needed(
-+                state.completed_redraw, state.frame_serial, state.context_serial,
-+            ) {
-                 return;
+-                return;
+-            }
++            if !state.publication.needs_redraw(key) { return; }
+             state.job_running = true;
+-            (source, context, state.frame_serial, state.context_serial)
++            NativeRedrawJob { source, context, key }
+         };
+         self.obj().call_async(move |obj| {
+-            let (source, context, frame_serial, context_serial) = job;
+             let result = {
+                 let mut mapper = obj.imp().native_mapper.lock().unwrap();
+-                if mapper.is_none() {
+-                    match super::native::Mapper::new() {
+-                        Ok(created) => *mapper = Some(created),
+-                        Err(error) => {
+-                            let object = obj.clone();
+-                            glib::idle_add_once(move || {
+-                                object.imp().finish_native_redraw(
+-                                    Err(error),
+-                                    frame_serial,
+-                                    context_serial,
+-                                    source.overlays,
+-                                )
+-                            });
+-                            return;
+-                        }
+-                    }
+-                }
+-                mapper.as_mut().unwrap().render(&source.native, &context)
++                (|| {
++                    if mapper.is_none() { *mapper = Some(super::native::Mapper::new()?); }
++                    mapper.as_mut().unwrap().render(&job.source.native, &job.context)
++                })()
+             };
+             let object = obj.clone();
+-            // Always dispatch on GTK's main loop, never invoke GTK on the GPU
+-            // worker when the default main context temporarily has no owner.
+-            glib::idle_add_once(move || {
+-                object.imp().finish_native_redraw(
+-                    result,
+-                    frame_serial,
+-                    context_serial,
+-                    source.overlays,
+-                )
+-            });
++            glib::idle_add_once(move || object.imp().finish_native_redraw(result, job));
+         });
+     }
+ 
+     fn finish_native_redraw(
+         &self,
+         result: Result<Option<(gst::Buffer, gst_video::VideoInfo, bool)>, String>,
+-        frame_serial: u64,
+-        context_serial: u64,
+-        overlays: Vec<gst_video::VideoOverlayComposition>,
++        job: NativeRedrawJob,
+     ) {
+-        let epoch = {
++        let key = job.key;
++        let ordinary_pending = self.has_ordinary_pending_frame();
++        let acceptable = {
+             let mut state = self.native_visible.lock().unwrap();
+             state.job_running = false;
+-            if state.frame_serial != frame_serial || state.context_serial != context_serial {
+-                drop(state);
+-                self.queue_native_redraw();
+-                return;
+-            }
+-            state.stream_epoch
++            !ordinary_pending && state.publication.can_publish(key, state.stream_epoch,
++                state.context_serial, job.source.native.is_live())
+         };
+-        // A scheduled streaming frame takes precedence. Its normal visible
+-        // publication will reconsider the newest target if required.
+-        if self.pending_frame.lock().unwrap().is_some() {
+-            return;
+-        }
++        if !acceptable { self.queue_native_redraw(); return; }
+         match result {
+             Err(error) => {
+-                gst::element_error!(
+-                    self.obj(),
+-                    gst::StreamError::Failed,
+-                    ("Native Dolby redraw failed: {error}")
+-                );
++                gst::element_error!(self.obj(), gst::StreamError::Failed,
++                    ("Native Dolby redraw failed: {error}"));
+                 self.clear_native_visible();
+                 if let Some(paintable) = &*self.paintable.lock().unwrap() {
+                     paintable.get_ref().handle_flush_frames();
+                 }
              }
-@@ -1050,5 +1050 @@
+             Ok(None) => {
+-                if let Some(paintable) = &*self.paintable.lock().unwrap() {
+-                    paintable.get_ref().handle_flush_frames();
+-                }
+-                let mut state = self.native_visible.lock().unwrap();
 -                state.generation = state
 -                    .context
 -                    .as_ref()
 -                    .and_then(|c| c.structure().get::<u64>("generation").ok())
 -                    .unwrap_or(0);
-+                state.completed_redraw = Some((frame_serial, context_serial));
-@@ -1060,6 +1060,5 @@
-                 if current.width() != info.width()
-                     || current.height() != info.height()
--                    || current.format() != info.format()
-                 {
++                self.native_visible.lock().unwrap().publication.complete_without_pixels(key);
++                self.queue_native_redraw();
+             }
+             Ok(Some((buffer, info, mapped))) => {
++                if super::native::pixel_destination(&info) != Some(super::native::requested_destination(&job.context)) {
++                    gst::element_error!(self.obj(), gst::StreamError::Format,
++                        ("Native redraw returned a different destination declaration"));
++                    self.clear_native_visible(); return;
++                }
+                 let config = self.config.lock().unwrap();
+-                let Some(current) = config.info.as_ref() else {
++                let Some(current) = config.info.as_ref() else { return; };
++                if current.width() != info.width() || current.height() != info.height() {
                      return;
-                 }
-@@ -1090,2 +1090 @@
-                 let source = frame.native_source.clone();
+-                };
+-                if current.width() != info.width()
+-                    || current.height() != info.height()
+-                    || current.format() != info.format()
+-                {
+-                    return;
+-                }
+-                let orientation = config
+-                    .stream_orientation
+-                    .unwrap_or(config.global_orientation);
+-                let frame = Frame::new_with_overlays(
+-                    self,
+-                    &buffer,
+-                    &super::frame::VideoInfo::VideoInfo(info),
+-                    orientation,
+-                    None,
+-                    overlays,
+-                );
++                }
++                let orientation = config.stream_orientation.unwrap_or(config.global_orientation);
++                let frame = Frame::new_with_overlays(self, &buffer,
++                    &super::frame::VideoInfo::VideoInfo(info), orientation, None,
++                    job.source.overlays.clone());
+                 drop(config);
+                 let Ok(mut frame) = frame else {
+-                    gst::element_error!(
+-                        self.obj(),
+-                        gst::StreamError::Failed,
+-                        ("Failed mapping native Dolby redraw")
+-                    );
+-                    self.clear_native_visible();
+-                    if let Some(paintable) = &*self.paintable.lock().unwrap() {
+-                        paintable.get_ref().handle_flush_frames();
+-                    }
+-                    return;
++                    gst::element_error!(self.obj(), gst::StreamError::Failed,
++                        ("Failed mapping native Dolby redraw"));
++                    self.clear_native_visible(); return;
+                 };
+-                frame.native_epoch = epoch;
+-                let source = frame.native_source.clone();
+-                let overlays = frame.overlay_compositions.clone();
 -                let generation = frame.native_generation;
-@@ -1110 +1110,6 @@
--                    self.native_became_visible(source, generation, epoch);
++                frame.native_epoch = key.epoch;
++                // A/B/C may have advanced while A was in flight. A remains a
++                // valid monotonic PQ presentation; afterward coalesce to C.
++                let current = {
++                    let state = self.native_visible.lock().unwrap();
++                    state.publication.can_publish(key, state.stream_epoch,
++                        state.context_serial, job.source.native.is_live())
++                };
++                if !current || self.has_ordinary_pending_frame() {
++                    self.queue_native_redraw(); return;
++                }
+                 if let Some(paintable) = &*self.paintable.lock().unwrap() {
+                     if !paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
+                         self.clear_native_visible();
+-                        paintable.get_ref().handle_flush_frames();
+-                        return;
++                        paintable.get_ref().handle_flush_frames(); return;
+                     }
+-                    gst::info!(
+-                        CAT,
+-                        imp = self,
+-                        "Retargeted visible native picture without seek: frame-serial={frame_serial} context-serial={context_serial} mapped={mapped}"
+-                    );
+-                    self.native_became_visible(source, overlays, generation, epoch);
+-                }
 +                    let mut state = self.native_visible.lock().unwrap();
-+                    if state.stream_epoch == epoch && state.frame_serial == frame_serial
-+                        && state.context_serial == context_serial {
-+                        state.source = source;
-+                        state.completed_redraw = Some((frame_serial, context_serial));
++                    if state.publication.can_publish(key, state.stream_epoch,
++                        state.context_serial, job.source.native.is_live()) {
++                        state.publication.record_published(key, false);
++                        gst::info!(CAT, imp = self,
++                            "Presented native picture frame={} context={} mapped={mapped}", key.frame, key.context);
++                    } else {
++                        // Context/source changed during synchronous GTK work.
++                        // Preserve a genuinely newer publication, otherwise
++                        // remove this late image before the next main-loop paint.
++                        if !state.publication.has_current_pixels(state.stream_epoch, state.context_serial) {
++                            drop(state); paintable.get_ref().handle_flush_frames();
++                        }
 +                    }
++                }
++                self.queue_native_redraw();
+             }
+         }
+     }
+@@ -1131,12 +1103,29 @@
+                     return glib::ControlFlow::Continue;
+                 }
+                 gst::trace!(CAT, imp = self, "Frame changed");
+-                let source = frame.native_source.clone();
++                if frame.native_source.as_ref().is_some_and(|source| !source.is_live()) {
++                    self.clear_native_visible();
++                    paintable.get_ref().handle_flush_frames();
++                    return glib::ControlFlow::Continue;
++                }
++                let source = frame.native_source.clone().filter(|_| frame.native_destination.is_some());
+                 let overlays = frame.overlay_compositions.clone();
+-                let generation = frame.native_generation;
+                 let epoch = frame.native_epoch;
+-                if paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
+-                    self.native_became_visible(source, overlays, generation, epoch);
++                let already_target = {
++                    let state = self.native_visible.lock().unwrap();
++                    let wanted = state.context.as_ref().map(super::native::requested_destination).unwrap_or(1);
++                    let generation = state.context.as_ref().and_then(|c| c.structure().get::<u64>("generation").ok()).unwrap_or(0);
++                    frame.native_destination == Some(wanted) &&
++                        (wanted == 1 || frame.native_generation == generation)
++                };
++                if source.is_some() && !already_target {
++                    // Keep the current correctly tagged image while one HDR
++                    // job runs. Retain only the newest eligible source/overlays;
++                    // never pulse this producer's SDR baseline on an HDR view.
++                    self.offer_native_frame(source, overlays, epoch, false);
++                } else if paintable.get_ref().handle_frame_changed(&self.obj(), frame) {
++                    // Genuine SDR and ordinary/non-native pictures publish now.
++                    self.offer_native_frame(source, overlays, epoch, true);
+                 }
+             }
+         }
