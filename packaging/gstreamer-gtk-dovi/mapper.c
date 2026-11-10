@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 #include "mapper.h"
 #include "native-input-formats.h"
+#include "render-preconditions.h"
 #include "gstdovipicture.h"
 #include <dv_provider387.h>
 #if !defined(DV_PROVIDER387_TARGET_V2_VERSION) || DV_PROVIDER387_TARGET_V2_VERSION != 2
@@ -244,6 +245,14 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   const AVDOVIMetadata *resolved = meta && meta->picture ?
       gst_dovi_picture_get_metadata (meta->picture) : NULL;
   GBytes *raw = meta && meta->picture ? gst_dovi_picture_get_rpu (meta->picture) : NULL;
+  const AVDOVIDecoderConfigurationRecord *configuration = meta && meta->picture ?
+      gst_dovi_picture_get_stream_config (meta->picture) : NULL;
+  gboolean profile5 = gtk_dovi_profile5_has_no_base_fallback (configuration);
+  if (!gtk_dovi_profile5_destination_supported (configuration, sdr, t)) {
+    g_set_error_literal (error, GST_STREAM_ERROR, GST_STREAM_ERROR_FORMAT,
+        "Profile 5 needs an explicit SDR destination or a current native HDR witness");
+    return -1;
+  }
   guint width = GST_VIDEO_INFO_WIDTH (info), height = GST_VIDEO_INFO_HEIGHT (info);
   GstVideoCropMeta *crop = gst_buffer_get_video_crop_meta (input);
   enum AVPixelFormat format = input_format (GST_VIDEO_INFO_FORMAT (info));
@@ -326,6 +335,11 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     apply_dovi &= pl_primaries_valid (&prim);
     s->transport_gain = gain;
     if (!apply_dovi) decline (s, 128, "actual HDR render declaration/transport unqualified");
+  }
+  if (profile5 && !apply_dovi) {
+    g_set_error_literal (error, GST_STREAM_ERROR, GST_STREAM_ERROR_FORMAT,
+        "Profile 5 cannot use ordinary base-layer color conversion");
+    goto done;
   }
   gboolean active_import = apply_dovi && crop;
   guint source_width = crop && !active_import ? storage_width : width;
@@ -462,6 +476,11 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   s->mapped = 0;
   if (!pl_render_image (s->renderer, &source, &destination, &params)) goto done;
   if (apply_dovi && s->mapped == 0) {
+    if (profile5) {
+      g_set_error_literal (error, GST_STREAM_ERROR, GST_STREAM_ERROR_FORMAT,
+          "Profile 5 mapping was declined; ordinary base-layer conversion is unsupported");
+      goto done;
+    }
     /* The provider can decline compressed/unqualified creative metadata.
      * Reproduce the ordinary input interpretation, then encode it as PQ;
      * do not call a normalized-but-ungraded image the stock fallback. */
@@ -552,7 +571,8 @@ done:
   if (mapped.buffer) gst_video_frame_unmap (&mapped);
   gst_clear_buffer (&result); av_frame_free (&src); av_frame_free (&dst); av_frame_free (&converted);
   if (!success) {
-    g_set_error_literal (error, mapper_error (), 1, "Eligible Dolby frame normalization/mapping failed");
+    if (!error || !*error)
+      g_set_error_literal (error, mapper_error (), 1, "Eligible Dolby frame normalization/mapping failed");
     return -1;
   }
   return s->mapped == 1 ? 1 : 2;

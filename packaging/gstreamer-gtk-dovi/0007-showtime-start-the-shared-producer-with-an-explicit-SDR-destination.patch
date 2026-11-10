@@ -1,0 +1,11 @@
+--- a/showtime/play.py
++++ b/showtime/play.py
+@@ -240,2 +240,8 @@
+     mapper = Gst.ElementFactory.make("gtkdovimap")
++    if mapper:
++        # Preroll and ordinary composition always receive a correctly graded
++        # SDR picture; the sink may regrade its retained source for native HDR.
++        if not mapper.find_property("destination-abi") or mapper.get_property("destination-abi") != 1:
++            raise RuntimeError("Destination-aware Dolby mapper ABI1 is required")
++        mapper.set_property("destination-kind", 1)
+     precision_filter = None
