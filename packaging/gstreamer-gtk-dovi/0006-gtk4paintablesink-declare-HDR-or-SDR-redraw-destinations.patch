@@ -38,7 +38,7 @@
                  &mut error,
              )
          };
-@@ -111,3 +121,19 @@
+@@ -111,3 +121,40 @@
          }))
      }
  }
@@ -46,6 +46,12 @@
 +// Public destination ABI1: only a complete current view witness selects PQ.
 +fn destination_kind(valid: bool, ready: bool, composed: bool) -> i32 {
 +    if valid && ready && composed { 0 } else { 1 }
++}
++
++// Completion belongs to this exact visible source and context, not the
++// producer baseline's physical target generation or a returned buffer tag.
++pub(crate) fn redraw_needed(completed: Option<(u64, u64)>, frame: u64, context: u64) -> bool {
++    completed != Some((frame, context))
 +}
 +
 +#[cfg(test)]
@@ -57,9 +63,55 @@
 +            assert_eq!(actual, if flags == 7 { 0 } else { 1 });
 +        }
 +    }
++
++    #[test]
++    fn streaming_and_paused_redraws_complete_once_per_picture_and_context() {
++        let mut completed = None;
++        let mut renders = 0;
++        // HDR streaming A, same paused A, streaming B on the same target,
++        // paused B on SDR, duplicate SDR notification, restored HDR.
++        for (frame, context) in [(1, 1), (1, 1), (2, 1), (2, 2), (2, 2), (2, 3)] {
++            if super::redraw_needed(completed, frame, context) {
++                renders += 1;
++                completed = Some((frame, context));
++            }
++        }
++        assert_eq!(renders, 4);
++    }
 +}
 --- a/src/sink/imp.rs
 +++ b/src/sink/imp.rs
+@@ -90,2 +90,2 @@
+-    generation: u64,
++    completed_redraw: Option<(u64, u64)>,
+     frame_serial: u64,
+@@ -925,2 +925,2 @@
+-        state.generation = 0;
++        state.completed_redraw = None;
+         drop(state);
+@@ -935,2 +935,2 @@
+-        generation: u64,
++        _generation: u64,
+         epoch: u64,
+@@ -950,2 +950,2 @@
+-            state.generation = generation;
++            state.completed_redraw = None;
+         }
+@@ -970,4 +970,5 @@
+-            let generation = context.structure().get::<u64>("generation").unwrap_or(0);
+-            if state.generation == generation {
++            if !super::native::redraw_needed(
++                state.completed_redraw, state.frame_serial, state.context_serial,
++            ) {
+                 return;
+             }
+@@ -1050,5 +1050 @@
+-                state.generation = state
+-                    .context
+-                    .as_ref()
+-                    .and_then(|c| c.structure().get::<u64>("generation").ok())
+-                    .unwrap_or(0);
++                state.completed_redraw = Some((frame_serial, context_serial));
 @@ -1060,6 +1060,5 @@
                  if current.width() != info.width()
                      || current.height() != info.height()
@@ -67,3 +119,14 @@
                  {
                      return;
                  }
+@@ -1090,2 +1090 @@
+                 let source = frame.native_source.clone();
+-                let generation = frame.native_generation;
+@@ -1110 +1110,6 @@
+-                    self.native_became_visible(source, generation, epoch);
++                    let mut state = self.native_visible.lock().unwrap();
++                    if state.stream_epoch == epoch && state.frame_serial == frame_serial
++                        && state.context_serial == context_serial {
++                        state.source = source;
++                        state.completed_redraw = Some((frame_serial, context_serial));
++                    }

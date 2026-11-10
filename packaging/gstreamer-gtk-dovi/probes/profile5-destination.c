@@ -33,6 +33,14 @@ int main (int argc, char **argv)
   compatible.dv_profile = 7; compatible.dv_bl_signal_compatibility_id = 6; compatible.el_present_flag = 1;
   require (!gtk_dovi_profile5_has_no_base_fallback (&compatible) && gtk_dovi_profile5_destination_supported (&compatible, FALSE, NULL),
       "Profile 7 safe base fallback remains unchanged");
+  require (!gtk_dovi_same_configuration (&p5, &compatible), "mismatched Profile 7 picture cannot satisfy a negotiated Profile 5 record");
+  compatible = p5; compatible.dv_level++;
+  require (!gtk_dovi_same_configuration (&p5, &compatible), "same-profile different stream configuration cannot satisfy a Profile 5 record");
+  GstBuffer *missing_picture = gst_buffer_new_allocate (NULL, 32, NULL);
+  require (!gtk_dovi_profile5_picture_proved (&p5, missing_picture), "known Profile 5 cannot lose its per-picture proof");
+  compatible = p5; compatible.dv_profile = 8; compatible.dv_bl_signal_compatibility_id = 1;
+  require (gtk_dovi_profile5_picture_proved (&compatible, missing_picture), "Profile 8.1 missing metadata keeps its compatible base route");
+  gst_buffer_unref (missing_picture);
   compatible = p5; compatible.dv_version_major = 0;
   require (!gtk_dovi_profile5_has_no_base_fallback (&compatible), "broken configuration cannot become a Profile 5 assertion");
   g_bytes_unref (original); gst_caps_unref (caps); gst_buffer_unref (bytes);

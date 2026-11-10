@@ -1,11 +1,22 @@
 --- a/showtime/play.py
 +++ b/showtime/play.py
-@@ -240,2 +240,8 @@
-     mapper = Gst.ElementFactory.make("gtkdovimap")
-+    if mapper:
-+        # Preroll and ordinary composition always receive a correctly graded
-+        # SDR picture; the sink may regrade its retained source for native HDR.
-+        if not mapper.find_property("destination-abi") or mapper.get_property("destination-abi") != 1:
-+            raise RuntimeError("Destination-aware Dolby mapper ABI1 is required")
-+        mapper.set_property("destination-kind", 1)
+@@ -73 +73 @@
+-            caps = Gst.Caps.from_string("video/x-raw(memory:GLMemory),format=RGBA64_LE;video/x-raw,format=RGBA64_LE") if self.dolby_stream else Gst.Caps.new_any()
++            caps = Gst.Caps.from_string("video/x-raw(memory:GLMemory),format=RGBA;video/x-raw,format=RGBA") if self.dolby_stream else Gst.Caps.new_any()
+@@ -232 +232,12 @@
++def standard_destination_mapper(mapper):
++    # Optional old/absent mappers retain the existing ordinary playback route.
++    if mapper is None or not mapper.find_property("destination-abi") or not mapper.find_property("destination-kind"):
++        return None
++    if mapper.get_property("destination-abi") != 1:
++        return None
++    # Baseline/preroll is graded SDR; the retained view selects its own grade.
++    mapper.set_property("destination-kind", 1)
++    return mapper
++
++
+ def gst_play_setup(
+@@ -240,2 +251,2 @@
+-    mapper = Gst.ElementFactory.make("gtkdovimap")
++    mapper = standard_destination_mapper(Gst.ElementFactory.make("gtkdovimap"))
      precision_filter = None

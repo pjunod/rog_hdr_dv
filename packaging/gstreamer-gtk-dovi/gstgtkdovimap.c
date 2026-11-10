@@ -3,6 +3,7 @@
 #include "source-lease-private.h"
 #include "native-input-formats.h"
 #include "stream.h"
+#include "render-preconditions.h"
 #include "gstdovipicture.h"
 #include <gst/video/gstvideodovirpumeta.h>
 #include <gst/base/gstbasetransform.h>
@@ -14,7 +15,9 @@ typedef struct { GstBaseTransform parent; GMutex lock; GstGtkDoviTarget target;
   gchar *stream_id;
   GHashTable *clear_sources;
   GstGtkDoviSourceLease *source_lease;
-  gboolean known_stream; GstVideoInfo info, output_info; GstGtkDoviMapper *mapper; } GtkDoviMap;
+  gboolean known_stream, requires_profile5;
+  AVDOVIDecoderConfigurationRecord stream_configuration;
+  GstVideoInfo info, output_info; GstGtkDoviMapper *mapper; } GtkDoviMap;
 typedef struct { GstBaseTransformClass parent; } GtkDoviMapClass;
 G_DEFINE_TYPE (GtkDoviMap, gtk_dovi_map, GST_TYPE_BASE_TRANSFORM)
 /* Copy a caller-owned Structure natively into one immutable Context. Python
@@ -292,6 +295,7 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
     if (qualified_structure (s, gst_caps_get_structure (input, i)))
       profile = gtk_dovi_stream_profile (gst_caps_get_structure (input, i));
   gboolean known = profile != 0;
+  AVDOVIDecoderConfigurationRecord configuration = {0};
   if (known) {
     if (!gst_caps_is_fixed (input) || !gst_caps_is_fixed (output) ||
         gst_caps_get_size (input) != 1 || gst_caps_get_size (output) != 1 ||
@@ -320,9 +324,17 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
         output_info.colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
         output_info.colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255)
       return FALSE;
+    if (profile == 5) {
+      GBytes *bytes = NULL;
+      gboolean complete = gst_dovi_caps_get_stream_config (input, &configuration, &bytes);
+      g_clear_pointer (&bytes, g_bytes_unref);
+      if (!complete) return FALSE;
+    }
     s->info = info;
     s->output_info = output_info;
   } else if (!gst_caps_is_equal (input, output)) return FALSE;
+  s->requires_profile5 = known && profile == 5;
+  s->stream_configuration = configuration;
   if (s->known_stream != known) {
     s->known_stream = known;
     gst_element_post_message (GST_ELEMENT (s), gst_message_new_element (GST_OBJECT (s),
@@ -416,14 +428,23 @@ static GstFlowReturn prepare (GstBaseTransform *base, GstBuffer *input, GstBuffe
   if (!s->known_stream || gst_buffer_n_memory (input) == 0) {
     gst_gtk_dovi_source_lease_unref (lease); *output = gst_buffer_ref (input); return GST_FLOW_OK;
   }
-  /* Before the composition/HDR witness is ready, re-encode the ordinary
-   * baseline. Private mapping requires both witnesses inside the shared core. */
+  /* A negotiated Profile 5 stream remains IPT even if one picture loses its
+   * immutable metadata. Never replace the required grade with a base decode. */
+  if (s->requires_profile5 && !gtk_dovi_profile5_picture_proved (&s->stream_configuration, input)) {
+    GST_ELEMENT_ERROR (s, STREAM, FORMAT,
+        ("Known Profile 5 picture lacks matching complete per-picture Dolby proof"), (NULL));
+    gst_gtk_dovi_source_lease_unref (lease); return GST_FLOW_ERROR;
+  }
+  /* Compatible base layers may use their declared ordinary interpretation. */
   GstVideoInfo result_info = s->output_info;
   GError *error = NULL;
   int result = gst_gtk_dovi_mapper_render_destination (s->mapper, input, &s->info,
       s->destination_kind, &target, output, &result_info, &error);
   if (result < 1 || !*output) {
-    GST_ELEMENT_ERROR (s, STREAM, FAILED, ("%s", error ? error->message : "Dolby map failed"), (NULL));
+    if (error && error->domain == GST_STREAM_ERROR && error->code == GST_STREAM_ERROR_FORMAT)
+      GST_ELEMENT_ERROR (s, STREAM, FORMAT, ("%s", error->message), (NULL));
+    else
+      GST_ELEMENT_ERROR (s, STREAM, FAILED, ("%s", error ? error->message : "Dolby map failed"), (NULL));
     g_clear_error (&error); gst_gtk_dovi_source_lease_unref (lease); return GST_FLOW_ERROR;
   }
   g_mutex_lock (&s->lock);

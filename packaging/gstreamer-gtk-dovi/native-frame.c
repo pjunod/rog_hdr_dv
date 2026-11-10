@@ -2,11 +2,13 @@
 #include "mapper.h"
 #include "source-lease-private.h"
 #include "gstdovipicture.h"
+#include "render-preconditions.h"
 struct GstGtkDoviSourceLease {
   gint refs, revoked;
   guint64 revision, selection;
   gchar *stream_id;
   GBytes *configuration;
+  AVDOVIDecoderConfigurationRecord stream_configuration;
 };
 GstGtkDoviSourceLease *_gst_gtk_dovi_source_lease_new_selected (const GstCaps *caps,
     const gchar *stream_id, guint64 revision, guint64 selection)
@@ -34,6 +36,7 @@ GstGtkDoviSourceLease *_gst_gtk_dovi_source_lease_new_selected (const GstCaps *c
   GstGtkDoviSourceLease *lease = g_new0 (GstGtkDoviSourceLease, 1);
   lease->refs = 1; lease->revision = revision; lease->selection = selection;
   lease->stream_id = g_strdup (stream_id); lease->configuration = bytes;
+  lease->stream_configuration = config;
   return lease;
 }
 GstGtkDoviSourceLease *gst_gtk_dovi_source_lease_new (const GstCaps *caps,
@@ -69,6 +72,7 @@ struct GstGtkDoviNativeFrame {
   GstBuffer *source;
   GstVideoInfo input_info, output_info;
   GstGtkDoviSourceLease *lease;
+  AVDOVIDecoderConfigurationRecord required_configuration;
 };
 typedef struct { GstMeta meta; GstGtkDoviNativeFrame *frame; guint64 generation; } NativeMeta;
 static const GstMetaInfo *native_meta_info (void);
@@ -139,7 +143,12 @@ gboolean gst_gtk_dovi_native_frame_attach_source (GstBuffer *output, GstBuffer *
     gst_gtk_dovi_native_frame_unref (frame); return FALSE;
   }
   if (!frame) {
+    GstDoviPictureMeta *picture = gst_buffer_get_dovi_picture_meta (input);
+    const AVDOVIDecoderConfigurationRecord *required = lease ? &lease->stream_configuration :
+        (picture && picture->picture ? gst_dovi_picture_get_stream_config (picture->picture) : NULL);
+    if (!gtk_dovi_profile5_picture_proved (required, input)) return FALSE;
     frame = g_new0 (GstGtkDoviNativeFrame, 1); frame->refs = 1;
+    if (required) frame->required_configuration = *required;
     frame->source = gst_buffer_ref (input);
     frame->input_info = *input_info; frame->output_info = *output_info;
     frame->lease = gst_gtk_dovi_source_lease_ref (lease);
@@ -185,6 +194,11 @@ int gst_gtk_dovi_native_frame_render_destination (GstGtkDoviNativeFrame *frame,
   if (epoch_out) *epoch_out = 0;
   if (picture_id_out) *picture_id_out = 0;
   if (frame->lease && !gst_gtk_dovi_source_lease_is_valid (frame->lease)) return 0;
+  if (!gtk_dovi_profile5_picture_proved (&frame->required_configuration, frame->source)) {
+    g_set_error_literal (error, GST_STREAM_ERROR, GST_STREAM_ERROR_FORMAT,
+        "Retained Profile 5 source lacks matching complete per-picture Dolby proof");
+    return -1;
+  }
   gboolean sdr = kind == GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
   if (!sdr && kind != GST_GTK_DOVI_DESTINATION_DISPLAY_PQ) {
     g_set_error_literal (error, GST_CORE_ERROR, GST_CORE_ERROR_NEGOTIATION,

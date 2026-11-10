@@ -259,6 +259,37 @@ linked_query_controls (GstElement *element, GstBaseTransformClass *klass,
 }
 
 static void
+profile5_missing_picture_controls (void)
+{
+  for (guint kind = 0; kind < 2; kind++) {
+    GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
+    g_object_set (map, "destination-kind", kind, NULL);
+    GstBus *bus = gst_bus_new (); gst_element_set_bus (map, bus);
+    GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+    GstBaseTransformClass *klass = GST_BASE_TRANSFORM_GET_CLASS (base);
+    GstCaps *input = caps_for ("P010_10LE", NULL, TRUE);
+    GstCaps *graded = klass->transform_caps (base, GST_PAD_SINK, input, NULL);
+    require (klass->set_caps (base, input, graded), "complete marked P5 has an explicit destination contract");
+    GstBuffer *pixels = gst_buffer_new_allocate (NULL, 768, NULL), *output = NULL;
+    require (klass->prepare_output_buffer (base, pixels, &output) == GST_FLOW_ERROR && !output,
+        "known P5 pixels without immutable picture proof cannot become graded or retained output");
+    GstMessage *message = gst_bus_pop_filtered (bus, GST_MESSAGE_ERROR);
+    GError *error = NULL;
+    if (message) gst_message_parse_error (message, &error, NULL);
+    require (error && error->domain == GST_STREAM_ERROR && error->code == GST_STREAM_ERROR_FORMAT,
+        "known P5 missing-proof refusal keeps typed FORMAT on the real element bus");
+    g_clear_error (&error); if (message) gst_message_unref (message);
+    GstCaps *plain = caps_for ("P010_10LE", NULL, FALSE);
+    require (klass->set_caps (base, plain, plain), "unmarked stream returns to its original identity contract");
+    require (klass->prepare_output_buffer (base, pixels, &output) == GST_FLOW_OK && output == pixels,
+        "unmarked control preserves the exact original GstBuffer");
+    gst_clear_buffer (&output); gst_buffer_unref (pixels);
+    gst_caps_unref (plain); gst_caps_unref (graded); gst_caps_unref (input);
+    gst_element_set_bus (map, NULL); gst_object_unref (bus); gst_object_unref (map);
+  }
+}
+
+static void
 source_context (GstElement *map, guint64 revision, gboolean blocked,
     const gchar *stream_id, GstCaps *coded)
 {
@@ -505,6 +536,7 @@ main (int argc, char **argv)
   }
   linked_query_controls (element, klass, output);
   source_lifecycle_controls ();
+  profile5_missing_picture_controls ();
   gst_caps_unref (reverse);
   gst_caps_unref (output);
   gst_caps_unref (nv12);

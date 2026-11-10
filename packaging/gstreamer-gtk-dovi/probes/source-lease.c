@@ -21,7 +21,9 @@ int gst_gtk_dovi_mapper_render_destination (GstGtkDoviMapper *mapper,
 }
 static GstCaps *coded (guint length)
 {
-  guint8 record[24] = {1, 0, 10, 29, 0};
+  /* The CPU rendering stub models a compatible Profile 8.1 base layer.
+   * Profile 5 cannot be retained without real per-picture evidence. */
+  guint8 record[24] = {1, 0, 16, 29, 16};
   GstBuffer *buffer = gst_buffer_new_memdup (record, length);
   GstCaps *caps = gst_caps_new_simple ("video/x-h265", "dovi-configuration",
       GST_TYPE_BUFFER, buffer, NULL);
@@ -55,6 +57,20 @@ int main (int argc, char **argv)
   gst_structure_set_name (gst_caps_get_structure (invalid, 0), "application/x-cenc");
   require (!gst_gtk_dovi_source_lease_new (invalid, "source/video0", 17), "protected input is rejected");
   gst_caps_unref (invalid);
+  GstCaps *p5_caps = gst_caps_copy (caps);
+  guint8 p5_record[24] = {1, 0, 10, 29, 0};
+  GstBuffer *p5_bytes = gst_buffer_new_memdup (p5_record, sizeof p5_record);
+  gst_caps_set_simple (p5_caps, "dovi-configuration", GST_TYPE_BUFFER, p5_bytes, NULL);
+  gst_buffer_unref (p5_bytes);
+  GstGtkDoviSourceLease *p5_lease = gst_gtk_dovi_source_lease_new (p5_caps, "source/p5", 99);
+  GstVideoInfo p5_info; gst_video_info_set_format (&p5_info, GST_VIDEO_FORMAT_RGBA, 4, 4);
+  GstBuffer *p5_input = gst_buffer_new_allocate (NULL, p5_info.size, NULL);
+  GstBuffer *p5_output = gst_buffer_new_allocate (NULL, p5_info.size, NULL);
+  require (p5_lease && !gst_gtk_dovi_native_frame_attach_source (p5_output, p5_input,
+      &p5_info, &p5_info, 99, p5_lease), "known P5 without picture proof cannot become a retained source");
+  require (!gst_gtk_dovi_native_frame_from_buffer (p5_output, NULL), "rejected P5 attachment exposes no retained frame");
+  gst_buffer_unref (p5_output); gst_buffer_unref (p5_input);
+  gst_gtk_dovi_source_lease_unref (p5_lease); gst_caps_unref (p5_caps);
   GstGtkDoviNativeFrame *f = frame (lease);
   require (gst_gtk_dovi_native_frame_source_revision (f) == 17, "revision belongs to retained frame");
   GstBuffer *output = NULL; GstVideoInfo info; guint64 epoch = 99, picture = 99;
