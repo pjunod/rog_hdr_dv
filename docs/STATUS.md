@@ -2,7 +2,7 @@
 
 **Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
 
-**Browser native HDR, qualified in a private compositor (November 11).**
+**Browser native HDR, qualified and installed (November 11).**
 
 - **Scope.** Ordinary clear WebKitGTK `<video>` now negotiates the destination-aware mapper and
   presents a native HDR plane under the GTK view lease. It passed 20 of 21 normal-sandbox runtime
@@ -16,6 +16,14 @@
   - Playback start drops up to 14 frames while the mapper starts.
 - **Release family.** WebKit `2.52.6-1ubuntu1+rogdv1`, GTK `4.24.1+ds-1+rogdv5`, mapper core
   `0.1.0+rogdv7`, bad/extra `1.28.6-1ubuntu1+rogdv6`, sink `+rogdv5.2` and Showtime `+rogdv5.3`.
+- **Installed.** The 20-package release was installed on the laptop with the desktop session open:
+  20 changes, zero removals, marks preserved.
+  - `dpkg --audit` is empty, and `dpkg --verify` matches every installed file.
+  - The archives were digest-checked in a root-owned staging copy before APT ran.
+  - Afterwards the installed VA decoder negotiated marked P010 VAMemory, and the installed mapper
+    mapped all 122 pictures of the Profile 5 clip.
+  - The rollback set equals the previously installed bytes. It is prepared and was not used.
+  - In-session visual and optical acceptance remain pending.
 
 [Browser results](WEBKIT_NATIVE_HDR.md#runtime-qualification) · [Producer and mapper fixes](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
 
