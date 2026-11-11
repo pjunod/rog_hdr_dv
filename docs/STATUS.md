@@ -2,6 +2,23 @@
 
 **Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
 
+**Browser native HDR, qualified in a private compositor (November 11).**
+
+- **Scope.** Ordinary clear WebKitGTK `<video>` now negotiates the destination-aware mapper and
+  presents a native HDR plane under the GTK view lease. It passed 20 of 21 normal-sandbox runtime
+  steps.
+- **Results.** Profile 5 and Profile 8 were native at 462–478 cd/m² against 203 cd/m² page white.
+  Paused HDR↔SDR retargeting, seek and source changes, SDR/HDR10/base controls and CSS effects
+  passed.
+- **Known gaps.**
+  - Profile 7 FEL plays its base layer ordinarily, because the browser sandbox does not expose the
+    CUDA device.
+  - Playback start drops up to 14 frames while the mapper starts.
+- **Release family.** WebKit `2.52.6-1ubuntu1+rogdv1`, GTK `4.24.1+ds-1+rogdv5`, mapper core
+  `0.1.0+rogdv7`, bad/extra `1.28.6-1ubuntu1+rogdv6`, sink `+rogdv5.2` and Showtime `+rogdv5.3`.
+
+[Browser results](WEBKIT_NATIVE_HDR.md#runtime-qualification) · [Producer and mapper fixes](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
+
 **Native GStreamer FEL candidate, not installed.** The active five-patch NVIDIA source series pairs decoded Profile 7 enhancement planes with their exact base picture. The candidate paired all 70 pictures before and after seek, retained copied planes, and passed duplicate/missing timestamp and missing/corrupt enhancement controls. Actual GTK mapped the same 4K picture at 616 cd/m² before and after a flush seek; its mapped output and ten-bit PQ compositor pixels remained identical. A control preserving all 70 coded base pictures, RPU bytes and timestamps while removing only enhancement NALs used ordinary base conversion. The complete Ubuntu source tree is pinned, and all 18 normal amd64/all candidate packages built with coherent client dependencies. A distinct GtkVideo package-overlay trial advanced its clock and reached EOS, but its heavily instrumented run dropped frames; clean full-rate playback and rebuilt-client runtime qualification remain open. GPU trials are stopped, and no candidate package was installed. These are private GPU-compositor digital checks; the installed 45-package release, browser playback and optical acceptance remain separate. [Source, exact scope and results](GSTREAMER_DOLBY_RECONSTRUCTION.md#profile-7-native-source-and-digital-qualification) · [Sanitized receipt](../evidence/gstreamer-native-fel-20261109.json).
 
 After installation, the system FFmpeg chart output matched the qualified output byte for byte across 19,660,800 bytes. The installed Display P3 loader preserved 16 colors with mean absolute error 0.00012436 and maximum error 0.0004883 in normalized linear channels. These checks cover installed software output; post-login visual acceptance and optical measurement remain pending.

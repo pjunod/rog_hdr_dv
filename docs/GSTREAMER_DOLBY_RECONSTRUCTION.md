@@ -76,6 +76,40 @@ The normal Ubuntu builds produced 18 amd64/all packages: bridge `0.2.0+rogdv2`, 
 
 A separate GtkVideo trial used the extracted bridge/core/bad packages and reached its 2.999666-second EOS in 3.069 seconds after explicit play. Visible native redraws mapped pictures from the beginning through the end of the clip. This diagnostic rendered seven sink frames and dropped thirteen while LOG-level code hashed and scanned every visible 4K frame. It establishes clock progression and no delayed-output hang, not clean 24 fps. The upstream per-stream baseline conversion is expected before each view applies its own grade. Normal-logging throughput and runtime qualification of the matching rebuilt clients remain open; further GPU trials are stopped.
 
+## Browser runtime fixes (November 11)
+
+Qualifying ordinary WebKit `<video>` found five producer and mapper defects that no earlier
+client exercised. Each is fixed at its cause:
+
+- **VA stream-lock deadlock.** [0008](../patches/ubuntu-gst-plugins-bad-rpu/0008-va-renegotiate-qualified-output-without-the-stream-lock.patch)
+  removes the `src_event` handler, which took the decoder stream lock on RECONFIGURE. That lock
+  deadlocked against a downstream queue that was answering the decoder's serialized allocation
+  query. Qualified output is now recomputed on every negotiation.
+- **Shallow accept-caps.** [0010](../patches/ubuntu-gst-plugins-bad-rpu/0010-va-prove-marked-output-against-the-whole-linked-consumer-chain.patch)
+  proves a marked output against the whole linked chain with a filtered CAPS query.
+  Passthrough converters answer ACCEPT_CAPS from their pad templates, so a tiled DMABuf that
+  the mapper must refuse had been accepted. The VA producer is versioned `1.28.6-1ubuntu1+rogdv6`.
+- **Identity allocation.** The mapper core (`0.1.0+rogdv6`) now forwards an identity allocation
+  query downstream. Previously it answered the query itself, and VA/DMABuf producers lost
+  VideoMeta even for ordinary SDR video.
+- **Negotiation before stream start (`0.1.0+rogdv7`).** decodebin answers a producer's
+  pre-exposure queries through playbin's sink, before any stream event reaches the mapper.
+  - A marked query is therefore qualified by an identical clear proof of the current revision
+    until a stream starts.
+  - Unfiltered reverse answers also offer the importable domain, marked with its exact
+    configuration, because deinterlace forwards queries without their filter.
+  - A newer revision that only awaits the started stream's own restart (a browser advances
+    per seek) no longer triggers renegotiation inside the flush.
+- **Explicit SDR destination.** This path had never rendered. libplacebo cannot sample a
+  download-only render target, so the graded PQ intermediate now has its own sampleable
+  textures.
+
+The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 115 checks,
+including the pre-start and unfiltered-reverse controls. The coherent family is core
+`0.1.0+rogdv7`, sink `0.15.2-1ubuntu2+rogdv5.2` and Showtime `50.0-2+rogdv5.3`, with the
+bad/extra `rogdv6` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
+Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
+
 These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
 
 ## Which geometry reaches the mapper
