@@ -1,0 +1,393 @@
+--- a/debian/rules
++++ b/debian/rules
+@@ -7,7 +7,7 @@
+ 
+ # gtk3 build -> 4.1 API packages
+ # gtk4 build -> 6.0 API packages
+-ENABLE_GTK3=YES
++ENABLE_GTK3=NO
+ ENABLE_GTK4=YES
+ # YES => build libwebkit2gtk-4.0-doc, libjavascriptcoregtk-4.0-bin and webkit2gtk-driver (for trixie)
+ BUILD_TRANSITIONAL_PKGS=NO
+@@ -174,6 +174,205 @@
+ ifneq (,$(filter $(DEB_HOST_ARCH),arm64 armel armhf))
+ 	DH_GENCONTROL_ARGS += -Vgles:Depends="libgles2"
+ endif
++
++# This derivative is the reviewed amd64 clang profile, not stock Ubuntu
++# build flags. Do not clean or configure an opt-in external warm cache.
++ifneq ($(DEB_HOST_ARCH),amd64)
++$(error The native HDR derivative is qualified only for amd64)
++endif
++ROG_WEBKIT_BUILD_DIR ?= build-gtk4
++ROG_WEBKIT_DOVI_SDK_ROOT ?= /usr/include
++ROG_WEBKIT_GDK_SDK_ROOT ?= /usr/include/gtk-4.0
++export ROG_WEBKIT_DOVI_SDK_ROOT ROG_WEBKIT_GDK_SDK_ROOT
++export CFLAGS =
++export CXXFLAGS =
++export CPPFLAGS =
++export LDFLAGS =
++BUILD_DOCS=OFF
++EXTRA_CMAKE_ARGUMENTS = -DPORT="GTK" \
++	-DUSE_GTK4="ON" \
++	-DCMAKE_BUILD_TYPE="Release" \
++	-DCMAKE_C_COMPILER="/usr/bin/clang" \
++	-DCMAKE_CXX_COMPILER="/usr/bin/clang++" \
++	-DCMAKE_C_FLAGS="" \
++	-DCMAKE_CXX_FLAGS="" \
++	-DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG -g0" \
++	-DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG -g0" \
++	-DCMAKE_INSTALL_PREFIX="/usr" \
++	-DCMAKE_INSTALL_LIBDIR="lib/x86_64-linux-gnu" \
++	-DCMAKE_INSTALL_LIBEXECDIR="lib/x86_64-linux-gnu" \
++	-DLIB_INSTALL_DIR="/usr/lib/x86_64-linux-gnu" \
++	-DLIBEXEC_INSTALL_DIR="/usr/lib/x86_64-linux-gnu/webkitgtk-6.0" \
++	-DEXEC_INSTALL_DIR="/usr/bin" \
++	-DCMAKE_BUILD_WITH_INSTALL_RPATH="ON" \
++	-DCMAKE_INSTALL_RPATH="" \
++	-DENABLE_BUBBLEWRAP_SANDBOX="ON" \
++	-DENABLE_INTROSPECTION="ON" \
++	-DENABLE_API_TESTS="OFF" \
++	-DENABLE_DOCUMENTATION="OFF" \
++	-DENABLE_MINIBROWSER="ON" \
++	-DENABLE_WEBDRIVER="OFF" \
++	-DENABLE_GAMEPAD="OFF" \
++	-DENABLE_SPEECH_SYNTHESIS="OFF" \
++	-DUSE_AVIF="OFF" \
++	-DUSE_LIBBACKTRACE="OFF" \
++	-DENABLE_JOURNALD_LOG="ON" \
++	-DUSE_SYSPROF_CAPTURE="ON" \
++	-DCMAKE_INSTALL_BINDIR="bin" \
++	-DCMAKE_INSTALL_DATADIR="share" \
++	-DCMAKE_INSTALL_LOCALEDIR="share/locale" \
++	-DCMAKE_EXE_LINKER_FLAGS="" \
++	-DCMAKE_EXE_LINKER_FLAGS_RELEASE="" \
++	-DCMAKE_SHARED_LINKER_FLAGS="" \
++	-DCMAKE_SHARED_LINKER_FLAGS_RELEASE="" \
++	-DCMAKE_MODULE_LINKER_FLAGS="" \
++	-DCMAKE_MODULE_LINKER_FLAGS_RELEASE="" \
++	-DENABLE_ACCESSIBILITY_ISOLATED_TREE="OFF" \
++	-DENABLE_APPLE_PAY="OFF" \
++	-DENABLE_APPLICATION_MANIFEST="OFF" \
++	-DENABLE_ASYNC_SCROLLING="ON" \
++	-DENABLE_ATTACHMENT_ELEMENT="OFF" \
++	-DENABLE_AUTOCAPITALIZE="ON" \
++	-DENABLE_AVF_CAPTIONS="OFF" \
++	-DENABLE_BREAKPAD="OFF" \
++	-DENABLE_CACHE_PARTITIONING="OFF" \
++	-DENABLE_CONTENT_EXTENSIONS="ON" \
++	-DENABLE_CONTENT_FILTERING="OFF" \
++	-DENABLE_CONTEXT_MENUS="ON" \
++	-DENABLE_CURSOR_VISIBILITY="ON" \
++	-DENABLE_C_LOOP="OFF" \
++	-DENABLE_DARK_MODE_CSS="ON" \
++	-DENABLE_DATACUE_VALUE="OFF" \
++	-DENABLE_DEVICE_ORIENTATION="OFF" \
++	-DENABLE_DFG_JIT="ON" \
++	-DENABLE_DRAG_SUPPORT="ON" \
++	-DENABLE_ENCRYPTED_MEDIA="OFF" \
++	-DENABLE_EXPERIMENTAL_FEATURES="OFF" \
++	-DENABLE_FTL_JIT="ON" \
++	-DENABLE_FTPDIR="OFF" \
++	-DENABLE_FULLSCREEN_API="ON" \
++	-DENABLE_GEOLOCATION="ON" \
++	-DENABLE_GPU_PROCESS="ON" \
++	-DENABLE_IMAGE_DIFF="ON" \
++	-DENABLE_INSPECTOR_ALTERNATE_DISPATCHERS="OFF" \
++	-DENABLE_INSPECTOR_EXTENSIONS="OFF" \
++	-DENABLE_INSPECTOR_TELEMETRY="OFF" \
++	-DENABLE_IOS_GESTURE_EVENTS="OFF" \
++	-DENABLE_IOS_TOUCH_EVENTS="OFF" \
++	-DENABLE_JAVASCRIPTCORE="ON" \
++	-DENABLE_JAVASCRIPT_SHELL="ON" \
++	-DENABLE_JIT="ON" \
++	-DENABLE_JSC_RESTRICTED_OPTIONS_BY_DEFAULT="OFF" \
++	-DENABLE_LAYOUT_TESTS="OFF" \
++	-DENABLE_LEGACY_CUSTOM_PROTOCOL_MANAGER="OFF" \
++	-DENABLE_LEGACY_ENCRYPTED_MEDIA="OFF" \
++	-DENABLE_LLVM_PROFILE_GENERATION="OFF" \
++	-DENABLE_MALLOC_HEAP_BREAKDOWN="OFF" \
++	-DENABLE_MATHML="ON" \
++	-DENABLE_MEDIA_CAPTURE="OFF" \
++	-DENABLE_MEDIA_CONTROLS_CONTEXT_MENUS="ON" \
++	-DENABLE_MEDIA_RECORDER="ON" \
++	-DENABLE_MEDIA_SESSION="ON" \
++	-DENABLE_MEDIA_SESSION_COORDINATOR="OFF" \
++	-DENABLE_MEDIA_SESSION_PLAYLIST="OFF" \
++	-DENABLE_MEDIA_SOURCE="ON" \
++	-DENABLE_MEDIA_STATISTICS="OFF" \
++	-DENABLE_MEDIA_STREAM="ON" \
++	-DENABLE_MEDIA_TELEMETRY="OFF" \
++	-DENABLE_MEMORY_SAMPLER="ON" \
++	-DENABLE_MHTML="ON" \
++	-DENABLE_MOUSE_CURSOR_SCALE="ON" \
++	-DENABLE_NAVIGATOR_STANDALONE="OFF" \
++	-DENABLE_NOTIFICATIONS="ON" \
++	-DENABLE_OFFSCREEN_CANVAS="ON" \
++	-DENABLE_OFFSCREEN_CANVAS_IN_WORKERS="ON" \
++	-DENABLE_ORIENTATION_EVENTS="OFF" \
++	-DENABLE_PAYMENT_REQUEST="OFF" \
++	-DENABLE_PDFJS="ON" \
++	-DENABLE_PDFKIT_PLUGIN="OFF" \
++	-DENABLE_PERIODIC_MEMORY_MONITOR="ON" \
++	-DENABLE_PICTURE_IN_PICTURE_API="OFF" \
++	-DENABLE_POINTER_LOCK="ON" \
++	-DENABLE_QUARTZ_TARGET="ON" \
++	-DENABLE_REFTRACKER="OFF" \
++	-DENABLE_RELEASE_LOG="OFF" \
++	-DENABLE_REMOTE_INSPECTOR="ON" \
++	-DENABLE_RESOURCE_USAGE="ON" \
++	-DENABLE_SAMPLING_PROFILER="ON" \
++	-DENABLE_SANDBOX_EXTENSIONS="OFF" \
++	-DENABLE_SERVICE_CONTROLS="OFF" \
++	-DENABLE_SHAREABLE_RESOURCE="ON" \
++	-DENABLE_SMOOTH_SCROLLING="ON" \
++	-DENABLE_SPELLCHECK="ON" \
++	-DENABLE_SWIFT_DEMO_URI_SCHEME="OFF" \
++	-DENABLE_TELEPHONE_NUMBER_DETECTION="OFF" \
++	-DENABLE_TEXT_AUTOSIZING="OFF" \
++	-DENABLE_THUNDER="OFF" \
++	-DENABLE_TOUCH_EVENTS="ON" \
++	-DENABLE_UNIFIED_BUILDS="ON" \
++	-DENABLE_UNSAFE_BUFFER_USAGE_WARNING="OFF" \
++	-DENABLE_USER_MESSAGE_HANDLERS="ON" \
++	-DENABLE_VARIATION_FONTS="ON" \
++	-DENABLE_VIDEO="ON" \
++	-DENABLE_VIDEO_PRESENTATION_MODE="OFF" \
++	-DENABLE_VIDEO_USES_ELEMENT_FULLSCREEN="ON" \
++	-DENABLE_WAYLAND_TARGET="ON" \
++	-DENABLE_WEBASSEMBLY="ON" \
++	-DENABLE_WEBASSEMBLY_BBQJIT="ON" \
++	-DENABLE_WEBASSEMBLY_OMGJIT="ON" \
++	-DENABLE_WEBCORE="ON" \
++	-DENABLE_WEBDRIVER_BIDI="OFF" \
++	-DENABLE_WEBDRIVER_KEYBOARD_GRAPHEME_CLUSTERS="OFF" \
++	-DENABLE_WEBDRIVER_KEYBOARD_INTERACTIONS="OFF" \
++	-DENABLE_WEBDRIVER_MOUSE_INTERACTIONS="OFF" \
++	-DENABLE_WEBDRIVER_TOUCH_INTERACTIONS="OFF" \
++	-DENABLE_WEBDRIVER_WHEEL_INTERACTIONS="OFF" \
++	-DENABLE_WEBGL="ON" \
++	-DENABLE_WEBGPU="OFF" \
++	-DENABLE_WEBKIT="ON" \
++	-DENABLE_WEBKIT_OVERFLOW_SCROLLING_CSS_PROPERTY="OFF" \
++	-DENABLE_WEBXR="OFF" \
++	-DENABLE_WEBXR_HIT_TEST="OFF" \
++	-DENABLE_WEBXR_LAYERS="OFF" \
++	-DENABLE_WEB_API_STATISTICS="ON" \
++	-DENABLE_WEB_AUDIO="ON" \
++	-DENABLE_WEB_AUTHN="OFF" \
++	-DENABLE_WEB_CODECS="ON" \
++	-DENABLE_WEB_RTC="OFF" \
++	-DENABLE_WIRELESS_PLAYBACK_TARGET="OFF" \
++	-DENABLE_WK_WEB_EXTENSIONS="OFF" \
++	-DENABLE_X11_TARGET="ON" \
++	-DENABLE_XSLT="ON" \
++	-DUSE_64KB_PAGE_BLOCK="OFF" \
++	-DUSE_APPLE_ICU="OFF" \
++	-DUSE_COMPRESSED_HEAP="OFF" \
++	-DUSE_CXX_STDLIB_ASSERTIONS="ON" \
++	-DUSE_FLITE="OFF" \
++	-DUSE_GBM="ON" \
++	-DUSE_GSTREAMER="ON" \
++	-DUSE_GSTREAMER_FULL="OFF" \
++	-DUSE_GSTREAMER_GL="ON" \
++	-DUSE_GSTREAMER_MPEGTS="OFF" \
++	-DUSE_GSTREAMER_WEBRTC="OFF" \
++	-DUSE_ISO_MALLOC="ON" \
++	-DUSE_JPEGXL="ON" \
++	-DUSE_LCMS="ON" \
++	-DUSE_LIBDRM="ON" \
++	-DUSE_LIBHYPHEN="ON" \
++	-DUSE_LIBRICE="OFF" \
++	-DUSE_LIBSECRET="ON" \
++	-DUSE_PGO_PROFILE="OFF" \
++	-DUSE_SKIA="ON" \
++	-DUSE_SKIA_ENCODERS="ON" \
++	-DUSE_SKIA_OPENTYPE_SVG="ON" \
++	-DUSE_SPIEL="OFF" \
++	-DUSE_SYSTEM_MALLOC="OFF" \
++	-DUSE_SYSTEM_SYSPROF_CAPTURE="ON" \
++	-DUSE_SYSTEM_UNIFDEF="ON" \
++	-DUSE_THIN_ARCHIVES="ON" \
++	-DUSE_WOFF2="ON" \
++	-DGTK_DOVI_SDK_ROOT=$(ROG_WEBKIT_DOVI_SDK_ROOT) \
++	-DGTK_NATIVE_VIDEO_GDK_SDK_ROOT=$(ROG_WEBKIT_GDK_SDK_ROOT)
+ 
+ # Disable commands and binary packages of the builds that we don't want
+ ifneq ($(ENABLE_GTK3),YES)
+@@ -247,6 +446,23 @@
+ 	dh_gencontrol -- $(DH_GENCONTROL_ARGS)
+ 
+ override_dh_auto_configure:
++	python3 debian/rog-native-hdr/verify-build.py --path-only
++ifeq ($(ROG_WEBKIT_BUILD_DIR),build-gtk4)
++	$(MAKE) -f debian/rules rog-native-manifests
++	$(GTK3_BUILD) dh_auto_configure -Bbuild-gtk3 -- \
++		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
++		$(EXTRA_CMAKE_ARGUMENTS)
++	$(GTK4_BUILD) dh_auto_configure -B"$(ROG_WEBKIT_BUILD_DIR)" -- \
++		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) -DENABLE_WEBDRIVER=OFF \
++		$(EXTRA_CMAKE_ARGUMENTS)
++else
++	# -nc skips clean, not dh's configure stage in an unstamped manual cache.
++	# Verify the existing graph and generate package metadata only.
++	python3 debian/rog-native-hdr/verify-build.py
++	$(MAKE) -f debian/rules rog-native-manifests
++endif
++
++rog-native-manifests:
+ 	echo debian/clean > debian/clean
+ 	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
+ 		for src in $(WEBKIT_DH_FILES); do \
+@@ -255,24 +471,26 @@
+ 			echo debian/$$dst >> debian/clean ; \
+ 		done ; \
+ 	fi
+-	$(GTK3_BUILD) dh_auto_configure -Bbuild-gtk3 -- \
+-		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
+-		$(EXTRA_CMAKE_ARGUMENTS)
+-	$(GTK4_BUILD) dh_auto_configure -Bbuild-gtk4 -- \
+-		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) -DENABLE_WEBDRIVER=OFF \
+-		$(EXTRA_CMAKE_ARGUMENTS)
+ 
+ override_dh_auto_build:
++	python3 debian/rog-native-hdr/verify-build.py
++	$(MAKE) -f debian/rules rog-native-manifests
+ 	$(GTK3_BUILD) dh_auto_build -Bbuild-gtk3
+-	$(GTK4_BUILD) dh_auto_build -Bbuild-gtk4
++	$(GTK4_BUILD) dh_auto_build -B"$(ROG_WEBKIT_BUILD_DIR)"
+ 
+ override_dh_auto_install:
++	python3 debian/rog-native-hdr/verify-build.py
++	$(MAKE) -f debian/rules rog-native-manifests
+ 	$(GTK3_BUILD) dh_auto_install -Bbuild-gtk3
+-	$(GTK4_BUILD) dh_auto_install -Bbuild-gtk4
++	$(GTK4_BUILD) dh_auto_install -B"$(ROG_WEBKIT_BUILD_DIR)"
+ 
+ override_dh_auto_clean: debian/control
++	python3 debian/rog-native-hdr/verify-build.py --path-only
++ifneq ($(ROG_WEBKIT_BUILD_DIR),build-gtk4)
++	$(error External warm cache clean is refused; unset ROG_WEBKIT_BUILD_DIR for source-owned clean)
++endif
+ 	$(GTK3_BUILD) dh_auto_clean -Bbuild-gtk3
+-	$(GTK4_BUILD) dh_auto_clean -Bbuild-gtk4
++	$(GTK4_BUILD) dh_auto_clean -B"$(ROG_WEBKIT_BUILD_DIR)"
+ 	find Source Tools -type f -name "*.pyc" -exec rm {} \;
+ 	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
+ 
+--- a/debian/control.in
++++ b/debian/control.in
+@@ -12,9 +12,7 @@
+                clang [amd64 arm64 armel i386 ppc64el riscv64 s390x],
+                clang-22 [armhf],
+                cmake (>= 3.20),
+-               flite1-dev,
+                gir1.2-gobject-2.0-dev,
+-               gir1.2-gtk-3.0-dev,
+                gir1.2-gtk-4.0-dev,
+                gir1.2-soup-3.0-dev,
+                libglib2.0-dev,
+@@ -25,12 +23,13 @@
+                libfreetype-dev,
+                libicu-dev,
+                libgcrypt20-dev,
+-               libgtk-3-dev,
+-               libgtk-4-dev,
++               libgtk-4-dev (>= 4.24.1+ds-1+rogdv5),
++               libgstgtk-dovi-core-dev (>= 0.1.0+rogdv5),
++               python3,
++               dpkg-dev,
+                libhyphen-dev,
+                libjxl-dev,
+                liblcms2-dev,
+-               libmanette-0.2-dev [!hurd-any !i386],
+                libsoup-3.0-dev,
+                libsysprof-capture-4-dev (>= 3.38.0) [amd64 arm64 armel armhf i386 ppc64el riscv64 s390x hppa loong64 powerpc ppc64 sh4],
+                libxslt1-dev,
+@@ -44,7 +43,6 @@
+                flex,
+                ruby:native,
+                unifdef,
+-               libavif-dev,
+                libjpeg-dev,
+                libopenjp2-7-dev,
+                libpng-dev,
+@@ -61,67 +59,8 @@
+                libegl-dev,
+                libgl-dev,
+                libgles-dev
+-Build-Depends-Indep: gi-docgen, jdupes
+ Standards-Version: 4.7.4
+ Vcs-Browser: https://salsa.debian.org/webkit-team/webkit
+ Vcs-Git: https://salsa.debian.org/webkit-team/webkit.git
+ Homepage: https://webkitgtk.org/
+ 
+-Package: libjavascriptcoregtk-bin
+-Section: interpreters
+-Architecture: any
+-Pre-Depends: ${misc:Pre-Depends}
+-Depends: libjavascriptcoregtk-4.1-0 (= ${binary:Version}),
+-         ${shlibs:Depends},
+-         ${misc:Depends}
+-Breaks: libjavascriptcoregtk-4.0-bin (<< 2.43.4-2~)
+-Replaces: libjavascriptcoregtk-4.0-bin (<< 2.43.4-2~)
+-Description: JavaScript engine library from WebKitGTK - command-line interpreter
+- JavaScriptCore is the JavaScript engine used in WebKit. It consists
+- of the following building blocks: lexer, parser, start-up interpreter
+- (LLInt), baseline JIT, a low-latency optimizing JIT (DFG), and a
+- high-throughput optimizing JIT (FTL).
+- .
+- This package provides jsc, a command-line JavaScript interpreter.
+-
+-Package: libwebkitgtk-doc
+-Build-Profiles: <!nodoc>
+-Section: doc
+-Architecture: all
+-Multi-Arch: foreign
+-Depends: ${misc:Depends}
+-Breaks: libwebkit2gtk-4.0-doc (<< 2.43.4-2~)
+-Replaces: libwebkit2gtk-4.0-doc (<< 2.43.4-2~)
+-Description: Web content engine library for GTK - documentation
+- WebKit is a web content engine, derived from KHTML and KJS from KDE, and
+- used primarily in Apple's Safari browser.  It is made to be embedded in
+- other applications, such as mail readers, or web browsers.
+- .
+- It is able to display content such as HTML, SVG, XML, and others. It also
+- supports DOM, XMLHttpRequest, XSLT, CSS, JavaScript/ECMAScript and more.
+- .
+- WebKitGTK is a WebKit port designed to be used in GTK applications.
+- .
+- This package contains the documentation.
+-
+-Package: webkitgtk-webdriver
+-Architecture: any
+-Pre-Depends: ${misc:Pre-Depends}
+-Depends: libwebkit2gtk-4.1-0 (= ${binary:Version}),
+-         ${shlibs:Depends},
+-         ${misc:Depends}
+-Breaks: webkit2gtk-driver (<< 2.45.5~)
+-Replaces: webkit2gtk-driver (<< 2.45.5~)
+-Description: WebKitGTK WebDriver support
+- WebKit is a web content engine, derived from KHTML and KJS from KDE, and
+- used primarily in Apple's Safari browser.  It is made to be embedded in
+- other applications, such as mail readers, or web browsers.
+- .
+- It is able to display content such as HTML, SVG, XML, and others. It also
+- supports DOM, XMLHttpRequest, XSLT, CSS, JavaScript/ECMAScript and more.
+- .
+- WebKitGTK is a WebKit port designed to be used in GTK applications.
+- .
+- This package provides the WebDriver service implementation for
+- WebKitGTK.
+-
+--- a/debian/control-common.in
++++ b/debian/control-common.in
+@@ -59,6 +59,8 @@
+ Multi-Arch: same
+ Pre-Depends: ${misc:Pre-Depends}
+ Depends: @LIBJSC_PKG@ (= ${binary:Version}),
++         gstreamer1.0-gtk-dovi (>= 0.1.0+rogdv5),
++         libgtk-4-1 (>= 4.24.1+ds-1+rogdv5),
+          gstreamer1.0-plugins-base,
+          gstreamer1.0-plugins-good,
+          libgles2,

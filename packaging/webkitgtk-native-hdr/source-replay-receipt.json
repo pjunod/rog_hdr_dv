@@ -1,0 +1,64 @@
+{
+  "schema": "webkitgtk-ubuntu-source-qualification-v1",
+  "date": "2026-11-09",
+  "qualified_recipe_revision": "8cd850a6079ebc558335ea3a7d95985fea375719",
+  "product_git_commit": "ad531204790393e4fc39b4ef4f7a472012394a3b",
+  "ubuntu_source_version": "2.52.6-1ubuntu1",
+  "derivative_source_version": "2.52.6-1ubuntu1+rogdv1",
+  "cmake_profile_sha256": "c6604971e3ceb1575b0ed536ab5be396da4ede83559f7e2b728b49051e9bdc8b",
+  "cmake_feature_map_sha256": "65d40e4893ebf3245ab680c1723e3a869d4af580b56129afc74ddea34f42fccc",
+  "focused_tests": {
+    "covered_cases": 17,
+    "retained_unaffected_passes": 13,
+    "affected_rerun_passes": 4,
+    "initial_failure_receipts_retained_privately": true
+  },
+  "source_replay": {
+    "commands": [
+      "prepare-source.py --source <owned-clean-source> --product-patch <reviewed-public-patch>",
+      "dh_listpackages",
+      "dpkg-buildpackage -S -us -uc -d",
+      "dpkg-source -x <generated.dsc> <owned-replay-source>"
+    ],
+    "passed": true,
+    "public_source_files_and_modes_matched": 34386,
+    "generated_binary_control_packages": [
+      "libjavascriptcoregtk-6.0-1",
+      "libjavascriptcoregtk-6.0-dev",
+      "gir1.2-javascriptcoregtk-6.0",
+      "libwebkitgtk-6.0-4",
+      "libwebkitgtk-6.0-dev",
+      "gir1.2-webkit-6.0"
+    ],
+    "debian_archive_member_count": 55,
+    "debian_archive_cache_and_private_members": 0,
+    "roots": {
+      "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
+      "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
+      "Documentation": "715ccd92d15a815e4e47f749d14a2d11a09fdddc",
+      "Source": "618cd1831ea52af537d8e0e34242960594741ca1",
+      "Tools": "a2b93a24e58662878c2bf7c4e3b2e18800d9cbea"
+    }
+  },
+  "real_source_negative_controls": {
+    "top_level_private_sentinel_rejected_before_recording": true,
+    "debian_python_cache_private_sentinel_rejected_before_recording": true
+  },
+  "source_timestamp_controls": {
+    "clean_prepare_normalized_and_restored_files": 39,
+    "already_patched_prepare_normalized_and_restored_files": 39,
+    "all_public_source_identities_and_mtimes_preserved": true,
+    "normal_source_package_preserved_mtimes": true,
+    "immutable_recovery_snapshot_mode": "0600",
+    "initial_snapshot_unchanged_after_packaging": true
+  },
+  "boundary": {
+    "compiler_executed": false,
+    "active_webkit_source_headers_cache_mutated": false,
+    "binary_packages_qualified": false,
+    "browser_runtime_qualified": false,
+    "packages_installed": false,
+    "optical_acceptance": false
+  },
+  "evidence_scope": "Source archive hashes matched the official descriptor pins. This receipt does not attest a new signing-key verification; original source-acquisition records remain separate. The product Git import and complete distribution documentation identity remain distinct in source-pin.json. Detailed logs, member list, source mtime snapshots and original failures remain private."
+}
