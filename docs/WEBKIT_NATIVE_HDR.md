@@ -91,7 +91,14 @@ nominal, not optical.
 - **Native verdict:** the video's 99.9th percentile exceeds page white by more than 5%. An
   ordinary page video can never exceed page white.
 - **Dim pictures:** a dim native picture can stay below page white. Then the decisive control
-  is the same picture forced ordinary by CSS clipping, and native must change the inner region.
+  is the same picture forced ordinary by CSS clipping (its twin). Native must change the inner
+  region and be brighter than the twin, and the run must have mapped pictures; an untrusted load
+  shows an ungraded picture, which also differs.
+- **Evidence:** only a run whose receipt records a captured, process-qualified run is analysed,
+  with the step list and every capture digest matching the files. The PipeWire reader that writes
+  the captures is digest-pinned like the other helpers, and its digest is in every receipt.
+- **Repeat:** the release candidate was qualified twice, before and after the review fixes,
+  with identical verdicts.
 
 | Case | Expected | Result |
 |---|---|---|
