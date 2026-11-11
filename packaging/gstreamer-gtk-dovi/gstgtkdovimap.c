@@ -537,6 +537,7 @@ static void get_property (GObject *object, guint property,
   }
   g_value_set_uint (value, self->destination_kind);
 }
+static gboolean propose_allocation (GstBaseTransform *base, GstQuery *decide, GstQuery *query);
 static void gtk_dovi_map_class_init (GtkDoviMapClass *klass)
 {
   GstElementClass *element = GST_ELEMENT_CLASS (klass);
@@ -585,6 +586,7 @@ static void gtk_dovi_map_class_init (GtkDoviMapClass *klass)
   base->sink_event = sink_event; base->stop = stop; base->set_caps = set_caps; base->transform_caps = transform_caps; base->prepare_output_buffer = prepare;
   base->transform = transform; base->transform_meta = transform_meta;
   base->passthrough_on_same_caps = FALSE;
+  base->propose_allocation = propose_allocation;
 }
 static void gtk_dovi_map_init (GtkDoviMap *s)
 {
@@ -592,6 +594,23 @@ static void gtk_dovi_map_init (GtkDoviMap *s)
   s->clear_sources = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) gst_caps_unref);
   s->mapper = gst_gtk_dovi_mapper_new ();
   gst_base_transform_set_in_place (GST_BASE_TRANSFORM (s), FALSE);
+}
+/* Identity output pushes the upstream buffers unchanged, so the allocation
+ * contract belongs to downstream: forward the query exactly as passthrough
+ * would. The default non-passthrough answer proposes no GstVideoMeta, and a
+ * VA/DMABuf producer then refuses to allocate, so even ordinary SDR video
+ * failed to preroll behind the mapper in WebKit's playsink. Graded output
+ * (different caps) keeps the element's own allocation. */
+static gboolean propose_allocation (GstBaseTransform *base, GstQuery *decide, GstQuery *query)
+{
+  GstCaps *caps = NULL;
+  gst_query_parse_allocation (query, &caps, NULL);
+  GstCaps *output = gst_pad_get_current_caps (GST_BASE_TRANSFORM_SRC_PAD (base));
+  gboolean identity = caps && output && gst_caps_is_equal (caps, output);
+  gst_clear_caps (&output);
+  if (identity)
+    return gst_pad_peer_query (GST_BASE_TRANSFORM_SRC_PAD (base), query);
+  return GST_BASE_TRANSFORM_CLASS (gtk_dovi_map_parent_class)->propose_allocation (base, decide, query);
 }
 static gboolean plugin_init (GstPlugin *plugin)
 {
