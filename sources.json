@@ -723,9 +723,9 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "d4c2f4f940c5212f7e87fcfa7079e5c1c03182e9",
-      "candidate_tree": "4cc6a7f251f3cbafe2f2cf80e34a569970c49c4d",
-      "patch_count": 9,
+      "candidate_commit": "9f5de3cedd408dcd36ed0d0ee97614aa77fe0b5d",
+      "candidate_tree": "2e90d6126f138012de628c8c4b8dde6e9b786677",
+      "patch_count": 11,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
@@ -735,7 +735,9 @@
         "0006-va-negotiate-authenticated-stream-candidates-before-allocation.patch",
         "0007-debian-version-the-stream-qualified-VA-producer.patch",
         "0008-va-renegotiate-qualified-output-without-the-stream-lock.patch",
-        "0009-debian-version-the-deadlock-free-VA-producer.patch"
+        "0009-debian-version-the-deadlock-free-VA-producer.patch",
+        "0010-va-prove-marked-output-against-the-whole-linked-consumer-chain.patch",
+        "0011-debian-version-the-chain-proven-VA-producer.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -764,10 +766,10 @@
           }
         ]
       },
-      "candidate_status": "Nine-patch source candidate. 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. Previous seven-patch qualification is retained separately; no installation.",
+      "candidate_status": "Eleven-patch source candidate. 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately.",
       "previous_candidate_commit": "dc6ab20bf049ac5d534f0b22fff24b65db9e83c3",
       "previous_candidate_tree": "0659fe2008e4b42a3cf2a72725ad90dc4b35681e",
-      "candidate_package_version": "1.28.6-1ubuntu1+rogdv5"
+      "candidate_package_version": "1.28.6-1ubuntu1+rogdv6"
     },
     {
       "component": "ubuntu-gtk4-display-target",
