@@ -723,9 +723,9 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "dc6ab20bf049ac5d534f0b22fff24b65db9e83c3",
-      "candidate_tree": "0659fe2008e4b42a3cf2a72725ad90dc4b35681e",
-      "patch_count": 7,
+      "candidate_commit": "d4c2f4f940c5212f7e87fcfa7079e5c1c03182e9",
+      "candidate_tree": "4cc6a7f251f3cbafe2f2cf80e34a569970c49c4d",
+      "patch_count": 9,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
@@ -733,7 +733,9 @@
         "0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch",
         "0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch",
         "0006-va-negotiate-authenticated-stream-candidates-before-allocation.patch",
-        "0007-debian-version-the-stream-qualified-VA-producer.patch"
+        "0007-debian-version-the-stream-qualified-VA-producer.patch",
+        "0008-va-renegotiate-qualified-output-without-the-stream-lock.patch",
+        "0009-debian-version-the-deadlock-free-VA-producer.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -762,10 +764,10 @@
           }
         ]
       },
-      "candidate_status": "Seven-patch source candidate includes stream-qualified VA negotiation and package versioning. The affected producer CPU controls pass 24/0; normal compilation and task-owned rootless package emission completed. Prior five-patch FEL qualification is retained separately. Normal-sandbox browser runtime qualification remains pending; no installation.",
-      "previous_candidate_commit": "245873a2752a1891857850db265f296ff017310a",
-      "previous_candidate_tree": "0c3b13cfcb8a1dc2be9eb4bf1ccbd2078de1b8c6",
-      "candidate_package_version": "1.28.6-1ubuntu1+rogdv4"
+      "candidate_status": "Nine-patch source candidate. 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. Previous seven-patch qualification is retained separately; no installation.",
+      "previous_candidate_commit": "dc6ab20bf049ac5d534f0b22fff24b65db9e83c3",
+      "previous_candidate_tree": "0659fe2008e4b42a3cf2a72725ad90dc4b35681e",
+      "candidate_package_version": "1.28.6-1ubuntu1+rogdv5"
     },
     {
       "component": "ubuntu-gtk4-display-target",

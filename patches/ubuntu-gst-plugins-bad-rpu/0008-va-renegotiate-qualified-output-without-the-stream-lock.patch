@@ -1,0 +1,48 @@
+diff --git a/sys/va/gstvabasedec.c b/sys/va/gstvabasedec.c
+index 92ca6a439601a84c70dd1e17cf4a819d499fc75d..50bd7d4c3d6f23a0afb31bd3c922dc6272b0e9b4 100644
+--- a/sys/va/gstvabasedec.c
++++ b/sys/va/gstvabasedec.c
+@@ -73,22 +73,6 @@ _dovi_allowed_caps (GstVaBaseDec *base, GBytes *configuration)
+   return allowed;
+ }
+ 
+-static gboolean
+-gst_va_base_dec_src_event (GstVideoDecoder *decoder, GstEvent *event)
+-{
+-  GstVaBaseDec *base = GST_VA_BASE_DEC (decoder);
+-  if (GST_EVENT_TYPE (event) == GST_EVENT_RECONFIGURE) {
+-    GST_VIDEO_DECODER_STREAM_LOCK (decoder);
+-    GBytes *configuration = _dovi_qualified_configuration (base);
+-    if (configuration || _dovi_configuration_changed (base))
+-      base->need_negotiation = TRUE;
+-    g_clear_pointer (&configuration, g_bytes_unref);
+-    GST_VIDEO_DECODER_STREAM_UNLOCK (decoder);
+-  }
+-  return GST_VIDEO_DECODER_CLASS (GST_VA_BASE_DEC_GET_PARENT_CLASS (decoder))->
+-      src_event (decoder, event);
+-}
+-
+ static void
+ gst_va_base_dec_get_property (GObject * object, guint prop_id,
+     GValue * value, GParamSpec * pspec)
+@@ -796,6 +780,12 @@ gst_va_base_dec_negotiate (GstVideoDecoder * decoder)
+   GBytes *configuration = _dovi_qualified_configuration (base);
+   if (configuration) {
+     g_bytes_unref (configuration);
++    /* A qualified stream recomputes its marked output state on every
++     * negotiation, including the one the streaming thread starts for a
++     * downstream RECONFIGURE. Deciding that in the upstream event handler
++     * needed the stream lock, which a downstream streaming thread can request
++     * while this thread holds it waiting on that thread's serialized query. */
++    base->need_negotiation = TRUE;
+     return gst_va_base_dec_negotiate_dovi (decoder);
+   }
+ 
+@@ -885,7 +875,6 @@ gst_va_base_dec_class_init (GstVaBaseDecClass * klass, GstVaCodecs codec,
+   decoder_class->stop = GST_DEBUG_FUNCPTR (gst_va_base_dec_stop);
+   decoder_class->getcaps = GST_DEBUG_FUNCPTR (gst_va_base_dec_getcaps);
+   decoder_class->src_query = GST_DEBUG_FUNCPTR (gst_va_base_dec_src_query);
+-  decoder_class->src_event = GST_DEBUG_FUNCPTR (gst_va_base_dec_src_event);
+   decoder_class->sink_query = GST_DEBUG_FUNCPTR (gst_va_base_dec_sink_query);
+   decoder_class->decide_allocation =
+       GST_DEBUG_FUNCPTR (gst_va_base_dec_decide_allocation);
