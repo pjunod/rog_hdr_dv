@@ -44,6 +44,16 @@ Materialize only owned files from `$task_stage$task_runtime` into the compiled `
 
 Before claiming the native branch was compiled, inspect the actual UI adapter compile command and preprocess it with those same include flags: `GDK_TYPE_WAYLAND_HDR_RENDERING` must be defined. For the native frame adapter, verify `GST_GTK_DOVI_DESTINATION_ABI >= 1` and `GST_GTK_DOVI_SOURCE_LEASE_ABI >= 2` from the same actual command. A manually added include during a diagnostic does not prove the normal target selected the new headers.
 
+## Viewport suspension keeps the latest requested state
+
+WebKit suspends a muted video that leaves the viewport and restores a saved
+pipeline state when it returns. The native source-replacement drain moves the
+pipeline to READY before the first viewport notification, so a suspension
+saved READY; `changePipelineState()` recorded only requests above PAUSED, so
+the load's PAUSED preroll was not remembered and becoming visible restored
+READY, stopping typefinding. The patch records every request made while
+suspended and still defers requests above PAUSED until the element is visible.
+
 ## Source and picture lifetime
 
 The browser requires a before-first-byte witness from the exact original WebKitWebSrc instance through allowed transparent holders to the selected qtdemux. Unknown adaptive/decrypting paths, late observations, protection events and ambiguous topology stay on the ordinary route. Input histories cannot rearm without a confirmed whole READY drain. The proof is bound to the actual live demux pad and its complete coded configuration, not a reused stream-id string.
