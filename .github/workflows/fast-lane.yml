@@ -26,10 +26,16 @@ jobs:
       - name: Repository integrity
         if: inputs.repository_check
         run: python3 scripts/check_repository.py
+      - name: Packaging replay tools
+        # The WebKit packaging tests replay the real debhelper sequence.
+        if: ${{ inputs.test_target == 'all' || startsWith(inputs.test_target, 'test_webkit_ubuntu_packaging') }}
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends debhelper
       - name: Selected Python checks
         if: ${{ always() && inputs.test_target != 'none' }}
         env:
           TEST_TARGET: ${{ inputs.test_target }}
+          # Tests write only under a task-owned TMPDIR, never a system default.
+          TMPDIR: ${{ runner.temp }}
           PYTHONPATH: tests
         run: |
           python3 - <<'PY'

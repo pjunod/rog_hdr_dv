@@ -169,7 +169,9 @@ For a failed test, use its reported module/class/method directly, for example
 `PYTHONPATH=tests python3 -m unittest -v test_module.TestClass.test_method`.
 Do not rerun the whole discovery suite to retry that case. The manual GitHub
 workflow accepts the same test target and a separate repository-check choice;
-it deliberately does not run on every push. For the initial workflow addition,
+it deliberately does not run on every push. It exports the runner's temporary
+directory as the task-owned `TMPDIR` the tests require, and installs debhelper
+when the WebKit packaging replay is selected. For the initial workflow addition,
 record these local checks because GitHub dispatch needs the workflow on the
 default branch first. Display experiments have their own receipts and never
 run automatically on the owner's laptop from public CI.
