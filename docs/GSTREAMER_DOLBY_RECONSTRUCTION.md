@@ -87,6 +87,8 @@ client exercised. Each is fixed at its cause:
   query. Qualified output is now recomputed on every negotiation.
 - **Shallow accept-caps.** [0010](../patches/ubuntu-gst-plugins-bad-rpu/0010-va-prove-marked-output-against-the-whole-linked-consumer-chain.patch)
   proves a marked output against the whole linked chain with a filtered CAPS query.
+  Both queries are issued directly, so a linked peer that fails either query counts as
+  a rejection (the pad helpers would read a failed query as acceptance).
   Passthrough converters answer ACCEPT_CAPS from their pad templates, so a tiled DMABuf that
   the mapper must refuse had been accepted. The VA producer is versioned `1.28.6-1ubuntu1+rogdv6`.
 - **Identity allocation.** The mapper core (`0.1.0+rogdv6`) now forwards an identity allocation

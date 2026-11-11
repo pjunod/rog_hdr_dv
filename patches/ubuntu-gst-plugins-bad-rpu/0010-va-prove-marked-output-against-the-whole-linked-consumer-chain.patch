@@ -21,10 +21,10 @@ index 50bd7d4c3d6f23a0afb31bd3c922dc6272b0e9b4..056e10938cfcf83e93d56ced8f359b44
      goto reject;
    GST_INFO_OBJECT (base, "Negotiated marked caps %" GST_PTR_FORMAT,
 diff --git a/sys/va/gstvabasedecdovi.h b/sys/va/gstvabasedecdovi.h
-index 98d6da9f18cf50db14e16fbda179cc37beab412a..b4d21a79bceb03c777d09ad938593b4501c7eb79 100644
+index 98d6da9f18cf50db14e16fbda179cc37beab412a..b0c606ee58b2a0a3fd5de9a17a563f6443e3594d 100644
 --- a/sys/va/gstvabasedecdovi.h
 +++ b/sys/va/gstvabasedecdovi.h
-@@ -85,6 +85,22 @@ gst_va_dovi_query_allowed (GstPad *src, const GstCaps *real,
+@@ -85,6 +85,35 @@ gst_va_dovi_query_allowed (GstPad *src, const GstCaps *real,
    return allowed;
  }
  
@@ -32,15 +32,28 @@ index 98d6da9f18cf50db14e16fbda179cc37beab412a..b4d21a79bceb03c777d09ad938593b45
 + * the one playsink puts in front of a video filter) answers it from its pad
 + * templates without asking the consumer behind it. A marked output must be
 + * accepted by the whole linked chain, so also require a filtered CAPS query,
-+ * which every element answers for its downstream, to keep the exact caps. */
++ * which every element answers for its downstream, to keep the exact caps.
++ * The pad helpers read a failed query as acceptance (ACCEPT_CAPS) or as the
++ * filter itself (CAPS); a linked peer that answers neither has accepted
++ * nothing, so both queries are issued directly and a failure rejects. */
 +static inline gboolean
 +gst_va_dovi_peer_accepts (GstPad *src, GstCaps *caps)
 +{
-+  if (!gst_pad_peer_query_accept_caps (src, caps))
++  GstQuery *query = gst_query_new_accept_caps (caps);
++  gboolean accepted = gst_pad_peer_query (src, query);
++  if (accepted)
++    gst_query_parse_accept_caps_result (query, &accepted);
++  gst_query_unref (query);
++  if (!accepted)
 +    return FALSE;
-+  GstCaps *peer = gst_pad_peer_query_caps (src, caps);
-+  gboolean accepted = peer && gst_caps_can_intersect (caps, peer);
-+  gst_clear_caps (&peer);
++  query = gst_query_new_caps (caps);
++  accepted = gst_pad_peer_query (src, query);
++  if (accepted) {
++    GstCaps *peer = NULL;
++    gst_query_parse_caps_result (query, &peer);
++    accepted = peer && gst_caps_can_intersect (caps, peer);
++  }
++  gst_query_unref (query);
 +  return accepted;
 +}
 +
