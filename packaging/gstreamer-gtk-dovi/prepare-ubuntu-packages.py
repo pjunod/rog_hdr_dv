@@ -9,10 +9,10 @@ from pathlib import Path
 import re
 import shutil
 
-CORE_VERSION = "0.1.0+rogdv3.1"
-GTK_VERSION = "0.15.2-1ubuntu2+rogdv4.1"
-SHOWTIME_VERSION = "50.0-2+rogdv4.1"
-FIXED_GTK = "4.24.1+ds-1+rogdv4"
+CORE_VERSION = "0.1.0+rogdv7"
+GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.2"
+SHOWTIME_VERSION = "50.0-2+rogdv5.3"
+FIXED_GTK = "4.24.1+ds-1+rogdv5"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
 INPUT_FILES = ("control", "rules", "changelog")
@@ -263,6 +263,7 @@ def prepare(workspace):
         gtk / "debian/changelog": changelog(
             "rust-gst-plugin-gtk4", GTK_VERSION, [
                 "Preserve native 16-bit mapped pictures and retarget visible paused frames.",
+                "Publish completed pictures to each view's declared HDR or SDR destination.",
                 "Build full plugin features offline from the Ubuntu vendored source.",
             ], inputs["gtk"]["changelog"]),
         showtime / "debian/control": showtime_control(inputs["showtime"]["control"]),
@@ -270,7 +271,8 @@ def prepare(workspace):
         showtime / "debian/changelog": changelog(
             "showtime", SHOWTIME_VERSION,
             ["Bind Dolby streams to their native surface target and HDR lease.",
-             "Require the matching sink and mapper with paused overlay preservation."],
+             "Require the matching sink and mapper with paused overlay preservation.",
+             "Start the shared producer with an explicit SDR destination."],
             inputs["showtime"]["changelog"]),
     }
     # Complete all validation before creating backups or changing source files.

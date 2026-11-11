@@ -724,14 +724,21 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "6a95f6a8aee5d1fb1e01b7033bba92d1953a5f7f",
-      "candidate_tree": "d3775948a231a9dada3e51541aee7e97db34167f",
-      "patch_count": 4,
+      "candidate_commit": "8fac3a61b97fc2ff06f1cc02d248d278413e4a12",
+      "candidate_tree": "06322b5b7145d28168be55dec0e4b261b1e6c470",
+      "patch_count": 11,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
         "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
-        "0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch"
+        "0004-nvcodec-preserve-resolved-Dolby-pictures-and-conformance-geometry.patch",
+        "0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch",
+        "0006-va-negotiate-authenticated-stream-candidates-before-allocation.patch",
+        "0007-debian-version-the-stream-qualified-VA-producer.patch",
+        "0008-va-renegotiate-qualified-output-without-the-stream-lock.patch",
+        "0009-debian-version-the-deadlock-free-VA-producer.patch",
+        "0010-va-prove-marked-output-against-the-whole-linked-consumer-chain.patch",
+        "0011-debian-version-the-chain-proven-VA-producer.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -760,15 +767,18 @@
           }
         ]
       },
-      "candidate_status": "The transport and VA resolved-picture code passed native matched-frame, crop and configuration-change controls."
+      "candidate_status": "Eleven-patch source candidate. 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately.",
+      "previous_candidate_commit": "dc6ab20bf049ac5d534f0b22fff24b65db9e83c3",
+      "previous_candidate_tree": "0659fe2008e4b42a3cf2a72725ad90dc4b35681e",
+      "candidate_package_version": "1.28.6-1ubuntu1+rogdv6"
     },
     {
       "component": "ubuntu-gtk4-display-target",
       "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
       "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
-      "candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
-      "candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980",
-      "patch_count": 12,
+      "candidate_commit": "4f7262cbd4083a34b74985943182ac0041a8094c",
+      "candidate_tree": "1bcc5a55318f9ebd1da7aaa840e47d7d7d918514",
+      "patch_count": 16,
       "patch_order": [
         "0001-wayland-expose-preferred-color-target-snapshots.patch",
         "0002-debian-stage-preferred-target-snapshots.patch",
@@ -781,7 +791,11 @@
         "0009-gtkvideo-capture-original-pictures-before-playsink.patch",
         "0010-gtkvideo-load-the-optional-sdk-through-a-checked-abi.patch",
         "0011-gtkvideo-match-the-native-frame-context-signature.patch",
-        "0012-debian-package-gtkvideo-view-binding-as-rogdv4.patch"
+        "0012-debian-package-gtkvideo-view-binding-as-rogdv4.patch",
+        "0013-gtkvideo-grade-each-view-to-its-declared-HDR-or-SDR-destination.patch",
+        "0014-debian-package-destination-aware-GtkVideo-as-rogdv5.patch",
+        "0015-gtkvideo-require-a-composed-view-for-native-HDR.patch",
+        "0016-debian-recommend-the-destination-aware-mapper-runtime.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -814,10 +828,10 @@
           "include_ignored": true
         }
       },
-      "candidate_status": "Normal +rogdv4 source-package replay and package-extracted GtkVideo Profile 5 default Vulkan, paused retarget, independent-view/source lifecycle and optional-SDK startup controls pass. Matched release-bundle qualification and independent merge review remain separate. No installation.",
-      "candidate_package_version": "4.24.1+ds-1+rogdv4",
-      "previous_candidate_commit": "4157e3268bda91bde231545033fc08954b7e5e77",
-      "previous_candidate_tree": "770b82e3cb6b16cb120a07570ca223ee1c03b2ec"
+      "candidate_status": "Sixteen-patch source candidate declares authoritative HDR or logical SDR output, requires a composed view for native HDR, and recommends the matching destination-aware runtime. Independent source review, old/new SDK configuration and normal compilation/link/GIR/symbol staging pass. Package output and HDR/SDR retarget runtime qualification remain pending; no installation.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv5",
+      "previous_candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
+      "previous_candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980"
     },
     {
       "component": "libplacebo-fel-system-dv",
@@ -837,16 +851,20 @@
       "upstream": "https://github.com/mpv-player/mpv.git",
       "base_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
       "base_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
-      "candidate_commit": "12b007d41ea6510bc554233ac7f7224d5690d6bb",
-      "candidate_tree": "1b69124c05f23d97bdcc039f69699152724680a0",
-      "patch_count": 5,
+      "candidate_commit": "35c7040a7a16734cb5d8f60eacd3ea26d62cd2f1",
+      "candidate_tree": "e802ac71b9b4bb58f7f4959865a9b21c2e4a2be4",
+      "patch_count": 7,
       "patch_order": [
         "0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
         "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch",
         "0003-retain-displayed-grade-in-tagged-window-captures.patch",
         "0004-map-validated-physical-xy-with-optional-provider-v2.patch",
-        "0005-require-public-target-api-v2-sdk-contract.patch"
-      ]
+        "0005-require-public-target-api-v2-sdk-contract.patch",
+        "0006-report-native-dolby-backend-capabilities.patch",
+        "0007-expose-authoritative-native-dolby-target-state.patch"
+      ],
+      "candidate_package_version": "0.42.0-0ubuntu0+rogdv5.2",
+      "candidate_status": "Normal binary build and fresh normal source-package replay match all 902 public Git-archive files and executable modes. Six focused private-compositor IPC checks pass, including paused active/inactive generation changes, read-only setter and video-output teardown notification. System-launcher package transaction and deployment remain separate."
     },
     {
       "component": "ubuntu-gst-plugins-good-dovi",
@@ -1070,6 +1088,50 @@
       },
       "candidate_package_version": "2.2.1+ds-1ubuntu2+rogcolor1",
       "candidate_status": "Normal Ubuntu-feature packages built from reconstructed DSC source, with existing compiler cache reused for unchanged decoder code. Exact packaged sandboxed analytic controls, ordinary 10-bit PQ window comparison and two-package offline upgrade/rollback passed; not installed; no optical calibration claim."
+    },
+    {
+      "component": "ubuntu-webkitgtk-native-hdr",
+      "base_commit": "5e156fdf2d8daf0485d3b20ffbdde9725bb57d26",
+      "base_tree": "42cb56170bd8e122c8632b3616fd3a2e707bb458",
+      "candidate_commit": "b0ec7ff07b890da30908f66adede75f7fee5df6f",
+      "candidate_tree": "ab53abe7c321c8072e2945f80ee206d07ca5c9f0",
+      "patch_count": 1,
+      "patch_order": [
+        "0001-webkitgtk-clear-video-and-native-hdr.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "webkit2gtk",
+        "version": "2.52.6-1ubuntu1",
+        "authentication": "Archive hashes match the pinned official descriptor; dsc OpenPGP signature not independently checked.",
+        "descriptor": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.dsc",
+        "artifacts": [
+          {
+            "file": "webkit2gtk_2.52.6-1ubuntu1.debian.tar.xz",
+            "sha256": "6a6299568055c96438a801ba5f13300bb6dc3e4256f34f3a1f6be25452c4392e",
+            "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.debian.tar.xz"
+          },
+          {
+            "file": "webkit2gtk_2.52.6.orig.tar.xz",
+            "sha256": "179a2ea3f8f6edd4be7f31fdc55afc57bd0729f1fba648c61d4181539ac116fc",
+            "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6.orig.tar.xz"
+          },
+          {
+            "file": "webkit2gtk_2.52.6.orig.tar.xz.asc",
+            "sha256": "6694b1f87b10c4b799f2aadf20da7a0b6725b9c3b41b598ecba8bc35d54e7090",
+            "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6.orig.tar.xz.asc"
+          }
+        ],
+        "documentation_provenance": {
+          "distribution_tree": "715ccd92d15a815e4e47f749d14a2d11a09fdddc",
+          "git_import_tree": "25294bec9c7b3553c013ef304d4df046ec26ee66",
+          "distribution_only_path": "Documentation/webkitgtk-6.0/type_func.WebExtensionMatchPattern.register_custom_URL_scheme.html",
+          "distribution_only_blob": "eda6d2dd2df64b54144889788ce8700ebd86d162",
+          "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
+        }
+      },
+      "candidate_status": "Single product patch (39 paths; reviewed ad531204 plus the viewport state-restore fix, source-policy attestation logging, arming of byte holders autoplugged after typefinding and a mapper-led page video sink (b0ec7ff0)) for ordinary clear HTML video with an explicit 100-nit SDR page destination and a tagged native HDR plane under a current GTK view lease. Packaged by packaging/webkitgtk-native-hdr as 2.52.6-1ubuntu1+rogdv1.",
+      "candidate_package_version": "2.52.6-1ubuntu1+rogdv1"
     }
   ]
 }

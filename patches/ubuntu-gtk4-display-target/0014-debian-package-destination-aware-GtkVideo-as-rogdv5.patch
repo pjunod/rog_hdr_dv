@@ -1,0 +1,299 @@
+From c2b3073d7529e20e419169a3f60bb1f9d1f03747 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Tue, 10 Nov 2026 00:45:00 +0000
+Subject: [PATCH] build(debian): package destination-aware GtkVideo support as
+ rogdv5
+
+---
+ debian/changelog                              |   7 +
+ debian/control                                |   2 +-
+ .../gtkvideo-dovi-sdr-destination.patch       | 224 ++++++++++++++++++
+ debian/patches/series                         |   1 +
+ gtk/media/meson.build                         |   3 +-
+ 5 files changed, 235 insertions(+), 2 deletions(-)
+ create mode 100644 debian/patches/gtkvideo-dovi-sdr-destination.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index d3c4955..bc78859 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gtk4 (4.24.1+ds-1+rogdv5) stonking; urgency=medium
++
++  * Grade each retained GtkVideo picture to its declared HDR or SDR view.
++  * Require the destination-aware public SDK for this optional integration.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Tue, 10 Nov 2026 00:45:00 +0000
++
+ gtk4 (4.24.1+ds-1+rogdv4) stonking; urgency=medium
+ 
+   * Bind retained Dolby Vision pictures to each realized GtkVideo surface.
+diff --git a/debian/control b/debian/control
+index a14a136..6ec801f 100644
+--- a/debian/control
++++ b/debian/control
+@@ -37,7 +37,7 @@ Build-Depends: debhelper-compat (= 14),
+                libgraphene-1.0-dev,
+                libgstreamer-plugins-bad1.0-dev (>= 1.28),
+                libgstreamer1.0-dev,
+-               libgstgtk-dovi-core-dev (>= 0.1.0+rogdv3) [amd64],
++               libgstgtk-dovi-core-dev (>= 0.1.0+rogdv5) [amd64],
+                libharfbuzz-dev (>= 8.4.0),
+                libjpeg-dev,
+                libjson-glib-dev:native,
+diff --git a/debian/patches/gtkvideo-dovi-sdr-destination.patch b/debian/patches/gtkvideo-dovi-sdr-destination.patch
+new file mode 100644
+index 0000000..66332a0
+--- /dev/null
++++ b/debian/patches/gtkvideo-dovi-sdr-destination.patch
+@@ -0,0 +1,224 @@
++Description: Declare each GtkVideo HDR or SDR destination explicitly
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++
++--- a/gtk/media/gtkgstdoviview.c
+++++ b/gtk/media/gtkgstdoviview.c
++@@ -19,8 +19,9 @@
++   void (*mapper_free) (GstGtkDoviMapper *);
++   GstGtkDoviNativeFrame *(*frame_from_buffer) (GstBuffer *, guint64 *);
++   void (*frame_unref) (GstGtkDoviNativeFrame *);
++-  int (*frame_render) (GstGtkDoviNativeFrame *, GstGtkDoviMapper *,
++-                       const GstContext *, GstBuffer **, GstVideoInfo *, GError **);
+++  int (*frame_render_destination) (GstGtkDoviNativeFrame *, GstGtkDoviMapper *,
+++                                  GstGtkDoviDestinationKind, const GstContext *,
+++                                  GstBuffer **, GstVideoInfo *, guint64 *, guint64 *, GError **);
++ } DoviCore;
++ 
++ static const DoviCore *
++@@ -43,7 +44,7 @@
++       RESOLVE (mapper_free, "gst_gtk_dovi_mapper_free");
++       RESOLVE (frame_from_buffer, "gst_gtk_dovi_native_frame_from_buffer");
++       RESOLVE (frame_unref, "gst_gtk_dovi_native_frame_unref");
++-      RESOLVE (frame_render, "gst_gtk_dovi_native_frame_render");
+++      RESOLVE (frame_render_destination, "gst_gtk_dovi_native_frame_render_destination");
++ #undef RESOLVE
++       valid = valid && api.abi () == GST_GTK_DOVI_CORE_ABI;
++       if (valid)
++@@ -148,9 +149,26 @@
++ {
++   if (dovi_core () == NULL)
++     return NULL;
++-  /* Capture original input before playsink conversion. No display context is
++-   * installed on the shared producer: each realized view maps its own frame. */
++-  return gst_element_factory_make ("gtkdovimap", NULL);
+++  /* Produce a correctly declared logical SDR baseline for every ordinary
+++   * consumer. The attached frame still owns the original coded picture, so
+++   * each realized view can independently regrade it for its real destination. */
+++  GstElement *filter = gst_element_factory_make ("gtkdovimap", NULL);
+++  if (filter)
+++    {
+++      GObjectClass *klass = G_OBJECT_GET_CLASS (filter);
+++      GParamSpec *abi = g_object_class_find_property (klass, "destination-abi");
+++      GParamSpec *kind = g_object_class_find_property (klass, "destination-kind");
+++      guint version = 0;
+++      if (abi && kind && G_IS_PARAM_SPEC_UINT (abi) && G_IS_PARAM_SPEC_UINT (kind))
+++        g_object_get (filter, "destination-abi", &version, NULL);
+++      if (version != GST_GTK_DOVI_DESTINATION_ABI)
+++        {
+++          gst_object_unref (filter);
+++          return NULL;
+++        }
+++      g_object_set (filter, "destination-kind", GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB, NULL);
+++    }
+++  return filter;
++ }
++ 
++ typedef struct
++@@ -175,6 +193,7 @@
++   guint64 target_revision;
++   guint64 binding_epoch;
++   gboolean context_ready;
+++  GstGtkDoviDestinationKind destination_kind;
++   gboolean composed;
++   gboolean busy;
++   gboolean target_refresh;
++@@ -256,15 +275,18 @@
++   char *signature;
++ 
++   valid = gdk_wayland_surface_get_color_target (surface, &physical);
++-  ready = gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
+++  ready = self->lease && gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
++           state.generation == physical.generation &&
++           MIN (state.red_bits, MIN (state.green_bits, state.blue_bits)) >= 10 &&
++           state.color_primaries == 9 && state.transfer_function == 16 &&
++           state.matrix_coefficients == 0 && state.range == GDK_CICP_RANGE_FULL &&
++           state.reference_luminance == 203.0 && state.max_luminance == 10000.0;
+++  self->destination_kind = ready ? GST_GTK_DOVI_DESTINATION_DISPLAY_PQ :
+++                                   GST_GTK_DOVI_DESTINATION_STANDARD_SDR_SRGB;
++   context = gst_context_new ("gst.gtk.dovi.target.v1", FALSE);
++   structure = gst_context_writable_structure (context);
++   gst_structure_set (structure,
+++                     "destination-kind", G_TYPE_UINT, self->destination_kind,
++                      "valid", G_TYPE_BOOLEAN, valid,
++                      "generation", G_TYPE_UINT64, physical.generation,
++                      "min-nits", G_TYPE_DOUBLE, physical.min_luminance,
++@@ -297,7 +319,9 @@
++       g_free (signature);
++       gst_context_unref (context);
++     }
++-  self->context_ready = ready;
+++  /* A realized/composed view always has a valid logical SDR destination.
+++   * The copied native HDR witness remains false when the lease is absent. */
+++  self->context_ready = TRUE;
++ }
++ 
++ typedef struct
++@@ -306,6 +330,7 @@
++   ViewMapper *mapper;
++   GtkGstPaintableFrame *frame;
++   GstContext *context;
+++  GstGtkDoviDestinationKind destination_kind;
++   guint64 target_revision;
++   guint64 binding_epoch;
++ } RenderJob;
++@@ -350,10 +375,12 @@
++   (void) source;
++   (void) cancellable;
++   g_mutex_lock (&job->mapper->lock);
++-  result->result = dovi_core ()->frame_render (job->frame->native->native,
++-                                                     job->mapper->mapper,
++-                                                     job->context, &result->buffer,
++-                                                     &result->info, &result->error);
+++  result->result = dovi_core ()->frame_render_destination (job->frame->native->native,
+++                                                         job->mapper->mapper,
+++                                                         job->destination_kind,
+++                                                         job->context, &result->buffer,
+++                                                         &result->info, NULL, NULL,
+++                                                         &result->error);
++   g_mutex_unlock (&job->mapper->lock);
++   g_task_return_pointer (task, result, render_result_free);
++ }
++@@ -385,12 +412,20 @@
++   guint64 required;
++   gsize offset;
++   int stride;
+++  if (result->buffer == NULL || info->finfo == NULL ||
+++      GST_VIDEO_INFO_WIDTH (info) <= 0 || GST_VIDEO_INFO_HEIGHT (info) <= 0)
+++    return NULL;
+++  gboolean pq = GST_VIDEO_INFO_FORMAT (info) == GST_VIDEO_FORMAT_RGBA64_LE &&
+++                info->colorimetry.transfer == GST_VIDEO_TRANSFER_SMPTE2084 &&
+++                info->colorimetry.primaries == GST_VIDEO_COLOR_PRIMARIES_BT2020;
+++  gboolean sdr = GST_VIDEO_INFO_FORMAT (info) == GST_VIDEO_FORMAT_RGBA &&
+++                 info->colorimetry.transfer == GST_VIDEO_TRANSFER_SRGB &&
+++                 info->colorimetry.primaries == GST_VIDEO_COLOR_PRIMARIES_BT709;
+++  guint pixel_stride = GST_VIDEO_INFO_COMP_PSTRIDE (info, 0);
++ 
++   if (result->buffer == NULL || GST_VIDEO_INFO_WIDTH (info) <= 0 ||
++       GST_VIDEO_INFO_HEIGHT (info) <= 0 ||
++-      GST_VIDEO_INFO_FORMAT (info) != GST_VIDEO_FORMAT_RGBA64_LE ||
++-      info->colorimetry.transfer != GST_VIDEO_TRANSFER_SMPTE2084 ||
++-      info->colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT2020 ||
+++      (!pq && !sdr) || pixel_stride != (pq ? 8 : 4) ||
++       info->colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB ||
++       info->colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255 ||
++       !gdk_memory_format_find_by_gst_video_format (GST_VIDEO_INFO_FORMAT (info),
++@@ -399,7 +434,7 @@
++     return NULL;
++   stride = GST_VIDEO_INFO_PLANE_STRIDE (info, 0);
++   offset = GST_VIDEO_INFO_PLANE_OFFSET (info, 0);
++-  if (stride <= 0)
+++  if (stride <= 0 || (guint64) stride < (guint64) GST_VIDEO_INFO_WIDTH (info) * pixel_stride)
++     return NULL;
++   pixels = g_new0 (MappedPixels, 1);
++   pixels->buffer = gst_buffer_ref (result->buffer);
++@@ -411,7 +446,7 @@
++     }
++   required = (guint64) offset +
++              (guint64) (GST_VIDEO_INFO_HEIGHT (info) - 1) * stride +
++-             (guint64) GST_VIDEO_INFO_WIDTH (info) * 8;
+++             (guint64) GST_VIDEO_INFO_WIDTH (info) * pixel_stride;
++   if (required > pixels->map.size)
++     {
++       mapped_pixels_free (pixels);
++@@ -426,7 +461,8 @@
++   gdk_memory_texture_builder_set_format (builder, format);
++   gdk_memory_texture_builder_set_stride (builder, stride);
++   gdk_memory_texture_builder_set_bytes (builder, bytes);
++-  gdk_memory_texture_builder_set_color_state (builder, gdk_color_state_get_rec2100_pq ());
+++  gdk_memory_texture_builder_set_color_state (builder, pq ? gdk_color_state_get_rec2100_pq () :
+++                                                          gdk_color_state_get_srgb ());
++   texture = gdk_memory_texture_builder_build (builder);
++   g_object_unref (builder);
++   g_bytes_unref (bytes);
++@@ -455,7 +491,8 @@
++    * changed delivery must not make a vanished native witness appear current. */
++   view_update (self);
++   self->busy = FALSE;
++-  if (self->context_ready && self->target_revision == job->target_revision &&
+++  if (self->context_ready && self->destination_kind == job->destination_kind &&
+++      self->target_revision == job->target_revision &&
++       self->binding_epoch == job->binding_epoch &&
++       gtk_gst_paintable_frame_is_current (self->producer, job->frame) &&
++       (self->visible == NULL || job->frame->serial >= self->visible->serial))
++@@ -510,6 +547,7 @@
++   job->mapper = view_mapper_ref (self->mapper);
++   job->frame = gtk_gst_paintable_frame_ref (frame);
++   job->context = gst_context_ref (self->context);
+++  job->destination_kind = self->destination_kind;
++   job->target_revision = self->target_revision;
++   job->binding_epoch = self->binding_epoch;
++   self->busy = TRUE;
++@@ -547,14 +585,9 @@
++   if (self->lease == NULL)
++     {
++       self->lease = gdk_wayland_surface_request_hdr_rendering (surface);
++-      if (self->lease == NULL)
++-        {
++-          g_object_unref (surface);
++-          clear_mapped (self);
++-          return;
++-        }
++-      self->lease_changed = g_signal_connect (self->lease, "changed",
++-                                               G_CALLBACK (lease_changed), self);
+++      if (self->lease)
+++        self->lease_changed = g_signal_connect (self->lease, "changed",
+++                                                 G_CALLBACK (lease_changed), self);
++     }
++   set_context_snapshot (self, surface);
++   g_object_unref (surface);
++
++diff --git a/gtk/media/meson.build b/gtk/media/meson.build
++index 1c5f81c..ea41713 100644
++--- a/gtk/media/meson.build
+++++ b/gtk/media/meson.build
++@@ -5,7 +5,8 @@ media_backends = []
++ if gstplay_dep.found() and gstgl_dep.found() and gstallocators_dep.found()
++   # Optional shared source/mapping ABI; ordinary builds keep their backend.
++   dovi_core_dep = dependency('gst-gtk-dovi-core', version: '>=1', required: false)
++-  if dovi_core_dep.found() and get_option('wayland-backend')
+++  if dovi_core_dep.found() and get_option('wayland-backend') and cc.has_header_symbol(
+++      'mapper.h', 'GST_GTK_DOVI_DESTINATION_ABI', dependencies: dovi_core_dep)
++     cdata.set('HAVE_GST_GTK_DOVI_CORE', 1)
++     media_deps += dovi_core_dep.partial_dependency(compile_args: true, includes: true)
++     media_sources += files('gtkgstdoviview.c')
+diff --git a/debian/patches/series b/debian/patches/series
+index e494bbf..34a1aac 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -18,3 +18,4 @@ wayland-preferred-color-target.patch
+ wayland-hdr-rendering-lease.patch
+ gles-readback-query.patch
+ gtkvideo-dovi-view.patch
++gtkvideo-dovi-sdr-destination.patch
+diff --git a/gtk/media/meson.build b/gtk/media/meson.build
+index 1c5f81c..a4b5345 100644
+--- a/gtk/media/meson.build
++++ b/gtk/media/meson.build
+@@ -5,7 +5,8 @@ media_backends = []
+ if gstplay_dep.found() and gstgl_dep.found() and gstallocators_dep.found()
+   # Optional shared source/mapping ABI; ordinary builds keep their backend.
+   dovi_core_dep = dependency('gst-gtk-dovi-core', version: '>=1', required: false)
+-  if dovi_core_dep.found() and get_option('wayland-backend')
++  if dovi_core_dep.found() and get_option('wayland-backend') and cc.has_header_symbol(
++      'mapper.h', 'GST_GTK_DOVI_DESTINATION_ABI', dependencies: dovi_core_dep)
+     cdata.set('HAVE_GST_GTK_DOVI_CORE', 1)
+     media_deps += dovi_core_dep.partial_dependency(compile_args: true, includes: true)
+     media_sources += files('gtkgstdoviview.c')
+-- 
+2.55.0
+

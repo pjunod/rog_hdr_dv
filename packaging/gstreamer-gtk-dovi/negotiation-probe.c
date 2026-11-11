@@ -101,6 +101,357 @@ pipeline_control (const gchar *format, const gchar *memory, gboolean marked)
   gst_object_unref (pipeline);
 }
 
+typedef struct {
+  GstCaps *offered;
+  gboolean normalize_stream_fields;
+} QueryPeer;
+
+static GstCaps *
+peer_caps_copy (GstCaps *caps, gboolean normalize)
+{
+  GstCaps *copy = gst_caps_copy (caps);
+  if (normalize) {
+    for (guint i = 0; i < gst_caps_get_size (copy); i++)
+      gst_structure_remove_fields (gst_caps_get_structure (copy, i),
+          "dovi-configuration", "dovi-fel-decoder", NULL);
+  }
+  return copy;
+}
+
+static gboolean
+query_peer (GstPad *pad, GstObject *parent, GstQuery *query)
+{
+  QueryPeer *peer = gst_pad_get_element_private (pad);
+  if (GST_QUERY_TYPE (query) == GST_QUERY_CAPS) {
+    GstCaps *filter, *offered, *answer;
+    gst_query_parse_caps (query, &filter);
+    offered = peer_caps_copy (peer->offered, peer->normalize_stream_fields);
+    if (filter) {
+      GstCaps *plain_filter = peer_caps_copy (filter,
+          peer->normalize_stream_fields);
+      answer = gst_caps_intersect_full (plain_filter, offered,
+          GST_CAPS_INTERSECT_FIRST);
+      gst_caps_unref (plain_filter);
+    } else {
+      answer = gst_caps_ref (offered);
+    }
+    gst_query_set_caps_result (query, answer);
+    gst_caps_unref (answer);
+    gst_caps_unref (offered);
+    return TRUE;
+  }
+  if (GST_QUERY_TYPE (query) == GST_QUERY_ACCEPT_CAPS) {
+    GstCaps *caps, *offered, *plain;
+    gst_query_parse_accept_caps (query, &caps);
+    plain = peer_caps_copy (caps, peer->normalize_stream_fields);
+    offered = peer_caps_copy (peer->offered, peer->normalize_stream_fields);
+    gst_query_set_accept_caps_result (query,
+        gst_caps_is_subset (plain, offered));
+    gst_caps_unref (offered);
+    gst_caps_unref (plain);
+    return TRUE;
+  }
+  return gst_pad_query_default (pad, parent, query);
+}
+
+static void
+linked_query_controls (GstElement *element, GstBaseTransformClass *klass,
+    GstCaps *output)
+{
+  GstBaseTransform *base = GST_BASE_TRANSFORM (element);
+  GstPad *src = gst_element_get_static_pad (element, "src");
+  GstPad *sink = gst_element_get_static_pad (element, "sink");
+  GstPad *peer_pad = gst_pad_new ("cpu-query-peer", GST_PAD_SINK);
+  QueryPeer peer = {gst_caps_copy (output), TRUE};
+  gst_pad_set_element_private (peer_pad, &peer);
+  gst_pad_set_query_function (peer_pad, query_peer);
+  require (gst_pad_link (src, peer_pad) == GST_PAD_LINK_OK,
+      "real downstream peer links for filtered query controls");
+
+  GstCaps *input = caps_for ("P010_10LE", "memory:VAMemory", TRUE);
+  GstCaps *result = gst_pad_query_caps (sink, input);
+  require (gst_caps_is_equal (result, input),
+      "filtered sink query preserves VA preimage when peer drops stream fields");
+  gst_caps_unref (result);
+
+  GstCaps *dma = caps_for ("DMA_DRM", "memory:DMABuf", TRUE);
+  gst_caps_set_simple (dma, "drm-format", G_TYPE_STRING,
+      "P010:0x0100000000000009", NULL);
+  result = gst_pad_query_caps (sink, dma);
+  require (gst_caps_is_empty (result),
+      "marked tiled DMA_DRM cannot acquire support through unmarked identity");
+  require (!gst_pad_query_accept_caps (sink, dma),
+      "actual marked tiled DMA_DRM ACCEPT_CAPS is false");
+  gst_caps_unref (result);
+
+  GstCaps *unmarked_output = peer_caps_copy (output, TRUE);
+  result = klass->transform_caps (base, GST_PAD_SRC, unmarked_output, dma);
+  require (gst_caps_is_empty (result),
+      "normalized output plus marked DMA filter has no false identity preimage");
+  gst_caps_unref (result);
+
+  GstCaps *wrong = gst_caps_copy (unmarked_output);
+  gst_caps_set_simple (wrong, "width", G_TYPE_INT, 32, NULL);
+  gst_caps_unref (peer.offered); peer.offered = wrong;
+  result = gst_pad_query_caps (sink, input);
+  require (gst_caps_is_empty (result), "actual peer width restriction retained");
+  gst_caps_unref (result);
+
+  wrong = gst_caps_copy (unmarked_output);
+  gst_caps_set_simple (wrong, "format", G_TYPE_STRING, "RGB", NULL);
+  gst_caps_unref (peer.offered); peer.offered = wrong;
+  result = gst_pad_query_caps (sink, input);
+  require (gst_caps_is_empty (result), "actual peer wrong output format rejected");
+  gst_caps_unref (result);
+
+  wrong = gst_caps_copy (unmarked_output);
+  gst_caps_set_features_simple (wrong,
+      gst_caps_features_new ("memory:GLMemory", NULL));
+  gst_caps_unref (peer.offered); peer.offered = wrong;
+  result = gst_pad_query_caps (sink, input);
+  require (gst_caps_is_empty (result), "actual peer wrong output memory rejected");
+  gst_caps_unref (result);
+
+  GstCaps *plain = caps_for ("NV21", "memory:DMABuf", FALSE);
+  gst_caps_unref (peer.offered); peer.offered = gst_caps_copy (plain);
+  result = gst_pad_query_caps (sink, plain);
+  require (gst_caps_is_equal (result, plain),
+      "real unmarked DMA passthrough query remains byte-for-byte unchanged");
+  gst_caps_unref (result);
+
+  GstCaps *other = gst_caps_copy (input);
+  GstBuffer *other_config = gst_buffer_new_allocate (NULL, 24, NULL);
+  const guint8 record[24] = {1, 0, 10, 37, 0};
+  gst_buffer_fill (other_config, 0, record, sizeof (record));
+  gst_caps_set_simple (other, "dovi-configuration", GST_TYPE_BUFFER,
+      other_config, NULL);
+  gst_buffer_unref (other_config);
+  GstCaps *other_output = klass->transform_caps (base, GST_PAD_SINK,
+      other, NULL);
+  GstCaps *mixed = gst_caps_copy (input);
+  gst_caps_append (mixed, gst_caps_copy (other));
+  gst_caps_append (mixed, gst_caps_copy (plain));
+  GstCaps *offer = gst_caps_copy (other_output);
+  gst_caps_append (offer, gst_caps_copy (plain));
+  peer.normalize_stream_fields = FALSE;
+  gst_caps_unref (peer.offered); peer.offered = offer;
+  result = gst_pad_query_caps (sink, mixed);
+  require (gst_caps_can_intersect (result, other),
+      "mixed query retains the matching marked config");
+  require (!gst_caps_can_intersect (result, input),
+      "mixed query never crosses marked configuration identity");
+  require (gst_caps_can_intersect (result, plain),
+      "mixed marked and unmarked query preserves plain alternative");
+  gst_caps_unref (result);
+
+  gst_caps_unref (other_output);
+  gst_caps_unref (mixed);
+  gst_caps_unref (other);
+  gst_caps_unref (plain);
+  gst_caps_unref (unmarked_output);
+  gst_caps_unref (dma);
+  gst_caps_unref (input);
+  gst_pad_unlink (src, peer_pad);
+  gst_caps_unref (peer.offered);
+  gst_object_unref (peer_pad);
+  gst_object_unref (sink);
+  gst_object_unref (src);
+}
+
+static void
+profile5_missing_picture_controls (void)
+{
+  for (guint kind = 0; kind < 2; kind++) {
+    GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
+    g_object_set (map, "destination-kind", kind, NULL);
+    GstBus *bus = gst_bus_new (); gst_element_set_bus (map, bus);
+    GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+    GstBaseTransformClass *klass = GST_BASE_TRANSFORM_GET_CLASS (base);
+    GstCaps *input = caps_for ("P010_10LE", NULL, TRUE);
+    GstCaps *graded = klass->transform_caps (base, GST_PAD_SINK, input, NULL);
+    require (klass->set_caps (base, input, graded), "complete marked P5 has an explicit destination contract");
+    GstBuffer *pixels = gst_buffer_new_allocate (NULL, 768, NULL), *output = NULL;
+    require (klass->prepare_output_buffer (base, pixels, &output) == GST_FLOW_ERROR && !output,
+        "known P5 pixels without immutable picture proof cannot become graded or retained output");
+    GstMessage *message = gst_bus_pop_filtered (bus, GST_MESSAGE_ERROR);
+    GError *error = NULL;
+    if (message) gst_message_parse_error (message, &error, NULL);
+    require (error && error->domain == GST_STREAM_ERROR && error->code == GST_STREAM_ERROR_FORMAT,
+        "known P5 missing-proof refusal keeps typed FORMAT on the real element bus");
+    g_clear_error (&error); if (message) gst_message_unref (message);
+    GstCaps *plain = caps_for ("P010_10LE", NULL, FALSE);
+    require (klass->set_caps (base, plain, plain), "unmarked stream returns to its original identity contract");
+    require (klass->prepare_output_buffer (base, pixels, &output) == GST_FLOW_OK && output == pixels,
+        "unmarked control preserves the exact original GstBuffer");
+    gst_clear_buffer (&output); gst_buffer_unref (pixels);
+    gst_caps_unref (plain); gst_caps_unref (graded); gst_caps_unref (input);
+    gst_element_set_bus (map, NULL); gst_object_unref (bus); gst_object_unref (map);
+  }
+}
+
+static void
+source_context (GstElement *map, guint64 revision, gboolean blocked,
+    const gchar *stream_id, GstCaps *coded)
+{
+  GstContext *context = gst_context_new ("gst.webkit.dovi.source.v1", FALSE);
+  GstStructure *st = gst_context_writable_structure (context);
+  gst_structure_set (st, "source-revision", G_TYPE_UINT64, revision,
+      "blocked", G_TYPE_BOOLEAN, blocked, NULL);
+  if (stream_id) gst_structure_set (st, "stream-id", G_TYPE_STRING, stream_id, NULL);
+  if (coded) gst_structure_set (st, "clear-coded-caps", GST_TYPE_CAPS, coded, NULL);
+  gst_element_set_context (map, context); gst_context_unref (context);
+}
+static void
+source_gate_check (GstElement *map, GstCaps *input, gboolean graded, const gchar *name)
+{
+  GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+  GstCaps *out = GST_BASE_TRANSFORM_GET_CLASS (base)->transform_caps (base,
+      GST_PAD_SINK, input, NULL);
+  gboolean mapped = !gst_caps_is_empty (out) && !gst_caps_is_equal (input, out) &&
+      !g_strcmp0 (gst_structure_get_string (gst_caps_get_structure (out, 0), "format"), "RGBA");
+  require (graded ? mapped : gst_caps_is_equal (input, out), name);
+  gst_caps_unref (out);
+}
+typedef struct { guint64 revoked_revision, revoked_selection; guint revokes; } SelectionEvents;
+static void source_selection_revoked (GstElement *map, guint64 revision,
+    guint64 selection, gpointer data)
+{
+  (void) map;
+  SelectionEvents *events = data;
+  events->revoked_revision = revision; events->revoked_selection = selection;
+  events->revokes++;
+}
+static void
+pre_start_query_controls (void)
+{
+  GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
+  g_object_set (map, "destination-kind", 1u, "require-clear-source", TRUE, NULL);
+  GstPad *sink = gst_element_get_static_pad (map, "sink");
+  GstPad *src = gst_element_get_static_pad (map, "src");
+  gst_pad_set_active (sink, TRUE); gst_pad_set_active (src, TRUE);
+  GstCaps *input = caps_for ("P010_10LE", NULL, TRUE);
+  GstCaps *coded = gst_caps_copy (input);
+  gst_structure_set_name (gst_caps_get_structure (coded, 0), "video/x-h265");
+  source_gate_check (map, input, FALSE, "pre-start query without a clear proof keeps identity caps");
+  source_context (map, 1, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, TRUE,
+      "pre-start query is qualified by an identical clear proof of the current revision");
+  GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+  GstCaps *downstream = gst_caps_from_string ("video/x-raw, format=(string)RGBA; "
+      "video/x-raw(memory:DMABuf), format=(string)DMA_DRM");
+  GstCaps *offered = GST_BASE_TRANSFORM_GET_CLASS (base)->transform_caps (base,
+      GST_PAD_SRC, downstream, NULL);
+  GstCaps *va = caps_for ("P010_10LE", "memory:VAMemory", TRUE);
+  require (gst_caps_can_intersect (offered, va),
+      "unfiltered reverse query offers the marked importable domain of a clear proof");
+  gst_caps_unref (va); gst_caps_unref (offered); gst_caps_unref (downstream);
+  GstCaps *wrong = gst_caps_copy (input);
+  guint8 record[24] = {1, 0, 16, 29, 16};
+  GstBuffer *config = gst_buffer_new_memdup (record, sizeof (record));
+  gst_caps_set_simple (wrong, "dovi-configuration", GST_TYPE_BUFFER, config, NULL);
+  gst_buffer_unref (config);
+  source_gate_check (map, wrong, FALSE, "pre-start query cannot borrow a different configuration");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
+  source_gate_check (map, input, FALSE, "a started stream needs its own exact lease");
+  source_context (map, 2, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "after a stream started, a new revision needs its own start");
+  source_context (map, 3, TRUE, NULL, NULL);
+  gst_caps_unref (wrong); gst_caps_unref (coded); gst_caps_unref (input);
+  gst_pad_set_active (sink, FALSE); gst_pad_set_active (src, FALSE);
+  gst_object_unref (sink); gst_object_unref (src); gst_object_unref (map);
+}
+static void
+source_lifecycle_controls (void)
+{
+  GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
+  g_object_set (map, "destination-kind", 1u, "require-clear-source", TRUE, NULL);
+  SelectionEvents selections = {0};
+  g_signal_connect (map, "source-selection-revoked", G_CALLBACK (source_selection_revoked), &selections);
+  GstPad *sink = gst_element_get_static_pad (map, "sink");
+  GstPad *src = gst_element_get_static_pad (map, "src");
+  gst_pad_set_active (sink, TRUE); gst_pad_set_active (src, TRUE);
+  GstCaps *input = caps_for ("P010_10LE", NULL, TRUE);
+  GstCaps *coded = gst_caps_copy (input);
+  gst_structure_set_name (gst_caps_get_structure (coded, 0), "video/x-h265");
+  source_gate_check (map, input, FALSE, "browser unknown source uses exact identity caps");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
+  gst_pad_send_event (sink, gst_event_new_caps (input));
+  GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+  GstBaseTransformClass *klass = GST_BASE_TRANSFORM_GET_CLASS (base);
+  require (klass->set_caps (base, input, input), "unknown source establishes original identity contract");
+  GstBuffer *pending = gst_buffer_new_allocate (NULL, 768, NULL), *prepared = NULL;
+  require (klass->prepare_output_buffer (base, pending, &prepared) == GST_FLOW_OK && prepared == pending,
+      "unknown source preserves the exact original buffer");
+  gst_clear_buffer (&prepared);
+
+  source_context (map, 1, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "coded proof alone cannot authorize a prior or unknown raw stream");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
+  source_gate_check (map, input, FALSE, "another stream cannot borrow a clear configuration");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
+  source_gate_check (map, input, TRUE, "matching raw stream and original coded proof enable grade");
+  require (klass->prepare_output_buffer (base, pending, &prepared) == GST_BASE_TRANSFORM_FLOW_DROPPED && !prepared,
+      "positive STREAM_START lease drops old marked identity buffers pending graded renegotiation");
+  GstCaps *fresh = klass->transform_caps (base, GST_PAD_SINK, input, NULL);
+  require (klass->set_caps (base, input, fresh), "fresh graded caps resume the matched lease contract");
+  gst_caps_unref (fresh); gst_buffer_unref (pending);
+
+  guint64 revision_a = 0, selection_a = 0, revision_b = 0, selection_b = 0;
+  g_object_get (map, "active-source-revision", &revision_a,
+      "active-source-selection", &selection_a, NULL);
+  source_context (map, 1, FALSE, "clear/video1", coded);
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video1"));
+  g_object_get (map, "active-source-revision", &revision_b,
+      "active-source-selection", &selection_b, NULL);
+  require (revision_a == 1 && revision_b == revision_a && selection_a && selection_b > selection_a,
+      "downstream-only STREAM_START rotates the selected lease within the same origin");
+  require (selections.revokes && selections.revoked_revision == revision_a && selections.revoked_selection == selection_a,
+      "held A export receives exact selected-lease revocation before B");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
+
+  GstCaps *wrong = gst_caps_copy (input);
+  guint8 record[24] = {1, 0, 16, 29, 16};
+  GstBuffer *config = gst_buffer_new_memdup (record, sizeof (record));
+  gst_caps_set_simple (wrong, "dovi-configuration", GST_TYPE_BUFFER, config, NULL);
+  gst_buffer_unref (config);
+  source_gate_check (map, wrong, FALSE, "different coded configuration cannot borrow source proof");
+  gst_pad_send_event (sink, gst_event_new_caps (wrong));
+  require (klass->set_caps (base, wrong, wrong), "distinct valid B config under A proof negotiates original identity");
+  GstBuffer *other = gst_buffer_new_allocate (NULL, 768, NULL);
+  prepared = NULL;
+  require (klass->prepare_output_buffer (base, other, &prepared) == GST_FLOW_OK && prepared == other,
+      "same stream ID with unmatched valid B configuration preserves exact buffer identity");
+  gst_clear_buffer (&prepared); gst_buffer_unref (other);
+
+  gst_caps_unref (wrong);
+  source_context (map, 1, TRUE, NULL, NULL);
+  source_gate_check (map, input, FALSE, "CDM/source revoke restores identity negotiation");
+  source_context (map, 1, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "same-revision late callback cannot undo protection revocation");
+  source_context (map, 2, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "new source revision requires its own raw stream start");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("clear/video0"));
+  source_gate_check (map, input, TRUE, "new clear source revision qualifies independently");
+  g_object_get (map, "active-source-selection", &selection_a, NULL);
+  gst_pad_send_event (sink, gst_event_new_flush_start ());
+  g_object_get (map, "active-source-selection", &selection_b, NULL);
+  require (!selection_b && selections.revoked_selection == selection_a,
+      "filter-local flush revokes and clears the actual selected lease");
+  source_gate_check (map, input, FALSE, "flush revokes the retained source lease immediately");
+  source_context (map, 3, FALSE, "clear/video0", coded);
+  gst_pad_send_event (sink, gst_event_new_flush_stop (TRUE));
+  source_gate_check (map, input, TRUE, "flush stop restores exact sticky stream identity under the new proof");
+  source_context (map, 1, TRUE, NULL, NULL);
+  source_gate_check (map, input, TRUE, "older callback cannot revoke the newer source revision");
+  GstCaps *protected = gst_caps_copy (coded);
+  gst_structure_set_name (gst_caps_get_structure (protected, 0), "application/x-cenc");
+  source_context (map, 3, FALSE, "clear/video0", protected);
+  source_gate_check (map, input, FALSE, "protected replacement cannot retain clear source proof");
+  gst_caps_unref (protected); gst_caps_unref (coded); gst_caps_unref (input);
+  gst_pad_set_active (sink, FALSE); gst_pad_set_active (src, FALSE);
+  gst_object_unref (sink); gst_object_unref (src); gst_object_unref (map);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -222,6 +573,10 @@ main (int argc, char **argv)
     gst_caps_unref (plain);
     gst_caps_unref (result);
   }
+  linked_query_controls (element, klass, output);
+  pre_start_query_controls ();
+  source_lifecycle_controls ();
+  profile5_missing_picture_controls ();
   gst_caps_unref (reverse);
   gst_caps_unref (output);
   gst_caps_unref (nv12);

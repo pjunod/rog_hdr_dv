@@ -1,0 +1,27 @@
+diff --git a/meson.build b/meson.build
+index fa8088e..558afa8 100644
+--- a/meson.build
++++ b/meson.build
+@@ -286,6 +286,9 @@ sources = files(
+ cc = meson.get_compiler('c')
+ features += {'av-hevc-conf': cc.has_header_symbol('libavcodec/packet.h',
+     'AV_PKT_DATA_HEVC_CONF', dependencies: libavcodec)}
++# Read-only backend capability reported by --version for native launchers.
++# This build requires the shared raw-RPU provider and includes EL pairing.
++features += {'native-dovi-api-1': features['av-hevc-conf']}
+ 
+ flags = ['-D_FILE_OFFSET_BITS=64']
+ flags_c = []
+diff --git a/player/main.c b/player/main.c
+index 2fbb19d..40e8f4d 100644
+--- a/player/main.c
++++ b/player/main.c
+@@ -165,6 +165,8 @@ void mp_print_version(struct mp_log *log, int always)
+         mp_msg(log, v, " built on %s\n", mpv_builddate);
+     mp_msg(log, v, "libplacebo version: %s\n", PL_VERSION);
+     check_library_versions(log, v);
++    if (always)
++        mp_msg(log, v, "List of enabled features: " FULLCONFIG "\n");
+     // Only in verbose mode.
+     if (!always) {
+         mp_msg(log, MSGL_V, "Configuration: " CONFIGURATION "\n");

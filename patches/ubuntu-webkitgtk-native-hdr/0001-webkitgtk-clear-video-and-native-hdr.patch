@@ -1,0 +1,3369 @@
+diff --git a/Source/WebCore/PlatformGTK.cmake b/Source/WebCore/PlatformGTK.cmake
+index df8988a5..620edaec 100644
+--- a/Source/WebCore/PlatformGTK.cmake
++++ b/Source/WebCore/PlatformGTK.cmake
+@@ -5,6 +5,18 @@ include(platform/ImageDecoders.cmake)
+ include(platform/Soup.cmake)
+ include(platform/TextureMapper.cmake)
+ 
++# Optional headers only: the already-loaded mapper core is resolved by checked
++# ABI/symbol lookup, never a new codec/provider link dependency in WebKit.
++if (ENABLE_VIDEO AND USE_GSTREAMER)
++    find_path(GTK_DOVI_SDK_ROOT NAMES gst-gtk-dovi-1.0/mapper.h)
++    if (GTK_DOVI_SDK_ROOT)
++        set_property(SOURCE "${WEBCORE_DIR}/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp"
++            APPEND PROPERTY INCLUDE_DIRECTORIES "${GTK_DOVI_SDK_ROOT}")
++    endif ()
++    mark_as_advanced(GTK_DOVI_SDK_ROOT)
++endif ()
++
++
+ if (USE_CAIRO)
+     include(platform/Cairo.cmake)
+     include(platform/FreeType.cmake)
+@@ -54,6 +66,10 @@ list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
+     platform/glib/SelectionData.h
+     platform/glib/SystemSettings.h
+ 
++    platform/graphics/texmap/GTKNativeVideo.h
++    platform/graphics/texmap/GTKNativeVideoLimits.h
++    platform/graphics/texmap/GTKVideoSourceRegistry.h
++
+     platform/graphics/egl/PlatformDisplayDefault.h
+     platform/graphics/egl/PlatformDisplaySurfaceless.h
+ 
+diff --git a/Source/WebCore/html/HTMLMediaElement.cpp b/Source/WebCore/html/HTMLMediaElement.cpp
+index 2539c9a7..0b16bb66 100644
+--- a/Source/WebCore/html/HTMLMediaElement.cpp
++++ b/Source/WebCore/html/HTMLMediaElement.cpp
+@@ -8518,6 +8518,13 @@ bool HTMLMediaElement::mediaPlayerIsVideo() const
+     return isVideo();
+ }
+ 
++std::optional<PageIdentifier> HTMLMediaElement::mediaPlayerPageIdentifier() const
++{
++    if (auto* page = document().page())
++        return page->identifier();
++    return std::nullopt;
++}
++
+ LayoutRect HTMLMediaElement::mediaPlayerContentBoxRect() const
+ {
+     CheckedPtr renderer = this->renderer();
+diff --git a/Source/WebCore/html/HTMLMediaElement.h b/Source/WebCore/html/HTMLMediaElement.h
+index a8cd5ef0..a5b7ebf2 100644
+--- a/Source/WebCore/html/HTMLMediaElement.h
++++ b/Source/WebCore/html/HTMLMediaElement.h
+@@ -791,6 +791,7 @@ protected:
+     void mediaPlayerPlaybackStateChanged() final;
+     void mediaPlayerResourceNotSupported() final;
+     void mediaPlayerRepaint() final;
++    std::optional<PageIdentifier> mediaPlayerPageIdentifier() const final;
+     void mediaPlayerSizeChanged() final;
+     bool mediaPlayerAcceleratedCompositingEnabled() final;
+     void mediaPlayerWillInitializeMediaEngine() final;
+diff --git a/Source/WebCore/platform/graphics/MediaPlayer.h b/Source/WebCore/platform/graphics/MediaPlayer.h
+index d56b6cf9..32544657 100644
+--- a/Source/WebCore/platform/graphics/MediaPlayer.h
++++ b/Source/WebCore/platform/graphics/MediaPlayer.h
+@@ -37,6 +37,7 @@
+ #include <WebCore/MediaPlayerClientIdentifier.h>
+ #include <WebCore/MediaPlayerEnums.h>
+ #include <WebCore/MediaPlayerIdentifier.h>
++#include <WebCore/PageIdentifier.h>
+ #include <WebCore/MediaPromiseTypes.h>
+ #include <WebCore/PlatformDynamicRangeLimit.h>
+ #include <WebCore/PlatformLayer.h>
+@@ -217,6 +218,7 @@ public:
+ // Presentation-related methods
+     // a new frame of video is available
+     virtual void mediaPlayerRepaint() { }
++    virtual std::optional<PageIdentifier> mediaPlayerPageIdentifier() const { return std::nullopt; }
+ 
+     // the movie size has changed
+     virtual void mediaPlayerSizeChanged() { }
+@@ -752,6 +754,7 @@ public:
+     void audioOutputDeviceChanged();
+ 
+     std::optional<MediaPlayerIdentifier> identifier() const;
++    std::optional<PageIdentifier> hostingPageIdentifier() const { return protectedClient()->mediaPlayerPageIdentifier(); }
+     bool hasMediaEngine() const;
+ 
+     std::optional<VideoFrameMetadata> videoFrameMetadata();
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h
+new file mode 100644
+index 00000000..92471ef5
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h
+@@ -0,0 +1,72 @@
++/* Copyright (C) 2026 ROG HDR contributors.
++ * SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++
++#include <atomic>
++#include <cstdint>
++#include <functional>
++
++namespace WebCore {
++
++// One input-holder history in one caller-owned, drained source/load epoch.
++// Construct with true only when attached BEFORE any input in that epoch. A new
++// instance is allowed only after the caller proves a whole-pipeline READY drain.
++// The caller owns pipeline blocking/order, topology subscriptions/revalidation,
++// upstream-holder history checks, and fresh stream/CAPS/protection qualification.
++// This atomic history does not itself stop a buffer or reset a GStreamer element.
++class OriginalInputHistory {
++public:
++    explicit OriginalInputHistory(bool observedBeforeBytes)
++        : m_word(observedBeforeBytes ? pending : tainted) { }
++
++    // Single use. The nonthrowing callback must finish every subscription,
++    // topology revalidation and upstream-holder check before returning true.
++    // It runs without a history lock. Any first byte or invalidation while the
++    // callback runs prevents the exact arming -> armed CAS from succeeding.
++    bool arm(const std::function<bool()>& subscriptionAndRevalidate)
++    {
++        uint32_t expected = pending;
++        if (!subscriptionAndRevalidate || !m_word.compare_exchange_strong(expected, arming, std::memory_order_acq_rel, std::memory_order_acquire)) {
++            invalidate();
++            return false;
++        }
++        if (!subscriptionAndRevalidate()) {
++            invalidate();
++            return false;
++        }
++        expected = arming; // EXACTLY arming: neither seen nor tainted may be set.
++        if (!m_word.compare_exchange_strong(expected, armed, std::memory_order_acq_rel, std::memory_order_acquire)) {
++            invalidate();
++            return false;
++        }
++        return isArmed();
++    }
++
++    // The first operation records Seen in the SAME atomic word as the state,
++    // before taking any caller lock. A separate seen flag and state load would
++    // let arm commit between those operations and retroactively trust old input.
++    bool observeBytes()
++    {
++        uint32_t previous = m_word.fetch_or(seen, std::memory_order_acq_rel);
++        if ((previous & (stateMask | tainted)) != armed) {
++            invalidate();
++            return false;
++        }
++        return isArmed();
++    }
++    void invalidate() { m_word.fetch_or(tainted, std::memory_order_acq_rel); }
++    bool isArmed() const { return (m_word.load(std::memory_order_acquire) & (stateMask | tainted)) == armed; }
++    bool hasSeenBytes() const { return m_word.load(std::memory_order_acquire) & seen; }
++
++private:
++    static constexpr uint32_t pending = 0;
++    static constexpr uint32_t arming = 1;
++    static constexpr uint32_t armed = 2;
++    static constexpr uint32_t stateMask = 3;
++    static constexpr uint32_t seen = 4;
++    static constexpr uint32_t tainted = 8;
++    static_assert(std::atomic<uint32_t>::is_always_lock_free);
++    std::atomic<uint32_t> m_word;
++};
++
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputSetup.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputSetup.h
+new file mode 100644
+index 00000000..9b014ff7
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputSetup.h
+@@ -0,0 +1,25 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++#include <gst/gst.h>
++namespace WebCore {
++// Keep both locks through probe/subscription installation. Committed READY
++// alone is insufficient: READY->PAUSED may already be activating the pad/task.
++class OriginalInputSetup {
++public:
++    OriginalInputSetup(GstElement* element, GstPad* pad) : m_element(element), m_pad(pad)
++    { GST_STATE_LOCK(m_element); GST_PAD_STREAM_LOCK(m_pad); }
++    ~OriginalInputSetup() { GST_PAD_STREAM_UNLOCK(m_pad); GST_STATE_UNLOCK(m_element); }
++    OriginalInputSetup(const OriginalInputSetup&) = delete;
++    OriginalInputSetup& operator=(const OriginalInputSetup&) = delete;
++    bool beforeBytes() const
++    {
++        auto pending = GST_STATE_PENDING(m_element);
++        return GST_STATE(m_element) <= GST_STATE_READY
++            && (pending == GST_STATE_VOID_PENDING || pending <= GST_STATE_READY)
++            && !gst_pad_is_active(m_pad);
++    }
++private:
++    GstElement* m_element;
++    GstPad* m_pad;
++};
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviOriginalSource.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviOriginalSource.h
+new file mode 100644
+index 00000000..1c11664b
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviOriginalSource.h
+@@ -0,0 +1,320 @@
++/* Copyright (C) 2026 ROG HDR contributors.
++ * SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++
++#include <gst/gst.h>
++#include <algorithm>
++#include <functional>
++#include <memory>
++#include <optional>
++#include <utility>
++#include <vector>
++
++namespace WebCore {
++
++class OriginalSourceTopology;
++inline std::optional<OriginalSourceTopology> captureOriginalSourceTopology(GstElement*, GstPad*, GstElement*);
++inline std::optional<OriginalSourceTopology> captureOriginalByteInputTopology(GstElement*, GstPad*, GstElement*);
++
++// A referenced topology witness, NOT a lock or a mutation lease. The caller must
++// subscribe to linked/unlinked on ALL observed pads (including ghost internals),
++// pad-added/removed on observed elements, and element-added/removed on observed
++// bins, FILTERING those signals with observesPadMutation/observesElementMutation,
++// then revalidate before use. Unrelated downstream autoplugging is not a change
++// to this upstream proof. GstObject notify::parent is not emitted by set_parent/
++// unparent. Any relevant observed mutation permanently invalidates that lease;
++// revalidation alone cannot detect unlink/relink ABA or make a snapshot atomic.
++// The caller also authenticates the original WebKitWebSrc instance, binds the
++// actual demux OUTPUT pad and source/load epoch, and handles stream/protection
++// events. This helper only establishes the byte-preserving upstream topology.
++// It cannot certify bytes previously buffered by any element: the caller must
++// arm before first input or prove a reset/drain and fresh post-proof stream/CAPS.
++class OriginalSourceTopology {
++public:
++    OriginalSourceTopology(OriginalSourceTopology&&) = default;
++    OriginalSourceTopology& operator=(OriginalSourceTopology&&) = default;
++    OriginalSourceTopology(const OriginalSourceTopology&) = delete;
++    OriginalSourceTopology& operator=(const OriginalSourceTopology&) = delete;
++
++    enum class EdgeKind { Parent, Peer, Internal, Target };
++    struct Edge {
++        EdgeKind kind;
++        GstObject* from;
++        GstObject* to;
++        bool operator==(const Edge& other) const { return kind == other.kind && from == other.from && to == other.to; }
++    };
++    const std::vector<Edge>& observedEdges() const { return m_relations; }
++    const std::vector<GstPad*>& observedPads() const { return m_pads; }
++    const std::vector<GstElement*>& observedElements() const { return m_elements; }
++    bool revalidate() const;
++    bool observesPadMutation(GstElement* owner, GstPad* changed) const
++    {
++        for (const auto& inventory : m_inventories) {
++            if (inventory.element == owner)
++                return !inventory.sinksOnly || GST_PAD_DIRECTION(changed) == GST_PAD_SINK;
++        }
++        return std::find(m_pads.begin(), m_pads.end(), changed) != m_pads.end()
++            && recorded(EdgeKind::Parent, GST_OBJECT(changed)) == GST_OBJECT(owner);
++    }
++    bool observesElementMutation(GstElement* owner, GstElement* changed) const
++    {
++        return recorded(EdgeKind::Parent, GST_OBJECT(changed)) == GST_OBJECT(owner);
++    }
++
++private:
++    friend std::optional<OriginalSourceTopology> captureOriginalSourceTopology(GstElement*, GstPad*, GstElement*);
++    friend std::optional<OriginalSourceTopology> captureOriginalByteInputTopology(GstElement*, GstPad*, GstElement*);
++    struct Inventory {
++        GstElement* element;
++        bool sinksOnly;
++        std::vector<GstPad*> pads;
++        bool operator==(const Inventory& other) const { return element == other.element && sinksOnly == other.sinksOnly && pads == other.pads; }
++    };
++    OriginalSourceTopology(GstElement* demux, GstPad* sink, GstElement* source, bool byteInput = false)
++        : m_demux(demux), m_sink(sink), m_source(source), m_byteInput(byteInput) { }
++
++    // All getters return full references; retain() also keeps borrowed identities
++    // alive, preventing an object address from being reused during revalidation.
++    bool retain(GstObject* object)
++    {
++        if (!object || std::find(m_objects.begin(), m_objects.end(), object) != m_objects.end())
++            return true;
++        if (m_objects.size() >= 512)
++            return false;
++        m_objects.push_back(object);
++        m_refs.emplace_back(static_cast<GstObject*>(gst_object_ref(object)), gst_object_unref);
++        if (GST_IS_ELEMENT(object))
++            m_elements.push_back(GST_ELEMENT(object));
++        auto* parent = gst_object_get_parent(object);
++        m_relations.push_back({ EdgeKind::Parent, object, parent });
++        bool valid = retain(parent);
++        if (parent)
++            gst_object_unref(parent);
++        return valid;
++    }
++    bool relation(EdgeKind kind, GstObject* from, GstObject* to)
++    {
++        m_relations.push_back({ kind, from, to });
++        return retain(from) && retain(to);
++    }
++    GstObject* recorded(EdgeKind kind, GstObject* from) const
++    {
++        auto edge = std::find_if(m_relations.begin(), m_relations.end(), [&](const auto& candidate) {
++            return candidate.kind == kind && candidate.from == from;
++        });
++        return edge == m_relations.end() ? nullptr : edge->to;
++    }
++    bool observePad(GstPad* pad)
++    {
++        if (!pad)
++            return false;
++        if (std::find(m_pads.begin(), m_pads.end(), pad) != m_pads.end())
++            return true;
++        if (m_pads.size() >= 256 || !retain(GST_OBJECT(pad)))
++            return false;
++        m_pads.push_back(pad);
++        auto* peer = gst_pad_get_peer(pad);
++        bool valid = relation(EdgeKind::Peer, GST_OBJECT(pad), GST_OBJECT(peer));
++        if (peer)
++            gst_object_unref(peer);
++        if (GST_IS_PROXY_PAD(pad)) {
++            auto* internal = gst_proxy_pad_get_internal(GST_PROXY_PAD(pad));
++            valid = relation(EdgeKind::Internal, GST_OBJECT(pad), GST_OBJECT(internal)) && valid;
++            if (internal) {
++                valid = observePad(GST_PAD(internal)) && valid;
++                gst_object_unref(internal);
++            }
++        }
++        if (GST_IS_GHOST_PAD(pad)) {
++            auto* target = gst_ghost_pad_get_target(GST_GHOST_PAD(pad));
++            valid = relation(EdgeKind::Target, GST_OBJECT(pad), GST_OBJECT(target)) && valid;
++            if (target) {
++                valid = observePad(target) && valid;
++                gst_object_unref(target);
++            }
++        }
++        return valid;
++    }
++    bool inventory(GstElement* element, std::vector<GstPad*>& pads, bool sinksOnly = false)
++    {
++        auto* iterator = sinksOnly ? gst_element_iterate_sink_pads(element) : gst_element_iterate_pads(element);
++        GValue value = G_VALUE_INIT;
++        GstIteratorResult result;
++        while ((result = gst_iterator_next(iterator, &value)) == GST_ITERATOR_OK) {
++            auto* pad = GST_PAD(g_value_get_object(&value));
++            if (!observePad(pad)) {
++                g_value_unset(&value);
++                gst_iterator_free(iterator);
++                return false;
++            }
++            pads.push_back(pad);
++            g_value_reset(&value);
++        }
++        if (G_IS_VALUE(&value))
++            g_value_unset(&value);
++        gst_iterator_free(iterator);
++        // RESYNC means a concurrent mutation, not permission to accept a partial
++        // inventory. Fail closed rather than retrying an unstable graph.
++        if (result != GST_ITERATOR_DONE)
++            return false;
++        std::sort(pads.begin(), pads.end(), std::less<GstPad*>());
++        m_inventories.push_back({ element, sinksOnly, pads });
++        return retain(GST_OBJECT(element));
++    }
++    static bool factoryIs(GstElement* element, const char* name)
++    {
++        auto* factory = gst_element_factory_find(name);
++        bool matches = factory && gst_element_get_factory(element) == factory;
++        if (factory)
++            gst_object_unref(factory);
++        return matches;
++    }
++    bool ghostIsConsistent(GstPad* ghost) const
++    {
++        if (!GST_IS_GHOST_PAD(ghost))
++            return false;
++        // All pointers below come from the same recorded graph and have strong
++        // references. Never requery an edge and assume its new result was the
++        // object retained by observePad: concurrent retarget may replace/remove it.
++        auto* owner = recorded(EdgeKind::Parent, GST_OBJECT(ghost));
++        bool structuralOwner = owner && GST_IS_BIN(owner)
++            && (G_OBJECT_TYPE(owner) == GST_TYPE_BIN
++                || factoryIs(GST_ELEMENT(owner), "playbin")
++                || factoryIs(GST_ELEMENT(owner), "uridecodebin")
++                || factoryIs(GST_ELEMENT(owner), "decodebin"));
++        if (!structuralOwner)
++            return false;
++        auto* internal = recorded(EdgeKind::Internal, GST_OBJECT(ghost));
++        auto* target = recorded(EdgeKind::Target, GST_OBJECT(ghost));
++        auto* targetOwner = target ? recorded(EdgeKind::Parent, target) : nullptr;
++        return internal && GST_IS_PROXY_PAD(internal) && target && GST_IS_PAD(target)
++            && recorded(EdgeKind::Internal, internal) == GST_OBJECT(ghost)
++            && recorded(EdgeKind::Parent, internal) == GST_OBJECT(ghost)
++            && recorded(EdgeKind::Peer, internal) == target
++            && recorded(EdgeKind::Peer, target) == internal
++            && targetOwner && GST_IS_ELEMENT(targetOwner)
++            && recorded(EdgeKind::Parent, targetOwner) == owner
++            && GST_PAD_DIRECTION(GST_PAD(target)) == GST_PAD_DIRECTION(ghost)
++            && GST_PAD_DIRECTION(GST_PAD(internal)) != GST_PAD_DIRECTION(ghost);
++    }
++    bool build()
++    {
++        if (!m_demux || !m_sink || !m_source || m_demux == m_source
++            || !(factoryIs(m_demux, "qtdemux") || (m_byteInput && (factoryIs(m_demux, "typefind")
++                || factoryIs(m_demux, "queue2") || factoryIs(m_demux, "downloadbuffer"))))
++            || GST_IS_BIN(m_source)
++            || GST_PAD_DIRECTION(m_sink) != GST_PAD_SINK
++            || !gst_object_has_as_parent(GST_OBJECT(m_sink), GST_OBJECT(m_demux)))
++            return false;
++        std::vector<GstPad*> demuxPads;
++        // Dynamic audio/video outputs are owned by the caller's selected-output
++        // binding. Recording them here would revoke a valid upstream proof during
++        // ordinary downstream autoplugging immediately after demux pad-added.
++        if (!inventory(m_demux, demuxPads, true) || demuxPads.size() != 1 || demuxPads.front() != m_sink
++            || recorded(EdgeKind::Parent, GST_OBJECT(m_sink)) != GST_OBJECT(m_demux))
++            return false;
++        GstPad* current = m_sink;
++        std::vector<GstPad*> visited;
++        for (unsigned hop = 0; hop < 64; ++hop) {
++            if (std::find(visited.begin(), visited.end(), current) != visited.end() || !observePad(current))
++                return false;
++            visited.push_back(current);
++            if (GST_PAD_DIRECTION(current) == GST_PAD_SINK) {
++                auto* peer = recorded(EdgeKind::Peer, GST_OBJECT(current));
++                if (!peer || !GST_IS_PAD(peer) || !observePad(GST_PAD(peer))
++                    || recorded(EdgeKind::Peer, peer) != GST_OBJECT(current)
++                    || GST_PAD_DIRECTION(GST_PAD(peer)) != GST_PAD_SRC)
++                    return false;
++                current = GST_PAD(peer);
++                continue;
++            }
++            if (GST_PAD_DIRECTION(current) != GST_PAD_SRC)
++                return false;
++            if (GST_IS_GHOST_PAD(current)) {
++                if (!ghostIsConsistent(current))
++                    return false;
++                current = GST_PAD(recorded(EdgeKind::Target, GST_OBJECT(current)));
++                continue;
++            }
++            if (GST_IS_PROXY_PAD(current)) {
++                // A source proxy is the INTERNAL side of an outer sink ghost.
++                // Its upstream continuation is that ghost's external peer,
++                // never the proxy's own peer (which points downstream).
++                auto* outer = recorded(EdgeKind::Internal, GST_OBJECT(current));
++                if (!outer || !GST_IS_GHOST_PAD(outer)
++                    || GST_PAD_DIRECTION(GST_PAD(outer)) != GST_PAD_SINK
++                    || !ghostIsConsistent(GST_PAD(outer)))
++                    return false;
++                current = GST_PAD(outer);
++                continue;
++            }
++            auto* parent = recorded(EdgeKind::Parent, GST_OBJECT(current));
++            if (!parent || !GST_IS_ELEMENT(parent))
++                return false;
++            auto* element = GST_ELEMENT(parent);
++            bool source = element == m_source;
++            bool allowed = source || (!GST_IS_BIN(element) && (factoryIs(element, "typefind")
++                || factoryIs(element, "queue2") || factoryIs(element, "downloadbuffer")));
++            std::vector<GstPad*> pads;
++            bool valid = allowed && inventory(element, pads);
++            GstPad* sink = nullptr;
++            unsigned sourceCount = 0;
++            unsigned sinkCount = 0;
++            for (auto* pad : pads) {
++                if (GST_PAD_DIRECTION(pad) == GST_PAD_SRC) {
++                    ++sourceCount;
++                    valid = valid && pad == current;
++                } else if (GST_PAD_DIRECTION(pad) == GST_PAD_SINK) {
++                    ++sinkCount;
++                    sink = pad;
++                } else
++                    valid = false;
++            }
++            if (!valid || sourceCount != 1 || sinkCount != (source ? 0u : 1u))
++                return false;
++            if (source)
++                return true;
++            current = sink;
++        }
++        return false;
++    }
++
++    GstElement* m_demux;
++    GstPad* m_sink;
++    GstElement* m_source;
++    bool m_byteInput;
++    std::vector<std::shared_ptr<GstObject>> m_refs;
++    std::vector<GstObject*> m_objects;
++    std::vector<GstPad*> m_pads;
++    std::vector<GstElement*> m_elements;
++    std::vector<Edge> m_relations;
++    std::vector<Inventory> m_inventories;
++};
++
++inline std::optional<OriginalSourceTopology> captureOriginalSourceTopology(GstElement* demux, GstPad* sink, GstElement* source)
++{
++    OriginalSourceTopology proof(demux, sink, source);
++    if (!proof.build())
++        return std::nullopt;
++    return proof;
++}
++
++// For a caller arming byte-history attestation BEFORE first input: the terminal
++// may also be one of the three supported byte holders. This snapshot alone does
++// not assert that any previously buffered bytes have the same provenance.
++inline std::optional<OriginalSourceTopology> captureOriginalByteInputTopology(GstElement* consumer, GstPad* sink, GstElement* source)
++{
++    OriginalSourceTopology proof(consumer, sink, source, true);
++    if (!proof.build())
++        return std::nullopt;
++    return proof;
++}
++
++inline bool OriginalSourceTopology::revalidate() const
++{
++    auto current = m_byteInput ? captureOriginalByteInputTopology(m_demux, m_sink, m_source)
++        : captureOriginalSourceTopology(m_demux, m_sink, m_source);
++    return current && current->m_relations == m_relations && current->m_inventories == m_inventories;
++}
++
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h
+new file mode 100644
+index 00000000..f758e802
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h
+@@ -0,0 +1,455 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include "GStreamerCommon.h"
++#include "GStreamerDoviOriginalSource.h"
++#include "GStreamerDoviInputHistory.h"
++#include "GStreamerDoviInputSetup.h"
++#include "GTKNativeVideo.h"
++#include <atomic>
++#include <mutex>
++#include <string>
++#include <unordered_map>
++#include <wtf/MainThread.h>
++#include <wtf/ThreadSafeRefCounted.h>
++
++namespace WebCore {
++// Created only after a confirmed whole-playbin READY drain. Source bytes cannot
++// certify earlier contents of a queue: every byte holder is armed before input,
++// and every proof belongs to a live demux output pad, not a reusable string.
++class GStreamerDoviSourcePolicy final : public ThreadSafeRefCounted<GStreamerDoviSourcePolicy> {
++    struct Connection {
++        GWeakRef object;
++        gulong id;
++        bool probe;
++        Connection(GObject* o, gulong value, bool p = false) : id(value), probe(p) { g_weak_ref_init(&object, o); }
++        ~Connection()
++        {
++            auto objectRef = adoptGRef(G_OBJECT(g_weak_ref_get(&object)));
++            if (objectRef) {
++                if (probe) gst_pad_remove_probe(GST_PAD(objectRef.get()), id);
++                else if (g_signal_handler_is_connected(objectRef.get(), id)) g_signal_handler_disconnect(objectRef.get(), id);
++            }
++            g_weak_ref_clear(&object);
++        }
++    };
++    struct Input {
++        GWeakRef element, sink;
++        bool demux;
++        std::atomic<bool> required { false };
++        OriginalInputHistory history;
++        std::shared_ptr<OriginalSourceTopology> topology;
++        std::vector<std::unique_ptr<Connection>> watches;
++        Input(GstElement* e, GstPad* p, bool d, bool early) : demux(d), history(early)
++        { g_weak_ref_init(&element, e); g_weak_ref_init(&sink, p); }
++        ~Input() { g_weak_ref_clear(&element); g_weak_ref_clear(&sink); }
++        void disconnect() { watches.clear(); topology.reset(); }
++    };
++    struct Proof {
++        GWeakRef pad;
++        GstCaps* caps;
++        std::shared_ptr<Input> input;
++        Proof(GstPad* p, GstCaps* c, std::shared_ptr<Input> h) : caps(gst_caps_ref(c)), input(WTF::move(h)) { g_weak_ref_init(&pad, p); }
++        ~Proof() { gst_caps_unref(caps); g_weak_ref_clear(&pad); }
++    };
++    struct Watch {
++        Ref<GStreamerDoviSourcePolicy> policy;
++        std::shared_ptr<Input> input;
++        std::shared_ptr<OriginalSourceTopology> topology;
++    };
++public:
++    static Ref<GStreamerDoviSourcePolicy> create(GstElement* filter, PageIdentifier page)
++    {
++        auto policy = adoptRef(*new GStreamerDoviSourcePolicy(filter, page));
++        policy->observeSelections(filter); policy->advance(); return policy;
++    }
++    ~GStreamerDoviSourcePolicy() { g_weak_ref_clear(&m_filter); g_weak_ref_clear(&m_source); }
++    void revoke()
++    {
++        std::lock_guard lock(m_mutex);
++        if (m_revision) announce(m_revision);
++        if (m_revoked) return;
++        m_revoked = true;
++        GST_DEBUG("Dolby source policy: revoked at revision %" G_GUINT64_FORMAT, m_revision);
++        sendContext(m_revision, true);
++        m_proofs.clear();
++        for (auto& [element, input] : m_inputs) { (void)element; input->history.invalidate(); input->disconnect(); }
++        m_connections.clear(); m_inputs.clear();
++    }
++    void advance()
++    {
++        std::lock_guard lock(m_mutex);
++        if (m_revoked || m_untrusted.load(std::memory_order_acquire)) return;
++        if (m_revision) announce(m_revision);
++        static std::atomic<uint64_t> next { 1 };
++        m_revision = next.fetch_add(1, std::memory_order_relaxed);
++        m_atomicRevision.store(m_revision, std::memory_order_release);
++        if (!m_revision) { m_revoked = true; return; }
++        GST_DEBUG("Dolby source policy: advanced to revision %" G_GUINT64_FORMAT " with %zu proof(s)", m_revision, m_proofs.size());
++        sendContext(m_revision, false);
++        for (auto it = m_proofs.begin(); it != m_proofs.end();) {
++            if (!proofIsLive(*it->second)) it = m_proofs.erase(it);
++            else { sendContext(m_revision, false, it->first.c_str(), it->second->caps); ++it; }
++        }
++    }
++    // Only sourceSetup's verified WebKitWebSrc instance may be passed here.
++    void bindOriginalSource(GstElement* source)
++    {
++        auto src = adoptGRef(gst_element_get_static_pad(source, "src"));
++        if (!src) { markUntrusted("original source has no src pad"); return; }
++        OriginalInputSetup setup(source, src.get());
++        std::lock_guard lock(m_mutex);
++        if (m_revoked || m_untrusted.load(std::memory_order_acquire)) return;
++        auto previous = adoptGRef(GST_ELEMENT(g_weak_ref_get(&m_source)));
++        if (previous.get() == source) return;
++        if (previous || m_sourceStarted.load(std::memory_order_acquire)) { markUntrusted("a second or late original source"); return; }
++        g_weak_ref_set(&m_source, source);
++        if (!setup.beforeBytes()) { markUntrusted("original source bound after bytes"); return; }
++        ref();
++        auto id = gst_pad_add_probe(src.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST),
++            +[](GstPad*, GstPadProbeInfo*, gpointer data) -> GstPadProbeReturn {
++                static_cast<GStreamerDoviSourcePolicy*>(data)->beforeOriginalBytes(); return GST_PAD_PROBE_OK;
++            }, this, +[](gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->deref(); });
++        m_connections.push_back(std::make_unique<Connection>(G_OBJECT(src.get()), id, true));
++    }
++    void observeElement(GstElement* element)
++    {
++        bool demux = factoryIs(element, "qtdemux");
++        if (!demux && !isHolder(element)) return;
++        auto sink = adoptGRef(gst_element_get_static_pad(element, "sink"));
++        if (!sink) { markUntrusted("byte holder or demux has no sink pad"); return; }
++        std::shared_ptr<Input> input;
++        OriginalInputSetup setup(element, sink.get());
++        {
++            std::lock_guard lock(m_mutex);
++            if (m_revoked || m_inputs.contains(element)) return;
++            // Decoding bins autoplug byte holders only after typefinding has
++            // consumed original bytes, so "before bytes" is judged per input:
++            // an input whose own sink has carried nothing can still be armed
++            // before its first buffer, behind an already attested route.
++            bool early = setup.beforeBytes();
++            GST_DEBUG("Dolby source policy: observing %s %s (before bytes=%d, source started=%d, early=%d)", demux ? "demux" : "byte holder",
++                GST_ELEMENT_NAME(element), setup.beforeBytes(), m_sourceStarted.load(std::memory_order_acquire), early);
++            input = std::make_shared<Input>(element, sink.get(), demux, early);
++            auto* hook = new Watch { Ref { *this }, input, nullptr };
++            auto probe = gst_pad_add_probe(sink.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST | GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM),
++                +[](GstPad*, GstPadProbeInfo* info, gpointer data) -> GstPadProbeReturn {
++                    auto& hook = *static_cast<Watch*>(data);
++                    if (GST_PAD_PROBE_INFO_TYPE(info) & (GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST)) {
++                        if (!hook.input->history.isArmed() && !hook.input->history.hasSeenBytes()) hook.policy->armBeforeFirstBytes(hook.input);
++                        if (!hook.input->history.observeBytes() && hook.input->required.load(std::memory_order_acquire)) hook.policy->markUntrusted("bytes reached a required input before it was armed");
++                    } else if (GST_EVENT_TYPE(GST_PAD_PROBE_INFO_EVENT(info)) == GST_EVENT_PROTECTION) hook.policy->markUntrusted("protection event on a source input");
++                    return GST_PAD_PROBE_OK;
++                }, hook, +[](gpointer data) { delete static_cast<Watch*>(data); });
++            input->watches.push_back(std::make_unique<Connection>(G_OBJECT(sink.get()), probe, true));
++            connectInputSignal(input, sink.get(), "linked", false);
++            connectInputSignal(input, sink.get(), "unlinked", true);
++            m_inputs.emplace(element, input);
++        }
++        if (demux) {
++            for (bool added : { false, true }) {
++                ref();
++                auto id = g_signal_connect_data(element, added ? "pad-added" : "pad-removed",
++                    added ? G_CALLBACK(+[](GstElement*, GstPad* pad, gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->observeOutput(pad); })
++                          : G_CALLBACK(+[](GstElement*, GstPad* pad, gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->removePadProof(pad); }),
++                    this, +[](gpointer data, GClosure*) { static_cast<GStreamerDoviSourcePolicy*>(data)->deref(); }, GConnectFlags(0));
++                remember(std::make_unique<Connection>(G_OBJECT(element), id));
++            }
++            // A first link after this early subscription must already have a
++            // complete, attested upstream route; a late snapshot is insufficient.
++            if (gst_pad_is_linked(sink.get())) armDemux(input);
++            GUniquePtr<GstIterator> iterator(gst_element_iterate_src_pads(element));
++            while (gst_iterator_foreach(iterator.get(), +[](const GValue* item, gpointer data) {
++                static_cast<GStreamerDoviSourcePolicy*>(data)->observeOutput(GST_PAD(g_value_get_object(item)));
++            }, this) == GST_ITERATOR_RESYNC) gst_iterator_resync(iterator.get());
++        }
++    }
++private:
++    GStreamerDoviSourcePolicy(GstElement* filter, PageIdentifier page) : m_page(page)
++    { g_weak_ref_init(&m_filter, filter); g_weak_ref_init(&m_source, nullptr); }
++    static bool factoryIs(GstElement* element, const char* name)
++    {
++        auto* expected = gst_element_factory_find(name);
++        bool matches = expected && gst_element_get_factory(element) == expected;
++        if (expected) gst_object_unref(expected);
++        return matches;
++    }
++    static bool isHolder(GstElement* element)
++    { return factoryIs(element, "typefind") || factoryIs(element, "queue2") || factoryIs(element, "downloadbuffer"); }
++    void markUntrusted(const char* reason)
++    {
++        if (m_untrusted.exchange(true, std::memory_order_acq_rel)) return;
++        GST_INFO("Dolby source policy: ordinary route for this load (%s)", reason);
++        // No policy mutex: topology signals can be nested inside sendContext.
++        // Core blocking is immediate; owning-page cleanup is queued safely.
++        sendContext(m_atomicRevision.load(std::memory_order_acquire), true);
++        callOnMainThread([self = Ref { *this }] { self->revoke(); });
++    }
++    void beforeOriginalBytes()
++    {
++        if (m_sourceStarted.exchange(true, std::memory_order_acq_rel)) return;
++        std::lock_guard lock(m_mutex);
++        if (m_revoked || m_untrusted.load(std::memory_order_acquire)) return;
++        for (size_t pass = 0; pass <= m_inputs.size(); ++pass) {
++            bool progress = false;
++            for (auto& [element, input] : m_inputs) { (void)element;
++                if (!input->history.isArmed()) progress |= tryArm(input);
++            }
++            if (!progress) break;
++        }
++    }
++    void armDemux(const std::shared_ptr<Input>& input)
++    {
++        std::lock_guard lock(m_mutex);
++        if (m_revoked || m_untrusted.load(std::memory_order_acquire)) return;
++        // Content-type hints may link the container before the first source
++        // buffer. Seal any complete upstream holders in topological order first.
++        for (size_t pass = 0; pass <= m_inputs.size(); ++pass) {
++            bool progress = false;
++            for (auto& [element, upstream] : m_inputs) { (void)element;
++                if (!upstream->demux && !upstream->history.isArmed()) progress |= tryArm(upstream);
++            }
++            if (!progress) break;
++        }
++        if (!input->history.isArmed() && !tryArm(input)) {
++            GST_DEBUG("Dolby source policy: demux input could not be armed (required=%d)", input->required.load(std::memory_order_acquire));
++            input->history.invalidate();
++            if (input->required.load(std::memory_order_acquire)) markUntrusted("required input could not be armed");
++        }
++    }
++    // Runs in the input's streaming thread with its first buffer in hand and
++    // not yet delivered: the last moment its byte history is still empty.
++    void armBeforeFirstBytes(const std::shared_ptr<Input>& input)
++    {
++        std::lock_guard lock(m_mutex);
++        if (m_revoked || m_untrusted.load(std::memory_order_acquire) || input->history.isArmed() || input->history.hasSeenBytes()) return;
++        tryArm(input);
++    }
++    bool tryArm(const std::shared_ptr<Input>& input)
++    {
++        if (input->history.isArmed()) return true;
++        if (m_untrusted.load(std::memory_order_acquire)) return false;
++        auto source = adoptGRef(GST_ELEMENT(g_weak_ref_get(&m_source)));
++        auto element = adoptGRef(GST_ELEMENT(g_weak_ref_get(&input->element)));
++        auto sink = adoptGRef(GST_PAD(g_weak_ref_get(&input->sink)));
++        if (!source || !element || !sink) { GST_DEBUG("Dolby source policy: cannot arm, source/input released"); return false; }
++        auto capture = captureOriginalByteInputTopology(element.get(), sink.get(), source.get());
++        if (!capture) { GST_DEBUG("Dolby source policy: cannot arm %s, route to the original source is not attestable", GST_ELEMENT_NAME(element.get())); return false; }
++        auto topology = std::make_shared<OriginalSourceTopology>(WTF::move(*capture));
++        for (auto* upstream : topology->observedElements()) {
++            if (upstream == element.get() || !isHolder(upstream)) continue;
++            auto entry = m_inputs.find(upstream);
++            if (entry == m_inputs.end() || !entry->second->history.isArmed()) {
++                GST_DEBUG("Dolby source policy: cannot arm %s, upstream byte holder %s is %s", GST_ELEMENT_NAME(element.get()), GST_ELEMENT_NAME(upstream),
++                    entry == m_inputs.end() ? "unobserved" : "not armed");
++                return false;
++            }
++        }
++        bool armed = input->history.arm([&] {
++            input->required.store(true, std::memory_order_release);
++            installTopologyWatches(input, topology);
++            if (!topology->revalidate() || m_untrusted.load(std::memory_order_acquire)) return false;
++            input->topology = topology; return true;
++        });
++        GST_DEBUG("Dolby source policy: arming %s %s", GST_ELEMENT_NAME(element.get()), armed ? "succeeded" : "failed");
++        return armed;
++    }
++    void connectInputSignal(const std::shared_ptr<Input>& input, GstPad* pad, const char* signal, bool unlink)
++    {
++        auto* hook = new Watch { Ref { *this }, input, nullptr };
++        auto id = g_signal_connect_data(pad, signal, unlink ? G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) {
++            auto& hook = *static_cast<Watch*>(data);
++            hook.input->history.invalidate();
++            if (hook.input->required.load(std::memory_order_acquire)) hook.policy->markUntrusted("required input pad signal");
++        }) : G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) {
++            auto& hook = *static_cast<Watch*>(data); if (hook.input->demux) hook.policy->armDemux(hook.input);
++        }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
++        input->watches.push_back(std::make_unique<Connection>(G_OBJECT(pad), id));
++    }
++    void installTopologyWatches(const std::shared_ptr<Input>& input, const std::shared_ptr<OriginalSourceTopology>& topology)
++    {
++        for (auto* pad : topology->observedPads()) for (auto* signal : { "linked", "unlinked" }) {
++            auto* hook = new Watch { Ref { *this }, input, topology };
++            auto id = g_signal_connect_data(pad, signal, G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) {
++                auto& hook = *static_cast<Watch*>(data); hook.input->history.invalidate(); hook.policy->markUntrusted("source topology watch fired");
++            }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
++            input->watches.push_back(std::make_unique<Connection>(G_OBJECT(pad), id));
++        }
++        for (auto* element : topology->observedElements()) {
++            for (auto* signal : { "pad-added", "pad-removed" }) {
++                auto* hook = new Watch { Ref { *this }, input, topology };
++                auto id = g_signal_connect_data(element, signal, G_CALLBACK(+[](GstElement* owner, GstPad* changed, gpointer data) {
++                    auto& hook = *static_cast<Watch*>(data);
++                    if (hook.topology->observesPadMutation(owner, changed)) { hook.input->history.invalidate(); hook.policy->markUntrusted("source topology pad mutation"); }
++                }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
++                input->watches.push_back(std::make_unique<Connection>(G_OBJECT(element), id));
++            }
++            if (GST_IS_BIN(element)) for (auto* signal : { "element-added", "element-removed" }) {
++                auto* hook = new Watch { Ref { *this }, input, topology };
++                auto id = g_signal_connect_data(element, signal, G_CALLBACK(+[](GstBin* owner, GstElement* changed, gpointer data) {
++                    auto& hook = *static_cast<Watch*>(data);
++                    if (hook.topology->observesElementMutation(GST_ELEMENT(owner), changed)) { hook.input->history.invalidate(); hook.policy->markUntrusted("source topology element mutation"); }
++                }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
++                input->watches.push_back(std::make_unique<Connection>(G_OBJECT(element), id));
++            }
++        }
++    }
++    bool proofIsLive(const Proof& proof)
++    {
++        if (!proof.input->history.isArmed() || !proof.input->history.hasSeenBytes() || !proof.input->topology || !proof.input->topology->revalidate()) {
++            GST_DEBUG("Dolby source policy: proof not live (armed=%d, seen bytes=%d, topology=%d)", proof.input->history.isArmed(),
++                proof.input->history.hasSeenBytes(), !!proof.input->topology);
++            return false;
++        }
++        auto pad = adoptGRef(GST_PAD(g_weak_ref_get(const_cast<GWeakRef*>(&proof.pad))));
++        auto demux = adoptGRef(GST_ELEMENT(g_weak_ref_get(&proof.input->element)));
++        return pad && demux && GST_PAD_DIRECTION(pad.get()) == GST_PAD_SRC && gst_pad_is_linked(pad.get())
++            && gst_object_has_as_parent(GST_OBJECT(pad.get()), GST_OBJECT(demux.get()));
++    }
++    void record(GstPad* pad, GstCaps* caps)
++    {
++        if (!caps || !gst_caps_is_fixed(caps) || gst_caps_get_size(caps) != 1) return;
++        auto* structure = gst_caps_get_structure(caps, 0);
++        if (gst_structure_has_name(structure, "application/x-cenc") || gst_structure_has_field(structure, "protection-system")) { markUntrusted("encrypted coded caps"); return; }
++        auto demux = adoptGRef(gst_pad_get_parent_element(pad));
++        char* id = gst_pad_get_stream_id(pad);
++        if (!demux || !id) { g_free(id); return; }
++        bool changed = false;
++        {
++            std::lock_guard lock(m_mutex);
++            auto history = m_inputs.find(demux.get());
++            if (!m_revoked && !m_untrusted.load(std::memory_order_acquire) && history != m_inputs.end() && history->second->demux) {
++                auto proof = std::make_unique<Proof>(pad, caps, history->second);
++                bool clear = gst_structure_has_name(structure, "video/x-h265") && gst_structure_has_field(structure, "dovi-configuration") && proofIsLive(*proof);
++                GST_DEBUG("Dolby source policy: demux caps on stream %s: %s", id, clear ? "clear proof" : "no clear proof");
++                auto previous = m_proofs.find(id);
++                auto oldPad = previous != m_proofs.end() ? adoptGRef(GST_PAD(g_weak_ref_get(&previous->second->pad))) : GRefPtr<GstPad> { };
++                if (previous != m_proofs.end() && oldPad && oldPad.get() != pad && proofIsLive(*previous->second)) { markUntrusted("stream id moved to another live demux pad"); }
++                else if (clear) {
++                    changed = previous == m_proofs.end() || oldPad.get() != pad || !gst_caps_is_equal(previous->second->caps, caps);
++                    m_proofs.insert_or_assign(id, WTF::move(proof));
++                    if (!changed) sendContext(m_revision, false, id, caps);
++                } else if (previous != m_proofs.end() && oldPad.get() == pad) { m_proofs.erase(previous); changed = true; }
++            }
++        }
++        if (changed) advance();
++        g_free(id);
++    }
++    void removePadProof(GstPad* pad)
++    {
++        bool changed = false;
++        {
++            std::lock_guard lock(m_mutex);
++            for (auto it = m_proofs.begin(); it != m_proofs.end();) {
++                auto old = adoptGRef(GST_PAD(g_weak_ref_get(&it->second->pad)));
++                if (old.get() == pad) {
++                    sendContext(m_revision, false, it->first.c_str(), nullptr);
++                    it = m_proofs.erase(it); changed = true;
++                } else ++it;
++            }
++        }
++        if (changed) advance();
++    }
++    void remember(std::unique_ptr<Connection> connection)
++    {
++        std::lock_guard lock(m_mutex);
++        if (!m_revoked) m_connections.push_back(WTF::move(connection));
++    }
++    void observeOutput(GstPad* pad)
++    {
++        if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC) return;
++        // Subscribe and snapshot under the serialized stream lock. Inspect ALL
++        // sticky protections before considering already-present coded CAPS.
++        GST_PAD_STREAM_LOCK(pad);
++        ref();
++        auto id = gst_pad_add_probe(pad, static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM | GST_PAD_PROBE_TYPE_EVENT_FLUSH),
++            +[](GstPad* pad, GstPadProbeInfo* info, gpointer data) -> GstPadProbeReturn {
++                auto& policy = *static_cast<GStreamerDoviSourcePolicy*>(data); auto* event = GST_PAD_PROBE_INFO_EVENT(info);
++                switch (GST_EVENT_TYPE(event)) {
++                case GST_EVENT_CAPS: { GstCaps* caps = nullptr; gst_event_parse_caps(event, &caps); policy.record(pad, caps); break; }
++                case GST_EVENT_PROTECTION: policy.markUntrusted("protection event on demux output"); break;
++                case GST_EVENT_STREAM_START: policy.removePadProof(pad); break;
++                case GST_EVENT_FLUSH_START: policy.advance(); break;
++                default: break;
++                }
++                return GST_PAD_PROBE_OK;
++            }, this, +[](gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->deref(); });
++        remember(std::make_unique<Connection>(G_OBJECT(pad), id, true));
++        ref();
++        auto unlink = g_signal_connect_data(pad, "unlinked", G_CALLBACK(+[](GstPad* pad, GstPad*, gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->removePadProof(pad); }),
++            this, +[](gpointer data, GClosure*) { static_cast<GStreamerDoviSourcePolicy*>(data)->deref(); }, GConnectFlags(0));
++        remember(std::make_unique<Connection>(G_OBJECT(pad), unlink));
++        bool protectedInput = false;
++        for (guint i = 0;; ++i) {
++            auto protection = adoptGRef(gst_pad_get_sticky_event(pad, GST_EVENT_PROTECTION, i));
++            if (!protection) break;
++            protectedInput = true;
++        }
++        if (protectedInput) markUntrusted("sticky protection on demux output");
++        else if (auto caps = adoptGRef(gst_pad_get_current_caps(pad))) record(pad, caps.get());
++        GST_PAD_STREAM_UNLOCK(pad);
++    }
++    void announce(uint64_t revision)
++    {
++        if (isMainThread()) notifyGTKVideoSourceState(m_page, revision, 0, false);
++        else callOnMainThread([self = Ref { *this }, revision] { notifyGTKVideoSourceState(self->m_page, revision, 0, false); });
++    }
++    void selectionChanged(uint64_t revision, uint64_t selection, bool active)
++    {
++        callOnMainThread([self = Ref { *this }, revision, selection, active] {
++            {
++                std::lock_guard lock(self->m_mutex);
++                if (self->m_revision != revision || (active && (self->m_revoked || self->m_untrusted.load(std::memory_order_acquire)))) return;
++                if (active) {
++                    if (self->m_proofs.empty()) { self->markUntrusted("selection activated without any clear proof"); return; }
++                    for (const auto& [id, proof] : self->m_proofs) {
++                        (void)id;
++                        if (!self->proofIsLive(*proof)) { self->markUntrusted("selection activated with a stale proof"); return; }
++                    }
++                }
++            }
++            if (active) {
++                auto filter = adoptGRef(GST_ELEMENT(g_weak_ref_get(&self->m_filter))); guint64 actualRevision = 0, actualSelection = 0;
++                if (!filter) return;
++                g_object_get(filter.get(), "active-source-revision", &actualRevision, "active-source-selection", &actualSelection, nullptr);
++                if (actualRevision != revision || actualSelection != selection) return;
++            }
++            notifyGTKVideoSourceState(self->m_page, revision, selection, active);
++        });
++    }
++    void observeSelections(GstElement* filter)
++    {
++        for (bool active : { false, true }) {
++            ref();
++            auto id = g_signal_connect_data(filter, active ? "source-selection-activated" : "source-selection-revoked",
++                active ? G_CALLBACK(+[](GstElement*, guint64 r, guint64 s, gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->selectionChanged(r, s, true); })
++                       : G_CALLBACK(+[](GstElement*, guint64 r, guint64 s, gpointer data) { static_cast<GStreamerDoviSourcePolicy*>(data)->selectionChanged(r, s, false); }),
++                this, +[](gpointer data, GClosure*) { static_cast<GStreamerDoviSourcePolicy*>(data)->deref(); }, GConnectFlags(0));
++            m_connections.push_back(std::make_unique<Connection>(G_OBJECT(filter), id));
++        }
++    }
++    void sendContext(uint64_t revision, bool blocked, const char* id = nullptr, GstCaps* coded = nullptr)
++    {
++        if (!revision) return;
++        auto filter = adoptGRef(GST_ELEMENT(g_weak_ref_get(&m_filter))); if (!filter) return;
++        blocked |= m_untrusted.load(std::memory_order_acquire);
++        auto context = adoptGRef(gst_context_new("gst.webkit.dovi.source.v1", false)); auto* st = gst_context_writable_structure(context.get());
++        gst_structure_set(st, "source-revision", G_TYPE_UINT64, revision, "blocked", G_TYPE_BOOLEAN, blocked, nullptr);
++        if (!blocked && id) gst_structure_set(st, "stream-id", G_TYPE_STRING, id, nullptr);
++        if (!blocked && coded) gst_structure_set(st, "clear-coded-caps", GST_TYPE_CAPS, coded, nullptr);
++        GST_DEBUG("Dolby source policy: context revision %" G_GUINT64_FORMAT " blocked=%d stream=%s", revision, blocked, (!blocked && id) ? id : "-");
++        gst_element_set_context(filter.get(), context.get());
++    }
++    std::mutex m_mutex;
++    GWeakRef m_filter, m_source;
++    PageIdentifier m_page;
++    std::unordered_map<GstElement*, std::shared_ptr<Input>> m_inputs;
++    std::unordered_map<std::string, std::unique_ptr<Proof>> m_proofs;
++    std::vector<std::unique_ptr<Connection>> m_connections;
++    std::atomic<bool> m_untrusted { false }, m_sourceStarted { false };
++    std::atomic<uint64_t> m_atomicRevision { 0 };
++    uint64_t m_revision { 0 };
++    bool m_revoked { false };
++};
++} // namespace WebCore
++#endif
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerSDRVideoDestination.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerSDRVideoDestination.h
+new file mode 100644
+index 00000000..ddc34acd
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerSDRVideoDestination.h
+@@ -0,0 +1,74 @@
++/*
++ * Copyright (C) 2026 ROG HDR contributors.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND ITS CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED. IN NO EVENT
++ * SHALL THE COPYRIGHT HOLDER OR ITS CONTRIBUTORS BE LIABLE FOR ANY DAMAGES
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE.
++ */
++
++#pragma once
++
++#include <WebCore/ColorConversion.h>
++#include <WebCore/ColorTypes.h>
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <optional>
++#include <limits>
++
++namespace WebCore {
++
++// This conversion is for an explicitly SDR video destination, not a declaration
++// that the browser page or its GTK framebuffer supports HDR. The caller must map
++// the original picture exactly once to the chosen SDR mastering target first.
++struct GStreamerSDRVideoDestination {
++    // Undo the upstream renderer's declared linear PQ transport scaling.
++    // This is distinct from the fixed logical mastering white below.
++    double inverseTransportScale { 1 };
++    double referenceWhiteNits { 100 };
++};
++
++inline std::optional<SRGBA<float>> sdrVideoPixelFromTransportPQ(const std::array<float, 3>& encoded, const GStreamerSDRVideoDestination& destination)
++{
++    if (!std::isfinite(destination.inverseTransportScale) || destination.inverseTransportScale <= 0
++        || !std::isfinite(destination.referenceWhiteNits) || destination.referenceWhiteNits <= 0)
++        return std::nullopt;
++
++    auto linearChannel = [&](float value) -> std::optional<float> {
++        if (!std::isfinite(value) || value < 0 || value > 1)
++            return std::nullopt;
++
++        // SMPTE ST 2084: decode to absolute cd/m² before undoing transport.
++        constexpr double m1 = 2610.0 / 16384.0;
++        constexpr double m2 = 2523.0 / 32.0;
++        constexpr double c1 = 3424.0 / 4096.0;
++        constexpr double c2 = 2413.0 / 128.0;
++        constexpr double c3 = 2392.0 / 128.0;
++        double p = std::pow(value, 1.0 / m2);
++        double nits = 10000 * std::pow(std::max(p - c1, 0.0) / (c2 - c3 * p), 1.0 / m1);
++        double relative = nits * destination.inverseTransportScale / destination.referenceWhiteNits;
++        if (!std::isfinite(relative) || relative > std::numeric_limits<float>::max())
++            return std::nullopt;
++        return static_cast<float>(relative);
++    };
++    auto red = linearChannel(encoded[0]);
++    auto green = linearChannel(encoded[1]);
++    auto blue = linearChannel(encoded[2]);
++    if (!red || !green || !blue)
++        return std::nullopt;
++
++    // Reuse WebCore's D65 matrix and sRGB transfer conversion. Keep the input
++    // extended until after the gamut conversion, then clip to the SDR range.
++    return convertColor<SRGBA<float>>(ExtendedLinearRec2020<float> { *red, *green, *blue, 1 });
++}
++
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+index ae14d494..5f85f328 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+@@ -33,6 +33,9 @@
+ #include "GStreamerAudioMixer.h"
+ #include "GStreamerCaptureDeviceManager.h"
+ #include "GStreamerCommon.h"
++#if PLATFORM(GTK) && USE(GTK4)
++#include "GStreamerDoviSourcePolicy.h"
++#endif
+ #include "GStreamerQuirks.h"
+ #include "GStreamerRegistryScanner.h"
+ #include "GraphicsContext.h"
+@@ -219,6 +222,9 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
+ {
+     GST_DEBUG_OBJECT(pipeline(), "Disposing player");
+     m_isPlayerShuttingDown.store(true);
++#if PLATFORM(GTK) && USE(GTK4)
++    revokeDoviSourcePolicy();
++#endif
+ 
+ #if ENABLE(MEDIA_TELEMETRY)
+     MediaTelemetryReport::singleton().reportPlaybackState(MediaTelemetryReport::AVPipelineState::Stop);
+@@ -278,6 +284,9 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
+         m_audioSink = nullptr;
+         m_textSink = nullptr;
+         m_pipeline = nullptr;
++#if PLATFORM(GTK) && USE(GTK4)
++        m_doviFilter = nullptr;
++#endif
+     }
+ 
+     if (!clearMediaPlayer)
+@@ -1106,6 +1115,12 @@ void MediaPlayerPrivateGStreamer::sourceSetup(GstElement* sourceElement)
+     GST_DEBUG_OBJECT(pipeline(), "Source element set-up for %s", GST_ELEMENT_NAME(sourceElement));
+ 
+     m_source = sourceElement;
++#if PLATFORM(GTK) && USE(GTK4)
++    if (auto policy = doviSourcePolicy()) {
++        if (WEBKIT_IS_WEB_SRC(sourceElement)) policy->bindOriginalSource(sourceElement);
++        else policy->revoke();
++    }
++#endif
+ 
+     if (WEBKIT_IS_WEB_SRC(m_source.get())) {
+         auto* source = WEBKIT_WEB_SRC_CAST(m_source.get());
+@@ -1131,10 +1146,15 @@ MediaPlayerPrivateGStreamer::ChangePipelineStateResult MediaPlayerPrivateGStream
+ {
+     ASSERT(m_pipeline);
+ 
+-    if (isPausedByViewport() && newState > GST_STATE_PAUSED) {
++    if (isPausedByViewport()) {
++        // The latest request is the state to restore when the element becomes
++        // visible. Recording only PLAYING let a suspension that saved an earlier
++        // READY (for example the source-replacement drain) discard a load's
++        // PAUSED preroll, leaving the visible element stuck in READY.
+         GST_DEBUG_OBJECT(pipeline(), "Saving state for when player becomes visible: %s", gst_element_state_get_name(newState));
+         m_stateToRestoreWhenVisible = newState;
+-        return ChangePipelineStateResult::Ok;
++        if (newState > GST_STATE_PAUSED)
++            return ChangePipelineStateResult::Ok;
+     }
+ 
+     GstState currentState, pending;
+@@ -1177,8 +1197,64 @@ MediaPlayerPrivateGStreamer::ChangePipelineStateResult MediaPlayerPrivateGStream
+     return ChangePipelineStateResult::Ok;
+ }
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++RefPtr<GStreamerDoviSourcePolicy> MediaPlayerPrivateGStreamer::doviSourcePolicy() const
++{
++    Locker locker { m_doviPolicyLock };
++    return m_doviSourcePolicy;
++}
++void MediaPlayerPrivateGStreamer::revokeDoviSourcePolicy()
++{
++    auto policy = doviSourcePolicy();
++    if (policy)
++        policy->revoke();
++}
++void MediaPlayerPrivateGStreamer::resetDoviSourcePolicy(const URL& url)
++{
++    revokeDoviSourcePolicy();
++    {
++        Locker locker { m_doviPolicyLock };
++        m_doviSourcePolicy = nullptr;
++    }
++    // Source replacement must drain the old decoder/queues before a new clear
++    // proof can be installed, even when playbin itself is reused.
++    if (m_doviFilter && m_pipeline) {
++        if (gst_element_set_state(m_pipeline.get(), GST_STATE_READY) == GST_STATE_CHANGE_FAILURE)
++            return;
++        GstState state = GST_STATE_NULL;
++        auto result = gst_element_get_state(m_pipeline.get(), &state, nullptr, GST_SECOND);
++        if (result == GST_STATE_CHANGE_FAILURE || result == GST_STATE_CHANGE_ASYNC || state != GST_STATE_READY)
++            return;
++    }
++    RefPtr player = m_player.get();
++    if (!m_doviFilter || !player || !player->isVideoPlayer() || isMediaSource()
++        || url.protocolIs("blob"_s) || url.protocolIs("mediastream"_s))
++        return;
++#if ENABLE(ENCRYPTED_MEDIA)
++    if (m_cdmInstance)
++        return;
++#endif
++    auto page = player->hostingPageIdentifier();
++    if (!page)
++        return;
++    auto policy = GStreamerDoviSourcePolicy::create(m_doviFilter.get(), *page);
++    {
++        Locker locker { m_doviPolicyLock };
++        m_doviSourcePolicy = policy.ptr();
++    }
++    GUniquePtr<GstIterator> iterator(gst_bin_iterate_recurse(GST_BIN_CAST(m_pipeline.get())));
++    while (gst_iterator_foreach(iterator.get(), +[](const GValue* item, gpointer data) {
++        static_cast<GStreamerDoviSourcePolicy*>(data)->observeElement(GST_ELEMENT(g_value_get_object(item)));
++    }, policy.ptr()) == GST_ITERATOR_RESYNC)
++        gst_iterator_resync(iterator.get());
++}
++#endif
++
+ void MediaPlayerPrivateGStreamer::setPlaybinURL(const URL& url)
+ {
++#if PLATFORM(GTK) && USE(GTK4)
++    resetDoviSourcePolicy(url);
++#endif
+     // Clean out everything after file:// url path.
+     String cleanURLString(url.string());
+     if (url.protocolIsFile())
+@@ -1709,8 +1785,22 @@ void MediaPlayerPrivateGStreamer::updateEnabledVideoTrack()
+ 
+     if (m_isLegacyPlaybin) {
+         GST_DEBUG_OBJECT(m_pipeline.get(), "Setting playbin2 current-video=%d", wantedTrack->trackIndex());
++#if PLATFORM(GTK) && USE(GTK4)
++        int currentTrack = -1;
++        g_object_get(m_pipeline.get(), "current-video", &currentTrack, nullptr);
++        if (currentTrack != wantedTrack->trackIndex()) {
++            if (auto policy = doviSourcePolicy())
++                policy->advance();
++        }
++#endif
+         g_object_set(m_pipeline.get(), "current-video", wantedTrack->trackIndex(), nullptr);
+     } else {
++#if PLATFORM(GTK) && USE(GTK4)
++        if (m_wantedVideoStreamId != wantedTrack->streamId()) {
++            if (auto policy = doviSourcePolicy())
++                policy->advance();
++        }
++#endif
+         m_wantedVideoStreamId = wantedTrack->streamId();
+         playbin3SendSelectStreamsIfAppropriate();
+     }
+@@ -2712,6 +2802,10 @@ void MediaPlayerPrivateGStreamer::configureUriDecodebin2(GstElement* element)
+ void MediaPlayerPrivateGStreamer::configureElement(GstElement* element)
+ {
+     configureElementPlatformQuirks(element);
++#if PLATFORM(GTK) && USE(GTK4)
++    if (auto policy = doviSourcePolicy())
++        policy->observeElement(element);
++#endif
+ 
+     auto name = GMallocString::unsafeAdoptFromUTF8(gst_element_get_name(element));
+     String elementClass(unsafeSpan(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS)));
+@@ -3581,6 +3675,37 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
+     if (!m_audioSink)
+         m_audioSink = createAudioSink();
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    // The page compositor currently presents ordinary SDR/sRGB buffers. A
++    // destination-capable mapper can grade a decoded Dolby picture to a logical
++    // 100-nit BT709 target ahead of the page video sink. This does not request
++    // or declare HDR on the WebView's native GTK surface.
++    bool useStandardVideoDestination = player->isVideoPlayer() && !isMediaStream && !isMediaSource() && !isBlob;
++    if (useStandardVideoDestination) {
++        GRefPtr filter = makeGStreamerElement("gtkdovimap"_s);
++        if (filter) {
++            auto* filterClass = G_OBJECT_GET_CLASS(filter.get());
++            auto* abiProperty = g_object_class_find_property(filterClass, "destination-abi");
++            auto* kindProperty = g_object_class_find_property(filterClass, "destination-kind");
++            auto* sourceABIProperty = g_object_class_find_property(filterClass, "source-policy-abi");
++            auto* clearProperty = g_object_class_find_property(filterClass, "require-clear-source");
++            if (abiProperty && kindProperty && sourceABIProperty && clearProperty
++                && G_IS_PARAM_SPEC_UINT(abiProperty) && G_IS_PARAM_SPEC_UINT(kindProperty)
++                && G_IS_PARAM_SPEC_UINT(sourceABIProperty) && G_IS_PARAM_SPEC_BOOLEAN(clearProperty)) {
++                unsigned destinationABI = 0, sourceABI = 0;
++                g_object_get(filter.get(), "destination-abi", &destinationABI, "source-policy-abi", &sourceABI, nullptr);
++                if (destinationABI == 1 && sourceABI == 2) {
++                    g_object_set(filter.get(), "destination-kind", 1u, "require-clear-source", TRUE, nullptr);
++                    m_doviFilter = filter;
++                    GST_INFO_OBJECT(m_pipeline.get(), "Using explicit standard100nit BT709/sRGB video destination");
++                }
++            }
++        }
++    }
++
++
++#endif
++
+     g_object_set(m_pipeline.get(), "audio-sink", m_audioSink.get(), "video-sink", createVideoSink(), nullptr);
+ 
+     if (m_shouldPreservePitch && !isMediaStream && !GStreamerQuirksManager::singleton().needsCustomInstantRateChange()) {
+@@ -3812,7 +3937,7 @@ void MediaPlayerPrivateGStreamer::pushTextureToCompositor(bool isDuplicateSample
+     if (!m_videoInfo)
+         m_videoInfo = VideoFrameGStreamer::infoFromCaps(GRefPtr(gst_sample_get_caps(m_sample.get())));
+ 
+-    m_contentsBufferProxy->setDisplayBuffer(CoordinatedPlatformLayerBufferVideo::create(m_sample.get(), &m_videoInfo->info, m_videoInfo->dmaBufFormat, m_videoDecoderPlatform, !m_isUsingFallbackVideoSink, m_textureMapperFlags));
++    m_contentsBufferProxy->setDisplayBuffer(CoordinatedPlatformLayerBufferVideo::create(m_sample.get(), &m_videoInfo->info, m_videoInfo->dmaBufFormat, m_videoDecoderPlatform, !m_isUsingFallbackVideoSink, m_textureMapperFlags, m_videoSourceOrientation.orientation() == ImageOrientation::Orientation::OriginTopLeft));
+ }
+ #endif // USE(COORDINATED_GRAPHICS)
+ 
+@@ -4414,6 +4539,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
+         }), this);
+     }
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    // Lead the page video sink with the mapper instead of installing it as a
++    // playsink "video-filter": playbin answers decodebin's pre-exposure CAPS
++    // queries from the video sink alone, so a decoder would otherwise settle on
++    // memory the mapper refuses for a qualified Dolby stream (for example a
++    // tiled DMABuf it cannot import) and fail when the chain is finally linked.
++    if (m_doviFilter && m_videoSink) {
++        GstElement* bin = gst_bin_new("dovi-video-sink-bin");
++        gst_bin_add_many(GST_BIN_CAST(bin), m_doviFilter.get(), m_videoSink.get(), nullptr);
++        auto filterSink = adoptGRef(gst_element_get_static_pad(m_doviFilter.get(), "sink"));
++        if (gst_element_link(m_doviFilter.get(), m_videoSink.get()) && filterSink
++            && gst_element_add_pad(bin, gst_ghost_pad_new("sink", filterSink.get())))
++            return bin;
++        GST_WARNING_OBJECT(m_pipeline.get(), "Could not lead the video sink with the Dolby mapper; using an ordinary route");
++        gst_bin_remove_many(GST_BIN_CAST(bin), m_doviFilter.get(), m_videoSink.get(), nullptr);
++        gst_object_unref(gst_object_ref_sink(bin));
++        m_doviFilter = nullptr;
++    }
++#endif
+     return m_videoSink.get();
+ }
+ 
+@@ -4565,6 +4709,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
+         return;
+     }
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    // Revoke on the main thread before any key/decryptor context handoff.
++    revokeDoviSourcePolicy();
++#if USE(GSTREAMER_GL)
++    flushCurrentBuffer();
++#endif
++#endif
+     m_cdmInstance = reinterpret_cast<CDMInstanceProxy*>(&instance);
+     RELEASE_ASSERT(m_cdmInstance);
+     m_cdmInstance->setPlayer(m_player.get());
+diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
+index 61eafe79..addac269 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
++++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
+@@ -87,6 +87,9 @@ class BitmapTexture;
+ class GLContext;
+ class GraphicsContext;
+ class GraphicsContextGL;
++#if PLATFORM(GTK) && USE(GTK4)
++class GStreamerDoviSourcePolicy;
++#endif
+ class IntSize;
+ class IntRect;
+ 
+@@ -307,6 +310,11 @@ protected:
+ 
+     virtual void durationChanged();
+     virtual void sourceSetup(GstElement*);
++#if PLATFORM(GTK) && USE(GTK4)
++    RefPtr<GStreamerDoviSourcePolicy> doviSourcePolicy() const;
++    void resetDoviSourcePolicy(const URL&);
++    void revokeDoviSourcePolicy();
++#endif
+     virtual void updatePlaybackRate();
+ 
+     bool isHolePunchRenderingEnabled() const;
+@@ -417,6 +425,11 @@ protected:
+     GRefPtr<GstElement> m_audioSink;
+     GRefPtr<GstElement> m_videoSink;
+     GRefPtr<GstElement> m_pipeline;
++#if PLATFORM(GTK) && USE(GTK4)
++    GRefPtr<GstElement> m_doviFilter;
++    mutable Lock m_doviPolicyLock;
++    RefPtr<GStreamerDoviSourcePolicy> m_doviSourcePolicy WTF_GUARDED_BY_LOCK(m_doviPolicyLock);
++#endif
+     IntSize m_size;
+ 
+     String m_originalPipelineName;
+diff --git a/Source/WebCore/platform/graphics/texmap/GTKNativeVideo.h b/Source/WebCore/platform/graphics/texmap/GTKNativeVideo.h
+new file mode 100644
+index 00000000..a5204069
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/texmap/GTKNativeVideo.h
+@@ -0,0 +1,73 @@
++/*
++ * Copyright (C) 2026 ROG HDR contributors.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND ITS CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED. IN NO EVENT
++ * SHALL THE COPYRIGHT HOLDER OR ITS CONTRIBUTORS BE LIABLE FOR ANY DAMAGES
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE.
++ */
++
++#pragma once
++
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include "GTKNativeVideoLimits.h"
++#include <WebCore/IntRect.h>
++#include <WebCore/PageIdentifier.h>
++#include <WebCore/ProcessIdentifier.h>
++#include <wtf/Function.h>
++#include <array>
++#include <cmath>
++#include <wtf/unix/UnixFileDescriptor.h>
++
++namespace WebCore {
++
++// Main-thread source state goes to the owning page. UI activation is a bounded
++// live registry; a revoked token is removed and can never be reused.
++WEBCORE_EXPORT void setGTKVideoSourceStateHandler(Function<void(PageIdentifier, uint64_t, uint64_t, bool)>&&);
++WEBCORE_EXPORT void notifyGTKVideoSourceState(PageIdentifier, uint64_t, uint64_t selection, bool active);
++
++
++// One realized view binding. A new lease may reuse another surface's generation.
++struct GTKVideoTarget {
++    uint64_t revision { 0 };
++    uint64_t generation { 0 };
++    std::array<double, 8> primaries { };
++    double black { 0 };
++    double peak { 0 };
++    double reference { 0 };
++    bool ready { false };
++    bool operator==(const GTKVideoTarget&) const = default;
++};
++
++// The only transport format is opaque full-range RGBA64_LE, RGB/BT.2020/PQ.
++// Rows are tightly packed, top-down, plane zero, offset zero.
++struct GTKVideoPlane {
++    uint64_t revision;
++    uint64_t generation;
++    ProcessIdentifier sourceProcess;
++    uint64_t sourceRevision;
++    uint64_t sourceSelection;
++    uint64_t epoch;
++    uint64_t picture;
++    IntRect destination;
++    IntSize size;
++    uint32_t stride;
++    UnixFileDescriptor pixels;
++
++    static constexpr size_t maxBytes = gtkNativeVideoMaxBytes;
++    static size_t byteLength(const IntSize& size, uint32_t stride)
++    {
++        return gtkNativeVideoByteLength(size.width(), size.height(), stride);
++    }
++};
++
++} // namespace WebCore
++#endif
+diff --git a/Source/WebCore/platform/graphics/texmap/GTKNativeVideoLimits.h b/Source/WebCore/platform/graphics/texmap/GTKNativeVideoLimits.h
+new file mode 100644
+index 00000000..551a61f8
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/texmap/GTKNativeVideoLimits.h
+@@ -0,0 +1,14 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++#include <cstddef>
++#include <cstdint>
++namespace WebCore {
++constexpr size_t gtkNativeVideoMaxBytes = 64 * 1024 * 1024;
++constexpr size_t gtkNativeVideoByteLength(int width, int height, uint32_t stride)
++{
++    if (width <= 0 || height <= 0 || width > 8192 || height > 8192
++        || stride != static_cast<uint32_t>(width) * 8) return 0;
++    auto bytes = static_cast<size_t>(stride) * height;
++    return bytes <= gtkNativeVideoMaxBytes ? bytes : 0;
++}
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/texmap/GTKVideoSourceRegistry.h b/Source/WebCore/platform/graphics/texmap/GTKVideoSourceRegistry.h
+new file mode 100644
+index 00000000..25532e6d
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/texmap/GTKVideoSourceRegistry.h
+@@ -0,0 +1,36 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++#include <array>
++#include <cstdint>
++namespace WebCore {
++// One UI view/connection owns this bounded live table. Revoked history is not
++// retained; late exports must match the current selected lease exactly.
++class GTKVideoSourceRegistry {
++public:
++    bool activate(uint64_t origin, uint64_t selection)
++    {
++        if (!origin || !selection) return false;
++        for (auto& entry : m_entries)
++            if (entry.origin == origin) { entry.selection = selection; return true; }
++        for (auto& entry : m_entries)
++            if (!entry.origin) { entry = { origin, selection }; return true; }
++        return false;
++    }
++    void revoke(uint64_t origin, uint64_t selection)
++    {
++        for (auto& entry : m_entries)
++            if (entry.origin == origin && (!selection || entry.selection == selection)) entry = { };
++    }
++    bool accepts(uint64_t origin, uint64_t selection) const
++    {
++        if (!origin || !selection) return false;
++        for (const auto& entry : m_entries)
++            if (entry.origin == origin) return entry.selection == selection;
++        return false;
++    }
++    void clear() { m_entries = { }; }
++private:
++    struct Entry { uint64_t origin { 0 }; uint64_t selection { 0 }; };
++    std::array<Entry, 64> m_entries;
++};
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/texmap/TextureMapper.cpp b/Source/WebCore/platform/graphics/texmap/TextureMapper.cpp
+index 4cd60795..3683d2cc 100644
+--- a/Source/WebCore/platform/graphics/texmap/TextureMapper.cpp
++++ b/Source/WebCore/platform/graphics/texmap/TextureMapper.cpp
+@@ -232,6 +232,40 @@ ClipStack& TextureMapper::clipStack()
+     return data().currentSurface ? data().currentSurface->clipStack() : m_clipStack;
+ }
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++void TextureMapper::beginNativeVideoFrame()
++{
++    m_renderNativeVideo = nullptr;
++    m_nativeVideoDrawSerial = 0;
++    m_encounteredNativeVideo = false;
++}
++
++void TextureMapper::offerNativeVideo(uint64_t precedingDraw, const FloatRect& rect, const TransformationMatrix& transform, RenderNativeVideo&& render)
++{
++    m_encounteredNativeVideo = true;
++    // Only a single, actually issued, axis-aligned draw on the page framebuffer.
++    // Subsequent page draws that might cover this rectangle invalidate the offer.
++    if (currentSurface() || m_isMaskMode || glIsEnabled(GL_DEPTH_TEST) || m_nativeVideoDrawSerial != precedingDraw + 1
++        || !transform.isAffine() || transform.m12() || transform.m21() || transform.m11() <= 0 || transform.m22() <= 0
++        || !m_patternTransform.isIdentity() || m_wrapMode != WrapMode::Stretch
++        || clipStack().isRoundedRectClipEnabled() || clipStack().getStencilIndex() != 1)
++        return;
++    auto mapped = transform.mapRect(rect);
++    auto bounds = enclosingIntRect(mapped);
++    if (bounds.isEmpty() || FloatRect(bounds) != mapped || !clipStack().current().scissorBox.contains(bounds))
++        return;
++    m_nativeVideoRect = bounds;
++    m_renderNativeVideo = WTF::move(render);
++}
++
++std::optional<GTKVideoPlane> TextureMapper::renderNativeVideo(const GTKVideoTarget& target)
++{
++    if (!m_renderNativeVideo || !target.ready)
++        return std::nullopt;
++    return m_renderNativeVideo(target, m_nativeVideoMapper, m_nativeVideoRect);
++}
++#endif
++
+ void TextureMapper::beginPainting(FlipY flipY, BitmapTexture* surface)
+ {
+     glGetIntegerv(GL_CURRENT_PROGRAM, &data().previousProgram);
+@@ -832,6 +866,12 @@ void TextureMapper::drawSolidColor(const FloatRect& rect, const TransformationMa
+ 
+ void TextureMapper::clearColor(const Color& color)
+ {
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    if (!currentSurface()) {
++        ++m_nativeVideoDrawSerial;
++        m_renderNativeVideo = nullptr;
++    }
++#endif
+     auto [r, g, b, a] = color.toColorTypeLossy<SRGBA<float>>().resolved();
+     glClearColor(r, g, b, a);
+     glClear(GL_COLOR_BUFFER_BIT);
+@@ -879,6 +919,25 @@ void TextureMapper::drawUnitRect(TextureMapperShaderProgram& program, GLenum dra
+ 
+ void TextureMapper::draw(const FloatRect& rect, const TransformationMatrix& modelViewMatrix, TextureMapperShaderProgram& program, GLenum drawingMode, OptionSet<TextureMapperFlags> flags)
+ {
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    if (!currentSurface()) {
++        ++m_nativeVideoDrawSerial;
++        if (m_renderNativeVideo) {
++            // A later page draw may remain in the SDR bands if its rasterized
++            // bounds are provably disjoint. Unknown depth, debug lines, and
++            // perspective conservatively retain the intact SDR page.
++            if (!modelViewMatrix.isAffine() || drawingMode != GL_TRIANGLE_FAN || glIsEnabled(GL_DEPTH_TEST))
++                m_renderNativeVideo = nullptr;
++            else {
++                auto bounds = enclosingIntRect(modelViewMatrix.mapRect(rect));
++                bounds.inflate(1);
++                bounds.intersect(clipStack().current().scissorBox);
++                if (bounds.intersects(m_nativeVideoRect))
++                    m_renderNativeVideo = nullptr;
++            }
++        }
++    }
++#endif
+     TransformationMatrix matrix(modelViewMatrix);
+     matrix.multiply(TransformationMatrix::rectToRect(FloatRect(0, 0, 1, 1), rect));
+ 
+diff --git a/Source/WebCore/platform/graphics/texmap/TextureMapper.h b/Source/WebCore/platform/graphics/texmap/TextureMapper.h
+index befdb133..d84123be 100644
+--- a/Source/WebCore/platform/graphics/texmap/TextureMapper.h
++++ b/Source/WebCore/platform/graphics/texmap/TextureMapper.h
+@@ -40,6 +40,12 @@
+ 
+ typedef void *EGLImage;
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include <WebCore/GTKNativeVideo.h>
++#include <memory>
++#include <wtf/Function.h>
++#endif
++
+ namespace WebCore {
+ class BitmapTexture;
+ class ClipPath;
+@@ -88,6 +94,15 @@ public:
+     void drawSolidColor(const FloatRect&, const TransformationMatrix&, const Color&, bool);
+     void clearColor(const Color&);
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    using RenderNativeVideo = Function<std::optional<GTKVideoPlane>(const GTKVideoTarget&, std::shared_ptr<void>&, const IntRect&)>;
++    WEBCORE_EXPORT void beginNativeVideoFrame();
++    bool encounteredNativeVideo() const { return m_encounteredNativeVideo; }
++    WEBCORE_EXPORT bool hasNativeVideo() const { return !!m_renderNativeVideo; }
++    WEBCORE_EXPORT std::optional<GTKVideoPlane> renderNativeVideo(const GTKVideoTarget&);
++    uint64_t nativeVideoDrawSerial() const { return m_nativeVideoDrawSerial; }
++    void offerNativeVideo(uint64_t precedingDraw, const FloatRect&, const TransformationMatrix&, RenderNativeVideo&&);
++#endif
+     // makes a surface the target for the following drawTexture calls.
+     void bindSurface(BitmapTexture* surface);
+     BitmapTexture* currentSurface();
+@@ -146,6 +161,13 @@ private:
+ 
+     void updateProjectionMatrix();
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    RenderNativeVideo m_renderNativeVideo;
++    std::shared_ptr<void> m_nativeVideoMapper;
++    IntRect m_nativeVideoRect;
++    uint64_t m_nativeVideoDrawSerial { 0 };
++    bool m_encounteredNativeVideo { false };
++#endif
+     bool m_isMaskMode { false };
+     TransformationMatrix m_patternTransform;
+     WrapMode m_wrapMode { WrapMode::Stretch };
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp
+index b9905616..b8326095 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp
+@@ -48,22 +48,54 @@
+ #include <wtf/unix/UnixFileDescriptor.h>
+ #endif
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++#include "GTKNativeVideoSource.h"
++#include <wtf/MainThread.h>
++#include <wtf/NeverDestroyed.h>
++#endif
++
+ namespace WebCore {
+ 
+-std::unique_ptr<CoordinatedPlatformLayerBufferVideo> CoordinatedPlatformLayerBufferVideo::create(GstSample* sample, const GstVideoInfo* videoInfo, std::optional<DMABufFormat> dmabufFormat, std::optional<GstVideoDecoderPlatform> videoDecoderPlatform, bool gstGLEnabled, OptionSet<TextureMapperFlags> flags)
++#if PLATFORM(GTK) && USE(GTK4)
++static Function<void(PageIdentifier, uint64_t, uint64_t, bool)>& sourceStateHandler()
++{
++    static NeverDestroyed<Function<void(PageIdentifier, uint64_t, uint64_t, bool)>> handler;
++    return handler.get();
++}
++void setGTKVideoSourceStateHandler(Function<void(PageIdentifier, uint64_t, uint64_t, bool)>&& handler)
++{
++    ASSERT(isMainThread());
++    sourceStateHandler() = WTF::move(handler);
++}
++void notifyGTKVideoSourceState(PageIdentifier page, uint64_t revision, uint64_t selection, bool active)
++{
++    ASSERT(isMainThread());
++    if (sourceStateHandler())
++        sourceStateHandler()(page, revision, selection, active);
++}
++#endif
++
++
++std::unique_ptr<CoordinatedPlatformLayerBufferVideo> CoordinatedPlatformLayerBufferVideo::create(GstSample* sample, const GstVideoInfo* videoInfo, std::optional<DMABufFormat> dmabufFormat, std::optional<GstVideoDecoderPlatform> videoDecoderPlatform, bool gstGLEnabled, OptionSet<TextureMapperFlags> flags, bool nativeVideoEligible)
+ {
+     auto* buffer = gst_sample_get_buffer(sample);
+     if (!GST_IS_BUFFER(buffer)) [[unlikely]]
+         return nullptr;
+ 
+-    return makeUnique<CoordinatedPlatformLayerBufferVideo>(buffer, videoInfo, dmabufFormat, videoDecoderPlatform, gstGLEnabled, flags);
++    return makeUnique<CoordinatedPlatformLayerBufferVideo>(buffer, videoInfo, dmabufFormat, videoDecoderPlatform, gstGLEnabled, flags, nativeVideoEligible);
+ }
+ 
+-CoordinatedPlatformLayerBufferVideo::CoordinatedPlatformLayerBufferVideo(GstBuffer* buffer, const GstVideoInfo* videoInfo, std::optional<DMABufFormat> dmabufFormat, std::optional<GstVideoDecoderPlatform> videoDecoderPlatform, bool gstGLEnabled, OptionSet<TextureMapperFlags> flags)
++CoordinatedPlatformLayerBufferVideo::CoordinatedPlatformLayerBufferVideo(GstBuffer* buffer, const GstVideoInfo* videoInfo, std::optional<DMABufFormat> dmabufFormat, std::optional<GstVideoDecoderPlatform> videoDecoderPlatform, bool gstGLEnabled, OptionSet<TextureMapperFlags> flags, bool nativeVideoEligible)
+     : CoordinatedPlatformLayerBuffer(Type::Video, IntSize(GST_VIDEO_INFO_WIDTH(videoInfo), GST_VIDEO_INFO_HEIGHT(videoInfo)), flags, nullptr)
+     , m_videoDecoderPlatform(videoDecoderPlatform)
+     , m_buffer(createBufferIfNeeded(buffer, videoInfo, dmabufFormat, gstGLEnabled))
+ {
++#if PLATFORM(GTK) && USE(GTK4)
++    if (auto api = g_type_from_name("GstGtkDoviNativeFrameMetaAPI"); nativeVideoEligible && api && gst_buffer_get_meta(buffer, api))
++        m_nativeVideoSample = buffer;
++#else
++    UNUSED_PARAM(nativeVideoEligible);
++#endif
+ }
+ 
+ CoordinatedPlatformLayerBufferVideo::~CoordinatedPlatformLayerBufferVideo() = default;
+@@ -306,8 +338,18 @@ void CoordinatedPlatformLayerBufferVideo::paintToTextureMapper(TextureMapper& te
+         }
+     }
+ 
+-    if (m_buffer)
+-        m_buffer->paintToTextureMapper(textureMapper, targetRect, modelViewMatrix, opacity);
++    if (!m_buffer)
++        return;
++#if PLATFORM(GTK) && USE(GTK4)
++    auto precedingDraw = textureMapper.nativeVideoDrawSerial();
++#endif
++    m_buffer->paintToTextureMapper(textureMapper, targetRect, modelViewMatrix, opacity);
++#if PLATFORM(GTK) && USE(GTK4)
++    if (opacity == 1 && !m_flags.containsAny({ TextureMapperFlags::ShouldFlipTexture, TextureMapperFlags::ShouldRotateTexture90, TextureMapperFlags::ShouldRotateTexture180, TextureMapperFlags::ShouldRotateTexture270 })) {
++        if (auto render = nativeVideoRenderer(m_nativeVideoSample.get(), m_size))
++            textureMapper.offerNativeVideo(precedingDraw, targetRect, modelViewMatrix, WTF::move(render));
++    }
++#endif
+ }
+ 
+ } // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h
+index 7bab6fee..1154c489 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h
+@@ -35,8 +35,8 @@ using DMABufFormat = std::pair<uint32_t, uint64_t>;
+ 
+ class CoordinatedPlatformLayerBufferVideo final : public CoordinatedPlatformLayerBuffer {
+ public:
+-    static std::unique_ptr<CoordinatedPlatformLayerBufferVideo> create(GstSample*, const GstVideoInfo*, std::optional<DMABufFormat>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>);
+-    CoordinatedPlatformLayerBufferVideo(GstBuffer*, const GstVideoInfo*, std::optional<DMABufFormat>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>);
++    static std::unique_ptr<CoordinatedPlatformLayerBufferVideo> create(GstSample*, const GstVideoInfo*, std::optional<DMABufFormat>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>, bool nativeVideoEligible = false);
++    CoordinatedPlatformLayerBufferVideo(GstBuffer*, const GstVideoInfo*, std::optional<DMABufFormat>, std::optional<GstVideoDecoderPlatform>, bool gstGLEnabled, OptionSet<TextureMapperFlags>, bool nativeVideoEligible = false);
+     virtual ~CoordinatedPlatformLayerBufferVideo();
+ 
+     std::unique_ptr<CoordinatedPlatformLayerBuffer> copyBuffer() const;
+@@ -52,6 +52,11 @@ private:
+     std::unique_ptr<CoordinatedPlatformLayerBuffer> createBufferFromGLMemory(GstBuffer*, const GstVideoInfo*);
+ #endif
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    // Tied to this exact appsink sample. Conversion that drops the full-picture
++    // metadata also drops eligibility for native presentation.
++    GRefPtr<GstBuffer> m_nativeVideoSample;
++#endif
+     std::optional<GstMappedFrame> m_videoFrame;
+     std::optional<GstVideoDecoderPlatform> m_videoDecoderPlatform;
+     std::unique_ptr<CoordinatedPlatformLayerBuffer> m_buffer;
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/GTKNativeVideoSource.h b/Source/WebCore/platform/graphics/texmap/coordinated/GTKNativeVideoSource.h
+new file mode 100644
+index 00000000..5f530b90
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/GTKNativeVideoSource.h
+@@ -0,0 +1,153 @@
++/*
++ * Copyright (C) 2026 ROG HDR contributors.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ * 1. Redistributions of source code must retain the above copyright notice,
++ *    this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ *    this list of conditions and the following disclaimer in the documentation
++ *    and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER AND ITS CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES ARE DISCLAIMED. IN NO EVENT
++ * SHALL THE COPYRIGHT HOLDER OR ITS CONTRIBUTORS BE LIABLE FOR ANY DAMAGES
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE.
++ */
++
++#pragma once
++
++#include "GRefPtrGStreamer.h"
++#include "GTKNativeVideo.h"
++#include <gst/video/video.h>
++#include <dlfcn.h>
++#include <fcntl.h>
++#include <sys/mman.h>
++#include <unistd.h>
++
++// The source SDK is optional. Its ABI version is checked before decoding any
++// private metadata and no codec/provider library is linked into WebKit.
++#if __has_include(<gst-gtk-dovi-1.0/mapper.h>)
++#include <gst-gtk-dovi-1.0/mapper.h>
++#endif
++
++namespace WebCore {
++#if defined(GST_GTK_DOVI_DESTINATION_ABI) && defined(GST_GTK_DOVI_SOURCE_LEASE_ABI) && GST_GTK_DOVI_SOURCE_LEASE_ABI >= 2
++
++struct GTKNativeVideoAPI {
++    decltype(&gst_gtk_dovi_native_frame_from_buffer) frame { nullptr };
++    decltype(&gst_gtk_dovi_native_frame_unref) release { nullptr };
++    decltype(&gst_gtk_dovi_native_frame_source_revision) sourceRevision { nullptr };
++    decltype(&gst_gtk_dovi_native_frame_source_selection) sourceSelection { nullptr };
++    decltype(&gst_gtk_dovi_mapper_new) createMapper { nullptr };
++    decltype(&gst_gtk_dovi_mapper_free) freeMapper { nullptr };
++    decltype(&gst_gtk_dovi_native_frame_render_destination) render { nullptr };
++
++    static const GTKNativeVideoAPI& singleton()
++    {
++        static const GTKNativeVideoAPI api = [] {
++            // The matching pipeline plugin already loaded its core dependency.
++            void* core = dlopen("libgstgtkdovicore.so.0", RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
++            if (!core)
++                return GTKNativeVideoAPI { };
++            auto abi = reinterpret_cast<decltype(&gst_gtk_dovi_core_abi)>(dlsym(core, "gst_gtk_dovi_core_abi"));
++            GTKNativeVideoAPI api;
++            if (abi && abi() == GST_GTK_DOVI_CORE_ABI) {
++                api.frame = reinterpret_cast<decltype(api.frame)>(dlsym(core, "gst_gtk_dovi_native_frame_from_buffer"));
++                api.release = reinterpret_cast<decltype(api.release)>(dlsym(core, "gst_gtk_dovi_native_frame_unref"));
++                api.sourceRevision = reinterpret_cast<decltype(api.sourceRevision)>(dlsym(core, "gst_gtk_dovi_native_frame_source_revision"));
++                api.sourceSelection = reinterpret_cast<decltype(api.sourceSelection)>(dlsym(core, "gst_gtk_dovi_native_frame_source_selection"));
++                api.createMapper = reinterpret_cast<decltype(api.createMapper)>(dlsym(core, "gst_gtk_dovi_mapper_new"));
++                api.freeMapper = reinterpret_cast<decltype(api.freeMapper)>(dlsym(core, "gst_gtk_dovi_mapper_free"));
++                api.render = reinterpret_cast<decltype(api.render)>(dlsym(core, "gst_gtk_dovi_native_frame_render_destination"));
++            }
++            if (api.frame && api.release && api.sourceRevision && api.sourceSelection && api.createMapper && api.freeMapper && api.render)
++                return api;
++            dlclose(core);
++            return GTKNativeVideoAPI { };
++        }();
++        return api;
++    }
++};
++
++inline TextureMapper::RenderNativeVideo nativeVideoRenderer(GstBuffer* sample, const IntSize& displayedSize)
++{
++    if (displayedSize.isEmpty() || displayedSize.width() > 8192 || displayedSize.height() > 8192
++        || !GTKVideoPlane::byteLength(displayedSize, static_cast<uint32_t>(displayedSize.width()) * 8))
++        return { };
++    if (!sample || gst_buffer_get_video_overlay_composition_meta(sample) || !gst_meta_get_info("GstGtkDoviNativeFrameMeta"))
++        return { };
++    const auto& api = GTKNativeVideoAPI::singleton();
++    if (!api.frame)
++        return { };
++    std::shared_ptr<GstGtkDoviNativeFrame> frame(api.frame(sample, nullptr), api.release);
++    if (!frame || !api.sourceRevision(frame.get()) || !api.sourceSelection(frame.get()))
++        return { };
++    return [frame = WTF::move(frame), displayedSize](const GTKVideoTarget& target, std::shared_ptr<void>& mapper, const IntRect& rect) -> std::optional<GTKVideoPlane> {
++        const auto& api = GTKNativeVideoAPI::singleton();
++        auto sourceRevision = api.sourceRevision(frame.get());
++        auto sourceSelection = api.sourceSelection(frame.get());
++        if (!sourceRevision || !sourceSelection)
++            return std::nullopt;
++        if (!mapper)
++            mapper = std::shared_ptr<GstGtkDoviMapper>(api.createMapper(), api.freeMapper);
++        if (!mapper)
++            return std::nullopt;
++        auto context = adoptGRef(gst_context_new("gst.gtk.dovi.target.v1", false));
++        auto* s = gst_context_writable_structure(context.get());
++        gst_structure_set(s, "generation", G_TYPE_UINT64, target.generation,
++            "valid", G_TYPE_BOOLEAN, TRUE, "composed", G_TYPE_BOOLEAN, TRUE, "hdr-ready", G_TYPE_BOOLEAN, TRUE,
++            "min-nits", G_TYPE_DOUBLE, target.black, "max-nits", G_TYPE_DOUBLE, target.peak,
++            "reference-nits", G_TYPE_DOUBLE, target.reference,
++            "encoding-reference-nits", G_TYPE_DOUBLE, 203., "encoding-max-nits", G_TYPE_DOUBLE, 10000., nullptr);
++        static constexpr const char* keys[] = { "primary-r-x", "primary-r-y", "primary-g-x", "primary-g-y", "primary-b-x", "primary-b-y", "white-x", "white-y" };
++        for (unsigned i = 0; i < target.primaries.size(); ++i)
++            gst_structure_set(s, keys[i], G_TYPE_DOUBLE, target.primaries[i], nullptr);
++        GstVideoInfo info { };
++        GstBuffer* raw = nullptr;
++        guint64 epoch = 0, picture = 0;
++        int status = api.render(frame.get(), static_cast<GstGtkDoviMapper*>(mapper.get()), GST_GTK_DOVI_DESTINATION_DISPLAY_PQ, context.get(), &raw, &info, &epoch, &picture, nullptr);
++        auto pixels = adoptGRef(raw);
++        if (status != 1 || !pixels || GST_VIDEO_INFO_FORMAT(&info) != GST_VIDEO_FORMAT_RGBA64_LE
++            || info.colorimetry.transfer != GST_VIDEO_TRANSFER_SMPTE2084 || info.colorimetry.primaries != GST_VIDEO_COLOR_PRIMARIES_BT2020
++            || info.colorimetry.matrix != GST_VIDEO_COLOR_MATRIX_RGB || info.colorimetry.range != GST_VIDEO_COLOR_RANGE_0_255
++            || gst_buffer_get_video_overlay_composition_meta(pixels.get()))
++            return std::nullopt;
++        IntSize size { info.width, info.height };
++        if (size != displayedSize || size.isEmpty() || size.width() > 8192)
++            return std::nullopt;
++        uint32_t stride = size.width() * 8;
++        size_t bytes = GTKVideoPlane::byteLength(size, stride);
++        if (!bytes)
++            return std::nullopt;
++        UnixFileDescriptor fd { memfd_create("WebKit-native-video", MFD_CLOEXEC | MFD_ALLOW_SEALING), UnixFileDescriptor::Adopt };
++        if (!fd || ftruncate(fd.value(), bytes))
++            return std::nullopt;
++        GstVideoFrame mapped { };
++        if (!gst_video_frame_map(&mapped, &info, pixels.get(), GST_MAP_READ))
++            return std::nullopt;
++        bool valid = GST_VIDEO_FRAME_PLANE_STRIDE(&mapped, 0) >= static_cast<int>(stride);
++        auto* plane = static_cast<const uint8_t*>(GST_VIDEO_FRAME_PLANE_DATA(&mapped, 0));
++        for (int y = 0; valid && y < size.height(); ++y) {
++            auto* row = plane + static_cast<size_t>(y) * GST_VIDEO_FRAME_PLANE_STRIDE(&mapped, 0);
++            for (uint32_t x = 0; x < stride; x += 8) {
++                if (row[x + 6] != 255 || row[x + 7] != 255) {
++                    valid = false;
++                    break;
++                }
++            }
++            if (valid)
++                valid = pwrite(fd.value(), row, stride, static_cast<off_t>(y) * stride) == static_cast<ssize_t>(stride);
++        }
++        gst_video_frame_unmap(&mapped);
++        if (!valid || fcntl(fd.value(), F_ADD_SEALS, F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL))
++            return std::nullopt;
++        if (api.sourceRevision(frame.get()) != sourceRevision || api.sourceSelection(frame.get()) != sourceSelection)
++            return std::nullopt;
++        return GTKVideoPlane { target.revision, target.generation, Process::identifier(), sourceRevision, sourceSelection, epoch, picture, rect, size, stride, WTF::move(fd) };
++    };
++}
++#else
++inline TextureMapper::RenderNativeVideo nativeVideoRenderer(GstBuffer*, const IntSize&) { return { }; }
++#endif
++} // namespace WebCore
+diff --git a/Source/WebCore/platform/graphics/texmap/tests/GTKVideoSourceRegistry.cpp b/Source/WebCore/platform/graphics/texmap/tests/GTKVideoSourceRegistry.cpp
+new file mode 100644
+index 00000000..583fc859
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/texmap/tests/GTKVideoSourceRegistry.cpp
+@@ -0,0 +1,40 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#include "GTKVideoSourceRegistry.h"
++#include "GTKNativeVideoLimits.h"
++#include <cassert>
++#include <cstdio>
++using namespace WebCore;
++int main()
++{
++    GTKVideoSourceRegistry registry;
++    assert(registry.activate(10, 1)); // A exported plane is held by UI.
++    assert(registry.accepts(10, 1));
++    registry.revoke(10, 1); // Downstream-only S_START invalidates A before B.
++    assert(!registry.accepts(10, 1)); // Full SDR page remains available.
++    assert(registry.activate(10, 2));
++    assert(!registry.accepts(10, 1) && registry.accepts(10, 2));
++    registry.revoke(10, 1); // Late A revoke cannot remove B.
++    assert(registry.accepts(10, 2));
++    registry.revoke(10, 2); // Filter-local flush, while paused.
++    assert(!registry.accepts(10, 2));
++    assert(registry.activate(10, 3));
++    assert(!registry.accepts(10, 2) && registry.accepts(10, 3));
++    assert(registry.activate(11, 1));
++    registry.revoke(10, 0); // Synchronous whole-origin CDM/source revoke.
++    assert(!registry.accepts(10, 3) && registry.accepts(11, 1));
++    registry.clear(); // Connection/view process swap.
++    assert(!registry.accepts(11, 1));
++    for (uint64_t i = 1; i <= 64; ++i) assert(registry.activate(i, 1));
++    assert(!registry.activate(65, 1));
++    assert(registry.activate(1, 2));
++    for (uint64_t i = 1; i <= 64; ++i) registry.revoke(i, 0);
++    assert(registry.activate(65, 1)); // No tombstone/history growth.
++    int rendererCalls = 0;
++    auto render = [&](int width, int height) {
++        if (gtkNativeVideoByteLength(width, height, static_cast<uint32_t>(width) * 8)) ++rendererCalls;
++    };
++    render(4096, 2160); render(7680, 4320);
++    assert(!rendererCalls);
++    render(3840, 2160); assert(rendererCalls == 1);
++    std::puts("PASS selected-source registry, held-export revoke/restore, bounded lifetime, pre-render size envelope");
++}
+diff --git a/Source/WebKit/PlatformGTK.cmake b/Source/WebKit/PlatformGTK.cmake
+index 1985f6a6..3940e2f1 100644
+--- a/Source/WebKit/PlatformGTK.cmake
++++ b/Source/WebKit/PlatformGTK.cmake
+@@ -2,6 +2,19 @@ include(GLibMacros)
+ include(InspectorGResources.cmake)
+ include(ModernMediaControlsGResources.cmake)
+ 
++# Optional public GDK lease declarations only; runtime symbols and the actual
++# realized-surface HDR witness are still checked before native presentation.
++if (USE_GTK4 AND ENABLE_VIDEO AND USE_GSTREAMER AND ENABLE_WAYLAND_TARGET)
++    find_path(GTK_NATIVE_VIDEO_GDK_SDK_ROOT NAMES gdk/wayland/gdkwaylandsurface.h
++        PATH_SUFFIXES gtk-4.0)
++    if (GTK_NATIVE_VIDEO_GDK_SDK_ROOT)
++        set_property(SOURCE "${WEBKIT_DIR}/UIProcess/gtk/AcceleratedBackingStore.cpp"
++            APPEND PROPERTY INCLUDE_DIRECTORIES "${GTK_NATIVE_VIDEO_GDK_SDK_ROOT}")
++    endif ()
++    mark_as_advanced(GTK_NATIVE_VIDEO_GDK_SDK_ROOT)
++endif ()
++
++
+ if (ENABLE_PDFJS)
+     include(PdfJSGResources.cmake)
+ endif ()
+diff --git a/Source/WebKit/Scripts/webkit/messages.py b/Source/WebKit/Scripts/webkit/messages.py
+index f5ec305a..9ff28f37 100644
+--- a/Source/WebKit/Scripts/webkit/messages.py
++++ b/Source/WebKit/Scripts/webkit/messages.py
+@@ -151,6 +151,7 @@ def types_that_must_be_moved():
+         'IPC::Signal',
+         'IPC::StreamServerConnectionHandle',
+         'MachSendRight',
++        'std::optional<WebCore::GTKVideoPlane>',
+         'std::optional<WebKit::SharedVideoFrame>',
+         'Vector<WebCore::SharedMemory::Handle>',
+         'WebKit::WebGPU::ExternalTextureDescriptor',
+@@ -585,6 +586,8 @@ def types_that_cannot_be_forward_declared():
+         'String',
+         'WebCore::BackForwardFrameItemIdentifier',
+         'WebCore::BackForwardItemIdentifier',
++        'WebCore::GTKVideoPlane',
++        'WebCore::GTKVideoTarget',
+         'WebCore::ControlStyle',
+         'WebCore::DOMCacheIdentifier',
+         'WebCore::DOMCacheEngine::CacheIdentifierOrError',
+@@ -721,6 +724,7 @@ def conditions_for_header(header):
+         '<WebCore/ModelPlayerIdentifier.h>': ["ENABLE(MODEL_PROCESS)"],
+         '<WebCore/PlaybackTargetClientContextIdentifier.h>': ["ENABLE(WIRELESS_PLAYBACK_TARGET)"],
+         '<WebCore/SoupNetworkProxySettings.h>': ["USE(SOUP)"],
++        '<WebCore/GTKNativeVideo.h>': ['PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)'],
+         '<WebCore/SelectionData.h>': ["PLATFORM(GTK)", "PLATFORM(WPE)"],
+         '<WebCore/TimelineIdentifier.h>': ["ENABLE(THREADED_ANIMATIONS)"],
+         '<WebCore/VideoFrameCV.h>': ["PLATFORM(COCOA)", ],
+@@ -1199,6 +1203,8 @@ def headers_for_type(type, for_implementation_file=False):
+         'WebCore::DragOperation': ['<WebCore/DragActions.h>'],
+         'WebCore::DragSourceAction': ['<WebCore/DragActions.h>'],
+         'WebCore::DynamicRangeMode': ['<WebCore/PlatformScreen.h>'],
++        'WebCore::GTKVideoTarget': ['<WebCore/GTKNativeVideo.h>'],
++        'WebCore::GTKVideoPlane': ['<WebCore/GTKNativeVideo.h>'],
+         'WebCore::ElementAnimationContext': ['<WebCore/ElementAnimationContext.h>'],
+         'WebCore::ElementContext': ['<WebCore/ElementContext.h>'],
+         'WebCore::EncryptionBoxType': ['<WebCore/TrackInfo.h>'],
+diff --git a/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in b/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in
+index 7ac4cbbe..8dcd33c8 100644
+--- a/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in
++++ b/Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in
+@@ -9250,3 +9250,30 @@ header: <WebCore/EventHandler.h>
+     Wheel,
+     Touch
+ };
++
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++header: <WebCore/GTKNativeVideo.h>
++[CustomHeader] struct WebCore::GTKVideoTarget {
++    uint64_t revision;
++    uint64_t generation;
++    std::array<double, 8> primaries;
++    double black;
++    double peak;
++    double reference;
++    bool ready;
++};
++
++[RValue, CustomHeader] struct WebCore::GTKVideoPlane {
++    uint64_t revision;
++    uint64_t generation;
++    WebCore::ProcessIdentifier sourceProcess;
++    uint64_t sourceRevision;
++    uint64_t sourceSelection;
++    uint64_t epoch;
++    uint64_t picture;
++    WebCore::IntRect destination;
++    WebCore::IntSize size;
++    uint32_t stride;
++    UnixFileDescriptor pixels;
++};
++#endif
+diff --git a/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBase.cpp b/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBase.cpp
+index dae663ad..de4d1041 100644
+--- a/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBase.cpp
++++ b/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBase.cpp
+@@ -3751,3 +3751,11 @@ void webkitWebViewBaseSetCursor(WebKitWebViewBase* webViewBase, const Cursor& cu
+     gdk_window_set_cursor(window, newCursor.get());
+ #endif // USE(GTK4)
+ }
++
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++void webkitWebViewBaseSetGTKVideoSourceState(WebKitWebViewBase* view, WebCore::ProcessIdentifier process, uint64_t revision, uint64_t selection, bool active)
++{
++    if (view->priv->acceleratedBackingStore)
++        view->priv->acceleratedBackingStore->setVideoSourceState(process, revision, selection, active);
++}
++#endif
+diff --git a/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBasePrivate.h b/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBasePrivate.h
+index d84099f5..364ed2eb 100644
+--- a/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBasePrivate.h
++++ b/Source/WebKit/UIProcess/API/gtk/WebKitWebViewBasePrivate.h
+@@ -147,3 +147,7 @@ void webkitWebViewBaseSetPlugID(WebKitWebViewBase*, const String&);
+ 
+ WebKit::RendererBufferDescription webkitWebViewBaseGetRendererBufferDescription(WebKitWebViewBase*);
+ void webkitWebViewBaseSetCursor(WebKitWebViewBase*, const WebCore::Cursor&);
++
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++void webkitWebViewBaseSetGTKVideoSourceState(WebKitWebViewBase*, WebCore::ProcessIdentifier, uint64_t revision, uint64_t selection, bool active);
++#endif
+diff --git a/Source/WebKit/UIProcess/WebPageProxy.h b/Source/WebKit/UIProcess/WebPageProxy.h
+index 0a2be51f..71775d07 100644
+--- a/Source/WebKit/UIProcess/WebPageProxy.h
++++ b/Source/WebKit/UIProcess/WebPageProxy.h
+@@ -1380,6 +1380,9 @@ public:
+ 
+ #if PLATFORM(GTK)
+     GtkWidget* viewWidget();
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    void setGTKVideoSourceState(IPC::Connection&, WebCore::ProcessIdentifier, uint64_t revision, uint64_t selection, bool active);
++#endif
+ #endif
+ 
+ #if PLATFORM(GTK) && HAVE(APP_ACCENT_COLORS)
+diff --git a/Source/WebKit/UIProcess/WebPageProxy.messages.in b/Source/WebKit/UIProcess/WebPageProxy.messages.in
+index 6b6c9890..f71bd2c3 100644
+--- a/Source/WebKit/UIProcess/WebPageProxy.messages.in
++++ b/Source/WebKit/UIProcess/WebPageProxy.messages.in
+@@ -27,6 +27,9 @@ Copyright (C) 2010-2024 Apple Inc. All rights reserved.
+     SharedPreferencesNeedsConnection
+ ]
+ messages -> WebPageProxy {
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    SetGTKVideoSourceState(WebCore::ProcessIdentifier process, uint64_t revision, uint64_t selection, bool active)
++#endif
+     # UI messages
+     CreateNewPage(struct WebCore::WindowFeatures windowFeatures, struct WebKit::NavigationActionData navigationActionData) -> (std::optional<WebCore::PageIdentifier> newPageID, std::optional<WebKit::WebPageCreationParameters> newPageParameters) Synchronous
+     ShowPage()
+diff --git a/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in b/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in
+index 49092f08..b3af61aa 100644
+--- a/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in
++++ b/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in
+@@ -33,6 +33,9 @@ messages -> AcceleratedBackingStore {
+     DidCreateAndroidBuffer(uint64_t id, RefPtr<AHardwareBuffer> androidBuffer)
+ #endif
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    VideoFrame(uint64_t id, Vector<WebCore::IntRect, 1> damage, UnixFileDescriptor syncFD, uint64_t serial, std::optional<WebCore::GTKVideoPlane> plane)
++#endif
+     DidDestroyBuffer(uint64_t id)
+     Frame(uint64_t id, Vector<WebCore::IntRect, 1> damage, UnixFileDescriptor syncFD)
+ 
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+index d244f303..4e6f7c76 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+@@ -77,6 +77,14 @@ IGNORE_CLANG_WARNINGS_END
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+ #endif
+ 
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include <sys/stat.h>
++#if PLATFORM(WAYLAND)
++#include <gdk/wayland/gdkwayland.h>
++#include <dlfcn.h>
++#endif
++#endif
++
+ namespace WebKit {
+ using namespace WebCore;
+ 
+@@ -266,6 +274,9 @@ AcceleratedBackingStore::AcceleratedBackingStore(WebPageProxy& webPage)
+ 
+ AcceleratedBackingStore::~AcceleratedBackingStore()
+ {
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    clearVideoBinding();
++#endif
+     if (m_surfaceID) {
+         if (RefPtr legacyMainFrameProcess = m_legacyMainFrameProcess.get())
+             legacyMainFrameProcess->removeMessageReceiver(Messages::AcceleratedBackingStore::messageReceiverName(), m_surfaceID);
+@@ -749,9 +760,193 @@ void AcceleratedBackingStore::didDestroyBuffer(uint64_t id)
+     m_buffers.remove(id);
+ }
+ 
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++void AcceleratedBackingStore::clearVideoBinding()
++{
++    if (m_videoLease)
++        g_signal_handlers_disconnect_by_data(m_videoLease.get(), this);
++    if (m_videoSurface)
++        g_signal_handlers_disconnect_by_data(m_videoSurface.get(), this);
++    m_videoLease = nullptr;
++    m_videoSurface = nullptr;
++    m_videoTexture = nullptr;
++    m_committedPlane.reset();
++    m_pendingPlane.reset();
++}
++
++void AcceleratedBackingStore::updateVideoTarget(bool candidate)
++{
++    GTKVideoTarget target;
++    target.revision = m_videoTarget.revision;
++#if PLATFORM(WAYLAND) && defined(GDK_TYPE_WAYLAND_HDR_RENDERING)
++    static auto request = reinterpret_cast<decltype(&gdk_wayland_surface_request_hdr_rendering)>(dlsym(RTLD_DEFAULT, "gdk_wayland_surface_request_hdr_rendering"));
++    static auto physicalTarget = reinterpret_cast<decltype(&gdk_wayland_surface_get_color_target)>(dlsym(RTLD_DEFAULT, "gdk_wayland_surface_get_color_target"));
++    static auto renderState = reinterpret_cast<decltype(&gdk_wayland_hdr_rendering_get_state)>(dlsym(RTLD_DEFAULT, "gdk_wayland_hdr_rendering_get_state"));
++    auto* widget = m_webPage ? m_webPage->viewWidget() : nullptr;
++    auto* native = candidate && widget && gtk_widget_get_mapped(widget) ? gtk_widget_get_native(widget) : nullptr;
++    auto* surface = native ? gtk_native_get_surface(native) : nullptr;
++    if (surface != m_videoSurface.get()) {
++        clearVideoBinding();
++        ++target.revision;
++    }
++    if (surface && GDK_IS_WAYLAND_SURFACE(surface) && request && physicalTarget && renderState) {
++        if (!m_videoLease) {
++            m_videoSurface = surface;
++            m_videoLease = adoptGRef(G_OBJECT(request(surface)));
++            if (m_videoLease) {
++                auto changed = +[](AcceleratedBackingStore* self) {
++                    self->updateVideoTarget(self->m_videoCandidate);
++                    if (self->m_webPage)
++                        gtk_widget_queue_draw(self->m_webPage->viewWidget());
++                };
++                g_signal_connect_swapped(m_videoLease.get(), "changed", G_CALLBACK(changed), this);
++                g_signal_connect_swapped(surface, "color-target-changed", G_CALLBACK(changed), this);
++            }
++        }
++        GdkWaylandHdrRenderState state { };
++        GdkWaylandColorTarget physical { };
++        if (m_videoLease && physicalTarget(surface, &physical) && renderState(reinterpret_cast<GdkWaylandHdrRendering*>(m_videoLease.get()), &state)
++            && state.generation == physical.generation && std::min({ state.red_bits, state.green_bits, state.blue_bits }) >= 10
++            && state.color_primaries == 9 && state.transfer_function == 16 && !state.matrix_coefficients && state.range == GDK_CICP_RANGE_FULL
++            && state.reference_luminance == 203 && state.max_luminance == 10000
++            && std::isfinite(physical.max_luminance) && std::isfinite(physical.min_luminance)
++            && physical.max_luminance > physical.min_luminance && physical.min_luminance >= 0
++            && std::isfinite(physical.reference_luminance) && physical.reference_luminance > 0) {
++            target.generation = physical.generation;
++            std::copy_n(physical.primaries, target.primaries.size(), target.primaries.begin());
++            target.black = physical.min_luminance;
++            target.peak = physical.max_luminance;
++            target.reference = physical.reference_luminance;
++            target.ready = std::ranges::all_of(target.primaries, [](double value) { return std::isfinite(value); });
++        }
++    }
++#else
++    UNUSED_PARAM(candidate);
++#endif
++    if (m_videoTarget == target)
++        return;
++    target.revision = m_videoTarget.revision + 1;
++    m_videoTarget = target;
++    m_videoTexture = nullptr;
++    if (m_surfaceID) {
++        if (RefPtr process = m_legacyMainFrameProcess.get())
++            process->send(Messages::AcceleratedSurface::SetVideoTarget(target), m_surfaceID);
++    }
++}
++
++void AcceleratedBackingStore::setVideoSourceState(ProcessIdentifier process, uint64_t revision, uint64_t selection, bool active)
++{
++    if (!revision || !m_webPage || m_webPage->legacyMainFrameProcess().coreProcessIdentifier() != process)
++        return;
++    if (m_sourceProcess != process) {
++        m_activeVideoSources.clear();
++        m_sourceProcess = process;
++    }
++    if (active) {
++        if (!m_activeVideoSources.activate(revision, selection))
++            return;
++        if (m_surfaceID) {
++            if (RefPtr source = m_legacyMainFrameProcess.get(); source && source->coreProcessIdentifier() == process)
++                source->send(Messages::AcceleratedSurface::SourceActivated(revision), m_surfaceID);
++        }
++    } else
++        m_activeVideoSources.revoke(revision, selection);
++    auto accepts = [&](const GTKVideoPlane& plane) {
++        return m_sourceProcess == plane.sourceProcess
++            && m_activeVideoSources.accepts(plane.sourceRevision, plane.sourceSelection);
++    };
++    if (m_pendingPlane && !accepts(*m_pendingPlane))
++        m_pendingPlane.reset();
++    if (m_committedPlane && !accepts(*m_committedPlane)) {
++        m_committedPlane.reset(); m_videoTexture = nullptr;
++    }
++    gtk_widget_queue_draw(m_webPage->viewWidget());
++}
++
++void AcceleratedBackingStore::videoFrame(uint64_t id, Rects&& damage, UnixFileDescriptor&& fence, uint64_t serial, std::optional<GTKVideoPlane>&& plane)
++{
++    frame(id, WTF::move(damage), WTF::move(fence));
++    if (!m_pendingBuffer || m_pendingBuffer->id() != id || serial <= m_lastVideoSerial)
++        return;
++    m_lastVideoSerial = serial;
++    m_pendingVideoCandidate = true;
++    if (plane && (m_sourceProcess != plane->sourceProcess || !m_activeVideoSources.accepts(plane->sourceRevision, plane->sourceSelection)))
++        plane.reset();
++    m_pendingPlane = WTF::move(plane);
++}
++
++bool AcceleratedBackingStore::snapshotNativeVideo(GtkSnapshot* snapshot)
++{
++#if GTK_CHECK_VERSION(4, 16, 0) && G_BYTE_ORDER == G_LITTLE_ENDIAN
++    if (!m_videoTarget.ready || !m_committedPlane || !m_committedBuffer->texture())
++        return false;
++    auto& plane = *m_committedPlane;
++    const auto& extent = m_committedBuffer->pixelSize();
++    const auto& rect = plane.destination;
++    if (m_sourceProcess != plane.sourceProcess || !m_activeVideoSources.accepts(plane.sourceRevision, plane.sourceSelection)
++        || plane.revision != m_videoTarget.revision || plane.generation != m_videoTarget.generation || rect.isEmpty()
++        || rect.x() < 0 || rect.y() < 0 || rect.width() > extent.width() - rect.x() || rect.height() > extent.height() - rect.y())
++        return false;
++    if (!m_videoTexture) {
++        size_t bytes = GTKVideoPlane::byteLength(plane.size, plane.stride);
++        struct stat st { };
++        constexpr int requiredSeals = F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW;
++        int seals = plane.pixels ? fcntl(plane.pixels.value(), F_GET_SEALS) : -1;
++        if (!bytes || seals < 0 || (seals & requiredSeals) != requiredSeals || fstat(plane.pixels.value(), &st)
++            || !S_ISREG(st.st_mode) || st.st_size != static_cast<off_t>(bytes))
++            return false;
++        GMappedFile* file = g_mapped_file_new_from_fd(plane.pixels.value(), false, nullptr);
++        if (!file)
++            return false;
++        auto pixels = adoptGRef(g_mapped_file_get_bytes(file));
++        g_mapped_file_unref(file);
++        auto builder = adoptGRef(gdk_memory_texture_builder_new());
++        gdk_memory_texture_builder_set_bytes(builder.get(), pixels.get());
++        gdk_memory_texture_builder_set_width(builder.get(), plane.size.width());
++        gdk_memory_texture_builder_set_height(builder.get(), plane.size.height());
++        gdk_memory_texture_builder_set_stride(builder.get(), plane.stride);
++        gdk_memory_texture_builder_set_format(builder.get(), GDK_MEMORY_R16G16B16A16);
++        gdk_memory_texture_builder_set_color_state(builder.get(), gdk_color_state_get_rec2100_pq());
++        m_videoTexture = adoptGRef(gdk_memory_texture_builder_build(builder.get()));
++        if (!m_videoTexture)
++            return false;
++    }
++
++    float scale = m_committedBuffer->deviceScaleFactor();
++    auto clip = [scale](const IntRect& r) -> graphene_rect_t {
++        return GRAPHENE_RECT_INIT(r.x() / scale, r.y() / scale, r.width() / scale, r.height() / scale);
++    };
++    auto bounds = clip(rect);
++    gtk_snapshot_append_texture(snapshot, m_videoTexture.get(), &bounds);
++    // Keep the full SDR page available. Construct the hole in this GTK snapshot
++    // only; a revoked target can immediately present the very same SDR frame.
++    const IntRect bands[] = {
++        { 0, 0, extent.width(), rect.y() }, { 0, rect.maxY(), extent.width(), extent.height() - rect.maxY() },
++        { 0, rect.y(), rect.x(), rect.height() }, { rect.maxX(), rect.y(), extent.width() - rect.maxX(), rect.height() }
++    };
++    for (const auto& band : bands) {
++        if (band.isEmpty())
++            continue;
++        auto bounds = clip(band);
++        gtk_snapshot_push_clip(snapshot, &bounds);
++        m_committedBuffer->snapshot(snapshot);
++        gtk_snapshot_pop(snapshot);
++    }
++    return true;
++#else
++    UNUSED_PARAM(snapshot);
++    return false;
++#endif
++}
++#endif
++
+ void AcceleratedBackingStore::frame(uint64_t bufferID, Rects&& damageRects, WTF::UnixFileDescriptor&& renderingFenceFD)
+ {
+     ASSERT(!m_pendingBuffer);
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    m_pendingVideoCandidate = false;
++    m_pendingPlane.reset();
++#endif
+     auto* buffer = m_buffers.get(bufferID);
+     if (!buffer) {
+         frameDone();
+@@ -775,6 +970,12 @@ void AcceleratedBackingStore::realize()
+ 
+ void AcceleratedBackingStore::unrealize()
+ {
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    m_videoCandidate = false;
++    m_pendingVideoCandidate = false;
++    updateVideoTarget(false);
++    clearVideoBinding();
++#endif
+     m_committedBuffer = nullptr;
+ 
+     if (m_gdkGLContext && m_gdkGLContext.get() == gdk_gl_context_get_current())
+@@ -824,6 +1025,19 @@ void AcceleratedBackingStore::update(const LayerTreeContext& context)
+             legacyMainFrameProcess->removeMessageReceiver(Messages::AcceleratedBackingStore::messageReceiverName(), m_surfaceID);
+     }
+ 
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    clearVideoBinding();
++    ++m_videoTarget.revision;
++    m_videoTarget.ready = false;
++    m_videoCandidate = false;
++    m_pendingVideoCandidate = false;
++    m_lastVideoSerial = 0;
++#endif
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    if (m_webPage && m_sourceProcess != m_webPage->legacyMainFrameProcess().coreProcessIdentifier()) {
++        m_activeVideoSources.clear(); m_sourceProcess.reset();
++    }
++#endif
+     m_surfaceID = context.contextID;
+     if (m_surfaceID && m_webPage) {
+         m_legacyMainFrameProcess = m_webPage->legacyMainFrameProcess();
+@@ -847,6 +1061,11 @@ bool AcceleratedBackingStore::swapBuffersIfNeeded()
+         m_committedBuffer->release();
+ 
+     m_committedBuffer = WTF::move(m_pendingBuffer);
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    m_videoCandidate = std::exchange(m_pendingVideoCandidate, false);
++    m_committedPlane = std::exchange(m_pendingPlane, std::nullopt);
++    m_videoTexture = nullptr;
++#endif
+     return true;
+ }
+ 
+@@ -857,7 +1076,11 @@ bool AcceleratedBackingStore::snapshot(GtkSnapshot* gtkSnapshot)
+     if (!m_committedBuffer)
+         return false;
+ 
+-    m_committedBuffer->snapshot(gtkSnapshot);
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    updateVideoTarget(m_videoCandidate);
++    if (!snapshotNativeVideo(gtkSnapshot))
++#endif
++        m_committedBuffer->snapshot(gtkSnapshot);
+     if (didSwapBuffers)
+         frameDone();
+ 
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+index ae5bcc61..7cde20f4 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+@@ -40,6 +40,11 @@
+ #include <wtf/glib/GRefPtr.h>
+ #include <wtf/unix/UnixFileDescriptor.h>
+ 
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include <WebCore/GTKNativeVideo.h>
++#include <WebCore/GTKVideoSourceRegistry.h>
++#endif
++
+ typedef void *EGLImage;
+ 
+ #if USE(GBM)
+@@ -75,6 +80,9 @@ public:
+     void deref() const final { RefCounted::deref(); }
+ 
+     void update(const LayerTreeContext&);
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    void setVideoSourceState(WebCore::ProcessIdentifier, uint64_t, uint64_t, bool);
++#endif
+ #if USE(GTK4)
+     bool snapshot(GtkSnapshot*);
+ #else
+@@ -96,6 +104,12 @@ private:
+     void didDestroyBuffer(uint64_t id);
+     void frame(uint64_t id, Rects&&, WTF::UnixFileDescriptor&&);
+     void frameDone();
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    void videoFrame(uint64_t, Rects&&, WTF::UnixFileDescriptor&&, uint64_t, std::optional<WebCore::GTKVideoPlane>&&);
++    void updateVideoTarget(bool candidate);
++    bool snapshotNativeVideo(GtkSnapshot*);
++    void clearVideoBinding();
++#endif
+ 
+     void ensureGLContext();
+     bool swapBuffersIfNeeded();
+@@ -129,6 +143,7 @@ private:
+         virtual void release() = 0;
+ 
+         uint64_t id() const { return m_id; }
++        const WebCore::IntSize& pixelSize() const { return m_size; }
+         float deviceScaleFactor() const;
+         void setSurfaceID(uint64_t surfaceID) { m_surfaceID = surfaceID; }
+ #if USE(GTK4)
+@@ -248,6 +263,19 @@ private:
+     WeakPtr<WebProcessProxy> m_legacyMainFrameProcess;
+     RefPtr<Buffer> m_pendingBuffer;
+     RefPtr<Buffer> m_committedBuffer;
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    WebCore::GTKVideoTarget m_videoTarget;
++    std::optional<WebCore::ProcessIdentifier> m_sourceProcess;
++    WebCore::GTKVideoSourceRegistry m_activeVideoSources;
++    GRefPtr<GdkSurface> m_videoSurface;
++    GRefPtr<GObject> m_videoLease;
++    uint64_t m_lastVideoSerial { 0 };
++    bool m_videoCandidate { false };
++    bool m_pendingVideoCandidate { false };
++    std::optional<WebCore::GTKVideoPlane> m_pendingPlane;
++    std::optional<WebCore::GTKVideoPlane> m_committedPlane;
++    GRefPtr<GdkTexture> m_videoTexture;
++#endif
+     Rects m_pendingDamageRects;
+     HashMap<uint64_t, RefPtr<Buffer>> m_buffers;
+ };
+diff --git a/Source/WebKit/UIProcess/gtk/WebPageProxyGtk.cpp b/Source/WebKit/UIProcess/gtk/WebPageProxyGtk.cpp
+index 951e0e73..a247d4ae 100644
+--- a/Source/WebKit/UIProcess/gtk/WebPageProxyGtk.cpp
++++ b/Source/WebKit/UIProcess/gtk/WebPageProxyGtk.cpp
+@@ -58,6 +58,17 @@ GtkWidget* WebPageProxy::viewWidget()
+     return pageClient ? static_cast<PageClientImpl&>(*pageClient).viewWidget() : nullptr;
+ }
+ 
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++void WebPageProxy::setGTKVideoSourceState(IPC::Connection& connection, WebCore::ProcessIdentifier process, uint64_t revision, uint64_t selection, bool active)
++{
++    auto& source = legacyMainFrameProcess();
++    if (!source.hasConnection() || &source.connection() != &connection || source.coreProcessIdentifier() != process)
++        return;
++    if (auto* widget = viewWidget())
++        webkitWebViewBaseSetGTKVideoSourceState(WEBKIT_WEB_VIEW_BASE(widget), process, revision, selection, active);
++}
++#endif
++
+ void WebPageProxy::bindAccessibilityTree(const String& plugID)
+ {
+ #if USE(GTK4)
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+index fc00aa6e..2df014dc 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+@@ -196,6 +196,12 @@ AcceleratedSurface::RenderTargetShareableBuffer::~RenderTargetShareableBuffer()
+ 
+ void AcceleratedSurface::RenderTargetShareableBuffer::didRenderFrame(Vector<IntRect, 1>&& damageRects)
+ {
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    if (auto serial = std::exchange(m_videoSerial, 0)) {
++        WebProcess::singleton().parentProcessConnection()->send(Messages::AcceleratedBackingStore::VideoFrame(m_id, WTF::move(damageRects), WTF::move(m_renderingFenceFD), serial, std::exchange(m_videoPlane, std::nullopt)), m_surfaceID);
++        return;
++    }
++#endif
+     WebProcess::singleton().parentProcessConnection()->send(Messages::AcceleratedBackingStore::Frame(m_id, WTF::move(damageRects), WTF::move(m_renderingFenceFD)), m_surfaceID);
+ }
+ 
+@@ -998,6 +1004,9 @@ void AcceleratedSurface::didCreateCompositingRunLoop(RunLoop& runLoop)
+ void AcceleratedSurface::willDestroyCompositingRunLoop()
+ {
+     m_frameCompleteHandler = nullptr;
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    m_nativeVideoRedraw = nullptr;
++#endif
+ 
+ #if USE(WPE_RENDERER)
+     if (m_swapChain.type() == SwapChain::Type::WPEBackend)
+@@ -1034,6 +1043,31 @@ GraphicsContext* AcceleratedSurface::graphicsContext()
+     return m_target ? m_target->graphicsContext() : nullptr;
+ }
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++void AcceleratedSurface::setVideoTarget(GTKVideoTarget&& target)
++{
++    if (target.revision <= m_videoTarget.revision)
++        return;
++    m_videoTarget = WTF::move(target);
++    if (m_nativeVideoRedraw)
++        m_nativeVideoRedraw();
++}
++
++void AcceleratedSurface::sourceActivated(uint64_t revision)
++{
++    // Source registration may reach UI after a paused picture's first export.
++    // Redraw that retained picture without changing the actual target lease.
++    if (revision && m_nativeVideoRedraw)
++        m_nativeVideoRedraw();
++}
++
++void AcceleratedSurface::setNativeVideoFrame(bool candidate, std::optional<GTKVideoPlane>&& plane)
++{
++    if (m_target && candidate)
++        m_target->setVideoFrame(++m_videoSerial, WTF::move(plane));
++}
++#endif
++
+ void AcceleratedSurface::willRenderFrame(const IntSize& size)
+ {
+     bool sizeDidChange = m_swapChain.resize(size);
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
+index 334bdd9c..3970e996 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
+@@ -67,6 +67,10 @@ typedef void *EGLImage;
+ struct wpe_renderer_backend_egl_target;
+ #endif
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include <WebCore/GTKNativeVideo.h>
++#endif
++
+ namespace WTF {
+ class RunLoop;
+ }
+@@ -115,6 +119,12 @@ public:
+ 
+     WebCore::GraphicsContext* graphicsContext();
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    const WebCore::GTKVideoTarget& nativeVideoTarget() const { return m_videoTarget; }
++    void setNativeVideoFrame(bool candidate, std::optional<WebCore::GTKVideoPlane>&&);
++    void setNativeVideoRedrawHandler(Function<void()>&& redraw) { m_nativeVideoRedraw = WTF::move(redraw); }
++#endif
++
+     void willDestroyGLContext();
+     void willRenderFrame(const WebCore::IntSize&);
+     void didRenderFrame();
+@@ -144,6 +154,10 @@ private:
+     void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
+ 
+     void releaseBuffer(uint64_t, WTF::UnixFileDescriptor&&);
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    void setVideoTarget(WebCore::GTKVideoTarget&&);
++    void sourceActivated(uint64_t);
++#endif
+ #endif
+     void frameDone();
+     void releaseUnusedBuffersTimerFired();
+@@ -154,6 +168,13 @@ private:
+         virtual ~RenderTarget();
+ 
+         uint64_t id() const { return m_id; }
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++        void setVideoFrame(uint64_t serial, std::optional<WebCore::GTKVideoPlane>&& plane)
++        {
++            m_videoSerial = serial;
++            m_videoPlane = WTF::move(plane);
++        }
++#endif
+ 
+         virtual WebCore::GraphicsContext* graphicsContext() { RELEASE_ASSERT_NOT_REACHED(); }
+ 
+@@ -171,6 +192,10 @@ private:
+ 
+     protected:
+         explicit RenderTarget(uint64_t);
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++        uint64_t m_videoSerial { 0 };
++        std::optional<WebCore::GTKVideoPlane> m_videoPlane;
++#endif
+ 
+         uint64_t m_id { 0 };
+         uint64_t m_surfaceID { 0 };
+@@ -383,6 +408,11 @@ private:
+ 
+     static constexpr ColorComponents white { 1.f, 1.f, 1.f, WebCore::AlphaTraits<float>::opaque };
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    WebCore::GTKVideoTarget m_videoTarget;
++    Function<void()> m_nativeVideoRedraw;
++    uint64_t m_videoSerial { 0 };
++#endif
+     WeakRef<WebPage> m_webPage;
+     Function<void()> m_frameCompleteHandler;
+     uint64_t m_id { 0 };
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in
+index 8548e591..af9b3ad0 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in
+@@ -28,4 +28,8 @@
+ messages -> AcceleratedSurface {
+     ReleaseBuffer(uint64_t id, UnixFileDescriptor releaseFence)
+     FrameDone()
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    SetVideoTarget(struct WebCore::GTKVideoTarget target)
++    SourceActivated(uint64_t revision)
++#endif
+ }
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp
+index a23514cb..46c2984e 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp
+@@ -101,6 +101,9 @@ ThreadedCompositor::ThreadedCompositor(LayerTreeHost& layerTreeHost)
+             glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
+ 
+             m_textureMapper = TextureMapper::create();
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++            m_surface->setNativeVideoRedrawHandler([this] { requestComposition(CompositionReason::VideoFrame); });
++#endif
+         }
+     });
+ }
+@@ -272,6 +275,12 @@ void ThreadedCompositor::paintToCurrentGLContext(const TransformationMatrix& mat
+ 
+     bool sceneHasRunningAnimations = currentRootLayer.applyAnimationsRecursively(MonotonicTime::now());
+ 
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#if ENABLE(DAMAGE_TRACKING)
++    bool hadNativePicture = m_textureMapper->encounteredNativeVideo();
++#endif
++    m_textureMapper->beginNativeVideoFrame();
++#endif
+     m_textureMapper->beginPainting(m_flipY ? TextureMapper::FlipY::Yes : TextureMapper::FlipY::No);
+     m_textureMapper->beginClip(TransformationMatrix(), FloatRoundedRect(clipRect));
+ 
+@@ -290,7 +299,16 @@ void ThreadedCompositor::paintToCurrentGLContext(const TransformationMatrix& mat
+ 
+         m_surface->setFrameDamage(WTF::move(frameDamage));
+ 
+-        if (m_damage.flags->contains(DamagePropagationFlags::UseForCompositing)) {
++        bool usePartialDamage = m_damage.flags->contains(DamagePropagationFlags::UseForCompositing);
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++        // A native candidate needs an entire paint traversal to prove occlusion.
++        // Video-frame compositions also cover paused retargeting.
++        if (hadNativePicture || m_surface->nativeVideoTarget().ready) {
++            usePartialDamage = false;
++            m_textureMapper->setDamage(std::nullopt);
++        }
++#endif
++        if (usePartialDamage) {
+             const auto& damageSinceLastSurfaceUse = m_surface->renderTargetDamage();
+             if (damageSinceLastSurfaceUse && !FloatRect(damageSinceLastSurfaceUse->bounds()).contains(clipRect))
+                 rectContainingRegionThatActuallyChanged = FloatRoundedRect(damageSinceLastSurfaceUse->bounds());
+@@ -325,6 +343,16 @@ void ThreadedCompositor::paintToCurrentGLContext(const TransformationMatrix& mat
+ 
+     m_textureMapper->endClip();
+     m_textureMapper->endPainting();
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    bool nativeCandidate = m_textureMapper->hasNativeVideo();
++#if ENABLE(DAMAGE_TRACKING)
++    bool completeTraversal = !m_textureMapper->damage() || m_textureMapper->damage()->mode() == Damage::Mode::Full;
++    if (!completeTraversal && !hadNativePicture && m_textureMapper->encounteredNativeVideo())
++        requestComposition(CompositionReason::VideoFrame);
++    nativeCandidate &= completeTraversal;
++#endif
++    m_surface->setNativeVideoFrame(nativeCandidate, nativeCandidate ? m_textureMapper->renderNativeVideo(m_surface->nativeVideoTarget()) : std::nullopt);
++#endif
+ 
+     if (sceneHasRunningAnimations)
+         requestComposition(CompositionReason::Animation);
+diff --git a/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp b/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
+index 8e88b4bb..2dd16c07 100644
+--- a/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
++++ b/Source/WebKit/WebProcess/glib/WebProcessGLib.cpp
+@@ -31,6 +31,8 @@
+ #include "SystemSettingsManager.h"
+ #include "WebKitWebProcessExtensionPrivate.h"
+ #include "WebPage.h"
++#include "WebPageProxyMessages.h"
++#include "MessageSenderInlines.h"
+ #include "WebProcessCreationParameters.h"
+ #include "WebProcessExtensionManager.h"
+ #include "WebSystemSoundDelegate.h"
+@@ -45,6 +47,9 @@
+ 
+ #if USE(GSTREAMER)
+ #include <WebCore/GStreamerCommon.h>
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO)
++#include <WebCore/GTKNativeVideo.h>
++#endif
+ #endif
+ 
+ #include <WebCore/ApplicationGLib.h>
+@@ -193,6 +198,12 @@ void WebProcess::initializePlatformDisplayIfNeeded() const
+ 
+ void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters& parameters)
+ {
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    WebCore::setGTKVideoSourceStateHandler([this](WebCore::PageIdentifier pageID, uint64_t revision, uint64_t selection, bool active) {
++        if (RefPtr page = webPage(pageID))
++            page->send(Messages::WebPageProxy::SetGTKVideoSourceState(WebCore::Process::identifier(), revision, selection, active));
++    });
++#endif
+ #if USE(SKIA)
+     const char* enableCPURendering = getenv("WEBKIT_SKIA_ENABLE_CPU_RENDERING");
+     IGNORE_CLANG_WARNINGS_BEGIN("unsafe-buffer-usage-in-libc-call")
+diff --git a/Tools/dovi-input-history-probe.cpp b/Tools/dovi-input-history-probe.cpp
+new file mode 100644
+index 00000000..e4776428
+--- /dev/null
++++ b/Tools/dovi-input-history-probe.cpp
+@@ -0,0 +1,191 @@
++/* Copyright (C) 2026 ROG HDR contributors.
++ * SPDX-License-Identifier: BSD-2-Clause */
++// CPU-only state/topology probe: no media, network, decoder, GPU or browser.
++// Build with C++20, -pthread, -Wall -Wextra -Werror and gstreamer-1.0 pkg-config.
++// Run with G_DEBUG=fatal-criticals and ASan/UBSan; production pipeline ordering,
++// whole-pipeline drain evidence and browser UI leases are separate obligations.
++#include "GStreamerDoviInputHistory.h"
++#include "GStreamerDoviOriginalSource.h"
++#include <barrier>
++#include <cstdio>
++#include <cstdlib>
++#include <thread>
++
++using WebCore::OriginalInputHistory;
++using WebCore::captureOriginalByteInputTopology;
++using WebCore::captureOriginalSourceTopology;
++
++static void require(bool condition, const char* description)
++{
++    if (!condition) {
++        std::fprintf(stderr, "FAIL: %s\n", description);
++        std::abort();
++    }
++}
++
++struct Graph {
++    GstElement* pipeline { gst_pipeline_new(nullptr) };
++    ~Graph()
++    {
++        gst_element_set_state(pipeline, GST_STATE_NULL);
++        gst_object_unref(pipeline);
++    }
++    GstElement* make(const char* factory)
++    {
++        auto* element = gst_element_factory_make(factory, nullptr);
++        require(element && gst_bin_add(GST_BIN(pipeline), element), factory);
++        return element;
++    }
++    void readyDrain()
++    {
++        require(gst_element_set_state(pipeline, GST_STATE_READY) != GST_STATE_CHANGE_FAILURE, "caller resets complete synthetic pipeline to READY");
++        GstState state = GST_STATE_NULL;
++        require(gst_element_get_state(pipeline, &state, nullptr, GST_SECOND) != GST_STATE_CHANGE_FAILURE && state == GST_STATE_READY, "caller observes READY completion");
++    }
++};
++
++static GstPad* sink(GstElement* element)
++{
++    auto* pad = gst_element_get_static_pad(element, "sink");
++    require(pad, "consumer sink exists");
++    gst_object_unref(pad); // Borrowed from an element retained by Graph.
++    return pad;
++}
++
++static void link(GstElement* source, GstElement* consumer)
++{
++    require(gst_element_link(source, consumer), "link source path");
++}
++
++static void stateTransitions()
++{
++    OriginalInputHistory late(false);
++    bool called = false;
++    require(!late.arm([&] { called = true; return true; }) && !called, "late attachment starts tainted without running arm callback");
++    require(!late.observeBytes() && late.hasSeenBytes(), "late attachment still records input");
++
++    OriginalInputHistory before(false);
++    before.invalidate();
++    require(!before.arm([] { return true; }), "invalidation cannot be undone");
++
++    OriginalInputHistory early(true);
++    require(!early.isArmed() && !early.hasSeenBytes(), "early history starts pending without bytes");
++    require(!early.observeBytes() && early.hasSeenBytes(), "pending first byte taints before arming");
++    require(!early.arm([] { return true; }), "pending prefill cannot be retroactively armed");
++
++    OriginalInputHistory rejected(true);
++    require(!rejected.arm([] { return false; }), "failed upstream/subscription check rejects arm");
++    require(!rejected.arm([] { return true; }), "failed arm permanently taints");
++
++    OriginalInputHistory empty(true);
++    require(!empty.arm({}) && !empty.arm([] { return true; }), "empty arm callback permanently taints");
++
++    OriginalInputHistory valid(true);
++    require(valid.arm([] { return true; }) && valid.isArmed(), "pristine history arms after successful checks");
++    require(valid.observeBytes() && valid.hasSeenBytes() && valid.isArmed(), "normal armed first byte records Seen without taint");
++    require(valid.observeBytes(), "later bytes remain valid in the same armed history");
++    valid.invalidate();
++    require(!valid.isArmed() && !valid.observeBytes(), "mutation permanently invalidates armed history");
++
++    OriginalInputHistory singleUse(true);
++    require(singleUse.arm([] { return true; }), "single-use initial arm");
++    require(!singleUse.arm([] { return true; }) && !singleUse.isArmed(), "repeated arm is rejected and cannot reopen history");
++}
++
++static void prefillAndReset()
++{
++    Graph graph;
++    auto* source = graph.make("fakesrc");
++    auto* unknown = graph.make("identity");
++    auto* holder = graph.make("queue2");
++    auto* demux = graph.make("qtdemux");
++    link(source, unknown);
++    link(unknown, holder);
++    link(holder, demux);
++    require(!captureOriginalByteInputTopology(holder, sink(holder), source), "unknown wrapped holder input rejected");
++    require(!captureOriginalSourceTopology(demux, sink(demux), source), "unknown wrapped demux path rejected");
++    OriginalInputHistory prefilling(true);
++    require(!prefilling.observeBytes(), "wrapped input before arm taints holder");
++    gst_element_unlink(source, unknown);
++    gst_element_unlink(unknown, holder);
++    link(source, holder);
++    auto direct = captureOriginalByteInputTopology(holder, sink(holder), source);
++    require(direct && direct->revalidate(), "current direct path is now a valid topology snapshot");
++    bool callbackRan = false;
++    require(!prefilling.arm([&] { callbackRan = true; return direct->revalidate(); }) && !callbackRan,
++        "old wrapped prefill cannot regain history after direct relink");
++    OriginalInputHistory lateDirect(false);
++    require(!lateDirect.arm([&] { return direct->revalidate(); }), "late attachment cannot certify existing direct-path bytes");
++
++    // This synthetic graph has sent no GstBuffers. It exercises the caller's
++    // explicit reset boundary; it is not proof of production queue draining.
++    graph.readyDrain();
++    OriginalInputHistory resetHolder(true);
++    auto holderProof = captureOriginalByteInputTopology(holder, sink(holder), source);
++    require(holderProof.has_value(), "reset holder direct path captured");
++    require(resetHolder.arm([&] { return holderProof->revalidate(); }), "fresh history after caller reset can arm");
++    OriginalInputHistory resetDemux(true);
++    auto demuxProof = captureOriginalSourceTopology(demux, sink(demux), source);
++    require(demuxProof.has_value(), "reset demux path includes allowed byte holder");
++    require(resetDemux.arm([&] { return resetHolder.isArmed() && demuxProof->revalidate(); }), "demux arms only after upstream holder history is valid");
++    require(resetHolder.observeBytes() && resetDemux.observeBytes(), "post-arm bytes traverse separately valid holder histories");
++    resetHolder.invalidate();
++    resetDemux.invalidate(); // The production owner propagates path invalidation.
++    require(!resetHolder.isArmed() && !resetDemux.isArmed(), "mutation revokes the dependent history chain");
++}
++
++static void armingRace(bool injectByte)
++{
++    Graph graph;
++    auto* source = graph.make("fakesrc");
++    auto* demux = graph.make("qtdemux");
++    link(source, demux);
++    OriginalInputHistory history(true);
++    std::barrier rendezvous(2);
++    bool armed = true;
++    std::thread worker([&] {
++        armed = history.arm([&] {
++            auto proof = captureOriginalSourceTopology(demux, sink(demux), source);
++            require(proof && proof->revalidate(), "concurrent arm callback checks actual direct topology");
++            rendezvous.arrive_and_wait(); // Arming is active, before final CAS.
++            rendezvous.arrive_and_wait(); // Wait until main records input/mutation.
++            return proof->revalidate();
++        });
++    });
++    rendezvous.arrive_and_wait();
++    if (injectByte)
++        require(!history.observeBytes(), "byte during Arming immediately taints");
++    else
++        history.invalidate();
++    rendezvous.arrive_and_wait();
++    worker.join();
++    require(!armed && !history.isArmed(), "exact Arming CAS cannot overwrite concurrent Seen/Tainted bits");
++    require(history.hasSeenBytes() == injectByte, "Seen accurately distinguishes byte from mutation");
++    require(!history.arm([] { return true; }), "race-tainted history cannot rearm");
++}
++
++static void normalConcurrentBytes()
++{
++    OriginalInputHistory history(true);
++    require(history.arm([] { return true; }), "arm before concurrent normal bytes");
++    std::barrier rendezvous(3);
++    bool first = false;
++    bool second = false;
++    std::thread a([&] { rendezvous.arrive_and_wait(); first = history.observeBytes(); });
++    std::thread b([&] { rendezvous.arrive_and_wait(); second = history.observeBytes(); });
++    rendezvous.arrive_and_wait();
++    a.join();
++    b.join();
++    require(first && second && history.isArmed() && history.hasSeenBytes(), "concurrent post-arm bytes preserve valid history");
++}
++
++int main(int argc, char** argv)
++{
++    gst_init(&argc, &argv);
++    stateTransitions();
++    prefillAndReset();
++    armingRace(true);
++    armingRace(false);
++    normalConcurrentBytes();
++    std::puts("PASS: single-word input history, prefill/relink/reset boundaries, exact topology, barrier-controlled byte/mutation races");
++}
+diff --git a/Tools/dovi-input-setup-probe.cpp b/Tools/dovi-input-setup-probe.cpp
+new file mode 100644
+index 00000000..908e533b
+--- /dev/null
++++ b/Tools/dovi-input-setup-probe.cpp
+@@ -0,0 +1,54 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#include "GStreamerDoviInputSetup.h"
++#include "GStreamerDoviInputHistory.h"
++#include <cassert>
++#include <cstdio>
++using namespace WebCore;
++static unsigned received;
++static GstFlowReturn accept(GstPad*, GstObject*, GstBuffer* buffer)
++{ ++received; gst_buffer_unref(buffer); return GST_FLOW_OK; }
++int main(int argc, char** argv)
++{
++    gst_init(&argc, &argv);
++    auto* source = gst_element_factory_make("identity", nullptr);
++    auto* sink = gst_element_factory_make("identity", nullptr);
++    assert(source && sink);
++    gst_element_set_state(source, GST_STATE_READY);
++    gst_element_set_state(sink, GST_STATE_READY);
++    auto* output = gst_element_get_static_pad(source, "src");
++    auto* input = gst_element_get_static_pad(sink, "sink");
++    {
++        OriginalInputSetup setup(sink, input);
++        assert(setup.beforeBytes()); // Normal inactive READY setup.
++        OriginalInputHistory early(setup.beforeBytes());
++        assert(early.arm([] { return true; }));
++    }
++    // Exercise pad delivery independently of identity's normal PAUSED-state
++    // caps/allocation handler: the negative case intentionally stays READY.
++    gst_pad_set_event_function(input, +[](GstPad*, GstObject*, GstEvent* event) -> gboolean {
++        gst_event_unref(event); return TRUE;
++    });
++    gst_pad_set_chain_function(input, accept);
++    assert(gst_pad_set_active(input, TRUE));
++    assert(gst_pad_set_active(output, TRUE));
++    assert(gst_pad_link(output, input) == GST_PAD_LINK_OK);
++    gst_pad_push_event(output, gst_event_new_stream_start("cpu/old-history"));
++    auto* caps = gst_caps_new_empty_simple("application/octet-stream");
++    gst_pad_push_event(output, gst_event_new_caps(caps)); gst_caps_unref(caps);
++    GstSegment segment; gst_segment_init(&segment, GST_FORMAT_BYTES);
++    gst_pad_push_event(output, gst_event_new_segment(&segment));
++    assert(gst_pad_push(output, gst_buffer_new_allocate(nullptr, 4, nullptr)) == GST_FLOW_OK);
++    assert(received == 1 && GST_STATE(source) == GST_STATE_READY && GST_STATE(sink) == GST_STATE_READY);
++    bool observedEarly;
++    { OriginalInputSetup setup(sink, input); observedEarly = setup.beforeBytes(); assert(!observedEarly); }
++    OriginalInputHistory late(observedEarly);
++    assert(!late.arm([] { return true; }));
++    // Becoming inactive does not erase already accepted bytes or reopen history.
++    gst_pad_unlink(output, input);
++    gst_pad_set_active(output, FALSE); gst_pad_set_active(input, FALSE);
++    { OriginalInputSetup setup(sink, input); assert(setup.beforeBytes()); }
++    assert(!late.arm([] { return true; }));
++    gst_element_set_state(source, GST_STATE_NULL); gst_element_set_state(sink, GST_STATE_NULL);
++    gst_object_unref(output); gst_object_unref(input); gst_object_unref(source); gst_object_unref(sink);
++    std::puts("PASS inactive READY setup; active data while committed READY stays unqualified after deactivation");
++}
+diff --git a/Tools/dovi-original-source-probe.cpp b/Tools/dovi-original-source-probe.cpp
+new file mode 100644
+index 00000000..db1f5d6a
+--- /dev/null
++++ b/Tools/dovi-original-source-probe.cpp
+@@ -0,0 +1,379 @@
++/* Copyright (C) 2026 ROG HDR contributors.
++ * SPDX-License-Identifier: BSD-2-Clause */
++// Run stress with G_DEBUG=fatal-criticals; additionally compile with
++// -fsanitize=address,undefined -fno-omit-frame-pointer when supported.
++// CPU-only topology probe; no pipeline state transition, media, decoder, GPU,
++// network access, or browser is needed. fakesrc stands in for the original source
++// INSTANCE only: the production caller separately authenticates WebKitWebSrc.
++// Build: c++ -std=c++20 -Wall -Wextra -Werror -pthread Tools/dovi-original-source-probe.cpp
++//   -ISource/WebCore/platform/graphics/gstreamer $(pkg-config --cflags --libs gstreamer-1.0) -o <owned-external-output>
++#include "GStreamerDoviOriginalSource.h"
++#include <atomic>
++#include <cstdio>
++#include <cstdlib>
++#include <string>
++#include <thread>
++
++using WebCore::captureOriginalSourceTopology;
++using WebCore::captureOriginalByteInputTopology;
++using WebCore::OriginalSourceTopology;
++
++static void require(bool condition, const char* description)
++{
++    if (!condition) {
++        std::fprintf(stderr, "FAIL: %s\n", description);
++        std::abort();
++    }
++}
++
++struct Graph {
++    GstElement* pipeline { gst_pipeline_new(nullptr) };
++    ~Graph() { gst_object_unref(pipeline); }
++    GstElement* make(const char* factory, GstElement* parent = nullptr)
++    {
++        auto* element = gst_element_factory_make(factory, nullptr);
++        require(element, factory);
++        require(gst_bin_add(GST_BIN(parent ? parent : pipeline), element), "add element");
++        return element;
++    }
++    GstElement* bin(GstElement* parent = nullptr)
++    {
++        auto* element = gst_bin_new(nullptr);
++        require(gst_bin_add(GST_BIN(parent ? parent : pipeline), element), "add structural bin");
++        return element;
++    }
++};
++
++static GstPad* pad(GstElement* element, const char* name)
++{
++    auto* result = gst_element_get_static_pad(element, name);
++    require(result, name);
++    // Return a borrowed pointer. The owning element remains alive in Graph.
++    gst_object_unref(result);
++    return result;
++}
++
++static void link(GstElement* from, GstElement* to)
++{
++    require(gst_element_link(from, to), "link elements");
++}
++
++static GstPad* ghost(GstElement* owner, GstPad* target)
++{
++    auto* result = gst_ghost_pad_new(GST_PAD_DIRECTION(target) == GST_PAD_SRC ? "src" : "sink", target);
++    require(result && gst_element_add_pad(owner, result), "add ghost pad");
++    return result;
++}
++
++// Exercises the REQUIRED caller handshake and monotonic invalidation. A raw
++// witness intentionally does not remember mutations that restore identical
++// topology. Never use a successful later snapshot to reopen an old lease.
++class Lease {
++public:
++    explicit Lease(OriginalSourceTopology&& proof) : m_proof(std::move(proof))
++    {
++        for (auto* observed : m_proof.observedPads()) {
++            connect(G_OBJECT(observed), "linked", G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) { static_cast<Lease*>(data)->revoke(); }));
++            connect(G_OBJECT(observed), "unlinked", G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) { static_cast<Lease*>(data)->revoke(); }));
++        }
++        for (auto* observed : m_proof.observedElements()) {
++            connect(G_OBJECT(observed), "pad-added", G_CALLBACK(+[](GstElement* owner, GstPad* changed, gpointer data) { static_cast<Lease*>(data)->padMutation(owner, changed); }));
++            connect(G_OBJECT(observed), "pad-removed", G_CALLBACK(+[](GstElement* owner, GstPad* changed, gpointer data) { static_cast<Lease*>(data)->padMutation(owner, changed); }));
++            if (GST_IS_BIN(observed)) {
++                connect(G_OBJECT(observed), "element-added", G_CALLBACK(+[](GstBin* owner, GstElement* changed, gpointer data) { static_cast<Lease*>(data)->elementMutation(GST_ELEMENT(owner), changed); }));
++                connect(G_OBJECT(observed), "element-removed", G_CALLBACK(+[](GstBin* owner, GstElement* changed, gpointer data) { static_cast<Lease*>(data)->elementMutation(GST_ELEMENT(owner), changed); }));
++            }
++        }
++        if (!m_proof.revalidate())
++            revoke();
++    }
++    ~Lease() { for (const auto& signal : m_signals) g_signal_handler_disconnect(signal.first, signal.second); }
++    bool authorized() const { return !m_revoked.load() && m_proof.revalidate() && !m_revoked.load(); }
++private:
++    void revoke() { m_revoked.store(true); }
++    void padMutation(GstElement* owner, GstPad* changed)
++    {
++        if (m_proof.observesPadMutation(owner, changed))
++            revoke();
++    }
++    void elementMutation(GstElement* owner, GstElement* changed)
++    {
++        if (m_proof.observesElementMutation(owner, changed))
++            revoke();
++    }
++    void connect(GObject* object, const char* signal, GCallback callback)
++    {
++        m_signals.emplace_back(object, g_signal_connect(object, signal, callback, this));
++        require(m_signals.back().second, signal);
++    }
++    OriginalSourceTopology m_proof;
++    std::vector<std::pair<GObject*, gulong>> m_signals;
++    std::atomic<bool> m_revoked { false };
++};
++
++static void directAndIdentity()
++{
++    Graph graph;
++    auto* source = graph.make("fakesrc");
++    auto* otherSource = graph.make("fakesrc");
++    auto* demux = graph.make("qtdemux");
++    require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "unlinked graph rejected");
++    link(source, demux);
++    auto proof = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(proof && proof->revalidate(), "direct exact source accepted");
++    require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), otherSource), "different same-factory source rejected");
++    require(!captureOriginalSourceTopology(demux, pad(source, "src"), source), "wrong demux sink rejected");
++    Lease lease(std::move(*proof));
++    require(lease.authorized(), "subscribed lease initially valid");
++    gst_element_unlink(source, demux);
++    require(!lease.authorized(), "unlink revokes lease");
++    link(source, demux);
++    require(!lease.authorized(), "unlink/relink cannot revive old lease");
++    auto fresh = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(fresh && fresh->revalidate(), "new proof can describe restored graph");
++}
++
++static void wrappers()
++{
++    Graph graph;
++    auto* source = graph.make("fakesrc");
++    auto* previous = source;
++    for (auto* name : { "queue2", "typefind", "downloadbuffer" }) {
++        auto* next = graph.make(name);
++        link(previous, next);
++        previous = next;
++    }
++    auto* demux = graph.make("qtdemux");
++    link(previous, demux);
++    auto proof = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(proof && proof->revalidate(), "only explicitly allowed wrapper chain accepted");
++}
++
++// Intentionally has no GstElementFactory: missing factory is NOT permission
++// to treat an arbitrary processing subclass as a plain structural GstBin.
++typedef struct _UnknownProcessingBin { GstBin parent; } UnknownProcessingBin;
++typedef struct _UnknownProcessingBinClass { GstBinClass parent; } UnknownProcessingBinClass;
++G_DEFINE_TYPE(UnknownProcessingBin, unknown_processing_bin, GST_TYPE_BIN)
++static void unknown_processing_bin_class_init(UnknownProcessingBinClass*) { }
++static void unknown_processing_bin_init(UnknownProcessingBin*) { }
++
++static void structuralBinTypes()
++{
++    Graph graph;
++    auto* unknown = GST_ELEMENT(g_object_new(unknown_processing_bin_get_type(), nullptr));
++    require(gst_bin_add(GST_BIN(graph.pipeline), unknown), "add unregistered derived processing bin");
++    require(!gst_element_get_factory(unknown), "test subclass is not registered as a factory");
++    auto* source = graph.make("fakesrc", unknown);
++    ghost(unknown, pad(source, "src"));
++    auto* demux = graph.make("qtdemux");
++    link(unknown, demux);
++    require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "unregistered GstBin subclass rejected");
++    // Exercise exact plain GstBin even when constructed through its factory.
++    auto* factory = gst_element_factory_find("bin");
++    if (factory) {
++        gst_object_unref(factory);
++        Graph plainGraph;
++        auto* plain = plainGraph.make("bin");
++        require(G_OBJECT_TYPE(plain) == GST_TYPE_BIN, "bin factory produces exact plain GstBin");
++        auto* exactSource = plainGraph.make("fakesrc", plain);
++        ghost(plain, pad(exactSource, "src"));
++        auto* exactDemux = plainGraph.make("qtdemux");
++        link(plain, exactDemux);
++        auto proof = captureOriginalSourceTopology(exactDemux, pad(exactDemux, "sink"), exactSource);
++        require(proof && proof->revalidate(), "factory-created exact plain GstBin accepted");
++    }
++}
++
++static void normalDownstreamAutoplug()
++{
++    Graph graph;
++    auto* source = graph.make("fakesrc");
++    auto* demux = graph.make("qtdemux");
++    link(source, demux);
++    auto proof = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(proof.has_value(), "capture upstream before dynamic outputs exist");
++    Lease lease(std::move(*proof));
++    for (auto* name : { "video_0", "audio_0" }) {
++        require(gst_element_add_pad(demux, gst_pad_new(name, GST_PAD_SRC)), "add ordinary dynamic demux output");
++        auto* downstream = graph.make("fakesink");
++        require(gst_pad_link(pad(demux, name), pad(downstream, "sink")) == GST_PAD_LINK_OK, "autoplug downstream sink");
++        require(lease.authorized(), "dynamic output and unrelated downstream addition preserve upstream proof");
++        require(gst_element_remove_pad(demux, pad(demux, name)), "remove ordinary downstream output");
++        require(gst_bin_remove(GST_BIN(graph.pipeline), downstream), "remove unrelated downstream child");
++        require(lease.authorized(), "ordinary output/child removal preserves upstream proof");
++    }
++    graph.make("identity"); // An unrelated graph addition also stays irrelevant.
++    require(lease.authorized(), "unrelated downstream processing element addition preserves upstream proof");
++    require(gst_element_add_pad(demux, gst_pad_new("alternate-sink", GST_PAD_SINK)), "add alternate demux sink");
++    require(!lease.authorized(), "alternate input sink irrevocably invalidates proof");
++    require(gst_element_remove_pad(demux, pad(demux, "alternate-sink")), "remove alternate demux sink");
++    require(!lease.authorized(), "sink inventory ABA cannot revive old lease");
++}
++
++static void byteInputEndpoints()
++{
++    for (auto* name : { "queue2", "typefind", "downloadbuffer" }) {
++        Graph graph;
++        auto* source = graph.make("fakesrc");
++        auto* consumer = graph.make(name);
++        link(source, consumer);
++        auto proof = captureOriginalByteInputTopology(consumer, pad(consumer, "sink"), source);
++        require(proof && proof->revalidate(), "explicit byte holder input accepts exact direct source");
++        require(!captureOriginalSourceTopology(consumer, pad(consumer, "sink"), source), "demux output API still requires actual qtdemux");
++    }
++    Graph graph;
++    auto* source = graph.make("fakesrc");
++    auto* unknown = graph.make("identity");
++    link(source, unknown);
++    require(!captureOriginalByteInputTopology(unknown, pad(unknown, "sink"), source), "byte-input API rejects unknown terminal factory");
++}
++
++static void concurrentRetargetLifetime()
++{
++    Graph graph;
++    auto* owner = graph.bin();
++    auto* source = graph.make("fakesrc", owner);
++    auto* outer = ghost(owner, pad(source, "src"));
++    auto* demux = graph.make("qtdemux");
++    link(owner, demux);
++    std::atomic<bool> start { false };
++    std::thread mutator([&] {
++        while (!start.load()) std::this_thread::yield();
++        for (unsigned i = 0; i < 1500; ++i) {
++            auto* transient = graph.make("fakesrc", owner);
++            auto* target = gst_element_get_static_pad(transient, "src");
++            require(target, "transient target exists");
++            require(gst_ghost_pad_set_target(GST_GHOST_PAD(outer), target), "race replaces ghost target");
++            require(gst_ghost_pad_set_target(GST_GHOST_PAD(outer), nullptr), "race removes ghost target");
++            gst_object_unref(target);
++            require(gst_bin_remove(GST_BIN(owner), transient), "race removes transient target owner");
++            require(gst_ghost_pad_set_target(GST_GHOST_PAD(outer), pad(source, "src")), "race restores original target");
++        }
++    });
++    start.store(true);
++    for (unsigned i = 0; i < 3000; ++i) {
++        auto proof = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++        // Concurrent mutation may legitimately make capture/revalidate fail.
++        // Every pointer in any returned witness must nevertheless remain alive.
++        if (proof) {
++            for (auto* retained : proof->observedPads())
++                require(GST_IS_PAD(retained), "concurrent retarget witness retains every pad");
++            proof->revalidate();
++        }
++    }
++    mutator.join();
++    auto settled = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(settled && settled->revalidate(), "settled original topology valid after retarget/remove stress");
++}
++
++static void rejectedProcessing()
++{
++    for (auto* name : { "identity", "qtdemux" }) {
++        Graph graph;
++        auto* source = graph.make("fakesrc");
++        auto* wrapper = graph.make(name);
++        if (std::string(name) == "qtdemux")
++            require(gst_element_add_pad(wrapper, gst_pad_new("test-src", GST_PAD_SRC)), "synthetic nested demux output");
++        else
++            gst_object_set_name(GST_OBJECT(wrapper), "decrypt-like-wrapper");
++        auto* demux = graph.make("qtdemux");
++        link(source, wrapper);
++        require(gst_pad_link(pad(wrapper, std::string(name) == "qtdemux" ? "test-src" : "src"), pad(demux, "sink")) == GST_PAD_LINK_OK, "link unknown processing output");
++        require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "unknown/decrypt/nested demux rejected without protection event");
++    }
++    Graph graph;
++    auto* wrapper = graph.make("parsebin");
++    auto* source = graph.make("fakesrc", wrapper);
++    ghost(wrapper, pad(source, "src"));
++    auto* demux = graph.make("qtdemux");
++    link(wrapper, demux);
++    require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "plugin processing bin rejected despite direct ghost target");
++}
++
++static void ghostsAndMutation()
++{
++    Graph graph;
++    auto* sourceOuter = graph.bin();
++    auto* sourceInner = graph.make("decodebin", sourceOuter);
++    auto* source = graph.make("fakesrc", sourceInner);
++    auto* alternative = graph.make("fakesrc", sourceInner);
++    auto* innerGhost = ghost(sourceInner, pad(source, "src"));
++    ghost(sourceOuter, innerGhost);
++    auto* sinkOuter = graph.bin();
++    auto* sinkInner = graph.bin(sinkOuter);
++    auto* demux = graph.make("qtdemux", sinkInner);
++    ghost(sinkOuter, ghost(sinkInner, pad(demux, "sink")));
++    link(sourceOuter, sinkOuter);
++    auto proof = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(proof && proof->revalidate(), "nested source/sink ghosts and stock decodebin owner accepted");
++    require(proof->observedPads().size() >= 10, "ghost internals included in subscription surface");
++    Lease lease(std::move(*proof));
++    auto snapshot = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    require(gst_ghost_pad_set_target(GST_GHOST_PAD(innerGhost), pad(alternative, "src")), "replace ghost target");
++    require(!snapshot->revalidate() && !lease.authorized(), "target change rejects snapshot and revokes lease");
++    require(gst_ghost_pad_set_target(GST_GHOST_PAD(innerGhost), pad(source, "src")), "restore ghost target");
++    require(snapshot->revalidate(), "snapshot documents ABA limitation explicitly");
++    require(!lease.authorized(), "target ABA never revives old lease");
++    auto current = captureOriginalSourceTopology(demux, pad(demux, "sink"), source);
++    Lease removalLease(std::move(*current));
++    auto* oldGhost = pad(sourceOuter, "src");
++    require(gst_element_remove_pad(sourceOuter, oldGhost), "remove outer source pad");
++    require(gst_ghost_pad_set_target(GST_GHOST_PAD(oldGhost), nullptr), "detach removed pad's target");
++    ghost(sourceOuter, innerGhost);
++    link(sourceOuter, sinkOuter);
++    require(!snapshot->revalidate() && !removalLease.authorized(), "removed/replaced ghost pad rejected");
++}
++
++static void boundsAndAmbiguity()
++{
++    {
++        Graph graph;
++        auto* source = graph.make("fakesrc");
++        auto* previous = source;
++        for (unsigned i = 0; i < 34; ++i) {
++            auto* queue = graph.make("queue2");
++            link(previous, queue);
++            previous = queue;
++        }
++        auto* demux = graph.make("qtdemux");
++        link(previous, demux);
++        require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "hop bound rejects overlong topology");
++    }
++    {
++        Graph graph;
++        auto* source = graph.make("fakesrc");
++        auto* demux = graph.make("qtdemux");
++        link(source, demux);
++        require(gst_element_add_pad(source, gst_pad_new("ambiguous-src", GST_PAD_SRC)), "add ambiguous source output");
++        require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "ambiguous original source outputs rejected");
++    }
++    {
++        Graph graph;
++        auto* source = graph.make("fakesrc");
++        auto* first = graph.make("queue2");
++        auto* second = graph.make("queue2");
++        auto* demux = graph.make("qtdemux");
++        link(first, second);
++        link(second, first);
++        // A reachable cycle with an exit necessarily branches: the ambiguity
++        // check rejects it before following the cyclic processing path.
++        require(gst_element_add_pad(first, gst_pad_new("branch-src", GST_PAD_SRC)), "add cycle exit");
++        require(gst_pad_link(pad(first, "branch-src"), pad(demux, "sink")) == GST_PAD_LINK_OK, "link reachable cyclic component");
++        require(!captureOriginalSourceTopology(demux, pad(demux, "sink"), source), "reachable ambiguous cycle rejected");
++    }
++}
++
++int main(int argc, char** argv)
++{
++    gst_init(&argc, &argv);
++    directAndIdentity();
++    wrappers();
++    structuralBinTypes();
++    normalDownstreamAutoplug();
++    byteInputEndpoints();
++    concurrentRetargetLifetime();
++    rejectedProcessing();
++    ghostsAndMutation();
++    boundsAndAmbiguity();
++    std::puts("PASS: exact original source topology, wrappers, ghost internals, mutation leases, rejection and bounds");
++}

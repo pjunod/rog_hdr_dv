@@ -1,6 +1,23 @@
 # GStreamer resolved Dolby pictures
 
-**Updated November 8, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The staged GNOME consumers also graded a paused Profile 5 picture with embedded text and restored the original image after a display-target round trip. Profile 7 enhancement-layer composition is qualified separately in mpv. The producer evidence below covers metadata ownership, configuration changes and conformance geometry. [GNOME playback results](../evidence/gnome-embedded-dolby-subtitles.json) · [Current installation status](STATUS.md).
+**Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
+
+## Browser destination interface in development
+
+The source candidate adds an explicit logical100nit BT709/sRGB destination
+without changing the native DISPLAY_PQ witness requirement. The additive
+destination API preserves the existing core ABI and legacy entry points.
+Retained pictures keep their original dimensions and picture identity when a
+later destination requests a different output layout. The marked reverse caps
+query now derives each input candidate through its actual graded output before
+intersecting downstream constraints; unmarked passthrough remains unchanged.
+
+The extended negotiation probe exercises actual linked pad queries, normalized
+peer answers, output format/memory/width restrictions, and separate marked
+configurations. Runtime and normal-package qualification of this new source
+remain pending. These source changes do not grant native HDR browser delivery
+or physical panel acceptance. Browser source/track/CDM lifecycle qualification
+and stream-qualified VA selection are separate required parts of that work.
 
 ## Normal GNOME playback
 
@@ -14,8 +31,8 @@ From each extracted source root, import each listed patch into its Debian quilt 
 
 | Source | Patches in application order |
 |---|---|
-| Rust GTK4 paintable sink | [16-bit textures](../packaging/gstreamer-gtk-dovi/0002-gtk4paintablesink-preserve-16bit-rgba.patch), [native-picture retargeting](../packaging/gstreamer-gtk-dovi/0003-gtk4paintablesink-retarget-visible-native-pictures.patch), [visible overlay compositions](../packaging/gstreamer-gtk-dovi/0005-gtk4paintablesink-retain-visible-overlay-compositions.patch) |
-| Showtime | [Bind the surface target before conversion](../packaging/gstreamer-gtk-dovi/0001-showtime-bind-native-target-before-gl-conversion.patch) |
+| Rust GTK4 paintable sink | [16-bit textures](../packaging/gstreamer-gtk-dovi/0002-gtk4paintablesink-preserve-16bit-rgba.patch), [native-picture retargeting](../packaging/gstreamer-gtk-dovi/0003-gtk4paintablesink-retarget-visible-native-pictures.patch), [visible overlay compositions](../packaging/gstreamer-gtk-dovi/0005-gtk4paintablesink-retain-visible-overlay-compositions.patch), [HDR or SDR redraw destinations](../packaging/gstreamer-gtk-dovi/0006-gtk4paintablesink-declare-HDR-or-SDR-redraw-destinations.patch) |
+| Showtime | [Bind the surface target before conversion](../packaging/gstreamer-gtk-dovi/0001-showtime-bind-native-target-before-gl-conversion.patch), [explicit SDR producer destination](../packaging/gstreamer-gtk-dovi/0007-showtime-start-the-shared-producer-with-an-explicit-SDR-destination.patch) |
 
 Run `python3 packaging/gstreamer-gtk-dovi/prepare-ubuntu-packages.py BUILD_DIRECTORY` from this repository. It derives the control, rules and changelog files from the pinned inputs. Build the native mapping core and development package first, then build the sink and Showtime with their declared dependencies and `dpkg-buildpackage`. The mapper and the sink must use the same core ABI. The mapper accepts eleven system-memory pixel formats. On the ROG it also reads NV12 and P010 through GStreamer’s CUDA and VA allocators. Both accelerator paths produce full-range RGBA64 BT.2020/PQ in system memory. [Native mapper package and GPU checks](../evidence/gstreamer-gtk-mapper-negotiation.json).
 
@@ -44,6 +61,58 @@ AU in decode order and owns the result on the exact GstH265Picture through
 reordering. Its snapshot is attached only after output geometry is validated.
 An RPU gap emits no snapshot. Neither constructor claims verified FEL residual
 participation; consumers must decline an unreconstructed residual.
+
+## Profile 7 native source and digital qualification
+
+The active [NVIDIA producer patch](../patches/ubuntu-gst-plugins-bad-rpu/0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch) follows the four existing patches. The bridge and GTK mapper support progressive, single-track Profile 7 with a half-resolution Main10 enhancement layer and compatibility ID 6. The full Ubuntu source import reproduces the pinned base and preceding four-patch tree. [Source pins](../sources.json) identify all five patches and the complete resulting source tree; they do not advertise the local import commit as a fetchable upstream revision.
+
+The decoder sends each extracted enhancement AU with a reference to the exact resolved base picture. FFmpeg returns that reference through picture reordering. The producer retains decoded planes on the output buffer and full-buffer copies, while still reporting the residual as unreconstructed. Flush, discontinuity and configuration changes release pending references. Default file playback reserves one 16-picture HEVC reorder window and drains the secondary decoder at EOS. An explicit NVIDIA display-delay setting or live input retains the requested latency.
+
+Ordinary decodebin selected the candidate NVIDIA decoder and paired all 70 pictures before and all 70 after a flushing seek. Full-buffer copies retained their decoded enhancement pixels. Direct bridge controls preserved all 70 per-picture pixel hashes with duplicate or absent presentation timestamps. A missing enhancement AU and an invalid enhancement NAL header each left the affected picture unpaired. Resetting with ten pending pictures produced no stale pairs, and replay restored all 70 expected hashes.
+
+The actual GTK path uploaded both layers, and the provider accepted a composed 3840×2160 master at a declared 616 cd/m² destination. At the same one-second picture, a flush seek preserved both the RGBA64 output and the independent ten-bit PQ compositor capture byte for byte. The missing-EL control retained all 70 original coded base pictures, RPU bytes and timestamps; only enhancement NALs were removed. It reached ordinary base conversion without provider mapping. FEL and missing-EL output differed across 2,667,662 of 2,764,800 visible channel samples. Profile 5 still mapped without an enhancement layer, and SDR selected no Dolby mapping. [Aggregate digital receipt and limitations](../evidence/gstreamer-native-fel-20261109.json).
+
+The normal Ubuntu builds produced 18 amd64/all packages: bridge `0.2.0+rogdv2`, core/mapper `0.1.0+rogdv4`, bad plugins `1.28.6-1ubuntu1+rogdv3`, sink `0.15.2-1ubuntu2+rogdv4.2` and Showtime `50.0-2+rogdv4.2`. The normal public package preparer uses the actual bad/extra outputs and advances the exact client dependencies together. Complete private rollback archives preserve the prior build slots and package outputs.
+
+A separate GtkVideo trial used the extracted bridge/core/bad packages and reached its 2.999666-second EOS in 3.069 seconds after explicit play. Visible native redraws mapped pictures from the beginning through the end of the clip. This diagnostic rendered seven sink frames and dropped thirteen while LOG-level code hashed and scanned every visible 4K frame. It establishes clock progression and no delayed-output hang, not clean 24 fps. The upstream per-stream baseline conversion is expected before each view applies its own grade. Normal-logging throughput and runtime qualification of the matching rebuilt clients remain open; further GPU trials are stopped.
+
+## Browser runtime fixes (November 11)
+
+Qualifying ordinary WebKit `<video>` found five producer and mapper defects that no earlier
+client exercised. Each is fixed at its cause:
+
+- **VA stream-lock deadlock.** [0008](../patches/ubuntu-gst-plugins-bad-rpu/0008-va-renegotiate-qualified-output-without-the-stream-lock.patch)
+  removes the `src_event` handler, which took the decoder stream lock on RECONFIGURE. That lock
+  deadlocked against a downstream queue that was answering the decoder's serialized allocation
+  query. Qualified output is now recomputed on every negotiation.
+- **Shallow accept-caps.** [0010](../patches/ubuntu-gst-plugins-bad-rpu/0010-va-prove-marked-output-against-the-whole-linked-consumer-chain.patch)
+  proves a marked output against the whole linked chain with a filtered CAPS query.
+  Both queries are issued directly, so a linked peer that fails either query counts as
+  a rejection (the pad helpers would read a failed query as acceptance).
+  Passthrough converters answer ACCEPT_CAPS from their pad templates, so a tiled DMABuf that
+  the mapper must refuse had been accepted. The VA producer is versioned `1.28.6-1ubuntu1+rogdv6`.
+- **Identity allocation.** The mapper core (`0.1.0+rogdv6`) now forwards an identity allocation
+  query downstream. Previously it answered the query itself, and VA/DMABuf producers lost
+  VideoMeta even for ordinary SDR video.
+- **Negotiation before stream start (`0.1.0+rogdv7`).** decodebin answers a producer's
+  pre-exposure queries through playbin's sink, before any stream event reaches the mapper.
+  - A marked query is therefore qualified by an identical clear proof of the current revision
+    until a stream starts.
+  - Unfiltered reverse answers also offer the importable domain, marked with its exact
+    configuration, because deinterlace forwards queries without their filter.
+  - A newer revision that only awaits the started stream's own restart (a browser advances
+    per seek) no longer triggers renegotiation inside the flush.
+- **Explicit SDR destination.** This path had never rendered. libplacebo cannot sample a
+  download-only render target, so the graded PQ intermediate now has its own sampleable
+  textures.
+
+The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 115 checks,
+including the pre-start and unfiltered-reverse controls. The coherent family is core
+`0.1.0+rogdv7`, sink `0.15.2-1ubuntu2+rogdv5.2` and Showtime `50.0-2+rogdv5.3`, with the
+bad/extra `rogdv6` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
+Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
+
+These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
 
 ## Which geometry reaches the mapper
 

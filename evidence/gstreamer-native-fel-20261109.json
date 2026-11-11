@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "date": "2026-11-09",
+  "scope": "Uninstalled native NVIDIA HEVC/GTK Profile 7 FEL candidate; software and native GPU private-compositor digital checks, no physical panel calibration or browser playback claim.",
+  "source_revision_under_runtime_test": "c0f20610707aa8221f38639420d37972141b0549",
+  "ubuntu_source": {
+    "package": "gst-plugins-bad1.0",
+    "version": "1.28.6-1ubuntu1",
+    "signed_dsc_sha256": "8352f9eb7efde49ca339552f0c914739aabea3b4fb468070cfb9963a41162b73",
+    "new_signature_verification": false,
+    "authentication_scope": "All preserved source artifacts match the existing authenticated baseline pins; no new GPG verification.",
+    "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
+    "prior_four_patch_tree": "d3775948a231a9dada3e51541aee7e97db34167f",
+    "candidate_commit": "245873a2752a1891857850db265f296ff017310a",
+    "candidate_tree": "0c3b13cfcb8a1dc2be9eb4bf1ccbd2078de1b8c6",
+    "tracked_source_files": 3944,
+    "commit_identity_scope": "Local complete-source import provenance; public reconstruction proves base and final tree equality rather than fetching these local commit IDs.",
+    "patch": "patches/ubuntu-gst-plugins-bad-rpu/0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch",
+    "patch_sha256": "04fffd4be9942c6462c8e240ec0471292ae46cf5392744ebf2dbad573666c47a"
+  },
+  "compiler": {
+    "affected_bridge_C_and_NV_CXX": "PASS each affected unit with warnings as errors; exact SDK2 mapper source recompiled successfully.",
+    "normal_meson_entrypoints": "PASS bridge, shared GTK core and gtkdovimap plugin; installed only in private prefixes/DESTDIR.",
+    "mapper_sha256": "4dc7d3794902ae73217983c391c6b8d6147c6ebcde5e856591ee0c0fc4953cb8",
+    "fel_decoder_sha256": "bdcadf000e633c7868b5b5fbc8d69f064f1b48e7acc7d374a505a62f131bcd17"
+  },
+  "normal_decodebin_boundary": {
+    "frames_before_seek": 70,
+    "frames_after_seek": 70,
+    "paired_EL_before_seek": 70,
+    "paired_EL_after_seek": 70,
+    "retained_full_copy_EL_pixels": true,
+    "identity_errors": 0,
+    "PTS_errors": 0,
+    "producer_verified_claims": 0,
+    "producer_unreconstructed_pictures": 140,
+    "scope": "Ordinary uridecodebin selected the candidate NVIDIA decoder; retained decoded EL remains unreconstructed until renderer composition."
+  },
+  "direct_bridge_controls": {
+    "collection_delay_pictures": 16,
+    "baseline_paired": 70,
+    "duplicate_PTS_paired_and_matching_pixel_hashes": 70,
+    "absent_PTS_paired_and_matching_pixel_hashes": 70,
+    "missing_EL_AU_index": 25,
+    "missing_EL_picture_paired": false,
+    "corrupt_EL_header_AU_index": 25,
+    "corrupt_EL_picture_paired": false,
+    "pending_pictures_before_reset": 10,
+    "stale_pairs_after_reset": 0,
+    "replayed_pictures_matching_hashes_after_reset": 70,
+    "scope": "Direct public bridge API with same encoded 70-AU fixture, 16-picture delayed collection, per-picture active YUV plane SHA256 comparison to unmodified baseline; deterministic inner-EL NAL header corruption; reset with 10 pending pictures. Does not independently prove EL/BL image correspondence or actual producer negative render behavior.",
+    "harness_sha256": "ddb82f5f3a638f59a52edec2ac70d53fd87b79ab9e021a6ff9c64fa094178f52"
+  },
+  "actual_GTK_composition": {
+    "client": "Actual Gtk.Picture, native gtkdovimap, glsinkbin and gtk4paintablesink with shipped Showtime surface binding. Separate ordinary Gtk.Video also mapped Profile 7 with composed EL.",
+    "compositor": "Owned native GPU headless Mutter virtual monitor and private DBus/PipeWire runtime.",
+    "declared_target_nits": 616,
+    "selected_PTS_ns": 1000000000,
+    "master_size": [
+      3840,
+      2160
+    ],
+    "provider_EL_composed": true,
+    "native_HDR_ready": true,
+    "RGBA64_same_picture_hash_before_and_after_flush_seek": "92e5f0e0fc50664e1654b37a214f04b51642f5c3f790cb076e15c9f357e0cebb",
+    "RGBA64_same_picture_hash_equal_after_flush_seek": true,
+    "PQ_capture": "PipeWire independently negotiated and validated xRGB210LE, BT2020/PQ, 1280x800.",
+    "visible_video_ROI": [
+      0,
+      40,
+      1280,
+      720
+    ],
+    "visible_channels": 2764800,
+    "FEL_repeat_changed_channels_after_seek": 0,
+    "missing_EL_repeat_changed_channels_after_seek": 0,
+    "FEL_vs_missing_EL_changed_channels": 2667662,
+    "FEL_vs_missing_EL_maximum_10bit_code_difference": 39,
+    "FEL_vs_missing_EL_mean_absolute_10bit_code_difference": 13.404083116319445,
+    "missing_EL_result": "Ordinary BL conversion to RGBA64/PQ, with zero provider mapping.",
+    "same_picture_mapping": "FEL mapped PTS1s at epoch13/id21, then epoch17/id40 after flush seek; ordinary missing EL output retained the same PTS.",
+    "DSO_scope": "Primary FEL process loaded the normal-build core, mapper and exactly one bridge; private binary identities retained outside version control.",
+    "owned_runtime_processes_remaining_after_cleanup": 0
+  },
+  "coded_control": {
+    "source_AUs": 70,
+    "control_AUs": 70,
+    "BL_RPU_timing_mismatches": [],
+    "original_EL_NALs": 301,
+    "control_EL_NALs": 0,
+    "control_creation": "ffmpeg -c copy -bsf:v filter_units=remove_types=63; no coded BL re-encoding"
+  },
+  "single_layer_controls": {
+    "actual_GTK_Profile5_frames": 49,
+    "Profile5_provider": "CM v2.9 mapped, EL composed=0.",
+    "actual_GTK_SDR_frames": 3,
+    "SDR_Dolby_selected": false,
+    "SDR_provider_mapping": false
+  },
+  "packaging_and_installation": {
+    "bridge_candidate_version": "0.2.0+rogdv2",
+    "GTK_core_candidate_version": "0.1.0+rogdv4",
+    "bad_candidate_version": "1.28.6-1ubuntu1+rogdv3",
+    "normal_candidate_Ubuntu_packages": "PASS: 18 normal amd64/all binary packages from five source families; full existing feature sets, offline and DEB_BUILD_OPTIONS=parallel=1 nocheck.",
+    "installed_release": "The previously installed 45-package November9 release remains unchanged by these checks.",
+    "GTK_sink_candidate_version": "0.15.2-1ubuntu2+rogdv4.2",
+    "Showtime_candidate_version": "50.0-2+rogdv4.2",
+    "client_recipe": "The normal public package preparer pins the actual bad/extra package outputs, core +rogdv4, sink +rogdv4.2 and Showtime +rogdv4.2 coherently.",
+    "archive_identity_scope": "Only the two user-approved public-source GStreamer bad/extra archive hashes enter qualified-pipeline.json; remaining binary identities and all private artifacts remain outside Git.",
+    "candidate_runtime_scope": "The timed package-overlay run used the new bridge/core/bad packages with the previously qualified sink. The matching rebuilt +rogdv4.2 clients have not received another GPU runtime trial.",
+    "host_installation": false
+  },
+  "limits": [
+    "Progressive single-track Profile 7, half-resolution Main 10 EL and compatibility ID 6; live or explicit low-latency operation retains its requested display-delay policy.",
+    "FEL versus missing EL compares complete qualified Dolby mapping to ordinary BL baseline; it does not isolate residual reconstruction from creative grading.",
+    "Private virtualmonitor compositor pixels establish digital rendering behavior, not physical scanout or optical accuracy.",
+    "Browser media playback, post-login visual acceptance, normal candidate package installation and optical calibration remain separate.",
+    "Corrupt-EL negative used an invalid inner NAL header; it does not claim exhaustive damage concealment coverage.",
+    "Timed playback reached EOS but its LOG-instrumented run dropped frames; clean full-rate playback and runtime qualification of the rebuilt clients remain open."
+  ],
+  "timed_GtkVideo_package_overlay": {
+    "scope": "Distinct explicit-play and EOS trial after a composed-EL view witness; private native GPU Weston, normal package-extracted bridge/core/bad, existing qualified sink.",
+    "prepared": true,
+    "error": null,
+    "duration_us": 2999666,
+    "final_timestamp_us": 2999666,
+    "ended": true,
+    "playback_wall_seconds": 3.0693681209813803,
+    "sampled_nonzero_playing_positions": 14,
+    "visible_native_mapped_records": 6,
+    "visible_native_baseline_records": 0,
+    "visible_mapped_PTS_range_ns": [
+      0,
+      2958000000
+    ],
+    "sink_rendered": 7,
+    "sink_dropped": 13,
+    "per_stream_baseline_context": "Upstream per-stream conversion had no view target; its baseline output is expected before per-view grading and does not indicate a visible missing-EL fallback.",
+    "throughput_limit": "The diagnostic enabled LOG-level full-frame hashes and component scans on every visible 4K redraw. It proves advancing clock/EOS and visible mapped pictures across the clip, not clean 24 fps.",
+    "latency_source_check": "GstH265Decoder includes preferred_output_delay when computing its min/max decoder latency. The observed nonlive file pipeline negotiated zero sink latency.",
+    "runtime_hold": "Further GPU/runtime trials remain stopped. Normal-logging throughput and the matching rebuilt client binaries remain unqualified.",
+    "sink_and_view_count_scope": "Sink statistics and visible-native redraw logs count different stages; seven sink renders correspond to six logged native mapped redraws, not a proven one-to-one presentation count."
+  }
+}

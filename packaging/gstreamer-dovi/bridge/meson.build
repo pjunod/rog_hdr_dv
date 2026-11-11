@@ -7,7 +7,7 @@ cc = meson.get_compiler('c')
 if not cc.has_function('av_dovi_rpu_parser_alloc', prefix: '#include <libavcodec/dovi_parser.h>', dependencies: avcodec)
   error('Requires the reviewed public FFmpeg RPU resolver source extension')
 endif
-bridge = shared_library('gstdovipicture-1.0', ['gstdovipicture.c', 'gstdoviresolver.c', 'gstdovihevc.c', 'gstdoviconfig.c'],
+bridge = shared_library('gstdovipicture-1.0', ['gstdovipicture.c', 'gstdoviresolver.c', 'gstdovihevc.c', 'gstdoviconfig.c', 'gstdovifel.c'],
   dependencies: [pbutils, gst, avutil, avcodec], version: '0.0.0', soversion: '0',
   gnu_symbol_visibility: 'hidden', install: true)
 install_headers('gstdovipicture.h', subdir: 'gstreamer-dovi-1.0')
