@@ -18,7 +18,7 @@ measurement of this panel.
 |---|---|---|---|
 | `P` | Physical peak at the backlight Mutter holds while this route is active | The monitor configuration's target `peak` override | User-declared. On the ThinkPad, Lenovo's nominal 500 cd/m² (an OEM specification) or the Windows driver's reported 270 cd/m²; neither is a measurement |
 | `B` | Physical black | The override's `min`, when present | User-declared; otherwise the explicit ideal-zero fallback, never inferred from a contrast specification |
-| `W` | SDR reference white | `203 × f`, where `f` is the reference-white brightness factor | Compositor policy; follows the brightness control |
+| `W` | SDR reference white | `203 × f` in whole cd/m², where `f` is the reference-white brightness factor, kept strictly between `B` and `P` | Compositor policy; follows the brightness control |
 
 `P` is defined at maximum backlight. The route therefore uses the
 reference-white backlight that BT.2100 mode already uses: the sysfs backlight
@@ -27,11 +27,20 @@ the quantity the user declared. A route that left the hardware backlight
 user-controlled would make `P` a function of an unmeasured backlight curve,
 which this contract refuses to guess.
 
+The reference-white backlight spans `f` from 0.1 to 2.1, so `203 × f` can
+exceed a declared peak below 426 cd/m². SDR white then stops one cd/m² below
+`P`, and the top of the brightness range has no further effect: brightness
+above the peak has nothing physical to show. At the bottom, SDR white stays
+at least one cd/m² above `B`.
+
 ## 2. Activation is a declaration, not a gate
 
-The route is active exactly when the monitor is in the native SDR colour mode
-(mode 2), HDR is not debug-forced and the monitor configuration declares a
-target peak `P > W` at `f = 1`. Without a declared peak the native SDR mode
+The route is active exactly when the monitor is a built-in panel in the
+native SDR colour mode (mode 2), HDR is not debug-forced and the monitor
+configuration declares a target peak above 203 cd/m². Only built-in panels
+qualify: `P` is defined at a backlight the compositor holds, and an external
+monitor has none. An external monitor's saved override keeps its previous
+meaning, so no existing configuration changes behaviour. Without a declared peak the native SDR mode
 keeps its current encoding (gamma 2.2, 0.2–80 cd/m², reference 80) bit for
 bit. Firmware supplies no physical luminance for this panel, so the peak can
 only be declared; nothing is inferred from the panel model.
@@ -44,9 +53,12 @@ physical range:
 
     min = B (0 when undeclared)   max = P   ref = W
 
-A physical luminance `L` encodes as `((L − B) / (P − B))^(1/2.2)`. For the
-zero-black illustration at `P = 500`: 500 → 1.0000, 203 → 0.6638,
-80 → 0.4347. SDR content at reference white lands on `W`, not on full code.
+Clutter maps luminance relative to the peak, so a physical luminance `L`
+encodes as `(L / P)^(1/2.2)`, whatever `B`. At `P = 500`: 500 → 1.0000,
+203 → 0.6638, 80 → 0.4347. `B` is published and bounds the target, but it is
+not subtracted. This is Mutter's existing SDR behaviour too, and modelling a
+black offset would need the measured response this contract does not have.
+SDR content at reference white lands on `W`, not on full code.
 
 KMS output keeps the default colorspace and RGB, with no
 `HDR_OUTPUT_METADATA` (the connector has none) and no fabricated metadata.
@@ -109,8 +121,13 @@ is separate work, not claimed by this slice.
 1. Native SDR mode without an override: output colour state, rendering state
    and descriptions identical to before.
 2. With `P = 500` and no `B`: encoding 0–500 ref 203 at `f = 1`; ref follows
-   `f`; target maxima equal encoding maxima; the reference-white backlight is
-   selected and the sysfs backlight held at maximum.
-3. Signal checks against §3 at 500, 203 and 80 cd/m².
-4. BT.2100 and forced-HDR behaviour unchanged.
-5. Mutter's own native HDR and colour-management test suites pass unchanged.
+   `f` and stays inside `B`–`P` at `f` = 0.1 and 2.1; target maxima equal
+   encoding maxima; the published output description carries the range.
+3. Signal checks against §3 at 500, 203, 80 and 1 cd/m², both into the
+   encoding and through the rendering state, and with `B = 50`.
+4. An external monitor with a saved override in native SDR is unchanged.
+5. On hardware: the reference-white backlight is selected and the sysfs
+   backlight held at maximum. Headless tests cannot create a KMS output;
+   Mutter recreates backlights on every applied configuration.
+6. BT.2100 and forced-HDR behaviour unchanged.
+7. Mutter's own native HDR and colour-management test suites pass.
