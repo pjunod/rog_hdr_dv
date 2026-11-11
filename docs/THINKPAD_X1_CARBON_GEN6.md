@@ -67,7 +67,26 @@ on the enabled monitor driver, application and certified display in
 A current download's product-page breadcrumb alone does not establish
 compatibility with this generation.
 
-**Next evidence:** trace the original installation through normal Windows
+**Runtime result (2026-11-11).** A read-only DXGI/DisplayConfig probe, run as
+the ordinary user on the normal Windows desktop, confirms the cached
+association at runtime: the active path reports the Lenovo `LEN40AE`
+identity, not the panel's own `AUO2036`, with `TPLCD_40AE_SDR.icm` as the
+output profile. Windows runs this panel as SDR: advanced colour is reported
+unsupported and force-disabled, the desktop colour space is RGB full-range
+gamma 2.2, eight bits per channel, and SDR white is 80 cd/m². The driver
+reports sRGB-like primaries and 0.5–270 cd/m² luminance. Those values come
+from the driver's description, not from an optical measurement, and they
+conflict with Lenovo's nominal 500 cd/m². The probe cannot see the OEM Dolby
+processing.
+
+**Consequence for Linux.** Windows never drives this panel in an HDR mode,
+so Windows offers no runtime HDR configuration to reproduce. The
+native-gamma route's peak stays a declared configuration value
+([contract](NATIVE_GAMMA_HDR.md) §1). Of the two available figures, 270
+cd/m² is the conservative declaration and 500 cd/m² the OEM nominal one;
+neither is measured.
+
+**Remaining evidence:** trace the original installation through normal Windows
 operation, with the owner coordinating boot and recovery. Establish the
 runtime monitor binding, active driver/profile, ordinary Dolby playback and
 backlight behaviour before choosing Linux output policy. Use supported tools
