@@ -1,0 +1,31 @@
+diff --git a/sys/nvcodec/gstnvh265dec.cpp b/sys/nvcodec/gstnvh265dec.cpp
+index 78c33c1885b829d240f89146e6444322d58aa0f3..afbc2d4f60e80255c1a187c4ac70b5f442aa6b85 100644
+--- a/sys/nvcodec/gstnvh265dec.cpp
++++ b/sys/nvcodec/gstnvh265dec.cpp
+@@ -441,6 +441,11 @@ gst_nv_h265_dec_class_init (GstNvH265DecClass * klass,
+       "NVDEC H.265 Decoder",
+       "Codec/Decoder/Video/Hardware",
+       "NVIDIA H.265 video decoder", "Seungha Yang <seungha@centricular.com>");
++  /* A consumer choosing among decoders can see that this one reconstructs a
++   * Dolby Vision enhancement layer (Profile 7 FEL/MEL) with its base picture,
++   * where a base-only decoder of the same stream presents just the base layer. */
++  gst_element_class_add_static_metadata (element_class,
++      "dovi-enhancement-layer", "compose");
+ 
+   auto pad_templ = gst_pad_template_new ("sink",
+       GST_PAD_SINK, GST_PAD_ALWAYS, cdata->sink_caps);
+diff --git a/sys/va/gstvabasedec.c b/sys/va/gstvabasedec.c
+index 056e10938cfcf83e93d56ced8f359b4417710b51..3c7944045967ee45363ebb166129881c0aebe1f7 100644
+--- a/sys/va/gstvabasedec.c
++++ b/sys/va/gstvabasedec.c
+@@ -847,6 +847,10 @@ gst_va_base_dec_class_init (GstVaBaseDecClass * klass, GstVaCodecs codec,
+ 
+   klass->codec = codec;
+   klass->render_device_path = g_strdup (render_device_path);
++  /* A consumer choosing among decoders can match the device this decoder runs
++   * on against its own renderer from the registry, without loading plugins. */
++  gst_element_class_add_metadata (element_class, "drm-render-node",
++      render_device_path);
+ 
+   sink_pad_templ = gst_pad_template_new ("sink", GST_PAD_SINK, GST_PAD_ALWAYS,
+       sink_caps);

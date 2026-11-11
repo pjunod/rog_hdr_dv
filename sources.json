@@ -724,9 +724,9 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "8fac3a61b97fc2ff06f1cc02d248d278413e4a12",
-      "candidate_tree": "06322b5b7145d28168be55dec0e4b261b1e6c470",
-      "patch_count": 11,
+      "candidate_commit": "209a660a679c1941be7a58bcfe1c20963dba45f7",
+      "candidate_tree": "c9b6494d351bee59723de818a917f28c4dbe8820",
+      "patch_count": 13,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
@@ -738,7 +738,9 @@
         "0008-va-renegotiate-qualified-output-without-the-stream-lock.patch",
         "0009-debian-version-the-deadlock-free-VA-producer.patch",
         "0010-va-prove-marked-output-against-the-whole-linked-consumer-chain.patch",
-        "0011-debian-version-the-chain-proven-VA-producer.patch"
+        "0011-debian-version-the-chain-proven-VA-producer.patch",
+        "0012-va-nvcodec-declare-the-decoder-device-and-dolby-enhancement-layer-composition.patch",
+        "0013-debian-version-the-self-describing-decoders.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -767,10 +769,10 @@
           }
         ]
       },
-      "candidate_status": "Eleven-patch source candidate. 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately.",
+      "candidate_status": "Thirteen-patch source candidate. 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately. VA decoders state their DRM render node and the NVDEC H.265 decoder states Dolby enhancement-layer composition in element metadata, so a consumer can choose a decoder from the registry without loading plugins.",
       "previous_candidate_commit": "dc6ab20bf049ac5d534f0b22fff24b65db9e83c3",
       "previous_candidate_tree": "0659fe2008e4b42a3cf2a72725ad90dc4b35681e",
-      "candidate_package_version": "1.28.6-1ubuntu1+rogdv6"
+      "candidate_package_version": "1.28.6-1ubuntu1+rogdv7"
     },
     {
       "component": "ubuntu-gtk4-display-target",
@@ -1094,8 +1096,8 @@
       "component": "ubuntu-webkitgtk-native-hdr",
       "base_commit": "5e156fdf2d8daf0485d3b20ffbdde9725bb57d26",
       "base_tree": "42cb56170bd8e122c8632b3616fd3a2e707bb458",
-      "candidate_commit": "1d380b378132d8b7ae77d3a9a526945b40dddbdb",
-      "candidate_tree": "a08ca400c546e025208c814a004e0e29bb34340d",
+      "candidate_commit": "0175a11cacd7e91dd91259c9874ec7dd7367c9e8",
+      "candidate_tree": "92d0e79e57da34bcb6ca3a8b52c59c8f45651f7a",
       "patch_count": 1,
       "patch_order": [
         "0001-webkitgtk-clear-video-and-native-hdr.patch"
@@ -1131,8 +1133,8 @@
           "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
         }
       },
-      "candidate_status": "Single product patch (40 paths; reviewed ad531204 plus the viewport state-restore fix, source-policy attestation logging, arming of byte holders autoplugged after typefinding and a mapper-led page video sink (b0ec7ff0), and a GStreamer registry of the sandbox’s own (1d380b37)) for ordinary clear HTML video with an explicit 100-nit SDR page destination and a tagged native HDR plane under a current GTK view lease. Packaged by packaging/webkitgtk-native-hdr as 2.52.6-1ubuntu1+rogdv1.",
-      "candidate_package_version": "2.52.6-1ubuntu1+rogdv2"
+      "candidate_status": "Single product patch (41 paths; reviewed ad531204 plus the viewport state-restore fix, source-policy attestation logging, arming of byte holders autoplugged after typefinding and a mapper-led page video sink (b0ec7ff0), a GStreamer registry of the sandbox’s own (1d380b37), the NVIDIA unified-memory device bind and decoder ordering by the rendering GPU unless only another decoder composes the enhancement layer (0175a11c)) for ordinary clear HTML video with an explicit 100-nit SDR page destination and a tagged native HDR plane under a current GTK view lease. Packaged by packaging/webkitgtk-native-hdr as 2.52.6-1ubuntu1+rogdv3.",
+      "candidate_package_version": "2.52.6-1ubuntu1+rogdv3"
     }
   ]
 }
