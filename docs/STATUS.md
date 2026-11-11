@@ -92,6 +92,37 @@ The GTK default Vulkan renderer presented an actual floating-point RGB surface u
 
 The NVIDIA HEVC decoder now preserves each decoded picture’s Dolby configuration, crop and metadata across seeking and changes of configuration. All 95 cropped pictures matched the software decoder. Ordinary Showtime automatically chose NVIDIA, ran the Profile 5 mapper and retained the same paused native picture when the target changed. The CPU-side handoff contained nonblack, opaque pixels. The private compositor still saw an all-black Showtime output on the same frame that rendered visibly in mpv. A standalone GTK OpenGL ES texture reproduced the black output. GTK queried the framebuffer read format and type with an unsupported OpenGL ES command. The supported query returned the expected 16-bit format, and direct readback recovered the exact pixel. The corrected GTK library recovered the exact 16-bit pixel and showed 44,730 distinct colors in the Showtime framebuffer on the original GL path. A paused target change still produced identical framebuffer bytes and remains under investigation. [NVIDIA producer qualification](../evidence/gstreamer-nvidia-picture-qualification.json).
 
+## ThinkPad X1 Carbon Gen 6 — native-gamma route compiled, installation pending
+
+**2026-11-11 (owner: Claude):** the Windows runtime probe shows the panel
+bound as LEN40AE in SDR, with advanced colour force-disabled and a
+driver-reported 0.5–270 cd/m² range. The [native-gamma HDR
+contract](NATIVE_GAMMA_HDR.md) is frozen, and Mutter patch 0108 implements
+it. Patched libdisplay-info passed 45/45 tests in a private prefix. Mutter
+built with `-Dwerror` on the ThinkPad, and all 48 colour and HDR test entries
+passed, including the new native-gamma case. Pending: KMS backlight selection
+on hardware, packaging, actual GPU output, an attended install and visual
+acceptance. Nothing is installed on the desktop.
+
+### 2026-11-09 inspection
+
+
+**2026-11-09:** read-only stage 1 inspection is closed. UHD 620/i915 Gen 9
+uses an eight-bit native-gamma wide-gamut eDP panel, AUO B140QAN02.0. The
+EDID has no HDR declaration, the connector has no `HDR_OUTPUT_METADATA`, and
+GNOME offers SDR/native modes 0 and 2, with no HDR mode 1. Cached Windows
+LEN40AE records match the model timing/chromaticities and link the OEM
+monitor driver to its SDR profile; they do not prove a current Windows
+runtime binding. The opaque OEM Dolby ICC is not a physical peak calibration.
+
+The ThinkPad still runs stock Ubuntu kernel `7.3.0-10.10` and Mutter
+`51.0-1ubuntu3`. Source implementation and installation are pending. Trace
+normal Windows operation and backlight behaviour first; then freeze separate
+physical-peak, SDR-white and grade-peak contracts and qualify synthetic Mutter
+controls plus the actual ThinkPad GPU/Dolby/transport path before installation.
+The nominal OEM 500 cd/m² specification is not an optical measurement, and
+the owner has no meter. [Evidence, guardrails and staged acceptance](THINKPAD_X1_CARBON_GEN6.md).
+
 ## Shared Dolby Vision renderer — November 7
 
 Normal Ubuntu mpv and FFmpeg’s libplacebo filter now have source integrations with a separately packaged display mapper. Each passes frame-owned Dolby metadata and a destination target. The packaged FFmpeg filter passed Profile 5 and synthetic Profile 8.1 checks, ordinary fallback controls and separate Level 2/Level 8 creative-trim comparisons. The ROG’s Intel GPU mapped Profile 5 to a 616 cd/m² P3 target offscreen. With the reviewed mpv and Mesa fixes the Vulkan surface was accepted and a real nonblack frame with an authored Level 2 trim rendered. A separately verified HEVC Main 10 HDR10 control matched stock mpv pixel for pixel. Automatic replay of the panel profile used mpv’s normalized 880.644-nit mapper target for the 616-nit physical peak at reference white 142. Both Vulkan driver architectures built. APT simulated the seven-package installation and its exact stock rollback offline. All seven packages are installed and dpkg-verified. The installed FFmpeg mapped genuine Profile 5 on Intel at 616 cd/m². Installed mpv mapped the same title on a private Wayland surface, where the 880.644-nit automatic trim-selection issue remains reproducible. The existing GNOME session stayed open. [Source, operating commands and recovery](SYSTEM_DOLBY_VISION.md).
