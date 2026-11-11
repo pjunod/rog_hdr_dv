@@ -41,7 +41,7 @@ struct GstGtkDoviMapper {
   struct pl_color_space physical;
   float transport_gain;
   struct dv_provider387 *provider;
-  pl_tex source[4], enhancement[4], output[4], sdr_output[4];
+  pl_tex source[4], enhancement[4], output[4], sdr_intermediate[4], sdr_output[4];
   gboolean has_destination, last_sdr_destination;
   GstBufferPool *output_pool;
   GstVideoInfo pool_info;
@@ -221,6 +221,7 @@ void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
       pl_tex_destroy (s->vk->gpu, &s->source[i]);
       pl_tex_destroy (s->vk->gpu, &s->enhancement[i]);
       pl_tex_destroy (s->vk->gpu, &s->output[i]);
+      pl_tex_destroy (s->vk->gpu, &s->sdr_intermediate[i]);
       pl_tex_destroy (s->vk->gpu, &s->sdr_output[i]);
     }
     pl_vulkan_destroy (&s->vk);
@@ -441,6 +442,16 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     }
   }
   if (!pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
+  /* Render targets recreated for download are not sampleable, but the SDR
+   * destination reads the graded PQ picture back in a second pass. Give that
+   * intermediate its own stable textures with the same layout, sampleable. */
+  for (int i = 0; sdr && i < destination.num_planes; i++) {
+    struct pl_tex_params params = destination.planes[i].texture->params;
+    params.sampleable = true;
+    if (!(params.format->caps & PL_FMT_CAP_SAMPLEABLE) ||
+        !pl_tex_recreate (s->vk->gpu, &s->sdr_intermediate[i], &params)) goto done;
+    destination.planes[i].texture = s->sdr_intermediate[i];
+  }
   direct_output = !sdr && direct_output_layout (&out, &destination);
   if (!sdr && !direct_output) {
     /* Keep valid bottom-up or GPU-incompatible custom rows on the existing

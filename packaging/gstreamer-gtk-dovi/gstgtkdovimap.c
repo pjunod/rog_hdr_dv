@@ -13,6 +13,7 @@ typedef struct { GstBaseTransform parent; GMutex lock; GstGtkDoviTarget target;
   guint destination_kind;
   gboolean require_clear_source, source_blocked;
   gchar *stream_id;
+  gboolean stream_started;
   GHashTable *clear_sources;
   GstGtkDoviSourceLease *source_lease;
   gboolean known_stream, requires_profile5;
@@ -79,6 +80,23 @@ static gboolean qualified_structure (GtkDoviMap *s, const GstStructure *st)
   g_mutex_lock (&s->lock);
   gboolean qualified = !s->source_blocked && gst_gtk_dovi_source_lease_matches (
       s->source_lease, s->stream_id, caps);
+  /* Decodebin answers a producer's pre-exposure queries through playbin's
+   * sink before any stream event reaches this element. Until a stream starts,
+   * a marked query is qualified by a clear proof of the current revision with
+   * the identical configuration, so the producer does not settle on memory
+   * that must be refused once the stream starts. Caps and pictures still
+   * require the exact live lease for the started stream, and once any stream
+   * has started (until stop) a new revision again needs its own start. */
+  if (!qualified && !s->stream_started && !s->source_blocked) {
+    GHashTableIter iter; gpointer id, coded;
+    g_hash_table_iter_init (&iter, s->clear_sources);
+    while (!qualified && g_hash_table_iter_next (&iter, &id, &coded)) {
+      GstGtkDoviSourceLease *probe = gst_gtk_dovi_source_lease_new (coded, id,
+          s->source_revision);
+      qualified = gst_gtk_dovi_source_lease_matches (probe, id, caps);
+      gst_gtk_dovi_source_lease_unref (probe);
+    }
+  }
   g_mutex_unlock (&s->lock);
   gst_caps_unref (caps); return qualified;
 }
@@ -110,11 +128,19 @@ static void update_source_context (GtkDoviMap *s, const GstStructure *st)
     }
   }
   SourceSelection current = source_selection_locked (s);
+  /* A newer revision for a started stream only waits for that stream's own
+   * STREAM_START or FLUSH_STOP (a browser advances on every flush). Asking the
+   * producer to renegotiate inside that unconfirmed window would settle it on
+   * identity memory just before the flush stop restores the lease. Blocking,
+   * a selected lease, or pre-start query answers do change negotiation now. */
+  gboolean renegotiate = s->source_blocked || current.selection || !s->stream_started;
   g_mutex_unlock (&s->lock);
   gst_gtk_dovi_source_lease_unref (proof);
   emit_selection_change (s, old, current);
-  gst_base_transform_reconfigure_sink (GST_BASE_TRANSFORM (s));
-  gst_base_transform_reconfigure_src (GST_BASE_TRANSFORM (s));
+  if (renegotiate) {
+    gst_base_transform_reconfigure_sink (GST_BASE_TRANSFORM (s));
+    gst_base_transform_reconfigure_src (GST_BASE_TRANSFORM (s));
+  }
 }
 static void set_context (GstElement *element, GstContext *context)
 {
@@ -226,6 +252,42 @@ static GstCaps *marked_filter_preimage (GstBaseTransform *base,
   gst_clear_caps (&identity);
   return result;
 }
+/* Elements between a producer and this mapper (deinterlace, the playsink
+ * converter bin) can forward a producer's CAPS query without its filter. The
+ * unfiltered answer must still offer the importable input domain of the live
+ * lease (or, before any stream starts, of a current clear proof), marked with
+ * its exact configuration, whenever downstream takes the graded output.
+ * Otherwise only the identity answer remains, which a marked producer would
+ * read as permission for memory that set_caps must then refuse. */
+static void append_qualified_inputs (GtkDoviMap *s, GstCaps *downstream, GstCaps *result)
+{
+  GPtrArray *configurations = g_ptr_array_new_with_free_func ((GDestroyNotify) g_bytes_unref);
+  g_mutex_lock (&s->lock);
+  GHashTableIter iter; gpointer id, coded;
+  g_hash_table_iter_init (&iter, s->clear_sources);
+  while (!s->source_blocked && g_hash_table_iter_next (&iter, &id, &coded)) {
+    gboolean live = s->stream_started && gst_gtk_dovi_source_lease_matches (
+        s->source_lease, id, coded);
+    if (s->stream_started && !live) continue;
+    GstGtkDoviSourceLease *probe = gst_gtk_dovi_source_lease_new (coded, id, s->source_revision);
+    AVDOVIDecoderConfigurationRecord config; GBytes *bytes = NULL;
+    if (probe && gst_dovi_caps_get_stream_config (coded, &config, &bytes) && bytes)
+      g_ptr_array_add (configurations, g_steal_pointer (&bytes));
+    g_clear_pointer (&bytes, g_bytes_unref);
+    gst_gtk_dovi_source_lease_unref (probe);
+  }
+  g_mutex_unlock (&s->lock);
+  GstCaps *graded = graded_output_caps (s);
+  if (configurations->len && gst_caps_can_intersect (graded, downstream)) {
+    for (guint i = 0; i < configurations->len; i++) {
+      GstCaps *native = native_input_caps ();
+      gst_dovi_caps_apply_stream_config (native, g_ptr_array_index (configurations, i));
+      gst_caps_append (result, native);
+    }
+  }
+  gst_caps_unref (graded);
+  g_ptr_array_unref (configurations);
+}
 static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection direction,
     GstCaps *caps, GstCaps *filter)
 {
@@ -265,6 +327,8 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
     gst_caps_unref (constraint);
     gst_caps_append (result, one);
   }
+  if (direction == GST_PAD_SRC && self->require_clear_source && !gst_caps_is_any (result))
+    append_qualified_inputs (self, caps, result);
   if (filter) {
     GstCaps *intersection = gst_caps_intersect_full (filter, result, GST_CAPS_INTERSECT_FIRST);
     gst_caps_unref (result); result = intersection;
@@ -282,7 +346,7 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
       GstEvent *start = gst_pad_get_sticky_event (GST_BASE_TRANSFORM_SINK_PAD (base), GST_EVENT_STREAM_START, 0);
       if (start) {
         const gchar *id = NULL; gst_event_parse_stream_start (start, &id);
-        s->stream_id = g_strdup (id); gst_event_unref (start);
+        s->stream_id = g_strdup (id); s->stream_started = TRUE; gst_event_unref (start);
         select_source_locked (s);
       }
     }
@@ -353,7 +417,7 @@ static gboolean sink_event (GstBaseTransform *base, GstEvent *event)
     case GST_EVENT_STREAM_START: {
       const gchar *id = NULL; gst_event_parse_stream_start (event, &id);
       revoke_source_locked (s);
-      g_free (s->stream_id); s->stream_id = g_strdup (id);
+      g_free (s->stream_id); s->stream_id = g_strdup (id); s->stream_started = TRUE;
       select_source_locked (s); break;
     }
     case GST_EVENT_FLUSH_START:
@@ -362,7 +426,7 @@ static gboolean sink_event (GstBaseTransform *base, GstEvent *event)
       GstEvent *start = gst_pad_get_sticky_event (GST_BASE_TRANSFORM_SINK_PAD (base), GST_EVENT_STREAM_START, 0);
       if (start) {
         const gchar *id = NULL; gst_event_parse_stream_start (start, &id);
-        g_free (s->stream_id); s->stream_id = g_strdup (id);
+        g_free (s->stream_id); s->stream_id = g_strdup (id); s->stream_started = TRUE;
         gst_event_unref (start);
       }
       select_source_locked (s); break;
@@ -384,7 +448,7 @@ static gboolean stop (GstBaseTransform *base)
   g_mutex_lock (&s->lock);
   SourceSelection old = source_selection_locked (s);
   revoke_source_locked (s); g_hash_table_remove_all (s->clear_sources);
-  g_clear_pointer (&s->stream_id, g_free);
+  g_clear_pointer (&s->stream_id, g_free); s->stream_started = FALSE;
   SourceSelection current = source_selection_locked (s);
   g_mutex_unlock (&s->lock);
   emit_selection_change (s, old, current);

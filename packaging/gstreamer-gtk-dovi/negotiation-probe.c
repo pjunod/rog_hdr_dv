@@ -322,6 +322,45 @@ static void source_selection_revoked (GstElement *map, guint64 revision,
   events->revokes++;
 }
 static void
+pre_start_query_controls (void)
+{
+  GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
+  g_object_set (map, "destination-kind", 1u, "require-clear-source", TRUE, NULL);
+  GstPad *sink = gst_element_get_static_pad (map, "sink");
+  GstPad *src = gst_element_get_static_pad (map, "src");
+  gst_pad_set_active (sink, TRUE); gst_pad_set_active (src, TRUE);
+  GstCaps *input = caps_for ("P010_10LE", NULL, TRUE);
+  GstCaps *coded = gst_caps_copy (input);
+  gst_structure_set_name (gst_caps_get_structure (coded, 0), "video/x-h265");
+  source_gate_check (map, input, FALSE, "pre-start query without a clear proof keeps identity caps");
+  source_context (map, 1, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, TRUE,
+      "pre-start query is qualified by an identical clear proof of the current revision");
+  GstBaseTransform *base = GST_BASE_TRANSFORM (map);
+  GstCaps *downstream = gst_caps_from_string ("video/x-raw, format=(string)RGBA; "
+      "video/x-raw(memory:DMABuf), format=(string)DMA_DRM");
+  GstCaps *offered = GST_BASE_TRANSFORM_GET_CLASS (base)->transform_caps (base,
+      GST_PAD_SRC, downstream, NULL);
+  GstCaps *va = caps_for ("P010_10LE", "memory:VAMemory", TRUE);
+  require (gst_caps_can_intersect (offered, va),
+      "unfiltered reverse query offers the marked importable domain of a clear proof");
+  gst_caps_unref (va); gst_caps_unref (offered); gst_caps_unref (downstream);
+  GstCaps *wrong = gst_caps_copy (input);
+  guint8 record[24] = {1, 0, 16, 29, 16};
+  GstBuffer *config = gst_buffer_new_memdup (record, sizeof (record));
+  gst_caps_set_simple (wrong, "dovi-configuration", GST_TYPE_BUFFER, config, NULL);
+  gst_buffer_unref (config);
+  source_gate_check (map, wrong, FALSE, "pre-start query cannot borrow a different configuration");
+  gst_pad_send_event (sink, gst_event_new_stream_start ("other/video0"));
+  source_gate_check (map, input, FALSE, "a started stream needs its own exact lease");
+  source_context (map, 2, FALSE, "clear/video0", coded);
+  source_gate_check (map, input, FALSE, "after a stream started, a new revision needs its own start");
+  source_context (map, 3, TRUE, NULL, NULL);
+  gst_caps_unref (wrong); gst_caps_unref (coded); gst_caps_unref (input);
+  gst_pad_set_active (sink, FALSE); gst_pad_set_active (src, FALSE);
+  gst_object_unref (sink); gst_object_unref (src); gst_object_unref (map);
+}
+static void
 source_lifecycle_controls (void)
 {
   GstElement *map = gst_element_factory_make ("gtkdovimap", NULL);
@@ -535,6 +574,7 @@ main (int argc, char **argv)
     gst_caps_unref (result);
   }
   linked_query_controls (element, klass, output);
+  pre_start_query_controls ();
   source_lifecycle_controls ();
   profile5_missing_picture_controls ();
   gst_caps_unref (reverse);
