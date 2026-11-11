@@ -527,10 +527,10 @@ index 00000000..1c11664b
 +} // namespace WebCore
 diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h
 new file mode 100644
-index 00000000..f9155689
+index 00000000..f758e802
 --- /dev/null
 +++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h
-@@ -0,0 +1,424 @@
+@@ -0,0 +1,455 @@
 +/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
 +#pragma once
 +#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
@@ -603,6 +603,7 @@ index 00000000..f9155689
 +        if (m_revision) announce(m_revision);
 +        if (m_revoked) return;
 +        m_revoked = true;
++        GST_DEBUG("Dolby source policy: revoked at revision %" G_GUINT64_FORMAT, m_revision);
 +        sendContext(m_revision, true);
 +        m_proofs.clear();
 +        for (auto& [element, input] : m_inputs) { (void)element; input->history.invalidate(); input->disconnect(); }
@@ -617,6 +618,7 @@ index 00000000..f9155689
 +        m_revision = next.fetch_add(1, std::memory_order_relaxed);
 +        m_atomicRevision.store(m_revision, std::memory_order_release);
 +        if (!m_revision) { m_revoked = true; return; }
++        GST_DEBUG("Dolby source policy: advanced to revision %" G_GUINT64_FORMAT " with %zu proof(s)", m_revision, m_proofs.size());
 +        sendContext(m_revision, false);
 +        for (auto it = m_proofs.begin(); it != m_proofs.end();) {
 +            if (!proofIsLive(*it->second)) it = m_proofs.erase(it);
@@ -627,15 +629,15 @@ index 00000000..f9155689
 +    void bindOriginalSource(GstElement* source)
 +    {
 +        auto src = adoptGRef(gst_element_get_static_pad(source, "src"));
-+        if (!src) { markUntrusted(); return; }
++        if (!src) { markUntrusted("original source has no src pad"); return; }
 +        OriginalInputSetup setup(source, src.get());
 +        std::lock_guard lock(m_mutex);
 +        if (m_revoked || m_untrusted.load(std::memory_order_acquire)) return;
 +        auto previous = adoptGRef(GST_ELEMENT(g_weak_ref_get(&m_source)));
 +        if (previous.get() == source) return;
-+        if (previous || m_sourceStarted.load(std::memory_order_acquire)) { markUntrusted(); return; }
++        if (previous || m_sourceStarted.load(std::memory_order_acquire)) { markUntrusted("a second or late original source"); return; }
 +        g_weak_ref_set(&m_source, source);
-+        if (!setup.beforeBytes()) { markUntrusted(); return; }
++        if (!setup.beforeBytes()) { markUntrusted("original source bound after bytes"); return; }
 +        ref();
 +        auto id = gst_pad_add_probe(src.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST),
 +            +[](GstPad*, GstPadProbeInfo*, gpointer data) -> GstPadProbeReturn {
@@ -648,21 +650,28 @@ index 00000000..f9155689
 +        bool demux = factoryIs(element, "qtdemux");
 +        if (!demux && !isHolder(element)) return;
 +        auto sink = adoptGRef(gst_element_get_static_pad(element, "sink"));
-+        if (!sink) { markUntrusted(); return; }
++        if (!sink) { markUntrusted("byte holder or demux has no sink pad"); return; }
 +        std::shared_ptr<Input> input;
 +        OriginalInputSetup setup(element, sink.get());
 +        {
 +            std::lock_guard lock(m_mutex);
 +            if (m_revoked || m_inputs.contains(element)) return;
-+            bool early = setup.beforeBytes() && (demux || !m_sourceStarted.load(std::memory_order_acquire));
++            // Decoding bins autoplug byte holders only after typefinding has
++            // consumed original bytes, so "before bytes" is judged per input:
++            // an input whose own sink has carried nothing can still be armed
++            // before its first buffer, behind an already attested route.
++            bool early = setup.beforeBytes();
++            GST_DEBUG("Dolby source policy: observing %s %s (before bytes=%d, source started=%d, early=%d)", demux ? "demux" : "byte holder",
++                GST_ELEMENT_NAME(element), setup.beforeBytes(), m_sourceStarted.load(std::memory_order_acquire), early);
 +            input = std::make_shared<Input>(element, sink.get(), demux, early);
 +            auto* hook = new Watch { Ref { *this }, input, nullptr };
 +            auto probe = gst_pad_add_probe(sink.get(), static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST | GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM),
 +                +[](GstPad*, GstPadProbeInfo* info, gpointer data) -> GstPadProbeReturn {
 +                    auto& hook = *static_cast<Watch*>(data);
 +                    if (GST_PAD_PROBE_INFO_TYPE(info) & (GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST)) {
-+                        if (!hook.input->history.observeBytes() && hook.input->required.load(std::memory_order_acquire)) hook.policy->markUntrusted();
-+                    } else if (GST_EVENT_TYPE(GST_PAD_PROBE_INFO_EVENT(info)) == GST_EVENT_PROTECTION) hook.policy->markUntrusted();
++                        if (!hook.input->history.isArmed() && !hook.input->history.hasSeenBytes()) hook.policy->armBeforeFirstBytes(hook.input);
++                        if (!hook.input->history.observeBytes() && hook.input->required.load(std::memory_order_acquire)) hook.policy->markUntrusted("bytes reached a required input before it was armed");
++                    } else if (GST_EVENT_TYPE(GST_PAD_PROBE_INFO_EVENT(info)) == GST_EVENT_PROTECTION) hook.policy->markUntrusted("protection event on a source input");
 +                    return GST_PAD_PROBE_OK;
 +                }, hook, +[](gpointer data) { delete static_cast<Watch*>(data); });
 +            input->watches.push_back(std::make_unique<Connection>(G_OBJECT(sink.get()), probe, true));
@@ -700,9 +709,10 @@ index 00000000..f9155689
 +    }
 +    static bool isHolder(GstElement* element)
 +    { return factoryIs(element, "typefind") || factoryIs(element, "queue2") || factoryIs(element, "downloadbuffer"); }
-+    void markUntrusted()
++    void markUntrusted(const char* reason)
 +    {
 +        if (m_untrusted.exchange(true, std::memory_order_acq_rel)) return;
++        GST_INFO("Dolby source policy: ordinary route for this load (%s)", reason);
 +        // No policy mutex: topology signals can be nested inside sendContext.
 +        // Core blocking is immediate; owning-page cleanup is queued safely.
 +        sendContext(m_atomicRevision.load(std::memory_order_acquire), true);
@@ -735,9 +745,18 @@ index 00000000..f9155689
 +            if (!progress) break;
 +        }
 +        if (!input->history.isArmed() && !tryArm(input)) {
++            GST_DEBUG("Dolby source policy: demux input could not be armed (required=%d)", input->required.load(std::memory_order_acquire));
 +            input->history.invalidate();
-+            if (input->required.load(std::memory_order_acquire)) markUntrusted();
++            if (input->required.load(std::memory_order_acquire)) markUntrusted("required input could not be armed");
 +        }
++    }
++    // Runs in the input's streaming thread with its first buffer in hand and
++    // not yet delivered: the last moment its byte history is still empty.
++    void armBeforeFirstBytes(const std::shared_ptr<Input>& input)
++    {
++        std::lock_guard lock(m_mutex);
++        if (m_revoked || m_untrusted.load(std::memory_order_acquire) || input->history.isArmed() || input->history.hasSeenBytes()) return;
++        tryArm(input);
 +    }
 +    bool tryArm(const std::shared_ptr<Input>& input)
 +    {
@@ -746,21 +765,27 @@ index 00000000..f9155689
 +        auto source = adoptGRef(GST_ELEMENT(g_weak_ref_get(&m_source)));
 +        auto element = adoptGRef(GST_ELEMENT(g_weak_ref_get(&input->element)));
 +        auto sink = adoptGRef(GST_PAD(g_weak_ref_get(&input->sink)));
-+        if (!source || !element || !sink) return false;
++        if (!source || !element || !sink) { GST_DEBUG("Dolby source policy: cannot arm, source/input released"); return false; }
 +        auto capture = captureOriginalByteInputTopology(element.get(), sink.get(), source.get());
-+        if (!capture) return false;
++        if (!capture) { GST_DEBUG("Dolby source policy: cannot arm %s, route to the original source is not attestable", GST_ELEMENT_NAME(element.get())); return false; }
 +        auto topology = std::make_shared<OriginalSourceTopology>(WTF::move(*capture));
 +        for (auto* upstream : topology->observedElements()) {
 +            if (upstream == element.get() || !isHolder(upstream)) continue;
 +            auto entry = m_inputs.find(upstream);
-+            if (entry == m_inputs.end() || !entry->second->history.isArmed()) return false;
++            if (entry == m_inputs.end() || !entry->second->history.isArmed()) {
++                GST_DEBUG("Dolby source policy: cannot arm %s, upstream byte holder %s is %s", GST_ELEMENT_NAME(element.get()), GST_ELEMENT_NAME(upstream),
++                    entry == m_inputs.end() ? "unobserved" : "not armed");
++                return false;
++            }
 +        }
-+        return input->history.arm([&] {
++        bool armed = input->history.arm([&] {
 +            input->required.store(true, std::memory_order_release);
 +            installTopologyWatches(input, topology);
 +            if (!topology->revalidate() || m_untrusted.load(std::memory_order_acquire)) return false;
 +            input->topology = topology; return true;
 +        });
++        GST_DEBUG("Dolby source policy: arming %s %s", GST_ELEMENT_NAME(element.get()), armed ? "succeeded" : "failed");
++        return armed;
 +    }
 +    void connectInputSignal(const std::shared_ptr<Input>& input, GstPad* pad, const char* signal, bool unlink)
 +    {
@@ -768,7 +793,7 @@ index 00000000..f9155689
 +        auto id = g_signal_connect_data(pad, signal, unlink ? G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) {
 +            auto& hook = *static_cast<Watch*>(data);
 +            hook.input->history.invalidate();
-+            if (hook.input->required.load(std::memory_order_acquire)) hook.policy->markUntrusted();
++            if (hook.input->required.load(std::memory_order_acquire)) hook.policy->markUntrusted("required input pad signal");
 +        }) : G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) {
 +            auto& hook = *static_cast<Watch*>(data); if (hook.input->demux) hook.policy->armDemux(hook.input);
 +        }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
@@ -779,7 +804,7 @@ index 00000000..f9155689
 +        for (auto* pad : topology->observedPads()) for (auto* signal : { "linked", "unlinked" }) {
 +            auto* hook = new Watch { Ref { *this }, input, topology };
 +            auto id = g_signal_connect_data(pad, signal, G_CALLBACK(+[](GstPad*, GstPad*, gpointer data) {
-+                auto& hook = *static_cast<Watch*>(data); hook.input->history.invalidate(); hook.policy->markUntrusted();
++                auto& hook = *static_cast<Watch*>(data); hook.input->history.invalidate(); hook.policy->markUntrusted("source topology watch fired");
 +            }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
 +            input->watches.push_back(std::make_unique<Connection>(G_OBJECT(pad), id));
 +        }
@@ -788,7 +813,7 @@ index 00000000..f9155689
 +                auto* hook = new Watch { Ref { *this }, input, topology };
 +                auto id = g_signal_connect_data(element, signal, G_CALLBACK(+[](GstElement* owner, GstPad* changed, gpointer data) {
 +                    auto& hook = *static_cast<Watch*>(data);
-+                    if (hook.topology->observesPadMutation(owner, changed)) { hook.input->history.invalidate(); hook.policy->markUntrusted(); }
++                    if (hook.topology->observesPadMutation(owner, changed)) { hook.input->history.invalidate(); hook.policy->markUntrusted("source topology pad mutation"); }
 +                }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
 +                input->watches.push_back(std::make_unique<Connection>(G_OBJECT(element), id));
 +            }
@@ -796,7 +821,7 @@ index 00000000..f9155689
 +                auto* hook = new Watch { Ref { *this }, input, topology };
 +                auto id = g_signal_connect_data(element, signal, G_CALLBACK(+[](GstBin* owner, GstElement* changed, gpointer data) {
 +                    auto& hook = *static_cast<Watch*>(data);
-+                    if (hook.topology->observesElementMutation(GST_ELEMENT(owner), changed)) { hook.input->history.invalidate(); hook.policy->markUntrusted(); }
++                    if (hook.topology->observesElementMutation(GST_ELEMENT(owner), changed)) { hook.input->history.invalidate(); hook.policy->markUntrusted("source topology element mutation"); }
 +                }), hook, +[](gpointer data, GClosure*) { delete static_cast<Watch*>(data); }, GConnectFlags(0));
 +                input->watches.push_back(std::make_unique<Connection>(G_OBJECT(element), id));
 +            }
@@ -804,7 +829,11 @@ index 00000000..f9155689
 +    }
 +    bool proofIsLive(const Proof& proof)
 +    {
-+        if (!proof.input->history.isArmed() || !proof.input->history.hasSeenBytes() || !proof.input->topology || !proof.input->topology->revalidate()) return false;
++        if (!proof.input->history.isArmed() || !proof.input->history.hasSeenBytes() || !proof.input->topology || !proof.input->topology->revalidate()) {
++            GST_DEBUG("Dolby source policy: proof not live (armed=%d, seen bytes=%d, topology=%d)", proof.input->history.isArmed(),
++                proof.input->history.hasSeenBytes(), !!proof.input->topology);
++            return false;
++        }
 +        auto pad = adoptGRef(GST_PAD(g_weak_ref_get(const_cast<GWeakRef*>(&proof.pad))));
 +        auto demux = adoptGRef(GST_ELEMENT(g_weak_ref_get(&proof.input->element)));
 +        return pad && demux && GST_PAD_DIRECTION(pad.get()) == GST_PAD_SRC && gst_pad_is_linked(pad.get())
@@ -814,7 +843,7 @@ index 00000000..f9155689
 +    {
 +        if (!caps || !gst_caps_is_fixed(caps) || gst_caps_get_size(caps) != 1) return;
 +        auto* structure = gst_caps_get_structure(caps, 0);
-+        if (gst_structure_has_name(structure, "application/x-cenc") || gst_structure_has_field(structure, "protection-system")) { markUntrusted(); return; }
++        if (gst_structure_has_name(structure, "application/x-cenc") || gst_structure_has_field(structure, "protection-system")) { markUntrusted("encrypted coded caps"); return; }
 +        auto demux = adoptGRef(gst_pad_get_parent_element(pad));
 +        char* id = gst_pad_get_stream_id(pad);
 +        if (!demux || !id) { g_free(id); return; }
@@ -825,9 +854,10 @@ index 00000000..f9155689
 +            if (!m_revoked && !m_untrusted.load(std::memory_order_acquire) && history != m_inputs.end() && history->second->demux) {
 +                auto proof = std::make_unique<Proof>(pad, caps, history->second);
 +                bool clear = gst_structure_has_name(structure, "video/x-h265") && gst_structure_has_field(structure, "dovi-configuration") && proofIsLive(*proof);
++                GST_DEBUG("Dolby source policy: demux caps on stream %s: %s", id, clear ? "clear proof" : "no clear proof");
 +                auto previous = m_proofs.find(id);
 +                auto oldPad = previous != m_proofs.end() ? adoptGRef(GST_PAD(g_weak_ref_get(&previous->second->pad))) : GRefPtr<GstPad> { };
-+                if (previous != m_proofs.end() && oldPad && oldPad.get() != pad && proofIsLive(*previous->second)) { markUntrusted(); }
++                if (previous != m_proofs.end() && oldPad && oldPad.get() != pad && proofIsLive(*previous->second)) { markUntrusted("stream id moved to another live demux pad"); }
 +                else if (clear) {
 +                    changed = previous == m_proofs.end() || oldPad.get() != pad || !gst_caps_is_equal(previous->second->caps, caps);
 +                    m_proofs.insert_or_assign(id, WTF::move(proof));
@@ -870,7 +900,7 @@ index 00000000..f9155689
 +                auto& policy = *static_cast<GStreamerDoviSourcePolicy*>(data); auto* event = GST_PAD_PROBE_INFO_EVENT(info);
 +                switch (GST_EVENT_TYPE(event)) {
 +                case GST_EVENT_CAPS: { GstCaps* caps = nullptr; gst_event_parse_caps(event, &caps); policy.record(pad, caps); break; }
-+                case GST_EVENT_PROTECTION: policy.markUntrusted(); break;
++                case GST_EVENT_PROTECTION: policy.markUntrusted("protection event on demux output"); break;
 +                case GST_EVENT_STREAM_START: policy.removePadProof(pad); break;
 +                case GST_EVENT_FLUSH_START: policy.advance(); break;
 +                default: break;
@@ -888,7 +918,7 @@ index 00000000..f9155689
 +            if (!protection) break;
 +            protectedInput = true;
 +        }
-+        if (protectedInput) markUntrusted();
++        if (protectedInput) markUntrusted("sticky protection on demux output");
 +        else if (auto caps = adoptGRef(gst_pad_get_current_caps(pad))) record(pad, caps.get());
 +        GST_PAD_STREAM_UNLOCK(pad);
 +    }
@@ -904,10 +934,10 @@ index 00000000..f9155689
 +                std::lock_guard lock(self->m_mutex);
 +                if (self->m_revision != revision || (active && (self->m_revoked || self->m_untrusted.load(std::memory_order_acquire)))) return;
 +                if (active) {
-+                    if (self->m_proofs.empty()) { self->markUntrusted(); return; }
++                    if (self->m_proofs.empty()) { self->markUntrusted("selection activated without any clear proof"); return; }
 +                    for (const auto& [id, proof] : self->m_proofs) {
 +                        (void)id;
-+                        if (!self->proofIsLive(*proof)) { self->markUntrusted(); return; }
++                        if (!self->proofIsLive(*proof)) { self->markUntrusted("selection activated with a stale proof"); return; }
 +                    }
 +                }
 +            }
@@ -940,6 +970,7 @@ index 00000000..f9155689
 +        gst_structure_set(st, "source-revision", G_TYPE_UINT64, revision, "blocked", G_TYPE_BOOLEAN, blocked, nullptr);
 +        if (!blocked && id) gst_structure_set(st, "stream-id", G_TYPE_STRING, id, nullptr);
 +        if (!blocked && coded) gst_structure_set(st, "clear-coded-caps", GST_TYPE_CAPS, coded, nullptr);
++        GST_DEBUG("Dolby source policy: context revision %" G_GUINT64_FORMAT " blocked=%d stream=%s", revision, blocked, (!blocked && id) ? id : "-");
 +        gst_element_set_context(filter.get(), context.get());
 +    }
 +    std::mutex m_mutex;
@@ -1036,7 +1067,7 @@ index 00000000..ddc34acd
 +
 +} // namespace WebCore
 diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
-index ae14d494..da40e6bb 100644
+index ae14d494..5f85f328 100644
 --- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
 +++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
 @@ -33,6 +33,9 @@
@@ -1199,15 +1230,15 @@ index ae14d494..da40e6bb 100644
  
      auto name = GMallocString::unsafeAdoptFromUTF8(gst_element_get_name(element));
      String elementClass(unsafeSpan(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS)));
-@@ -3583,6 +3677,38 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
- 
-     g_object_set(m_pipeline.get(), "audio-sink", m_audioSink.get(), "video-sink", createVideoSink(), nullptr);
+@@ -3581,6 +3675,37 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
+     if (!m_audioSink)
+         m_audioSink = createAudioSink();
  
 +#if PLATFORM(GTK) && USE(GTK4)
 +    // The page compositor currently presents ordinary SDR/sRGB buffers. A
 +    // destination-capable mapper can grade a decoded Dolby picture to a logical
-+    // 100-nit BT709 target before the normal video conversion chain. This does
-+    // not request or declare HDR on the WebView's native GTK surface.
++    // 100-nit BT709 target ahead of the page video sink. This does not request
++    // or declare HDR on the WebView's native GTK surface.
 +    bool useStandardVideoDestination = player->isVideoPlayer() && !isMediaStream && !isMediaSource() && !isBlob;
 +    if (useStandardVideoDestination) {
 +        GRefPtr filter = makeGStreamerElement("gtkdovimap"_s);
@@ -1225,7 +1256,6 @@ index ae14d494..da40e6bb 100644
 +                if (destinationABI == 1 && sourceABI == 2) {
 +                    g_object_set(filter.get(), "destination-kind", 1u, "require-clear-source", TRUE, nullptr);
 +                    m_doviFilter = filter;
-+                    g_object_set(m_pipeline.get(), "video-filter", filter.get(), nullptr);
 +                    GST_INFO_OBJECT(m_pipeline.get(), "Using explicit standard100nit BT709/sRGB video destination");
 +                }
 +            }
@@ -1235,10 +1265,10 @@ index ae14d494..da40e6bb 100644
 +
 +#endif
 +
+     g_object_set(m_pipeline.get(), "audio-sink", m_audioSink.get(), "video-sink", createVideoSink(), nullptr);
+ 
      if (m_shouldPreservePitch && !isMediaStream && !GStreamerQuirksManager::singleton().needsCustomInstantRateChange()) {
-         if (auto* scale = makeGStreamerElement("scaletempo"_s))
-             g_object_set(m_pipeline.get(), "audio-filter", scale, nullptr);
-@@ -3812,7 +3938,7 @@ void MediaPlayerPrivateGStreamer::pushTextureToCompositor(bool isDuplicateSample
+@@ -3812,7 +3937,7 @@ void MediaPlayerPrivateGStreamer::pushTextureToCompositor(bool isDuplicateSample
      if (!m_videoInfo)
          m_videoInfo = VideoFrameGStreamer::infoFromCaps(GRefPtr(gst_sample_get_caps(m_sample.get())));
  
@@ -1247,7 +1277,33 @@ index ae14d494..da40e6bb 100644
  }
  #endif // USE(COORDINATED_GRAPHICS)
  
-@@ -4565,6 +4691,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
+@@ -4414,6 +4539,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
+         }), this);
+     }
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    // Lead the page video sink with the mapper instead of installing it as a
++    // playsink "video-filter": playbin answers decodebin's pre-exposure CAPS
++    // queries from the video sink alone, so a decoder would otherwise settle on
++    // memory the mapper refuses for a qualified Dolby stream (for example a
++    // tiled DMABuf it cannot import) and fail when the chain is finally linked.
++    if (m_doviFilter && m_videoSink) {
++        GstElement* bin = gst_bin_new("dovi-video-sink-bin");
++        gst_bin_add_many(GST_BIN_CAST(bin), m_doviFilter.get(), m_videoSink.get(), nullptr);
++        auto filterSink = adoptGRef(gst_element_get_static_pad(m_doviFilter.get(), "sink"));
++        if (gst_element_link(m_doviFilter.get(), m_videoSink.get()) && filterSink
++            && gst_element_add_pad(bin, gst_ghost_pad_new("sink", filterSink.get())))
++            return bin;
++        GST_WARNING_OBJECT(m_pipeline.get(), "Could not lead the video sink with the Dolby mapper; using an ordinary route");
++        gst_bin_remove_many(GST_BIN_CAST(bin), m_doviFilter.get(), m_videoSink.get(), nullptr);
++        gst_object_unref(gst_object_ref_sink(bin));
++        m_doviFilter = nullptr;
++    }
++#endif
+     return m_videoSink.get();
+ }
+ 
+@@ -4565,6 +4709,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
          return;
      }
  
