@@ -150,9 +150,9 @@ mapping in higher precision alone does not prove precision at the panel.
 | Stage | Required result before advancing | State on 2026-11-09 |
 |---|---|---|
 | 1. Read-only inspection | Identify Linux output limitations and cached OEM association, with evidence limits stated | Closed |
-| 2. Windows and backlight trace | Observe normal runtime binding and Dolby behaviour; separate `P(b)`, `W` and `T` provenance | Pending |
-| 3. Source contract and compiler loop | Freeze native-gamma/reference-anchor policy and establish the exact Ubuntu build loop | Pending |
-| 4. Synthetic Mutter controls | Verify SDR white, HDR headroom, gamut, target generations, pause/source lifetime and eight-bit dithering, including absent/invalid target controls | Pending |
+| 2. Windows and backlight trace | Observe normal runtime binding and Dolby behaviour; separate `P(b)`, `W` and `T` provenance | Runtime binding and SDR state traced 2026-11-11; Dolby playback behaviour not observed |
+| 3. Source contract and compiler loop | Freeze native-gamma/reference-anchor policy and establish the exact Ubuntu build loop | Done 2026-11-11: contract frozen; `-Dwerror` build and colour suites pass |
+| 4. Synthetic Mutter controls | Verify SDR white, HDR headroom, gamut, target generations, pause/source lifetime and eight-bit dithering, including absent/invalid target controls | Partial: SDR white, headroom, reference factor, declared black, invalid peak and forced HDR covered; generations, pause lifetime, saturated edges and dithering pending |
 | 5. Actual ThinkPad GPU qualification | Exercise native output, genuine Dolby grade, truthful transport, paused retargeting and ordinary SDR fallback on this GPU | Pending |
 | 6. Package and recovery qualification | Rehearse exact upgrade/rollback and coordinate an owner-attended display test window | Pending |
 | 7. Installation and acceptance | Verify installed versions, normal session behaviour and bounded visual acceptance | Pending |

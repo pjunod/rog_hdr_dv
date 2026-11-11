@@ -158,6 +158,7 @@ has the remote and branch rules.
 | [Status](docs/STATUS.md) · [status page](docs/STATUS.html) | What is proven, what is installed, what remains |
 | [Hardware](docs/HARDWARE.md) | Exactly which panel this is and what its firmware declares |
 | [ThinkPad X1 Carbon Gen 6](docs/THINKPAD_X1_CARBON_GEN6.md) | Closed read-only inspection and the pending native-gamma HDR qualification plan |
+| [Native-gamma HDR](docs/NATIVE_GAMMA_HDR.md) | HDR on a gamma 2.2 panel: declared physical range, reference white and backlight contract |
 | [Architecture](docs/ARCHITECTURE.md) | Which component owns which part of the colour path |
 | [Dolby Vision and display quality](docs/DOLBY_VISION_AND_QUALITY.md) | The overall plan and its staged acceptance criteria |
 | [Full HDR programme ledger](docs/FULL_HDR_HANDOFF.md) · [continuation](docs/HANDOFF.md) | Done, current and remaining work across the programme |

@@ -1,0 +1,400 @@
+From 1ca6cbd47e7064d2a5b3a8cfa6a4ae2462fc2c7f Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude@localhost>
+Date: Wed, 11 Nov 2026 13:28:56 -0500
+Subject: [PATCH] backends/color: Encode the native SDR mode over a declared
+ physical range
+
+A declared target peak above 203 cd/m2 in the native SDR mode selects a
+native-gamma HDR route: the output stays gamma 2.2 over its base EDID
+primaries, but its encoding spans the declared physical range, with SDR
+white at 203 cd/m2 times the reference factor, and the same range as the
+luminance target. The reference-white backlight holds the sysfs backlight
+at maximum, so the declared peak stays the full-backlight peak.
+
+Without a declared peak the native SDR mode is unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BCWL9z1ijNdgVDMvuiX96f
+---
+ src/backends/meta-color-device.c          |  88 +++++++++++-
+ src/backends/meta-color-device.h          |   3 +
+ src/backends/native/meta-output-kms.c     |   7 +-
+ src/tests/wayland-color-management-test.c | 165 +++++++++++++++++++++-
+ 4 files changed, 254 insertions(+), 9 deletions(-)
+
+diff --git a/src/backends/meta-color-device.c b/src/backends/meta-color-device.c
+index cf2f112..97b4d44 100644
+--- a/src/backends/meta-color-device.c
++++ b/src/backends/meta-color-device.c
+@@ -1052,6 +1052,58 @@ meta_color_target_luminance_init (MetaColorTargetLuminance      *target,
+   select_cta_luminance (target, edid_info, encoding);
+ }
+ 
++/*
++ * The reference white of the native-gamma HDR route at the default
++ * brightness: the HDR reference white of BT.2408, to which a PQ grade
++ * anchors its SDR white, so that at the default brightness a grade is shown
++ * at its graded luminance.
++ */
++#define NATIVE_HDR_REFERENCE_WHITE 203.0f
++
++/*
++ * The physical range of the native-gamma HDR route (docs/NATIVE_GAMMA_HDR.md
++ * in the rog_hdr_dv repository), if @monitor is on it: in the native SDR
++ * mode, active, HDR not forced, with a declared target peak above
++ * NATIVE_HDR_REFERENCE_WHITE. The output then stays gamma 2.2 over its
++ * native primaries, but its encoding spans the declared range rather than
++ * the 80 cd/m2 of SDR. Black is the declared minimum, or the ideal zero:
++ * nothing else is known about it. Only the declaration selects the route;
++ * firmware describes no physical luminance for a gamma 2.2 panel.
++ *
++ * This reads the monitor, not the device, so that the backlight selection,
++ * made when the output is configured, and the color state agree.
++ */
++static gboolean
++get_native_hdr_range (MetaMonitor              *monitor,
++                      MetaColorTargetLuminance *range)
++{
++  MetaBackend *backend = meta_monitor_get_backend (monitor);
++  MetaDebugControl *debug_control =
++    meta_context_get_debug_control (meta_backend_get_context (backend));
++  ClutterLuminance encoding = {
++    .type = CLUTTER_LUMINANCE_TYPE_EXPLICIT,
++    .min = 0.0f,
++    .ref = NATIVE_HDR_REFERENCE_WHITE,
++  };
++
++  if (!meta_monitor_is_active (monitor) ||
++      meta_debug_control_is_hdr_forced (debug_control) ||
++      meta_monitor_get_color_mode (monitor) != META_COLOR_MODE_SDR_NATIVE)
++    return FALSE;
++
++  return select_user_luminance (range,
++                                meta_monitor_get_target_override (monitor),
++                                &encoding);
++}
++
++gboolean
++meta_color_device_is_native_hdr (MetaMonitor *monitor)
++{
++  MetaColorTargetLuminance range;
++
++  return get_native_hdr_range (monitor, &range);
++}
++
+ static gboolean
+ target_luminance_equal (const MetaColorTargetLuminance *a,
+                         const MetaColorTargetLuminance *b)
+@@ -1448,6 +1500,18 @@ get_target_encoding_luminance (ClutterColorStateParams *color_state_params,
+   return luminance;
+ }
+ 
++/* As get_target_encoding_luminance(), on the native-gamma HDR route: with
++ * its reference white at the default brightness, which a declared peak must
++ * exceed at any brightness. */
++static const ClutterLuminance *
++get_native_hdr_encoding_luminance (ClutterColorStateParams *color_state_params,
++                                   ClutterLuminance        *luminance)
++{
++  *luminance = *clutter_color_state_params_get_luminance (color_state_params);
++  luminance->ref = NATIVE_HDR_REFERENCE_WHITE;
++  return luminance;
++}
++
+ static UpdateResult
+ update_target_volume (MetaColorDevice *color_device)
+ {
+@@ -1458,7 +1522,10 @@ update_target_volume (MetaColorDevice *color_device)
+   MetaDebugControl *debug_control =
+     meta_context_get_debug_control (meta_backend_get_context (backend));
+   ClutterLuminance encoding_luminance;
+-  const ClutterLuminance *encoding =
++  gboolean native_hdr = meta_color_device_is_native_hdr (monitor);
++  const ClutterLuminance *encoding = native_hdr ?
++    get_native_hdr_encoding_luminance (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
++                                       &encoding_luminance) :
+     get_target_encoding_luminance (CLUTTER_COLOR_STATE_PARAMS (color_device->color_state),
+                                    &encoding_luminance);
+   MetaColorTargetLuminance target;
+@@ -1476,7 +1543,9 @@ update_target_volume (MetaColorDevice *color_device)
+ 
+   /* The default SDR mode renders into an assumed sRGB encoding, and forced
+    * HDR into an encoding the output did not choose: neither has a target.
+-   * Target luminance is only selected in BT.2100, the user's override first.
++   * Target luminance is only selected in BT.2100, the user's override first,
++   * and on the native-gamma HDR route, where the override selects it and the
++   * encoding spans the same range (see get_native_hdr_range()).
+    * Target primaries in BT.2100 follow the override's gamut source, by
+    * default the DisplayID physical gamut; in the native SDR mode they are
+    * the base EDID gamut it encodes in, whatever the override. */
+@@ -1487,7 +1556,8 @@ update_target_volume (MetaColorDevice *color_device)
+   else if (declared && color_mode == META_COLOR_MODE_SDR_NATIVE)
+     primaries_sources = META_COLOR_TARGET_PRIMARIES_SOURCES_BASE_EDID;
+   meta_color_target_luminance_init (&target, info->edid_info, override,
+-                                    declared && color_mode == META_COLOR_MODE_BT2100,
++                                    declared && (color_mode == META_COLOR_MODE_BT2100 ||
++                                                 native_hdr),
+                                     encoding);
+   meta_color_target_primaries_init (&target_primaries, info->edid_info, override,
+                                     primaries_sources, encoding_primaries);
+@@ -1730,6 +1800,7 @@ update_color_state (MetaColorDevice *color_device)
+   g_auto (ClutterColorimetry) colorimetry = { 0 };
+   ClutterEOTF eotf;
+   ClutterLuminance luminance;
++  MetaColorTargetLuminance native_range;
+   UpdateResult result = 0;
+ 
+   get_color_metadata_from_monitor (color_device, &colorimetry, &eotf);
+@@ -1743,6 +1814,17 @@ update_color_state (MetaColorDevice *color_device)
+     }
+ 
+   luminance = *clutter_eotf_get_default_luminance (eotf);
++  /* On the native-gamma HDR route the gamma 2.2 encoding spans the declared
++   * physical range, with SDR white at the HDR reference white: full code is
++   * the declared peak, not SDR white. */
++  if (get_native_hdr_range (color_device->monitor, &native_range))
++    {
++      luminance.type = CLUTTER_LUMINANCE_TYPE_EXPLICIT;
++      luminance.min = native_range.minimum;
++      luminance.max = native_range.maximum;
++      luminance.ref = NATIVE_HDR_REFERENCE_WHITE;
++      luminance.mastering_max = native_range.maximum;
++    }
+   /* Whole cd/m², as the Wayland image descriptions publish it, so that a
+    * client copying the published reference luminance gets this one. */
+   luminance.ref = roundf (luminance.ref * color_device->reference_luminance_factor);
+diff --git a/src/backends/meta-color-device.h b/src/backends/meta-color-device.h
+index e9c901b..33c1d0a 100644
+--- a/src/backends/meta-color-device.h
++++ b/src/backends/meta-color-device.h
+@@ -174,6 +174,9 @@ gboolean meta_color_device_is_ready (MetaColorDevice *color_device);
+ META_EXPORT_TEST
+ void meta_color_device_update (MetaColorDevice *color_device);
+ 
++META_EXPORT_TEST
++gboolean meta_color_device_is_native_hdr (MetaMonitor *monitor);
++
+ float meta_color_device_get_reference_luminance_factor (MetaColorDevice *color_device);
+ 
+ META_EXPORT_TEST
+diff --git a/src/backends/native/meta-output-kms.c b/src/backends/native/meta-output-kms.c
+index d4ebd72..c2b828a 100644
+--- a/src/backends/native/meta-output-kms.c
++++ b/src/backends/native/meta-output-kms.c
+@@ -413,9 +413,12 @@ meta_output_kms_create_backlight (MetaOutput  *output,
+   /* Unfortunately we don't know if a sysfs backlight actually works in
+    * HDR modes. Ideally a new KMS backlight API would allow us to get this
+    * information and react accordingly. Until then, we force the ref-white
+-   * backlight.
++   * backlight. The native-gamma HDR route needs it for another reason: its
++   * declared peak is the peak at full backlight, so the backlight stays
++   * there and brightness moves the reference white.
+    */
+-  if (color_mode == META_COLOR_MODE_BT2100)
++  if (color_mode == META_COLOR_MODE_BT2100 ||
++      meta_color_device_is_native_hdr (monitor))
+     {
+       g_autoptr (MetaBacklightRefWhite) backlight_ref_white = NULL;
+ 
+diff --git a/src/tests/wayland-color-management-test.c b/src/tests/wayland-color-management-test.c
+index 6665eba..0e113d0 100644
+--- a/src/tests/wayland-color-management-test.c
++++ b/src/tests/wayland-color-management-test.c
+@@ -2015,8 +2015,10 @@ display_targets_sdr_native (void)
+  * CTA peak, and base-edid makes the base gamut the target, both
+  * user-declared, published and carried by the blending state. The peak is
+  * validated against the nominal reference white, so a raised reference
+- * luminance does not remove it. none suppresses the gamut target; native SDR
+- * ignores the override; clearing it restores the display's declarations.
++ * luminance does not remove it. none suppresses the gamut target; in native
++ * SDR the declared peak selects the native-gamma HDR route (see
++ * native_gamma_hdr_route()); clearing it restores the display's
++ * declarations.
+  */
+ static void
+ display_targets_user_override (void)
+@@ -2130,13 +2132,17 @@ display_targets_user_override (void)
+   g_assert_false (target_volume->has_primaries);
+ 
+   /* The native SDR mode keeps its own encoding gamut target, with EDID
+-   * provenance, and no luminance target, whatever the override. */
++   * provenance, whatever the override; the declared 400 cd/m² peak, above
++   * the 203 cd/m² reference white, makes it the native-gamma HDR route, whose
++   * luminance target is the user's. */
+   set_test_color_mode_with_override (output, META_COLOR_MODE_SDR_NATIVE, &override);
+   meta_color_device_update (device);
+   g_assert_cmpint (meta_color_device_get_target_primaries (device)->source,
+                    ==, META_COLOR_TARGET_EDID_DECLARED);
+   g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
+-                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++                   ==, META_COLOR_TARGET_USER_DECLARED);
++  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum,
++                     ==, 400.0f);
+ 
+   /* Forced HDR keeps the fallback targets whatever the override. */
+   set_test_color_mode_with_override (output, META_COLOR_MODE_BT2100, &override);
+@@ -2160,6 +2166,155 @@ display_targets_user_override (void)
+   meta_color_device_update (device);
+ }
+ 
++/* The PQ code value of @luminance cd/m² (SMPTE ST 2084). */
++static float
++pq_encode (double luminance)
++{
++  const double m1 = 2610.0 / 16384.0, m2 = 2523.0 / 4096.0 * 128.0;
++  const double c1 = 3424.0 / 4096.0, c2 = 2413.0 / 4096.0 * 32.0;
++  const double c3 = 2392.0 / 4096.0 * 32.0;
++  double y = pow (luminance / 10000.0, m1);
++
++  return (float) pow ((c1 + c2 * y) / (1.0 + c3 * y), m2);
++}
++
++/* The output signal of a neutral PQ pixel of @luminance cd/m². */
++static void
++assert_native_signal (ClutterColorState *output_state,
++                      double             luminance,
++                      double             expected)
++{
++  ClutterContext *context = clutter_color_state_get_context (output_state);
++  g_autoptr (ClutterColorState) pq = NULL;
++  ClutterColorTransform *transform;
++  float code = pq_encode (luminance);
++  float pixel[4] = { code, code, code, 1.0f };
++  unsigned int i;
++
++  pq = clutter_color_state_params_new (context, CLUTTER_COLORSPACE_BT2020,
++                                       CLUTTER_TRANSFER_FUNCTION_PQ);
++  transform = clutter_color_transform_from_color_states (context, pq,
++                                                         output_state, 0);
++  clutter_color_pipeline_do_transform (clutter_color_transform_get_pipeline (transform),
++                                       pixel, 1);
++  for (i = 0; i < 3; i++)
++    g_assert_cmpfloat_with_epsilon (pixel[i], expected, 1e-3);
++}
++
++/*
++ * The native-gamma HDR route (docs/NATIVE_GAMMA_HDR.md in the rog_hdr_dv
++ * repository) on an internal gamma 2.2 panel with a wide base EDID gamut and
++ * no HDR declaration. Without an override the native SDR mode is exactly
++ * SDR. A declared 500 cd/m² peak makes the gamma 2.2 encoding span 0–500
++ * cd/m², with SDR white at 203 cd/m² scaled by the reference factor, and the
++ * same range as the luminance target. A neutral PQ grade then encodes as
++ * ((L - 0) / 500)^(1/2.2): 1, 0.6638 and 0.4347 at 500, 203 and 80 cd/m². A
++ * declared black is the encoding's black; a peak not above 203 cd/m², and
++ * forced HDR, leave the route.
++ */
++static void
++native_gamma_hdr_route (void)
++{
++  MetaBackend *backend = meta_context_get_backend (test_context);
++  MetaColorManager *manager = meta_backend_get_color_manager (backend);
++  MetaOutput *output = meta_virtual_monitor_get_output (virtual_monitor);
++  MetaMonitor *monitor = meta_output_get_monitor (output);
++  MetaOutputInfo *info = (MetaOutputInfo *) meta_output_get_info (output);
++  MetaColorDevice *device = meta_color_manager_get_color_device (manager, monitor);
++  MetaColorTargetOverride override = {
++    .has_peak = TRUE,
++    .peak = 500,
++    .gamut_source = META_HDR_GAMUT_SOURCE_AUTO,
++  };
++  const MetaColorTargetLuminance *target;
++  const ClutterLuminance *lum;
++  ClutterColorState *state;
++
++  info->connector_type = META_CONNECTOR_TYPE_eDP;
++  info->supported_hdr_eotfs = 0;
++  info->supported_color_spaces = 0;
++  g_clear_pointer (&info->edid_info, meta_edid_info_free);
++  info->edid_info = g_new0 (MetaEdidInfo, 1);
++  info->edid_info->default_gamma = 2.2;
++  set_wide_gamut_base_primaries (info->edid_info);
++
++  /* Without a declared peak, native SDR is SDR. */
++  set_test_color_mode (output, META_COLOR_MODE_SDR_NATIVE);
++  meta_color_device_update (device);
++  g_assert_false (meta_color_device_is_native_hdr (monitor));
++  state = meta_color_device_get_color_state (device);
++  lum = clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (state));
++  g_assert_cmpfloat (lum->min, ==, 0.2f);
++  g_assert_cmpfloat (lum->max, ==, 80.0f);
++  g_assert_cmpfloat (lum->ref, ==, 80.0f);
++  g_assert_cmpint (meta_color_device_get_target_luminance (device)->maximum_source,
++                   ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++
++  /* A declared 500 cd/m² peak. */
++  set_test_color_mode_with_override (output, META_COLOR_MODE_SDR_NATIVE, &override);
++  meta_color_device_update (device);
++  g_assert_true (meta_color_device_is_native_hdr (monitor));
++  state = meta_color_device_get_color_state (device);
++  g_assert_cmpuint (clutter_color_state_params_get_eotf (CLUTTER_COLOR_STATE_PARAMS (state))->tf_name,
++                    ==, CLUTTER_TRANSFER_FUNCTION_GAMMA22);
++  lum = clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (state));
++  g_assert_cmpfloat (lum->min, ==, 0.0f);
++  g_assert_cmpfloat (lum->max, ==, 500.0f);
++  g_assert_cmpfloat (lum->ref, ==, 203.0f);
++  target = meta_color_device_get_target_luminance (device);
++  g_assert_cmpfloat (target->maximum, ==, 500.0f);
++  g_assert_cmpint (target->maximum_source, ==, META_COLOR_TARGET_USER_DECLARED);
++  g_assert_cmpint (target->minimum_source, ==, META_COLOR_TARGET_ENCODING_FALLBACK);
++  g_assert_cmpfloat (target->minimum, ==, 0.0f);
++  g_assert_cmpint (meta_color_device_get_target_primaries (device)->source,
++                   ==, META_COLOR_TARGET_EDID_DECLARED);
++  assert_native_signal (state, 500.0, 1.0);
++  assert_native_signal (state, 203.0, pow (203.0 / 500.0, 1.0 / 2.2));
++  assert_native_signal (state, 80.0, pow (80.0 / 500.0, 1.0 / 2.2));
++
++  /* Brightness moves the reference white, never the physical range. */
++  meta_color_device_set_reference_luminance_factor (device, 0.5f);
++  state = meta_color_device_get_color_state (device);
++  lum = clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (state));
++  g_assert_cmpfloat (lum->ref, ==, 102.0f);
++  g_assert_cmpfloat (lum->max, ==, 500.0f);
++  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->maximum, ==, 500.0f);
++  meta_color_device_set_reference_luminance_factor (device, 1.0f);
++
++  /* A declared black is the encoding's black. */
++  override.has_min = TRUE;
++  override.min = 0.5f;
++  set_test_color_mode_with_override (output, META_COLOR_MODE_SDR_NATIVE, &override);
++  meta_color_device_update (device);
++  state = meta_color_device_get_color_state (device);
++  lum = clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (state));
++  g_assert_cmpfloat (lum->min, ==, 0.5f);
++  g_assert_cmpfloat (meta_color_device_get_target_luminance (device)->minimum, ==, 0.5f);
++  assert_native_signal (state, 203.0, pow ((203.0 - 0.5) / 499.5, 1.0 / 2.2));
++
++  /* A peak not above the reference white is no route. */
++  override.has_min = FALSE;
++  override.peak = 203;
++  set_test_color_mode_with_override (output, META_COLOR_MODE_SDR_NATIVE, &override);
++  meta_color_device_update (device);
++  g_assert_false (meta_color_device_is_native_hdr (monitor));
++  state = meta_color_device_get_color_state (device);
++  g_assert_cmpfloat (clutter_color_state_params_get_luminance (CLUTTER_COLOR_STATE_PARAMS (state))->max,
++                     ==, 80.0f);
++
++  /* Forced HDR leaves the route. */
++  override.peak = 500;
++  set_test_color_mode_with_override (output, META_COLOR_MODE_SDR_NATIVE, &override);
++  set_fixture_force_hdr (meta_context_get_debug_control (test_context),
++                         meta_backend_get_monitor_manager (backend), TRUE);
++  g_assert_false (meta_color_device_is_native_hdr (monitor));
++  set_fixture_force_hdr (meta_context_get_debug_control (test_context),
++                         meta_backend_get_monitor_manager (backend), FALSE);
++
++  set_test_color_mode (output, META_COLOR_MODE_DEFAULT);
++  meta_color_device_update (device);
++}
++
+ static void
+ call_gsd_color_mock (const char *method,
+                      GVariant   *parameters)
+@@ -2727,6 +2882,8 @@ init_tests (void)
+                    display_targets_sdr_native);
+   g_test_add_func ("/wayland/display-targets/user-override",
+                    display_targets_user_override);
++  g_test_add_func ("/wayland/display-targets/native-gamma-hdr",
++                   native_gamma_hdr_route);
+   g_test_add_func ("/wayland/mapping/target-gamut",
+                    mapping_target_gamut);
+ }

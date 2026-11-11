@@ -73,7 +73,20 @@ The GTK default Vulkan renderer presented an actual floating-point RGB surface u
 
 The NVIDIA HEVC decoder now preserves each decoded picture’s Dolby configuration, crop and metadata across seeking and changes of configuration. All 95 cropped pictures matched the software decoder. Ordinary Showtime automatically chose NVIDIA, ran the Profile 5 mapper and retained the same paused native picture when the target changed. The CPU-side handoff contained nonblack, opaque pixels. The private compositor still saw an all-black Showtime output on the same frame that rendered visibly in mpv. A standalone GTK OpenGL ES texture reproduced the black output. GTK queried the framebuffer read format and type with an unsupported OpenGL ES command. The supported query returned the expected 16-bit format, and direct readback recovered the exact pixel. The corrected GTK library recovered the exact 16-bit pixel and showed 44,730 distinct colors in the Showtime framebuffer on the original GL path. A paused target change still produced identical framebuffer bytes and remains under investigation. [NVIDIA producer qualification](../evidence/gstreamer-nvidia-picture-qualification.json).
 
-## ThinkPad X1 Carbon Gen 6 — inspection closed, implementation pending
+## ThinkPad X1 Carbon Gen 6 — native-gamma route compiled, installation pending
+
+**2026-11-11 (owner: Claude):** the Windows runtime probe shows the panel
+bound as LEN40AE in SDR, with advanced colour force-disabled and a
+driver-reported 0.5–270 cd/m² range. The [native-gamma HDR
+contract](NATIVE_GAMMA_HDR.md) is frozen, and Mutter patch 0108 implements
+it. Patched libdisplay-info passed 45/45 tests in a private prefix. Mutter
+built with `-Dwerror` on the ThinkPad, and all 48 colour and HDR test entries
+passed, including the new native-gamma case. Pending: KMS backlight selection
+on hardware, packaging, actual GPU output, an attended install and visual
+acceptance. Nothing is installed on the desktop.
+
+### 2026-11-09 inspection
+
 
 **2026-11-09:** read-only stage 1 inspection is closed. UHD 620/i915 Gen 9
 uses an eight-bit native-gamma wide-gamut eDP panel, AUO B140QAN02.0. The
