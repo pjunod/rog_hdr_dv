@@ -1,6 +1,23 @@
 # GStreamer resolved Dolby pictures
 
-**Updated November 8, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The staged GNOME consumers also graded a paused Profile 5 picture with embedded text and restored the original image after a display-target round trip. Profile 7 enhancement-layer composition is qualified separately in mpv. The producer evidence below covers metadata ownership, configuration changes and conformance geometry. [GNOME playback results](../evidence/gnome-embedded-dolby-subtitles.json) · [Current installation status](STATUS.md).
+**Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
+
+## Browser destination interface in development
+
+The source candidate adds an explicit logical100nit BT709/sRGB destination
+without changing the native DISPLAY_PQ witness requirement. The additive
+destination API preserves the existing core ABI and legacy entry points.
+Retained pictures keep their original dimensions and picture identity when a
+later destination requests a different output layout. The marked reverse caps
+query now derives each input candidate through its actual graded output before
+intersecting downstream constraints; unmarked passthrough remains unchanged.
+
+The extended negotiation probe exercises actual linked pad queries, normalized
+peer answers, output format/memory/width restrictions, and separate marked
+configurations. Runtime and normal-package qualification of this new source
+remain pending. These source changes do not grant native HDR browser delivery
+or physical panel acceptance. Browser source/track/CDM lifecycle qualification
+and stream-qualified VA selection are separate required parts of that work.
 
 ## Normal GNOME playback
 
@@ -44,6 +61,22 @@ AU in decode order and owns the result on the exact GstH265Picture through
 reordering. Its snapshot is attached only after output geometry is validated.
 An RPU gap emits no snapshot. Neither constructor claims verified FEL residual
 participation; consumers must decline an unreconstructed residual.
+
+## Profile 7 native source and digital qualification
+
+The active [NVIDIA producer patch](../patches/ubuntu-gst-plugins-bad-rpu/0005-nvcodec-decode-and-bind-matched-profile7-enhancement-pictures.patch) follows the four existing patches. The bridge and GTK mapper support progressive, single-track Profile 7 with a half-resolution Main10 enhancement layer and compatibility ID 6. The full Ubuntu source import reproduces the pinned base and preceding four-patch tree. [Source pins](../sources.json) identify all five patches and the complete resulting source tree; they do not advertise the local import commit as a fetchable upstream revision.
+
+The decoder sends each extracted enhancement AU with a reference to the exact resolved base picture. FFmpeg returns that reference through picture reordering. The producer retains decoded planes on the output buffer and full-buffer copies, while still reporting the residual as unreconstructed. Flush, discontinuity and configuration changes release pending references. Default file playback reserves one 16-picture HEVC reorder window and drains the secondary decoder at EOS. An explicit NVIDIA display-delay setting or live input retains the requested latency.
+
+Ordinary decodebin selected the candidate NVIDIA decoder and paired all 70 pictures before and all 70 after a flushing seek. Full-buffer copies retained their decoded enhancement pixels. Direct bridge controls preserved all 70 per-picture pixel hashes with duplicate or absent presentation timestamps. A missing enhancement AU and an invalid enhancement NAL header each left the affected picture unpaired. Resetting with ten pending pictures produced no stale pairs, and replay restored all 70 expected hashes.
+
+The actual GTK path uploaded both layers, and the provider accepted a composed 3840×2160 master at a declared 616 cd/m² destination. At the same one-second picture, a flush seek preserved both the RGBA64 output and the independent ten-bit PQ compositor capture byte for byte. The missing-EL control retained all 70 original coded base pictures, RPU bytes and timestamps; only enhancement NALs were removed. It reached ordinary base conversion without provider mapping. FEL and missing-EL output differed across 2,667,662 of 2,764,800 visible channel samples. Profile 5 still mapped without an enhancement layer, and SDR selected no Dolby mapping. [Aggregate digital receipt and limitations](../evidence/gstreamer-native-fel-20261109.json).
+
+The normal Ubuntu builds produced 18 amd64/all packages: bridge `0.2.0+rogdv2`, core/mapper `0.1.0+rogdv4`, bad plugins `1.28.6-1ubuntu1+rogdv3`, sink `0.15.2-1ubuntu2+rogdv4.2` and Showtime `50.0-2+rogdv4.2`. The normal public package preparer uses the actual bad/extra outputs and advances the exact client dependencies together. Complete private rollback archives preserve the prior build slots and package outputs.
+
+A separate GtkVideo trial used the extracted bridge/core/bad packages and reached its 2.999666-second EOS in 3.069 seconds after explicit play. Visible native redraws mapped pictures from the beginning through the end of the clip. This diagnostic rendered seven sink frames and dropped thirteen while LOG-level code hashed and scanned every visible 4K frame. It establishes clock progression and no delayed-output hang, not clean 24 fps. The upstream per-stream baseline conversion is expected before each view applies its own grade. Normal-logging throughput and runtime qualification of the matching rebuilt clients remain open; further GPU trials are stopped.
+
+These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
 
 ## Which geometry reaches the mapper
 

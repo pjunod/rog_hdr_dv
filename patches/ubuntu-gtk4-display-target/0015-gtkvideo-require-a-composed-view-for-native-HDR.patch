@@ -1,0 +1,36 @@
+--- a/gtk/media/gtkgstdoviview.c
++++ b/gtk/media/gtkgstdoviview.c
+@@ -275,7 +275,7 @@
+   char *signature;
+ 
+   valid = gdk_wayland_surface_get_color_target (surface, &physical);
+-  ready = self->lease && gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
++  ready = self->composed && self->lease && gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
+           state.generation == physical.generation &&
+           MIN (state.red_bits, MIN (state.green_bits, state.blue_bits)) >= 10 &&
+           state.color_primaries == 9 && state.transfer_function == 16 &&
+--- /dev/null
++++ b/debian/patches/gtkvideo-hdr-composed-witness.patch
+@@ -0,0 +1,15 @@
++Description: Require a composed view before selecting native HDR
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++
++--- a/gtk/media/gtkgstdoviview.c
+++++ b/gtk/media/gtkgstdoviview.c
++@@ -275,7 +275,7 @@
++   char *signature;
++ 
++   valid = gdk_wayland_surface_get_color_target (surface, &physical);
++-  ready = self->lease && gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
+++  ready = self->composed && self->lease && gdk_wayland_hdr_rendering_get_state (self->lease, &state) && valid &&
++           state.generation == physical.generation &&
++           MIN (state.red_bits, MIN (state.green_bits, state.blue_bits)) >= 10 &&
++           state.color_primaries == 9 && state.transfer_function == 16 &&
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -2,3 +2,4 @@
+ gles-readback-query.patch
+ gtkvideo-dovi-view.patch
+ gtkvideo-dovi-sdr-destination.patch
++gtkvideo-hdr-composed-witness.patch

@@ -269,17 +269,30 @@ void gst_dovi_picture_get_dimensions (const GstDoviPicture *p, guint *width, gui
   if (height) *height = p->geometry.height;
 }
 
+typedef struct {
+  GstDoviPictureMeta public;
+  AVFrame *fel;
+} OwnedMeta;
+
+const AVFrame *gst_dovi_picture_meta_get_fel (const GstDoviPictureMeta *meta) {
+  return meta ? ((const OwnedMeta *) meta)->fel : NULL;
+}
+
 static gboolean meta_init (GstMeta *meta, gpointer params, GstBuffer *buffer) {
-  (void) params; (void) buffer; ((GstDoviPictureMeta *) meta)->picture = NULL; return TRUE;
+  (void) params; (void) buffer; ((OwnedMeta *) meta)->public.picture = NULL; ((OwnedMeta *) meta)->fel = NULL; return TRUE;
 }
 static void meta_free (GstMeta *meta, GstBuffer *buffer) {
-  (void) buffer; gst_dovi_picture_unref (((GstDoviPictureMeta *) meta)->picture);
+  (void) buffer; av_frame_free (&((OwnedMeta *) meta)->fel);
+  gst_dovi_picture_unref (((GstDoviPictureMeta *) meta)->picture);
 }
 static gboolean meta_transform (GstBuffer *dest, GstMeta *meta,
     GstBuffer *src, GQuark type, gpointer data) {
   (void) src;
-  if (GST_META_TRANSFORM_IS_COPY (type) && !((GstMetaTransformCopy *) data)->region)
-    return gst_buffer_add_dovi_picture_meta (dest, ((GstDoviPictureMeta *) meta)->picture) != NULL;
+  if (GST_META_TRANSFORM_IS_COPY (type) && !((GstMetaTransformCopy *) data)->region) {
+    OwnedMeta *owned = (OwnedMeta *) meta;
+    AVFrame *frame = owned->fel ? av_frame_clone (owned->fel) : NULL;
+    return gst_dovi_add_meta_take_frame (dest, owned->public.picture, frame) != NULL;
+  }
   return FALSE;
 }
 GType gst_dovi_picture_meta_api_get_type (void) {
@@ -295,15 +308,28 @@ const GstMetaInfo *gst_dovi_picture_meta_get_info (void) {
   static gsize info;
   if (g_once_init_enter (&info)) {
     const GstMetaInfo *value = gst_meta_register (GST_DOVI_PICTURE_META_API_TYPE,
-        "GstDoviPictureMeta", sizeof (GstDoviPictureMeta), meta_init, meta_free, meta_transform);
+        "GstDoviPictureMeta", sizeof (OwnedMeta), meta_init, meta_free, meta_transform);
     g_once_init_leave (&info, (gsize) value);
   }
   return (const GstMetaInfo *) info;
 }
 GstDoviPictureMeta *gst_buffer_add_dovi_picture_meta (GstBuffer *buffer, GstDoviPicture *p) {
+  return gst_dovi_add_meta_take_frame (buffer, p, NULL);
+}
+
+GstDoviPictureMeta *gst_dovi_add_meta_take_frame (GstBuffer *buffer,
+    GstDoviPicture *p, AVFrame *frame) {
   GstDoviPictureMeta *meta;
-  g_return_val_if_fail (p && !gst_buffer_get_dovi_picture_meta (buffer), NULL);
+  if (!p || gst_buffer_get_dovi_picture_meta (buffer)) {
+    av_frame_free (&frame);
+    return NULL;
+  }
   meta = (GstDoviPictureMeta *) gst_buffer_add_meta (buffer, GST_DOVI_PICTURE_META_INFO, NULL);
-  if (meta) meta->picture = gst_dovi_picture_ref (p);
+  if (meta) {
+    meta->picture = gst_dovi_picture_ref (p);
+    ((OwnedMeta *) meta)->fel = frame;
+  } else {
+    av_frame_free (&frame);
+  }
   return meta;
 }

@@ -14,13 +14,31 @@ static gboolean start_code (const guint8 *data, gsize size, gsize from,
   return FALSE;
 }
 static gboolean collect (const guint8 *data, gsize size, GBytes **rpu,
-    guint *first_slices) {
+    guint *first_slices, GByteArray *el, guint *el_slices, gboolean *irap) {
   if (size < 2 || (data[0] & 0x80) || !(data[1] & 7)) return FALSE;
   guint type = (data[0] >> 1) & 63;
   guint layer = ((data[0] & 1) << 5) | (data[1] >> 3);
   if (type <= 31) {
     if (layer || size < 3) return FALSE;
     if (data[2] & 0x80) (*first_slices)++;
+  }
+  if (type == 63 && el) {
+    static const guint8 prefix[] = { 0, 0, 0, 1 };
+    if (layer || size < 5 || (data[2] & 0x81) || (data[3] >> 3) || !(data[3] & 7))
+      return FALSE;
+    guint inner = (data[2] >> 1) & 63;
+    if (inner >= 48 || size > 16 * 1024 * 1024 ||
+        el->len + sizeof (prefix) > 16 * 1024 * 1024 - (size - 2)) return FALSE;
+    if (inner < 32) {
+      if (data[4] & 0x80) {
+        (*el_slices)++;
+        *irap = inner >= 16 && inner <= 21;
+      } else if (!*el_slices) {
+        return FALSE;
+      }
+    }
+    g_byte_array_append (el, prefix, sizeof (prefix));
+    g_byte_array_append (el, data + 2, size - 2);
   }
   if (type != 62) return TRUE;
   /* Annex-B trailing_zero_8bits do not belong to the RPU payload. */
@@ -30,11 +48,11 @@ static gboolean collect (const guint8 *data, gsize size, GBytes **rpu,
   *rpu = g_bytes_new (data + 2, size - 2);
   return TRUE;
 }
-int gst_dovi_extract_hevc_rpu (GstBuffer *buffer, const GstVideoCodecState *state,
-    GBytes **rpu, GError **error) {
+static int extract_au (GstBuffer *buffer, const GstVideoCodecState *state,
+    GBytes **rpu, GByteArray *el, gboolean *irap, GError **error) {
   GstMapInfo map;
   gboolean valid = TRUE;
-  guint slices = 0, length_size = 0;
+  guint slices = 0, el_slices = 0, length_size = 0;
   const GstStructure *structure;
   const gchar *format, *alignment;
   *rpu = NULL;
@@ -63,7 +81,7 @@ int gst_dovi_extract_hevc_rpu (GstBuffer *buffer, const GstVideoCodecState *stat
       guint32 size = 0;
       if (map.size - offset < length_size) { valid = FALSE; break; }
       for (guint i = 0; i < length_size; i++) size = (size << 8) | map.data[offset++];
-      if (size > map.size - offset || !collect (map.data + offset, size, rpu, &slices)) {
+      if (size > map.size - offset || !collect (map.data + offset, size, rpu, &slices, el, &el_slices, irap)) {
         valid = FALSE; break;
       }
       offset += size;
@@ -77,17 +95,35 @@ int gst_dovi_extract_hevc_rpu (GstBuffer *buffer, const GstVideoCodecState *stat
         gsize next, next_payload;
         gboolean more = start_code (map.data, map.size, payload, &next, &next_payload);
         gsize end = more ? next : map.size;
-        valid = collect (map.data + payload, end - payload, rpu, &slices);
+        valid = collect (map.data + payload, end - payload, rpu, &slices, el, &el_slices, irap);
         if (!more) break;
         payload = next_payload;
       }
     }
   }
   gst_buffer_unmap (buffer, &map);
-  if (!valid || slices != 1) goto fail;
+  if (!valid || slices != 1 || (el && el_slices != 1)) goto fail;
   return *rpu ? 1 : 0;
 fail:
   g_clear_pointer (rpu, g_bytes_unref);
   gst_dovi_fail (error, "malformed, ambiguous or non-AU HEVC picture");
   return -1;
+}
+
+int gst_dovi_extract_hevc_rpu (GstBuffer *buffer, const GstVideoCodecState *state,
+    GBytes **rpu, GError **error) {
+  return extract_au (buffer, state, rpu, NULL, NULL, error);
+}
+
+GBytes *gst_dovi_extract_fel (GstBuffer *buffer, const GstVideoCodecState *state,
+    GstDoviPicture *picture, gboolean *irap) {
+  GBytes *rpu = NULL;
+  GByteArray *el = g_byte_array_new ();
+  *irap = FALSE;
+  gboolean valid = extract_au (buffer, state, &rpu, el, irap, NULL) == 1 &&
+      g_bytes_equal (rpu, gst_dovi_picture_get_rpu (picture));
+  g_clear_pointer (&rpu, g_bytes_unref);
+  if (valid) return g_byte_array_free_to_bytes (el);
+  g_byte_array_unref (el);
+  return NULL;
 }

@@ -1,0 +1,38 @@
+--- a/showtime/play.py
++++ b/showtime/play.py
+@@ -80,7 +80,7 @@
+         import weakref
+ 
+         if self.precision_filter is not None and self.precision_dolby != self.dolby_stream:
+-            caps = Gst.Caps.from_string("video/x-raw(memory:GLMemory),format=RGBA64_LE;video/x-raw,format=RGBA64_LE") if self.dolby_stream else Gst.Caps.new_any()
++            caps = Gst.Caps.from_string("video/x-raw(memory:GLMemory),format=RGBA;video/x-raw,format=RGBA") if self.dolby_stream else Gst.Caps.new_any()
+             self.precision_filter.set_property("caps", caps)
+             self.precision_dolby = self.dolby_stream
+         picture = self.picture()
+@@ -220,6 +220,17 @@
+         self.changed(surface)
+ 
+ 
++def standard_destination_mapper(mapper):
++    # Optional old/absent mappers retain the existing ordinary playback route.
++    if mapper is None or not mapper.find_property("destination-abi") or not mapper.find_property("destination-kind"):
++        return None
++    if mapper.get_property("destination-abi") != 1:
++        return None
++    # Baseline/preroll is graded SDR; the retained view selects its own grade.
++    mapper.set_property("destination-kind", 1)
++    return mapper
++
++
+ def gst_play_setup(
+     picture: Gtk.Picture,
+ ) -> tuple[Gdk.Paintable, GstPlay.Play, Gst.Element, Gst.Element]:
+@@ -232,7 +243,7 @@
+     paintable = paintable_sink.props.paintable  # pyright: ignore[reportAttributeAccessIssue]
+     picture.props.paintable = paintable
+ 
+-    mapper = Gst.ElementFactory.make("gtkdovimap")
++    mapper = standard_destination_mapper(Gst.ElementFactory.make("gtkdovimap"))
+     precision_filter = None
+ 
+     # OpenGL doesn't work on macOS properly
