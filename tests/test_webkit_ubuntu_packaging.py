@@ -20,10 +20,12 @@ prep_spec = importlib.util.spec_from_file_location('webkit_prepare', RECIPE / 'p
 prepare = importlib.util.module_from_spec(prep_spec)
 prep_spec.loader.exec_module(prepare)
 
+DEBHELPER = shutil.which('dh') and shutil.which('dh_listpackages')
+
 
 class WebKitPackagingTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir=os.environ['TMPDIR'])
+        self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.source = self.root / 'source'
@@ -259,6 +261,7 @@ class WebKitPackagingTests(unittest.TestCase):
 
     @unittest.skipUnless(Path('/usr/share/dpkg/architecture.mk').exists(),
                          'actual make/debhelper lifecycle requires Ubuntu')
+    @unittest.skipUnless(DEBHELPER, 'replays the real debhelper sequence')
     def test_unstamped_external_configure_only_verifies_and_generates_manifests(self):
         debian = self.overlay()
         self.populate_manifest_inputs(debian)
@@ -336,6 +339,7 @@ class WebKitPackagingTests(unittest.TestCase):
 
     @unittest.skipUnless(Path('/usr/share/dpkg/architecture.mk').exists(),
                          'actual control generation requires Ubuntu dpkg/debhelper')
+    @unittest.skipUnless(DEBHELPER, 'replays the real debhelper sequence')
     def test_generated_control_selects_exact_six_gtk4_packages(self):
         debian = self.overlay()
         # Upstream rules require these normal source-owned templates.
