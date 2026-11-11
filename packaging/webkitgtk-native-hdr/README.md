@@ -149,9 +149,15 @@ DEB_BUILD_OPTIONS='parallel=2 nocheck nodoc' dpkg-buildpackage -b -nc -us -uc
 The gate refuses a changed source, build source pathname, generator, compiler,
 flags, feature, output directory or SDK search root. The complete
 `ENABLE_*`/`USE_*` Boolean map must match, including key presence; a new or
-missing option also fails. The feature receipt has its own canonical SHA256. `GI_GIRDIR` and
-`GI_TYPELIBDIR` are SDK search inputs and are deliberately not interpreted as
-installation paths. It does not rewrite them. Source/header compile checks
+missing option also fails. The feature receipt has its own canonical SHA256.
+`GI_GIRDIR` and `GI_TYPELIBDIR` are installation destinations: WebKit's
+`FindGI.cmake` uses them only in `install(DESTINATION)`. They are cached
+without `FORCE`, so a cache first configured under `/usr/local` keeps
+`/usr/local` GIR and typelib destinations after the prefix is corrected, and
+`dh_install` then cannot find the introspection files. The profile pins both
+to the `/usr` multiarch paths and the gate refuses any other value; correct a
+stale cache with an explicit `-D` for each key and prove that
+`ninja -t commands` is unchanged. Source/header compile checks
 must separately establish that the actual compiler selected the declared
 native SDK APIs; matching cache keys alone cannot prove that acceptance.
 

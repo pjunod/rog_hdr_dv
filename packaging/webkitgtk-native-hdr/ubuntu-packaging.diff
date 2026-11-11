@@ -9,11 +9,10 @@
  ENABLE_GTK4=YES
  # YES => build libwebkit2gtk-4.0-doc, libjavascriptcoregtk-4.0-bin and webkit2gtk-driver (for trixie)
  BUILD_TRANSITIONAL_PKGS=NO
-@@ -174,6 +174,205 @@
- ifneq (,$(filter $(DEB_HOST_ARCH),arm64 armel armhf))
+@@ -175,10 +175,210 @@
  	DH_GENCONTROL_ARGS += -Vgles:Depends="libgles2"
  endif
-+
+ 
 +# This derivative is the reviewed amd64 clang profile, not stock Ubuntu
 +# build flags. Do not clean or configure an opt-in external warm cache.
 +ifneq ($(DEB_HOST_ARCH),amd64)
@@ -210,12 +209,19 @@
 +	-DUSE_SYSTEM_UNIFDEF="ON" \
 +	-DUSE_THIN_ARCHIVES="ON" \
 +	-DUSE_WOFF2="ON" \
++	-DGI_GIRDIR="/usr/share/gir-1.0" \
++	-DGI_TYPELIBDIR="/usr/lib/x86_64-linux-gnu/girepository-1.0" \
 +	-DGTK_DOVI_SDK_ROOT=$(ROG_WEBKIT_DOVI_SDK_ROOT) \
 +	-DGTK_NATIVE_VIDEO_GDK_SDK_ROOT=$(ROG_WEBKIT_GDK_SDK_ROOT)
- 
++
  # Disable commands and binary packages of the builds that we don't want
  ifneq ($(ENABLE_GTK3),YES)
-@@ -247,6 +446,23 @@
+ 	GTK3_BUILD = @:
+-	EXTRA_DH_ARGUMENTS += -Nlibjavascriptcoregtk-bin -Nwebkitgtk-webdriver
+ endif
+ ifneq ($(ENABLE_GTK4),YES)
+ 	GTK4_BUILD = @:
+@@ -247,6 +447,23 @@
  	dh_gencontrol -- $(DH_GENCONTROL_ARGS)
  
  override_dh_auto_configure:
@@ -239,7 +245,7 @@
  	echo debian/clean > debian/clean
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
-@@ -255,24 +471,26 @@
+@@ -255,24 +472,26 @@
  			echo debian/$$dst >> debian/clean ; \
  		done ; \
  	fi

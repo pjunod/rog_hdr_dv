@@ -49,13 +49,22 @@ class WebKitPackagingTests(unittest.TestCase):
             f'{key}:{"BOOL" if key in self.features or key == "ENABLE_UNREVIEWED_FEATURE" else "STRING"}={value}\n'
             for key, value in self.cache.items()))
 
-    def test_cache_accepts_compiler_discovery_and_ignores_gi_search_roots(self):
+    def test_cache_accepts_compiler_discovery_and_usr_gi_destinations(self):
         self.cache.update(CMAKE_C_COMPILER='/usr/bin/clang',
-                          CMAKE_CXX_COMPILER='/usr/bin/clang++',
-                          GI_GIRDIR='/usr/local/share/gir-1.0',
-                          GI_TYPELIBDIR='/usr/local/lib/girepository-1.0')
+                          CMAKE_CXX_COMPILER='/usr/bin/clang++')
         self.save_cache()
         verify.verify_cache(self.source, self.build, self.profile)
+
+    def test_rejects_stale_usr_local_gi_install_destinations(self):
+        for key, stale in (('GI_GIRDIR', '/usr/local/share/gir-1.0'),
+                           ('GI_TYPELIBDIR', '/usr/local/lib/x86_64-linux-gnu/girepository-1.0')):
+            with self.subTest(key=key):
+                value = self.cache[key]
+                self.cache[key] = stale
+                self.save_cache()
+                with self.assertRaisesRegex(verify.VerificationError, key):
+                    verify.verify_cache(self.source, self.build, self.profile)
+                self.cache[key] = value
 
     def test_rejects_each_changed_profile_value(self):
         for key in self.cache:
