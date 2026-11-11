@@ -16,6 +16,14 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 | Staged GNOME Showtime | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
 | FFmpeg 8.1.2, libplacebo video filter | Explicit export target, because a filter graph can run without a display | Example below |
 
+### One system mpv for native launchers
+
+The system-player contract candidate is mpv `0.42.0-0ubuntu0+rogdv5.2`. It adds the read-only `native-dovi-api-1` token to the enabled-features line of `mpv --no-config --version`. A launcher can query the actual selected binary, including an explicit override, before advertising native Dolby formats. A failed or missing probe does not prevent launching that binary. The installed baseline remains `+rogdv5.1` until the candidate transaction is qualified and deployed. [Source replay and focused IPC qualification](../evidence/mpv-system-player-contract.json).
+
+The read-only IPC property `native-dovi-target-state` contains `active` and `generation`. Active means automatic physical-target eligibility, and a matching successful rendering record is still required before reporting a mapped Dolby picture. Target transitions and video-output teardown notify observers. A source change discards previous success facts. `video-target-params` continues to describe the encoded signal, whose maximum can differ from the physical panel peak.
+
+Reproduce this candidate by applying all seven registered `mpv-fel-system-dv` patches to the pinned upstream source. Apply the existing Ubuntu packaging, live-configuration and raw-xy overlays, followed by [the system-player changelog overlay](../packaging/system-dv/mpv-042-ubuntu-system-player-contract.diff). The application delta belongs in the normal Debian quilt series before `dpkg-source -b`. Preserve the source archive, fresh extraction and focused IPC qualification together. Public source recipes do not carry private SDK binaries or a separately bundled launcher player.
+
 ### Paused GNOME playback
 
 On the ROG, the packaged Showtime client retained one decoded Profile 5 picture while a private GNOME monitor changed from 616 to 308 cd/m² and back. The mapper received both peaks with an unchanged 203 cd/m² reference white. GNOME’s 1280×800 PipeWire capture changed over 375,877 pixels inside the movie rectangle. The last capture matched the first byte for byte. The monitor advertised synthetic HDR capabilities, with the normal Mutter configuration, renderer and capture code. An independent late-HDR window also updated correctly on installed GNOME Shell. [Methods and measured differences](../evidence/gnome-showtime-paused-retarget.json).
