@@ -10,6 +10,13 @@ after an update could cache the NVIDIA plugin without elements in the shared reg
 then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 [Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
 
+**Profile 7 FEL in the browser (November 12).** WebKit `2.52.6-1ubuntu1+rogdv3` binds the NVIDIA
+unified-memory device and orders decoders by the page's GPU, so Profile 7 FEL composes on NVDEC while
+ordinary video stays on Intel. Mapper core `0.1.0+rogdv9` keeps later ordinary video presented after an
+NVDEC picture. The family adds bad/extra `rogdv7`, sink `+rogdv5.4` and Showtime `+rogdv5.6`. All 30
+qualification steps passed, including Profile 7 native and its source changes.
+[Details](WEBKIT_NATIVE_HDR.md#runtime-qualification).
+
 **Browser playback starts without dropped pictures (November 12).** Mapper core `0.1.0+rogdv8`
 shares one Vulkan device per process. The browser compositor no longer creates a device on the
 first visible picture, which had held playback for about 450 ms and dropped the opening 14
@@ -27,7 +34,7 @@ browser qualification repeated with identical verdicts and no drops.
   passed.
 - **Known gaps.**
   - Profile 7 FEL plays its base layer ordinarily, because the browser sandbox does not expose the
-    CUDA device.
+    CUDA device. Fixed by the November 12 Profile 7 release (above).
 - **Release family.** WebKit `2.52.6-1ubuntu1+rogdv1`, GTK `4.24.1+ds-1+rogdv5`, mapper core
   `0.1.0+rogdv7`, bad/extra `1.28.6-1ubuntu1+rogdv6`, sink `+rogdv5.2` and Showtime `+rogdv5.3`.
 - **Installed.** The 20-package release was installed on the laptop with the desktop session open:
