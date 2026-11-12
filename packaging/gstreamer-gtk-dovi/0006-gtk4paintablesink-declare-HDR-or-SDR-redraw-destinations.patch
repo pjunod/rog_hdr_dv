@@ -120,7 +120,7 @@
 +// and so does a surface target that is not HDR: the mapper grades a PQ
 +// destination only above the 203 cd/m2 reference (an SDR-mode display).
 +fn destination_kind(valid: bool, ready: bool, composed: bool, max_nits: f64) -> i32 {
-+    if valid && ready && composed && max_nits > 203.0 { 0 } else { 1 }
++    if valid && ready && composed && max_nits.is_finite() && max_nits > 203.0 { 0 } else { 1 }
 +}
 +pub(crate) fn requested_destination(context: &gst::Context) -> i32 {
 +    let s = context.structure();
@@ -156,7 +156,7 @@
 +                if flags == 7 { 0 } else { 1 }
 +            );
 +        }
-+        for max_nits in [0.0, 80.0, 203.0, f64::NAN] {
++        for max_nits in [-1.0, 0.0, 80.0, 203.0, f64::NAN, f64::INFINITY] {
 +            assert_eq!(super::destination_kind(true, true, true, max_nits), 1);
 +        }
 +    }
