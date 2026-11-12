@@ -137,7 +137,12 @@ the WebKit sandbox did not bind before `+rogdv3`.
   registry metadata: the decoder on the page's rendering GPU first, unless the stream has an
   enhancement layer and another decoder declares that it composes it. Ordinary video stays on the
   Intel GPU, and Profile 7 FEL goes to NVDEC. gst-plugins-bad `rogdv7` declares that metadata, and
-  WebKit Breaks older bad packages.
+  WebKit Breaks older bad packages. The ordering applies to ordinary playback through
+  uridecodebin; MSE and encrypted media keep GStreamer's order. A bad package without the metadata
+  (for example a later stock Ubuntu revision) leaves the default order in place.
+- **Sandbox surface.** Every web process now reaches the NVIDIA unified-memory driver interface;
+  `nvidiactl` and `nvidia0` were already bound for GL. The bind is skipped when the node is absent,
+  and CUDA then stays unavailable until a host process loads `nvidia_uvm`.
 - **Later video after an NVDEC source.** In one web process, ordinary video shown after a native
   NVDEC picture used to present nothing. The retained native frame held the decoder's CUDA picture,
   and WebKit's compositor dropped it on its own thread. The last reference finalized the decoder's

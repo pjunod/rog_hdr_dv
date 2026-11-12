@@ -95,25 +95,33 @@ GstGtkDoviNativeFrame *gst_gtk_dovi_native_frame_ref (GstGtkDoviNativeFrame *f)
  * context; done on WebKit's compositor thread, that left later ordinary video
  * in the same web process unpresented. Decoder pictures are therefore released
  * on a thread of this library, never the consumer's. */
-static void release_source (gpointer source, gpointer unused)
+typedef struct { GstBuffer *source; GstGtkDoviSourceLease *lease; } SourceRelease;
+static void release_source (gpointer data, gpointer unused)
 {
   (void) unused;
-  gst_buffer_unref (source);
+  SourceRelease *job = data;
+  gst_buffer_unref (job->source);
+  gst_gtk_dovi_source_lease_unref (job->lease);
+  g_free (job);
 }
 static GThreadPool *source_release_pool (void)
 {
   static GThreadPool *pool;
+  /* Shared (non-exclusive) threads: creation cannot fail, and a slow final
+   * release (a CUDA context) never holds up another decoder's returns. */
   if (g_once_init_enter (&pool))
-    g_once_init_leave (&pool, g_thread_pool_new (release_source, NULL, 1, FALSE, NULL));
+    g_once_init_leave (&pool, g_thread_pool_new (release_source, NULL, 4, FALSE, NULL));
   return pool;
 }
 void gst_gtk_dovi_native_frame_unref (GstGtkDoviNativeFrame *f)
 {
   if (!f || !g_atomic_int_dec_and_test (&f->refs)) return;
-  GThreadPool *pool = source_release_pool ();
-  if (!pool || !g_thread_pool_push (pool, f->source, NULL))
-    gst_buffer_unref (f->source);
-  gst_gtk_dovi_source_lease_unref (f->lease);
+  SourceRelease *job = g_new (SourceRelease, 1);
+  job->source = f->source;
+  job->lease = f->lease;
+  /* The picture is released before its lease, as before. A failed push of a
+   * non-exclusive pool still queues the job, so it is never released here. */
+  g_thread_pool_push (source_release_pool (), job, NULL);
   g_free (f);
 }
 static gboolean meta_init (GstMeta *meta, gpointer params, GstBuffer *buffer)
