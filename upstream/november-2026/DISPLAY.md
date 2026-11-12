@@ -212,11 +212,12 @@ segment seeks and ends an iteration at the pipeline's segment-done message.
 For media served by WebKitWebSrc (HTTP, HTTPS, blob), the demuxer runs in push
 mode and turns the segment seek into a byte-range seek. The source then posts
 segment-done when its download completes. On a fast connection that happens
-long before playback ends. In GNOME Web 50.4 on WebKitGTK 2.52.6, a 3 s 24 fps
-H.264 clip played its first 0.75 s repeatedly, and after a seek into its last
-0.5 s a clip stopped for good. The push-mode demuxer never posts a time-domain
-segment-done, and the source's segment-done event does not get past the
-download queue, so neither can mark the true end.
+long before playback ends. In GNOME Web 50.4 on WebKitGTK 2.52.6 (this
+project's build, whose patches do not touch looping), a 3 s 24 fps H.264 clip
+played its first 0.75 s repeatedly, and after a seek into its last 0.5 s a clip
+stopped for good. qtdemux 1.28 posts a time-domain segment-done only from its
+pull-mode loop. In the logged runs the source's segment-done event reached the
+download queue and went no further. Neither marked the true end.
 
 The downstream fix ([WebKit notes](../../docs/WEBKIT_NATIVE_HDR.md#looping-media-from-webkitwebsrc))
 returns those media to flushing loops at end of stream. It is a workaround, not
