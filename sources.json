@@ -126,10 +126,10 @@
       "component": "ubuntu-mutter",
       "base_commit": "f8b113189f8c67beabf7475adf26f6ebcbf36684",
       "candidate_commit": "1c6c681d742093d3c9059cc0d43a1efb35aaf252",
-      "patch_count": 108,
-      "candidate_tree": "d1d40834f19baf4c8ed559ef84f38ea63d5b53da",
-      "previous_candidate_tree": "1d20b861bc329c8a16623063bad2b4fed33bf4fe",
-      "previous_candidate_note": "Ubuntu107 is the candidate the ThinkPad native-panel work started from.",
+      "patch_count": 109,
+      "candidate_tree": "acc1f840cdd78696a8fd76aec2bf362948c713bd",
+      "previous_candidate_tree": "d1d40834f19baf4c8ed559ef84f38ea63d5b53da",
+      "previous_candidate_note": "Ubuntu108 failed its package build: its new test symbol was undeclared.",
       "patch_order": [
         "0001-backends-native-recognize-native-DisplayID-RGB-BT.20.patch",
         "0002-backends-native-scope-native-capability-veto-to-exte.patch",
@@ -238,7 +238,8 @@
         "0105-frames-use-the-GTK-interface-color-scheme-property.patch",
         "0106-color-compare-client-mastering-peaks-at-their-wire-precision.patch",
         "0107-screencast-memory-format.patch",
-        "0108-color-encode-native-SDR-over-a-declared-physical-range.patch"
+        "0108-color-encode-native-SDR-over-a-declared-physical-range.patch",
+        "0109-debian-declare-the-native-gamma-HDR-symbol.patch"
       ],
       "base_tree": "30242cc54cebe1ec524a6d79473b41be5f07d05b",
       "historical_workspace_subdirectory": "mutter/work",
@@ -272,7 +273,7 @@
       "delivered_candidate_tree": "61bf80d9dea0995f98120f783155eb79029d6be1",
       "delivered_patch_count": 5,
       "delivered_version": "51.0-1ubuntu3+nativehdr2",
-      "candidate_status": "Ubuntu108 adds the native-gamma HDR route (docs/NATIVE_GAMMA_HDR.md). Compiled with -Dwerror on the ThinkPad compiler workspace (commit over a single-commit import of tree 1d20b861); all 48 colour and HDR test entries passed after the adversarial-review fixes, including the new native-gamma case (built-in panels only; SDR white kept inside the declared range). KMS backlight selection, packaging, GPU and visual checks are pending."
+      "candidate_status": "Ubuntu109 declares the native-gamma HDR test symbol, which failed Ubuntu108 under DPKG_GENSYMBOLS_CHECK_LEVEL 4 (dpkg-gensymbols reproduced on the ThinkPad build). Native-gamma route as Ubuntu108: built with -Dwerror, 48 colour and HDR test entries passed. Installation and visual checks pending."
     },
     {
       "component": "libdisplay-info",
