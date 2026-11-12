@@ -681,14 +681,16 @@
       "component": "ubuntu-gst-plugins-base-rpu",
       "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
       "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
-      "candidate_commit": "4d7ff5c79950aef458a506395b4fe7b78345a2bd",
-      "candidate_tree": "48967577303944e3b5dc66df978ea33e150de0ff",
-      "patch_count": 4,
+      "candidate_commit": "deb42f8c596cd3acb524243dd5344b3464383340",
+      "candidate_tree": "edf18b254ba631b507aa632b4ee0842ff6278210",
+      "patch_count": 6,
       "patch_order": [
         "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
         "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch",
         "0003-package-frame-metadata-and-configuration-interfaces.patch",
-        "0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch"
+        "0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch",
+        "0005-playsink-keep-caps-features-when-filtering-by-the-converters.patch",
+        "0006-debian-version-the-feature-preserving-playsink-converter-bin.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -717,8 +719,10 @@
           }
         ]
       },
-      "candidate_status": "The normal source and binary packages preserve normalized 16-bit GL color and discard color-sensitive provenance after pixel changes. The four-patch replay matches the distributed source tree.",
-      "candidate_package_version": "1.28.7-1+rogdv2"
+      "candidate_status": "The normal source and binary packages preserve normalized 16-bit GL color and discard color-sensitive provenance after pixel changes. The four-patch replay matches the distributed rogdv2 source tree. 0005 keeps the caps features of each raw filter structure when playsink's converter bin filters a caps query by its converters, so VA memory with a subtitle overlay reaches the Dolby mapper as such (rogdv3).",
+      "previous_candidate_commit": "4d7ff5c79950aef458a506395b4fe7b78345a2bd",
+      "previous_candidate_tree": "48967577303944e3b5dc66df978ea33e150de0ff",
+      "candidate_package_version": "1.28.7-1+rogdv3"
     },
     {
       "component": "ubuntu-gst-plugins-bad-rpu",
@@ -873,8 +877,8 @@
       "component": "ubuntu-gst-plugins-good-dovi",
       "base_commit": "73d3a23875505394b9cbb0a7eca71050d0eeaaa3",
       "base_tree": "0a06fafebcfba125e6ede43150e685215b307b5b",
-      "candidate_commit": "7bf3d71a76fcb0697ed5bbe158e1c800b7ce1cf6",
-      "candidate_tree": "ff0cc0b06d9b969a87bc2fc4926f19b28bc00eca",
+      "candidate_commit": "d19e8df9670a6ed4e60be4200dab35cfce855cef",
+      "candidate_tree": "2595a47937313572c8e3a03f92e80a16283322fd",
       "source_origin": {
         "kind": "ubuntu-source-package",
         "artifacts": [
@@ -908,20 +912,24 @@
         "0002-use-the-shared-HEVC-configuration-parser.patch",
         "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
         "0004-matroska-preserve-bounded-track-Dolby-configuration.patch",
-        "0005-package-the-reviewed-Matroska-configuration-series.patch"
+        "0005-package-the-reviewed-Matroska-configuration-series.patch",
+        "0006-deinterlace-forward-the-producers-candidates-to-downstream-caps-queries.patch",
+        "0007-debian-version-the-filter-forwarding-deinterlacer.patch"
       ],
-      "patch_count": 5,
-      "candidate_status": "The five-patch canonical replay matches all 1,791 paths and modes of the actual unsigned good+2 source package, including normal Debian dependency metadata. Five normal binary outputs and the recorded 25 track controls passed; P5 owned metadata transport passed on normal NVIDIA decoding. P7 is track metadata only, not FEL pixel qualification.",
-      "candidate_package_version": "1.28.7-1build1+rogdv2",
+      "patch_count": 7,
+      "candidate_status": "The five-patch canonical replay matches all 1,791 paths and modes of the actual unsigned good+2 source package, including normal Debian dependency metadata. Five normal binary outputs and the recorded 25 track controls passed; P5 owned metadata transport passed on normal NVIDIA decoding. P7 is track metadata only, not FEL pixel qualification. 0006 forwards a producer's candidates through the deinterlacer to downstream caps queries, relaxed only by interlacing, field order, frame rate and the interlaced-format feature, so the Dolby mapper behind playsink's deinterlacer answers for the stream it will receive (Intel-decoded Dolby video in Showtime).",
+      "previous_candidate_commit": "7bf3d71a76fcb0697ed5bbe158e1c800b7ce1cf6",
+      "previous_candidate_tree": "ff0cc0b06d9b969a87bc2fc4926f19b28bc00eca",
+      "candidate_package_version": "1.28.7-1build1+rogdv3",
       "candidate_source_package": {
         "kind": "unsigned-private-source-package",
-        "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv2.dsc",
-        "sha256": "720c310e13798d104f4174dc05736e998472173bc2afd1e3d0d9bd3373c90f6f",
+        "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv3.dsc",
+        "sha256": "6170e14acce1988011c1750489a65ec7bc1cfe9c5ced182967671a220249b1f0",
         "debian_archive": {
-          "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv2.debian.tar.xz",
-          "sha256": "a9a71981cbf06a838e02748027d58d461d2789927a673a48d1cc7deb7644c04c"
+          "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv3.debian.tar.xz",
+          "sha256": "cc5a2783f3796fc36662e57d156c677a40ecf79cf92b29b297161b29685054ec"
         },
-        "replay_receipt": "evidence/gstreamer-matroska-distribution-replay-20261108.json"
+        "rogdv2_replay_receipt": "evidence/gstreamer-matroska-distribution-replay-20261108.json"
       }
     },
     {

@@ -1,0 +1,107 @@
+diff --git a/debian/changelog b/debian/changelog
+index 160c01e..02d32aa 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-good1.0 (1.28.7-1build1+rogdv3) stonking; urgency=medium
++
++  * Forward the producer's candidates through the deinterlacer to downstream
++    caps queries.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Thu, 12 Nov 2026 03:30:00 +0000
++
+ gst-plugins-good1.0 (1.28.7-1build1+rogdv2) stonking; urgency=medium
+ 
+   * Preserve validated, bounded track-local Dolby configuration in Matroska.
+diff --git a/debian/patches/rog-deinterlace-filter.patch b/debian/patches/rog-deinterlace-filter.patch
+new file mode 100644
+index 0000000..97b4dff
+--- /dev/null
++++ b/debian/patches/rog-deinterlace-filter.patch
+@@ -0,0 +1,77 @@
++Description: Forward the producer's candidates to downstream caps queries
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++Last-Update: 2026-11-12
++
++--- a/gst/deinterlace/gstdeinterlace.c
+++++ b/gst/deinterlace/gstdeinterlace.c
++@@ -2483,6 +2483,51 @@ dup_caps_with_alternate (GstCaps * caps)
++   return with_alternate;
++ }
++ 
+++/* Downstream is asked what it accepts for a producer's candidate formats.
+++ * Forward those candidates, relaxed only by what this element can change
+++ * (interlacing, field order and frame rate, and the interlaced-format
+++ * feature), so that downstream elements whose answer depends on the
+++ * candidates (for example a converter that accepts a configuration-marked
+++ * stream only in some memory) see them; without any filter they must
+++ * answer for unknown input. The result is still intersected with the
+++ * original filter below. */
+++static GstCaps *
+++gst_deinterlace_relax_filter (GstCaps * filter)
+++{
+++  GstCaps *relaxed = gst_caps_new_empty ();
+++  guint i, n = gst_caps_get_size (filter);
+++
+++  if (gst_caps_is_any (filter)) {
+++    gst_caps_unref (relaxed);
+++    return gst_caps_new_any ();
+++  }
+++
+++  for (i = 0; i < n; i++) {
+++    GstStructure *s = gst_structure_copy (gst_caps_get_structure (filter, i));
+++    GstCapsFeatures *f = gst_caps_get_features (filter, i);
+++
+++    f = f ? gst_caps_features_copy (f) :
+++        gst_caps_features_copy (GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY);
+++    gst_structure_remove_fields (s, "interlace-mode", "field-order",
+++        "framerate", NULL);
+++    if (!gst_caps_features_is_any (f)
+++        && gst_caps_features_contains (f, GST_CAPS_FEATURE_FORMAT_INTERLACED)) {
+++      GstCapsFeatures *plain = gst_caps_features_copy (f);
+++
+++      gst_caps_features_remove (plain, GST_CAPS_FEATURE_FORMAT_INTERLACED);
+++      if (gst_caps_features_get_size (plain) == 0) {
+++        gst_caps_features_free (plain);
+++        plain = gst_caps_features_copy (GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY);
+++      }
+++      relaxed = gst_caps_merge_structure_full (relaxed, gst_structure_copy (s),
+++          plain);
+++    }
+++    relaxed = gst_caps_merge_structure_full (relaxed, s, f);
+++  }
+++
+++  return relaxed;
+++}
+++
++ static GstCaps *
++ gst_deinterlace_getcaps (GstDeinterlace * self, GstPad * pad, GstCaps * filter)
++ {
++@@ -2491,12 +2536,16 @@ gst_deinterlace_getcaps (GstDeinterlace
++   gint len;
++   GstCaps *ourcaps;
++   GstCaps *peercaps;
+++  GstCaps *peer_filter;
++   GstCaps *tmp, *tmp2;
++ 
++   otherpad = (pad == self->srcpad) ? self->sinkpad : self->srcpad;
++ 
++   ourcaps = gst_pad_get_pad_template_caps (pad);
++-  peercaps = gst_pad_peer_query_caps (otherpad, NULL);
+++  peer_filter = (pad == self->sinkpad && filter) ?
+++      gst_deinterlace_relax_filter (filter) : NULL;
+++  peercaps = gst_pad_peer_query_caps (otherpad, peer_filter);
+++  gst_clear_caps (&peer_filter);
++ 
++   /* Filter any peercaps that are available with our template
++    * to get started with the subset of caps we actually support */
+diff --git a/debian/patches/series b/debian/patches/series
+index fc4cee1..2a9d061 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -1,3 +1,4 @@
+ 0000_remove-flv-test.patch
+ rog-dovi-isobmff.patch
+ rog-dovi-matroska-track.patch
++rog-deinterlace-filter.patch

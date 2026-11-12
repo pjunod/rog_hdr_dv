@@ -1,0 +1,65 @@
+From deb42f8c596cd3acb524243dd5344b3464383340 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Thu, 12 Nov 2026 03:27:43 +0000
+Subject: [PATCH] debian: version the feature-preserving playsink converter bin
+
+---
+ debian/changelog                              |  7 ++++++
+ ...rog-playsink-convert-filter-features.patch | 23 +++++++++++++++++++
+ debian/patches/series                         |  1 +
+ 3 files changed, 31 insertions(+)
+ create mode 100644 debian/patches/rog-playsink-convert-filter-features.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index 41dc12f..5d0d693 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-base1.0 (1.28.7-1+rogdv3) unstable; urgency=medium
++
++  * Keep caps features when playsink filters a caps query by its
++    converters.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Thu, 12 Nov 2026 04:00:00 +0000
++
+ gst-plugins-base1.0 (1.28.7-1+rogdv2) unstable; urgency=medium
+ 
+   * Preserve RGBA64 precision in normal GL color-balance processing.
+diff --git a/debian/patches/rog-playsink-convert-filter-features.patch b/debian/patches/rog-playsink-convert-filter-features.patch
+new file mode 100644
+index 0000000..f22e3d2
+--- /dev/null
++++ b/debian/patches/rog-playsink-convert-filter-features.patch
+@@ -0,0 +1,23 @@
++Description: Keep caps features when playsink filters by its converters
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++Last-Update: 2026-11-12
++
++--- a/gst/playback/gstplaysinkconvertbin.c
+++++ b/gst/playback/gstplaysinkconvertbin.c
++@@ -429,7 +429,14 @@ gst_play_sink_convert_bin_getcaps (GstPa
++           s = gst_structure_copy (gst_caps_get_structure (filter, i));
++           if (gst_structure_has_name (s,
++                   self->audio ? "audio/x-raw" : "video/x-raw")) {
++-            tmp = gst_caps_new_full (s, NULL);
+++            /* Keep the structure's caps features: a raw structure in
+++             * accelerator memory or with a meta must not be asked for as
+++             * system memory. */
+++            const GstCapsFeatures *f = gst_caps_get_features (filter, i);
+++
+++            tmp = gst_caps_new_empty ();
+++            gst_caps_append_structure_full (tmp, s,
+++                f ? gst_caps_features_copy (f) : NULL);
++             tmp2 = gst_caps_intersect (tmp, self->converter_caps);
++             gst_caps_append (downstream_filter, tmp2);
++             gst_caps_unref (tmp);
+diff --git a/debian/patches/series b/debian/patches/series
+index 53a6a31..a559a6e 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -5,3 +5,4 @@
+ 0007_failing-test-compositor.patch
+ 0008_failing-test-videoscale.patch
+ rog-dovi-base-api-and-gl-precision.patch
++rog-playsink-convert-filter-features.patch
