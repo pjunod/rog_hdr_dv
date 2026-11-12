@@ -205,6 +205,28 @@ acceptance. High-precision HDR page composition, typed per-view target
 invalidation, ordinary accelerated/software controls and protected streaming
 have separate unresolved requirements.
 
+### WK-2: seamless looping of media pushed by WebKitWebSrc
+
+Added November 12. Upstream WebKitGTK loops a `<video loop>` with non-flushing
+segment seeks and ends an iteration at the pipeline's segment-done message.
+For media served by WebKitWebSrc (HTTP, HTTPS, blob), the demuxer runs in push
+mode and turns the segment seek into a byte-range seek. The source then posts
+segment-done when its download completes. On a fast connection that happens
+long before playback ends. In GNOME Web 50.4 on WebKitGTK 2.52.6 (this
+project's build, whose patches do not touch looping), a 3 s 24 fps H.264 clip
+played its first 0.75 s repeatedly, and after a seek into its last 0.5 s a clip
+stopped for good. qtdemux 1.28 posts a time-domain segment-done only from its
+pull-mode loop. In the logged runs the source's segment-done event reached the
+download queue and went no further. Neither marked the true end.
+
+The downstream fix ([WebKit notes](../../docs/WEBKIT_NATIVE_HDR.md#looping-media-from-webkitwebsrc))
+returns those media to flushing loops at end of stream. It is a workaround, not
+the upstream proposal. A bug report should give a public synthetic clip, the
+page `<video src=clip.mp4 muted loop autoplay>`, and the observed restart
+point. It should ask how upstream wants push-mode iterations to end, for
+example from EOS with a reset-free restart. It must not attach Dolby media or
+private recipes.
+
 ## Existing kernel entries and material that stays local
 
 LNX-3 now has a real downstream patch and bounded target evidence. The

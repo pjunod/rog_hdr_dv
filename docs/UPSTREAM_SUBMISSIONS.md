@@ -1,7 +1,8 @@
 # Upstream submissions — material, evidence and remaining decisions
 
-**Updated:** 2026-11-09 · **Scope:** 124 inventory entries: the original 85,
-four mobile/converter observations, and 35 additions from the November audit.
+**Updated:** 2026-11-12 · **Scope:** 125 inventory entries: the original 85,
+four mobile/converter observations, 35 additions from the November audit and
+one November 12 addition (WK-2).
 The original inventory covered 20 upstream projects; seven new destinations
 bring that coverage to 27, plus local converter observations. No submission
 is performed by this inventory refresh.
@@ -329,6 +330,7 @@ Venue: https://github.com/WebKit/WebKit · WebKit contribution workflow; only th
 | Unit | Change | From | Status | Notes |
 |---|---|---|---|---|
 | WK-1 | Honor an explicit SDR destination when grading clear Dolby video into ordinary GTK browser pages | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md) · Public baseline WebKitGTK2.52.6 controls show identical output with/without Dolby carrier metadata. Active implementation is private, not a public patch kit. November9 handoff reports guarded full build resumed after memory stop; native SDR adapter evidence is not finished browser product acceptance. Keep discussion scoped to clear/unprotected SDR page output. Full high-precision HDR page composition, per-view typed target lifecycle, protected services and final browser comparison remain open. Do not publish private source/header or inference equations. |
+| WK-2 | End a seamless loop iteration at the end of playback, not at WebKitWebSrc's byte-range segment-done | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md#wk-2-seamless-looping-of-media-pushed-by-webkitwebsrc) · Reproduced in GNOME Web 50.4 on WebKitGTK 2.52.6 (this project's build; its patches do not touch looping): a 3 s H.264 `<video loop>` restarted after its first 0.75 s. Downstream workaround `ec69ce27`/`c1fcae69` uses flushing loops for HTTP(S)/blob media; a sink-side segment-done attempt failed because the event stops at the download queue. Upstream fix needs a design that reports the time-domain end in push mode. Report under the owner's account with a public test page; do not attach Dolby media. |
 
 ## Mesa
 
