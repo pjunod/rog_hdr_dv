@@ -182,9 +182,12 @@ The NVIDIA HEVC decoder now preserves each decoded picture’s Dolby configurati
 
 ## ThinkPad X1 Carbon Gen 6 — native-gamma route compiled, installation pending
 
-**2026-11-11 (owner: Claude):** the Windows runtime probe shows the panel
-bound as LEN40AE in SDR, with advanced colour force-disabled and a
-driver-reported 0.5–270 cd/m² range. The [native-gamma HDR
+**2026-11-12 (owner: Claude):** Windows binds the panel as LEN40AE with an
+SDR desktop and a driver-reported 0.5–270 cd/m² range. Its HDR is HDR video
+playback over the SDR link, on AC only, with the Dolby Vision HDR app.
+Yesterday's "force-disabled" reading was the battery policy. The TCON vendor
+is on Intel's eDP HDR whitelist, but the panel advertises none of Intel's
+TCON HDR registers. The [native-gamma HDR
 contract](NATIVE_GAMMA_HDR.md) is frozen, and Mutter patch 0108 implements
 it. Patched libdisplay-info passed 45/45 tests in a private prefix. Mutter
 built with `-Dwerror` on the ThinkPad, and all 48 colour and HDR test entries

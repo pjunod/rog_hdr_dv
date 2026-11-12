@@ -67,24 +67,41 @@ on the enabled monitor driver, application and certified display in
 A current download's product-page breadcrumb alone does not establish
 compatibility with this generation.
 
-**Runtime result (2026-11-11).** A read-only DXGI/DisplayConfig probe, run as
-the ordinary user on the normal Windows desktop, confirms the cached
-association at runtime: the active path reports the Lenovo `LEN40AE`
-identity, not the panel's own `AUO2036`, with `TPLCD_40AE_SDR.icm` as the
-output profile. Windows runs this panel as SDR: advanced colour is reported
-unsupported and force-disabled, the desktop colour space is RGB full-range
-gamma 2.2, eight bits per channel, and SDR white is 80 cd/m². The driver
+**Runtime result (2026-11-11, corrected 2026-11-12).** A read-only
+DXGI/DisplayConfig probe, run as the ordinary user on the normal Windows
+desktop, confirms the cached association at runtime: the active path reports
+the Lenovo `LEN40AE` identity, not the panel's own `AUO2036`, with
+`TPLCD_40AE_SDR.icm` as the output profile. The desktop is SDR: RGB
+full-range gamma 2.2, eight bits per channel, SDR white 80 cd/m², and
+Windows reports desktop HDR (advanced colour) as unsupported. The driver
 reports sRGB-like primaries and 0.5–270 cd/m² luminance. Those values come
 from the driver's description, not from an optical measurement, and they
-conflict with Lenovo's nominal 500 cd/m². The probe cannot see the OEM Dolby
-processing.
+conflict with Lenovo's nominal 500 cd/m².
 
-**Consequence for Linux.** Windows never drives this panel in an HDR mode,
-so Windows offers no runtime HDR configuration to reproduce. The
-native-gamma route's peak stays a declared configuration value
-([contract](NATIVE_GAMMA_HDR.md) §1). Of the two available figures, 270
+The 2026-11-11 run also reported advanced colour as force-disabled. A
+2026-11-12 run on AC power, after Lenovo's Dolby Vision provisioning package
+was installed, no longer did. Windows' video settings show HDR video
+playback enabled and disabled on battery (`EnableHDRForPlayback`,
+`DisableHDROnBattery`). The Dolby Vision HDR app is installed. Windows does
+have HDR on this laptop, as **HDR video playback over the SDR link**, not an
+HDR desktop.
+
+**Panel TCON.** The Intel Windows driver carries an eDP HDR whitelist of
+four TCON vendor OUIs. This panel's sink OUI, 38-EC-11, is on it. Intel's
+proprietary eDP HDR interface (DPCD 0x340–0x35F) can advertise PQ decode,
+BT.2020 gamut, tone mapping and nits brightness in the TCON. A read-only
+Linux read of the panel DPCD, with the source OUI already set to Intel's
+00-AA-01 by i915, found all 32 of those registers zero. The eDP backlight is
+PWM-pin controlled, not AUX. On this panel the TCON HDR interface is
+therefore not offered, at least to the standard Intel handshake. A
+Windows-only unlock sequence cannot be excluded from Linux reads.
+
+**Consequence for Linux.** Windows' HDR on this panel is software mapping
+into the SDR signal with the backlight raised, which is what the
+native-gamma route does ([contract](NATIVE_GAMMA_HDR.md)). The route's peak
+stays a declared configuration value (§1). Of the two available figures, 270
 cd/m² is the conservative declaration and 500 cd/m² the OEM nominal one;
-neither is measured.
+neither is measured. Dolby Vision processing itself remains unobserved.
 
 **Remaining evidence:** trace the original installation through normal Windows
 operation, with the owner coordinating boot and recovery. Establish the
@@ -150,7 +167,7 @@ mapping in higher precision alone does not prove precision at the panel.
 | Stage | Required result before advancing | State on 2026-11-09 |
 |---|---|---|
 | 1. Read-only inspection | Identify Linux output limitations and cached OEM association, with evidence limits stated | Closed |
-| 2. Windows and backlight trace | Observe normal runtime binding and Dolby behaviour; separate `P(b)`, `W` and `T` provenance | Runtime binding and SDR state traced 2026-11-11; Dolby playback behaviour not observed |
+| 2. Windows and backlight trace | Observe normal runtime binding and Dolby behaviour; separate `P(b)`, `W` and `T` provenance | Runtime binding, SDR desktop, AC-only HDR video playback and TCON HDR registers traced 2026-11-11/12; Dolby playback behaviour not observed |
 | 3. Source contract and compiler loop | Freeze native-gamma/reference-anchor policy and establish the exact Ubuntu build loop | Done 2026-11-11: contract frozen; `-Dwerror` build and colour suites pass |
 | 4. Synthetic Mutter controls | Verify SDR white, HDR headroom, gamut, target generations, pause/source lifetime and eight-bit dithering, including absent/invalid target controls | Partial: SDR white, headroom, reference factor, declared black, invalid peak and forced HDR covered; generations, pause lifetime, saturated edges and dithering pending |
 | 5. Actual ThinkPad GPU qualification | Exercise native output, genuine Dolby grade, truthful transport, paused retargeting and ordinary SDR fallback on this GPU | Pending |
