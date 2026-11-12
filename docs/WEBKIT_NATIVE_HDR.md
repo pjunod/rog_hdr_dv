@@ -1,6 +1,6 @@
 # WebKitGTK clear video and native HDR
 
-**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed all 30 steps, including Profile 7 FEL on NVDEC (`+rogdv3`, see below); `+rogdv4` loops pushed media with flushing seeks. · **Updated:** 2026-11-12
+**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed all 30 steps, including Profile 7 FEL on NVDEC (`+rogdv3`, see below); `+rogdv6` loops pushed media with flushing seeks. · **Updated:** 2026-11-12
 
 This browser change gives ordinary clear MP4/HEVC HTML video an explicit
 100-nit BT709/sRGB destination and adds an independent tagged HDR video plane
@@ -96,9 +96,12 @@ over and over, and after a seek into its last 0.5 s a clip never played again. T
 to never reports the end of the time segment, and the segment-done event does not reach the decoder.
 
 Since `2.52.6-1ubuntu1+rogdv4` (product `ec69ce27`), media pushed by WebKitWebSrc loops the way it did
-before upstream's seamless looping: at end of stream with a flushing seek. Every clip now plays to its
-end. Each iteration flushes once, and a one-picture clip set to loop never settles long enough to be
-presented on the native plane; the browser demo on the ROG loops only its moving clips.
+before upstream's seamless looping. At end of stream the player pauses the pipeline and restarts it
+with a flushing seek. `+rogdv6` (`c1fcae69`) also decides this from an HTTP(S) or blob URL, because
+`play()` can ask before the source element exists, and ignores a stray segment-done message. Every
+clip now plays to its end. The restart is visible as a brief flush, and a one-picture clip set to loop
+never settles long enough to be presented on the native plane. The browser demo on the ROG therefore
+loops only its moving clips.
 
 A `rogdv5` attempt kept seamless looping and ended an iteration when the segment-done event reached
 the video sink. The event never arrived (it stops at the download queue), so clips stalled after a
