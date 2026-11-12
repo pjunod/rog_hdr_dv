@@ -150,10 +150,16 @@ the WebKit sandbox did not bind before `+rogdv3`.
   and WebKit Breaks older cores. The exact GL-side effect of the finalization was not isolated: a
   standalone EGL and CUDA program kept its context. The fix point is proven by the same runs
   passing with NVDEC everywhere.
-- **Open, outside the qualified set.** Profile 7 under a CSS clip, then the base, then Profile 7
-  again, crashes the web process in both stacks. The released stack crashes in Intel's VA driver
-  (`iHD_drv_video.so`, the known decoder fault). The candidate crashes in WebKit's tile painting
-  (`CoordinatedTileBuffer::canvas`, a null Skia surface).
+- **Source change after Profile 7 (`0.1.0+rogdv10`).** Profile 7 under a CSS clip, then the base,
+  then Profile 7 again, crashed the web process in WebKit's tile painter (a null Skia surface).
+  Setting the new source frees the old pipeline on the main thread, and with it the last mapper,
+  which destroyed the process-shared Vulkan instance there. The Vulkan loader then unloaded the
+  NVIDIA driver library, whose unload calls `eglReleaseThread` and so released the main thread's
+  current EGL context, the Skia context WebKit still believed current. The next tile textures were
+  created without a context (texture name 0), Skia could not wrap them, and the painter crashed.
+  The core now destroys Vulkan devices on a thread of its own. The case passes, and the main thread
+  no longer loses its context. The CUDA finalization above probably released the compositor's
+  context in the same way; that was not traced.
 
 The first-frame drops came from the compositor's mapper creating its own Vulkan device on the
 first visible picture. Mapper core `0.1.0+rogdv8` shares one device per process, so the first
