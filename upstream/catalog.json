@@ -1313,6 +1313,22 @@
       "added": "2026-11-09"
     },
     {
+      "id": "WK-2",
+      "disposition": "discussion-draft",
+      "artifacts": [
+        "docs/WEBKIT_NATIVE_HDR.md",
+        "upstream/november-2026/DISPLAY.md"
+      ],
+      "evidence": [
+        "docs/WEBKIT_NATIVE_HDR.md"
+      ],
+      "notes": "Reproduced on WebKitGTK 2.52.6 behaviour: a 3 s H.264 <video loop> restarted after its first 0.75 s. Downstream workaround ec69ce27/c1fcae69 uses flushing loops for HTTP(S)/blob media; a sink-side segment-done attempt failed because the event stops at the download queue. Upstream fix needs a design that reports the time-domain end in push mode. Report under the owner's account with a public test page; do not attach Dolby media.",
+      "project": "WebKitGTK",
+      "title": "End a seamless loop iteration at the end of playback, not at WebKitWebSrc's byte-range segment-done",
+      "effort": "rog_hdr_dv",
+      "added": "2026-11-12"
+    },
+    {
       "id": "MESA-1",
       "disposition": "held",
       "artifacts": [
