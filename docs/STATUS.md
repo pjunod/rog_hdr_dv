@@ -8,6 +8,13 @@ after an update could cache the NVIDIA plugin without elements in the shared reg
 then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 [Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
 
+**Browser playback starts without dropped pictures (November 12).** Mapper core `0.1.0+rogdv8`
+shares one Vulkan device per process. The browser compositor no longer creates a device on the
+first visible picture, which had held playback for about 450 ms and dropped the opening 14
+pictures. The family moves to sink `+rogdv5.3` and Showtime `+rogdv5.5` for the exact pins. The
+browser qualification repeated with identical verdicts and no drops.
+[Details](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
+
 **Browser native HDR, qualified and installed (November 11).**
 
 - **Scope.** Ordinary clear WebKitGTK `<video>` now negotiates the destination-aware mapper and
@@ -19,7 +26,6 @@ then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 - **Known gaps.**
   - Profile 7 FEL plays its base layer ordinarily, because the browser sandbox does not expose the
     CUDA device.
-  - Playback start drops up to 14 frames while the mapper starts.
 - **Release family.** WebKit `2.52.6-1ubuntu1+rogdv1`, GTK `4.24.1+ds-1+rogdv5`, mapper core
   `0.1.0+rogdv7`, bad/extra `1.28.6-1ubuntu1+rogdv6`, sink `+rogdv5.2` and Showtime `+rogdv5.3`.
 - **Installed.** The 20-package release was installed on the laptop with the desktop session open:

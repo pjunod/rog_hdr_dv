@@ -105,10 +105,17 @@ client exercised. Each is fixed at its cause:
 - **Explicit SDR destination.** This path had never rendered. libplacebo cannot sample a
   download-only render target, so the graded PQ intermediate now has its own sampleable
   textures.
+- **One Vulkan device per process (`0.1.0+rogdv8`).** Every mapper used to create its own
+  Vulkan instance and device on its first picture. In the browser, the compositor's mapper did
+  so on the first visible frame, which took about 450 ms on the ROG. The pipeline waited, and the
+  decoder dropped the opening 14–16 pictures as late. Mappers now share one device and one shader
+  cache, because the Vulkan `pl_gpu` is thread-safe. Renderers, textures and the provider stay
+  per mapper, and a GPU that is not thread-safe keeps a device per mapper. Showtime's sink-side
+  mapper shares the device in the same way.
 
 The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 115 checks,
 including the pre-start and unfiltered-reverse controls. The coherent family is core
-`0.1.0+rogdv7`, sink `0.15.2-1ubuntu2+rogdv5.2` and Showtime `50.0-2+rogdv5.3`, with the
+`0.1.0+rogdv8`, sink `0.15.2-1ubuntu2+rogdv5.3` and Showtime `50.0-2+rogdv5.5`, with the
 bad/extra `rogdv6` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
 Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
 
