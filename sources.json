@@ -863,9 +863,9 @@
       "upstream": "https://github.com/mpv-player/mpv.git",
       "base_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
       "base_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
-      "candidate_commit": "e5d5021b58280575c3cc37451177d9b633fae953",
-      "candidate_tree": "84d6fd3205f7ca6b487149d171351e898a856fb9",
-      "patch_count": 8,
+      "candidate_commit": "b97aa047c9fa6d716d0b248f0954226273e5bee8",
+      "candidate_tree": "51651e8dd3e328cb420faa34037f860c4d677529",
+      "patch_count": 9,
       "patch_order": [
         "0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
         "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch",
@@ -874,10 +874,11 @@
         "0005-require-public-target-api-v2-sdk-contract.patch",
         "0006-report-native-dolby-backend-capabilities.patch",
         "0007-expose-authoritative-native-dolby-target-state.patch",
-        "0008-keep-describing-a-Wayland-Vulkan-window-colour-without-a-hint.patch"
+        "0008-keep-describing-a-Wayland-Vulkan-window-colour-without-a-hint.patch",
+        "0009-stop-dispatching-Wayland-events-after-a-fatal-display-error.patch"
       ],
-      "candidate_package_version": "0.42.0-0ubuntu0+rogdv5.4",
-      "candidate_status": "The rogdv5.4 binary build adds patch 0008 to the rogdv5.2 source package as a quilt patch (rogdv5.3 carried a narrower first version). An idle window followed by loadfile, as plurx-player opens titles, now plays on the NVIDIA Vulkan WSI instead of failing with a duplicate colour-surface protocol error. For rogdv5.2, the normal binary build and fresh normal source-package replay matched all 902 public Git-archive files and executable modes. Six focused private-compositor IPC checks pass, including paused active/inactive generation changes, read-only setter and video-output teardown notification. System-launcher package transaction and deployment remain separate."
+      "candidate_package_version": "0.42.0-0ubuntu0+rogdv5.5",
+      "candidate_status": "The rogdv5.5 source adds patch 0009, an upstreamable fix: once the Wayland display is in a fatal error state (the compositor ended the connection over a protocol error, or it was lost), mpv's VO thread no longer spins at 100% CPU in wayland_dispatch_events(); it logs the error, asks the player to close and keeps sleeping on its wakeup pipe. A lab compositor protocol error left the rogdv5.4-equivalent tree at 102% CPU with SIGTERM ignored, and the patched tree exited. Package build and installation are recorded separately. The rogdv5.4 binary build adds patch 0008 to the rogdv5.2 source package as a quilt patch (rogdv5.3 carried a narrower first version). An idle window followed by loadfile, as plurx-player opens titles, now plays on the NVIDIA Vulkan WSI instead of failing with a duplicate colour-surface protocol error. For rogdv5.2, the normal binary build and fresh normal source-package replay matched all 902 public Git-archive files and executable modes. Six focused private-compositor IPC checks pass, including paused active/inactive generation changes, read-only setter and video-output teardown notification. System-launcher package transaction and deployment remain separate."
     },
     {
       "component": "ubuntu-gst-plugins-good-dovi",

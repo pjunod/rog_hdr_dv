@@ -4,6 +4,8 @@
 
 **plurx-player titles play again with the system mpv (November 12).** mpv `0.42.0-0ubuntu0+rogdv5.4` is installed. Since plurx-player 0.5.0 began using the system mpv, a title opened from the web UI closed its window before any picture. The idle window let the NVIDIA Vulkan driver claim the window's colour management, and mpv's own HDR request then broke the Wayland connection. mpv now describes the idle window itself. [Details](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers).
 
+**mpv no longer spins on a dead Wayland connection (November 12, source).** Patch 0009 of the `mpv-fel-system-dv` series (package `+rogdv5.5`) stops the video-output thread pinning a CPU core and the GPU after the compositor ends the connection. Build and installation are recorded when done. [Details](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers).
+
 **Looping web videos and Profile 7 after a seek (November 12).** In GNOME Web every short looping
 video restarted as soon as its download finished. A 3 s clip played its first 0.75 s over and over,
 and after a seek near its end it stopped for good. WebKit `+rogdv6` loops media from its web source
