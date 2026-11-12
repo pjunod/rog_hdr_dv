@@ -1,6 +1,6 @@
 # WebKitGTK clear video and native HDR
 
-**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed 20 of 21 steps; Profile 7 FEL stays ordinary (see below). · **Updated:** 2026-11-11
+**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed all 30 steps, including Profile 7 FEL on NVDEC (`+rogdv3`, see below). · **Updated:** 2026-11-12
 
 This browser change gives ordinary clear MP4/HEVC HTML video an explicit
 100-nit BT709/sRGB destination and adds an independent tagged HDR video plane
@@ -106,8 +106,11 @@ nominal, not optical.
   ordinary page video can never exceed page white.
 - **Dim pictures:** a dim native picture can stay below page white. Then the decisive control
   is the same picture forced ordinary by CSS clipping (its twin). Native must change the inner
-  region and be brighter than the twin, and the run must have mapped pictures; an untrusted load
-  shows an ungraded picture, which also differs.
+  region by more than 5% and the run must have mapped pictures. It must also be brighter than the
+  twin, or the compositor must have recorded a visible native redraw of the picture shown at that
+  step. An untrusted load shows an ungraded picture, which also differs, but it never reaches the
+  native redraw. The redraw alternative exists because a Dolby grade can be dimmer than its base
+  layer's page-white rendering, as in the Profile 7 clip at 2.5 s.
 - **Evidence:** only a run whose receipt records a captured, process-qualified run is analysed,
   with the step list and every capture digest matching the files. The PipeWire reader that writes
   the captures is digest-pinned like the other helpers, and its digest is in every receipt.
@@ -123,22 +126,34 @@ nominal, not optical.
 | SDR, HDR10, clean base, SDR target | ordinary | pass |
 | CSS opacity, clip, rotation, covering element; native controls | ordinary | pass; page patches unchanged |
 | Profile 5 playing for 10 s | native | native; no QoS drops with mapper core `0.1.0+rogdv8` (core `rogdv7` dropped 14 pictures in the first 0.55 s) |
-| Profile 7 FEL at 2.5 s | native | **ordinary**: identical to its HDR10 base layer |
+| Profile 7 FEL at 2.5 s | native | native on NVDEC (`EL composed=1`): differs from its clipped twin by 14%, visible native redraw recorded; a dim grade, p99.9 170 cd/m² |
+| Profile 7 → base → Profile 7, and Profile 7 → Profile 5 → Profile 7 | native, ordinary, native | pass |
 
 Profile 7 FEL composition exists only in the CUDA decoder. cuInit needs `/dev/nvidia-uvm`, which
-the WebKit sandbox does not bind.
+the WebKit sandbox did not bind before `+rogdv3`.
 
-- **What binding it did.** Binding the device made Profile 7 native: the picture differed from its
-  ordinary twin by 14%.
-- **Why it is withheld.** With the device bound, the equal-rank NVIDIA decoder won for all browser
-  HEVC/H.264. It decodes to system memory because WebKit's GL context is not CUDA-compatible, and
-  after a source change a second decoder's picture never reached the page.
-- **Result.** The sandbox change is withheld, so Profile 7 FEL plays its base layer ordinarily.
-- **Follow-up in progress.** A candidate binds the device and orders decodebin's candidates from registry
-  metadata: the decoder on the page's GPU first, unless the stream has an enhancement layer and another
-  decoder declares that it composes it. That keeps ordinary video on the Intel GPU and gives Profile 7
-  FEL to NVDEC. It remains withheld. In one web process, an ordinary DMABuf video shown after an NVDEC
-  source presents nothing, although native and GL-memory pictures still present.
+- **Device and decoder choice.** `+rogdv3` binds the device. Binding it alone let the equal-rank
+  NVIDIA decoder win for all browser HEVC/H.264, so decodebin's candidates are now ordered from
+  registry metadata: the decoder on the page's rendering GPU first, unless the stream has an
+  enhancement layer and another decoder declares that it composes it. Ordinary video stays on the
+  Intel GPU, and Profile 7 FEL goes to NVDEC. gst-plugins-bad `rogdv7` declares that metadata, and
+  WebKit Breaks older bad packages. The ordering applies to ordinary playback through
+  uridecodebin; MSE and encrypted media keep GStreamer's order. A bad package without the metadata
+  (for example a later stock Ubuntu revision) leaves the default order in place.
+- **Sandbox surface.** Every web process now reaches the NVIDIA unified-memory driver interface;
+  `nvidiactl` and `nvidia0` were already bound for GL. The bind is skipped when the node is absent,
+  and CUDA then stays unavailable until a host process loads `nvidia_uvm`.
+- **Later video after an NVDEC source.** In one web process, ordinary video shown after a native
+  NVDEC picture used to present nothing. The retained native frame held the decoder's CUDA picture,
+  and WebKit's compositor dropped it on its own thread. The last reference finalized the decoder's
+  CUDA context there. Mapper core `0.1.0+rogdv9` releases decoder pictures on a thread of its own,
+  and WebKit Breaks older cores. The exact GL-side effect of the finalization was not isolated: a
+  standalone EGL and CUDA program kept its context. The fix point is proven by the same runs
+  passing with NVDEC everywhere.
+- **Open, outside the qualified set.** Profile 7 under a CSS clip, then the base, then Profile 7
+  again, crashes the web process in both stacks. The released stack crashes in Intel's VA driver
+  (`iHD_drv_video.so`, the known decoder fault). The candidate crashes in WebKit's tile painting
+  (`CoordinatedTileBuffer::canvas`, a null Skia surface).
 
 The first-frame drops came from the compositor's mapper creating its own Vulkan device on the
 first visible picture. Mapper core `0.1.0+rogdv8` shares one device per process, so the first

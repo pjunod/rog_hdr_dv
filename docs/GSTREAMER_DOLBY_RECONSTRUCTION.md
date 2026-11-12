@@ -112,11 +112,16 @@ client exercised. Each is fixed at its cause:
   cache, because the Vulkan `pl_gpu` is thread-safe. Renderers, textures and the provider stay
   per mapper, and a GPU that is not thread-safe keeps a device per mapper. Showtime's sink-side
   mapper shares the device in the same way.
+- **Decoder pictures released off the consumer's thread (`0.1.0+rogdv9`).** A retained native
+  frame holds the decoder's own picture, and a consumer drops it on its presentation thread. The
+  last reference to an NVDEC picture finalizes the decoder's CUDA context. On WebKit's compositor
+  thread, that left later ordinary video in the same web process unpresented. The core now releases
+  decoder pictures on a thread of its own.
 
 The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 115 checks,
 including the pre-start and unfiltered-reverse controls. The coherent family is core
-`0.1.0+rogdv8`, sink `0.15.2-1ubuntu2+rogdv5.3` and Showtime `50.0-2+rogdv5.5`, with the
-bad/extra `rogdv6` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
+`0.1.0+rogdv9`, sink `0.15.2-1ubuntu2+rogdv5.4` and Showtime `50.0-2+rogdv5.6`, with the
+bad/extra `rogdv7` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
 Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
 
 These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.

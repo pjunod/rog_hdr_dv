@@ -8,7 +8,7 @@ on:
         type: boolean
         default: true
       test_target:
-        description: "all, upstream, none, or a failed unittest module.Class.method"
+        description: "all, upstream, none, or space-separated unittest targets (module[.Class[.method]])"
         type: string
         default: all
 
@@ -28,7 +28,7 @@ jobs:
         run: python3 scripts/check_repository.py
       - name: Packaging replay tools
         # The WebKit packaging tests replay the real debhelper sequence.
-        if: ${{ inputs.test_target == 'all' || startsWith(inputs.test_target, 'test_webkit_ubuntu_packaging') }}
+        if: ${{ inputs.test_target == 'all' || contains(inputs.test_target, 'test_webkit_ubuntu_packaging') }}
         run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends debhelper dh-sequence-gir
       - name: Selected Python checks
         if: ${{ always() && inputs.test_target != 'none' }}
@@ -50,8 +50,8 @@ jobs:
               args = ['-v', 'test_check_repository', 'test_upstream_catalog',
                       'test_upstream_gitlab_submit', 'test_upstream_cinema_submit',
                       'test_upstream_forgejo_submit', 'test_upstream_linux_prepare']
-          elif re.fullmatch(r'test_[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+){0,2}', target):
-              args = ['-v', target]
+          elif all(re.fullmatch(r'test_[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+){0,2}', t) for t in target.split()):
+              args = ['-v', *target.split()]
           else:
               raise SystemExit('Invalid unittest target')
           raise SystemExit(subprocess.call([sys.executable, '-m', 'unittest', *args]))

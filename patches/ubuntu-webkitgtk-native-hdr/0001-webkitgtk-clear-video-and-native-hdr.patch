@@ -90,6 +90,103 @@ index d56b6cf9..32544657 100644
      bool hasMediaEngine() const;
  
      std::optional<VideoFrameMetadata> videoFrameMetadata();
+diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDecoderPreference.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDecoderPreference.h
+new file mode 100644
+index 00000000..e235b982
+--- /dev/null
++++ b/Source/WebCore/platform/graphics/gstreamer/GStreamerDecoderPreference.h
+@@ -0,0 +1,91 @@
++/* Copyright (C) 2026 ROG HDR contributors. SPDX-License-Identifier: BSD-2-Clause */
++#pragma once
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include "GStreamerCommon.h"
++#include <wtf/Vector.h>
++#include <wtf/text/CString.h>
++#if USE(GBM)
++#include "DRMDeviceManager.h"
++#endif
++
++namespace WebCore {
++
++// True for an H.265 stream whose Dolby Vision configuration record declares an
++// enhancement layer (Profile 7 FEL or MEL). The record keeps its version, then a
++// 7-bit profile, a 6-bit level and the RPU, EL and BL presence flags.
++inline bool doviStreamHasEnhancementLayer(GstCaps* caps)
++{
++    if (!caps || gst_caps_is_empty(caps) || gst_caps_is_any(caps))
++        return false;
++    auto* structure = gst_caps_get_structure(caps, 0);
++    if (!gst_structure_has_name(structure, "video/x-h265"))
++        return false;
++    const GValue* value = gst_structure_get_value(structure, "dovi-configuration");
++    if (!value || !GST_VALUE_HOLDS_BUFFER(value))
++        return false;
++    uint8_t record[4];
++    if (gst_buffer_extract(gst_value_get_buffer(value), 0, record, sizeof(record)) != sizeof(record))
++        return false;
++    return record[0] == 1 && (record[3] & 0x2);
++}
++
++// Orders decodebin's decoder candidates for one coded stream, from registry
++// metadata alone (no plugin is loaded, so no other GPU is woken to decide).
++//
++// A decoder on the GPU that renders the page comes first: its pictures reach the
++// compositor without a copy, and ordinary video does not wake a second GPU.
++// Decoders of equal rank are otherwise tried in name order, which on a hybrid
++// laptop puts the discrete GPU's decoder first for every stream. Decoders state
++// their device as "drm-render-node" element metadata.
++//
++// A Dolby Vision stream with an enhancement layer is the exception: only a decoder
++// that states "dovi-enhancement-layer" = "compose" reconstructs the full picture,
++// and any other presents just the base layer, so those lead wherever they run.
++//
++// Other candidates (parsers) keep their positions, and decoders otherwise keep
++// decodebin's rank order. Returns null when nothing moves.
++inline GValueArray* orderDecoderFactories(GstCaps* caps, GValueArray* factories)
++{
++ALLOW_DEPRECATED_DECLARATIONS_BEGIN
++    CString renderNode;
++#if USE(GBM)
++    if (DRMDeviceManager::singleton().isInitialized())
++        renderNode = DRMDeviceManager::singleton().mainDevice().renderNode;
++#endif
++    bool needsComposition = doviStreamHasEnhancementLayer(caps);
++    auto preferred = [&](GstElementFactory* factory) {
++        if (needsComposition)
++            return !g_strcmp0(gst_element_factory_get_metadata(factory, "dovi-enhancement-layer"), "compose");
++        return !renderNode.isNull() && !g_strcmp0(gst_element_factory_get_metadata(factory, "drm-render-node"), renderNode.data());
++    };
++
++    Vector<unsigned> slots;
++    Vector<GstElementFactory*> decoders;
++    for (unsigned i = 0; i < factories->n_values; i++) {
++        auto* factory = GST_ELEMENT_FACTORY_CAST(g_value_get_object(g_value_array_get_nth(factories, i)));
++        if (gst_element_factory_list_is_type(factory, GST_ELEMENT_FACTORY_TYPE_DECODER)) {
++            slots.append(i);
++            decoders.append(factory);
++        }
++    }
++    Vector<GstElementFactory*> ordered;
++    for (bool lead : { true, false }) {
++        for (auto* factory : decoders) {
++            if (preferred(factory) == lead)
++                ordered.append(factory);
++        }
++    }
++    if (ordered == decoders)
++        return nullptr;
++
++    GST_DEBUG("Decoder order for %" GST_PTR_FORMAT ": %s first (%s)", caps, GST_OBJECT_NAME(ordered.first()),
++        needsComposition ? "composes the Dolby enhancement layer" : "on the rendering GPU");
++    GValueArray* result = g_value_array_copy(factories);
++    for (unsigned j = 0; j < slots.size(); j++)
++        g_value_set_object(g_value_array_get_nth(result, slots[j]), ordered[j]);
++    return result;
++ALLOW_DEPRECATED_DECLARATIONS_END
++}
++
++} // namespace WebCore
++#endif
 diff --git a/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h b/Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h
 new file mode 100644
 index 00000000..92471ef5
@@ -1067,20 +1164,21 @@ index 00000000..ddc34acd
 +
 +} // namespace WebCore
 diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
-index ae14d494..5f85f328 100644
+index ae14d494..f6874765 100644
 --- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
 +++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
-@@ -33,6 +33,9 @@
+@@ -33,6 +33,10 @@
  #include "GStreamerAudioMixer.h"
  #include "GStreamerCaptureDeviceManager.h"
  #include "GStreamerCommon.h"
 +#if PLATFORM(GTK) && USE(GTK4)
++#include "GStreamerDecoderPreference.h"
 +#include "GStreamerDoviSourcePolicy.h"
 +#endif
  #include "GStreamerQuirks.h"
  #include "GStreamerRegistryScanner.h"
  #include "GraphicsContext.h"
-@@ -219,6 +222,9 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
+@@ -219,6 +223,9 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
  {
      GST_DEBUG_OBJECT(pipeline(), "Disposing player");
      m_isPlayerShuttingDown.store(true);
@@ -1090,7 +1188,7 @@ index ae14d494..5f85f328 100644
  
  #if ENABLE(MEDIA_TELEMETRY)
      MediaTelemetryReport::singleton().reportPlaybackState(MediaTelemetryReport::AVPipelineState::Stop);
-@@ -278,6 +284,9 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
+@@ -278,6 +285,9 @@ void MediaPlayerPrivateGStreamer::tearDown(bool clearMediaPlayer)
          m_audioSink = nullptr;
          m_textSink = nullptr;
          m_pipeline = nullptr;
@@ -1100,7 +1198,7 @@ index ae14d494..5f85f328 100644
      }
  
      if (!clearMediaPlayer)
-@@ -1106,6 +1115,12 @@ void MediaPlayerPrivateGStreamer::sourceSetup(GstElement* sourceElement)
+@@ -1106,6 +1116,12 @@ void MediaPlayerPrivateGStreamer::sourceSetup(GstElement* sourceElement)
      GST_DEBUG_OBJECT(pipeline(), "Source element set-up for %s", GST_ELEMENT_NAME(sourceElement));
  
      m_source = sourceElement;
@@ -1113,7 +1211,7 @@ index ae14d494..5f85f328 100644
  
      if (WEBKIT_IS_WEB_SRC(m_source.get())) {
          auto* source = WEBKIT_WEB_SRC_CAST(m_source.get());
-@@ -1131,10 +1146,15 @@ MediaPlayerPrivateGStreamer::ChangePipelineStateResult MediaPlayerPrivateGStream
+@@ -1131,10 +1147,15 @@ MediaPlayerPrivateGStreamer::ChangePipelineStateResult MediaPlayerPrivateGStream
  {
      ASSERT(m_pipeline);
  
@@ -1131,7 +1229,7 @@ index ae14d494..5f85f328 100644
      }
  
      GstState currentState, pending;
-@@ -1177,8 +1197,64 @@ MediaPlayerPrivateGStreamer::ChangePipelineStateResult MediaPlayerPrivateGStream
+@@ -1177,8 +1198,64 @@ MediaPlayerPrivateGStreamer::ChangePipelineStateResult MediaPlayerPrivateGStream
      return ChangePipelineStateResult::Ok;
  }
  
@@ -1196,7 +1294,7 @@ index ae14d494..5f85f328 100644
      // Clean out everything after file:// url path.
      String cleanURLString(url.string());
      if (url.protocolIsFile())
-@@ -1709,8 +1785,22 @@ void MediaPlayerPrivateGStreamer::updateEnabledVideoTrack()
+@@ -1709,8 +1786,22 @@ void MediaPlayerPrivateGStreamer::updateEnabledVideoTrack()
  
      if (m_isLegacyPlaybin) {
          GST_DEBUG_OBJECT(m_pipeline.get(), "Setting playbin2 current-video=%d", wantedTrack->trackIndex());
@@ -1219,7 +1317,24 @@ index ae14d494..5f85f328 100644
          m_wantedVideoStreamId = wantedTrack->streamId();
          playbin3SendSelectStreamsIfAppropriate();
      }
-@@ -2712,6 +2802,10 @@ void MediaPlayerPrivateGStreamer::configureUriDecodebin2(GstElement* element)
+@@ -2694,6 +2785,16 @@ void MediaPlayerPrivateGStreamer::configureUriDecodebin2(GstElement* element)
+         return TRUE;
+     }), this);
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    // Decode on the GPU that renders the page, unless the stream needs a decoder
++    // that only another device provides (see orderDecoderFactories).
++ALLOW_DEPRECATED_DECLARATIONS_BEGIN
++    g_signal_connect(element, "autoplug-sort", G_CALLBACK(+[](GstElement*, GstPad*, GstCaps* caps, GValueArray* factories, gpointer) -> GValueArray* {
++        return orderDecoderFactories(caps, factories);
++    }), nullptr);
++ALLOW_DEPRECATED_DECLARATIONS_END
++#endif
++
+ #if ENABLE(ENCRYPTED_MEDIA) && ENABLE(THUNDER)
+     if (CDMFactoryThunder::singleton().supportedKeySystems().isEmpty())
+         return;
+@@ -2712,6 +2813,10 @@ void MediaPlayerPrivateGStreamer::configureUriDecodebin2(GstElement* element)
  void MediaPlayerPrivateGStreamer::configureElement(GstElement* element)
  {
      configureElementPlatformQuirks(element);
@@ -1230,7 +1345,7 @@ index ae14d494..5f85f328 100644
  
      auto name = GMallocString::unsafeAdoptFromUTF8(gst_element_get_name(element));
      String elementClass(unsafeSpan(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS)));
-@@ -3581,6 +3675,37 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
+@@ -3581,6 +3686,37 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
      if (!m_audioSink)
          m_audioSink = createAudioSink();
  
@@ -1268,7 +1383,7 @@ index ae14d494..5f85f328 100644
      g_object_set(m_pipeline.get(), "audio-sink", m_audioSink.get(), "video-sink", createVideoSink(), nullptr);
  
      if (m_shouldPreservePitch && !isMediaStream && !GStreamerQuirksManager::singleton().needsCustomInstantRateChange()) {
-@@ -3812,7 +3937,7 @@ void MediaPlayerPrivateGStreamer::pushTextureToCompositor(bool isDuplicateSample
+@@ -3812,7 +3948,7 @@ void MediaPlayerPrivateGStreamer::pushTextureToCompositor(bool isDuplicateSample
      if (!m_videoInfo)
          m_videoInfo = VideoFrameGStreamer::infoFromCaps(GRefPtr(gst_sample_get_caps(m_sample.get())));
  
@@ -1277,7 +1392,7 @@ index ae14d494..5f85f328 100644
  }
  #endif // USE(COORDINATED_GRAPHICS)
  
-@@ -4414,6 +4539,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
+@@ -4414,6 +4550,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
          }), this);
      }
  
@@ -1303,7 +1418,7 @@ index ae14d494..5f85f328 100644
      return m_videoSink.get();
  }
  
-@@ -4565,6 +4709,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
+@@ -4565,6 +4720,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
          return;
      }
  
@@ -2068,7 +2183,7 @@ index d84099f5..364ed2eb 100644
 +void webkitWebViewBaseSetGTKVideoSourceState(WebKitWebViewBase*, WebCore::ProcessIdentifier, uint64_t revision, uint64_t selection, bool active);
 +#endif
 diff --git a/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp b/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
-index ce8330ee..9db10dc1 100644
+index ce8330ee..f4b15ba9 100644
 --- a/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
 +++ b/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
 @@ -424,6 +424,35 @@ static void bindGStreamerData(Vector<CString>& args)
@@ -2107,6 +2222,16 @@ index ce8330ee..9db10dc1 100644
      bindPathVar(args, "GST_PRESET_PATH");
  
      // GST_DEBUG_FILE points to an absolute file path, so we need write permissions for its parent directory.
+@@ -471,6 +500,9 @@ static void bindOpenGL(Vector<CString>& args)
+         "--dev-bind-try", "/dev/nvidiactl", "/dev/nvidiactl",
+         "--dev-bind-try", "/dev/nvidia0", "/dev/nvidia0",
+         "--dev-bind-try", "/dev/nvidia", "/dev/nvidia",
++        // CUDA video decoders (GStreamer nvcodec) also need the unified memory
++        // device; without it cuInit fails and NVIDIA hardware decode is lost.
++        "--dev-bind-try", "/dev/nvidia-uvm", "/dev/nvidia-uvm",
+         // Adreno
+         "--dev-bind-try", "/dev/kgsl-3d0", "/dev/kgsl-3d0",
+         "--dev-bind-try", "/dev/ion", "/dev/ion",
 diff --git a/Source/WebKit/UIProcess/WebPageProxy.h b/Source/WebKit/UIProcess/WebPageProxy.h
 index 0a2be51f..71775d07 100644
 --- a/Source/WebKit/UIProcess/WebPageProxy.h
