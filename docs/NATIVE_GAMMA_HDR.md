@@ -16,7 +16,7 @@ measurement of this panel.
 
 | Symbol | Meaning | Source in Mutter | Provenance |
 |---|---|---|---|
-| `P` | Physical peak at the backlight Mutter holds while this route is active | The monitor configuration's target `peak` override | User-declared. On the ThinkPad, Lenovo's nominal 500 cd/m² (an OEM specification) or the Windows driver's reported 270 cd/m²; neither is a measurement |
+| `P` | Physical peak at the backlight Mutter holds while this route is active | The monitor configuration's target `peak` override | User-declared. On the ThinkPad, best supported by a published meter measurement of the panel model (533 cd/m² average, black 0.38 cd/m²); Lenovo's nominal 500 and the Windows driver's 270 cd/m² are not measurements |
 | `B` | Physical black | The override's `min`, when present | User-declared; otherwise the explicit ideal-zero fallback, never inferred from a contrast specification |
 | `W` | SDR reference white | `203 × f` in whole cd/m², where `f` is the reference-white brightness factor, kept strictly between `B` and `P` | Compositor policy; follows the brightness control |
 
