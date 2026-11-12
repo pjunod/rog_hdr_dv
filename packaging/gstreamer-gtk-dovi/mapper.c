@@ -161,18 +161,47 @@ static pl_vulkan acquire_vulkan (gboolean *shared)
   g_mutex_unlock (&shared_gpu_lock);
   return vk;
 }
+/* Destroying a Vulkan instance lets the loader unload the driver's ICD. The
+ * NVIDIA ICD is its GL vendor library, and unloading it releases the calling
+ * thread's current EGL context (eglReleaseThread). The last mapper is freed on
+ * whichever thread drops the pipeline: WebKit's main thread on a source change,
+ * whose Skia context then silently stopped being current, so its next tile
+ * textures were never created and the tile painter crashed. Devices are
+ * therefore destroyed on a thread of this library, one at a time. */
+typedef struct { pl_vulkan vk; pl_cache cache; } VulkanRelease;
+static void destroy_vulkan (gpointer data, gpointer unused)
+{
+  (void) unused;
+  VulkanRelease *job = data;
+  pl_vulkan_destroy (&job->vk);
+  pl_cache_destroy (&job->cache);
+  g_free (job);
+}
+static void destroy_vulkan_off_thread (pl_vulkan vk, pl_cache cache)
+{
+  static GThreadPool *pool;
+  /* Non-exclusive with one thread: creation cannot fail, a failed push still
+   * queues the job, and instances are never torn down concurrently. */
+  if (g_once_init_enter (&pool))
+    g_once_init_leave (&pool, g_thread_pool_new (destroy_vulkan, NULL, 1, FALSE, NULL));
+  VulkanRelease *job = g_new (VulkanRelease, 1);
+  job->vk = vk;
+  job->cache = cache;
+  g_thread_pool_push (pool, job, NULL);
+}
 /* The last mapper out destroys the device: a web process without video should
  * not keep one. A new pipeline's own mapper creates the next device while it
  * prerolls, before the clock runs. */
 static void release_vulkan (pl_vulkan *vk, gboolean shared)
 {
   if (!*vk) return;
-  if (!shared) { pl_vulkan_destroy (vk); return; }
+  if (!shared) { destroy_vulkan_off_thread (*vk, NULL); *vk = NULL; return; }
   g_mutex_lock (&shared_gpu_lock);
   g_assert (*vk == shared_vk && shared_gpu_users > 0);
   if (!--shared_gpu_users) {
-    pl_vulkan_destroy (&shared_vk);
-    pl_cache_destroy (&shared_cache);
+    destroy_vulkan_off_thread (shared_vk, shared_cache);
+    shared_vk = NULL;
+    shared_cache = NULL;
   }
   g_mutex_unlock (&shared_gpu_lock);
   *vk = NULL;

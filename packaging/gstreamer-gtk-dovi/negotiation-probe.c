@@ -538,6 +538,64 @@ main (int argc, char **argv)
          gst_caps_features_contains (features, "memory:VAMemory"))),
         "reverse exposes only concrete CPU-readable domains");
   }
+  /* Overlay composition meta (playsink's subtitleoverlay) pairs one to one,
+   * in accelerator memory and in both spellings of system memory. */
+  const gchar *overlay_memory[] = {"memory:CUDAMemory", "memory:VAMemory",
+      GST_CAPS_FEATURE_MEMORY_SYSTEM_MEMORY, NULL};
+  for (guint i = 0; i < G_N_ELEMENTS (overlay_memory); i++) {
+    GstCaps *plain = caps_for ("P010_10LE", NULL, TRUE);
+    gst_caps_set_features (plain, 0, overlay_memory[i] ?
+        gst_caps_features_new (overlay_memory[i], NULL) : gst_caps_features_new_empty ());
+    GstCaps *input = gst_caps_copy (plain);
+    gst_caps_features_add (gst_caps_get_features (input, 0),
+        GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION);
+    GstCaps *mapped = klass->transform_caps (base, GST_PAD_SINK, input, NULL);
+    require (!gst_caps_is_empty (mapped), "overlay input has graded output");
+    GstCaps *plain_mapped = klass->transform_caps (base, GST_PAD_SINK, plain, NULL);
+    require (!gst_caps_is_empty (plain_mapped), "plain input has graded output (control)");
+    if (!gst_caps_is_empty (mapped) && !gst_caps_is_empty (plain_mapped)) {
+      GstCaps *first = gst_caps_copy_nth (mapped, 0);
+      GstCaps *plain_first = gst_caps_copy_nth (plain_mapped, 0);
+      require (gst_caps_is_fixed (first), "overlay graded output is fixed");
+      for (guint k = 0; k < gst_caps_get_size (mapped); k++)
+        require (gst_caps_features_contains (gst_caps_get_features (mapped, k),
+                GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION) &&
+            !gst_caps_features_contains (gst_caps_get_features (mapped, k), "memory:CUDAMemory") &&
+            !gst_caps_features_contains (gst_caps_get_features (mapped, k), "memory:VAMemory"),
+            "overlay input produces system memory output with the overlay meta");
+      require (klass->set_caps (base, input, first), "overlay input accepted");
+      require (!klass->set_caps (base, input, plain_first),
+          "overlay input rejected with an output that drops the meta");
+      require (!klass->set_caps (base, plain, first),
+          "plain input rejected with an output that claims the meta");
+      GstCaps *overlay_reverse = klass->transform_caps (base, GST_PAD_SRC, first, NULL);
+      GstCaps *plain_reverse = klass->transform_caps (base, GST_PAD_SRC, plain_first, NULL);
+      require (gst_caps_can_intersect (overlay_reverse, input),
+          "overlay output reverse exposes overlay input");
+      require (!gst_caps_can_intersect (overlay_reverse, plain),
+          "overlay output reverse excludes plain input");
+      require (gst_caps_can_intersect (plain_reverse, plain),
+          "plain output reverse exposes plain input (control)");
+      require (!gst_caps_can_intersect (plain_reverse, input),
+          "plain output reverse excludes overlay input");
+      gst_caps_unref (plain_reverse);
+      gst_caps_unref (overlay_reverse);
+      gst_caps_unref (plain_first);
+      gst_caps_unref (first);
+    }
+    gst_caps_unref (plain_mapped);
+    gst_caps_unref (mapped);
+    gst_caps_unref (input);
+    gst_caps_unref (plain);
+  }
+  GstCaps *dma_overlay = gst_caps_copy (dma);
+  gst_caps_features_add (gst_caps_get_features (dma_overlay, 0),
+      GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION);
+  result = klass->transform_caps (base, GST_PAD_SINK, dma_overlay, NULL);
+  require (gst_caps_is_empty (result), "marked DMABuf with overlay forward query is empty");
+  gst_caps_unref (result);
+  gst_caps_unref (dma_overlay);
+  require (klass->set_caps (base, nv12, output), "plain NV12 accepted again after overlay checks");
   GstCaps *gpu_output = gst_caps_copy (output);
   gst_caps_set_features (gpu_output, 0,
       gst_caps_features_new ("memory:CUDAMemory", NULL));
