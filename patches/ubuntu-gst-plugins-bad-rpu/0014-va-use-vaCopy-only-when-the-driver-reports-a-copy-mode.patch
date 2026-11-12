@@ -1,16 +1,19 @@
 diff --git a/gst-libs/gst/va/gstvasurfacecopy.c b/gst-libs/gst/va/gstvasurfacecopy.c
-index 82e0cdbe5adc4cd8fb2e2f3ace5d95c5c9377058..f7c25a2b56847f74fcb46555e0875f2049b78bf0 100644
+index 82e0cdbe5adc4cd8fb2e2f3ace5d95c5c9377058..d5bcde3bb5b3b050a27476b08ca255f28027b78e 100644
 --- a/gst-libs/gst/va/gstvasurfacecopy.c
 +++ b/gst-libs/gst/va/gstvasurfacecopy.c
-@@ -56,6 +56,14 @@ _has_copy (GstVaDisplay * display)
+@@ -56,6 +56,17 @@ _has_copy (GstVaDisplay * display)
      return FALSE;
    }
  
-+  /* The attribute's value holds one bit per supported VA_EXEC_MODE. A driver
-+   * that answers the query but supports no copy mode (iHD on Meteor Lake
-+   * reports 0) must not be given vaCopy: iHD then crashes in it. */
-+  if (attr.value == 0 || attr.value == VA_ATTRIB_NOT_SUPPORTED) {
-+    GST_INFO ("vaCopy is not supported (copy modes %#x)", attr.value);
++  /* The attribute's value holds one bit per supported VA_EXEC_MODE, and the
++   * copy below asks for VA_EXEC_MODE_DEFAULT. A driver that answers the query
++   * without that mode (iHD on Meteor Lake reports none) must not be given
++   * vaCopy: iHD then crashes in it. */
++  if (attr.value == VA_ATTRIB_NOT_SUPPORTED
++      || !(attr.value & (1 << VA_EXEC_MODE_DEFAULT))) {
++    GST_INFO ("vaCopy default mode is not supported (copy modes %#x)",
++        attr.value);
 +    return FALSE;
 +  }
 +
