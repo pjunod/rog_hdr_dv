@@ -67,24 +67,57 @@ on the enabled monitor driver, application and certified display in
 A current download's product-page breadcrumb alone does not establish
 compatibility with this generation.
 
-**Runtime result (2026-11-11).** A read-only DXGI/DisplayConfig probe, run as
-the ordinary user on the normal Windows desktop, confirms the cached
-association at runtime: the active path reports the Lenovo `LEN40AE`
-identity, not the panel's own `AUO2036`, with `TPLCD_40AE_SDR.icm` as the
-output profile. Windows runs this panel as SDR: advanced colour is reported
-unsupported and force-disabled, the desktop colour space is RGB full-range
-gamma 2.2, eight bits per channel, and SDR white is 80 cd/m². The driver
+**Runtime result (2026-11-11, corrected 2026-11-12).** A read-only
+DXGI/DisplayConfig probe, run as the ordinary user on the normal Windows
+desktop, confirms the cached association at runtime: the active path reports
+the Lenovo `LEN40AE` identity, not the panel's own `AUO2036`, with
+`TPLCD_40AE_SDR.icm` as the output profile. The desktop is SDR: RGB
+full-range gamma 2.2, eight bits per channel, SDR white 80 cd/m², and
+Windows reports desktop HDR (advanced colour) as unsupported. The driver
 reports sRGB-like primaries and 0.5–270 cd/m² luminance. Those values come
 from the driver's description, not from an optical measurement, and they
-conflict with Lenovo's nominal 500 cd/m². The probe cannot see the OEM Dolby
-processing.
+conflict with Lenovo's nominal 500 cd/m².
 
-**Consequence for Linux.** Windows never drives this panel in an HDR mode,
-so Windows offers no runtime HDR configuration to reproduce. The
-native-gamma route's peak stays a declared configuration value
-([contract](NATIVE_GAMMA_HDR.md) §1). Of the two available figures, 270
-cd/m² is the conservative declaration and 500 cd/m² the OEM nominal one;
-neither is measured.
+The 2026-11-11 run also reported advanced colour as force-disabled. A
+2026-11-12 run did not. Between the two runs the owner installed Lenovo's
+Dolby Vision provisioning package, and the second run was on AC power. The
+evidence cannot separate those two changes. On 2026-11-12, Windows' video
+settings enable HDR video playback and disable it on battery
+(`EnableHDRForPlayback`, `DisableHDROnBattery`), and the Dolby Vision HDR app
+is installed. Actual HDR playback was not observed. Lenovo's
+[Dolby Vision page](https://news.lenovo.com/why-your-next-pc-should-have-dolby-vision)
+describes the feature as display mapping based on per-device
+characterization, in Edge, the Netflix app and Movies & TV. By default it
+plays only on AC power, and it requires the Vantage enabling package and the
+ThinkPad monitor file.
+
+**Panel TCON.** Registry values under the Intel display-class key list four
+eDP HDR OUIs (`EdpHDRTotalOUICount`, `OUI_EDP_HDR_1`–`_4`). One of them is
+this panel's sink OUI, 38-EC-11. The capture followed the provisioning
+install, so which package wrote them is unknown. Intel's proprietary eDP
+HDR interface, from DPCD 0x340, can advertise PQ decode, BT.2020 gamut,
+tone mapping and nits brightness in the TCON. A read-only Linux read of
+32 bytes from 0x340 (0x340–0x344 decoded) returned all zero, with the
+source OUI already reading Intel's 00-AA-01. The panel advertises PWM-pin
+brightness and no AUX brightness control. So the TCON HDR interface is not
+offered, at least to the standard Intel handshake. A Windows-only unlock
+sequence cannot be excluded from Linux reads.
+
+**Published optical measurement of the model.** Notebookcheck measured an
+X1 Carbon 2018 with this panel model, B140QAN02.0, at maximum backlight
+([review](https://www.notebookcheck.net/Lenovo-ThinkPad-X1-Carbon-2018-WQHD-HDR-i7-Laptop-Review.284682.0.html)):
+578 cd/m² centre, 532.8 cd/m² average, 579 cd/m² centre on battery, black
+0.38 cd/m², contrast 1521:1, gamma 2.14, and no PWM flicker. This is a
+measurement of a different unit of the same model, not of this panel, which
+may have aged. It is the best available basis for the declared `P` and `B`.
+
+**Consequence for Linux.** The native-gamma route ([contract](NATIVE_GAMMA_HDR.md))
+does not depend on a TCON HDR mode, which this panel does not advertise.
+Whether Windows' Dolby Vision mapping raises the backlight was not observed.
+The route's peak stays a declared configuration value (§1). The published
+model measurement supports about 530 cd/m² with black 0.38 cd/m², ahead of
+the driver's 270 and Lenovo's nominal 500. None of these figures is a
+measurement of this unit.
 
 **Remaining evidence:** trace the original installation through normal Windows
 operation, with the owner coordinating boot and recovery. Establish the
@@ -150,7 +183,7 @@ mapping in higher precision alone does not prove precision at the panel.
 | Stage | Required result before advancing | State on 2026-11-09 |
 |---|---|---|
 | 1. Read-only inspection | Identify Linux output limitations and cached OEM association, with evidence limits stated | Closed |
-| 2. Windows and backlight trace | Observe normal runtime binding and Dolby behaviour; separate `P(b)`, `W` and `T` provenance | Runtime binding and SDR state traced 2026-11-11; Dolby playback behaviour not observed |
+| 2. Windows and backlight trace | Observe normal runtime binding and Dolby behaviour; separate `P(b)`, `W` and `T` provenance | Runtime binding, SDR desktop, HDR playback settings and TCON HDR registers read 2026-11-11/12; Dolby playback and backlight behaviour not observed |
 | 3. Source contract and compiler loop | Freeze native-gamma/reference-anchor policy and establish the exact Ubuntu build loop | Done 2026-11-11: contract frozen; `-Dwerror` build and colour suites pass |
 | 4. Synthetic Mutter controls | Verify SDR white, HDR headroom, gamut, target generations, pause/source lifetime and eight-bit dithering, including absent/invalid target controls | Partial: SDR white, headroom, reference factor, declared black, invalid peak and forced HDR covered; generations, pause lifetime, saturated edges and dithering pending |
 | 5. Actual ThinkPad GPU qualification | Exercise native output, genuine Dolby grade, truthful transport, paused retargeting and ordinary SDR fallback on this GPU | Pending |
