@@ -146,7 +146,8 @@ client exercised. Each is fixed at its cause:
   inside `vaCopy`. WebKit deep-copies the current picture at every flush, so a seek or source change
   with Intel decoding could kill the web process. The allocator now uses `vaCopy` only when a copy
   mode is reported, and otherwise copies through a VA image. Showtime moves to `+rogdv5.10` for the
-  exact pin.
+  exact pin. The driver side (iHD crashing in an operation it reports as unsupported,
+  instead of returning an error) belongs upstream at intel/media-driver.
 - **NVDEC pictures stay on the GPU in Showtime (bad `rogdv8`).** The NVIDIA decoder chose its output
   memory from downstream's answer for its unmarked template. Behind playsink, the mapper answers
   unmarked caps for the ordinary path behind it (GL memory), which a marked stream cannot take, so

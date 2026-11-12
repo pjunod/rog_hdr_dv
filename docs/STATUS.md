@@ -33,17 +33,24 @@ takes subtitle overlays as metadata, and base `rogdv3` stops playsink's converte
 about VA memory as system memory, so Dolby video with subtitles works on VA. Sink `+rogdv5.6` and
 Showtime `+rogdv5.9` carry the pins.
 
-**Installed on the ROG (November 12).** Four transactions ran with the desktop session open, each
+**Installed on the ROG (November 12).** Six transactions ran with the desktop session open, each
 with zero removals, an empty `dpkg --audit`, a clean `dpkg --verify` and a prepared rollback set
 equal to the previously installed bytes:
 - WebKit `+rogdv2` (sandbox GStreamer registry);
 - mpv `+rogdv5.4` (plurx-player titles);
 - the mapper core `rogdv8` family (browser start without drops);
-- the Profile 7 family of 11 packages, followed by sink `+rogdv5.5` and Showtime `+rogdv5.7`.
+- the Profile 7 family of 11 packages, followed by sink `+rogdv5.5` and Showtime `+rogdv5.7`;
+- 13 packages: base and good `rogdv3`, mapper core `rogdv10`, sink `+rogdv5.6` and Showtime
+  `+rogdv5.9` (Intel-decoded and subtitled Dolby in Showtime, browser source change after Profile 7);
+- 6 packages: bad/extra `rogdv8` and Showtime `+rogdv5.10` (the Intel VA copy crash, NVDEC on the
+  GPU in Showtime).
 
 After installation, Showtime mapped Profile 5 and Profile 7 FEL in both SDR and HDR modes of the
-private compositor without errors. GNOME Web left the host's NVIDIA decoder registered, and its
-Profile 5 picture was native. In-session visual and optical acceptance remain pending.
+private compositor without errors, on NVDEC (CUDA memory) and on Intel VA, with and without
+subtitles, and Profile 8 on VA. GNOME Web left the host's NVIDIA decoder registered. The browser
+qualification on the same mapper core and bad/extra builds passed all 33 steps of 21 cases,
+including Profile 7 under a CSS clip with source changes. In-session visual and optical acceptance
+remain pending.
 
 **Showtime plays Profile 5 on an SDR-mode display (November 12).** The GTK sink asked the mapper
 for an HDR redraw even when the display was in SDR mode, and Profile 5 then failed with a stream
