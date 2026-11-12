@@ -10,6 +10,18 @@ after an update could cache the NVIDIA plugin without elements in the shared reg
 then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 [Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
 
+**Installed on the ROG (November 12).** Four transactions ran with the desktop session open, each
+with zero removals, an empty `dpkg --audit`, a clean `dpkg --verify` and a prepared rollback set
+equal to the previously installed bytes:
+- WebKit `+rogdv2` (sandbox GStreamer registry);
+- mpv `+rogdv5.4` (plurx-player titles);
+- the mapper core `rogdv8` family (browser start without drops);
+- the Profile 7 family of 11 packages, followed by sink `+rogdv5.5` and Showtime `+rogdv5.7`.
+
+After installation, Showtime mapped Profile 5 and Profile 7 FEL in both SDR and HDR modes of the
+private compositor without errors. GNOME Web left the host's NVIDIA decoder registered, and its
+Profile 5 picture was native. In-session visual and optical acceptance remain pending.
+
 **Showtime plays Profile 5 on an SDR-mode display (November 12).** The GTK sink asked the mapper
 for an HDR redraw even when the display was in SDR mode, and Profile 5 then failed with a stream
 error. Sink `+rogdv5.5` requests the SDR destination for a non-HDR target; Showtime `+rogdv5.7`
