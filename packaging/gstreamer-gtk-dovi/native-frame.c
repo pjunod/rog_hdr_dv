@@ -89,8 +89,33 @@ static GType native_meta_api (void)
 }
 GstGtkDoviNativeFrame *gst_gtk_dovi_native_frame_ref (GstGtkDoviNativeFrame *f)
 { g_atomic_int_inc (&f->refs); return f; }
+/* A retained native frame holds the decoder's own picture, and consumers drop
+ * frames on their presentation thread (WebKit's compositor, GTK's frame
+ * clock). The last reference to an NVDEC picture finalizes the decoder's CUDA
+ * context; done on WebKit's compositor thread, that left later ordinary video
+ * in the same web process unpresented. Decoder pictures are therefore released
+ * on a thread of this library, never the consumer's. */
+static void release_source (gpointer source, gpointer unused)
+{
+  (void) unused;
+  gst_buffer_unref (source);
+}
+static GThreadPool *source_release_pool (void)
+{
+  static GThreadPool *pool;
+  if (g_once_init_enter (&pool))
+    g_once_init_leave (&pool, g_thread_pool_new (release_source, NULL, 1, FALSE, NULL));
+  return pool;
+}
 void gst_gtk_dovi_native_frame_unref (GstGtkDoviNativeFrame *f)
-{ if (f && g_atomic_int_dec_and_test (&f->refs)) { gst_buffer_unref (f->source); gst_gtk_dovi_source_lease_unref (f->lease); g_free (f); } }
+{
+  if (!f || !g_atomic_int_dec_and_test (&f->refs)) return;
+  GThreadPool *pool = source_release_pool ();
+  if (!pool || !g_thread_pool_push (pool, f->source, NULL))
+    gst_buffer_unref (f->source);
+  gst_gtk_dovi_source_lease_unref (f->lease);
+  g_free (f);
+}
 static gboolean meta_init (GstMeta *meta, gpointer params, GstBuffer *buffer)
 { (void) params; (void) buffer; ((NativeMeta *) meta)->frame = NULL; return TRUE; }
 static void meta_free (GstMeta *meta, GstBuffer *buffer)
