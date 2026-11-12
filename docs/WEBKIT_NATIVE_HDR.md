@@ -1,6 +1,6 @@
 # WebKitGTK clear video and native HDR
 
-**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed all 30 steps, including Profile 7 FEL on NVDEC (`+rogdv3`, see below). · **Updated:** 2026-11-12
+**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed all 30 steps, including Profile 7 FEL on NVDEC (`+rogdv3`, see below); `+rogdv4` loops pushed media with flushing seeks. · **Updated:** 2026-11-12
 
 This browser change gives ordinary clear MP4/HEVC HTML video an explicit
 100-nit BT709/sRGB destination and adds an independent tagged HDR video plane
@@ -85,6 +85,24 @@ Since `2.52.6-1ubuntu1+rogdv2` (product `1d380b37`), sandboxed processes use the
 `$XDG_CACHE_HOME/webkitgtk/gstreamer-1.0/registry.<cpu>.bin`, unless `GST_REGISTRY` or `GST_REGISTRY_1_0`
 names one explicitly, and the host's registry directory is read-only inside the sandbox. Browser
 playback is unchanged.
+
+## Looping media from WebKitWebSrc
+
+Upstream WebKitGTK loops a `<video loop>` with non-flushing segment seeks and treats the pipeline's
+segment-done message as the end of an iteration. WebKitWebSrc serves the demuxer's segment seek as a
+byte range and posts that message when the download completes. A short clip on a fast connection
+therefore restarted long before it finished: in GNOME Web a 3 s H.264 clip played its first 0.75 s
+over and over, and after a seek into its last 0.5 s a clip never played again. The demuxer it pushes
+to never reports the end of the time segment, and the segment-done event does not reach the decoder.
+
+Since `2.52.6-1ubuntu1+rogdv4` (product `ec69ce27`), media pushed by WebKitWebSrc loops the way it did
+before upstream's seamless looping: at end of stream with a flushing seek. Every clip now plays to its
+end. Each iteration flushes once, and a one-picture clip set to loop never settles long enough to be
+presented on the native plane; the browser demo on the ROG loops only its moving clips.
+
+A `rogdv5` attempt kept seamless looping and ended an iteration when the segment-done event reached
+the video sink. The event never arrived (it stops at the download queue), so clips stalled after a
+near-end seek. `rogdv5` was rolled back on the ROG; its number is not reused.
 
 ## Source and picture lifetime
 
