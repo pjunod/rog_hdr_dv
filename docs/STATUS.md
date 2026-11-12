@@ -10,6 +10,15 @@ after an update could cache the NVIDIA plugin without elements in the shared reg
 then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 [Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
 
+**Intel VA decoder crash fixed (November 12).** The recurring crash in Intel's media driver
+(`iHD_drv_video.so`) came from GStreamer copying a decoded picture with `vaCopy`, which the driver
+reports it does not support on Meteor Lake and then crashes in. WebKit copies the current picture at
+every flush, so seeks and source changes with Intel decoding could kill the web process. bad/extra
+`rogdv8` copies through a VA image instead; Showtime `+rogdv5.10` carries the pin. The same release keeps
+NVDEC pictures in CUDA memory on their way to Showtime's mapper; they used to be downloaded to system
+memory first.
+[Details](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
+
 **Browser source change after Profile 7 no longer crashes (November 12).** Profile 7 under a CSS
 clip, then another source, then Profile 7 again crashed the web process. Freeing the last mapper on
 the main thread destroyed its Vulkan device there, which unloaded the NVIDIA driver library, and that
@@ -23,12 +32,6 @@ decoder's candidates from the mapper; good `rogdv3` forwards them. Mapper core `
 takes subtitle overlays as metadata, and base `rogdv3` stops playsink's converter bin from asking
 about VA memory as system memory, so Dolby video with subtitles works on VA. Sink `+rogdv5.6` and
 Showtime `+rogdv5.9` carry the pins.
-
-**Open: NVDEC in Showtime downloads each picture (found November 12).** Showtime's NVIDIA decoder
-delivers Dolby pictures to the mapper in system memory, not CUDA memory (the browser uses CUDA). It
-plays correctly; the cost is a GPU-to-CPU copy per picture. The NVIDIA decoder's own output
-negotiation chooses system memory; not yet fixed.
-[Details](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
 
 **Installed on the ROG (November 12).** Four transactions ran with the desktop session open, each
 with zero removals, an empty `dpkg --audit`, a clean `dpkg --verify` and a prepared rollback set
