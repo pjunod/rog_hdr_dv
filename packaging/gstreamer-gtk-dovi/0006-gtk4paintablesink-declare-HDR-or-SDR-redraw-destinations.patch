@@ -111,14 +111,16 @@
                  &mut error,
              )
          };
-@@ -111,3 +148,43 @@
+@@ -111,3 +148,49 @@
          }))
      }
  }
 +
-+// Public destination ABI1. Every missing physical witness selects real SDR.
-+fn destination_kind(valid: bool, ready: bool, composed: bool) -> i32 {
-+    if valid && ready && composed { 0 } else { 1 }
++// Public destination ABI1. Every missing physical witness selects real SDR,
++// and so does a surface target that is not HDR: the mapper grades a PQ
++// destination only above the 203 cd/m2 reference (an SDR-mode display).
++fn destination_kind(valid: bool, ready: bool, composed: bool, max_nits: f64) -> i32 {
++    if valid && ready && composed && max_nits > 203.0 { 0 } else { 1 }
 +}
 +pub(crate) fn requested_destination(context: &gst::Context) -> i32 {
 +    let s = context.structure();
@@ -126,6 +128,7 @@
 +        s.get::<bool>("valid").unwrap_or(false),
 +        s.get::<bool>("hdr-ready").unwrap_or(false),
 +        s.get::<bool>("composed").unwrap_or(false),
++        s.get::<f64>("max-nits").unwrap_or(0.0),
 +    )
 +}
 +pub(crate) fn pixel_destination(info: &gst_video::VideoInfo) -> Option<i32> {
@@ -146,12 +149,15 @@
 +#[cfg(test)]
 +mod tests {
 +    #[test]
-+    fn destination_requires_all_witnesses() {
++    fn destination_requires_all_witnesses_and_an_hdr_target() {
 +        for flags in 0..8 {
 +            assert_eq!(
-+                super::destination_kind(flags & 1 != 0, flags & 2 != 0, flags & 4 != 0),
++                super::destination_kind(flags & 1 != 0, flags & 2 != 0, flags & 4 != 0, 616.0),
 +                if flags == 7 { 0 } else { 1 }
 +            );
++        }
++        for max_nits in [0.0, 80.0, 203.0, f64::NAN] {
++            assert_eq!(super::destination_kind(true, true, true, max_nits), 1);
 +        }
 +    }
 +}

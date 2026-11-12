@@ -117,10 +117,16 @@ client exercised. Each is fixed at its cause:
   last reference to an NVDEC picture finalizes the decoder's CUDA context. On WebKit's compositor
   thread, that left later ordinary video in the same web process unpresented. The core now releases
   decoder pictures on a thread of its own.
+- **SDR-mode displays in the GTK sink (`0.15.2-1ubuntu2+rogdv5.5`).** The sink requested a PQ
+  redraw destination whenever the view had all native witnesses, including a display in SDR mode
+  (target peak 80 cd/m²). The mapper grades PQ only above the 203 cd/m² reference, so Profile 5
+  failed in Showtime with "Profile 5 cannot use ordinary base-layer color conversion". The sink
+  now requests the SDR destination for a target at or below the reference. Showtime moves to
+  `+rogdv5.7` for the exact pin.
 
 The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 115 checks,
 including the pre-start and unfiltered-reverse controls. The coherent family is core
-`0.1.0+rogdv9`, sink `0.15.2-1ubuntu2+rogdv5.4` and Showtime `50.0-2+rogdv5.6`, with the
+`0.1.0+rogdv9`, sink `0.15.2-1ubuntu2+rogdv5.5` and Showtime `50.0-2+rogdv5.7`, with the
 bad/extra `rogdv7` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
 Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
 

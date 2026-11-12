@@ -10,6 +10,11 @@ after an update could cache the NVIDIA plugin without elements in the shared reg
 then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 [Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
 
+**Showtime plays Profile 5 on an SDR-mode display (November 12).** The GTK sink asked the mapper
+for an HDR redraw even when the display was in SDR mode, and Profile 5 then failed with a stream
+error. Sink `+rogdv5.5` requests the SDR destination for a non-HDR target; Showtime `+rogdv5.7`
+carries the pin. [Details](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
+
 **Profile 7 FEL in the browser (November 12).** WebKit `2.52.6-1ubuntu1+rogdv3` binds the NVIDIA
 unified-memory device and orders decoders by the page's GPU, so Profile 7 FEL composes on NVDEC while
 ordinary video stays on Intel. Mapper core `0.1.0+rogdv9` keeps later ordinary video presented after an
