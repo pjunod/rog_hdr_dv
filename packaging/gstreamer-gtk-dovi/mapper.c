@@ -161,6 +161,9 @@ static pl_vulkan acquire_vulkan (gboolean *shared)
   g_mutex_unlock (&shared_gpu_lock);
   return vk;
 }
+/* The last mapper out destroys the device: a web process without video should
+ * not keep one. A new pipeline's own mapper creates the next device while it
+ * prerolls, before the clock runs. */
 static void release_vulkan (pl_vulkan *vk, gboolean shared)
 {
   if (!*vk) return;
@@ -444,6 +447,15 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     if (!s->vk) goto done;
     s->dispatch = pl_dispatch_create (NULL, s->vk->gpu);
     s->renderer = pl_renderer_create (NULL, s->vk->gpu);
+    if (!s->dispatch || !s->renderer) {
+      /* Retry from scratch next time instead of holding a device unusable here. */
+      pl_renderer_destroy (&s->renderer);
+      pl_dispatch_destroy (&s->dispatch);
+      release_vulkan (&s->vk, s->shared_vk);
+      goto done;
+    }
+    GST_INFO ("native mapper %p uses %s Vulkan device", (void *) s,
+        s->shared_vk ? "the process-shared" : "its own");
   }
   if (!s->renderer || !s->dispatch) goto done;
   if (apply_dovi && !s->provider) s->provider = dv_provider387_create (s->vk->gpu, NULL);
