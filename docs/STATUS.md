@@ -186,18 +186,19 @@ The NVIDIA HEVC decoder now preserves each decoded picture’s Dolby configurati
 
 **2026-11-12 install (owner: Claude, owner attended):** Mutter and
 libdisplay-info `+nativehdr17` were installed from the registry: 5 packages
-upgraded, none removed, with a local rollback kit. A new login loaded them.
+upgraded, none removed, with a local rollback kit (not executed). GNOME Shell
+restarted after the install with no replaced Mutter library still mapped.
 The built-in panel is configured as `sdr-native` with a declared 530 cd/m²
 peak and 0.38 cd/m² black, the owner kept the configuration, and it is
-saved. On the hardware, the reference-white backlight replaced the sysfs
-control, and the sysfs backlight is held at its maximum. Stock Ubuntu mpv
+saved. On the hardware, `gdctl` reports the reference-white backlight
+(10–210, at 100), and the sysfs backlight is held at its maximum, 1060 of 1060. Stock Ubuntu mpv
 0.41 (`gpu-next`, Vulkan, `--target-colorspace-hint`) received the gamma 2.2
-0.38–530 cd/m² preferred description, with a 142 cd/m² reference at the
-owner's brightness. It submitted PQ BT.2020 with a 759 cd/m² mastering peak,
-which is 530 × 203 / 142. The owner saw a PQ patch clip at 80, 203, 400, 530
+0.38–530 cd/m² preferred description, with a 142 cd/m² reference. It
+submitted PQ BT.2020 with a 759 cd/m² mastering peak, consistent with
+530 × 203 / 142 ≈ 758. The owner saw a PQ patch clip at 80, 203, 400, 530
 and 1000 cd/m² as five distinct steps, the upper three brighter than desktop
 white. This is bounded visual acceptance, not optical measurement. Stock GTK
-and Showtime submit no colour management, so they show HDR video as SDR.
+and Showtime made no colour-management surface requests in this test.
 The ROG's patched client packages are not installed here.
 
 ### 2026-11-12 evidence

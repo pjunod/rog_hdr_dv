@@ -188,7 +188,7 @@ mapping in higher precision alone does not prove precision at the panel.
 | 4. Synthetic Mutter controls | Verify SDR white, HDR headroom, gamut, target generations, pause/source lifetime and eight-bit dithering, including absent/invalid target controls | Partial: SDR white, headroom, reference factor, declared black, invalid peak and forced HDR covered; generations, pause lifetime, saturated edges and dithering pending |
 | 5. Actual ThinkPad GPU qualification | Exercise native output, genuine Dolby grade, truthful transport, paused retargeting and ordinary SDR fallback on this GPU | Partial 2026-11-12: native output and truthful PQ transport from stock mpv; Dolby grade, paused retargeting pending |
 | 6. Package and recovery qualification | Rehearse exact upgrade/rollback and coordinate an owner-attended display test window | Done 2026-11-12: simulated, then installed with a rollback kit of the exact stock packages; rollback not executed |
-| 7. Installation and acceptance | Verify installed versions, normal session behaviour and bounded visual acceptance | Done 2026-11-12: nativehdr17 loaded; reference-white backlight held at max; owner saw five distinct PQ steps up to the peak |
+| 7. Installation and acceptance | Verify installed versions, normal session behaviour and bounded visual acceptance | Done 2026-11-12: nativehdr17 loaded; sysfs backlight held at max under the reference-white control; owner saw five distinct PQ steps, the top three brighter than desktop white |
 | 8. Optical calibration | Measure peak/black, gamut, transfer response and brightness dependence with a meter | Pending; no meter |
 
 Digital checks can establish consistency with an explicitly declared OEM
