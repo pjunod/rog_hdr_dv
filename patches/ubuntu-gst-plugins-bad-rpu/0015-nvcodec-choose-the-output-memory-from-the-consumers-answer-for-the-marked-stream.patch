@@ -1,8 +1,8 @@
 diff --git a/sys/nvcodec/gstnvdecoder.cpp b/sys/nvcodec/gstnvdecoder.cpp
-index 6f1eed6c5d39fc89c96142db2649646751adb1ff..d82eaa7c39754c03a0baf41916778752f0cdd2d7 100644
+index 6f1eed6c5d39fc89c96142db2649646751adb1ff..6e5c506b824be0457bb3fa9bc0ef0d649ad0f062 100644
 --- a/sys/nvcodec/gstnvdecoder.cpp
 +++ b/sys/nvcodec/gstnvdecoder.cpp
-@@ -1953,8 +1953,32 @@ gst_nv_decoder_negotiate (GstNvDecoder * decoder,
+@@ -1953,8 +1953,33 @@ gst_nv_decoder_negotiate (GstNvDecoder * decoder,
    available_types = selected_type = 0;
  
    {
@@ -11,7 +11,8 @@ index 6f1eed6c5d39fc89c96142db2649646751adb1ff..d82eaa7c39754c03a0baf41916778752
 +    GstCaps *caps = nullptr;
 +    AVDOVIDecoderConfigurationRecord dovi_config;
 +    GBytes *dovi_bytes = nullptr;
-+    if (gst_dovi_caps_get_stream_config (input_state->caps, &dovi_config,
++    if (gst_pad_is_linked (GST_VIDEO_DECODER_SRC_PAD (videodec)) &&
++        gst_dovi_caps_get_stream_config (input_state->caps, &dovi_config,
 +            &dovi_bytes) && dovi_bytes) {
 +      /* Ask downstream about the marked output this decoder will produce: a
 +       * Dolby consumer accepts a marked stream only in memory it can import
