@@ -728,9 +728,9 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "1c864330c483ae38bc688ed4edce26c7530c35cc",
-      "candidate_tree": "98a4bb4fb0e00c62dac2770035d016e8e36ecd49",
-      "patch_count": 15,
+      "candidate_commit": "abd35c21ab2fd489658ab2311125039c40edc4e0",
+      "candidate_tree": "6f2e74195182f5febbd1e754b40cb5552693da28",
+      "patch_count": 16,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
@@ -746,7 +746,8 @@
         "0012-va-nvcodec-declare-the-decoder-device-and-dolby-enhancement-layer-composition.patch",
         "0013-debian-version-the-self-describing-decoders.patch",
         "0014-va-use-vaCopy-only-when-the-driver-reports-a-copy-mode.patch",
-        "0015-debian-version-the-copy-mode-checking-VA-surface-copy.patch"
+        "0015-nvcodec-choose-the-output-memory-from-the-consumers-answer-for-the-marked-stream.patch",
+        "0016-debian-version-the-copy-checking-VA-surface-copy-and-marked-NVDEC-output.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -775,7 +776,7 @@
           }
         ]
       },
-      "candidate_status": "Fifteen-patch source candidate. 0014 uses vaCopy only when VADisplayAttribCopy reports the default copy mode it requests: iHD on Meteor Lake reports none and crashed inside vaCopy when a decoded picture was deep-copied (WebKit does so at every flush). 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately. VA decoders state their DRM render node and the NVDEC H.265 decoder states Dolby enhancement-layer composition in element metadata, so a consumer can choose a decoder from the registry without loading plugins.",
+      "candidate_status": "Sixteen-patch source candidate. 0015 makes NVDEC choose its output memory from the consumer's answer for the marked stream, so Showtime's mapper receives CUDA pictures instead of downloaded system memory. 0014 uses vaCopy only when VADisplayAttribCopy reports the default copy mode it requests: iHD on Meteor Lake reports none and crashed inside vaCopy when a decoded picture was deep-copied (WebKit does so at every flush). 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately. VA decoders state their DRM render node and the NVDEC H.265 decoder states Dolby enhancement-layer composition in element metadata, so a consumer can choose a decoder from the registry without loading plugins.",
       "previous_candidate_commit": "209a660a679c1941be7a58bcfe1c20963dba45f7",
       "previous_candidate_tree": "c9b6494d351bee59723de818a917f28c4dbe8820",
       "candidate_package_version": "1.28.6-1ubuntu1+rogdv8"

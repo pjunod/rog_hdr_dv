@@ -147,6 +147,11 @@ client exercised. Each is fixed at its cause:
   with Intel decoding could kill the web process. The allocator now uses `vaCopy` only when a copy
   mode is reported, and otherwise copies through a VA image. Showtime moves to `+rogdv5.10` for the
   exact pin.
+- **NVDEC pictures stay on the GPU in Showtime (bad `rogdv8`).** The NVIDIA decoder chose its output
+  memory from downstream's answer for its unmarked template. Behind playsink, the mapper answers
+  unmarked caps for the ordinary path behind it (GL memory), which a marked stream cannot take, so
+  Dolby pictures fell back to system memory and were downloaded before mapping. For a Dolby stream
+  the decoder now asks about the marked output it will produce, and the mapper receives CUDA memory.
 - **Vulkan devices destroyed off the consumer's thread (`0.1.0+rogdv10`).** The last mapper out
   destroyed the shared Vulkan device on whatever thread freed it. Destroying the instance unloads
   the NVIDIA driver library, which releases that thread's current EGL context; on WebKit's main

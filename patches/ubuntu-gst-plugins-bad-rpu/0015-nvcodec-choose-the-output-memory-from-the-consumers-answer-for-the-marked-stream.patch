@@ -1,0 +1,39 @@
+diff --git a/sys/nvcodec/gstnvdecoder.cpp b/sys/nvcodec/gstnvdecoder.cpp
+index 6f1eed6c5d39fc89c96142db2649646751adb1ff..d82eaa7c39754c03a0baf41916778752f0cdd2d7 100644
+--- a/sys/nvcodec/gstnvdecoder.cpp
++++ b/sys/nvcodec/gstnvdecoder.cpp
+@@ -1953,8 +1953,32 @@ gst_nv_decoder_negotiate (GstNvDecoder * decoder,
+   available_types = selected_type = 0;
+ 
+   {
+-    GstCaps *caps;
+-    caps = gst_pad_get_allowed_caps (GST_VIDEO_DECODER_SRC_PAD (videodec));
++    GstCaps *caps = nullptr;
++    AVDOVIDecoderConfigurationRecord dovi_config;
++    GBytes *dovi_bytes = nullptr;
++    if (gst_dovi_caps_get_stream_config (input_state->caps, &dovi_config,
++            &dovi_bytes) && dovi_bytes) {
++      /* Ask downstream about the marked output this decoder will produce: a
++       * Dolby consumer accepts a marked stream only in memory it can import
++       * (CUDA among it), while its answer for unmarked caps describes the
++       * ordinary path behind it (GL), which the marked stream cannot take. */
++      GstPad *srcpad = GST_VIDEO_DECODER_SRC_PAD (videodec);
++      GstCaps *filter =
++          gst_caps_make_writable (gst_pad_get_pad_template_caps (srcpad));
++      gst_dovi_caps_apply_stream_config (filter, dovi_bytes);
++      if (dovi_config.dv_profile == 7 && dovi_config.el_present_flag &&
++          gst_structure_has_name (gst_caps_get_structure (input_state->caps,
++                  0), "video/x-h265"))
++        gst_caps_set_simple (filter, "dovi-fel-decoder", G_TYPE_BOOLEAN, TRUE,
++            nullptr);
++      caps = gst_pad_peer_query_caps (srcpad, filter);
++      gst_caps_unref (filter);
++      if (caps && gst_caps_is_empty (caps))
++        gst_clear_caps (&caps);
++    }
++    g_clear_pointer (&dovi_bytes, g_bytes_unref);
++    if (!caps)
++      caps = gst_pad_get_allowed_caps (GST_VIDEO_DECODER_SRC_PAD (videodec));
+     GST_DEBUG_OBJECT (videodec, "Allowed caps %" GST_PTR_FORMAT, caps);
+ 
+     if (!caps || gst_caps_is_any (caps)) {
