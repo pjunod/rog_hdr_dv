@@ -145,7 +145,7 @@ client exercised. Each is fixed at its cause:
   pins (`+rogdv5.8` was a withdrawn candidate that bypassed playsink's converters and therefore
   also its subtitles and deinterlacing).
 
-The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 132 checks,
+The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 169 checks,
 including the pre-start, unfiltered-reverse and overlay-pairing controls. The coherent family is
 core `0.1.0+rogdv10`, sink `0.15.2-1ubuntu2+rogdv5.6` and Showtime `50.0-2+rogdv5.9`, with the
 base `rogdv3`, good `rogdv3` and bad/extra `rogdv7` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
