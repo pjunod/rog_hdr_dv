@@ -1164,7 +1164,7 @@ index 00000000..ddc34acd
 +
 +} // namespace WebCore
 diff --git a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
-index ae14d494..f6874765 100644
+index ae14d494..4c0ec3ac 100644
 --- a/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
 +++ b/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
 @@ -33,6 +33,10 @@
@@ -1345,6 +1345,15 @@ index ae14d494..f6874765 100644
  
      auto name = GMallocString::unsafeAdoptFromUTF8(gst_element_get_name(element));
      String elementClass(unsafeSpan(gst_element_get_metadata(element, GST_ELEMENT_METADATA_KLASS)));
+@@ -3541,7 +3646,7 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
+             if (!self)
+                 return;
+             RefPtr mediaPlayer = player->m_player.get();
+-            if (!mediaPlayer || !mediaPlayer->isLooping())
++            if (!mediaPlayer || !mediaPlayer->isLooping() || !player->isSeamlessSeekingEnabled())
+                 return;
+             GST_DEBUG_OBJECT(player->pipeline(), "Handling segment-done message");
+             player->didEnd();
 @@ -3581,6 +3686,37 @@ void MediaPlayerPrivateGStreamer::createGSTPlayBin(const URL& url)
      if (!m_audioSink)
          m_audioSink = createAudioSink();
@@ -1392,7 +1401,24 @@ index ae14d494..f6874765 100644
  }
  #endif // USE(COORDINATED_GRAPHICS)
  
-@@ -4414,6 +4550,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
+@@ -3984,6 +4120,16 @@ bool MediaPlayerPrivateGStreamer::isSeamlessSeekingEnabled() const
+         return false;
+     }
+ 
++    // WebKitWebSrc only pushes bytes, so a segment seek reaches it as a byte range. Its
++    // segment-done marks the end of the download, which a fast connection reaches long
++    // before playback ends, and the pushed-to demuxer never reports the end of the time
++    // segment. Taking that message as the end of an iteration restarts the loop early.
++    // Decide from the URL as well: play() can ask before the source element exists.
++    if (WEBKIT_IS_WEB_SRC(m_source.get()) || m_url.protocolIsInHTTPFamily() || m_url.protocolIs("blob"_s)) {
++        GST_DEBUG_OBJECT(m_pipeline.get(), "Seamless seeking not supported for media pushed by WebKitWebSrc");
++        return false;
++    }
++
+     return player->isLooping() && m_isSegmentSeekAllowed;
+ }
+ 
+@@ -4414,6 +4560,25 @@ GstElement* MediaPlayerPrivateGStreamer::createVideoSink()
          }), this);
      }
  
@@ -1418,7 +1444,7 @@ index ae14d494..f6874765 100644
      return m_videoSink.get();
  }
  
-@@ -4565,6 +4720,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
+@@ -4565,6 +4730,13 @@ void MediaPlayerPrivateGStreamer::cdmInstanceAttached(CDMInstance& instance)
          return;
      }
  

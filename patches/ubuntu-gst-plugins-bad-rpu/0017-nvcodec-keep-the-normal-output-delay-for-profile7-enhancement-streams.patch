@@ -1,0 +1,26 @@
+diff --git a/sys/nvcodec/gstnvh265dec.cpp b/sys/nvcodec/gstnvh265dec.cpp
+index afbc2d4f60e80255c1a187c4ac70b5f442aa6b85..75d1230ac2340b859a6a928ebf331fca4a1f016a 100644
+--- a/sys/nvcodec/gstnvh265dec.cpp
++++ b/sys/nvcodec/gstnvh265dec.cpp
+@@ -1449,16 +1449,11 @@ gst_nv_h265_dec_get_preferred_output_delay (GstH265Decoder * decoder,
+   if (live)
+     return 0;
+ 
+-  /* Give the software EL decoder one HEVC reorder window on file playback.
+-   * The base class includes this delay in its surface pool and latency query.
+-   * Explicit low-latency and live operation retain their normal policy. */
+-  AVDOVIDecoderConfigurationRecord config;
+-  GBytes *bytes = nullptr;
+-  gboolean fel = decoder->input_state &&
+-      gst_dovi_caps_get_stream_config (decoder->input_state->caps, &config, &bytes) &&
+-      config.dv_profile == 7 && config.el_present_flag;
+-  g_clear_pointer (&bytes, g_bytes_unref);
+-  return fel ? 16 : 2;
++  /* A Dolby Profile 7 enhancement layer repeats the base layer's picture
++   * order, so the secondary decoder returns each enhancement picture before
++   * this delay releases its base picture. A longer delay starves preroll
++   * after a seek into the final pictures of a segment-looped file. */
++  return 2;
+ }
+ 
+ void

@@ -4,6 +4,15 @@
 
 **plurx-player titles play again with the system mpv (November 12).** mpv `0.42.0-0ubuntu0+rogdv5.4` is installed. Since plurx-player 0.5.0 began using the system mpv, a title opened from the web UI closed its window before any picture. The idle window let the NVIDIA Vulkan driver claim the window's colour management, and mpv's own HDR request then broke the Wayland connection. mpv now describes the idle window itself. [Details](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers).
 
+**Looping web videos and Profile 7 after a seek (November 12).** In GNOME Web every short looping
+video restarted as soon as its download finished. A 3 s clip played its first 0.75 s over and over,
+and after a seek near its end it stopped for good. WebKit `+rogdv6` loops media from its web source
+with a flushing seek at end of stream. Profile 7 FEL also stayed black after a seek into its last
+0.8 s, because NVDEC held 19 pictures in flight. bad/extra `rogdv9` keep the normal output delay, and
+Showtime `+rogdv5.11` carries the pin. A one-picture clip set to loop does not reach the native
+plane, so the ROG's browser demo loops only its moving clips.
+[Details](WEBKIT_NATIVE_HDR.md#looping-media-from-webkitwebsrc).
+
 **WebKit sandbox GStreamer registry (November 12).** WebKit `2.52.6-1ubuntu1+rogdv2` gives
 sandboxed processes their own GStreamer registry. Previously a WebKit app that scanned plugins first
 after an update could cache the NVIDIA plugin without elements in the shared registry, and Showtime
@@ -33,7 +42,7 @@ takes subtitle overlays as metadata, and base `rogdv3` stops playsink's converte
 about VA memory as system memory, so Dolby video with subtitles works on VA. Sink `+rogdv5.6` and
 Showtime `+rogdv5.9` carry the pins.
 
-**Installed on the ROG (November 12).** Six transactions ran with the desktop session open, each
+**Installed on the ROG (November 12).** Eight transactions ran with the desktop session open, each
 with zero removals, an empty `dpkg --audit`, a clean `dpkg --verify` and a prepared rollback set
 equal to the previously installed bytes:
 - WebKit `+rogdv2` (sandbox GStreamer registry);
@@ -43,7 +52,10 @@ equal to the previously installed bytes:
 - 13 packages: base and good `rogdv3`, mapper core `rogdv10`, sink `+rogdv5.6` and Showtime
   `+rogdv5.9` (Intel-decoded and subtitled Dolby in Showtime, browser source change after Profile 7);
 - 6 packages: bad/extra `rogdv8` and Showtime `+rogdv5.10` (the Intel VA copy crash, NVDEC on the
-  GPU in Showtime).
+  GPU in Showtime);
+- 8 packages: bad/extra `rogdv9`, Showtime `+rogdv5.11` and WebKit `+rogdv4` (looping web videos,
+  Profile 7 after a seek), then WebKit `+rogdv6` (review fixes). A WebKit `+rogdv5` attempt was
+  installed and rolled back; see the WebKit notes.
 
 After installation, Showtime mapped Profile 5 and Profile 7 FEL in both SDR and HDR modes of the
 private compositor without errors, on NVDEC (CUDA memory) and on Intel VA, with and without
