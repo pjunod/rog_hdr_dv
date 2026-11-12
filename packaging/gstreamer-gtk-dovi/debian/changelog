@@ -1,3 +1,15 @@
+gst-gtk-dovi-map (0.1.0+rogdv10) UNRELEASED; urgency=medium
+
+  * Accept each native input domain with the overlay composition meta too,
+    paired with a graded output that declares it, so a subtitle overlay in
+    front of the mapper attaches its overlays instead of downloading and
+    blending them into the pictures.
+  * Destroy Vulkan devices on a thread of this library: unloading the NVIDIA
+    driver releases the calling thread's current EGL context, which crashed
+    WebKit's tile painter after a source change.
+
+ -- ROG HDR contributors <rog-hdr@invalid>  Thu, 12 Nov 2026 03:30:00 +0000
+
 gst-gtk-dovi-map (0.1.0+rogdv9) UNRELEASED; urgency=medium
 
   * Release a retained native frame's decoder picture on a thread of this

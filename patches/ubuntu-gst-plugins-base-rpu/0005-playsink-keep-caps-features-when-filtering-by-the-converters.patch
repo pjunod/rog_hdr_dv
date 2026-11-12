@@ -1,0 +1,37 @@
+From 2c0db7141ffa323b4a15c1ff41f3d9d4e3b2c031 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Thu, 12 Nov 2026 03:27:43 +0000
+Subject: [PATCH] playsink: keep caps features when filtering by the converters
+
+The converter bin rebuilt each raw structure of a caps query filter
+without its caps features before intersecting it with the converters'
+caps, so a producer offering accelerator memory, or memory with the
+overlay composition meta, was asked about as system memory downstream.
+A downstream element that accepts such memory for the producer's
+stream (the Dolby mapper takes VA memory with a subtitle overlay) then
+answered for system memory only, and VA decoding with subtitles failed
+to negotiate.
+---
+ gst/playback/gstplaysinkconvertbin.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/gst/playback/gstplaysinkconvertbin.c b/gst/playback/gstplaysinkconvertbin.c
+index 4dd2322..dad88fc 100644
+--- a/gst/playback/gstplaysinkconvertbin.c
++++ b/gst/playback/gstplaysinkconvertbin.c
+@@ -429,7 +429,14 @@ gst_play_sink_convert_bin_getcaps (GstPad * pad, GstCaps * filter)
+           s = gst_structure_copy (gst_caps_get_structure (filter, i));
+           if (gst_structure_has_name (s,
+                   self->audio ? "audio/x-raw" : "video/x-raw")) {
+-            tmp = gst_caps_new_full (s, NULL);
++            /* Keep the structure's caps features: a raw structure in
++             * accelerator memory or with a meta must not be asked for as
++             * system memory. */
++            const GstCapsFeatures *f = gst_caps_get_features (filter, i);
++
++            tmp = gst_caps_new_empty ();
++            gst_caps_append_structure_full (tmp, s,
++                f ? gst_caps_features_copy (f) : NULL);
+             tmp2 = gst_caps_intersect (tmp, self->converter_caps);
+             gst_caps_append (downstream_filter, tmp2);
+             gst_caps_unref (tmp);

@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
+#include <stdlib.h>
 #include "mapper.h"
 #include "native-input-formats.h"
 #include "render-preconditions.h"
@@ -161,18 +162,69 @@ static pl_vulkan acquire_vulkan (gboolean *shared)
   g_mutex_unlock (&shared_gpu_lock);
   return vk;
 }
+/* Destroying a Vulkan instance lets the loader unload the driver's ICD. The
+ * NVIDIA ICD is its GL vendor library, and unloading it releases the calling
+ * thread's current EGL context (eglReleaseThread). The last mapper is freed on
+ * whichever thread drops the pipeline: WebKit's main thread on a source change,
+ * whose Skia context then silently stopped being current, so its next tile
+ * textures were never created and the tile painter crashed. Devices are
+ * therefore destroyed on a thread of this library; destroys run one at a time
+ * (a new device may be created meanwhile). At exit, pending destroys finish
+ * before any library is finalized. */
+typedef struct { pl_vulkan vk; pl_cache cache; } VulkanRelease;
+static GMutex vulkan_release_lock;
+static GThreadPool *vulkan_release_pool;
+static gboolean vulkan_release_drained;
+static void destroy_vulkan (gpointer data, gpointer unused)
+{
+  (void) unused;
+  VulkanRelease *job = data;
+  pl_vulkan_destroy (&job->vk);
+  pl_cache_destroy (&job->cache);
+  g_free (job);
+}
+static void drain_vulkan_releases (void)
+{
+  g_mutex_lock (&vulkan_release_lock);
+  GThreadPool *pool = vulkan_release_pool;
+  vulkan_release_pool = NULL;
+  vulkan_release_drained = TRUE;
+  g_mutex_unlock (&vulkan_release_lock);
+  if (pool) g_thread_pool_free (pool, FALSE, TRUE);
+}
+static void destroy_vulkan_off_thread (pl_vulkan vk, pl_cache cache)
+{
+  VulkanRelease *job = g_new (VulkanRelease, 1);
+  job->vk = vk;
+  job->cache = cache;
+  g_mutex_lock (&vulkan_release_lock);
+  if (!vulkan_release_pool && !vulkan_release_drained) {
+    /* Non-exclusive with one thread: creation cannot fail, and a failed push
+     * still queues the job. atexit handlers run before library finalizers. */
+    vulkan_release_pool = g_thread_pool_new (destroy_vulkan, NULL, 1, FALSE, NULL);
+    atexit (drain_vulkan_releases);
+  }
+  if (vulkan_release_pool) {
+    g_thread_pool_push (vulkan_release_pool, job, NULL);
+    job = NULL;
+  }
+  g_mutex_unlock (&vulkan_release_lock);
+  /* Only after the exit drain: the process is finishing on this thread. */
+  if (job) destroy_vulkan (job, NULL);
+}
 /* The last mapper out destroys the device: a web process without video should
  * not keep one. A new pipeline's own mapper creates the next device while it
  * prerolls, before the clock runs. */
 static void release_vulkan (pl_vulkan *vk, gboolean shared)
 {
   if (!*vk) return;
-  if (!shared) { pl_vulkan_destroy (vk); return; }
+  if (!shared) { destroy_vulkan_off_thread (*vk, NULL); *vk = NULL; return; }
   g_mutex_lock (&shared_gpu_lock);
   g_assert (*vk == shared_vk && shared_gpu_users > 0);
   if (!--shared_gpu_users) {
-    pl_vulkan_destroy (&shared_vk);
-    pl_cache_destroy (&shared_cache);
+    destroy_vulkan_off_thread (shared_vk, shared_cache);
+    shared_vk = NULL;
+    shared_cache = NULL;
   }
   g_mutex_unlock (&shared_gpu_lock);
   *vk = NULL;

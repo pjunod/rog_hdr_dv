@@ -16,7 +16,7 @@ typedef struct { GstBaseTransform parent; GMutex lock; GstGtkDoviTarget target;
   gboolean stream_started;
   GHashTable *clear_sources;
   GstGtkDoviSourceLease *source_lease;
-  gboolean known_stream, requires_profile5;
+  gboolean known_stream, requires_profile5, output_overlay;
   AVDOVIDecoderConfigurationRecord stream_configuration;
   GstVideoInfo info, output_info; GstGtkDoviMapper *mapper; } GtkDoviMap;
 typedef struct { GstBaseTransformClass parent; } GtkDoviMapClass;
@@ -174,6 +174,51 @@ static GstCaps *native_format_caps (gboolean accelerator_only)
   g_value_unset (&formats);
   return caps;
 }
+/* A subtitle or other overlay producer in front of the mapper (playsink's
+ * subtitleoverlay) offers each domain once with and once without the overlay
+ * composition meta. The mapper carries that meta from each picture to its
+ * graded output (transform_meta), so every native domain is also accepted
+ * with the meta, paired with a graded output that declares it; otherwise
+ * the producer must download and blend into the pictures before mapping. */
+#define GTK_DOVI_OVERLAY_FEATURE GST_CAPS_FEATURE_META_GST_VIDEO_OVERLAY_COMPOSITION
+static gboolean overlay_features (const GstCapsFeatures *features)
+{
+  return features && !gst_caps_features_is_any (features) &&
+      gst_caps_features_contains (features, GTK_DOVI_OVERLAY_FEATURE);
+}
+/* System memory with the meta is spelled either with or without the explicit
+ * memory:SystemMemory feature, and caps features compare literally. */
+static void append_overlay_variants (GstCaps *caps)
+{
+  guint n = gst_caps_get_size (caps);
+  for (guint i = 0; i < n; i++) {
+    const GstCapsFeatures *plain = gst_caps_get_features (caps, i);
+    gboolean system = !plain || gst_caps_features_is_equal (plain,
+        GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY);
+    GstCapsFeatures *overlay = gst_caps_features_copy (system ?
+        GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY : plain);
+    gst_caps_features_add (overlay, GTK_DOVI_OVERLAY_FEATURE);
+    gst_caps_append_structure_full (caps,
+        gst_structure_copy (gst_caps_get_structure (caps, i)), overlay);
+    if (system)
+      gst_caps_append_structure_full (caps,
+          gst_structure_copy (gst_caps_get_structure (caps, i)),
+          gst_caps_features_new (GTK_DOVI_OVERLAY_FEATURE, NULL));
+  }
+}
+/* System memory, ignoring the overlay composition meta. */
+static gboolean system_memory_features (const GstCapsFeatures *features)
+{
+  if (!features) return TRUE;
+  if (gst_caps_features_is_any (features)) return FALSE;
+  GstCapsFeatures *memory = gst_caps_features_copy (features);
+  if (overlay_features (memory))
+    gst_caps_features_remove (memory, GTK_DOVI_OVERLAY_FEATURE);
+  gboolean system = gst_caps_features_get_size (memory) == 0 ||
+      gst_caps_features_is_equal (memory, GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY);
+  gst_caps_features_free (memory);
+  return system;
+}
 static GstCaps *native_input_caps (void)
 {
   GstCaps *caps = native_format_caps (FALSE);
@@ -185,14 +230,23 @@ static GstCaps *native_input_caps (void)
         gst_caps_features_new (features[i], NULL));
     gst_caps_append (caps, accelerator);
   }
+  append_overlay_variants (caps);
   return caps;
 }
 static gboolean native_input_memory (const GstCapsFeatures *features)
 {
-  return gst_caps_features_is_equal (features, GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY) ||
-      (gst_caps_features_get_size (features) == 1 &&
-      (gst_caps_features_contains (features, GTK_DOVI_CUDA_MEMORY_FEATURE) ||
-       gst_caps_features_contains (features, GTK_DOVI_VA_MEMORY_FEATURE)));
+  if (!features) return TRUE;
+  if (gst_caps_features_is_any (features)) return FALSE;
+  GstCapsFeatures *memory = gst_caps_features_copy (features);
+  if (overlay_features (memory))
+    gst_caps_features_remove (memory, GTK_DOVI_OVERLAY_FEATURE);
+  gboolean native = gst_caps_features_get_size (memory) == 0 ||
+      gst_caps_features_is_equal (memory, GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY) ||
+      (gst_caps_features_get_size (memory) == 1 &&
+      (gst_caps_features_contains (memory, GTK_DOVI_CUDA_MEMORY_FEATURE) ||
+       gst_caps_features_contains (memory, GTK_DOVI_VA_MEMORY_FEATURE)));
+  gst_caps_features_free (memory);
+  return native;
 }
 static GstCaps *graded_output_caps (GtkDoviMap *self)
 {
@@ -208,6 +262,7 @@ static GstCaps *graded_output_caps (GtkDoviMap *self)
       sdr ? "RGBA" : "RGBA64_LE", "colorimetry", G_TYPE_STRING, color,
       "gtk-dovi-preconverted", G_TYPE_BOOLEAN, TRUE, NULL);
   g_free (color);
+  append_overlay_variants (caps);
   return caps;
 }
 static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection direction,
@@ -277,11 +332,22 @@ static void append_qualified_inputs (GtkDoviMap *s, GstCaps *downstream, GstCaps
     gst_gtk_dovi_source_lease_unref (probe);
   }
   g_mutex_unlock (&s->lock);
+  /* Offer plain and overlay domains only where their own graded output is taken. */
   GstCaps *graded = graded_output_caps (s);
-  if (configurations->len && gst_caps_can_intersect (graded, downstream)) {
+  gboolean taken[2] = {FALSE, FALSE};
+  for (guint k = 0; k < gst_caps_get_size (graded); k++) {
+    GstCaps *one = gst_caps_copy_nth (graded, k);
+    if (gst_caps_can_intersect (one, downstream))
+      taken[overlay_features (gst_caps_get_features (graded, k)) ? 1 : 0] = TRUE;
+    gst_caps_unref (one);
+  }
+  if (configurations->len && (taken[0] || taken[1])) {
     for (guint i = 0; i < configurations->len; i++) {
       GstCaps *native = native_input_caps ();
       gst_dovi_caps_apply_stream_config (native, g_ptr_array_index (configurations, i));
+      for (guint k = gst_caps_get_size (native); k > 0; k--)
+        if (!taken[overlay_features (gst_caps_get_features (native, k - 1)) ? 1 : 0])
+          gst_caps_remove_structure (native, k - 1);
       gst_caps_append (result, native);
     }
   }
@@ -312,20 +378,25 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
     gst_caps_unref (one);
     gst_caps_unref (constraint);
     for (guint j = 0; j < gst_caps_get_size (allowed); j++) {
-      GstStructure *mapped = gst_caps_get_structure (allowed, j);
-      gst_structure_remove_fields (mapped, "colorimetry", "format",
-          "gtk-dovi-preconverted", "chroma-site", NULL);
+      gboolean overlay = overlay_features (gst_caps_get_features (allowed, j));
+      GstCaps *mapped = gst_caps_copy_nth (allowed, j);
+      gst_structure_remove_fields (gst_caps_get_structure (mapped, 0), "colorimetry",
+          "format", "gtk-dovi-preconverted", "chroma-site", NULL);
       /* Import may read concrete accelerator allocations, but mapped output
        * is newly allocated system memory. Reverse queries expose only the
-       * explicitly listed host-mappable input domains, never arbitrary memory. */
-      gst_caps_set_features (allowed, j, direction == GST_PAD_SINK ?
-          gst_caps_features_new_empty () : gst_caps_features_new_any ());
+       * explicitly listed host-mappable input domains, never arbitrary memory.
+       * The overlay composition meta pairs one to one across the mapping. */
+      gst_caps_set_features (mapped, 0, gst_caps_features_new_any ());
+      constraint = direction == GST_PAD_SINK ? graded_output_caps (self) : native_input_caps ();
+      one = gst_caps_intersect_full (mapped, constraint, GST_CAPS_INTERSECT_FIRST);
+      gst_caps_unref (mapped);
+      gst_caps_unref (constraint);
+      for (guint k = gst_caps_get_size (one); k > 0; k--)
+        if (overlay_features (gst_caps_get_features (one, k - 1)) != overlay)
+          gst_caps_remove_structure (one, k - 1);
+      result = gst_caps_merge (result, one);
     }
-    constraint = direction == GST_PAD_SINK ? graded_output_caps (self) : native_input_caps ();
-    one = gst_caps_intersect_full (allowed, constraint, GST_CAPS_INTERSECT_FIRST);
     gst_caps_unref (allowed);
-    gst_caps_unref (constraint);
-    gst_caps_append (result, one);
   }
   if (direction == GST_PAD_SRC && self->require_clear_source && !gst_caps_is_any (result))
     append_qualified_inputs (self, caps, result);
@@ -363,9 +434,11 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
   if (known) {
     if (!gst_caps_is_fixed (input) || !gst_caps_is_fixed (output) ||
         gst_caps_get_size (input) != 1 || gst_caps_get_size (output) != 1 ||
-        !native_input_memory (gst_caps_get_features (input, 0)) ||
-        !gst_caps_features_is_equal (gst_caps_get_features (output, 0),
-            GST_CAPS_FEATURES_MEMORY_SYSTEM_MEMORY))
+        !native_input_memory (gst_caps_get_features (input, 0)))
+      return FALSE;
+    const GstCapsFeatures *output_features = gst_caps_get_features (output, 0);
+    if (!system_memory_features (output_features) ||
+        overlay_features (output_features) != overlay_features (gst_caps_get_features (input, 0)))
       return FALSE;
     GstCaps *allowed = native_input_caps ();
     gboolean supported = gst_caps_is_subset (input, allowed);
@@ -398,6 +471,7 @@ static gboolean set_caps (GstBaseTransform *base, GstCaps *input, GstCaps *outpu
     s->output_info = output_info;
   } else if (!gst_caps_is_equal (input, output)) return FALSE;
   s->requires_profile5 = known && profile == 5;
+  s->output_overlay = known && overlay_features (gst_caps_get_features (output, 0));
   s->stream_configuration = configuration;
   if (s->known_stream != known) {
     s->known_stream = known;
@@ -551,7 +625,8 @@ static gboolean transform_meta (GstBaseTransform *base, GstBuffer *out,
   if (meta->info->api == GST_VIDEO_CROP_META_API_TYPE) return FALSE; /* materialized active output */
   if (meta->info->api == GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE) {
     GstVideoOverlayCompositionMeta *overlay = (GstVideoOverlayCompositionMeta *) meta;
-    gst_buffer_add_video_overlay_composition_meta (out, overlay->overlay);
+    if (((GtkDoviMap *) base)->output_overlay || !((GtkDoviMap *) base)->known_stream)
+      gst_buffer_add_video_overlay_composition_meta (out, overlay->overlay);
     return FALSE;
   }
   return GST_BASE_TRANSFORM_CLASS (gtk_dovi_map_parent_class)->transform_meta (base, out, meta, in);
@@ -674,7 +749,19 @@ static gboolean propose_allocation (GstBaseTransform *base, GstQuery *decide, Gs
   gst_clear_caps (&output);
   if (identity)
     return gst_pad_peer_query (GST_BASE_TRANSFORM_SRC_PAD (base), query);
-  return GST_BASE_TRANSFORM_CLASS (gtk_dovi_map_parent_class)->propose_allocation (base, decide, query);
+  gboolean ret = GST_BASE_TRANSFORM_CLASS (gtk_dovi_map_parent_class)->propose_allocation (base, decide, query);
+  /* An overlay producer attaches its composition only when the allocation
+   * answer carries the meta. The mapper hands it on to its graded output, so
+   * it offers the meta exactly when its own downstream took it. */
+  guint index;
+  if (ret && caps && gst_caps_get_size (caps) == 1 && overlay_features (gst_caps_get_features (caps, 0)) &&
+      decide && gst_query_find_allocation_meta (decide, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, &index) &&
+      !gst_query_find_allocation_meta (query, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, NULL)) {
+    const GstStructure *params = NULL;
+    gst_query_parse_nth_allocation_meta (decide, index, &params);
+    gst_query_add_allocation_meta (query, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, params);
+  }
+  return ret;
 }
 static gboolean plugin_init (GstPlugin *plugin)
 {
