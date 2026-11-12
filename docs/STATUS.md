@@ -182,7 +182,25 @@ The GTK default Vulkan renderer presented an actual floating-point RGB surface u
 
 The NVIDIA HEVC decoder now preserves each decoded picture’s Dolby configuration, crop and metadata across seeking and changes of configuration. All 95 cropped pictures matched the software decoder. Ordinary Showtime automatically chose NVIDIA, ran the Profile 5 mapper and retained the same paused native picture when the target changed. The CPU-side handoff contained nonblack, opaque pixels. The private compositor still saw an all-black Showtime output on the same frame that rendered visibly in mpv. A standalone GTK OpenGL ES texture reproduced the black output. GTK queried the framebuffer read format and type with an unsupported OpenGL ES command. The supported query returned the expected 16-bit format, and direct readback recovered the exact pixel. The corrected GTK library recovered the exact 16-bit pixel and showed 44,730 distinct colors in the Showtime framebuffer on the original GL path. A paused target change still produced identical framebuffer bytes and remains under investigation. [NVIDIA producer qualification](../evidence/gstreamer-nvidia-picture-qualification.json).
 
-## ThinkPad X1 Carbon Gen 6 — native-gamma route compiled, installation pending
+## ThinkPad X1 Carbon Gen 6 — native-gamma HDR installed and visually checked
+
+**2026-11-12 install (owner: Claude, owner attended):** Mutter and
+libdisplay-info `+nativehdr17` were installed from the registry: 5 packages
+upgraded, none removed, with a local rollback kit. A new login loaded them.
+The built-in panel is configured as `sdr-native` with a declared 530 cd/m²
+peak and 0.38 cd/m² black, the owner kept the configuration, and it is
+saved. On the hardware, the reference-white backlight replaced the sysfs
+control, and the sysfs backlight is held at its maximum. Stock Ubuntu mpv
+0.41 (`gpu-next`, Vulkan, `--target-colorspace-hint`) received the gamma 2.2
+0.38–530 cd/m² preferred description, with a 142 cd/m² reference at the
+owner's brightness. It submitted PQ BT.2020 with a 759 cd/m² mastering peak,
+which is 530 × 203 / 142. The owner saw a PQ patch clip at 80, 203, 400, 530
+and 1000 cd/m² as five distinct steps, the upper three brighter than desktop
+white. This is bounded visual acceptance, not optical measurement. Stock GTK
+and Showtime submit no colour management, so they show HDR video as SDR.
+The ROG's patched client packages are not installed here.
+
+### 2026-11-12 evidence
 
 **2026-11-12 (owner: Claude):** Windows binds the panel as LEN40AE with an
 SDR desktop and a driver-reported 0.5–270 cd/m² range. Windows is configured
@@ -194,9 +212,7 @@ gives 533 cd/m² average and 0.38 cd/m² black at maximum backlight. The [native
 contract](NATIVE_GAMMA_HDR.md) is frozen, and Mutter patch 0108 implements
 it. Patched libdisplay-info passed 45/45 tests in a private prefix. Mutter
 built with `-Dwerror` on the ThinkPad, and all 48 colour and HDR test entries
-passed, including the new native-gamma case. Pending: KMS backlight selection
-on hardware, packaging, actual GPU output, an attended install and visual
-acceptance. Nothing is installed on the desktop.
+passed, including the new native-gamma case.
 
 ### 2026-11-09 inspection
 
