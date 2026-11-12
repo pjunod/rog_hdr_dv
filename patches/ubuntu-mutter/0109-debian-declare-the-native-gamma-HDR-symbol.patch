@@ -1,0 +1,27 @@
+From c5fc342c2b7d00dd8961cc6c47cf64c1c600e771 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude@localhost>
+Date: Thu, 12 Nov 2026 15:08:51 -0500
+Subject: [PATCH] debian: Declare the native-gamma HDR test symbol
+
+meta_color_device_is_native_hdr() is exported for the tests. The package
+builds with DPKG_GENSYMBOLS_CHECK_LEVEL = 4, so an undeclared new symbol
+fails the build; declare it at the first revision that ships it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BCWL9z1ijNdgVDMvuiX96f
+---
+ debian/libmutter-51-0.symbols | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/debian/libmutter-51-0.symbols b/debian/libmutter-51-0.symbols
+index 2fa1a08..d0370f8 100644
+--- a/debian/libmutter-51-0.symbols
++++ b/debian/libmutter-51-0.symbols
+@@ -106,6 +106,7 @@ libmutter-51.so.0 libmutter-51-0 #MINVER#
+  meta_color_device_get_rendering_color_state@Base 51.0-1ubuntu3+nativehdr6~
+  meta_color_device_get_target_luminance@Base 51.0-1ubuntu3+nativehdr3~
+  meta_color_device_get_target_primaries@Base 51.0-1ubuntu3+nativehdr4~
++ meta_color_device_is_native_hdr@Base 51.0-1ubuntu3+nativehdr17~
+  meta_color_device_is_ready@Base 43.0
+  meta_color_device_set_reference_luminance_factor@Base 51.0-1ubuntu3+nativehdr6~
+  meta_color_device_update@Base 51.0-1ubuntu3+nativehdr3~
