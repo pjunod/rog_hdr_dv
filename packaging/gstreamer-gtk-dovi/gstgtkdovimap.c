@@ -394,7 +394,7 @@ static GstCaps *transform_caps (GstBaseTransform *base, GstPadDirection directio
       for (guint k = gst_caps_get_size (one); k > 0; k--)
         if (overlay_features (gst_caps_get_features (one, k - 1)) != overlay)
           gst_caps_remove_structure (one, k - 1);
-      gst_caps_append (result, one);
+      result = gst_caps_merge (result, one);
     }
     gst_caps_unref (allowed);
   }
@@ -751,11 +751,15 @@ static gboolean propose_allocation (GstBaseTransform *base, GstQuery *decide, Gs
     return gst_pad_peer_query (GST_BASE_TRANSFORM_SRC_PAD (base), query);
   gboolean ret = GST_BASE_TRANSFORM_CLASS (gtk_dovi_map_parent_class)->propose_allocation (base, decide, query);
   /* An overlay producer attaches its composition only when the allocation
-   * answer carries the meta; the mapper hands it on to its graded output. */
-  if (caps && gst_caps_get_size (caps) == 1 && overlay_features (gst_caps_get_features (caps, 0)) &&
+   * answer carries the meta. The mapper hands it on to its graded output, so
+   * it offers the meta exactly when its own downstream took it. */
+  guint index;
+  if (ret && caps && gst_caps_get_size (caps) == 1 && overlay_features (gst_caps_get_features (caps, 0)) &&
+      decide && gst_query_find_allocation_meta (decide, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, &index) &&
       !gst_query_find_allocation_meta (query, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, NULL)) {
-    gst_query_add_allocation_meta (query, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, NULL);
-    ret = TRUE;
+    const GstStructure *params = NULL;
+    gst_query_parse_nth_allocation_meta (decide, index, &params);
+    gst_query_add_allocation_meta (query, GST_VIDEO_OVERLAY_COMPOSITION_META_API_TYPE, params);
   }
   return ret;
 }

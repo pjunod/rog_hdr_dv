@@ -563,6 +563,11 @@ main (int argc, char **argv)
             !gst_caps_features_contains (gst_caps_get_features (mapped, k), "memory:CUDAMemory") &&
             !gst_caps_features_contains (gst_caps_get_features (mapped, k), "memory:VAMemory"),
             "overlay input produces system memory output with the overlay meta");
+      for (guint k = 1; k < gst_caps_get_size (mapped); k++) {
+        GstCaps *other = gst_caps_copy_nth (mapped, k);
+        require (klass->set_caps (base, input, other), "overlay input accepted with either output spelling");
+        gst_caps_unref (other);
+      }
       require (klass->set_caps (base, input, first), "overlay input accepted");
       require (!klass->set_caps (base, input, plain_first),
           "overlay input rejected with an output that drops the meta");
