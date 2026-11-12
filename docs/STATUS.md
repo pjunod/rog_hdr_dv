@@ -10,6 +10,13 @@ after an update could cache the NVIDIA plugin without elements in the shared reg
 then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
 [Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
 
+**Intel VA decoder crash fixed (November 12).** The recurring crash in Intel's media driver
+(`iHD_drv_video.so`) came from GStreamer copying a decoded picture with `vaCopy`, which the driver
+reports it does not support on Meteor Lake and then crashes in. WebKit copies the current picture at
+every flush, so seeks and source changes with Intel decoding could kill the web process. bad/extra
+`rogdv8` copies through a VA image instead; Showtime `+rogdv5.10` carries the pin.
+[Details](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
+
 **Browser source change after Profile 7 no longer crashes (November 12).** Profile 7 under a CSS
 clip, then another source, then Profile 7 again crashed the web process. Freeing the last mapper on
 the main thread destroyed its Vulkan device there, which unloaded the NVIDIA driver library, and that

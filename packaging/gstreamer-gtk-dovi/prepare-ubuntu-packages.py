@@ -11,7 +11,7 @@ import shutil
 
 CORE_VERSION = "0.1.0+rogdv10"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.6"
-SHOWTIME_VERSION = "50.0-2+rogdv5.9"
+SHOWTIME_VERSION = "50.0-2+rogdv5.10"
 FIXED_GTK = "4.24.1+ds-1+rogdv5"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")

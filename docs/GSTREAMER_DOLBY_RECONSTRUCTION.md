@@ -136,19 +136,27 @@ client exercised. Each is fixed at its cause:
   of each candidate before asking downstream, so VA memory with an overlay was asked about as
   system memory. With VA decoding and subtitles the stream failed to negotiate. The mapper now
   accepts each native domain with the meta too, paired with a graded output that declares it, and
-  carries the overlays to the sink; the converter bin keeps the candidates' features.
+  carries the overlays to the sink; the converter bin keeps the candidates' features. The sink
+  and Showtime moved to `+rogdv5.6` and `+rogdv5.9` for the exact pins (`+rogdv5.8` was a
+  withdrawn candidate that bypassed playsink's converters and therefore also its subtitles and
+  deinterlacing).
+- **Intel VA picture copies (bad `1.28.6-1ubuntu1+rogdv8`).** GStreamer's VA allocator copies a
+  decoded picture with `vaCopy` whenever the driver answers the copy-capability query, without
+  reading the answer. iHD on Meteor Lake answers that it supports no copy mode and then crashes
+  inside `vaCopy`. WebKit deep-copies the current picture at every flush, so a seek or source change
+  with Intel decoding could kill the web process. The allocator now uses `vaCopy` only when a copy
+  mode is reported, and otherwise copies through a VA image. Showtime moves to `+rogdv5.10` for the
+  exact pin.
 - **Vulkan devices destroyed off the consumer's thread (`0.1.0+rogdv10`).** The last mapper out
   destroyed the shared Vulkan device on whatever thread freed it. Destroying the instance unloads
   the NVIDIA driver library, which releases that thread's current EGL context; on WebKit's main
   thread that left Skia without a context and crashed the tile painter after a source change. The
-  core now destroys devices on a thread of its own, one at a time. The sink and Showtime move to `+rogdv5.6` and `+rogdv5.9` for the exact
-  pins (`+rogdv5.8` was a withdrawn candidate that bypassed playsink's converters and therefore
-  also its subtitles and deinterlacing).
+  core now destroys devices on a thread of its own, one at a time.
 
 The [negotiation probe](../packaging/gstreamer-gtk-dovi/negotiation-probe.c) passes 169 checks,
 including the pre-start, unfiltered-reverse and overlay-pairing controls. The coherent family is
-core `0.1.0+rogdv10`, sink `0.15.2-1ubuntu2+rogdv5.6` and Showtime `50.0-2+rogdv5.9`, with the
-base `rogdv3`, good `rogdv3` and bad/extra `rogdv7` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
+core `0.1.0+rogdv10`, sink `0.15.2-1ubuntu2+rogdv5.6` and Showtime `50.0-2+rogdv5.10`, with the
+base `rogdv3`, good `rogdv3` and bad/extra `rogdv8` pins in [qualified-pipeline.json](../packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json).
 Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
 
 These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
