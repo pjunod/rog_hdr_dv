@@ -122,7 +122,7 @@ nominal, not optical.
 | Profile 5 seek, then base and original sources | native, ordinary, native | pass |
 | SDR, HDR10, clean base, SDR target | ordinary | pass |
 | CSS opacity, clip, rotation, covering element; native controls | ordinary | pass; page patches unchanged |
-| Profile 5 playing for 10 s | native | native; 232 distinct mapped pictures, all 14 QoS drops in the first 0.55 s |
+| Profile 5 playing for 10 s | native | native; no QoS drops with mapper core `0.1.0+rogdv8` (core `rogdv7` dropped 14 pictures in the first 0.55 s) |
 | Profile 7 FEL at 2.5 s | native | **ordinary**: identical to its HDR10 base layer |
 
 Profile 7 FEL composition exists only in the CUDA decoder. cuInit needs `/dev/nvidia-uvm`, which
@@ -139,7 +139,11 @@ the WebKit sandbox does not bind.
   decoder declares that it composes it. That keeps ordinary video on the Intel GPU and gives Profile 7
   FEL to NVDEC. It remains withheld. In one web process, an ordinary DMABuf video shown after an NVDEC
   source presents nothing, although native and GL-memory pictures still present.
-  The QoS drops come from first-frame mapper start-up; steady-state playback keeps 24 fps.
+
+The first-frame drops came from the compositor's mapper creating its own Vulkan device on the
+first visible picture. Mapper core `0.1.0+rogdv8` shares one device per process, so the first
+native picture reaches the compositor about 70 ms after playback starts instead of about 690 ms.
+[Details](GSTREAMER_DOLBY_RECONSTRUCTION.md#browser-runtime-fixes-november-11).
 
 ## Qualification boundary
 

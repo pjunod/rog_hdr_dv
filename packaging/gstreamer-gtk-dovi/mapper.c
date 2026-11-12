@@ -35,6 +35,7 @@ _Static_assert (GST_DOVI_BRIDGE_ABI == 2, "Unsupported picture bridge ABI");
 _Static_assert (DV_PROVIDER387_ABI == 1, "Unsupported provider ABI");
 struct GstGtkDoviMapper {
   pl_vulkan vk;
+  gboolean shared_vk;
   pl_renderer renderer;
   pl_dispatch dispatch;
   pl_tex transport;
@@ -114,6 +115,68 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
   return s->mapped;
 }
 GstGtkDoviMapper *gst_gtk_dovi_mapper_new (void) { gst_gtk_dovi_debug_init (); return g_new0 (GstGtkDoviMapper, 1); }
+/* One Vulkan device and shader cache per process. Creating an instance and a
+ * device costs hundreds of milliseconds; a consumer that created its own on its
+ * first visible picture (the browser compositor) held presentation that long
+ * after playback started, and the decoder dropped the opening pictures as late.
+ * The Vulkan pl_gpu is thread-safe; renderers, dispatches, textures and the
+ * provider stay per mapper. The cache lets later mappers reuse compiled passes.
+ * A GPU that is not thread-safe gets a device of the mapper's own instead. */
+static GMutex shared_gpu_lock;
+static pl_vulkan shared_vk;
+static pl_cache shared_cache;
+static guint shared_gpu_users;
+static void log_device (pl_vulkan vk)
+{
+  PFN_vkGetPhysicalDeviceProperties get_properties =
+      (PFN_vkGetPhysicalDeviceProperties) vk->get_proc_addr (vk->instance, "vkGetPhysicalDeviceProperties");
+  if (get_properties) {
+    VkPhysicalDeviceProperties properties;
+    get_properties (vk->phys_device, &properties);
+    GST_INFO ("native mapper Vulkan device vendor=%04x device=%04x type=%u name=%s",
+        properties.vendorID, properties.deviceID, properties.deviceType, properties.deviceName);
+  }
+}
+static pl_vulkan acquire_vulkan (gboolean *shared)
+{
+  g_mutex_lock (&shared_gpu_lock);
+  if (!shared_vk) {
+    shared_vk = pl_vulkan_create (NULL, pl_vulkan_params (.allow_software = true));
+    if (shared_vk) {
+      log_device (shared_vk);
+      if (shared_vk->gpu->limits.thread_safe) {
+        shared_cache = pl_cache_create (pl_cache_params (.max_total_size = 64 << 20));
+        pl_gpu_set_cache (shared_vk->gpu, shared_cache);
+      }
+    }
+  }
+  pl_vulkan vk = shared_vk;
+  *shared = vk && vk->gpu->limits.thread_safe;
+  if (*shared) {
+    shared_gpu_users++;
+  } else if (vk) {
+    /* Never shared: the creating mapper keeps it as its own. */
+    shared_vk = NULL;
+  }
+  g_mutex_unlock (&shared_gpu_lock);
+  return vk;
+}
+/* The last mapper out destroys the device: a web process without video should
+ * not keep one. A new pipeline's own mapper creates the next device while it
+ * prerolls, before the clock runs. */
+static void release_vulkan (pl_vulkan *vk, gboolean shared)
+{
+  if (!*vk) return;
+  if (!shared) { pl_vulkan_destroy (vk); return; }
+  g_mutex_lock (&shared_gpu_lock);
+  g_assert (*vk == shared_vk && shared_gpu_users > 0);
+  if (!--shared_gpu_users) {
+    pl_vulkan_destroy (&shared_vk);
+    pl_cache_destroy (&shared_cache);
+  }
+  g_mutex_unlock (&shared_gpu_lock);
+  *vk = NULL;
+}
 static void clear_output_pool (GstGtkDoviMapper *s)
 {
   if (!s->output_pool) return;
@@ -224,7 +287,7 @@ void gst_gtk_dovi_mapper_free (GstGtkDoviMapper *s)
       pl_tex_destroy (s->vk->gpu, &s->sdr_intermediate[i]);
       pl_tex_destroy (s->vk->gpu, &s->sdr_output[i]);
     }
-    pl_vulkan_destroy (&s->vk);
+    release_vulkan (&s->vk, s->shared_vk);
   }
   g_free (s);
 }
@@ -380,18 +443,19 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   }
   av_image_copy (src->data, src->linesize, planes, strides, format, source_width, source_height);
   if (!s->vk) {
-    s->vk = pl_vulkan_create (NULL, pl_vulkan_params (.allow_software = true));
+    s->vk = acquire_vulkan (&s->shared_vk);
     if (!s->vk) goto done;
-    PFN_vkGetPhysicalDeviceProperties get_properties =
-        (PFN_vkGetPhysicalDeviceProperties) s->vk->get_proc_addr (s->vk->instance, "vkGetPhysicalDeviceProperties");
-    if (get_properties) {
-      VkPhysicalDeviceProperties properties;
-      get_properties (s->vk->phys_device, &properties);
-      GST_INFO ("native mapper Vulkan device vendor=%04x device=%04x type=%u name=%s",
-          properties.vendorID, properties.deviceID, properties.deviceType, properties.deviceName);
-    }
     s->dispatch = pl_dispatch_create (NULL, s->vk->gpu);
     s->renderer = pl_renderer_create (NULL, s->vk->gpu);
+    if (!s->dispatch || !s->renderer) {
+      /* Retry from scratch next time instead of holding a device unusable here. */
+      pl_renderer_destroy (&s->renderer);
+      pl_dispatch_destroy (&s->dispatch);
+      release_vulkan (&s->vk, s->shared_vk);
+      goto done;
+    }
+    GST_INFO ("native mapper %p uses %s Vulkan device", (void *) s,
+        s->shared_vk ? "the process-shared" : "its own");
   }
   if (!s->renderer || !s->dispatch) goto done;
   if (apply_dovi && !s->provider) s->provider = dv_provider387_create (s->vk->gpu, NULL);

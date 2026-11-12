@@ -1,0 +1,74 @@
+From e5d5021b58280575c3cc37451177d9b633fae953 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Wed, 11 Nov 2026 19:56:59 -0500
+Subject: [PATCH] fix(mpv): keep describing a Wayland Vulkan window's colour
+ without a hint
+
+plurx-player 0.5.0 opens mpv's window idle and loads the title later.
+With colour hints enabled and no video, mpv set no hint, so the idle
+window presented on an sRGB Vulkan swapchain. The NVIDIA Vulkan WSI then
+created its own wp_color_management_surface_v1 for the wl_surface. The
+first video frame's wp_color_manager_v1.get_surface failed with "surface
+already requested", and the compositor closed the connection before any
+picture was shown. A target that becomes known after the first frames
+(--target-colorspace-hint=auto) reached the same state through the
+no-hint path, which cleared mpv's colour surface.
+
+On Wayland Vulkan with a colour manager, mpv now describes the window as
+sRGB itself whenever it has no hint or no video, so the swapchain stays
+pass-through and the driver never takes the surface's colour
+management. Other contexts keep their previous behaviour.
+---
+ video/out/vo_gpu_next.c | 31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 2ede6e4a3..1a73d6c92 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -1493,6 +1493,21 @@ static void apply_crop(struct pl_frame *frame, struct mp_rect crop,
+     }
+ }
+ 
++// On Wayland Vulkan with a colour manager, mpv describes the window itself.
++// Clearing the description leaves an sRGB swapchain, and a driver WSI that
++// tags such a swapchain takes the surface's colour management. mpv's next
++// get_surface (the first video after an idle window, or a target that becomes
++// known later) then fails with "surface already requested".
++static bool wayland_vk_owns_color(struct priv *p, struct vo *vo)
++{
++#if HAVE_WAYLAND
++    return !strcmp(p->ra_ctx->fns->name, "waylandvk") && vo->wl &&
++           vo->wl->color_manager;
++#else
++    return false;
++#endif
++}
++
+ static bool set_colorspace_hint(struct priv *p, struct pl_color_space *hint)
+ {
+     struct ra_swapchain *sw = p->ra_ctx->swapchain;
+@@ -1776,10 +1791,20 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+         if (p->icc_profile)
+             hint = p->icc_profile->csp;
+         external_params = set_colorspace_hint(p, &hint);
+-    } else if (!target_hint) {
+-        if (!hint.hdr.min_luma)
++    } else if (!target_hint || !frame->current) {
++        if (!target_hint && !hint.hdr.min_luma)
+             hint.hdr.min_luma = target_csp.hdr.min_luma;
+-        external_params = set_colorspace_hint(p, NULL);
++        if (wayland_vk_owns_color(p, vo)) {
++            // No hint, or no video yet (an idle --force-window): describe
++            // sRGB, so the swapchain stays pass-through.
++            float min_luma = hint.hdr.min_luma;
++            hint = pl_color_space_srgb;
++            hint.hdr.min_luma = min_luma;
++            pl_color_space_infer(&hint);
++            external_params = set_colorspace_hint(p, &hint);
++        } else if (!target_hint) {
++            external_params = set_colorspace_hint(p, NULL);
++        }
+     }
+ 
+     struct pl_swapchain_frame swframe;
