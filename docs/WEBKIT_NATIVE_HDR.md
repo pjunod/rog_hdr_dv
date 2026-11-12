@@ -72,6 +72,20 @@ previously born tainted, so no Dolby load could ever be attested and every load 
 first buffer is still undelivered, behind an upstream route that must already be attested. Every
 attestation decision is logged at debug level.
 
+## The sandbox keeps its own GStreamer registry
+
+The WebKit sandbox binds the host's GStreamer cache read-write, but it cannot reach every device the
+host can: CUDA needs `/dev/nvidia-uvm`, so inside the sandbox the NVIDIA plugin registers no elements.
+A sandboxed WebKit app (GNOME Web, Yelp…) that scanned plugins first after a package update wrote
+that into the host's registry. Host GStreamer applications then lost the NVIDIA decoders, and with
+them Showtime's Profile 7 FEL composition, until the plugin files changed. Reproduced with GNOME Web
+50.4 in the private compositor: afterwards `gst-inspect-1.0 nvh265dec` failed on the host.
+
+Since `2.52.6-1ubuntu1+rogdv2` (product `1d380b37`), sandboxed processes use their own registry,
+`$XDG_CACHE_HOME/webkitgtk/gstreamer-1.0/registry.<cpu>.bin`, unless `GST_REGISTRY` or `GST_REGISTRY_1_0`
+names one explicitly, and the host's registry directory is read-only inside the sandbox. Browser
+playback is unchanged.
+
 ## Source and picture lifetime
 
 The browser requires a before-first-byte witness from the exact original WebKitWebSrc instance through allowed transparent holders to the selected qtdemux. Unknown adaptive/decrypting paths, late observations, protection events and ambiguous topology stay on the ordinary route. Input histories cannot rearm without a confirmed whole READY drain. The proof is bound to the actual live demux pad and its complete coded configuration, not a reused stream-id string.
@@ -120,6 +134,11 @@ the WebKit sandbox does not bind.
   HEVC/H.264. It decodes to system memory because WebKit's GL context is not CUDA-compatible, and
   after a source change a second decoder's picture never reached the page.
 - **Result.** The sandbox change is withheld, so Profile 7 FEL plays its base layer ordinarily.
+- **Follow-up in progress.** A candidate binds the device and orders decodebin's candidates from registry
+  metadata: the decoder on the page's GPU first, unless the stream has an enhancement layer and another
+  decoder declares that it composes it. That keeps ordinary video on the Intel GPU and gives Profile 7
+  FEL to NVDEC. It remains withheld. In one web process, an ordinary DMABuf video shown after an NVDEC
+  source presents nothing, although native and GL-memory pictures still present.
   The QoS drops come from first-frame mapper start-up; steady-state playback keeps 24 fps.
 
 ## Qualification boundary

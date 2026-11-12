@@ -2067,6 +2067,46 @@ index d84099f5..364ed2eb 100644
 +#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
 +void webkitWebViewBaseSetGTKVideoSourceState(WebKitWebViewBase*, WebCore::ProcessIdentifier, uint64_t revision, uint64_t selection, bool active);
 +#endif
+diff --git a/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp b/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
+index ce8330ee..9db10dc1 100644
+--- a/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
++++ b/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
+@@ -424,6 +424,35 @@ static void bindGStreamerData(Vector<CString>& args)
+     auto registryDir = FileSystem::parentPath(FileSystem::stringFromFileSystemRepresentation(registryPath));
+     bindIfExists(args, registryDir.utf8().data(), BindFlags::ReadWrite);
+ 
++    // A sandboxed process cannot reach every device the host can (CUDA needs /dev/nvidia-uvm,
++    // for example), so its plugin scanner records fewer elements for such plugins. Writing that
++    // into the host's registry made host applications lose those elements until the plugin
++    // files changed. Unless a registry was chosen explicitly, keep the sandbox's own, keyed by
++    // architecture like GStreamer's default, and make the host's registry read-only inside.
++    if (!g_getenv("GST_REGISTRY_1_0") && !g_getenv("GST_REGISTRY")) {
++#if CPU(X86_64)
++        static constexpr auto registryName = "registry.x86_64.bin";
++#elif CPU(X86)
++        static constexpr auto registryName = "registry.i686.bin";
++#elif CPU(ARM64)
++        static constexpr auto registryName = "registry.aarch64.bin";
++#elif CPU(ARM)
++        static constexpr auto registryName = "registry.arm.bin";
++#elif CPU(RISCV64)
++        static constexpr auto registryName = "registry.riscv64.bin";
++#else
++        static constexpr auto registryName = "registry.other.bin";
++#endif
++        GUniquePtr<char> sandboxRegistryDir(g_build_filename(g_get_user_cache_dir(), BASE_DIRECTORY, "gstreamer-1.0", nullptr));
++        if (!g_mkdir_with_parents(sandboxRegistryDir.get(), 0700)) {
++            GUniquePtr<char> sandboxRegistry(g_build_filename(sandboxRegistryDir.get(), registryName, nullptr));
++            bindIfExists(args, sandboxRegistryDir.get(), BindFlags::ReadWrite);
++            bindIfExists(args, defaultRegistryPath.get(), BindFlags::ReadOnly);
++            args.appendVector(Vector<CString>({ "--setenv", "GST_REGISTRY_1_0", sandboxRegistry.get() }));
++        } else
++            g_warning("Cannot create %s (%s): sandboxed processes share the host GStreamer registry", sandboxRegistryDir.get(), g_strerror(errno));
++    }
++
+     bindPathVar(args, "GST_PRESET_PATH");
+ 
+     // GST_DEBUG_FILE points to an absolute file path, so we need write permissions for its parent directory.
 diff --git a/Source/WebKit/UIProcess/WebPageProxy.h b/Source/WebKit/UIProcess/WebPageProxy.h
 index 0a2be51f..71775d07 100644
 --- a/Source/WebKit/UIProcess/WebPageProxy.h

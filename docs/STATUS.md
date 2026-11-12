@@ -2,6 +2,12 @@
 
 **Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
 
+**WebKit sandbox GStreamer registry (November 12).** WebKit `2.52.6-1ubuntu1+rogdv2` gives
+sandboxed processes their own GStreamer registry. Previously a WebKit app that scanned plugins first
+after an update could cache the NVIDIA plugin without elements in the shared registry, and Showtime
+then lost NVDEC and Profile 7 FEL. Browser playback is unchanged.
+[Details](WEBKIT_NATIVE_HDR.md#the-sandbox-keeps-its-own-gstreamer-registry).
+
 **Browser native HDR, qualified and installed (November 11).**
 
 - **Scope.** Ordinary clear WebKitGTK `<video>` now negotiates the destination-aware mapper and

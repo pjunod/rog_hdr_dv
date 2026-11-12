@@ -4,7 +4,7 @@
 **Updated:** 2026-11-09
 
 This recipe prepares Ubuntu `webkit2gtk 2.52.6-1ubuntu1` plus the reviewed
-clear-video/native HDR browser patch as `2.52.6-1ubuntu1+rogdv1`. It keeps
+clear-video/native HDR browser patch as `2.52.6-1ubuntu1+rogdv2`. It keeps
 Ubuntu's debhelper generation, symbols, GIR dependency generation and
 `dh_shlibdeps`. It selects GTK4 only, with standard `/usr` multiarch paths.
 The product patch and [source pin](source-pin.json) identify the separate
