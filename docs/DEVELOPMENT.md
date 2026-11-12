@@ -190,7 +190,10 @@ PYTHONPATH=tests python3 -m unittest -v \
   test_upstream_cinema_submit test_upstream_forgejo_submit test_upstream_linux_prepare
 ```
 
-The manual workflow accepts `test_target=upstream` for this same selection.
+The manual workflow accepts `test_target=upstream` for this same selection. Its `test_target` also takes
+several space-separated unittest targets, so one run can cover exactly the modules a change touches
+(for example `test_check_repository test_upstream_catalog test_webkit_ubuntu_packaging`). `all`
+also runs the private-corpus acceptance tests, which fail on the hosted runner (see below).
 This lane checks repository mutation cases, inventory integrity and submission
 transport behavior. Each source proposal separately needs its recorded
 upstream compiler/tests; these Python tests do not grant those results.
