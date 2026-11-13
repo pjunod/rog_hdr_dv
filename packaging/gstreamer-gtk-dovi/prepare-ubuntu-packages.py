@@ -102,7 +102,7 @@ def qualified_pipeline():
     """Use actual binary metadata, grouped by its independently built source."""
     expected = {
         "gst-plugins-base1.0": {
-            "gstreamer1.0-gl", "libgstreamer-gl1.0-0",
+            "gstreamer1.0-gl", "gstreamer1.0-plugins-base", "libgstreamer-gl1.0-0",
             "libgstreamer-plugins-base1.0-0",
         },
         "gst-plugins-good1.0": {"gstreamer1.0-plugins-good"},
@@ -211,7 +211,7 @@ def showtime_control(original):
             f"qualified {name}",
         )
     producer_lines = []
-    for name in ("gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra", "gstreamer1.0-libav"):
+    for name in ("gstreamer1.0-plugins-base", "gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra", "gstreamer1.0-libav"):
         if re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", depends):
             raise PreparationError(f"unexpected existing producer dependency: {name}")
         producer_lines.append(f" {name} (= {qualified[name]}),\n")
@@ -224,10 +224,10 @@ def showtime_control(original):
     return source + "\n\n" + binary + "\n"
 
 
-def changelog(source, version, bullets, original):
+def changelog(source, version, bullets, original, date="Sun, 08 Nov 2026 00:00:00 +0000"):
     entries = "".join(f"  * {line}\n" for line in bullets)
     return (f"{source} ({version}) unstable; urgency=medium\n\n" + entries +
-            "\n -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 00:00:00 +0000\n\n" + original)
+            f"\n -- ROG HDR contributors <rog-hdr@invalid>  {date}\n\n" + original)
 
 
 def pinned_inputs():
@@ -308,7 +308,7 @@ def prepare(workspace, showtime_only=False):
              "Require the matching sink and mapper with paused overlay preservation.",
              "Start the shared producer with an explicit SDR destination.",
              "Preserve overlay composition features through the RGBA precision filter."],
-            inputs["showtime"]["changelog"]),
+            inputs["showtime"]["changelog"], date="Fri, 13 Nov 2026 00:00:00 +0000"),
     }
     sources = [("showtime", showtime)] if showtime_only else [("gtk", gtk), ("showtime", showtime)]
     if showtime_only:

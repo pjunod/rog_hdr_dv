@@ -50,6 +50,8 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             self.assertEqual(receipt['patches'], self.series['patches'])
             self.assertEqual(hashlib.sha256(play.read_bytes()).hexdigest(), self.series['patches'][-1]['result_play_sha256'])
             self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.12)'))
+            self.assertIn('gstreamer1.0-plugins-base (= 1.28.7-1+rogdv3)',
+                          (root / 'showtime-50.0/debian/control').read_text())
             inventory = json.loads((root / 'package-output-inventory.json').read_text())
             self.assertEqual(inventory['showtime_source']['output_play_sha256'], receipt['output_play_sha256'])
             before = play.read_bytes()
