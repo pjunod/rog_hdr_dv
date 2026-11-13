@@ -1,13 +1,29 @@
 # Status — what is working and what remains
 
-**Updated November 13, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
+**Updated November 13, 2026.** Bounded real-panel Profile 5 playback was
+visible in GNOME Web and Showtime at target 616 with eDP-2 left in colour
+mode 1. The Plurx Player 0.5.1 source fix for stale control sequences on
+session replacement merged; owner deployment, whole-film playback and optical
+acceptance remain open. The capture results and their limits are recorded
+below.
+
+**November 9 deployment (historical).** The coordinated install completed all
+45 planned package changes with zero removals and a clean `dpkg --audit`. The
+installed versions at that time included mpv 0.42 `+rogdv5.1`, FFmpeg
+libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID
+remained unchanged during installation. A later normal login loaded the
+installed Mutter library. Its display state reported the internal panel at
+2560×1600 and 240 Hz with colour mode 1. Historical private-compositor playback
+receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md)
+· [Desktop handoff](SOFTWARE_DELIVERY.md).
 
 **November 13 visible Profile 5 checks and Player fix.** On the real eDP-2
 desktop, colour mode 1 stayed unchanged during bounded playback. GNOME Web
-reported `visible_native_redraw` at target 616; its 2560×1600 XR30 digital
-capture had peak Y 524.34 cd/m² and page white 202.92 cd/m². Showtime reported
-`visible_native_redraw` at target 616; its digital capture had peak Y
-551.06 cd/m² during a 40-second run. These are digital PQ-surface and
+reported `visible native redraw result=mapped` at target 616; its 2560×1600
+XR30 digital capture had peak Y 524.34 cd/m² and page white 202.92 cd/m².
+Showtime reported `visible native redraw result=mapped` at target 616; its
+digital capture had peak Y 551.06 cd/m² during a 40-second run. These are
+digital PQ-surface and
 compositor-capture results, not measurements of emitted panel light or a
 calibration claim. The final warning appeared 115 ms after capture during
 intentional group SIGTERM, so this run does not establish either a spontaneous
