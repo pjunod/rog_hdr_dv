@@ -1,6 +1,29 @@
 # Status — what is working and what remains
 
-**Updated November 9, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance remains pending. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
+**Updated November 13, 2026.** The coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. Installed versions include mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Historical private-compositor playback receipts retain their original scope. [Release and recovery](SYSTEM_DOLBY_VISION.md) · [Desktop handoff](SOFTWARE_DELIVERY.md).
+
+**November 13 visible Profile 5 checks and Player fix.** On the real eDP-2
+desktop, colour mode 1 stayed unchanged during bounded playback. GNOME Web
+reported `visible_native_redraw` at target 616; its 2560×1600 XR30 digital
+capture had peak Y 524.34 cd/m² and page white 202.92 cd/m². Showtime reported
+`visible_native_redraw` at target 616; its digital capture had peak Y
+551.06 cd/m² during a 40-second run. These are digital PQ-surface and
+compositor-capture results, not measurements of emitted panel light or a
+calibration claim. The final warning appeared 115 ms after capture during
+intentional group SIGTERM, so this run does not establish either a spontaneous
+crash or crash-free endurance. Initial browser launch flags were incompatible
+and were corrected for the browser check only.
+
+In a separate earlier owner-started Plurx Player observation, Profile 7's
+enhancement layer was composed and native-DV state remained active beyond the
+previous 6–24-second observation window. Plurx Player 0.5.0 was installed;
+the stale control-sequence fence during session replacement was a client-side
+counter defect, not a new server sequence regression. The 0.5.1 source fix
+merged as Plurx PR 1577, landing `a4c316d0baac`, after 105 affected tests and
+the green required main lane (run 7462). That merge addresses stale control
+sequences on replacement; it does not explain or prove the cause of the earlier
+RPU disappearance. No full-film or new Player product acceptance has been
+completed; a private whole-feature check is being prepared.
 
 **plurx-player titles play again with the system mpv (November 12).** mpv `0.42.0-0ubuntu0+rogdv5.4` is installed. Since plurx-player 0.5.0 began using the system mpv, a title opened from the web UI closed its window before any picture. The idle window let the NVIDIA Vulkan driver claim the window's colour management, and mpv's own HDR request then broke the Wayland connection. mpv now describes the idle window itself. [Details](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers).
 
