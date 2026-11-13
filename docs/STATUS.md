@@ -7,6 +7,15 @@ session replacement merged; owner deployment, whole-film playback and optical
 acceptance remain open. The capture results and their limits are recorded
 below.
 
+**Showtime full-feature follow-up (in progress).** A held Profile 5 feature
+startup stopped with a video caps negotiation error. A live query trace found
+that the mapper's valid overlay-metadata output was excluded by Showtime's
+plain-only RGBA precision filter. The installed plugins match their retained
+qualified package bytes; this is a consumer filter follow-up. Showtime
+`50.0-2+rogdv5.12` is the compiled and packaged correction candidate; review,
+regressions, candidate playback and full-feature acceptance remain pending.
+[Cause and scope](GSTREAMER_DOLBY_RECONSTRUCTION.md#showtime-precision-filter-overlays-november-13).
+
 **November 9 deployment (historical).** The coordinated install completed all
 45 planned package changes with zero removals and a clean `dpkg --audit`. The
 installed versions at that time included mpv 0.42 `+rogdv5.1`, FFmpeg
@@ -39,7 +48,7 @@ merged as Plurx PR 1577, landing `a4c316d0baac`, after 105 affected tests and
 the green required main lane (run 7462). That merge addresses stale control
 sequences on replacement; it does not explain or prove the cause of the earlier
 RPU disappearance. No full-film or new Player product acceptance has been
-completed; a private whole-feature check is being prepared.
+completed; the private whole-feature check is blocked by the precision-filter follow-up above.
 
 **plurx-player titles play again with the system mpv (November 12).** mpv `0.42.0-0ubuntu0+rogdv5.4` is installed. Since plurx-player 0.5.0 began using the system mpv, a title opened from the web UI closed its window before any picture. The idle window let the NVIDIA Vulkan driver claim the window's colour management, and mpv's own HDR request then broke the Wayland connection. mpv now describes the idle window itself. [Details](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers).
 

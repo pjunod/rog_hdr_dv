@@ -167,6 +167,49 @@ Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.
 
 These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
 
+## Showtime precision-filter overlays (November 13)
+
+A normal held 4K Profile 5 feature stopped with `not-negotiated` after decoded
+CUDA P010 video with overlay-composition metadata reached the mapper. The
+installed mapper and playback plugin matched their qualified package bytes.
+The mapper accepted this domain and offered graded system-memory RGBA with
+the overlay feature. Showtime's later precision filter advertised only plain
+GL-memory RGBA and plain system-memory RGBA, excluding the metadata-bearing
+candidate.
+
+A live filtered-query trace followed that candidate through the GL conversion
+chain to the plain-only precision filter and the resulting empty intersection.
+Under detailed logging, the decoder then selected a plain system-memory path
+and the feature advanced briefly. That is evidence of an excluded valid path;
+it does not reproduce every timing condition of the fatal startup failure.
+
+The [Showtime correction](../packaging/gstreamer-gtk-dovi/0008-showtime-preserve-overlay-features-in-precision-filter.patch)
+adds the corresponding overlay feature variants while retaining the existing
+RGBA constraints and plain paths. The candidate package is `50.0-2+rogdv5.12`;
+mapper, sink and GStreamer versions stay unchanged. The new Showtime package
+explicitly requires the already-qualified `gstreamer1.0-plugins-base` playback
+plugin; that dependency closes fresh-install coverage and was already correct
+on the inspected machine. Normal subtitle and decoder policy stays in use.
+Final independent review, affected regressions,
+candidate playback qualification and a whole-feature run remain pending.
+The source compiled and the binary package built with tests disabled.
+
+`prepare-ubuntu-packages.py --showtime-only` replays the exact authenticated
+Showtime `play.py` stages from the pinned upstream or a recorded patch prefix.
+The [behavior control](../packaging/gstreamer-gtk-dovi/probes/showtime-precision-controls.py)
+executes the prepared consumer caps branch through a real filter and linked
+mapper queries, including overlay/plain domains, format/memory refusals and
+the ordinary non-Dolby path. Source/package replay controls require the
+authenticated upstream file in `SHOWTIME_PINNED_PLAY`; these checks have not
+yet run. Patch and support-file hashes are recorded in the scoped
+[SHA256SUMS](../packaging/gstreamer-gtk-dovi/SHA256SUMS); imported patch bytes
+remain unchanged.
+
+The private whole-feature fixture uses the retained virtual-HDR Mutter build,
+whose virtual output declares PQ/BT.2020. Its library identities are recorded
+separately from installed physical-display Mutter. Results under that fixture
+do not grant physical-panel, optical, every-frame RPU or dropped-frame claims.
+
 ## Which geometry reaches the mapper
 
 `GstDoviGeometry` contains coded width/height and active x/y/width/height in luma
