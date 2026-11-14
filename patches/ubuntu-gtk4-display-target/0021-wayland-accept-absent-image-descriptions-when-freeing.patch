@@ -1,0 +1,52 @@
+From 0ac172ac10dfcbcbf149c7edd30ffff25813d373 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 14 Nov 2026 19:31:49 +0000
+Subject: [PATCH] fix(wayland): accept absent image descriptions when freeing
+ colour state
+
+cs_to_desc deliberately stores NULL for a colour state the compositor
+rejected or cannot describe (cs_image_desc_failed and the unsupported
+transfer paths). Its value destructor was wp_image_description_v1_destroy,
+which dereferences the proxy, so disposing a GdkWaylandDisplay after any
+such entry crashed in wl_proxy_get_version(NULL). Upstream 4.24.1 has the
+same table construction; the new prepare/rejected fixture is the first
+path that tears a display down after a rejection.
+
+Use a NULL-tolerant destructor; real descriptions are still destroyed.
+
+Agent-Model: claude-opus-5-5
+Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ gdk/wayland/gdkwaylandcolor.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/gdk/wayland/gdkwaylandcolor.c b/gdk/wayland/gdkwaylandcolor.c
+index 0134f9e..8b9318a 100644
+--- a/gdk/wayland/gdkwaylandcolor.c
++++ b/gdk/wayland/gdkwaylandcolor.c
+@@ -383,6 +383,15 @@ static struct wp_color_manager_v1_listener color_manager_listener = {
+   wp_color_manager_v1_done,
+ };
+ 
++/* cs_to_desc maps a color state to NULL when the compositor rejected or
++ * cannot describe it, so its value destructor must accept NULL. */
++static void
++cs_desc_destroy (gpointer data)
++{
++  if (data)
++    wp_image_description_v1_destroy (data);
++}
++
+ GdkWaylandColor *
+ gdk_wayland_color_new (GdkWaylandDisplay *display)
+ {
+@@ -398,7 +407,7 @@ gdk_wayland_color_new (GdkWaylandDisplay *display)
+   color->cs_to_desc = g_hash_table_new_full (color_state_hash,
+                                              color_state_equal,
+                                              (GDestroyNotify) gdk_color_state_unref,
+-                                             (GDestroyNotify) wp_image_description_v1_destroy);
++                                             cs_desc_destroy);
+   color->identities_by_wire = g_hash_table_new_full (g_int64_hash, g_int64_equal,
+                                                      NULL, g_free);
+   color->identities_by_token = g_hash_table_new (g_direct_hash, g_direct_equal);

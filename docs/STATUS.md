@@ -18,10 +18,11 @@ WebKit shared source correction is in progress. Four unchanged GTK compiler
 objects passed with pinned dependencies authenticated; the four selected
 unchanged WebKit objects also passed with Clang 22.1.8. GTK and WebKit source/regressions are prepared. The single independent
 adversarial review is complete; its shipping corrections and the targeted
-test-only teardown correction are integrated. Candidate builds and the
-15 GTK / 19 normal WebKit plus one actual-GLES2 checks remain open. Native
-admission is withdrawn pending an eligible host/VM with fresh role proof;
-historical compiler passes do not establish present eligibility. No candidate is deployed. Target feedback
+test-only teardown correction are integrated. GTK `+rogdv6` is now
+built and its 15 protocol cases pass. The first run found and fixed a
+display-teardown crash after a compositor rejection, shared with upstream.
+The WebKit `+rogdv7` package build and its 19 normal plus one actual-GLES2
+checks remain open. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 

@@ -1,0 +1,64 @@
+From 6d98a4e58ccbca9683822f0affd59fa452bd7883 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 14 Nov 2026 19:31:49 +0000
+Subject: [PATCH] test(wayland): initialise GDK and observe structured prepare
+ warnings
+
+The prepare cases construct a real GdkWaylandDisplay, whose constructor
+registers with the display manager; like gtk_init(), call gdk_pre_parse()
+first (no display is opened). GTK logs with G_LOG_USE_STRUCTURED, which
+g_test_expect_message() cannot observe, so the rejected scenario leaves the
+compositor-rejection warning non-fatal in the child and the parent asserts
+it on the child's stderr.
+
+Agent-Model: claude-opus-5-5
+Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ testsuite/gdk/wayland-color.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/testsuite/gdk/wayland-color.c b/testsuite/gdk/wayland-color.c
+index d93a861..def2a73 100644
+--- a/testsuite/gdk/wayland-color.c
++++ b/testsuite/gdk/wayland-color.c
+@@ -11,6 +11,7 @@
+ /* Exercise the actual private producer and its generated protocol listeners.
+  * No copied transfer/identity implementation and no test-only product API. */
+ #include "../../gdk/wayland/gdkwaylandcolor.c"
++#include "../../gdk/gdkprivate.h"
+ 
+ #if defined(WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION) && \
+     defined(WP_COLOR_MANAGEMENT_SURFACE_FEEDBACK_V1_PREFERRED_CHANGED2_SINCE_VERSION) && \
+@@ -535,9 +536,15 @@ test_prepare (gconstpointer data)
+     {
+       g_test_trap_subprocess (NULL, 5 * G_USEC_PER_SEC, G_TEST_SUBPROCESS_DEFAULT);
+       g_test_trap_assert_passed ();
++      if (scenario == PREPARE_REJECTED)
++        g_test_trap_assert_stderr ("*Failed to get one of the standard image descriptions: fixture rejection*");
+       return;
+     }
+ 
++  /* A real GdkDisplay registers with the display manager, which (like
++   * gtk_init) requires GDK initialization; no display is opened. */
++  gdk_pre_parse ();
++
+   Fixture f = fixture_new (version);
+   /* Instantiate the real type, but do not open a desktop display or install
+    * GSources. Its normal dispatcher consumes the private queue over our fd. */
+@@ -567,12 +574,11 @@ test_prepare (gconstpointer data)
+         .manager = wl_proxy_get_id ((struct wl_proxy *) f.color->color_manager)
+       };
+       GThread *thread = g_thread_new ("color-prepare-peer", prepare_peer_thread, &peer);
++      /* GTK logs structurally, which g_test_expect_message() cannot observe;
++       * the parent asserts the rejection warning on the child stderr. */
+       if (peer.reject)
+-        g_test_expect_message (G_LOG_DOMAIN, G_LOG_LEVEL_WARNING,
+-                               "*Failed to get one of the standard image descriptions: fixture rejection*");
++        g_log_set_always_fatal (G_LOG_FATAL_MASK | G_LOG_LEVEL_CRITICAL);
+       g_assert_true (gdk_wayland_color_prepare (f.color));
+-      if (peer.reject)
+-        g_test_assert_expected_messages ();
+       g_assert_cmpint (write (stop[1], "s", 1), ==, 1);
+       g_thread_join (thread);
+       close (stop[0]);

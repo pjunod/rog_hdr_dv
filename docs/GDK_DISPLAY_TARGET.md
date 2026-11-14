@@ -257,7 +257,7 @@ stopped after the pass.
 
 ## Normal colour candidate — November 14
 
-The source registry now appends four patches for `4.24.1+ds-1+rogdv6`.
+The source registry now appends six patches for `4.24.1+ds-1+rogdv6`.
 Normal rendering negotiates an exact supported transfer instead of requiring
 a debug variable: CMv2 compound-power, precise CMv1 extended-sRGB, or an
 accepted linear fallback. Both protocol event versions retain the full wire
@@ -266,17 +266,23 @@ GTK requires an actually advertised Vulkan pass-through format where it owns
 Wayland colour descriptions. Unsupported WSI uses the existing renderer
 fallback; the no-manager legacy path remains available.
 
-Four unchanged baseline objects compiled with GCC 15.3 and authenticated
-pinned dependencies before these edits. The new protocol regression sources
-exercise the production callbacks over a socket pair, including identity
-lifetime and lease ownership. They have not compiled or run. V2 qualification
-requires actual v2 cases without skips; a v1 dependency build alone is not
-sufficient. Actual Vulkan/GSK fallback and float import/rendering remain
-separate linked checks. No candidate package or installed/runtime pass is
-claimed. Existing rogdv5 receipts do not qualify this source.
+The protocol regressions exercise the production callbacks over a socket
+pair, including identity lifetime and lease ownership. Their first native run
+(November 14, normal Ubuntu 26.10 package build, wayland-protocols 1.49)
+found a real teardown crash: `cs_to_desc` stores NULL for a rejected or
+undescribable colour state, but its value destructor was
+`wp_image_description_v1_destroy`, so disposing the display after a rejection
+dereferenced NULL. Upstream 4.24.1 builds the table the same way. Patch 0021
+uses a NULL-tolerant destructor; patch 0022 corrects the new fixture (GDK
+initialisation before a real display, and the rejection warning asserted on
+the child's stderr, since structured logging bypasses
+`g_test_expect_message`). With both, all 15 cases pass with no skips, the v2
+cases included, and enabling the testsuite leaves `config.h` unchanged.
+Actual Vulkan/GSK fallback and float import/rendering remain separate linked
+checks. No installed or runtime pass is claimed.
 
 The original sixteen patches and their authorship are unchanged. Checksum
-entries were appended deliberately for the four new patch exports; imported
+entries were appended deliberately for the six new patch exports; imported
 patch digests were not regenerated. [Shared image pipeline design](GTK_WEBKIT_IMAGE_COLOUR.md).
 
 Final source review requested full normal-startup coverage in addition to
