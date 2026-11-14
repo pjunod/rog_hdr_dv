@@ -1,0 +1,1267 @@
+From a7d0fd84db6651b589ef0e2cb98819a22c984eaf Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:11:05 -0500
+Subject: [PATCH 4/7] Preserve typed Skia working storage through coordinated
+ pages
+
+Carry actual nonlinear-sRGB F16 working storage through tile allocation, profile-aware NativeImage uploads, copies, effects and ordinary page buffers. Keep physical precision and colour metadata paired through GTK import and retain explicit reduced-gamut transports.
+
+No global Canvas/ImageData pixel-format API enable is introduced. Compilation and focused regressions are pending the coordinating workflow.
+---
+ .../graphics/skia/SkiaPaintingEngine.cpp      |   7 +-
+ .../graphics/texmap/BitmapTexture.cpp         | 132 +++++++++++++++-
+ .../platform/graphics/texmap/BitmapTexture.h  |  27 +++-
+ .../graphics/texmap/BitmapTexturePool.cpp     |  20 +++
+ .../graphics/texmap/BitmapTexturePool.h       |   3 +
+ .../texmap/TextureMapperShaderProgram.cpp     |  12 ++
+ .../CoordinatedBackingStoreTile.cpp           |   7 +-
+ ...rdinatedPlatformLayerBufferNativeImage.cpp |  31 +++-
+ .../coordinated/CoordinatedTileBuffer.cpp     |  32 ++--
+ .../coordinated/CoordinatedTileBuffer.h       |  19 ++-
+ .../WebKit/Shared/glib/RendererBufferFormat.h |   3 +
+ .../RendererBufferFormat.serialization.in     |   1 +
+ .../glib/AcceleratedBackingStore.messages.in  |   3 +
+ .../UIProcess/gtk/AcceleratedBackingStore.cpp | 114 +++++++++++++-
+ .../UIProcess/gtk/AcceleratedBackingStore.h   |   6 +-
+ .../AcceleratedSurface.cpp                    | 141 ++++++++++++++++--
+ .../CoordinatedGraphics/AcceleratedSurface.h  |  10 +-
+ 17 files changed, 524 insertions(+), 44 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/skia/SkiaPaintingEngine.cpp b/Source/WebCore/platform/graphics/skia/SkiaPaintingEngine.cpp
+index 5cccf019..b9f448c9 100644
+--- a/Source/WebCore/platform/graphics/skia/SkiaPaintingEngine.cpp
++++ b/Source/WebCore/platform/graphics/skia/SkiaPaintingEngine.cpp
+@@ -41,6 +41,7 @@
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+ #include <skia/core/SkPictureRecorder.h>
+ #include <skia/gpu/ganesh/GrBackendSurface.h>
++#include <skia/gpu/ganesh/GrDirectContext.h>
+ #include <skia/gpu/ganesh/SkImageGanesh.h>
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+ #include <wtf/NumberOfCores.h>
+@@ -111,7 +112,11 @@ Ref<CoordinatedTileBuffer> SkiaPaintingEngine::createBuffer(RenderingMode render
+         if (!contentsOpaque)
+             textureFlags.add(BitmapTexture::Flags::SupportsAlpha);
+ 
+-        return CoordinatedAcceleratedTileBuffer::create(BitmapTexturePool::singleton().acquireTexture(size, textureFlags));
++        auto info = BitmapTexture::workingImageInfo(size, contentsOpaque);
++        auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
++        if (!grContext || !grContext->colorTypeSupportedAsSurface(info.colorType()))
++            info = info.makeColorType(kRGBA_8888_SkColorType);
++        return CoordinatedAcceleratedTileBuffer::create(BitmapTexturePool::singleton().acquireTexture(info, textureFlags));
+     }
+ 
+     return CoordinatedUnacceleratedTileBuffer::create(size, contentsOpaque ? CoordinatedTileBuffer::NoFlags : CoordinatedTileBuffer::SupportsAlpha);
+diff --git a/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp b/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp
+index 0de85c16..e93cfe45 100644
+--- a/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp
++++ b/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp
+@@ -33,6 +33,7 @@
+ #include "TextureMapper.h"
+ #include "TextureMapperFlags.h"
+ #include "TextureMapperShaderProgram.h"
++#include <cstring>
+ #include <wtf/HashMap.h>
+ #include <wtf/RefCounted.h>
+ #include <wtf/RefPtr.h>
+@@ -47,6 +48,8 @@
+ #if USE(SKIA)
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN // GLib/Win port
+ #include <skia/core/SkImage.h>
++#include <skia/core/SkBitmap.h>
++#include <skia/core/SkColorSpace.h>
+ #include <skia/core/SkPixmap.h>
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+ #endif
+@@ -80,11 +83,72 @@ GLenum depthBufferFormat()
+     return GL_DEPTH_COMPONENT16;
+ }
+ 
++#if USE(SKIA)
++// These are core GL 3 / GLES 3 enums. Capability selection below does not
++// infer renderability merely from the presence of an enum in the headers.
++static constexpr GLenum rgba16f = 0x881A;
++static constexpr GLenum halfFloat = 0x140B;
++
++bool BitmapTexture::supportsExtendedColor()
++{
++    auto* context = GLContext::current();
++    if (!context || context->version() < 300)
++        return false;
++
++    auto* version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
++    if (!version)
++        return false;
++    if (!std::strstr(version, "OpenGL ES"))
++        return true; // Floating colour attachments are core in desktop GL 3.
++
++    auto* extensions = reinterpret_cast<const char*>(glGetString(GL_EXTENSIONS));
++    return extensions && (GLContext::isExtensionSupported(extensions, "GL_EXT_color_buffer_float")
++        || GLContext::isExtensionSupported(extensions, "GL_EXT_color_buffer_half_float"));
++}
++
++SkImageInfo BitmapTexture::workingImageInfo(const IntSize& size, bool)
++{
++    // Keep a premultiplied alpha channel even for opaque layer content: these
++    // textures are also used by copies, masks and transparency intermediates.
++    return SkImageInfo::Make(size.width(), size.height(), supportsExtendedColor() ? kRGBA_F16_SkColorType : kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++}
++
++unsigned BitmapTexture::internalFormat() const
++{
++    return m_imageInfo.colorType() == kRGBA_F16_SkColorType ? rgba16f : GL_RGBA8;
++}
++
++BitmapTexture::BitmapTexture(const SkImageInfo& info, OptionSet<Flags> flags)
++    : BitmapTexture(IntSize(info.width(), info.height()), flags)
++{
++    if (m_imageInfo == info)
++        return;
++#if USE(GBM)
++    ASSERT(!flags.contains(Flags::BackedByDMABuf));
++#endif
++    GLint previousTexture;
++    glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture);
++    m_imageInfo = info;
++    glBindTexture(GL_TEXTURE_2D, m_id);
++    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat(), m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
++    glBindTexture(GL_TEXTURE_2D, previousTexture);
++}
++#endif
++
+ BitmapTexture::BitmapTexture(const IntSize& size, OptionSet<Flags> flags)
+     : m_flags(flags)
+     , m_size(size)
+     , m_pixelFormat(PixelFormat::RGBA8)
+ {
++#if USE(SKIA)
++    m_imageInfo = workingImageInfo(size, !flags.contains(Flags::SupportsAlpha));
++#if USE(GBM)
++    // MemoryMappedGPUBuffer currently allocates packed 8-bit storage. Keep
++    // that alternate transport honest instead of wrapping its bytes as F16.
++    if (flags.contains(Flags::BackedByDMABuf))
++        m_imageInfo = m_imageInfo.makeColorType(kRGBA_8888_SkColorType);
++#endif
++#endif
+     GLint boundTexture = 0;
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTexture);
+ 
+@@ -134,7 +198,11 @@ void BitmapTexture::createTexture()
+ void BitmapTexture::allocateTexture()
+ {
+     createTexture();
++#if USE(SKIA)
++    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat(), m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
++#else
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_size.width(), m_size.height(), 0, textureFormat, s_pixelDataType, nullptr);
++#endif
+ }
+ 
+ size_t BitmapTexture::sizeInBytes() const
+@@ -143,7 +211,11 @@ size_t BitmapTexture::sizeInBytes() const
+     if (size.isEmpty())
+         return 0;
+ 
++#if USE(SKIA)
++    const auto bytesPerRow = CheckedUint32(size.width()) * m_imageInfo.bytesPerPixel();
++#else
+     const auto bytesPerRow = CheckedUint32(size.width()) * 4;
++#endif
+     return CheckedUint32(size.height()) * bytesPerRow;
+ }
+ 
+@@ -195,11 +267,13 @@ void BitmapTexture::swapTexture(BitmapTexture& other)
+ #endif
+     std::swap(m_flags, other.m_flags);
+     std::swap(m_id, other.m_id);
++#if USE(SKIA)
++    std::swap(m_imageInfo, other.m_imageInfo);
++#endif
+ 
+     // Take the pixel format from the source texture. The source texture
+     // (going back to the pool) is reset to the default pixel format.
+-    m_pixelFormat = other.m_pixelFormat;
+-    other.m_pixelFormat = PixelFormat::RGBA8;
++    std::swap(m_pixelFormat, other.m_pixelFormat);
+ }
+ 
+ void BitmapTexture::reset(const IntSize& size, OptionSet<Flags> flags)
+@@ -237,6 +311,9 @@ void BitmapTexture::reset(const IntSize& size, OptionSet<Flags> flags)
+     if (m_size == size)
+         return;
+     m_size = size;
++#if USE(SKIA)
++    m_imageInfo = m_imageInfo.makeDimensions({ size.width(), size.height() });
++#endif
+ 
+     GLint boundTexture = 0;
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTexture);
+@@ -260,7 +337,11 @@ void BitmapTexture::reset(const IntSize& size, OptionSet<Flags> flags)
+ #endif
+ 
+     glBindTexture(GL_TEXTURE_2D, m_id);
++#if USE(SKIA)
++    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat(), m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
++#else
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_size.width(), m_size.height(), 0, textureFormat, s_pixelDataType, nullptr);
++#endif
+     glBindTexture(GL_TEXTURE_2D, boundTexture);
+ }
+ 
+@@ -335,6 +416,39 @@ void BitmapTexture::updateContents(const void* srcData, const IntRect& targetRec
+     }
+ }
+ 
++#if USE(SKIA)
++bool BitmapTexture::updateContents(const SkPixmap& source, const IntRect& targetRect, const IntPoint& sourceOffset)
++{
++    // SkPixmap conversion is required even for an 8-bit P3 source: a raw GL
++    // upload has neither a source colour space nor a colour transform.
++    SkBitmap converted;
++    auto info = m_imageInfo.makeDimensions({ targetRect.width(), targetRect.height() });
++    if (!converted.tryAllocPixels(info))
++        return false;
++    if (!source.readPixels(converted.pixmap(), sourceOffset.x(), sourceOffset.y()))
++        return false;
++
++    m_pixelFormat = PixelFormat::RGBA8; // Both physical working types use RGBA order.
++    glBindTexture(GL_TEXTURE_2D, m_id);
++    GLint previousAlignment;
++    glGetIntegerv(GL_UNPACK_ALIGNMENT, &previousAlignment);
++    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
++    glTexSubImage2D(GL_TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), GL_RGBA,
++        info.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, converted.getPixels());
++    glPixelStorei(GL_UNPACK_ALIGNMENT, previousAlignment);
++    return true;
++}
++
++void BitmapTexture::copyFromTexture(const BitmapTexture& source, const IntRect& targetRect, const IntSize& sourceOffset)
++{
++    // The physical copy converts between fixed and floating storage as needed;
++    // working textures have the same explicit nonlinear-sRGB colour space.
++    ASSERT(SkColorSpace::Equals(m_imageInfo.colorSpace(), source.m_imageInfo.colorSpace()));
++    copyFromExternalTexture(source.id(), targetRect, sourceOffset);
++    m_pixelFormat = source.m_pixelFormat;
++}
++#endif
++
+ void BitmapTexture::updateContents(NativeImage* frameImage, const IntRect& targetRect, const IntPoint& offset)
+ {
+     if (!frameImage)
+@@ -347,10 +461,14 @@ void BitmapTexture::updateContents(NativeImage* frameImage, const IntRect& targe
+ 
+     updateContents(imageData, targetRect, offset, bytesPerLine, PixelFormat::BGRA8);
+ #elif USE(SKIA)
+-    sk_sp<SkImage> surface = frameImage->platformImage();
+-    SkPixmap pixmap;
+-    if (surface->peekPixels(&pixmap))
+-        updateContents(pixmap.addr(), targetRect, offset, pixmap.rowBytes(), PixelFormat::BGRA8);
++    const auto& image = frameImage->platformImage();
++    SkBitmap converted;
++    auto info = m_imageInfo.makeDimensions(image->dimensions());
++    if (!converted.tryAllocPixels(info))
++        return;
++    if (!image->readPixels(frameImage->grContext(), converted.pixmap(), 0, 0))
++        return;
++    updateContents(converted.pixmap(), targetRect, offset);
+ #else
+     UNUSED_PARAM(targetRect);
+     UNUSED_PARAM(offset);
+@@ -444,6 +562,8 @@ void BitmapTexture::createFboIfNeeded()
+     glGenFramebuffers(1, &m_fbo);
+     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, id(), 0);
++    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
++        WTFLogAlways("BitmapTexture was unable to construct a complete framebuffer");
+     if (m_flags.contains(Flags::DepthBuffer))
+         initializeDepthBuffer();
+     m_shouldClear = true;
+diff --git a/Source/WebCore/platform/graphics/texmap/BitmapTexture.h b/Source/WebCore/platform/graphics/texmap/BitmapTexture.h
+index 00813f00..c7471189 100644
+--- a/Source/WebCore/platform/graphics/texmap/BitmapTexture.h
++++ b/Source/WebCore/platform/graphics/texmap/BitmapTexture.h
+@@ -41,6 +41,13 @@
+ #include "MemoryMappedGPUBuffer.h"
+ #endif
+ 
++#if USE(SKIA)
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
++#include <skia/core/SkImageInfo.h>
++#include <skia/core/SkPixmap.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
++#endif
++
+ typedef void *EGLImage;
+ 
+ namespace WebCore {
+@@ -74,10 +81,24 @@ public:
+     }
+ #endif
+ 
++#if USE(SKIA)
++    static Ref<BitmapTexture> create(const SkImageInfo& info, OptionSet<Flags> flags = { })
++    {
++        return adoptRef(*new BitmapTexture(info, flags));
++    }
++
++    WEBCORE_EXPORT static bool supportsExtendedColor();
++    WEBCORE_EXPORT static SkImageInfo workingImageInfo(const IntSize&, bool opaque);
++    const SkImageInfo& imageInfo() const { return m_imageInfo; }
++    unsigned internalFormat() const;
++    WEBCORE_EXPORT bool updateContents(const SkPixmap&, const IntRect&, const IntPoint&);
++    WEBCORE_EXPORT void copyFromTexture(const BitmapTexture&, const IntRect&, const IntSize&);
++#endif
++
+     WEBCORE_EXPORT ~BitmapTexture();
+ 
+     const IntSize& size() const { return m_size; };
+-    size_t sizeInBytes() const;
++    WEBCORE_EXPORT size_t sizeInBytes() const;
+     OptionSet<Flags> flags() const { return m_flags; }
+     bool isOpaque() const { return !m_flags.contains(Flags::SupportsAlpha); }
+ 
+@@ -111,6 +132,10 @@ public:
+ 
+ private:
+     BitmapTexture(const IntSize&, OptionSet<Flags>);
++#if USE(SKIA)
++    BitmapTexture(const SkImageInfo&, OptionSet<Flags>);
++    SkImageInfo m_imageInfo;
++#endif
+ #if USE(GBM)
+     BitmapTexture(EGLImage, OptionSet<Flags>);
+ #endif
+diff --git a/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.cpp b/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.cpp
+index 64bcca71..2307c237 100644
+--- a/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.cpp
++++ b/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.cpp
+@@ -70,11 +70,27 @@ BitmapTexturePool::BitmapTexturePool()
+ 
+ Ref<BitmapTexture> BitmapTexturePool::acquireTexture(const IntSize& size, OptionSet<BitmapTexture::Flags> flags)
+ {
++#if USE(SKIA)
++    auto info = BitmapTexture::workingImageInfo(size, !flags.contains(BitmapTexture::Flags::SupportsAlpha));
++#if USE(GBM)
++    if (flags.contains(BitmapTexture::Flags::BackedByDMABuf))
++        info = info.makeColorType(kRGBA_8888_SkColorType);
++#endif
++    return acquireTexture(info, flags);
++}
++
++Ref<BitmapTexture> BitmapTexturePool::acquireTexture(const SkImageInfo& info, OptionSet<BitmapTexture::Flags> flags)
++{
++    IntSize size(info.width(), info.height());
++#endif
+     ASSERT(GLContextWrapper::currentContext());
+     Locker locker { m_lock };
+     Entry* selectedEntry = std::find_if(m_textures.begin(), m_textures.end(), [&](Entry& entry) {
+         return entry.texture->refCount() == 1
+             && entry.texture->size() == size
++#if USE(SKIA)
++            && entry.texture->imageInfo() == info
++#endif
+ #if USE(GBM)
+             && entry.texture->flags().contains(BitmapTexture::Flags::BackedByDMABuf) == flags.contains(BitmapTexture::Flags::BackedByDMABuf)
+             && entry.texture->flags().contains(BitmapTexture::Flags::ForceLinearBuffer) == flags.contains(BitmapTexture::Flags::ForceLinearBuffer)
+@@ -84,7 +100,11 @@ Ref<BitmapTexture> BitmapTexturePool::acquireTexture(const IntSize& size, Option
+     });
+ 
+     if (selectedEntry == m_textures.end()) {
++#if USE(SKIA)
++        m_textures.append(Entry(BitmapTexture::create(info, flags)));
++#else
+         m_textures.append(Entry(BitmapTexture::create(size, flags)));
++#endif
+         selectedEntry = &m_textures.last();
+         m_poolSizeInBytes += selectedEntry->texture->sizeInBytes();
+     } else {
+diff --git a/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.h b/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.h
+index bdc5fbfa..fab943d3 100644
+--- a/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.h
++++ b/Source/WebCore/platform/graphics/texmap/BitmapTexturePool.h
+@@ -53,6 +53,9 @@ public:
+     ~BitmapTexturePool() = default;
+ 
+     WEBCORE_EXPORT Ref<BitmapTexture> acquireTexture(const IntSize&, OptionSet<BitmapTexture::Flags>);
++#if USE(SKIA)
++    WEBCORE_EXPORT Ref<BitmapTexture> acquireTexture(const SkImageInfo&, OptionSet<BitmapTexture::Flags>);
++#endif
+ #if USE(GBM)
+     Ref<BitmapTexture> createTextureForImage(EGLImage, OptionSet<BitmapTexture::Flags>);
+ #endif
+diff --git a/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp b/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp
+index c0a219f2..50e23ed1 100644
+--- a/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp
++++ b/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp
+@@ -354,6 +354,11 @@ static const char* fragmentTemplateCommon =
+         void applyOpacity(inout vec4 color) { color *= u_opacity; }
+         void applyAntialiasing(inout vec4 color) { color *= antialias(); }
+ 
++        // Retain the normalized CSS colour-filter result boundary independently
++        // of floating working storage. Plain sampling, copies and blending do
++        // not pass through this operation.
++        void clampColorFilterResult(inout vec4 color) { color = clamp(color, 0.0, 1.0); }
++
+         void applyGrayscaleFilter(inout vec4 color)
+         {
+             float amount = 1.0 - u_filterAmount;
+@@ -361,6 +366,7 @@ static const char* fragmentTemplateCommon =
+                 (0.2126 - 0.2126 * amount) * color.r + (0.7152 + 0.2848 * amount) * color.g + (0.0722 - 0.0722 * amount) * color.b,
+                 (0.2126 - 0.2126 * amount) * color.r + (0.7152 - 0.7152 * amount) * color.g + (0.0722 + 0.9278 * amount) * color.b,
+                 color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         void applySepiaFilter(inout vec4 color)
+@@ -370,6 +376,7 @@ static const char* fragmentTemplateCommon =
+                 (0.349 - 0.349 * amount) * color.r + (0.686 + 0.314 * amount) * color.g + (0.168 - 0.168 * amount) * color.b,
+                 (0.272 - 0.272 * amount) * color.r + (0.534 - 0.534 * amount) * color.g + (0.131 + 0.869 * amount) * color.b,
+                 color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         void applySaturateFilter(inout vec4 color)
+@@ -378,6 +385,7 @@ static const char* fragmentTemplateCommon =
+                 (0.213 - 0.213 * u_filterAmount) * color.r + (0.715 + 0.285 * u_filterAmount) * color.g + (0.072 - 0.072 * u_filterAmount) * color.b,
+                 (0.213 - 0.213 * u_filterAmount) * color.r + (0.715 - 0.715 * u_filterAmount) * color.g + (0.072 + 0.928 * u_filterAmount) * color.b,
+                 color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         void applyHueRotateFilter(inout vec4 color)
+@@ -389,23 +397,27 @@ static const char* fragmentTemplateCommon =
+                 color.r * (0.213 - c * 0.213 + s * 0.143) + color.g * (0.715 + c * 0.285 + s * 0.140) + color.b * (0.072 - c * 0.072 - s * 0.283),
+                 color.r * (0.213 - c * 0.213 - s * 0.787) +  color.g * (0.715 - c * 0.715 + s * 0.715) + color.b * (0.072 + c * 0.928 + s * 0.072),
+                 color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         float invert(float n, float a) { return (a - n) * u_filterAmount + n * (1.0 - u_filterAmount); }
+         void applyInvertFilter(inout vec4 color)
+         {
+             color = vec4(invert(color.r, color.a), invert(color.g, color.a), invert(color.b, color.a), color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         void applyBrightnessFilter(inout vec4 color)
+         {
+             color = vec4(color.rgb * u_filterAmount, color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         float contrast(float n) { return (n - 0.5) * u_filterAmount + 0.5; }
+         void applyContrastFilter(inout vec4 color)
+         {
+             color = vec4(contrast(color.r), contrast(color.g), contrast(color.b), color.a);
++            clampColorFilterResult(color);
+         }
+ 
+         void applyOpacityFilter(inout vec4 color)
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp
+index 383ac2d0..24884e49 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp
+@@ -96,7 +96,7 @@ void CoordinatedBackingStoreTile::processPendingUpdates()
+                 ASSERT(update.sourceRect.location().isZero());
+                 m_texture->swapTexture(buffer.texture());
+             } else
+-                m_texture->copyFromExternalTexture(buffer.texture().id(), update.sourceRect, toIntSize(update.bufferOffset));
++                m_texture->copyFromTexture(buffer.texture(), update.sourceRect, toIntSize(update.bufferOffset));
+ 
+             WTFEndSignpost(this, CopyTextureGPUToGPU);
+             WTFEndSignpost(this, CoordinatedSwapBuffer);
+@@ -107,7 +107,12 @@ void CoordinatedBackingStoreTile::processPendingUpdates()
+         WTFBeginSignpost(this, CopyTextureCPUToGPU);
+         ASSERT(!update.buffer->isBackedByOpenGL());
+         auto& buffer = static_cast<CoordinatedUnacceleratedTileBuffer&>(update.buffer.get());
++#if USE(SKIA)
++        SkPixmap pixels(buffer.imageInfo(), buffer.data(), buffer.stride());
++        m_texture->updateContents(pixels, update.sourceRect, update.bufferOffset);
++#else
+         m_texture->updateContents(buffer.data(), update.sourceRect, update.bufferOffset, buffer.stride(), buffer.pixelFormat());
++#endif
+         WTFEndSignpost(this, CopyTextureCPUToGPU);
+ 
+         WTFEndSignpost(this, CoordinatedSwapBuffer);
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp
+index 904ae5ce..ba702bd1 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp
+@@ -42,6 +42,10 @@
+ #include "PlatformDisplay.h"
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+ #include <skia/gpu/ganesh/GrBackendSurface.h>
++#include <skia/gpu/ganesh/SkSurfaceGanesh.h>
++#include <skia/core/SkCanvas.h>
++#include <skia/core/SkSurface.h>
++#include <skia/gpu/ganesh/GrDirectContext.h>
+ #include <skia/gpu/ganesh/SkImageGanesh.h>
+ #include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
+ #include <skia/core/SkPixmap.h> // NOLINT
+@@ -63,7 +67,7 @@ CoordinatedPlatformLayerBufferNativeImage::CoordinatedPlatformLayerBufferNativeI
+     , m_image(WTF::move(nativeImage))
+ {
+ #if USE(SKIA)
+-    const auto& image = m_image->platformImage();
++    auto image = m_image->platformImage();
+     if (!image->isTextureBacked())
+         return;
+ 
+@@ -73,6 +77,27 @@ CoordinatedPlatformLayerBufferNativeImage::CoordinatedPlatformLayerBufferNativeI
+ 
+     auto* grContext = m_image->grContext();
+     RELEASE_ASSERT(grContext);
++    waitForContentsIfNeeded();
++    auto info = BitmapTexture::workingImageInfo(m_size, !m_image->hasAlpha());
++    if (!grContext->colorTypeSupportedAsSurface(info.colorType()))
++        info = info.makeColorType(kRGBA_8888_SkColorType);
++    auto converted = SkSurfaces::RenderTarget(grContext, skgpu::Budgeted::kNo, info, 0, kTopLeft_GrSurfaceOrigin, nullptr);
++    if (!converted && info.colorType() == kRGBA_F16_SkColorType) {
++        info = info.makeColorType(kRGBA_8888_SkColorType);
++        converted = SkSurfaces::RenderTarget(grContext, skgpu::Budgeted::kNo, info, 0, kTopLeft_GrSurfaceOrigin, nullptr);
++    }
++    if (!converted)
++        return;
++    // TextureMapper samples raw GL textures. Convert both gamut and transfer
++    // through Skia before handing it a texture ID, including GPU NativeImages.
++    converted->getCanvas()->clear(SK_ColorTRANSPARENT);
++    converted->getCanvas()->drawImage(image, 0, 0);
++    image = converted->makeImageSnapshot();
++    if (!image)
++        return;
++    m_image = NativeImage::create(sk_ref_sp(image.get()), grContext);
++    if (!m_image)
++        return;
+     grContext->flushAndSubmit(GLFence::isSupported(display.glDisplay()) ? GrSyncCpu::kNo : GrSyncCpu::kYes);
+ 
+     unsigned textureID = 0;
+@@ -125,8 +150,8 @@ bool CoordinatedPlatformLayerBufferNativeImage::tryEnsureBuffer()
+ #elif USE(SKIA)
+     const auto& image = m_image->platformImage();
+     SkPixmap pixmap;
+-    if (image->peekPixels(&pixmap))
+-        texture->updateContents(pixmap.addr(), IntRect(IntPoint(), m_size), IntPoint(), image->imageInfo().minRowBytes(), PixelFormat::BGRA8);
++    if (!image->peekPixels(&pixmap) || !texture->updateContents(pixmap, IntRect(IntPoint(), m_size), IntPoint()))
++        return false;
+ #endif
+ 
+     m_buffer = CoordinatedPlatformLayerBufferRGB::create(WTF::move(texture), m_flags, nullptr);
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp
+index 80dc0317..904fa8c4 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp
+@@ -123,19 +123,26 @@ CoordinatedUnacceleratedTileBuffer::CoordinatedUnacceleratedTileBuffer(const Int
+     : CoordinatedTileBuffer(flags)
+     , m_size(size)
+ {
++#if USE(SKIA)
++    // Raster working storage is floating even when the final legacy transport
++    // is 8-bit; the upload is then an explicit conversion boundary.
++    m_imageInfo = SkImageInfo::Make(size.width(), size.height(), kRGBA_F16_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++    const auto checkedArea = size.area() * m_imageInfo.bytesPerPixel();
++#else
+     const auto checkedArea = size.area() * 4;
++#endif
+     m_data = MallocSpan<unsigned char>::tryZeroedMalloc(checkedArea);
+ 
+     {
+         Locker locker { s_layersMemoryUsageLock };
+-        s_currentLayersMemoryUsage += checkedArea;
++        s_currentLayersMemoryUsage += m_data.span().size();
+         s_maxLayersMemoryUsage = std::max(s_maxLayersMemoryUsage, s_currentLayersMemoryUsage);
+     }
+ }
+ 
+ CoordinatedUnacceleratedTileBuffer::~CoordinatedUnacceleratedTileBuffer()
+ {
+-    const auto checkedArea = m_size.area().value() * 4;
++    const auto checkedArea = m_data.span().size();
+     {
+         Locker locker { s_layersMemoryUsageLock };
+         s_currentLayersMemoryUsage -= checkedArea;
+@@ -148,11 +155,13 @@ bool CoordinatedUnacceleratedTileBuffer::tryEnsureSurface()
+     if (m_surface)
+         return true;
+ 
+-    auto imageInfo = SkImageInfo::Make(m_size.width(), m_size.height(), kBGRA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++    if (m_data.span().empty())
++        return false;
++    const auto& imageInfo = m_imageInfo;
+     // FIXME: ref buffer and unref on release proc?
+     SkSurfaceProps properties = FontRenderOptions::singleton().createSurfaceProps();
+     m_surface = SkSurfaces::WrapPixels(imageInfo, data(), imageInfo.minRowBytes64(), &properties);
+-    return true;
++    return !!m_surface;
+ }
+ #endif
+ 
+@@ -171,6 +180,11 @@ CoordinatedAcceleratedTileBuffer::CoordinatedAcceleratedTileBuffer(Ref<BitmapTex
+ 
+ CoordinatedAcceleratedTileBuffer::~CoordinatedAcceleratedTileBuffer() = default;
+ 
++const SkImageInfo& CoordinatedAcceleratedTileBuffer::imageInfo() const
++{
++    return m_texture->imageInfo();
++}
++
+ IntSize CoordinatedAcceleratedTileBuffer::size() const
+ {
+     return m_texture->size();
+@@ -187,7 +201,7 @@ bool CoordinatedAcceleratedTileBuffer::tryEnsureSurface()
+     GrGLTextureInfo externalTexture;
+     externalTexture.fTarget = GL_TEXTURE_2D;
+     externalTexture.fID = m_texture->id();
+-    externalTexture.fFormat = GL_RGBA8;
++    externalTexture.fFormat = m_texture->internalFormat();
+ 
+     const auto& size = m_texture->size();
+     auto backendTexture = GrBackendTextures::MakeGL(size.width(), size.height(), skgpu::Mipmapped::kNo, externalTexture);
+@@ -205,16 +219,16 @@ bool CoordinatedAcceleratedTileBuffer::tryEnsureSurface()
+         backendTexture,
+         kTopLeft_GrSurfaceOrigin,
+         msaaSampleCount,
+-        kRGBA_8888_SkColorType,
+-        SkColorSpace::MakeSRGB(),
++        imageInfo().colorType(),
++        imageInfo().refColorSpace(),
+         &properties);
+ 
+-    return true;
++    return !!m_surface;
+ }
+ 
+ void CoordinatedAcceleratedTileBuffer::completePainting()
+ {
+-    auto* recordingContext = m_surface->recordingContext();
++    auto* recordingContext = m_surface ? m_surface->recordingContext() : nullptr;
+     auto* grContext = recordingContext ? recordingContext->asDirectContext() : nullptr;
+     if (!grContext) {
+         CoordinatedTileBuffer::completePainting();
+diff --git a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h
+index 03e639c7..0fb47b3f 100644
+--- a/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h
++++ b/Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h
+@@ -69,7 +69,8 @@ public:
+     void waitUntilPaintingComplete();
+ 
+ #if USE(SKIA)
+-    SkCanvas* canvas();
++    WEBCORE_EXPORT SkCanvas* canvas();
++    virtual const SkImageInfo& imageInfo() const = 0;
+ #endif
+ 
+     static void resetMemoryUsage();
+@@ -107,7 +108,17 @@ public:
+     WEBCORE_EXPORT static Ref<CoordinatedTileBuffer> create(const IntSize&, Flags);
+     WEBCORE_EXPORT virtual ~CoordinatedUnacceleratedTileBuffer();
+ 
+-    int stride() const { return m_size.width() * 4; }
++    size_t stride() const
++    {
++#if USE(SKIA)
++        return m_imageInfo.minRowBytes();
++#else
++        return m_size.width() * 4;
++#endif
++    }
++#if USE(SKIA)
++    const SkImageInfo& imageInfo() const final { return m_imageInfo; }
++#endif
+ 
+     const unsigned char* data() const { return m_data.span().data(); }
+     unsigned char* data() { return m_data.mutableSpan().data(); }
+@@ -124,6 +135,9 @@ private:
+     bool tryEnsureSurface() final;
+ #endif
+ 
++#if USE(SKIA)
++    SkImageInfo m_imageInfo;
++#endif
+     MallocSpan<unsigned char> m_data;
+     IntSize m_size;
+ 
+@@ -146,6 +160,7 @@ public:
+     WEBCORE_EXPORT virtual ~CoordinatedAcceleratedTileBuffer();
+ 
+     BitmapTexture& texture() const { return m_texture.get(); }
++    const SkImageInfo& imageInfo() const final;
+     void serverWait();
+ 
+ private:
+diff --git a/Source/WebKit/Shared/glib/RendererBufferFormat.h b/Source/WebKit/Shared/glib/RendererBufferFormat.h
+index ad9b2fbc..fd1b4436 100644
+--- a/Source/WebKit/Shared/glib/RendererBufferFormat.h
++++ b/Source/WebKit/Shared/glib/RendererBufferFormat.h
+@@ -48,6 +48,9 @@ struct RendererBufferFormat {
+ 
+     using Usage = RendererBufferFormatUsage;
+     Usage usage { Usage::Rendering };
++    // The UI import route can attach the ordinary page's nonlinear-sRGB
++    // colour state to floating storage. This does not advertise driver formats.
++    bool supportsExtendedSRGB { false };
+ #if USE(GBM)
+     WebCore::DRMDevice drmDevice;
+ #endif
+diff --git a/Source/WebKit/Shared/glib/RendererBufferFormat.serialization.in b/Source/WebKit/Shared/glib/RendererBufferFormat.serialization.in
+index 639d20ab..13341233 100644
+--- a/Source/WebKit/Shared/glib/RendererBufferFormat.serialization.in
++++ b/Source/WebKit/Shared/glib/RendererBufferFormat.serialization.in
+@@ -24,6 +24,7 @@
+ 
+ struct WebKit::RendererBufferFormat {
+     WebKit::RendererBufferFormat::Usage usage;
++    bool supportsExtendedSRGB;
+ #if USE(GBM)
+     WebCore::DRMDevice drmDevice;
+ #endif
+diff --git a/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in b/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in
+index b3af61aa..8842f4fb 100644
+--- a/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in
++++ b/Source/WebKit/UIProcess/glib/AcceleratedBackingStore.messages.in
+@@ -27,6 +27,9 @@
+ ]
+ messages -> AcceleratedBackingStore {
+     DidCreateDMABufBuffer(uint64_t id, WebCore::IntSize size, uint32_t format, Vector<UnixFileDescriptor> fds, Vector<uint32_t> offsets, Vector<uint32_t> strides, uint64_t modifier, WebKit::RendererBufferFormat::Usage usage)
++#if PLATFORM(GTK) && USE(GTK4)
++    DidCreateDMABufBufferWithColorSpace(uint64_t id, WebCore::IntSize size, uint32_t format, Vector<UnixFileDescriptor> fds, Vector<uint32_t> offsets, Vector<uint32_t> strides, uint64_t modifier, WebKit::RendererBufferFormat::Usage usage, WebCore::DestinationColorSpace colorSpace)
++#endif
+     DidCreateSHMBuffer(uint64_t id, WebCore::ShareableBitmapHandle handle)
+ 
+ #if OS(ANDROID)
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+index 4e6f7c76..84a7976c 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+@@ -90,6 +90,17 @@ using namespace WebCore;
+ 
+ WTF_MAKE_TZONE_ALLOCATED_IMPL(AcceleratedBackingStore);
+ 
++static bool isFloatingPointBufferFormat(uint32_t format)
++{
++#if USE(LIBDRM)
++    return format == DRM_FORMAT_ARGB16161616F || format == DRM_FORMAT_ABGR16161616F
++        || format == DRM_FORMAT_XRGB16161616F || format == DRM_FORMAT_XBGR16161616F;
++#else
++    UNUSED_PARAM(format);
++    return false;
++#endif
++}
++
+ static bool isNVIDIA()
+ {
+     const char* forceDMABuf = getenv("WEBKIT_FORCE_DMABUF_RENDERER");
+@@ -247,9 +258,28 @@ Vector<RendererBufferFormat> AcceleratedBackingStore::preferredBufferFormats()
+     RendererBufferFormat format;
+     format.usage = RendererBufferFormat::Usage::Rendering;
+     format.drmDevice = drmMainDevice();
+-    format.formats = display.glDisplay()->bufferFormats().map([](const auto& format) -> RendererBufferFormat::Format {
+-        return { format.fourcc.value, format.modifiers };
+-    });
++#if USE(SKIA) && GTK_CHECK_VERSION(4, 16, 0)
++    auto* gdkFormats = gdk_display_get_dmabuf_formats(gdk_display_get_default());
++    format.supportsExtendedSRGB = true;
++#endif
++    for (const auto& supported : display.glDisplay()->bufferFormats()) {
++        RendererBufferFormat::Format candidate { supported.fourcc.value, supported.modifiers };
++        if (isFloatingPointBufferFormat(candidate.fourcc)) {
++#if USE(SKIA) && GTK_CHECK_VERSION(4, 16, 0)
++            // An EGL format alone is not proof that GDK can import its storage.
++            candidate.modifiers = WTF::compactMap(candidate.modifiers, [&](uint64_t modifier) -> std::optional<uint64_t> {
++                if (gdkFormats && gdk_dmabuf_formats_contains(gdkFormats, candidate.fourcc, modifier))
++                    return modifier;
++                return std::nullopt;
++            });
++            if (candidate.modifiers.isEmpty())
++                continue;
++#else
++            continue;
++#endif
++        }
++        format.formats.append(WTF::move(candidate));
++    }
+     return { WTF::move(format) };
+ }
+ #endif
+@@ -369,12 +399,24 @@ static RefPtr<NativeImage> nativeImageFromGdkTexture(GdkTexture* texture)
+     cairo_surface_mark_dirty(surface.get());
+     return NativeImage::create(WTF::move(surface));
+ #elif USE(SKIA)
++#if GTK_CHECK_VERSION(4, 16, 0)
++    auto imageInfo = SkImageInfo::Make(gdk_texture_get_width(texture), gdk_texture_get_height(texture), kRGBA_F16_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++#else
+     auto imageInfo = SkImageInfo::MakeN32Premul(gdk_texture_get_width(texture), gdk_texture_get_height(texture), SkColorSpace::MakeSRGB());
++#endif
+     SkBitmap bitmap;
+     if (!bitmap.tryAllocPixels(imageInfo))
+         return nullptr;
+ 
++#if GTK_CHECK_VERSION(4, 16, 0)
++    auto* downloader = gdk_texture_downloader_new(texture);
++    gdk_texture_downloader_set_format(downloader, GDK_MEMORY_R16G16B16A16_FLOAT_PREMULTIPLIED);
++    gdk_texture_downloader_set_color_state(downloader, gdk_color_state_get_srgb());
++    gdk_texture_downloader_download_into(downloader, reinterpret_cast<guchar*>(bitmap.getPixels()), bitmap.rowBytes());
++    gdk_texture_downloader_free(downloader);
++#else
+     gdk_texture_download(texture, reinterpret_cast<guchar*>(bitmap.getPixels()), imageInfo.minRowBytes());
++#endif
+     bitmap.setImmutable();
+     return NativeImage::create(bitmap.asImage());
+ #endif
+@@ -382,7 +424,7 @@ static RefPtr<NativeImage> nativeImageFromGdkTexture(GdkTexture* texture)
+ #endif
+ 
+ #if GTK_CHECK_VERSION(4, 13, 4)
+-RefPtr<AcceleratedBackingStore::Buffer> AcceleratedBackingStore::BufferDMABuf::create(WebPageProxy& webPage, uint64_t id, uint64_t surfaceID, const IntSize& size, RendererBufferFormat::Usage usage, uint32_t format, Vector<UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier)
++RefPtr<AcceleratedBackingStore::Buffer> AcceleratedBackingStore::BufferDMABuf::create(WebPageProxy& webPage, uint64_t id, uint64_t surfaceID, const IntSize& size, RendererBufferFormat::Usage usage, uint32_t format, Vector<UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, const DestinationColorSpace& colorSpace)
+ {
+     GRefPtr<GdkDmabufTextureBuilder> builder = adoptGRef(gdk_dmabuf_texture_builder_new());
+     gdk_dmabuf_texture_builder_set_display(builder.get(), gtk_widget_get_display(webPage.viewWidget()));
+@@ -390,6 +432,14 @@ RefPtr<AcceleratedBackingStore::Buffer> AcceleratedBackingStore::BufferDMABuf::c
+     gdk_dmabuf_texture_builder_set_height(builder.get(), size.height());
+     gdk_dmabuf_texture_builder_set_fourcc(builder.get(), format);
+     gdk_dmabuf_texture_builder_set_modifier(builder.get(), modifier);
++    // Only the explicit ordinary page contract reaches this builder. Native
++    // video descriptions are carried by their separate frame-plane lease.
++    if (colorSpace != DestinationColorSpace::SRGB())
++        return nullptr;
++#if GTK_CHECK_VERSION(4, 16, 0)
++    gdk_dmabuf_texture_builder_set_color_state(builder.get(), gdk_color_state_get_srgb());
++#endif
++    gdk_dmabuf_texture_builder_set_premultiplied(builder.get(), TRUE);
+     auto planeCount = fds.size();
+     gdk_dmabuf_texture_builder_set_n_planes(builder.get(), planeCount);
+     for (unsigned i = 0; i < planeCount; ++i) {
+@@ -548,9 +598,22 @@ void AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const R
+     auto* texture = createTexture();
+     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, m_image);
+ 
++#if GTK_CHECK_VERSION(4, 16, 0)
++    GRefPtr<GdkGLTextureBuilder> builder = adoptGRef(gdk_gl_texture_builder_new());
++    gdk_gl_texture_builder_set_context(builder.get(), texture->context.get());
++    gdk_gl_texture_builder_set_id(builder.get(), texture->id);
++    gdk_gl_texture_builder_set_width(builder.get(), m_size.width());
++    gdk_gl_texture_builder_set_height(builder.get(), m_size.height());
++    gdk_gl_texture_builder_set_format(builder.get(), isFloatingPointBufferFormat(m_fourcc) ? GDK_MEMORY_R16G16B16A16_FLOAT_PREMULTIPLIED : GDK_MEMORY_R8G8B8A8_PREMULTIPLIED);
++    gdk_gl_texture_builder_set_color_state(builder.get(), gdk_color_state_get_srgb());
++    m_texture = adoptGRef(gdk_gl_texture_builder_build(builder.get(), [](gpointer userData) {
++        destroyTexture(static_cast<Texture*>(userData));
++    }, texture));
++#else
+     m_texture = adoptGRef(gdk_gl_texture_new(texture->context.get(), texture->id, m_size.width(), m_size.height(), [](gpointer userData) {
+         destroyTexture(static_cast<Texture*>(userData));
+     }, texture));
++#endif
+ }
+ #else
+ void AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const Rects&)
+@@ -721,6 +784,9 @@ void AcceleratedBackingStore::BufferSHM::release()
+ 
+ void AcceleratedBackingStore::didCreateDMABufBuffer(uint64_t id, const IntSize& size, uint32_t format, Vector<WTF::UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, RendererBufferFormat::Usage usage)
+ {
++#if USE(GTK4)
++    didCreateDMABufBufferWithColorSpace(id, size, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, usage, DestinationColorSpace::SRGB());
++#else
+     RefPtr webPage = m_webPage.get();
+     if (!webPage)
+         return;
+@@ -743,8 +809,48 @@ void AcceleratedBackingStore::didCreateDMABufBuffer(uint64_t id, const IntSize&
+ 
+     if (auto buffer = BufferEGLImage::create(*webPage, id, m_surfaceID, size, usage, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier))
+         m_buffers.add(id, WTF::move(buffer));
++#endif
+ }
+ 
++#if USE(GTK4)
++void AcceleratedBackingStore::didCreateDMABufBufferWithColorSpace(uint64_t id, const IntSize& size, uint32_t format, Vector<WTF::UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, RendererBufferFormat::Usage usage, const DestinationColorSpace& colorSpace)
++{
++    if (colorSpace != DestinationColorSpace::SRGB()) {
++        WTFLogAlways("Unsupported ordinary page colour space");
++        return;
++    }
++#if !GTK_CHECK_VERSION(4, 16, 0)
++    if (isFloatingPointBufferFormat(format)) {
++        WTFLogAlways("Floating page import requires explicit GDK colour state support");
++        return;
++    }
++#endif
++    RefPtr webPage = m_webPage.get();
++    if (!webPage)
++        return;
++
++#if USE(GBM)
++    if (!Display::singleton().glDisplayIsSharedWithGtk()) {
++        ASSERT(fds.size() == 1 && strides.size() == 1);
++        if (auto buffer = BufferGBM::create(*webPage, id, m_surfaceID, size, usage, format, WTF::move(fds[0]), strides[0]))
++            m_buffers.add(id, WTF::move(buffer));
++        return;
++    }
++#endif
++
++#if GTK_CHECK_VERSION(4, 13, 4)
++    if (auto buffer = BufferDMABuf::create(*webPage, id, m_surfaceID, size, usage, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, colorSpace)) {
++        m_buffers.add(id, WTF::move(buffer));
++        return;
++    }
++#endif
++
++    if (auto buffer = BufferEGLImage::create(*webPage, id, m_surfaceID, size, usage, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier))
++        m_buffers.add(id, WTF::move(buffer));
++
++}
++#endif
++
+ void AcceleratedBackingStore::didCreateSHMBuffer(uint64_t id, ShareableBitmap::Handle&& handle)
+ {
+     RefPtr webPage = m_webPage.get();
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+index 7cde20f4..e0bc5b87 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+@@ -28,6 +28,7 @@
+ #include "FenceMonitor.h"
+ #include "MessageReceiver.h"
+ #include "RendererBufferDescription.h"
++#include <WebCore/DestinationColorSpace.h>
+ #include <WebCore/IntRect.h>
+ #include <WebCore/IntSize.h>
+ #include <WebCore/RefPtrCairo.h>
+@@ -100,6 +101,9 @@ private:
+     void didReceiveMessage(IPC::Connection&, IPC::Decoder&) override;
+ 
+     void didCreateDMABufBuffer(uint64_t id, const WebCore::IntSize&, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, RendererBufferFormat::Usage);
++#if USE(GTK4)
++    void didCreateDMABufBufferWithColorSpace(uint64_t id, const WebCore::IntSize&, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, RendererBufferFormat::Usage, const WebCore::DestinationColorSpace&);
++#endif
+     void didCreateSHMBuffer(uint64_t id, WebCore::ShareableBitmapHandle&&);
+     void didDestroyBuffer(uint64_t id);
+     void frame(uint64_t id, Rects&&, WTF::UnixFileDescriptor&&);
+@@ -166,7 +170,7 @@ private:
+ #if GTK_CHECK_VERSION(4, 13, 4)
+     class BufferDMABuf final : public Buffer {
+     public:
+-        static RefPtr<Buffer> create(WebPageProxy&, uint64_t id, uint64_t surfaceID, const WebCore::IntSize&, RendererBufferFormat::Usage, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier);
++        static RefPtr<Buffer> create(WebPageProxy&, uint64_t id, uint64_t surfaceID, const WebCore::IntSize&, RendererBufferFormat::Usage, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, const WebCore::DestinationColorSpace&);
+ 
+     private:
+         BufferDMABuf(WebPageProxy&, uint64_t id, uint64_t surfaceID, const WebCore::IntSize&, RendererBufferFormat::Usage, Vector<WTF::UnixFileDescriptor>&&, GRefPtr<GdkDmabufTextureBuilder>&&);
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+index 2df014dc..b2998dfc 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+@@ -78,8 +78,10 @@
+ #endif
+ 
+ #if USE(SKIA)
++#include <WebCore/BitmapTexture.h>
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
+ #include <skia/gpu/ganesh/GrBackendSurface.h>
++#include <skia/gpu/ganesh/GrDirectContext.h>
+ #include <skia/gpu/ganesh/SkSurfaceGanesh.h>
+ #include <skia/gpu/ganesh/gl/GrGLBackendSurface.h>
+ WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+@@ -95,6 +97,20 @@ static inline bool isColorOpaque(AcceleratedSurface::ColorComponents color)
+     return color[3] == WebCore::AlphaTraits<float>::opaque;
+ }
+ 
++static constexpr GLenum pageRGBA16F = 0x881A;
++static constexpr GLenum pageHalfFloat = 0x140B;
++
++static bool isFloatingPointBufferFormat(uint32_t format)
++{
++#if USE(GBM) || OS(ANDROID)
++    return format == DRM_FORMAT_ARGB16161616F || format == DRM_FORMAT_ABGR16161616F
++        || format == DRM_FORMAT_XRGB16161616F || format == DRM_FORMAT_XBGR16161616F;
++#else
++    UNUSED_PARAM(format);
++    return false;
++#endif
++}
++
+ static uint64_t generateID()
+ {
+     static uint64_t identifier = 0;
+@@ -125,7 +141,7 @@ AcceleratedSurface::AcceleratedSurface(WebPage& webPage, Function<void()>&& fram
+     m_backgroundColor = color ? color->toResolvedColorComponentsInColorSpace(WebCore::ColorSpace::SRGB) : white;
+ 
+ #if (PLATFORM(GTK) || ENABLE(WPE_PLATFORM)) && (USE(GBM) || OS(ANDROID))
+-    if (m_swapChain.type() == SwapChain::Type::EGLImage)
++    if (m_swapChain.type() == SwapChain::Type::EGLImage || m_swapChain.type() == SwapChain::Type::Texture)
+         m_swapChain.setupBufferFormat(m_webPage->preferredBufferFormats(), isColorOpaque(m_backgroundColor));
+ #endif
+ #if USE(WPE_RENDERER)
+@@ -168,10 +184,15 @@ void AcceleratedSurface::RenderTarget::addDamage(const std::optional<Damage>& da
+ #if PLATFORM(GTK) || ENABLE(WPE_PLATFORM)
+ WTF_MAKE_TZONE_ALLOCATED_IMPL(AcceleratedSurface::RenderTargetShareableBuffer);
+ 
+-AcceleratedSurface::RenderTargetShareableBuffer::RenderTargetShareableBuffer(uint64_t surfaceID, const IntSize& size)
++AcceleratedSurface::RenderTargetShareableBuffer::RenderTargetShareableBuffer(uint64_t surfaceID, const IntSize& size, bool extendedSRGB)
+     : RenderTarget(surfaceID)
+     , m_initialSize(size)
+ {
++#if USE(SKIA)
++    m_imageInfo = SkImageInfo::Make(size.width(), size.height(), extendedSRGB ? kRGBA_F16_SkColorType : kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++#else
++    UNUSED_PARAM(extendedSRGB);
++#endif
+     glGenFramebuffers(1, &m_fbo);
+     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+ 
+@@ -214,7 +235,7 @@ GraphicsContext* AcceleratedSurface::RenderTargetShareableBuffer::graphicsContex
+         const int sampleCount = 0; // 0 == no MSAA.
+         GrGLFramebufferInfo fbInfo;
+         fbInfo.fFBOID = m_fbo;
+-        fbInfo.fFormat = GL_RGBA8;
++        fbInfo.fFormat = m_imageInfo.colorType() == kRGBA_F16_SkColorType ? pageRGBA16F : GL_RGBA8;
+         GrBackendRenderTarget renderTargetSkia = GrBackendRenderTargets::MakeGL(
+             m_initialSize.width(),
+             m_initialSize.height(),
+@@ -228,8 +249,8 @@ GraphicsContext* AcceleratedSurface::RenderTargetShareableBuffer::graphicsContex
+             PlatformDisplay::sharedDisplay().skiaGrContext(),
+             renderTargetSkia,
+             GrSurfaceOrigin::kTopLeft_GrSurfaceOrigin,
+-            SkColorType::kRGBA_8888_SkColorType,
+-            nullptr,
++            m_imageInfo.colorType(),
++            m_imageInfo.refColorSpace(),
+             nullptr
+         );
+         if (!m_graphicsContext.surface)
+@@ -382,15 +403,22 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTarg
+         return nullptr;
+     }
+ 
+-    return makeUnique<RenderTargetEGLImage>(surfaceID, size, image, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, bufferFormat.usage);
++    auto target = makeUnique<RenderTargetEGLImage>(surfaceID, size, image, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, bufferFormat.usage);
++    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
++        return nullptr;
++    return target;
+ }
+ 
+ AcceleratedSurface::RenderTargetEGLImage::RenderTargetEGLImage(uint64_t surfaceID, const IntSize& size, EGLImage image, uint32_t format, Vector<UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier, RendererBufferFormat::Usage usage)
+-    : RenderTargetShareableBuffer(surfaceID, size)
++    : RenderTargetShareableBuffer(surfaceID, size, isFloatingPointBufferFormat(format))
+     , m_image(image)
+ {
+     initializeColorBuffer();
++#if PLATFORM(GTK) && USE(GTK4)
++    WebProcess::singleton().parentProcessConnection()->send(Messages::AcceleratedBackingStore::DidCreateDMABufBufferWithColorSpace(m_id, size, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, usage, DestinationColorSpace::SRGB()), surfaceID);
++#else
+     WebProcess::singleton().parentProcessConnection()->send(Messages::AcceleratedBackingStore::DidCreateDMABufBuffer(m_id, size, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, usage), surfaceID);
++#endif
+ }
+ #endif // USE(GBM)
+ 
+@@ -523,7 +551,7 @@ void AcceleratedSurface::RenderTargetSHMImage::didRenderFrame(Vector<IntRect, 1>
+     RenderTargetShareableBuffer::didRenderFrame(WTF::move(damageRects));
+ }
+ 
+-std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTargetTexture::create(uint64_t surfaceID, const IntSize& size)
++std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTargetTexture::create(uint64_t surfaceID, const IntSize& size, bool extendedSRGB)
+ {
+     unsigned texture;
+     glGenTextures(1, &texture);
+@@ -532,7 +560,7 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTarg
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width(), size.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
++    glTexImage2D(GL_TEXTURE_2D, 0, extendedSRGB ? pageRGBA16F : GL_RGBA, size.width(), size.height(), 0, GL_RGBA, extendedSRGB ? pageHalfFloat : GL_UNSIGNED_BYTE, nullptr);
+ 
+     auto& display = PlatformDisplay::sharedDisplay();
+     auto image = display.createEGLImage(eglGetCurrentContext(), EGL_GL_TEXTURE_2D, (EGLClientBuffer)(uint64_t)texture, { });
+@@ -551,6 +579,12 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTarg
+         return nullptr;
+     }
+ 
++    if (extendedSRGB && !isFloatingPointBufferFormat(fourcc)) {
++        display.destroyEGLImage(image);
++        glDeleteTextures(1, &texture);
++        return create(surfaceID, size, false);
++    }
++
+     Vector<int> fdsOut(planeCount);
+     Vector<int> stridesOut(planeCount);
+     Vector<int> offsetsOut(planeCount);
+@@ -577,12 +611,16 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTarg
+ }
+ 
+ AcceleratedSurface::RenderTargetTexture::RenderTargetTexture(uint64_t surfaceID, const IntSize& size, unsigned texture, uint32_t format, Vector<UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier)
+-    : RenderTargetShareableBuffer(surfaceID, size)
++    : RenderTargetShareableBuffer(surfaceID, size, isFloatingPointBufferFormat(format))
+     , m_texture(texture)
+ {
+     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_texture, 0);
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    WebProcess::singleton().parentProcessConnection()->send(Messages::AcceleratedBackingStore::DidCreateDMABufBufferWithColorSpace(m_id, size, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, RendererBufferFormat::Usage::Rendering, DestinationColorSpace::SRGB()), surfaceID);
++#else
+     WebProcess::singleton().parentProcessConnection()->send(Messages::AcceleratedBackingStore::DidCreateDMABufBuffer(m_id, size, format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier, RendererBufferFormat::Usage::Rendering), surfaceID);
++#endif
+ }
+ 
+ AcceleratedSurface::RenderTargetTexture::~RenderTargetTexture()
+@@ -713,6 +751,71 @@ void AcceleratedSurface::SwapChain::setupBufferFormat(const Vector<RendererBuffe
+             && fourcc != DRM_FORMAT_ABGR16161616F;
+     };
+ 
++#if PLATFORM(GTK) && USE(GTK4) && USE(SKIA)
++    // Prefer a sufficient working format only when both the real GL/Skia
++    // surface and the UI import route support it. Fourcc/modifiers still come
++    // from the intersection of the two devices' advertised formats.
++    bool supportsFloat = false;
++#if PLATFORM(GTK) && USE(GTK4) && USE(SKIA)
++    auto& display = PlatformDisplay::sharedDisplay();
++    auto* skiaContext = display.skiaGLContext();
++    if (skiaContext) {
++        GLContext::ScopedGLContextCurrent current(*skiaContext);
++        auto* grContext = display.skiaGrContext();
++        supportsFloat = BitmapTexture::supportsExtendedColor() && grContext && grContext->colorTypeSupportedAsSurface(kRGBA_F16_SkColorType);
++    }
++#endif
++    Locker locker { m_bufferFormatLock };
++    BufferFormat newBufferFormat;
++    const auto& supportedFormats = PlatformDisplay::sharedDisplay().bufferFormats();
++    for (bool preferFloat : { true, false }) {
++        for (const auto& bufferFormat : preferredFormats) {
++            bool matchesOpacity = false;
++            for (const auto& format : supportedFormats) {
++                bool floating = isFloatingPointBufferFormat(format.fourcc.value);
++                if (floating != preferFloat || (floating && (!supportsFloat || !bufferFormat.supportsExtendedSRGB)))
++                    continue;
++                // Other packed formats need a separate typed Skia wrapper;
++                // preserve the known RGBA8 fallback instead of mislabelling.
++                if (!floating && format.fourcc != DRM_FORMAT_ARGB8888 && format.fourcc != DRM_FORMAT_XRGB8888
++                    && format.fourcc != DRM_FORMAT_ABGR8888 && format.fourcc != DRM_FORMAT_XBGR8888)
++                    continue;
++                auto index = bufferFormat.formats.findIf([&](const auto& item) { return format.fourcc == item.fourcc; });
++                if (index == notFound)
++                    continue;
++                const auto& preferredFormat = bufferFormat.formats[index];
++                matchesOpacity = isOpaqueFormat(preferredFormat.fourcc) == isOpaque;
++                if (!matchesOpacity && newBufferFormat.fourcc)
++                    continue;
++#if USE(GBM)
++                Vector<uint64_t, 1> modifiers;
++                if (!preferredFormat.modifiers.isEmpty() && preferredFormat.modifiers[0] == DRM_FORMAT_MOD_INVALID)
++                    modifiers = preferredFormat.modifiers;
++                else {
++                    modifiers = WTF::compactMap(preferredFormat.modifiers, [&format](uint64_t modifier) -> std::optional<uint64_t> {
++                        if (format.modifiers.contains(modifier))
++                            return modifier;
++                        return std::nullopt;
++                    });
++                }
++                if (modifiers.isEmpty())
++                    continue;
++                newBufferFormat.drmDevice = bufferFormat.drmDevice;
++                newBufferFormat.modifiers = WTF::move(modifiers);
++#endif
++                newBufferFormat.usage = bufferFormat.usage;
++                newBufferFormat.fourcc = preferredFormat.fourcc;
++                if (matchesOpacity)
++                    break;
++            }
++            if (newBufferFormat.fourcc && matchesOpacity)
++                break;
++        }
++        if (newBufferFormat.fourcc)
++            break;
++    }
++
++#else
+     // The preferred formats vector is sorted by usage, but all formats for the same usage has the same priority.
+     Locker locker { m_bufferFormatLock };
+     BufferFormat newBufferFormat;
+@@ -755,6 +858,8 @@ void AcceleratedSurface::SwapChain::setupBufferFormat(const Vector<RendererBuffe
+             break;
+     }
+ 
++#endif
++
+     if (!newBufferFormat.fourcc || newBufferFormat == m_bufferFormat)
+         return;
+ 
+@@ -796,10 +901,18 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::SwapChain:
+ #if PLATFORM(GTK) || ENABLE(WPE_PLATFORM)
+ #if USE(GBM) || OS(ANDROID)
+     case Type::EGLImage:
+-        return RenderTargetEGLImage::create(m_surfaceID, m_size, m_bufferFormat);
++        if (auto target = RenderTargetEGLImage::create(m_surfaceID, m_size, m_bufferFormat))
++            return target;
++        return RenderTargetSHMImage::create(m_surfaceID, m_size);
+ #endif
+     case Type::Texture:
+-        return RenderTargetTexture::create(m_surfaceID, m_size);
++#if USE(GBM) || OS(ANDROID)
++        if (auto target = RenderTargetTexture::create(m_surfaceID, m_size, isFloatingPointBufferFormat(m_bufferFormat.fourcc)))
++            return target;
++        return RenderTargetSHMImage::create(m_surfaceID, m_size);
++#else
++        return RenderTargetTexture::create(m_surfaceID, m_size, false);
++#endif
+     case Type::SharedMemory:
+         return RenderTargetSHMImage::create(m_surfaceID, m_size);
+ #endif
+@@ -825,7 +938,7 @@ AcceleratedSurface::RenderTarget* AcceleratedSurface::SwapChain::nextTarget()
+ #endif
+ 
+ #if (PLATFORM(GTK) || ENABLE(WPE_PLATFORM)) && (USE(GBM) || OS(ANDROID))
+-    if (m_type == Type::EGLImage) {
++    if (m_type == Type::EGLImage || m_type == Type::Texture) {
+         Locker locker { m_bufferFormatLock };
+         if (m_bufferFormatChanged) {
+             reset();
+@@ -975,7 +1088,7 @@ void AcceleratedSurface::backgroundColorDidChange()
+         return;
+ 
+ #if (PLATFORM(GTK) || ENABLE(WPE_PLATFORM)) && (USE(GBM) || OS(ANDROID))
+-    if (m_swapChain.type() == SwapChain::Type::EGLImage)
++    if (m_swapChain.type() == SwapChain::Type::EGLImage || m_swapChain.type() == SwapChain::Type::Texture)
+         m_swapChain.setupBufferFormat(m_webPage->preferredBufferFormats(), isOpaque);
+ #endif
+ }
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
+index 3970e996..de749900 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
+@@ -61,6 +61,9 @@ typedef void *EGLImage;
+ 
+ #if USE(SKIA)
+ #include <WebCore/GraphicsContextSkia.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
++#include <skia/core/SkImageInfo.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+ #endif
+ 
+ #if USE(WPE_RENDERER)
+@@ -214,7 +217,7 @@ private:
+         std::unique_ptr<WebCore::GLFence> createRenderingFence(bool) const;
+ 
+     protected:
+-        RenderTargetShareableBuffer(uint64_t, const WebCore::IntSize&);
++        RenderTargetShareableBuffer(uint64_t, const WebCore::IntSize&, bool extendedSRGB = false);
+ 
+         WebCore::GraphicsContext* graphicsContext() override;
+ 
+@@ -236,6 +239,9 @@ private:
+         } m_graphicsContext;
+ #endif
+         WebCore::IntSize m_initialSize;
++#if USE(SKIA)
++        SkImageInfo m_imageInfo;
++#endif
+     };
+ 
+ #if USE(GBM) || OS(ANDROID)
+@@ -313,7 +319,7 @@ private:
+ 
+     class RenderTargetTexture final : public RenderTargetShareableBuffer {
+     public:
+-        static std::unique_ptr<RenderTarget> create(uint64_t, const WebCore::IntSize&);
++        static std::unique_ptr<RenderTarget> create(uint64_t, const WebCore::IntSize&, bool extendedSRGB);
+         RenderTargetTexture(uint64_t, const WebCore::IntSize&, unsigned texture, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier);
+         ~RenderTargetTexture();
+ 
+-- 
+2.54.0 (Apple Git-157)
+

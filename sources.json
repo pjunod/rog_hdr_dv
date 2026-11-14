@@ -1121,11 +1121,19 @@
       "component": "ubuntu-webkitgtk-native-hdr",
       "base_commit": "5e156fdf2d8daf0485d3b20ffbdde9725bb57d26",
       "base_tree": "42cb56170bd8e122c8632b3616fd3a2e707bb458",
-      "candidate_commit": "c1fcae696a4d2eb53258f7c9f2d23d1011b94dca",
-      "candidate_tree": "d540726b883a6f21596105ebb55d43729da7afc1",
-      "patch_count": 1,
+      "candidate_commit": "3a36d41e05708abafad13baa528ae597ea101878",
+      "candidate_tree": "eac3b703d500c66e8a3f5ef32236c2aef00f6a68",
+      "patch_count": 9,
       "patch_order": [
-        "0001-webkitgtk-clear-video-and-native-hdr.patch"
+        "0001-webkitgtk-clear-video-and-native-hdr.patch",
+        "0002-skia-preserve-image-profiles-and-png16.patch",
+        "0003-skia-use-typed-float-working-buffers.patch",
+        "0004-tests-cover-decoded-images-and-float-storage.patch",
+        "0005-skia-preserve-float-through-coordinated-pages.patch",
+        "0006-tests-cover-coordinated-image-precision.patch",
+        "0007-skia-preserve-typed-solid-fills-and-cache-cost.patch",
+        "0008-webkit-bind-native-frame-metadata-to-page-buffer-ownership.patch",
+        "0009-tests-reuse-shipping-objects-for-focused-colour-checks.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -1158,8 +1166,10 @@
           "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
         }
       },
-      "candidate_status": "Single product patch (41 paths; reviewed ad531204 plus the viewport state-restore fix, source-policy attestation logging, arming of byte holders autoplugged after typefinding and a mapper-led page video sink (b0ec7ff0), a GStreamer registry of the sandbox\u2019s own (1d380b37), the NVIDIA unified-memory device bind and decoder ordering by the rendering GPU unless only another decoder composes the enhancement layer (0175a11c), and flushing loops for media pushed by WebKitWebSrc, whose segment-done marks the end of the download rather than of playback (ec69ce27, c1fcae69)) for ordinary clear HTML video with an explicit 100-nit SDR page destination and a tagged native HDR plane under a current GTK view lease. Packaged by packaging/webkitgtk-native-hdr as 2.52.6-1ubuntu1+rogdv6.",
-      "candidate_package_version": "2.52.6-1ubuntu1+rogdv6"
+      "candidate_status": "Nine-patch product source candidate retains image profiles and meaningful PNG16 precision, uses typed nonlinear-sRGB float working storage through accelerated pages and GTK import, and couples native frame metadata to buffer ownership. Source/Tools implementation and focused native regression sources are prepared. An excluded focused executable reuses shipping WebCore objects with the production feature profile unchanged. Original Debian tree remains unchanged for the separate Ubuntu packaging overlay. Candidate compile/link, final independent review, affected tests, package and runtime acceptance remain pending; no rogdv7 installation. The rogdv6 source and historical receipts remain separate.",
+      "candidate_package_version": "2.52.6-1ubuntu1+rogdv7",
+      "previous_candidate_commit": "c1fcae696a4d2eb53258f7c9f2d23d1011b94dca",
+      "previous_candidate_tree": "d540726b883a6f21596105ebb55d43729da7afc1"
     }
   ]
 }

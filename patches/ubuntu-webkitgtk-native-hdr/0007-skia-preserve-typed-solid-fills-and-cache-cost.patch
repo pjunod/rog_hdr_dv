@@ -1,0 +1,297 @@
+From 04ec2128158ad58d25dfdd64f815d5032604c459 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:21:06 -0500
+Subject: [PATCH 6/7] Preserve typed image precision in solid fills and cache
+ accounting
+
+Read one-pixel images into explicit nonlinear-sRGB float RGBA with separate alpha and preserve extended colour through the optimized Skia fill. Count actual raster row storage or a typed nominal GPU estimate, refuse checked cache-size overflow, and retain each selected source cost before clearing its image. Prepare one-pixel drawing and padded-row clear regressions.
+
+No compiler or tests were run; native object, internal ABI/vtable link and behavioral qualification remain pending.
+---
+ .../platform/graphics/BitmapImageSource.cpp   | 13 ++++-
+ .../WebCore/platform/graphics/ImageFrame.cpp  | 40 ++++++++++++++-
+ Source/WebCore/platform/graphics/ImageFrame.h |  5 +-
+ .../graphics/skia/GraphicsContextSkia.cpp     |  5 +-
+ .../skia/ImageBufferSkiaSurfaceBackend.cpp    |  2 +-
+ .../graphics/skia/NativeImageSkia.cpp         | 31 ++++++------
+ .../Tests/WebCore/SkiaDecodedImageColour.cpp  | 49 +++++++++++++++++++
+ 7 files changed, 122 insertions(+), 23 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/BitmapImageSource.cpp b/Source/WebCore/platform/graphics/BitmapImageSource.cpp
+index 68ddd263..e0bb74c6 100644
+--- a/Source/WebCore/platform/graphics/BitmapImageSource.cpp
++++ b/Source/WebCore/platform/graphics/BitmapImageSource.cpp
+@@ -34,6 +34,7 @@
+ #include "ImageFrameAnimator.h"
+ #include "ImageObserver.h"
+ #include "Logging.h"
++#include <limits>
+ 
+ namespace WebCore {
+ 
+@@ -474,8 +475,16 @@ void BitmapImageSource::cacheNativeImageAtIndex(unsigned index, SubsamplingLevel
+     destroyNativeImageAtIndex(index, options.shouldDecodeToHDR());
+ 
+     // Do not cache NativeImage if adding its sizeInBytes to MemoryCache will cause numerical overflow.
++#if USE(SKIA)
++    auto sizeInBytes = ImageFrame::nativeImageSizeInBytes(nativeImage.get());
++#else
+     auto sizeInBytes = nativeImage->size().unclampedArea() * sizeof(uint32_t);
+-    if (!isInBounds<unsigned>(sizeInBytes + m_decodedSize))
++#endif
++#if USE(SKIA)
++    if (sizeInBytes == std::numeric_limits<size_t>::max())
++        return; // Skia/checked row-size overflow, including on 32-bit builds.
++#endif
++    if (!isInBounds<unsigned>(sizeInBytes) || sizeInBytes > std::numeric_limits<unsigned>::max() - m_decodedSize)
+         return;
+ 
+     auto& frame = m_frames[index];
+@@ -485,7 +494,7 @@ void BitmapImageSource::cacheNativeImageAtIndex(unsigned index, SubsamplingLevel
+     source.headroom = nativeImage->headroom();
+ 
+     cacheMetadataAtIndex(index, subsamplingLevel, options);
+-    decodedSizeIncreased(frame.sizeInBytes());
++    decodedSizeIncreased(frame.sizeInBytes(options.shouldDecodeToHDR()));
+ }
+ 
+ const ImageFrame& BitmapImageSource::frameAtIndex(unsigned index) const
+diff --git a/Source/WebCore/platform/graphics/ImageFrame.cpp b/Source/WebCore/platform/graphics/ImageFrame.cpp
+index 7d6678a5..9cc1c365 100644
+--- a/Source/WebCore/platform/graphics/ImageFrame.cpp
++++ b/Source/WebCore/platform/graphics/ImageFrame.cpp
+@@ -27,6 +27,14 @@
+ #include "ImageFrame.h"
+ 
+ #include <wtf/NeverDestroyed.h>
++#include <limits>
++#if USE(SKIA)
++#include <wtf/CheckedArithmetic.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
++#include <skia/core/SkImage.h>
++#include <skia/core/SkPixmap.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
++#endif
+ 
+ namespace WebCore {
+ 
+@@ -86,14 +94,44 @@ DecodingStatus ImageFrame::decodingStatus() const
+     return m_decodingStatus;
+ }
+ 
++#if USE(SKIA)
++size_t ImageFrame::nativeImageSizeInBytes(const NativeImage& nativeImage)
++{
++    auto image = nativeImage.platformImage();
++    SkPixmap pixels;
++    if (image->peekPixels(&pixels)) {
++        auto bytes = CheckedSize(pixels.rowBytes()) * image->height();
++        return bytes.hasOverflowed() ? std::numeric_limits<size_t>::max() : bytes.value();
++    }
++    // GPU resident allocation is driver-dependent. This is a checked nominal
++    // pixel-storage estimate with the actual colour type, not a residency claim.
++    return image->imageInfo().computeMinByteSize();
++}
++#endif
++
++unsigned ImageFrame::sizeInBytes(std::optional<ShouldDecodeToHDR> shouldDecodeToHDR) const
++{
++#if USE(SKIA)
++    auto image = nativeImage(shouldDecodeToHDR);
++    if (!image)
++        return 0;
++    auto bytes = nativeImageSizeInBytes(*image);
++    return isInBounds<unsigned>(bytes) ? static_cast<unsigned>(bytes) : std::numeric_limits<unsigned>::max();
++#else
++    UNUSED_PARAM(shouldDecodeToHDR);
++    return (size().area() * sizeof(uint32_t)).value();
++#endif
++}
++
+ unsigned ImageFrame::clearSourceImage(ShouldDecodeToHDR shouldDecodeToHDR)
+ {
+     auto& source = this->source(shouldDecodeToHDR);
+     if (!source.hasNativeImage())
+         return 0;
+ 
++    unsigned bytes = sizeInBytes(shouldDecodeToHDR);
+     source.clear();
+-    return sizeInBytes();
++    return bytes;
+ }
+ 
+ unsigned ImageFrame::clearImage(std::optional<ShouldDecodeToHDR> shouldDecodeToHDR)
+diff --git a/Source/WebCore/platform/graphics/ImageFrame.h b/Source/WebCore/platform/graphics/ImageFrame.h
+index 4366e4cf..acc83856 100644
+--- a/Source/WebCore/platform/graphics/ImageFrame.h
++++ b/Source/WebCore/platform/graphics/ImageFrame.h
+@@ -66,7 +66,7 @@ public:
+     void setSize(const IntSize& size) { m_size = size; }
+     IntSize size() const { return m_size; }
+ 
+-    unsigned sizeInBytes() const { return (size().area() * sizeof(uint32_t)).value(); }
++    unsigned sizeInBytes(std::optional<ShouldDecodeToHDR> = std::nullopt) const;
+ 
+     void setDensityCorrectedSize(const IntSize& size) { m_densityCorrectedSize = size; }
+     std::optional<IntSize> densityCorrectedSize() const { return m_densityCorrectedSize; }
+@@ -93,6 +93,9 @@ public:
+     bool hasMetadata() const { return !size().isEmpty(); }
+ 
+ private:
++#if USE(SKIA)
++    static size_t nativeImageSizeInBytes(const NativeImage&);
++#endif
+     struct Source {
+         RefPtr<NativeImage> nativeImage;
+         DecodingOptions decodingOptions { DecodingMode::Auto };
+diff --git a/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp b/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp
+index 04dbd382..d98bcff0 100644
+--- a/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp
++++ b/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp
+@@ -693,7 +693,10 @@ void GraphicsContextSkia::fillRect(const FloatRect& boundaries, const Color& fil
+         return;
+ 
+     SkPaint paint = createFillPaint();
+-    paint.setColor(SkColor(fillColor));
++    // A solid-colour image optimization may carry extended sRGB samples.
++    // Preserve them just as the corresponding typed NativeImage draw does.
++    auto [r, g, b, a] = fillColor.toColorTypeLossy<ExtendedSRGBA<float>>().resolved();
++    paint.setColor4f({ r, g, b, a }, SkColorSpace::MakeSRGB().get());
+     drawSkiaRect(boundaries, paint);
+ }
+ 
+diff --git a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp
+index 2e60affe..c804ba53 100644
+--- a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp
++++ b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp
+@@ -65,7 +65,7 @@ SkImageInfo ImageBufferSkiaSurfaceBackend::physicalImageInfo(const Parameters& p
+ unsigned ImageBufferSkiaSurfaceBackend::calculateBytesPerRow(const Parameters& parameters)
+ {
+     ASSERT(!parameters.backendSize.isEmpty());
+-    return physicalImageInfo(parameters).minRowBytes64();
++    return (CheckedUint32(parameters.backendSize.width()) * physicalImageInfo(parameters).bytesPerPixel()).value();
+ }
+ 
+ size_t ImageBufferSkiaSurfaceBackend::calculateMemoryCost(const Parameters& parameters)
+diff --git a/Source/WebCore/platform/graphics/skia/NativeImageSkia.cpp b/Source/WebCore/platform/graphics/skia/NativeImageSkia.cpp
+index 435b525c..b9bf54ef 100644
+--- a/Source/WebCore/platform/graphics/skia/NativeImageSkia.cpp
++++ b/Source/WebCore/platform/graphics/skia/NativeImageSkia.cpp
+@@ -25,6 +25,8 @@
+ 
+ #include "config.h"
+ #include "NativeImage.h"
++#include <array>
++#include <cmath>
+ 
+ #if USE(SKIA)
+ #include "GLContext.h"
+@@ -92,26 +94,21 @@ std::optional<Color> NativeImage::singlePixelSolidColor() const
+     if (size() != IntSize(1, 1))
+         return std::nullopt;
+ 
+-    auto platformImage = this->platformImage();
+-    if (platformImage->isTextureBacked()) {
+-        if (!PlatformDisplay::sharedDisplay().skiaGLContext()->makeContextCurrent())
+-            return std::nullopt;
++    auto image = platformImage();
++    if (image->isTextureBacked() && !PlatformDisplay::sharedDisplay().skiaGLContext()->makeContextCurrent())
++        return std::nullopt;
+ 
+-        ASSERT(m_grContext);
+-        const auto& imageInfo = platformImage->imageInfo();
+-        uint32_t pixel;
+-        SkPixmap pixmap(imageInfo, &pixel, imageInfo.minRowBytes());
+-        if (!platformImage->readPixels(m_grContext, pixmap, 0, 0))
++    // The source may be F16/F32 or use a non-sRGB profile. Never wrap its
++    // actual imageInfo around a four-byte scalar or quantize this optimization.
++    auto info = SkImageInfo::Make(1, 1, kRGBA_F32_SkColorType, kUnpremul_SkAlphaType, SkColorSpace::MakeSRGB());
++    std::array<float, 4> components;
++    if (!image->readPixels(m_grContext, info, components.data(), info.minRowBytes64(), 0, 0))
++        return std::nullopt;
++    for (float component : components) {
++        if (!std::isfinite(component))
+             return std::nullopt;
+-
+-        return pixmap.getColor(0, 0);
+     }
+-
+-    SkPixmap pixmap;
+-    if (!platformImage->peekPixels(&pixmap))
+-        return std::nullopt;
+-
+-    return pixmap.getColor(0, 0);
++    return Color(ExtendedSRGBA<float> { components[0], components[1], components[2], components[3] });
+ }
+ 
+ void NativeImage::clearSubimages()
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+index 9f1c92b8..3808aa18 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+@@ -5,6 +5,8 @@
+ 
+ #if USE(SKIA) && USE(LCMS)
+ #include <WebCore/ImageBackingStore.h>
++#include <WebCore/BitmapImage.h>
++#include <WebCore/ImageFrame.h>
+ #include <WebCore/ImageBuffer.h>
+ #include <WebCore/GraphicsContext.h>
+ #include <WebCore/NativeImage.h>
+@@ -322,6 +324,53 @@ TEST(SkiaDecodedImageColour, WorkingBufferKeepsEncodedBlendAndFloatMaskBeforeLog
+     }
+ }
+ 
++TEST(SkiaDecodedImageColour, OnePixelOptimizationPreservesWideFloatAndFrameClearCost)
++{
++    auto store = ImageBackingStore::create({ 1, 1 });
++    ASSERT_TRUE(store->setStorageFormat(kRGBA_F16_SkColorType));
++    store->setPixelFloat(0, 0, 1.2f, -0.1f, 0.2f, 0.5f);
++    auto maybeNative = NativeImage::create(store->image());
++    ASSERT_TRUE(maybeNative);
++    Ref native = maybeNative.releaseNonNull();
++    auto color = native->singlePixelSolidColor();
++    ASSERT_TRUE(color);
++    auto [r, g, b, a] = color->toColorTypeLossy<ExtendedSRGBA<float>>().resolved();
++    EXPECT_NEAR(r, 1.2f, 0.002f);
++    EXPECT_NEAR(g, -0.1f, 0.001f);
++    EXPECT_NEAR(b, 0.2f, 0.001f);
++    EXPECT_EQ(a, 0.5f);
++
++    auto bitmap = BitmapImage::create(native.copyRef());
++    auto page = ImageBuffer::create({ 2, 1 }, RenderingMode::Unaccelerated, RenderingPurpose::Unspecified,
++        1, DestinationColorSpace::SRGB(), PixelFormat::BGRA8);
++    ASSERT_TRUE(page);
++    page->context().drawImage(bitmap.get(), { 0, 0, 2, 1 }, { 0, 0, 1, 1 }, { });
++    auto result = page->copyNativeImage();
++    ASSERT_TRUE(result);
++    auto readback = pixels(result->platformImage());
++    EXPECT_NEAR(readback[0], 1.2f, 0.002f);
++    EXPECT_NEAR(readback[1], -0.1f, 0.001f);
++    EXPECT_NEAR(readback[2], 0.2f, 0.001f);
++    EXPECT_EQ(readback[3], 0.5f);
++
++    ImageFrame frame(native.copyRef());
++    EXPECT_EQ(frame.sizeInBytes(), 8u);
++    EXPECT_EQ(frame.clearSourceImage(ShouldDecodeToHDR::No), 8u);
++    EXPECT_EQ(frame.sizeInBytes(), 0u);
++    EXPECT_EQ(frame.clearSourceImage(ShouldDecodeToHDR::No), 0u);
++
++    // Actual raster row padding counts as storage; it is not width*height*4.
++    std::array<uint8_t, 32> padded { };
++    auto info = SkImageInfo::Make(1, 2, kRGBA_F16_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++    SkPixmap pixmap(info, padded.data(), 16);
++    auto paddedNative = NativeImage::create(SkImages::RasterFromPixmap(pixmap, nullptr, nullptr));
++    ASSERT_TRUE(paddedNative);
++    ImageFrame paddedFrame(paddedNative.releaseNonNull());
++    EXPECT_EQ(paddedFrame.sizeInBytes(), 32u);
++    EXPECT_EQ(paddedFrame.clearImage(), 32u);
++    EXPECT_EQ(paddedFrame.sizeInBytes(), 0u);
++}
++
+ TEST(SkiaDecodedImageColour, JPEGUsesSharedICCProfileAndIgnoredProfileStaysSRGB)
+ {
+     auto profile = linearP3Profile();
+-- 
+2.54.0 (Apple Git-157)
+

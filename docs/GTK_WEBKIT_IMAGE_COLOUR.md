@@ -176,3 +176,63 @@ for the negative case. It never adds formats or selects a renderer. Missing
 interception, real alternatives or private-frame evidence is inconclusive.
 Source is prepared only: no compilation or execution is claimed. Run it
 only after final review and resource admission, outside the owner session.
+
+## WebKit product and packaging integration
+
+The prepared product series now retains decoded RGB samples and ICC meaning,
+preserves meaningful PNG16 precision through interlace and animation, and
+uses typed nonlinear-sRGB F16 working storage through supported accelerated
+tiles, copies/effects, page transport and GTK import. Other codecs retain
+their explicit inherited precision limits. One-pixel image optimization and
+frame-cache accounting also follow the actual storage. No candidate build,
+link, test or runtime pass is claimed yet.
+
+Ordinary page colour metadata is separate from native-video PQ texture
+metadata. The production frame helper couples allocation, incoming fence
+and native serial/plane state; same-allocation updates retain ownership,
+and a later different allocation releases it once. Focused regression
+sources cover these transitions, but they have not run.
+
+The original product patch remains unchanged. The appended mail patches
+preserve their authors and the original Ubuntu Debian tree; the strict
+[package recipe](../packaging/webkitgtk-native-hdr/README.md) authenticates
+the ordered series before mutation, then applies a separate Debian overlay.
+The proposed WebKit `+rogdv7` runtime requires GTK `+rogdv6`; its existing
+GTK `+rogdv5` development-header minimum is retained because no new public
+build ABI is introduced. This separates the runtime behaviour dependency
+from the build-header requirement.
+
+F16 payload is eight bytes per pixel before stride, depth/stencil and
+driver overhead. Unsupported-ICC conversion can temporarily retain source
+storage and two F32 images plus row scratch; eight bytes per pixel is not a
+total-memory promise. Cache costs use actual raster row storage or a
+checked nominal GPU estimate, not a measurement of driver residency.
+
+## Focused tests without another producer build
+
+The excluded `TestWebCoreImageColour` target reuses shipping WebCore OBJECT
+files and the existing harness. `ENABLE_API_TESTS` stays off and unified
+builds stay on; no product SDK exports or global float API are added. The
+consumer adds five harness/regression translation units, two gtest units
+and one substantial object-level executable link. Link resource fit remains
+unmeasured. Neither normal package builds nor default CTest runs execute it.
+
+After final review and qualified resource admission, build the target
+explicitly and run the four prepared suites with GoogleTest XML output:
+
+```sh
+cmake --build "$webkit_build" --target TestWebCoreImageColour --parallel 1
+"$webkit_build/bin/TestWebKitAPI/TestWebCoreImageColour" \
+  --gtest_filter='SkiaDecodedImageColour.*:SkiaWorkingTextureTest.*:SkiaWorkingTile.*:RendererBufferFrame.*' \
+  --gtest_output="xml:$webkit_receipts/image-colour-focused.xml"
+```
+
+Use an admitted existing candidate build and a fresh owned receipt directory.
+The prepared inventory is14 cases: seven decoded-image, four working-texture,
+two working-tile and one frame-owner case. Require zero failures, errors,
+disabled cases and skips for the intended float route. The inherited console
+printer can label skipped cases PASS; use XML rather than that label. A
+zero-case filter or unavailable capability is not preservation qualification.
+Record source/configuration, producer objects and linked/loaded libraries.
+Actual shipping framebuffer, IPC, GDK import and native-lease checks remain
+separate. No command above has run for this candidate.
