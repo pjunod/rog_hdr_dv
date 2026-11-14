@@ -24,7 +24,10 @@ display-teardown crash after a compositor rejection, shared with upstream.
 The first full WebKit `+rogdv7` compile found five errors in
 the series, all fixed in two added patches: four 2.52.6 API mismatches, and
 an implicit system include directory passed for the distribution mapper SDK.
-Its 19 normal plus one actual-GLES2 checks remain open. No candidate is deployed. Target feedback
+A third patch fixes four focused-test fixture defects. All 19 normal cases
+and the actual ES 2.0 legacy case pass once, under software Mesa llvmpipe
+(surfaceless EGL; ES 2.0 via Mesa's version override, declared). That is API
+and storage evidence, not physical-GPU or on-screen acceptance. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 
