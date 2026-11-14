@@ -68,13 +68,14 @@ zero page-flip errors. Neither result proves the prior clock freeze's cause
 or successful suspend on the corrected baseline.
 
 After the owner's normal web handoff, Profile 7 advanced through a +60 s
-seek, then from 1747.478 to 1777.401 s over 30.143 s with native-DV state
+seek, then from 1747.478 to 1777.401 s during a roughly 30-second probe with native-DV state
 active throughout. No stale 409 was captured. This indexed VOD seek did not
 replace its server session: the replacement boundary remains qualified by
 the 105 affected client tests, without runtime replacement acceptance.
 A subsequent normal web handoff selected an external WebVTT text subtitle.
 The observe-only probe recorded six distinct nonempty cues across 16 samples,
-and clock progression from 1800.382 to 1830.412 s over 30.099 s with native
+and clock progression from 1800.382 to 1830.412 s during a roughly 30-second
+probe with native
 DV active throughout. Subtitle text and credentials were not retained. Both
 owned test windows quit normally through Player IPC; exact task-owned log
 followers were cleaned up. These are bounded P7/seek/text-subtitle results;
