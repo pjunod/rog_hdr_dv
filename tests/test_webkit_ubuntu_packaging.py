@@ -450,7 +450,7 @@ class WebKitPackagingTests(unittest.TestCase):
         self.assertIn('${gir:Depends}', control)
         self.assertIn('gstreamer1.0-gtk-dovi (>= 0.1.0+rogdv5)', control)
         self.assertIn('libgtk-4-1 (>= 4.24.1+ds-1+rogdv6)', control)
-        self.assertIn('libgtk-4-dev (>= 4.24.1+ds-1+rogdv6)', control)
+        self.assertIn('libgtk-4-dev (>= 4.24.1+ds-1+rogdv5)', control)
 
 
 if __name__ == '__main__':

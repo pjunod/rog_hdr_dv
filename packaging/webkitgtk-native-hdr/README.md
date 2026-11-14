@@ -95,8 +95,9 @@ Source package generation does not establish binary or runtime acceptance.
 
 The native path needs the public `libgstgtk-dovi-core-dev` package at
 `0.1.0+rogdv5` or newer and public GTK development headers at
-`4.24.1+ds-1+rogdv6` or newer. The generated control records those minimum
-build dependencies. The GTK4 runtime explicitly requires
+`4.24.1+ds-1+rogdv5` or newer. The image-colour changes add no GTK public
+build API, so the existing development minimum remains valid. The generated
+control records those minimum build dependencies. The GTK4 runtime explicitly requires
 `libgtk-4-1 (>= 4.24.1+ds-1+rogdv6)` alongside the native mapping plugin.
 Coordinated runtime qualification still uses the exact package set retained
 privately by the release owner.
