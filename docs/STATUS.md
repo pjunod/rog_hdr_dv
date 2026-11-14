@@ -1,23 +1,42 @@
 # Status — what is working and what remains
 
-**Updated November 13, 2026.** Bounded real-panel Profile 5 playback was
-visible in GNOME Web and Showtime at target 616 with eDP-2 left in colour
-mode 1. The Plurx Player 0.5.1 source fix for stale control sequences on
-session replacement merged; owner deployment, physical Player acceptance and
-optical acceptance remain open. A private uninstalled Showtime 5.12 whole-
-feature run reached regular EOS under the retained virtual-HDR fixture; this
-does not qualify installed or physical playback. The capture results and their
-limits are recorded below.
+**Updated November 13, 2026.** Showtime `50.0-2+rogdv5.12` is installed
+with a clean package audit. Bounded owner-attended desktop checks returned to
+baseline; two suspend attempts failed in the kernel freezer on an NFS media
+read, without actual sleep. The Plurx Player 0.5.1 control-sequence fix is
+merged but not installed; its deployment artifact is being prepared. Physical
+Player/product acceptance and optical acceptance remain open.
 
-**Showtime precision-filter correction (November 13).** Review approved the
-overlay-feature correction; three affected packaging regressions and 38 linked
-native caps checks passed. Implementation integrity lane 43516852485 is green
-for source revision `8b7970f`.
-Uninstalled Showtime `50.0-2+rogdv5.12` reached regular EOS at 1× under the retained
-virtual-HDR fixture. Installed Showtime 5.11 and GStreamer components remain
-unchanged. This private software run does not establish physical or installed
-Player acceptance, every-frame RPU continuity, a drop count or optical accuracy.
-[Cause and scope](GSTREAMER_DOLBY_RECONSTRUCTION.md#showtime-precision-filter-overlays-november-13).
+**Showtime precision-filter correction and installation (November 13).**
+Review approved the overlay-feature correction; three affected packaging
+regressions and 38 linked native caps checks passed. Implementation integrity
+lane 43516852485 is green for source revision `8b7970f`. The normal Showtime
+`50.0-2+rogdv5.12` package is now installed with a clean audit; GStreamer,
+mapper core and sink versions are unchanged.
+
+Before installation, the uninstalled candidate reached regular EOS at 1× in
+the retained private virtual-HDR fixture. That software run remains separate
+from the later bounded installed desktop checks. Neither grants every-frame
+RPU continuity, drop counts, optical accuracy or full-film Plurx Player
+acceptance. [Cause and scope](GSTREAMER_DOLBY_RECONSTRUCTION.md#showtime-precision-filter-overlays-november-13).
+
+**Owner-attended installed desktop results (November 13).** The owner confirmed
+that HDR playback, brightness, fullscreen and tiling returned to normal. DPMS
+was instrumented On→Off→On; Night Light changed to 2138 K and returned off at
+6500 K. The monitor configuration remained unchanged and the owned application
+was closed at the end. Showtime's MPRIS fullscreen API is unimplemented, so
+the owner used the normal UI. These are bounded operational observations;
+startup subtitle-index-0 and JavaScript rounding warnings remain unassigned,
+and no error-free, optical or per-frame fidelity claim follows.
+
+Two normal GNOME suspend attempts took the network transport down before an
+owned Showtime hard-NFS buffered read prevented kernel user-task freezing.
+Both timed out after about 20 seconds with `-EBUSY`, before device PM; neither
+entered actual sleep. Playback recovered after the failure and network
+restoration. This is an unresolved suspend qualification failure, not a
+proved GPU cause. The installed NVIDIA session-prefreeze drop-in is a separate
+contract and was not overridden. The owner window has ended; further physical
+tests need a new coordinated window. [NFS source diagnosis and fix ownership](SUSPEND_NFS_READER.md).
 
 **November 9 deployment (historical).** The coordinated install completed all
 45 planned package changes with zero removals and a clean `dpkg --audit`. The
@@ -50,7 +69,7 @@ counter defect, not a new server sequence regression. The 0.5.1 source fix
 merged as Plurx PR 1577, landing `a4c316d0baac`, after 105 affected tests and
 the green required main lane (run 7462). That merge addresses stale control
 sequences on replacement; it does not explain or prove the cause of the earlier
-RPU disappearance. The private Showtime whole-feature check is recorded below;
+RPU disappearance. The private Showtime whole-feature check is recorded above;
 full-film Player product acceptance remains open.
 
 **plurx-player titles play again with the system mpv (November 12).** mpv `0.42.0-0ubuntu0+rogdv5.4` is installed. Since plurx-player 0.5.0 began using the system mpv, a title opened from the web UI closed its window before any picture. The idle window let the NVIDIA Vulkan driver claim the window's colour management, and mpv's own HDR request then broke the Wayland connection. mpv now describes the idle window itself. [Details](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers).
