@@ -1,11 +1,13 @@
 # Status — what is working and what remains
 
-**Updated November 13, 2026.** Showtime `50.0-2+rogdv5.12` is installed
-with a clean package audit. Bounded owner-attended desktop checks returned to
-baseline; one suspend request produced two kernel freezer failures on an NFS
-media read, without actual sleep. The Plurx Player 0.5.1 control-sequence fix is
-merged but not installed; its package is prepared for owner deployment. Physical
-Player/product acceptance and optical acceptance remain open.
+**Updated November 13, 2026 (Eastern; postboot probes November 14 UTC).**
+Showtime `50.0-2+rogdv5.12` and Plurx Player `0.5.1-1` are installed with
+clean package audits and retained rollback packages. Owner-attended display
+transitions returned to baseline, but suspend failed before device PM on an
+NFS media read. After one approved boot into the qualified `nativehdr3`
+kernel, owner-started Profile 7 playback advanced through a seek with native
+DV active. Text-subtitle handoff also passed. Runtime session replacement,
+successful suspend and optical acceptance remain open.
 
 **Showtime precision-filter correction and installation (November 13).**
 Review approved the overlay-feature correction; three affected packaging
@@ -38,6 +40,61 @@ restoration. This is an unresolved suspend qualification failure, not a
 proved GPU cause. The installed NVIDIA session-prefreeze drop-in is a separate
 contract and was not overridden. The owner window has ended; further physical
 tests need a new coordinated window. [NFS source diagnosis and fix ownership](SUSPEND_NFS_READER.md).
+
+**Installed Player and corrected-kernel acceptance (November 13).**
+The owner explicitly instructed installation of Player `0.5.1-1` from the
+merged source. Package verification, dependency checks and preservation of
+APT marks/holds passed; the original installed-matching `0.5.0-1` rollback
+is retained. No server deployment was performed by this task.
+
+The first owner-started Profile 7 run froze its clock while native-DV state
+remained active and its cache was full. A silent audio-only PipeWire probe
+also stalled, with a suspended zero-port node. Restoring the physical card's
+existing saved Analog Stereo Duplex profile alone did not recover negotiation.
+One controlled WirePlumber restart restored ports, clock progression and
+normal completion of the same failed six-channel probe. No audio policy,
+driver or gain change was made. This is recovery evidence, not an audio
+source repair or proof of the original sustained DV-loss cause; audio source
+ownership remains in `rog_audio`.
+
+The owner approved one reboot into the already-installed corrected kernel.
+The running `7.3.0-nativehdr3` build ID matches the retained qualification
+receipt, Secure Boot remains enabled and NVIDIA 615.71.09 is loaded.
+The one-shot selection was consumed; persistent boot selection was already
+nativehdr3 and was not changed. The reason the prior boot used the older rc5
+kernel is unproved. A read-only DRM query sampled VRR enabled before screen
+capture. A bounded Shell journal interval, 02:27:37–02:42:02 UTC, contained
+zero page-flip errors. Neither result proves the prior clock freeze's cause
+or successful suspend on the corrected baseline.
+
+After the owner's normal web handoff, Profile 7 advanced through a +60 s
+seek, then from 1747.478 to 1777.401 s over 30.143 s with native-DV state
+active throughout. No stale 409 was captured. This indexed VOD seek did not
+replace its server session: the replacement boundary remains qualified by
+the 105 affected client tests, without runtime replacement acceptance.
+A subsequent normal web handoff selected an external WebVTT text subtitle.
+The observe-only probe recorded six distinct nonempty cues across 16 samples,
+and clock progression from 1800.382 to 1830.412 s over 30.099 s with native
+DV active throughout. Subtitle text and credentials were not retained. Both
+owned test windows quit normally through Player IPC; exact task-owned log
+followers were cleaned up. These are bounded P7/seek/text-subtitle results;
+full-film Player, every-frame RPU continuity and optical fidelity are not claimed.
+
+Operational correction: the approved reboot interrupted three CI containers
+missed by this task's preflight. Their owner was notified directly; retained
+passing test receipts were preserved for bounded recovery. Future host
+maintenance must establish CI quiescence as well as display-owner approval.
+No further maintenance is queued during the coordinated recovery window.
+
+**Installed Image Viewer route (November 13).** Loupe and Glycin executable
+hashes match the qualified candidate packages; no reinstall was needed.
+After correction of the harness's private-path confinement failure and
+incompatible browser flags, the owner confirmed that installed Image Viewer
+and GNOME Web both showed the same synthetic P3 chart normally. The explicitly
+authorized temporary Pictures copy and test windows were removed, with monitor
+configuration and Night Light unchanged. This is normal-route/appearance
+acceptance, not measured cross-app equivalence or optical qualification.
+[Installation, inherited numeric receipts and current limits](GNOME_IMAGE_COLOUR.md#installed-normal-desktop-route-check--november-13).
 
 **November 9 deployment (historical).** The coordinated install completed all
 45 planned package changes with zero removals and a clean `dpkg --audit`. The
