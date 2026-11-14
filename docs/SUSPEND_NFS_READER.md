@@ -30,6 +30,16 @@ includes a `TASK_KILLABLE` wait, which is not the same as a freezable wait.
 These upstream anchors explain the mechanism; the exact running kernel
 source, patches, configuration and instruction remain necessary for a fix.
 
+The explanatory upstream [NFS I/O bracket](https://github.com/torvalds/linux/blob/v7.3-rc5/fs/nfs/io.c#L15)
+holds a shared inode `i_rwsem` until the buffered read returns. Dropping the
+inner mapping lock before a folio wait therefore does not establish a
+lock-free freezing point. Marking generic folio waits freezable without a
+caller-lock audit is not a demonstrated repair. Relevant installed wait/freezer
+headers and selected NFS/PM configuration semantics match between the older
+and corrected kernels; exact implementation bodies and failed-instruction
+binding remain necessary. The corrected display-kernel boot does not establish
+NFS suspend acceptance.
+
 The mount used hard NFS 4.1 over TCP with a 60-second initial request timeout.
 Hard requests retry indefinitely; the retransmission setting does not turn
 them into bounded reads. [NFS option semantics](https://man7.org/linux/man-pages/man5/nfs.5.html).

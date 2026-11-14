@@ -6,6 +6,31 @@ The prior six Adobe RGB patches matched an independent BT.2020 reference within 
 
 This document covers the image viewer, its Ubuntu source packages and recovery. [Software delivery](SOFTWARE_DELIVERY.md) · [GTK display targets](GDK_DISPLAY_TARGET.md).
 
+## Installed normal-desktop route check — November 13
+
+A read-only inventory confirmed the installed Loupe
+`50.0-0ubuntu2+rogcolor2` and `glycin-loaders`
+`2.2.1+ds-1ubuntu2+rogcolor1` executable hashes match the qualified package
+receipt. Retained candidate and stock rollback packages still match their
+recorded hashes; no reinstall was needed.
+
+An owner-approved short check opened the same retained synthetic Display P3
+chart through ordinary installed Image Viewer and GNOME Web. The owner
+confirmed that both displayed it normally. Both owned windows were closed,
+the temporary chart copy was removed, and monitor configuration and Night
+Light returned unchanged. This establishes bounded normal-route loading and
+owner appearance only. No measured browser/photo/video equivalence, emitted
+panel luminance or calibrated accuracy follows.
+
+The first harness attempt was invalid: Image Viewer's normal AppArmor policy
+rejected the fixture under a private hidden state directory, and incompatible
+browser launch flags prevented its start. Only those failed image routes were
+repeated. The owner explicitly approved one temporary chart in the normal
+Pictures location; the retry used that permitted path and corrected browser
+flags, with confinement unchanged. No profile override or sandbox bypass was
+introduced. The earlier staged/private-compositor numeric results retain
+their original scope.
+
 ## Why the photograph lost colour
 
 Loupe 50 embeds glycin 3.1; the system `glycin-loaders` package supplies separate
@@ -173,9 +198,9 @@ ARGB8888 is not accepted as evidence.
 The final package hashes, exact source replay and retained native receipts belong
 in the [machine-readable qualification](../evidence/gnome-image-colour-20261108.json).
 No live compositor, viewer default, display profile or GNOME setting is changed
-by the preparation or diagnostics. Physical panel measurements, real external
-monitor coverage and a coordinated live-desktop installation remain separate
-acceptance work.
+by the preparation or diagnostics. The packages are now installed and the bounded ordinary-desktop route check
+is recorded above. Physical panel measurements, real external-monitor coverage
+and measured cross-app equivalence remain separate acceptance work.
 
 ## Retain exact offline recovery
 
