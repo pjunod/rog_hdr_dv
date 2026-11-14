@@ -188,6 +188,7 @@ has the remote and branch rules.
 | [Historical mapping](docs/SQRTSUM_PQ_Y_POST.md) · [ABI368 delivery](docs/MAPPING_ABI368_DELIVERY.md) | Earlier frozen candidate and its source-bound evidence; not the current plurx Player product |
 | [Headless harness](docs/DOLBY_HARNESS.md) | How references are rendered and scored, and the private boundary |
 | [HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) | Reproducible test images, and what may leave the private area |
+| [Image-quality source stimuli](docs/IMAGE_QUALITY_STIMULI.md) | Y4M chroma-siting, scaling, dither and cadence sources; not a measurement |
 | [Authored-master transport](docs/AUTHORED_MASTER_BASELINE.md) · [frame-owned mapping](docs/OPEN_XML205_CANDIDATE.md) · [absolute-PQ](docs/OPEN_ABSOLUTE_PQ_SOP.md) · [public RGB/Y](docs/PUBLIC_RGB_MAPPING.md) | Earlier mapping candidates, kept for their evidence |
 | [Historical native player](tools/native_player/README.md) · [qualification](tools/native_player/QUALIFICATION.md) | Retained experimental work, not the current install path; use external plurx Player |
 | [Activation probe](docs/DOLBY_ACTIVATION_PROBE.md) · [Wine API contract](docs/WINE_API_CONTRACT.md) · [Wine file API](docs/WINE_FILE_FROMAPP.md) · [Wine monitor discovery](docs/WINE_DISPLAY_MONITOR.md) | The Windows-processor-under-Wine route and its prerequisites |

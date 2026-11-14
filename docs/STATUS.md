@@ -9,6 +9,13 @@ kernel, owner-started Profile 7 playback advanced through a seek with native
 DV active. Text-subtitle handoff also passed. Runtime session replacement,
 successful suspend and optical acceptance remain open.
 
+**Image-quality source stimuli (November 14).** A stdlib generator now emits
+deterministic Y4M sources for chroma siting, scaling/aliasing, 10-to-8-bit
+banding and 24/25/30/50/60 fps cadence, with expected values in its manifest
+([stimuli](IMAGE_QUALITY_STIMULI.md)). These are sources only. No capture has
+run, so range, siting, scaling, dither and cadence qualification on the laptop
+remains open.
+
 **Showtime precision-filter correction and installation (November 13).**
 Review approved the overlay-feature correction; three affected packaging
 regressions and 38 linked native caps checks passed. Implementation integrity
