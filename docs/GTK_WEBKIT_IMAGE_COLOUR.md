@@ -166,3 +166,13 @@ belongs in the correction.
    installed acceptance window. No live compositor/session/boot or package
    activation follows from this document. Optical and full cross-app/video
    qualification remain separate.
+
+## Prepared default-renderer ownership fixture
+
+The [controlled GTK/Vulkan fixture](GTK_COLOUR_OWNER_FIXTURE.md) prepares an
+ordinary changing scene and target-bound interposer for the eventual native
+check. It forwards actual advertisements, then removes only pass-through
+for the negative case. It never adds formats or selects a renderer. Missing
+interception, real alternatives or private-frame evidence is inconclusive.
+Source is prepared only: no compilation or execution is claimed. Run it
+only after final review and resource admission, outside the owner session.
