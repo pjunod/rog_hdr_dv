@@ -17,6 +17,27 @@
       "rules": "263ee56eb2d1c2abf5b6fe13ae86ef67b001ab98326bacbaa4ec9fef33db9ab8",
       "changelog": "c37ac66c4a2d382934a361f470323afccd0b82e5b41eba2d51035cb31c37054e"
     },
-    "package_version": "50.0-2"
+    "package_version": "50.0-2",
+    "source_series": {
+      "upstream_play_sha256": "41d57873309d81c80d3c448ebb0957b34474f3d19bafd11b224f718199d0de77",
+      "patches": [
+        {
+          "file": "0001-showtime-bind-native-target-before-gl-conversion.patch",
+          "sha256": "c97bc0de07ba69a81983245288c8c93d3370f49d95c54e46205b8c7267bae259",
+          "result_play_sha256": "747eca20d33f95c1371f815cb1e34bca7a4d502b9f955d3035c9dae3a9d10d7c"
+        },
+        {
+          "file": "0007-showtime-start-the-shared-producer-with-an-explicit-SDR-destination.patch",
+          "sha256": "ddd738358bf57bcd0f95b4443d2a2e7323b7952e657d1d0270af09033587d5ce",
+          "result_play_sha256": "a7dfc9e8c15129b5578b5f0796fae38725802278387e372725441cd9ca5687f6"
+        },
+        {
+          "file": "0008-showtime-preserve-overlay-features-in-precision-filter.patch",
+          "sha256": "535c0ecfa53e89c7df9ccc24f6c90a439b1a2e10ccd27959b1014154203561a7",
+          "result_play_sha256": "7c3d62a10e8aac354dc77f0fe195e44570afc0359b1bd56daebc488d0008cc85"
+        }
+      ],
+      "scope": "Exact showtime/play.py stages from the pinned Showtime 50.0 source. Imported patch bytes and authorship are unchanged; the final patch changes only the consumer precision caps."
+    }
   }
 }

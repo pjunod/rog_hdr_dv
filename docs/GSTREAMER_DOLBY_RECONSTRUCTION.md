@@ -1,6 +1,6 @@
 # GStreamer resolved Dolby pictures
 
-**Updated November 9, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate now pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
+**Updated November 13, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
 
 ## Browser destination interface in development
 
@@ -166,6 +166,72 @@ base `rogdv3`, good `rogdv3` and bad/extra `rogdv8` pins in [qualified-pipeline.
 Browser results are in [WebKitGTK clear video and native HDR](WEBKIT_NATIVE_HDR.md#runtime-qualification).
 
 These runs used private process overlays and owned GPU-backed compositors, not the user's desktop. They establish digital composition and same-picture retention, not physical panel accuracy or browser playback. No candidate package was installed on the host; the installed 45-package release is unchanged.
+
+## Showtime precision-filter overlays (November 13)
+
+A normal held 4K Profile 5 feature stopped with `not-negotiated` after decoded
+CUDA P010 video with overlay-composition metadata reached the mapper. The
+installed mapper and playback plugin matched their qualified package bytes.
+The mapper accepted this domain and offered graded system-memory RGBA with
+the overlay feature. Showtime's later precision filter advertised only plain
+GL-memory RGBA and plain system-memory RGBA, excluding the metadata-bearing
+candidate.
+
+A live filtered-query trace followed that candidate through the GL conversion
+chain to the plain-only precision filter and the resulting empty intersection.
+Under detailed logging, the decoder then selected a plain system-memory path
+and the feature advanced briefly. That is evidence of an excluded valid path;
+it does not reproduce every timing condition of the fatal startup failure.
+
+The [Showtime correction](../packaging/gstreamer-gtk-dovi/0008-showtime-preserve-overlay-features-in-precision-filter.patch)
+adds the corresponding overlay feature variants while retaining the existing
+RGBA constraints and plain paths. The candidate package is `50.0-2+rogdv5.12`;
+mapper, sink and GStreamer versions stay unchanged. The new Showtime package
+explicitly requires the already-qualified `gstreamer1.0-plugins-base` playback
+plugin; that dependency closes fresh-install coverage and was already correct
+on the inspected machine. Normal subtitle and decoder policy stays in use.
+Independent source review approved revision `8b7970f`; three affected packaging
+regressions and 38 linked native caps checks passed. Implementation integrity
+lane 43516852485 is green for revision `8b7970f`. The source compiled and the
+binary package built with tests disabled.
+
+`prepare-ubuntu-packages.py --showtime-only` replays the exact authenticated
+Showtime `play.py` stages from the pinned upstream or a recorded patch prefix.
+The [behavior control](../packaging/gstreamer-gtk-dovi/probes/showtime-precision-controls.py)
+executes the prepared consumer caps branch through a real filter and linked
+mapper queries, including overlay/plain domains, format/memory refusals and
+the ordinary non-Dolby path. These focused checks cover package regressions
+and caps negotiation; they are separate from playback. Source/package replay
+controls require the authenticated upstream file in `SHOWTIME_PINNED_PLAY`.
+Patch and support-file hashes are recorded in the scoped
+[SHA256SUMS](../packaging/gstreamer-gtk-dovi/SHA256SUMS); imported patch bytes
+remain unchanged.
+
+The private whole-feature fixture uses the retained virtual-HDR Mutter build,
+whose virtual output declares PQ/BT.2020. Its library identities are recorded
+separately from installed physical-display Mutter. Results under that fixture
+do not grant physical-panel, optical, every-frame RPU or dropped-frame claims.
+
+### Showtime 5.12 reached regular EOS in the private fixture
+
+Uninstalled Showtime `50.0-2+rogdv5.12`, from the reviewed source revision
+`8b7970f`, played a Profile 5 feature of 6,850.144 seconds to regular EOS at
+1×. Elapsed time was 6,857.826 seconds and the maximum polled position was
+6,850.043 seconds. The candidate import was observed; the initial native
+target-616 RPU map occurred at 5.806 seconds. No automatic retry occurred.
+These are bounded session observations, not per-frame continuity or a drop
+census.
+
+The captured pipeline graph carried CUDA P010 with overlay metadata into the
+mapper, then system-memory RGBA with overlay metadata, and GL RGBA with overlay
+metadata through Showtime's precision filter. At EOS the normal reset returned
+position to zero and paused; the harness then intentionally terminated the
+application after observing EOS. Nonfatal sink property errors about access
+from a non-main thread and audio underflow appeared around that reset, so this
+run does not establish warning-free or crash-free playback. Installed Showtime
+5.11 and installed GStreamer/core/sink packages were unchanged. No physical
+display, installed Player, every-frame RPU/drop-count or optical acceptance is
+claimed.
 
 ## Which geometry reaches the mapper
 

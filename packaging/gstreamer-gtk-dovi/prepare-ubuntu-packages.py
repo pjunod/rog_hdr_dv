@@ -8,10 +8,12 @@ import json
 from pathlib import Path
 import re
 import shutil
+import subprocess
+import tempfile
 
 CORE_VERSION = "0.1.0+rogdv10"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.6"
-SHOWTIME_VERSION = "50.0-2+rogdv5.11"
+SHOWTIME_VERSION = "50.0-2+rogdv5.12"
 FIXED_GTK = "4.24.1+ds-1+rogdv5"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
@@ -100,7 +102,7 @@ def qualified_pipeline():
     """Use actual binary metadata, grouped by its independently built source."""
     expected = {
         "gst-plugins-base1.0": {
-            "gstreamer1.0-gl", "libgstreamer-gl1.0-0",
+            "gstreamer1.0-gl", "gstreamer1.0-plugins-base", "libgstreamer-gl1.0-0",
             "libgstreamer-plugins-base1.0-0",
         },
         "gst-plugins-good1.0": {"gstreamer1.0-plugins-good"},
@@ -209,7 +211,7 @@ def showtime_control(original):
             f"qualified {name}",
         )
     producer_lines = []
-    for name in ("gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra", "gstreamer1.0-libav"):
+    for name in ("gstreamer1.0-plugins-base", "gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-extra", "gstreamer1.0-libav"):
         if re.search(rf"(?<![\w-]){re.escape(name)}(?![\w-])", depends):
             raise PreparationError(f"unexpected existing producer dependency: {name}")
         producer_lines.append(f" {name} (= {qualified[name]}),\n")
@@ -222,10 +224,10 @@ def showtime_control(original):
     return source + "\n\n" + binary + "\n"
 
 
-def changelog(source, version, bullets, original):
+def changelog(source, version, bullets, original, date="Sun, 08 Nov 2026 00:00:00 +0000"):
     entries = "".join(f"  * {line}\n" for line in bullets)
     return (f"{source} ({version}) unstable; urgency=medium\n\n" + entries +
-            "\n -- ROG HDR contributors <rog-hdr@invalid>  Sun, 08 Nov 2026 00:00:00 +0000\n\n" + original)
+            f"\n -- ROG HDR contributors <rog-hdr@invalid>  {date}\n\n" + original)
 
 
 def pinned_inputs():
@@ -242,6 +244,37 @@ def pinned_inputs():
     return result
 
 
+def showtime_source_candidate(source):
+    """Replay only the authenticated Showtime play.py stages, without mutating source."""
+    series = json.loads((INPUT_DIR / "provenance.json").read_text())["showtime"]["source_series"]
+    patches = series["patches"]
+    stages = [series["upstream_play_sha256"]] + [item["result_play_sha256"] for item in patches]
+    current = (source / "showtime/play.py").read_bytes()
+    digest = hashlib.sha256(current).hexdigest()
+    if digest not in stages:
+        raise PreparationError("unrecognized Showtime play.py; use the pinned clean source or exact recorded patch stage")
+    start = stages.index(digest)
+    for item in patches:
+        patch = Path(__file__).parent / item["file"]
+        if hashlib.sha256(patch.read_bytes()).hexdigest() != item["sha256"]:
+            raise PreparationError("modified Showtime source patch: " + item["file"])
+    with tempfile.TemporaryDirectory(prefix=".showtime-source-", dir=source) as directory:
+        staging = Path(directory)
+        (staging / "showtime").mkdir()
+        target = staging / "showtime/play.py"
+        target.write_bytes(current)
+        for item in patches[start:]:
+            result = subprocess.run(["patch", "--batch", "--fuzz=0", "-p1", "-i",
+                                     str((Path(__file__).parent / item["file"]).resolve())],
+                                    cwd=staging, capture_output=True, text=True)
+            if result.returncode or hashlib.sha256(target.read_bytes()).hexdigest() != item["result_play_sha256"]:
+                raise PreparationError("Showtime exact source replay failed: " + item["file"])
+        candidate = target.read_bytes()
+    return candidate, {"input_play_sha256": digest, "output_play_sha256": stages[-1],
+                       "source_version": SHOWTIME_VERSION, "patches": patches,
+                       "upstream_play_sha256": stages[0]}
+
+
 def require_known_current(path, original, generated):
     if not path.is_file():
         raise PreparationError(f"missing source input: {path}")
@@ -252,11 +285,12 @@ def require_known_current(path, original, generated):
         )
 
 
-def prepare(workspace):
+def prepare(workspace, showtime_only=False):
     inputs = pinned_inputs()
     gtk = workspace / "source"
     showtime = workspace / "showtime-50.0"
     backups = workspace / "package-originals"
+    showtime_candidate, showtime_receipt = showtime_source_candidate(showtime)
     outputs = {
         gtk / "debian/control": gtk_control(inputs["gtk"]["control"]),
         gtk / "debian/rules": GTK_RULES,
@@ -272,11 +306,15 @@ def prepare(workspace):
             "showtime", SHOWTIME_VERSION,
             ["Bind Dolby streams to their native surface target and HDR lease.",
              "Require the matching sink and mapper with paused overlay preservation.",
-             "Start the shared producer with an explicit SDR destination."],
-            inputs["showtime"]["changelog"]),
+             "Start the shared producer with an explicit SDR destination.",
+             "Preserve overlay composition features through the RGBA precision filter."],
+            inputs["showtime"]["changelog"], date="Fri, 13 Nov 2026 00:00:00 +0000"),
     }
+    sources = [("showtime", showtime)] if showtime_only else [("gtk", gtk), ("showtime", showtime)]
+    if showtime_only:
+        outputs = {path: value for path, value in outputs.items() if path.is_relative_to(showtime)}
     # Complete all validation before creating backups or changing source files.
-    for label, source in (("gtk", gtk), ("showtime", showtime)):
+    for label, source in sources:
         for name in INPUT_FILES:
             original = inputs[label][name]
             path = source / "debian" / name
@@ -284,23 +322,26 @@ def prepare(workspace):
             backup = backups / f"{label}-{name}"
             if backup.exists() and backup.read_text() != original:
                 raise PreparationError(f"unrecognized original backup: {backup}")
-    cargo_config = gtk / ".cargo/config.toml"
-    if cargo_config.exists() and cargo_config.read_text() != CARGO_CONFIG:
-        raise PreparationError(f"unexpected Cargo source configuration: {cargo_config}")
-    shlibs = gtk / "debian/shlibs.local"
-    shlibs_text = shlibs.read_text() if shlibs.exists() else ""
-    core_line = f"libgstgtkdovicore 0 libgstgtk-dovi-core0 (= {CORE_VERSION})"
-    existing = [line for line in shlibs_text.splitlines()
-                if re.match(r"^libgstgtkdovicore\s", line)]
-    if existing not in ([], [core_line]):
-        raise PreparationError(f"unexpected core shlibs declaration: {shlibs}")
-    if not existing:
-        shlibs_text = shlibs_text.rstrip("\n") + ("\n" if shlibs_text else "") + core_line + "\n"
-    outputs[cargo_config] = CARGO_CONFIG
-    outputs[shlibs] = shlibs_text
+    if not showtime_only:
+        cargo_config = gtk / ".cargo/config.toml"
+        if cargo_config.exists() and cargo_config.read_text() != CARGO_CONFIG:
+            raise PreparationError(f"unexpected Cargo source configuration: {cargo_config}")
+        shlibs = gtk / "debian/shlibs.local"
+        shlibs_text = shlibs.read_text() if shlibs.exists() else ""
+        core_line = f"libgstgtkdovicore 0 libgstgtk-dovi-core0 (= {CORE_VERSION})"
+        existing = [line for line in shlibs_text.splitlines()
+                    if re.match(r"^libgstgtkdovicore\s", line)]
+        if existing not in ([], [core_line]):
+            raise PreparationError(f"unexpected core shlibs declaration: {shlibs}")
+        if not existing:
+            shlibs_text = shlibs_text.rstrip("\n") + ("\n" if shlibs_text else "") + core_line + "\n"
+        outputs[cargo_config] = CARGO_CONFIG
+        outputs[shlibs] = shlibs_text
 
+    (showtime / "showtime/play.py").write_bytes(showtime_candidate)
+    (workspace / "showtime-source-preparation.json").write_text(json.dumps(showtime_receipt, indent=2) + "\n")
     backups.mkdir(exist_ok=True)
-    for label, source in (("gtk", gtk), ("showtime", showtime)):
+    for label, source in sources:
         for name in INPUT_FILES:
             backup = backups / f"{label}-{name}"
             if not backup.exists():
@@ -310,24 +351,27 @@ def prepare(workspace):
     for path, text in outputs.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
-    (gtk / "debian/rules").chmod(0o755)
+    for _, source in sources:
+        (source / "debian/rules").chmod(0o755)
     inventory = {
-        "outputs": OUTPUT_INVENTORY,
+        "outputs": {label: OUTPUT_INVENTORY[label] for label, _ in sources},
+        "showtime_source": showtime_receipt,
         "source_metadata_sha256": {
             str(path.relative_to(workspace)): hashlib.sha256(text.encode()).hexdigest()
             for path, text in outputs.items()
         },
     }
     (workspace / "package-output-inventory.json").write_text(json.dumps(inventory, indent=2) + "\n")
-    print("Prepared declared GTK plugin and Showtime binary outputs from pinned Ubuntu inputs.")
+    print("Prepared declared " + ("Showtime" if showtime_only else "GTK plugin and Showtime") + " binary outputs from pinned Ubuntu inputs.")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("workspace", type=Path)
+    parser.add_argument("--showtime-only", action="store_true", help="prepare only Showtime source and packaging")
     args = parser.parse_args()
     try:
-        prepare(args.workspace.resolve())
+        prepare(args.workspace.resolve(), showtime_only=args.showtime_only)
     except (PreparationError, OSError, ValueError) as error:
         parser.exit(1, f"package preparation refused: {error}\n")
 
