@@ -1,0 +1,941 @@
+From b31ad89dac1596089a241b0057d9bcb0d4b03589 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 03:50:08 -0500
+Subject: [PATCH 09/11] Make actual page layout admission and import fallback
+ transactional
+
+Validate actual texture and implicit GBM export tuples against the complete negotiated set before creation IPC. Keep legal unsized U8 allocation separate from sized Skia descriptors. Preserve a valid committed texture on late import failure and retire rejected allocation ownership explicitly.
+
+A bounded per-surface rejection transaction requests one ordinary SHM repaint through dedicated compositor callbacks. SHM rejection is terminal without a retry chain. Cleanup uses the registered owning GL context and queue. Compilation and tests remain pending coordinated admission.
+---
+ .../graphics/texmap/BitmapTexture.cpp         |   8 +-
+ .../WebKit/Shared/glib/RendererBufferFormat.h |  33 +++
+ .../WebKit/Shared/gtk/RendererBufferFrame.h   |  46 ++++
+ .../UIProcess/gtk/AcceleratedBackingStore.cpp |  93 ++++---
+ .../UIProcess/gtk/AcceleratedBackingStore.h   |  10 +-
+ .../AcceleratedSurface.cpp                    | 235 +++++++++++++-----
+ .../CoordinatedGraphics/AcceleratedSurface.h  |  41 ++-
+ .../AcceleratedSurface.messages.in            |   3 +
+ .../NonCompositedFrameRenderer.cpp            |   6 +
+ .../ThreadedCompositor.cpp                    |   7 +
+ 10 files changed, 384 insertions(+), 98 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp b/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp
+index e93cfe45..fae83d51 100644
+--- a/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp
++++ b/Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp
+@@ -113,6 +113,8 @@ SkImageInfo BitmapTexture::workingImageInfo(const IntSize& size, bool)
+     return SkImageInfo::Make(size.width(), size.height(), supportsExtendedColor() ? kRGBA_F16_SkColorType : kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+ }
+ 
++// Skia needs the sized physical description. Texture allocation separately
++// keeps the unsized RGBA/UNSIGNED_BYTE pair legal on genuine GLES2 contexts.
+ unsigned BitmapTexture::internalFormat() const
+ {
+     return m_imageInfo.colorType() == kRGBA_F16_SkColorType ? rgba16f : GL_RGBA8;
+@@ -130,7 +132,7 @@ BitmapTexture::BitmapTexture(const SkImageInfo& info, OptionSet<Flags> flags)
+     glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture);
+     m_imageInfo = info;
+     glBindTexture(GL_TEXTURE_2D, m_id);
+-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat(), m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
++    glTexImage2D(GL_TEXTURE_2D, 0, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? rgba16f : GL_RGBA, m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
+     glBindTexture(GL_TEXTURE_2D, previousTexture);
+ }
+ #endif
+@@ -199,7 +201,7 @@ void BitmapTexture::allocateTexture()
+ {
+     createTexture();
+ #if USE(SKIA)
+-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat(), m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
++    glTexImage2D(GL_TEXTURE_2D, 0, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? rgba16f : GL_RGBA, m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
+ #else
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_size.width(), m_size.height(), 0, textureFormat, s_pixelDataType, nullptr);
+ #endif
+@@ -338,7 +340,7 @@ void BitmapTexture::reset(const IntSize& size, OptionSet<Flags> flags)
+ 
+     glBindTexture(GL_TEXTURE_2D, m_id);
+ #if USE(SKIA)
+-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat(), m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
++    glTexImage2D(GL_TEXTURE_2D, 0, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? rgba16f : GL_RGBA, m_size.width(), m_size.height(), 0, GL_RGBA, m_imageInfo.colorType() == kRGBA_F16_SkColorType ? halfFloat : s_pixelDataType, nullptr);
+ #else
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_size.width(), m_size.height(), 0, textureFormat, s_pixelDataType, nullptr);
+ #endif
+diff --git a/Source/WebKit/Shared/glib/RendererBufferFormat.h b/Source/WebKit/Shared/glib/RendererBufferFormat.h
+index fd1b4436..e8dc5f15 100644
+--- a/Source/WebKit/Shared/glib/RendererBufferFormat.h
++++ b/Source/WebKit/Shared/glib/RendererBufferFormat.h
+@@ -30,6 +30,8 @@
+ #endif
+ 
+ #include <wtf/Vector.h>
++#include <span>
++#include <utility>
+ #include <wtf/text/CString.h>
+ 
+ namespace WebKit {
+@@ -44,6 +46,7 @@ struct RendererBufferFormat {
+     struct Format {
+         uint32_t fourcc { 0 };
+         Vector<uint64_t, 1> modifiers;
++        bool operator==(const Format&) const = default;
+     };
+ 
+     using Usage = RendererBufferFormatUsage;
+@@ -57,4 +60,34 @@ struct RendererBufferFormat {
+     Vector<Format> formats;
+ };
+ 
++inline bool rendererBufferLayoutIsAllowed(std::span<const RendererBufferFormat::Format> allowed, uint32_t fourcc, uint64_t modifier)
++{
++    for (const auto& format : allowed) {
++        if (format.fourcc == fourcc && format.modifiers.contains(modifier))
++            return true;
++    }
++    return false;
++}
++
++// Allocation owns its unpublished GL/EGL resources. Rejected actual layouts
++// are destroyed before trying the legal U8 alternative. Only the publisher
++// may send creation IPC, and it sees admitted actual tuples exclusively.
++template<typename Allocate, typename Publish>
++auto createAllowedRendererBuffer(std::span<const RendererBufferFormat::Format> allowed, bool preferFloat, Allocate&& allocate, Publish&& publish)
++{
++    using Result = decltype(publish(allocate(false)));
++    if (allowed.empty())
++        return Result { };
++    for (bool floating : { true, false }) {
++        if (floating && !preferFloat)
++            continue;
++        auto allocation = allocate(floating);
++        if (!allocation || !rendererBufferLayoutIsAllowed(allowed, allocation->fourcc(), allocation->modifier()))
++            continue;
++        if (auto result = publish(WTF::move(allocation)))
++            return result;
++    }
++    return Result { };
++}
++
+ } // namespace WebKit
+diff --git a/Source/WebKit/Shared/gtk/RendererBufferFrame.h b/Source/WebKit/Shared/gtk/RendererBufferFrame.h
+index c58daea0..7e0efff9 100644
+--- a/Source/WebKit/Shared/gtk/RendererBufferFrame.h
++++ b/Source/WebKit/Shared/gtk/RendererBufferFrame.h
+@@ -39,6 +39,38 @@
+ 
+ namespace WebKit {
+ 
++// One bounded recovery transaction per surface. Only a real non-SHM import
++// rejection requests an ordinary redraw; rejecting the SHM leaf is terminal.
++class RendererBufferImportState {
++public:
++    bool reject(bool sharedMemory)
++    {
++        if (sharedMemory) {
++            m_state = State::Terminal;
++            return false;
++        }
++        if (m_state != State::Negotiated)
++            return false;
++        m_state = State::SharedMemory;
++        return true;
++    }
++    bool usesSharedMemory() const { return m_state == State::SharedMemory; }
++    bool terminal() const { return m_state == State::Terminal; }
++private:
++    enum class State { Negotiated, SharedMemory, Terminal };
++    State m_state { State::Negotiated };
++};
++
++template<typename Texture, typename Build>
++bool updateRendererBufferTexture(Texture& current, Build&& build)
++{
++    auto candidate = build();
++    if (!candidate)
++        return false;
++    current = WTF::move(candidate);
++    return true;
++}
++
+ // One page-buffer ownership interval. Its source colour contract belongs to
+ // the allocation; optional native-video metadata belongs to the individual
+ // frame and never retags the ordinary page texture.
+@@ -95,6 +127,20 @@ public:
+         return std::exchange(m_renderingFence, UnixFileDescriptor { });
+     }
+ 
++    template<typename Update, typename Reject, typename Acknowledge>
++    bool importAndCommitFrom(RendererBufferFrame&& next, Update&& update, Reject&& reject, Acknowledge&& acknowledgeRejected)
++    {
++        ASSERT(next.buffer && !next.m_renderingFence);
++        if (!update(*next.buffer, buffer.get())) {
++            reject(*next.buffer, next.buffer == buffer);
++            next.clear();
++            acknowledgeRejected();
++            return false;
++        }
++        commitFrom(WTF::move(next));
++        return true;
++    }
++
+     void commitFrom(RendererBufferFrame&& next)
+     {
+         // FenceMonitor owns the transferred fence and the caller waits for it
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+index 62717285..c0b24714 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+@@ -458,7 +458,7 @@ AcceleratedBackingStore::BufferDMABuf::BufferDMABuf(WebPageProxy& webPage, uint6
+ {
+ }
+ 
+-void AcceleratedBackingStore::BufferDMABuf::didUpdateContents(Buffer* previousBuffer, const Rects& damageRects)
++bool AcceleratedBackingStore::BufferDMABuf::didUpdateContents(Buffer* previousBuffer, const Rects& damageRects)
+ {
+ #if GTK_CHECK_VERSION(4, 16, 0)
+     // Reassert the ordinary page contract when this buffer is reused. The
+@@ -480,9 +480,12 @@ void AcceleratedBackingStore::BufferDMABuf::didUpdateContents(Buffer* previousBu
+     }
+ 
+     GUniqueOutPtr<GError> error;
+-    m_texture = adoptGRef(gdk_dmabuf_texture_builder_build(m_builder.get(), nullptr, nullptr, &error.outPtr()));
+-    if (!m_texture)
+-        WTFLogAlways("Failed to create DMA-BUF texture of size %dx%d: %s", m_size.width(), m_size.height(), error->message);
++    bool imported = updateRendererBufferTexture(m_texture, [&] {
++        return adoptGRef(gdk_dmabuf_texture_builder_build(m_builder.get(), nullptr, nullptr, &error.outPtr()));
++    });
++    if (!imported)
++        WTFLogAlways("Failed to create DMA-BUF texture of size %dx%d: %s", m_size.width(), m_size.height(), error ? error->message : "unknown import error");
++    return imported;
+ }
+ 
+ RendererBufferDescription AcceleratedBackingStore::BufferDMABuf::description() const
+@@ -599,7 +602,7 @@ struct Texture {
+ };
+ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(Texture)
+ 
+-void AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const Rects&)
++bool AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const Rects&)
+ {
+     auto* texture = createTexture();
+     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, m_image);
+@@ -612,20 +615,25 @@ void AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const R
+     gdk_gl_texture_builder_set_height(builder.get(), m_size.height());
+     gdk_gl_texture_builder_set_format(builder.get(), isFloatingPointBufferFormat(m_fourcc) ? GDK_MEMORY_R16G16B16A16_FLOAT_PREMULTIPLIED : GDK_MEMORY_R8G8B8A8_PREMULTIPLIED);
+     gdk_gl_texture_builder_set_color_state(builder.get(), gdk_color_state_get_srgb());
+-    m_texture = adoptGRef(gdk_gl_texture_builder_build(builder.get(), [](gpointer userData) {
++    auto importedTexture = adoptGRef(gdk_gl_texture_builder_build(builder.get(), [](gpointer userData) {
+         destroyTexture(static_cast<Texture*>(userData));
+     }, texture));
+ #else
+-    m_texture = adoptGRef(gdk_gl_texture_new(texture->context.get(), texture->id, m_size.width(), m_size.height(), [](gpointer userData) {
++    auto importedTexture = adoptGRef(gdk_gl_texture_new(texture->context.get(), texture->id, m_size.width(), m_size.height(), [](gpointer userData) {
+         destroyTexture(static_cast<Texture*>(userData));
+     }, texture));
+ #endif
++    if (!importedTexture) {
++        destroyTexture(texture);
++        return false;
++    }
++    return updateRendererBufferTexture(m_texture, [&] { return WTF::move(importedTexture); });
+ }
+ #else
+-void AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const Rects&)
++bool AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const Rects&)
+ {
+     if (m_textureID)
+-        return;
++        return true;
+ 
+     m_gdkGLContext = gdk_gl_context_get_current();
+     glGenTextures(1, &m_textureID);
+@@ -635,7 +643,9 @@ void AcceleratedBackingStore::BufferEGLImage::didUpdateContents(Buffer*, const R
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+     glEGLImageTargetTexture2DOES(GL_TEXTURE_2D, m_image);
++    return true;
+ }
++
+ #endif
+ 
+ RendererBufferDescription AcceleratedBackingStore::BufferEGLImage::description() const
+@@ -696,17 +706,21 @@ AcceleratedBackingStore::BufferGBM::~BufferGBM()
+     gbm_bo_destroy(m_buffer);
+ }
+ 
+-void AcceleratedBackingStore::BufferGBM::didUpdateContents(Buffer*, const Rects&)
++bool AcceleratedBackingStore::BufferGBM::didUpdateContents(Buffer*, const Rects&)
+ {
+     uint32_t mapStride = 0;
+     void* mapData = nullptr;
+     void* map = gbm_bo_map(m_buffer, 0, 0, static_cast<uint32_t>(m_size.width()), static_cast<uint32_t>(m_size.height()), GBM_BO_TRANSFER_READ, &mapStride, &mapData);
+     if (!map)
+-        return;
++        return false;
+ 
+     auto cairoFormat = gbm_bo_get_format(m_buffer) == DRM_FORMAT_ARGB8888 ? CAIRO_FORMAT_ARGB32 : CAIRO_FORMAT_RGB24;
+-    m_surface = adoptRef(cairo_image_surface_create_for_data(static_cast<unsigned char*>(map), cairoFormat, m_size.width(), m_size.height(), mapStride));
+-    cairo_surface_set_device_scale(m_surface.get(), deviceScaleFactor(), deviceScaleFactor());
++    auto nextSurface = adoptRef(cairo_image_surface_create_for_data(static_cast<unsigned char*>(map), cairoFormat, m_size.width(), m_size.height(), mapStride));
++    if (cairo_surface_status(nextSurface.get()) != CAIRO_STATUS_SUCCESS) {
++        gbm_bo_unmap(m_buffer, mapData);
++        return false;
++    }
++    cairo_surface_set_device_scale(nextSurface.get(), deviceScaleFactor(), deviceScaleFactor());
+     struct BufferData {
+         WTF_DEPRECATED_MAKE_STRUCT_FAST_ALLOCATED(BufferData);
+         RefPtr<BufferGBM> buffer;
+@@ -714,10 +728,17 @@ void AcceleratedBackingStore::BufferGBM::didUpdateContents(Buffer*, const Rects&
+     };
+     auto bufferData = makeUnique<BufferData>(BufferData { const_cast<BufferGBM*>(this), mapData });
+     static cairo_user_data_key_t s_surfaceDataKey;
+-    cairo_surface_set_user_data(m_surface.get(), &s_surfaceDataKey, bufferData.release(), [](void* data) {
++    auto* ownedData = bufferData.release();
++    if (cairo_surface_set_user_data(nextSurface.get(), &s_surfaceDataKey, ownedData, [](void* data) {
+         std::unique_ptr<BufferData> bufferData(static_cast<BufferData*>(data));
+         gbm_bo_unmap(bufferData->buffer->m_buffer, bufferData->data);
+-    });
++    }) != CAIRO_STATUS_SUCCESS) {
++        gbm_bo_unmap(m_buffer, ownedData->data);
++        delete ownedData;
++        return false;
++    }
++    m_surface = WTF::move(nextSurface);
++    return true;
+ }
+ 
+ RendererBufferDescription AcceleratedBackingStore::BufferGBM::description() const
+@@ -751,19 +772,27 @@ AcceleratedBackingStore::BufferSHM::BufferSHM(WebPageProxy& webPage, uint64_t id
+ {
+ }
+ 
+-void AcceleratedBackingStore::BufferSHM::didUpdateContents(Buffer*, const Rects&)
++bool AcceleratedBackingStore::BufferSHM::didUpdateContents(Buffer*, const Rects&)
+ {
++    return updateRendererBufferTexture(m_surface, [&]() -> RefPtr<cairo_surface_t> {
+ #if USE(CAIRO)
+-    m_surface = m_bitmap->createCairoSurface();
++        auto surface = m_bitmap->createCairoSurface();
+ #elif USE(SKIA)
+-    m_surface = adoptRef(cairo_image_surface_create_for_data(m_bitmap->mutableSpan().data(), CAIRO_FORMAT_ARGB32, m_size.width(), m_size.height(), m_bitmap->bytesPerRow()));
+-    m_bitmap->ref();
+-    static cairo_user_data_key_t s_surfaceDataKey;
+-    cairo_surface_set_user_data(m_surface.get(), &s_surfaceDataKey, m_bitmap.get(), [](void* userData) {
+-        static_cast<ShareableBitmap*>(userData)->deref();
+-    });
++        auto surface = adoptRef(cairo_image_surface_create_for_data(m_bitmap->mutableSpan().data(), CAIRO_FORMAT_ARGB32, m_size.width(), m_size.height(), m_bitmap->bytesPerRow()));
++        if (cairo_surface_status(surface.get()) != CAIRO_STATUS_SUCCESS)
++            return nullptr;
++        m_bitmap->ref();
++        static cairo_user_data_key_t surfaceDataKey;
++        if (cairo_surface_set_user_data(surface.get(), &surfaceDataKey, m_bitmap.get(), [](void* data) { static_cast<ShareableBitmap*>(data)->deref(); }) != CAIRO_STATUS_SUCCESS) {
++            m_bitmap->deref();
++            return nullptr;
++        }
+ #endif
+-    cairo_surface_set_device_scale(m_surface.get(), deviceScaleFactor(), deviceScaleFactor());
++        if (!surface || cairo_surface_status(surface.get()) != CAIRO_STATUS_SUCCESS)
++            return nullptr;
++        cairo_surface_set_device_scale(surface.get(), deviceScaleFactor(), deviceScaleFactor());
++        return surface;
++    });
+ }
+ 
+ RendererBufferDescription AcceleratedBackingStore::BufferSHM::description() const
+@@ -1163,11 +1192,19 @@ bool AcceleratedBackingStore::swapBuffersIfNeeded()
+         ensureGLContext();
+         gdk_gl_context_make_current(m_gdkGLContext.get());
+     }
+-    m_pendingFrame.buffer->didUpdateContents(m_committedFrame.buffer.get(), m_pendingDamageRects);
++    bool committed = m_committedFrame.importAndCommitFrom(WTF::move(m_pendingFrame), [&](Buffer& buffer, Buffer* previous) {
++        return buffer.didUpdateContents(previous, m_pendingDamageRects);
++    }, [&](Buffer& buffer, bool retained) {
++#if USE(GTK4)
++        if (RefPtr process = m_legacyMainFrameProcess.get())
++            process->send(Messages::AcceleratedSurface::BufferImportFailed(buffer.id(), retained), m_surfaceID);
++#else
++        if (!retained)
++            buffer.release();
++#endif
++    }, [&] { frameDone(); });
+     m_pendingDamageRects = { };
+-
+-    m_committedFrame.commitFrom(WTF::move(m_pendingFrame));
+-    return true;
++    return committed;
+ }
+ 
+ #if USE(GTK4)
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+index 97b7df64..e620a441 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+@@ -135,7 +135,7 @@ private:
+         };
+ 
+         virtual Type type() const = 0;
+-        virtual void didUpdateContents(Buffer*, const Rects&) = 0;
++        virtual bool didUpdateContents(Buffer*, const Rects&) = 0;
+ #if USE(GTK4)
+         virtual GdkTexture* texture() const { return nullptr; }
+ #else
+@@ -180,7 +180,7 @@ private:
+         BufferDMABuf(WebPageProxy&, uint64_t id, uint64_t surfaceID, const WebCore::IntSize&, RendererBufferFormat::Usage, Vector<WTF::UnixFileDescriptor>&&, GRefPtr<GdkDmabufTextureBuilder>&&);
+ 
+         Buffer::Type type() const override { return Buffer::Type::DmaBuf; }
+-        void didUpdateContents(Buffer*, const Rects&) override;
++        bool didUpdateContents(Buffer*, const Rects&) override;
+         GdkTexture* texture() const override { return m_texture.get(); }
+         RendererBufferDescription description() const override;
+         RefPtr<WebCore::NativeImage> asNativeImageForTesting() const override;
+@@ -201,7 +201,7 @@ private:
+         BufferEGLImage(WebPageProxy&, uint64_t id, uint64_t surfaceID, const WebCore::IntSize&, RendererBufferFormat::Usage, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, uint64_t modifier, EGLImage);
+ 
+         Buffer::Type type() const override { return Buffer::Type::EglImage; }
+-        void didUpdateContents(Buffer*, const Rects&) override;
++        bool didUpdateContents(Buffer*, const Rects&) override;
+ #if USE(GTK4)
+         GdkTexture* texture() const override { return m_texture.get(); }
+ #else
+@@ -233,7 +233,7 @@ private:
+         BufferGBM(WebPageProxy&, uint64_t id, uint64_t surfaceID, const WebCore::IntSize&, RendererBufferFormat::Usage, WTF::UnixFileDescriptor&&, struct gbm_bo*);
+ 
+         Buffer::Type type() const override { return Buffer::Type::Gbm; }
+-        void didUpdateContents(Buffer*, const Rects&) override;
++        bool didUpdateContents(Buffer*, const Rects&) override;
+         cairo_surface_t* surface() const override { return m_surface.get(); }
+         RendererBufferDescription description() const override;
+         RefPtr<WebCore::NativeImage> asNativeImageForTesting() const override;
+@@ -253,7 +253,7 @@ private:
+         BufferSHM(WebPageProxy&, uint64_t id, uint64_t surfaceID, RefPtr<WebCore::ShareableBitmap>&&);
+ 
+         Buffer::Type type() const override { return Buffer::Type::SharedMemory; }
+-        void didUpdateContents(Buffer*, const Rects&) override;
++        bool didUpdateContents(Buffer*, const Rects&) override;
+         cairo_surface_t* surface() const override { return m_surface.get(); }
+         RendererBufferDescription description() const override;
+         RefPtr<WebCore::NativeImage> asNativeImageForTesting() const override;
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+index 37f89d1b..0bd1eb0f 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+@@ -36,6 +36,7 @@
+ #include <WebCore/Region.h>
+ #include <WebCore/ShareableBitmap.h>
+ #include <array>
++#include <algorithm>
+ #include <fcntl.h>
+ #include <unistd.h>
+ #include <wtf/SafeStrerror.h>
+@@ -360,7 +361,12 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTarg
+     Vector<uint32_t> strides;
+     uint32_t format = gbm_bo_get_format(bo);
+     int planeCount = gbm_bo_get_plane_count(bo);
+-    uint64_t modifier = disableModifiers ? DRM_FORMAT_MOD_INVALID : gbm_bo_get_modifier(bo);
++    uint64_t modifier = gbm_bo_get_modifier(bo);
++    if (!rendererBufferLayoutIsAllowed(bufferFormat.allowedFormats.span(), format, modifier)) {
++        gbm_bo_destroy(bo);
++        WTFLogAlways("GBM allocated a layout outside the negotiated import set");
++        return nullptr;
++    }
+ 
+     Vector<EGLAttrib> attributes = {
+         EGL_WIDTH, static_cast<EGLAttrib>(gbm_bo_get_width(bo)),
+@@ -557,63 +563,72 @@ void AcceleratedSurface::RenderTargetSHMImage::didRenderFrame(Vector<IntRect, 1>
+     RenderTargetShareableBuffer::didRenderFrame(WTF::move(damageRects));
+ }
+ 
+-std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTargetTexture::create(uint64_t surfaceID, const IntSize& size, bool extendedSRGB)
++#if USE(GBM) || OS(ANDROID)
++std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTargetTexture::create(uint64_t surfaceID, const IntSize& size, const BufferFormat& bufferFormat)
++#else
++std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTargetTexture::create(uint64_t, const IntSize&)
++#endif
+ {
+-    unsigned texture;
+-    glGenTextures(1, &texture);
+-    glBindTexture(GL_TEXTURE_2D, texture);
+-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+-    glTexImage2D(GL_TEXTURE_2D, 0, extendedSRGB ? pageRGBA16F : GL_RGBA, size.width(), size.height(), 0, GL_RGBA, extendedSRGB ? pageHalfFloat : GL_UNSIGNED_BYTE, nullptr);
+-
+-    auto& display = PlatformDisplay::sharedDisplay();
+-    auto image = display.createEGLImage(eglGetCurrentContext(), EGL_GL_TEXTURE_2D, (EGLClientBuffer)(uint64_t)texture, { });
+-    if (!image) {
+-        glDeleteTextures(1, &texture);
+-        WTFLogAlways("Failed to create EGL image for texture");
+-        return nullptr;
+-    }
+-
+-    int fourcc, planeCount;
+-    uint64_t modifier;
+-    if (!eglExportDMABUFImageQueryMESA(display.eglDisplay(), image, &fourcc, &planeCount, &modifier)) {
+-        WTFLogAlways("eglExportDMABUFImageQueryMESA failed");
+-        display.destroyEGLImage(image);
+-        glDeleteTextures(1, &texture);
+-        return nullptr;
+-    }
+-
+-    if (extendedSRGB && !isFloatingPointBufferFormat(fourcc)) {
+-        display.destroyEGLImage(image);
+-        glDeleteTextures(1, &texture);
+-        return create(surfaceID, size, false);
+-    }
+-
+-    Vector<int> fdsOut(planeCount);
+-    Vector<int> stridesOut(planeCount);
+-    Vector<int> offsetsOut(planeCount);
+-    if (!eglExportDMABUFImageMESA(display.eglDisplay(), image, fdsOut.mutableSpan().data(), stridesOut.mutableSpan().data(), offsetsOut.mutableSpan().data())) {
+-        WTFLogAlways("eglExportDMABUFImageMESA failed");
+-        display.destroyEGLImage(image);
+-        glDeleteTextures(1, &texture);
+-        return nullptr;
+-    }
+-
+-    display.destroyEGLImage(image);
+-
+-    Vector<UnixFileDescriptor> fds = fdsOut.map([](int fd) {
+-        return UnixFileDescriptor(fd, UnixFileDescriptor::Adopt);
+-    });
+-    Vector<uint32_t> strides = stridesOut.map([](int stride) {
+-        return static_cast<uint32_t>(stride);
+-    });
+-    Vector<uint32_t> offsets = offsetsOut.map([](int offset) {
+-        return static_cast<uint32_t>(offset);
+-    });
+-
+-    return makeUnique<RenderTargetTexture>(surfaceID, size, texture, fourcc, WTF::move(fds), WTF::move(offsets), WTF::move(strides), modifier);
++#if USE(GBM) || OS(ANDROID)
++    struct TextureExport {
++        unsigned texture { 0 };
++        EGLImage image { nullptr };
++        uint32_t format { 0 };
++        int planes { 0 };
++        uint64_t layoutModifier { 0 };
++        uint32_t fourcc() const { return format; }
++        uint64_t modifier() const { return layoutModifier; }
++        ~TextureExport()
++        {
++            if (image)
++                PlatformDisplay::sharedDisplay().destroyEGLImage(image);
++            if (texture)
++                glDeleteTextures(1, &texture);
++        }
++    };
++    auto allocate = [&](bool floating) -> std::unique_ptr<TextureExport> {
++        auto allocation = makeUnique<TextureExport>();
++        glGenTextures(1, &allocation->texture);
++        glBindTexture(GL_TEXTURE_2D, allocation->texture);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
++        glTexImage2D(GL_TEXTURE_2D, 0, floating ? pageRGBA16F : GL_RGBA, size.width(), size.height(), 0, GL_RGBA, floating ? pageHalfFloat : GL_UNSIGNED_BYTE, nullptr);
++        auto& display = PlatformDisplay::sharedDisplay();
++        allocation->image = display.createEGLImage(eglGetCurrentContext(), EGL_GL_TEXTURE_2D, (EGLClientBuffer)(uint64_t)allocation->texture, { });
++        if (!allocation->image)
++            return nullptr;
++        int actualFormat;
++        if (!eglExportDMABUFImageQueryMESA(display.eglDisplay(), allocation->image, &actualFormat, &allocation->planes, &allocation->layoutModifier))
++            return nullptr;
++        allocation->format = actualFormat;
++        if (allocation->planes <= 0 || allocation->planes > 4 || floating != isFloatingPointBufferFormat(allocation->format))
++            return nullptr;
++        return allocation;
++    };
++    auto publish = [&](std::unique_ptr<TextureExport>&& allocation) -> std::unique_ptr<RenderTarget> {
++        Vector<int> fdsOut(allocation->planes, -1);
++        Vector<int> stridesOut(allocation->planes);
++        Vector<int> offsetsOut(allocation->planes);
++        auto& display = PlatformDisplay::sharedDisplay();
++        bool exported = eglExportDMABUFImageMESA(display.eglDisplay(), allocation->image, fdsOut.mutableSpan().data(), stridesOut.mutableSpan().data(), offsetsOut.mutableSpan().data());
++        Vector<UnixFileDescriptor> fds = fdsOut.map([](int fd) { return UnixFileDescriptor { fd, UnixFileDescriptor::Adopt }; });
++        if (!exported || std::ranges::any_of(fds, [](const auto& fd) { return !fd; })
++            || std::ranges::any_of(stridesOut, [](int stride) { return stride <= 0; })
++            || std::ranges::any_of(offsetsOut, [](int offset) { return offset < 0; }))
++            return nullptr;
++        Vector<uint32_t> strides = stridesOut.map([](int stride) { return static_cast<uint32_t>(stride); });
++        Vector<uint32_t> offsets = offsetsOut.map([](int offset) { return static_cast<uint32_t>(offset); });
++        // This constructor is the publication boundary. Both the actual fourcc
++        // and modifier were admitted before any creation IPC can be sent.
++        return makeUnique<RenderTargetTexture>(surfaceID, size, std::exchange(allocation->texture, 0), allocation->format, WTF::move(fds), WTF::move(offsets), WTF::move(strides), allocation->layoutModifier);
++    };
++    return createAllowedRendererBuffer(bufferFormat.allowedFormats.span(), isFloatingPointBufferFormat(bufferFormat.fourcc), allocate, publish);
++#else
++    // No advertised DMA-BUF layout contract exists on this route.
++    return nullptr;
++#endif
+ }
+ 
+ AcceleratedSurface::RenderTargetTexture::RenderTargetTexture(uint64_t surfaceID, const IntSize& size, unsigned texture, uint32_t format, Vector<UnixFileDescriptor>&& fds, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier)
+@@ -866,6 +881,38 @@ void AcceleratedSurface::SwapChain::setupBufferFormat(const Vector<RendererBuffe
+ 
+ #endif
+ 
++    // Keep the complete accepted set for this usage/device. Texture exports
++    // choose their layout in the driver, and implicit GBM fallback may choose
++    // a modifier different from the requested allocation list.
++    for (const auto& preferred : preferredFormats) {
++        if (preferred.usage != newBufferFormat.usage)
++            continue;
++#if USE(GBM)
++        if (preferred.drmDevice != newBufferFormat.drmDevice)
++            continue;
++#endif
++        for (const auto& candidate : preferred.formats) {
++            auto supported = supportedFormats.findIf([&](const auto& format) { return format.fourcc == candidate.fourcc; });
++            if (supported == notFound)
++                continue;
++#if PLATFORM(GTK) && USE(GTK4) && USE(SKIA)
++            bool floating = isFloatingPointBufferFormat(candidate.fourcc);
++            if (floating && (!supportsFloat || !preferred.supportsExtendedSRGB))
++                continue;
++            if (!floating && candidate.fourcc != DRM_FORMAT_ARGB8888 && candidate.fourcc != DRM_FORMAT_XRGB8888
++                && candidate.fourcc != DRM_FORMAT_ABGR8888 && candidate.fourcc != DRM_FORMAT_XBGR8888)
++                continue;
++#endif
++            RendererBufferFormat::Format accepted { candidate.fourcc, { } };
++            for (uint64_t modifier : candidate.modifiers) {
++                if (modifier == DRM_FORMAT_MOD_INVALID || supportedFormats[supported].modifiers.contains(modifier))
++                    accepted.modifiers.append(modifier);
++            }
++            if (!accepted.modifiers.isEmpty())
++                newBufferFormat.allowedFormats.append(WTF::move(accepted));
++        }
++    }
++
+     if (!newBufferFormat.fourcc || newBufferFormat == m_bufferFormat)
+         return;
+ 
+@@ -903,6 +950,12 @@ bool AcceleratedSurface::SwapChain::resize(const IntSize& size)
+ 
+ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::SwapChain::createTarget() const
+ {
++#if PLATFORM(GTK) && USE(GTK4)
++    if (m_importState.terminal())
++        return nullptr;
++    if (m_importState.usesSharedMemory())
++        return RenderTargetSHMImage::create(m_surfaceID, m_size);
++#endif
+     switch (m_type) {
+ #if PLATFORM(GTK) || ENABLE(WPE_PLATFORM)
+ #if USE(GBM) || OS(ANDROID)
+@@ -913,11 +966,11 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::SwapChain:
+ #endif
+     case Type::Texture:
+ #if USE(GBM) || OS(ANDROID)
+-        if (auto target = RenderTargetTexture::create(m_surfaceID, m_size, isFloatingPointBufferFormat(m_bufferFormat.fourcc)))
++        if (auto target = RenderTargetTexture::create(m_surfaceID, m_size, m_bufferFormat))
+             return target;
+         return RenderTargetSHMImage::create(m_surfaceID, m_size);
+ #else
+-        return RenderTargetTexture::create(m_surfaceID, m_size, false);
++        return RenderTargetSHMImage::create(m_surfaceID, m_size);
+ #endif
+     case Type::SharedMemory:
+         return RenderTargetSHMImage::create(m_surfaceID, m_size);
+@@ -938,6 +991,10 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::SwapChain:
+ 
+ AcceleratedSurface::RenderTarget* AcceleratedSurface::SwapChain::nextTarget()
+ {
++#if PLATFORM(GTK) && USE(GTK4)
++    if (m_importState.terminal())
++        return nullptr;
++#endif
+ #if USE(WPE_RENDERER)
+     if (m_type == Type::WPEBackend)
+         return m_lockedTargets[0].get();
+@@ -996,11 +1053,36 @@ void AcceleratedSurface::SwapChain::releaseTarget(uint64_t targetID, UnixFileDes
+     });
+     if (index != notFound) {
+         m_lockedTargets[index]->setReleaseFenceFD(WTF::move(releaseFence));
+-        m_freeTargets.insert(0, WTF::move(m_lockedTargets[index]));
++        bool retire = m_lockedTargets[index]->importRejected();
++#if PLATFORM(GTK) && USE(GTK4)
++        retire |= (m_importState.usesSharedMemory() || m_importState.terminal()) && !m_lockedTargets[index]->isSharedMemory();
++#endif
++        if (!retire)
++            m_freeTargets.insert(0, WTF::move(m_lockedTargets[index]));
+         m_lockedTargets.removeAt(index);
+     }
+ }
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++bool AcceleratedSurface::SwapChain::rejectTarget(uint64_t targetID, bool retainedForPresentation)
++{
++    auto index = m_lockedTargets.findIf([&](const auto& target) { return target->id() == targetID; });
++    if (index == notFound || !m_lockedTargets[index]->rejectImport())
++        return false;
++    bool sharedMemory = m_lockedTargets[index]->isSharedMemory();
++    bool redraw = m_importState.reject(sharedMemory);
++    if (!retainedForPresentation)
++        m_lockedTargets.removeAt(index); // Rejection retires, never frees, this allocation.
++    if (redraw)
++        m_freeTargets.removeAllMatching([](const auto& target) { return !target->isSharedMemory(); });
++    if (sharedMemory) {
++        m_freeTargets.clear();
++        WTFLogAlways("Ordinary page SHM fallback import failed; retaining the last valid frame without retry");
++    }
++    return redraw;
++}
++#endif
++
+ void AcceleratedSurface::SwapChain::reset()
+ {
+ #if ENABLE(WPE_PLATFORM)
+@@ -1123,6 +1205,9 @@ void AcceleratedSurface::didCreateCompositingRunLoop(RunLoop& runLoop)
+ void AcceleratedSurface::willDestroyCompositingRunLoop()
+ {
+     m_frameCompleteHandler = nullptr;
++#if PLATFORM(GTK) && USE(GTK4)
++    m_bufferImportFailureHandler = nullptr;
++#endif
+ #if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+     m_nativeVideoRedraw = nullptr;
+ #endif
+@@ -1138,8 +1223,31 @@ void AcceleratedSurface::willDestroyCompositingRunLoop()
+ #endif
+ }
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++void AcceleratedSurface::bufferImportFailed(uint64_t id, bool retainedForPresentation)
++{
++    if (!m_owningGLContext)
++        return;
++    GLContext::ScopedGLContextCurrent current(*m_owningGLContext);
++    if (m_target && m_target->id() == id)
++        m_target = nullptr;
++    if (m_swapChain.rejectTarget(id, retainedForPresentation) && m_bufferImportFailureHandler)
++        m_bufferImportFailureHandler();
++}
++#endif
++
+ void AcceleratedSurface::willDestroyGLContext()
+ {
++#if PLATFORM(GTK) && USE(GTK4)
++    if (m_owningGLContext) {
++        GLContext::ScopedGLContextCurrent current(*m_owningGLContext);
++        m_target = nullptr;
++        m_swapChain.reset();
++        m_owningGLContext = nullptr;
++        return;
++    }
++#endif
++    m_target = nullptr;
+     m_swapChain.reset();
+ }
+ 
+@@ -1261,6 +1369,13 @@ void AcceleratedSurface::releaseBuffer(uint64_t targetID, UnixFileDescriptor&& r
+ {
+ #if USE(WPE_RENDERER)
+     ASSERT(m_swapChain.type() != SwapChain::Type::WPEBackend);
++#endif
++#if PLATFORM(GTK) && USE(GTK4)
++    if (m_owningGLContext) {
++        GLContext::ScopedGLContextCurrent current(*m_owningGLContext);
++        m_swapChain.releaseTarget(targetID, WTF::move(releaseFence));
++        return;
++    }
+ #endif
+     m_swapChain.releaseTarget(targetID, WTF::move(releaseFence));
+ }
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
+index de749900..959d66df 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.h
+@@ -28,6 +28,9 @@
+ #if USE(COORDINATED_GRAPHICS)
+ 
+ #include "MessageReceiver.h"
++#if PLATFORM(GTK) && USE(GTK4)
++#include "RendererBufferFrame.h"
++#endif
+ #include <WebCore/ColorComponents.h>
+ #include <WebCore/ColorModels.h>
+ #include <WebCore/CoordinatedCompositionReason.h>
+@@ -80,6 +83,7 @@ class RunLoop;
+ 
+ namespace WebCore {
+ class GLFence;
++class GLContext;
+ class GraphicsContext;
+ class ShareableBitmap;
+ class ShareableBitmapHandle;
+@@ -129,6 +133,14 @@ public:
+ #endif
+ 
+     void willDestroyGLContext();
++    bool hasRenderTarget() const { return m_target; }
++#if PLATFORM(GTK) && USE(GTK4)
++    void setBufferImportFailureHandler(WebCore::GLContext& context, Function<void()>&& handler)
++    {
++        m_owningGLContext = &context;
++        m_bufferImportFailureHandler = WTF::move(handler);
++    }
++#endif
+     void willRenderFrame(const WebCore::IntSize&);
+     void didRenderFrame();
+     void clear(const OptionSet<WebCore::CompositionReason>&);
+@@ -163,6 +175,9 @@ private:
+ #endif
+ #endif
+     void frameDone();
++#if PLATFORM(GTK) && USE(GTK4)
++    void bufferImportFailed(uint64_t, bool retainedForPresentation);
++#endif
+     void releaseUnusedBuffersTimerFired();
+ 
+     class RenderTarget {
+@@ -171,6 +186,9 @@ private:
+         virtual ~RenderTarget();
+ 
+         uint64_t id() const { return m_id; }
++        virtual bool isSharedMemory() const { return false; }
++        bool rejectImport() { return !std::exchange(m_importRejected, true); }
++        bool importRejected() const { return m_importRejected; }
+ #if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+         void setVideoFrame(uint64_t serial, std::optional<WebCore::GTKVideoPlane>&& plane)
+         {
+@@ -200,6 +218,7 @@ private:
+         std::optional<WebCore::GTKVideoPlane> m_videoPlane;
+ #endif
+ 
++        bool m_importRejected { false };
+         uint64_t m_id { 0 };
+         uint64_t m_surfaceID { 0 };
+ #if ENABLE(DAMAGE_TRACKING)
+@@ -257,6 +276,7 @@ private:
+         {
+             usage = std::exchange(other.usage, RendererBufferFormat::Usage::Rendering);
+             fourcc = std::exchange(other.fourcc, 0);
++            allowedFormats = WTF::move(other.allowedFormats);
+ #if USE(GBM)
+             modifiers = WTF::move(other.modifiers);
+             gbmDevice = WTF::move(other.gbmDevice);
+@@ -272,11 +292,13 @@ private:
+                 && drmDevice == other.drmDevice
+                 && modifiers == other.modifiers
+ #endif
+-                && fourcc == other.fourcc;
++                && fourcc == other.fourcc
++                && allowedFormats == other.allowedFormats;
+         }
+ 
+         RendererBufferFormat::Usage usage { RendererBufferFormat::Usage::Rendering };
+         uint32_t fourcc { 0 };
++        Vector<RendererBufferFormat::Format> allowedFormats;
+ 
+ #if USE(GBM)
+         WebCore::DRMDevice drmDevice;
+@@ -311,6 +333,7 @@ private:
+ 
+     private:
+         bool supportsExplicitSync() const override { return false; }
++        bool isSharedMemory() const override { return true; }
+         void didRenderFrame(Vector<WebCore::IntRect, 1>&&) override;
+ 
+         unsigned m_colorBuffer { 0 };
+@@ -319,7 +342,11 @@ private:
+ 
+     class RenderTargetTexture final : public RenderTargetShareableBuffer {
+     public:
+-        static std::unique_ptr<RenderTarget> create(uint64_t, const WebCore::IntSize&, bool extendedSRGB);
++#if USE(GBM) || OS(ANDROID)
++        static std::unique_ptr<RenderTarget> create(uint64_t, const WebCore::IntSize&, const BufferFormat&);
++#else
++        static std::unique_ptr<RenderTarget> create(uint64_t, const WebCore::IntSize&);
++#endif
+         RenderTargetTexture(uint64_t, const WebCore::IntSize&, unsigned texture, uint32_t format, Vector<WTF::UnixFileDescriptor>&&, Vector<uint32_t>&& offsets, Vector<uint32_t>&& strides, uint64_t modifier);
+         ~RenderTargetTexture();
+ 
+@@ -372,6 +399,9 @@ private:
+         const WebCore::IntSize& size() const { return m_size; }
+         RenderTarget* nextTarget();
+         void releaseTarget(uint64_t, UnixFileDescriptor&& releaseFence);
++#if PLATFORM(GTK) && USE(GTK4)
++        bool rejectTarget(uint64_t, bool retainedForPresentation);
++#endif
+         void reset();
+         void releaseUnusedBuffers();
+ 
+@@ -401,6 +431,9 @@ private:
+         Vector<std::unique_ptr<RenderTarget>, s_maximumBuffers> m_freeTargets;
+         Vector<std::unique_ptr<RenderTarget>, s_maximumBuffers> m_lockedTargets;
+         bool m_initialTargetsCreated { false };
++#if PLATFORM(GTK) && USE(GTK4)
++        RendererBufferImportState m_importState;
++#endif
+ #if (PLATFORM(GTK) || ENABLE(WPE_PLATFORM)) && (USE(GBM) || OS(ANDROID))
+         Lock m_bufferFormatLock;
+         BufferFormat m_bufferFormat WTF_GUARDED_BY_LOCK(m_bufferFormatLock);
+@@ -418,6 +451,10 @@ private:
+     WebCore::GTKVideoTarget m_videoTarget;
+     Function<void()> m_nativeVideoRedraw;
+     uint64_t m_videoSerial { 0 };
++#endif
++#if PLATFORM(GTK) && USE(GTK4)
++    WebCore::GLContext* m_owningGLContext { nullptr };
++    Function<void()> m_bufferImportFailureHandler;
+ #endif
+     WeakRef<WebPage> m_webPage;
+     Function<void()> m_frameCompleteHandler;
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in
+index af9b3ad0..f09dfa9e 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in
+@@ -28,6 +28,9 @@
+ messages -> AcceleratedSurface {
+     ReleaseBuffer(uint64_t id, UnixFileDescriptor releaseFence)
+     FrameDone()
++#if PLATFORM(GTK) && USE(GTK4)
++    BufferImportFailed(uint64_t id, bool retainedForPresentation)
++#endif
+ #if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+     SetVideoTarget(struct WebCore::GTKVideoTarget target)
+     SourceActivated(uint64_t revision)
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/NonCompositedFrameRenderer.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/NonCompositedFrameRenderer.cpp
+index f70b7f07..403ce071 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/NonCompositedFrameRenderer.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/NonCompositedFrameRenderer.cpp
+@@ -70,6 +70,12 @@ bool NonCompositedFrameRenderer::initialize()
+     if (!m_context || !m_context->makeContextCurrent())
+         return false;
+ 
++#if PLATFORM(GTK) && USE(GTK4)
++    m_surface->setBufferImportFailureHandler(*m_context, [this] {
++        setNeedsDisplayInRect(m_webPage->bounds());
++        display(); // Existing follow-up flag waits for the separate FrameDone.
++    });
++#endif
+     m_surface->didCreateCompositingRunLoop(RunLoop::mainSingleton());
+     LayerTreeContext layerTreeContext;
+     layerTreeContext.contextID = m_surface->surfaceID();
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp
+index 46c2984e..c5031b86 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp
+@@ -101,6 +101,9 @@ ThreadedCompositor::ThreadedCompositor(LayerTreeHost& layerTreeHost)
+             glGetIntegerv(GL_MAX_TEXTURE_SIZE, &m_maxTextureSize);
+ 
+             m_textureMapper = TextureMapper::create();
++#if PLATFORM(GTK) && USE(GTK4)
++            m_surface->setBufferImportFailureHandler(*m_context, [this] { requestComposition(CompositionReason::RenderingUpdate); });
++#endif
+ #if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+             m_surface->setNativeVideoRedrawHandler([this] { requestComposition(CompositionReason::VideoFrame); });
+ #endif
+@@ -424,6 +427,10 @@ void ThreadedCompositor::renderLayerTree()
+     viewportTransform.scale(deviceScaleFactor);
+ 
+     m_surface->willRenderFrame(viewportSize);
++    if (!m_surface->hasRenderTarget()) {
++        frameComplete();
++        return;
++    }
+ 
+     RunLoop::mainSingleton().dispatch([this, protectedThis = Ref { *this }] {
+         if (m_layerTreeHost)
+-- 
+2.54.0 (Apple Git-157)
+

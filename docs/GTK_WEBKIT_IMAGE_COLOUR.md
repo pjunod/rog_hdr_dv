@@ -223,16 +223,56 @@ explicitly and run the four prepared suites with GoogleTest XML output:
 ```sh
 cmake --build "$webkit_build" --target TestWebCoreImageColour --parallel 1
 "$webkit_build/bin/TestWebKitAPI/TestWebCoreImageColour" \
-  --gtest_filter='SkiaDecodedImageColour.*:SkiaWorkingTextureTest.*:SkiaWorkingTile.*:RendererBufferFrame.*' \
+  --gtest_filter='SkiaDecodedImageColour.*:SkiaWorkingTextureTest.*:SkiaWorkingTile.*:RendererBufferFrame.*:RendererBufferLayouts.*' \
   --gtest_output="xml:$webkit_receipts/image-colour-focused.xml"
 ```
 
 Use an admitted existing candidate build and a fresh owned receipt directory.
-The prepared inventory is14 cases: seven decoded-image, four working-texture,
-two working-tile and one frame-owner case. Require zero failures, errors,
-disabled cases and skips for the intended float route. The inherited console
+The normal inventory is 19 cases: seven decoded-image, four working-texture,
+two working-tile, four frame-transaction and two layout-policy cases. Require
+zero failures, errors, disabled cases and skips for the intended float route. The inherited console
 printer can label skipped cases PASS; use XML rather than that label. A
 zero-case filter or unavailable capability is not preservation qualification.
 Record source/configuration, producer objects and linked/loaded libraries.
 Actual shipping framebuffer, IPC, GDK import and native-lease checks remain
 separate. No command above has run for this candidate.
+
+
+The disjoint twentieth case checks legal U8 texture allocation, upload, copy,
+sampling and framebuffer use on actual OpenGL ES 2. Keep the normal receipt;
+run only this case in a separately admitted genuine ES2 scenario:
+
+```sh
+"$webkit_build/bin/TestWebKitAPI/TestWebCoreImageColour" \
+  --gtest_filter='SkiaTextureContextTest.LegacyU8AllocationUploadCopySampleHasNoGLError' \
+  --gtest_output="xml:$webkit_receipts/image-colour-gles2.xml"
+```
+
+Require exactly one enabled case, no skips/failures, and recorded actual
+OpenGL ES API, numeric version 200, version string and renderer. A GL3 pass
+does not close this check. A declared software/constrained Mesa ES2 scenario
+can qualify API legality, with actual driver enforcement recorded; it grants
+no physical-hardware claim. Neither scenario has run.
+
+## Adversarial findings and source corrections
+
+The single independent full review identified actual exported-layout admission
+and late UI import ownership as one blocking area, and illegal sized RGBA
+allocation on GLES2 as another. The producer now validates the actual queried
+fourcc/modifier against the UI set before publication. UI import commits only
+a valid replacement; rejection retains the last valid frame, retires the
+failed allocation separately from frame completion, and schedules one ordinary
+static redraw through existing renderer callbacks. SHM is one terminal fallback
+leaf rather than a retry loop. Native-video metadata and release credit remain
+bound to their allocation. These are architectural source corrections, not
+runtime qualification or a new watchdog.
+
+A targeted continuation confirmed those shipping corrections and the fixture
+RAII fix. It found one test-only teardown defect: destroying an ordinary
+context could unbind EGL while leaving the shared Skia wrapper cached current.
+The final fixture correction unbinds through the current wrapper first,
+records an unbind failure, and checks both real EGL and wrapper state after
+cleanup. Its native verification remains pending. GTK startup coverage now
+prepares 15 cases, including exact/linear accepted descriptions, rejection and
+legacy startup through the normal synchronous preparation path. The qualified
+CMv2 run must not silently skip its version-2 cases.

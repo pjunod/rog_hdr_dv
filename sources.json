@@ -1122,9 +1122,9 @@
       "component": "ubuntu-webkitgtk-native-hdr",
       "base_commit": "5e156fdf2d8daf0485d3b20ffbdde9725bb57d26",
       "base_tree": "42cb56170bd8e122c8632b3616fd3a2e707bb458",
-      "candidate_commit": "3a36d41e05708abafad13baa528ae597ea101878",
-      "candidate_tree": "eac3b703d500c66e8a3f5ef32236c2aef00f6a68",
-      "patch_count": 9,
+      "candidate_commit": "0c052c6888ce5d4563849206d7445b7e42141e00",
+      "candidate_tree": "3b39411e9520d50a053ae4eb89f0a9a28a16d23a",
+      "patch_count": 13,
       "patch_order": [
         "0001-webkitgtk-clear-video-and-native-hdr.patch",
         "0002-skia-preserve-image-profiles-and-png16.patch",
@@ -1134,7 +1134,11 @@
         "0006-tests-cover-coordinated-image-precision.patch",
         "0007-skia-preserve-typed-solid-fills-and-cache-cost.patch",
         "0008-webkit-bind-native-frame-metadata-to-page-buffer-ownership.patch",
-        "0009-tests-reuse-shipping-objects-for-focused-colour-checks.patch"
+        "0009-tests-reuse-shipping-objects-for-focused-colour-checks.patch",
+        "0010-webkit-validate-import-layouts-and-retire-failed-frames.patch",
+        "0011-tests-cover-export-failure-and-legacy-textures.patch",
+        "0012-tests-bind-shared-layout-support-headers.patch",
+        "0013-tests-align-fixture-egl-context-teardown.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -1167,7 +1171,7 @@
           "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
         }
       },
-      "candidate_status": "Nine-patch product source candidate retains image profiles and meaningful PNG16 precision, uses typed nonlinear-sRGB float working storage through accelerated pages and GTK import, and couples native frame metadata to buffer ownership. Source/Tools implementation and focused native regression sources are prepared. An excluded focused executable reuses shipping WebCore objects with the production feature profile unchanged. Original Debian tree remains unchanged for the separate Ubuntu packaging overlay. Candidate compile/link, final independent review, affected tests, package and runtime acceptance remain pending; no rogdv7 installation. The rogdv6 source and historical receipts remain separate.",
+      "candidate_status": "Thirteen-patch product source candidate: typed profile/PNG16 and nonlinear-sRGB working pipeline plus adversarial-review corrections for actual export layouts, transactional import failure/ownership, GLES2 fallback and test RAII/current-context teardown. Source and prepared focused regressions now comprise nineteen normal/F16 cases plus one requiring actual GLES2. Original Debian tree remains unchanged before separate Ubuntu overlay. Candidate compile/link, affected tests, package and runtime acceptance remain pending; no rogdv7 installation. Historical rogdv6 receipts remain separate.",
       "candidate_package_version": "2.52.6-1ubuntu1+rogdv7",
       "previous_candidate_commit": "c1fcae696a4d2eb53258f7c9f2d23d1011b94dca",
       "previous_candidate_tree": "d540726b883a6f21596105ebb55d43729da7afc1"

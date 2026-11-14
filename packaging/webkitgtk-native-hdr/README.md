@@ -54,14 +54,14 @@ dpkg-buildpackage -S -us -uc -d
 
 Set `product_series` to the public
 [`patches/ubuntu-webkitgtk-native-hdr/series`](../../patches/ubuntu-webkitgtk-native-hdr/series)
-manifest, with all nine named patch files beside it. The helper compares its
+manifest, with all thirteen named patch files beside it. The helper compares its
 exact names and order with `product_patch_series` in [the pin](source-pin.json),
 then checks every regular patch file's SHA256 before changing the source.
 Reordering, omission, duplicate names, quilt options, traversal, symlink inputs
 and digest changes fail closed. It applies authenticated components in order
 with GNU patch, then verifies the complete final `Source` and `Tools` trees.
 `--product-patch` remains available for historical single-patch pins; it cannot
-substitute one patch or an unverified bundle for this nine-component series.
+substitute one patch or an unverified bundle for this thirteen-component series.
 
 Preparation refuses a different product patch digest, source tree, executable
 mode or Ubuntu `debian/` input. Its full top-level inventory permits only the
@@ -70,7 +70,7 @@ files, including private notes at the source root, fail before quilt records
 a delta. Original `debian/` identity is byte-closed: its Python caches are
 not ignored during pin verification. Explicit tar exclusions also prevent
 Python caches from entering the generated Debian source archive. The
-recorded patch must touch exactly the 80 pinned regular product
+recorded patch must touch exactly the 81 pinned regular product
 paths, with no binary patch, traversal, deletion or rename. Quilt metadata
 cannot contain symlinks or special files. Generated Python caches are excluded
 from source diffs explicitly; they never enter the public source package. It prints success only after generated control
@@ -127,7 +127,7 @@ An active compiler continues to own its source and headers. Add
 reviewed product tree. Preparation records the quilt delta using normal `dpkg-source --commit`.
 That tool normalizes patched source timestamps. The helper snapshots every
 public path, content identity, exact permission mode and timestamp. After the
-commit it proves the closed source inventory, pinned trees, exact 80 patch
+commit it proves the closed source inventory, pinned trees, exact 81 patch
 paths and all per-file identities still match, then restores only changed
 mtime metadata from its pre-commit snapshot. Final timestamps must equal the
 original snapshot, preserving completed objects. It does not alter the compiler cache. Before recording the delta it writes an
@@ -294,6 +294,6 @@ compiling WebKit or contacting a builder.
 
 The excluded `TestWebCoreImageColour` executable reuses shipping WebCore
 objects with `ENABLE_API_TESTS=OFF`; it is not part of the default package
-build. Its prepared14-case native recipe requires XML skip accounting and
+build. Its prepared20-case native recipe requires XML skip accounting and
 normal producer/library identity checks. Configuration, linking and execution
 remain pending final review and qualified resource admission.
