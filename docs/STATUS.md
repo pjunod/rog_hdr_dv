@@ -21,8 +21,10 @@ adversarial review is complete; its shipping corrections and the targeted
 test-only teardown correction are integrated. GTK `+rogdv6` is now
 built and its 15 protocol cases pass. The first run found and fixed a
 display-teardown crash after a compositor rejection, shared with upstream.
-The WebKit `+rogdv7` package build and its 19 normal plus one actual-GLES2
-checks remain open. No candidate is deployed. Target feedback
+The first full WebKit `+rogdv7` compile found five errors in
+the series, all fixed in two added patches: four 2.52.6 API mismatches, and
+an implicit system include directory passed for the distribution mapper SDK.
+Its 19 normal plus one actual-GLES2 checks remain open. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 

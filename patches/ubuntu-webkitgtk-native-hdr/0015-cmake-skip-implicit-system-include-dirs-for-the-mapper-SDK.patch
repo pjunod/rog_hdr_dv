@@ -1,0 +1,35 @@
+From f33dd10684aaa7b309bb5e7a67b411a036f85562 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 14 Nov 2026 20:54:23 +0000
+Subject: [PATCH] Skip implicit system include directories for the mapper SDK
+ root
+
+The native-video source adds GTK_DOVI_SDK_ROOT to one file's include
+directories. Packaging defaults that root to /usr/include when the SDK
+comes from the distribution -dev package, and passing an implicit system
+directory as -I breaks libstdc++'s #include_next <stdlib.h>. Add the root
+only when it is not one of the compiler's implicit include directories;
+a non-system SDK root is unchanged.
+
+Agent-Model: claude-opus-5-5
+Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Source/WebCore/PlatformGTK.cmake | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/Source/WebCore/PlatformGTK.cmake b/Source/WebCore/PlatformGTK.cmake
+index 620edaec..6bec37cd 100644
+--- a/Source/WebCore/PlatformGTK.cmake
++++ b/Source/WebCore/PlatformGTK.cmake
+@@ -9,7 +9,9 @@ include(platform/TextureMapper.cmake)
+ # ABI/symbol lookup, never a new codec/provider link dependency in WebKit.
+ if (ENABLE_VIDEO AND USE_GSTREAMER)
+     find_path(GTK_DOVI_SDK_ROOT NAMES gst-gtk-dovi-1.0/mapper.h)
+-    if (GTK_DOVI_SDK_ROOT)
++    # A distribution -dev package installs the SDK under an implicit system
++    # include directory; adding that as -I breaks libstdc++ #include_next.
++    if (GTK_DOVI_SDK_ROOT AND NOT GTK_DOVI_SDK_ROOT IN_LIST CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
+         set_property(SOURCE "${WEBCORE_DIR}/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp"
+             APPEND PROPERTY INCLUDE_DIRECTORIES "${GTK_DOVI_SDK_ROOT}")
+     endif ()

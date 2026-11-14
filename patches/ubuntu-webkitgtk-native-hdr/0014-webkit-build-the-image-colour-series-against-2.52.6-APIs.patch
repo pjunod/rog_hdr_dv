@@ -1,0 +1,79 @@
+From 963da9811cf5f48f19b216eac7edc8af127c3f66 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 14 Nov 2026 20:54:23 +0000
+Subject: [PATCH] Build the image-colour series against WebKitGTK 2.52.6 APIs
+
+The first full compile of the series found four mismatches with this
+release; none changes behaviour:
+
+- PNGImageDecoder: pass the ICC bytes as a const span, so
+  SharedBuffer::create is not ambiguous with its Vector overload
+- ImageBackingStoreSkia: reach the float scratch rows through
+  span()/mutableSpan(); Vector::data() is private here
+- ImageFrame: multiply two CheckedSize operands; WTF's checked
+  arithmetic has no size_t-by-int rule, and a negative height now
+  records overflow instead of wrapping
+- AcceleratedSurface: declare the local TextureExport FastMalloc-
+  allocated, as makeUnique requires
+
+Agent-Model: claude-opus-5-5
+Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Source/WebCore/platform/graphics/ImageFrame.cpp                 | 2 +-
+ Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp  | 2 +-
+ .../platform/image-decoders/skia/ImageBackingStoreSkia.cpp      | 2 +-
+ .../WebPage/CoordinatedGraphics/AcceleratedSurface.cpp          | 1 +
+ 4 files changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/ImageFrame.cpp b/Source/WebCore/platform/graphics/ImageFrame.cpp
+index 9cc1c365..7d07a467 100644
+--- a/Source/WebCore/platform/graphics/ImageFrame.cpp
++++ b/Source/WebCore/platform/graphics/ImageFrame.cpp
+@@ -100,7 +100,7 @@ size_t ImageFrame::nativeImageSizeInBytes(const NativeImage& nativeImage)
+     auto image = nativeImage.platformImage();
+     SkPixmap pixels;
+     if (image->peekPixels(&pixels)) {
+-        auto bytes = CheckedSize(pixels.rowBytes()) * image->height();
++        auto bytes = CheckedSize(pixels.rowBytes()) * CheckedSize(image->height());
+         return bytes.hasOverflowed() ? std::numeric_limits<size_t>::max() : bytes.value();
+     }
+     // GPU resident allocation is driver-dependent. This is a checked nominal
+diff --git a/Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp b/Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp
+index 3986cb13..d9ec62b0 100644
+--- a/Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp
++++ b/Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp
+@@ -391,7 +391,7 @@ void PNGImageDecoder::headerAvailable()
+             auto iccProfile = LCMSProfilePtr(cmsOpenProfileFromMem(iccProfileData, iccProfileDataSize));
+             if (iccProfile && cmsGetColorSpace(iccProfile.get()) == cmsSigRgbData) {
+ #if USE(SKIA)
+-                auto profile = SharedBuffer::create(unsafeMakeSpan(iccProfileData, iccProfileDataSize));
++                auto profile = SharedBuffer::create(unsafeMakeSpan(static_cast<const uint8_t*>(iccProfileData), iccProfileDataSize));
+                 if (ImageBackingStore::canUseColorProfile(profile.get()))
+                     m_sourceColorProfile = WTF::move(profile);
+ #else
+diff --git a/Source/WebCore/platform/image-decoders/skia/ImageBackingStoreSkia.cpp b/Source/WebCore/platform/image-decoders/skia/ImageBackingStoreSkia.cpp
+index 0150c554..8341b448 100644
+--- a/Source/WebCore/platform/image-decoders/skia/ImageBackingStoreSkia.cpp
++++ b/Source/WebCore/platform/image-decoders/skia/ImageBackingStoreSkia.cpp
+@@ -96,7 +96,7 @@ PlatformImagePtr ImageBackingStore::image() const
+                 for (unsigned c = 0; c < 3; ++c)
+                     rgb[x * 3 + c] = row[x * 4 + c];
+             }
+-            cmsDoTransform(transform.get(), rgb.data(), result.data(), size().width());
++            cmsDoTransform(transform.get(), rgb.span().data(), result.mutableSpan().data(), size().width());
+             for (int x = 0; x < size().width(); ++x) {
+                 for (unsigned c = 0; c < 3; ++c)
+                     row[x * 4 + c] = result[x * 3 + c];
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+index 0bd1eb0f..71f7e764 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+@@ -571,6 +571,7 @@ std::unique_ptr<AcceleratedSurface::RenderTarget> AcceleratedSurface::RenderTarg
+ {
+ #if USE(GBM) || OS(ANDROID)
+     struct TextureExport {
++        WTF_DEPRECATED_MAKE_STRUCT_FAST_ALLOCATED(TextureExport);
+         unsigned texture { 0 };
+         EGLImage image { nullptr };
+         uint32_t format { 0 };

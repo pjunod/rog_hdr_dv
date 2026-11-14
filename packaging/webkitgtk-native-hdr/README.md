@@ -54,14 +54,14 @@ dpkg-buildpackage -S -us -uc -d
 
 Set `product_series` to the public
 [`patches/ubuntu-webkitgtk-native-hdr/series`](../../patches/ubuntu-webkitgtk-native-hdr/series)
-manifest, with all thirteen named patch files beside it. The helper compares its
+manifest, with all fifteen named patch files beside it. The helper compares its
 exact names and order with `product_patch_series` in [the pin](source-pin.json),
 then checks every regular patch file's SHA256 before changing the source.
 Reordering, omission, duplicate names, quilt options, traversal, symlink inputs
 and digest changes fail closed. It applies authenticated components in order
 with GNU patch, then verifies the complete final `Source` and `Tools` trees.
 `--product-patch` remains available for historical single-patch pins; it cannot
-substitute one patch or an unverified bundle for this thirteen-component series.
+substitute one patch or an unverified bundle for this fifteen-component series.
 
 Preparation refuses a different product patch digest, source tree, executable
 mode or Ubuntu `debian/` input. Its full top-level inventory permits only the

@@ -200,7 +200,7 @@ class WebKitPackagingTests(unittest.TestCase):
     def test_public_product_series_matches_packaging_pin(self):
         pin = json.loads((RECIPE / 'source-pin.json').read_text())
         files = prepare.product_patches(pin, series=ROOT / 'patches/ubuntu-webkitgtk-native-hdr/series')
-        self.assertEqual(len(files), 13)
+        self.assertEqual(len(files), 15)
         self.assertEqual(files[0].name, '0001-webkitgtk-clear-video-and-native-hdr.patch')
 
     def product_series_fixture(self):
