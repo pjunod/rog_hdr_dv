@@ -1,10 +1,9 @@
-From 88399a8bede664b083a72ad2fe6774dfff660df6 Mon Sep 17 00:00:00 2001
+From 277f494d00f76fab52e2056469ee847396ccf577 Mon Sep 17 00:00:00 2001
 From: Claude Agent <claude-agent@invalid>
-Date: Sat, 14 Nov 2026 21:11:00 +0000
-Subject: [PATCH] Make the focused image-colour regressions build and tear down
- cleanly
+Date: Sat, 14 Nov 2026 21:28:02 +0000
+Subject: [PATCH] Make the focused image-colour regressions build in 2.52.6
 
-The first build and run of TestWebCoreImageColour found four fixture
+The first build and run of TestWebCoreImageColour found three fixture
 defects; no shipping code changes:
 
 - pass ICC bytes as explicit const spans, and spell the draw rectangle as
@@ -12,20 +11,14 @@ defects; no shipping code changes:
 - build the LUT-only P3 test profile with a 16-bit CLUT. lutAtoBType
   serialises only 8/16-bit CLUTs, so the float CLUT made
   cmsSaveProfileToMem fail. The u1Fixed15 table keeps the same XYZ
-- release the thread-local Skia context in SkiaWorkingTextureTest's
-  TearDown with its own GL context current. Otherwise GrDirectContext
-  freed its GL objects from TLS destructors at exit with no context
-  current, and libepoxy aborted. 2.52.6's defaulted ~SkiaGLContext is the
-  upstream shutdown-ordering issue fixed by WebKit e0b1fddaa468 (bug
-  305909); that 13-file change is outside this series
 
 Agent-Model: claude-opus-5-5
 Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 ---
  .../Tests/WebCore/SkiaDecodedImageColour.cpp   | 18 ++++++++++--------
- .../Tests/WebCore/glib/SkiaWorkingTexture.cpp  | 13 ++++++++++++-
- 2 files changed, 22 insertions(+), 9 deletions(-)
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp  |  2 +-
+ 2 files changed, 11 insertions(+), 9 deletions(-)
 
 diff --git a/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
 index 3808aa18..2f1232b1 100644
@@ -103,28 +96,10 @@ index 3808aa18..2f1232b1 100644
          auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, option);
          decoder->setData(buffer, true);
 diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
-index d14fc03c..ec49beda 100644
+index d14fc03c..f5c63e5d 100644
 --- a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
 +++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
-@@ -125,6 +125,17 @@ protected:
-         if (!BitmapTexture::supportsExtendedColor())
-             GTEST_SKIP() << "No floating colour attachment support";
-     }
-+
-+    void TearDown() override
-+    {
-+        // Release the thread-local Skia context, and the GPU objects its
-+        // GrDirectContext owns, while its own GL context is current, rather
-+        // than from TLS destructors at process exit with no context current.
-+        if (auto* context = PlatformDisplay::sharedDisplay().skiaGLContext())
-+            context->makeContextCurrent();
-+        PlatformDisplay::sharedDisplay().clearGLContexts();
-+        SkiaTextureContextTest::TearDown();
-+    }
- };
- 
- static SkImageInfo workingInfo(int width, int height, SkColorType type = kRGBA_F16_SkColorType)
-@@ -153,7 +164,7 @@ TEST_F(SkiaTextureContextTest, LegacyU8AllocationUploadCopySampleHasNoGLError)
+@@ -153,7 +153,7 @@ TEST_F(SkiaTextureContextTest, LegacyU8AllocationUploadCopySampleHasNoGLError)
      auto sampled = BitmapTexturePool::singleton().acquireTexture(info, { BitmapTexture::Flags::SupportsAlpha });
      auto mapper = TextureMapper::create();
      mapper->beginPainting(TextureMapper::FlipY::No, sampled.ptr());

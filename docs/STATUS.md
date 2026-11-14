@@ -21,13 +21,16 @@ adversarial review is complete; its shipping corrections and the targeted
 test-only teardown correction are integrated. GTK `+rogdv6` is now
 built and its 15 protocol cases pass. The first run found and fixed a
 display-teardown crash after a compositor rejection, shared with upstream.
-The first full WebKit `+rogdv7` compile found five errors in
-the series, all fixed in two added patches: four 2.52.6 API mismatches, and
-an implicit system include directory passed for the distribution mapper SDK.
-A third patch fixes four focused-test fixture defects. All 19 normal cases
-and the actual ES 2.0 legacy case pass once, under software Mesa llvmpipe
-(surfaceless EGL; ES 2.0 via Mesa's version override, declared). That is API
-and storage evidence, not physical-GPU or on-screen acceptance. No candidate is deployed. Target feedback
+The first full WebKit `+rogdv7` compile and test run found five
+compile errors in the series (four 2.52.6 API mismatches, and the mapper
+SDK root reaching the compile line as `-isystem /usr/include`), three
+focused-fixture defects, and a product teardown defect: 2.52.6's defaulted
+`~SkiaGLContext` released Skia's GL objects with no context current. Four
+added patches fix them; the teardown fix backports WebKit `63f86c394bc8` and
+`c5b6ec5b34d7`. All 19 normal cases and the actual ES 2.0 legacy case pass
+once with clean process exits, under software Mesa llvmpipe (surfaceless EGL;
+ES 2.0 via Mesa's version override, declared). That is API and storage
+evidence, not physical-GPU or on-screen acceptance. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 

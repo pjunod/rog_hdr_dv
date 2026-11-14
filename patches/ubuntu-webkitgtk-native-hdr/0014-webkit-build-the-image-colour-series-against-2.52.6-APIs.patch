@@ -1,18 +1,18 @@
-From 963da9811cf5f48f19b216eac7edc8af127c3f66 Mon Sep 17 00:00:00 2001
+From 8eea357cfc7c18bcb355d8b2e33ecf8c50a7c991 Mon Sep 17 00:00:00 2001
 From: Claude Agent <claude-agent@invalid>
-Date: Sat, 14 Nov 2026 20:54:23 +0000
+Date: Sat, 14 Nov 2026 21:28:01 +0000
 Subject: [PATCH] Build the image-colour series against WebKitGTK 2.52.6 APIs
 
 The first full compile of the series found four mismatches with this
-release; none changes behaviour:
+release. These are compile fixes:
 
 - PNGImageDecoder: pass the ICC bytes as a const span, so
   SharedBuffer::create is not ambiguous with its Vector overload
 - ImageBackingStoreSkia: reach the float scratch rows through
   span()/mutableSpan(); Vector::data() is private here
 - ImageFrame: multiply two CheckedSize operands; WTF's checked
-  arithmetic has no size_t-by-int rule, and a negative height now
-  records overflow instead of wrapping
+  arithmetic has no size_t-by-int rule; with both operands checked, a
+  negative height records overflow
 - AcceleratedSurface: declare the local TextureExport FastMalloc-
   allocated, as makeUnique requires
 
