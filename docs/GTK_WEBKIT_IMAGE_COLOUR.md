@@ -84,9 +84,11 @@ the different stale working copy is not used. Original stores were unchanged.
 These checks authenticate inputs. The four selected unchanged GTK translation
 units subsequently compiled with GCC 15.3 and authenticated pinned source
 dependencies. This is an object-level compiler prerequisite, not a full
-link/package or runtime proof. The separate WebKit compiler prerequisite,
-package/runtime binding and exact Vulkan ownership remain open. The GTK
-implementation is in progress; nothing from this batch is installed.
+link/package or runtime proof. The four selected unchanged WebKit objects also passed with Clang 22.1.8
+and authenticated pinned dependencies. GTK source and regression preparation
+is committed; WebKit implementation is active. Candidate compilation/linking,
+package/runtime binding and actual Vulkan fallback remain open. Nothing
+from this batch is installed.
 
 The live compositor advertises colour-manager version 2 and transfer function
 14 (`compound_power_2_4`). A version-2 output-only client receives that precise
@@ -100,8 +102,9 @@ Four unchanged GTK objects compiled with GCC 15.3, with pinned source
 dependencies authenticated. The owned compiler container was stopped after
 confirming it was idle, and its original resource limits were restored.
 This establishes the selected object loop; it grants no link, package or
-runtime colour claim. WebKit's separate compiler phase is waiting for the
-shared CI reservation to release. No candidate is installed.
+runtime colour claim. WebKit's separately admitted four-object baseline also passed with Clang
+22.1.8; its container was stopped and original limits restored. No candidate
+is installed.
 
 Further source tracing found RGBA8 assumptions in coordinated tiles and
 native-image uploads as well as the final page buffer. The selected design

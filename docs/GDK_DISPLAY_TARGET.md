@@ -74,7 +74,7 @@ gboolean ready = gdk_wayland_surface_get_color_target (surface, &target);
 | Snapshot member | Meaning |
 |---|---|
 | `generation` | Surface-local generation; increments when feedback becomes stale or the native surface is destroyed |
-| `identity` | Wayland v1 image-description identity, local to the display connection |
+| `identity` | Opaque connection-local description token, valid for its snapshot generation (layout remains 32-bit) |
 | `primaries[8]` | Actual target-volume CIE 1931 xy, ordered red, green, blue, white |
 | `min_luminance` | Target black, in cd/m², including the protocol's ambient flare term |
 | `max_luminance` | Target peak in cd/m² |
@@ -254,3 +254,27 @@ the app binary mappings. The paused round trip remains exact, all five
 lifecycle controls pass, and ordinary SDR pixels match the earlier startup.
 Source, ABI and SDK rejection evidence is reused. All private services were
 stopped after the pass.
+
+## Normal colour candidate — November 14
+
+The source registry now appends three patches for `4.24.1+ds-1+rogdv6`.
+Normal rendering negotiates an exact supported transfer instead of requiring
+a debug variable: CMv2 compound-power, precise CMv1 extended-sRGB, or an
+accepted linear fallback. Both protocol event versions retain the full wire
+identity internally; bounded tokens preserve the existing target SDK layout.
+GTK requires an actually advertised Vulkan pass-through format where it owns
+Wayland colour descriptions. Unsupported WSI uses the existing renderer
+fallback; the no-manager legacy path remains available.
+
+Four unchanged baseline objects compiled with GCC 15.3 and authenticated
+pinned dependencies before these edits. The new protocol regression sources
+exercise the production callbacks over a socket pair, including identity
+lifetime and lease ownership. They have not compiled or run. V2 qualification
+requires actual v2 cases without skips; a v1 dependency build alone is not
+sufficient. Actual Vulkan/GSK fallback and float import/rendering remain
+separate linked checks. No candidate package or installed/runtime pass is
+claimed. Existing rogdv5 receipts do not qualify this source.
+
+The original sixteen patches and their authorship are unchanged. Checksum
+entries were appended deliberately for the three new patch exports; imported
+patch digests were not regenerated. [Shared image pipeline design](GTK_WEBKIT_IMAGE_COLOUR.md).

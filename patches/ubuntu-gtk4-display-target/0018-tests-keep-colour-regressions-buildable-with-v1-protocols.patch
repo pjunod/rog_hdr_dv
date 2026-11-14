@@ -1,0 +1,131 @@
+From 88a2cb64c67ad5c54dde7a51a62b9025e4ec2cfc Mon Sep 17 00:00:00 2001
+From: Codex contributors <codex@invalid>
+Date: Sat, 14 Nov 2026 01:46:21 -0500
+Subject: [PATCH] test(wayland): retain protocol v1 fixture compatibility
+
+Guard only CMv2-specific cases and declarations. Keep common owner and lease checks available with older protocol dependencies; report explicit v2 skips that cannot qualify the v2 path. No dependency minimum is raised for test convenience. Tests have not been compiled or executed.
+---
+ testsuite/gdk/wayland-color.c | 53 ++++++++++++++++++++++++++++-------
+ 1 file changed, 43 insertions(+), 10 deletions(-)
+
+diff --git a/testsuite/gdk/wayland-color.c b/testsuite/gdk/wayland-color.c
+index ff486e9..109d679 100644
+--- a/testsuite/gdk/wayland-color.c
++++ b/testsuite/gdk/wayland-color.c
+@@ -11,10 +11,30 @@
+  * No copied transfer/identity implementation and no test-only product API. */
+ #include "../../gdk/wayland/gdkwaylandcolor.c"
+ 
+-#ifndef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
+-#error This regression fixture requires color-management-v1 XML version 2
++#if defined(WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION) && \
++    defined(WP_COLOR_MANAGEMENT_SURFACE_FEEDBACK_V1_PREFERRED_CHANGED2_SINCE_VERSION) && \
++    defined(WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4_SINCE_VERSION)
++#define TEST_CM_V2 1
++#else
++#define TEST_CM_V2 0
+ #endif
+ 
++static guint
++fixture_version (void)
++{
++  return TEST_CM_V2 ? 2 : 1;
++}
++
++static guint
++fixture_exact_transfer (guint version)
++{
++#ifdef WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4_SINCE_VERSION
++  if (version >= 2)
++    return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4;
++#endif
++  return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB;
++}
++
+ typedef struct {
+   struct wl_display *display;
+   struct wl_registry *registry;
+@@ -173,16 +193,22 @@ static void
+ test_exact_transfer (gconstpointer data)
+ {
+   guint version = GPOINTER_TO_UINT (data);
++  if (version >= 2 && !TEST_CM_V2)
++    {
++      g_test_skip ("CMv2 generated protocol declarations unavailable; this is not v2 qualification");
++      return;
++    }
+   Fixture f = fixture_new (version);
+-  guint exact = version >= 2 ? WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4
+-                            : WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB;
++  guint exact = fixture_exact_transfer (version);
+   advertise (&f, "supported_tf_named", exact);
+   g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB), ==, 0);
+   g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << exact), ==, exact);
+   if (version >= 2)
+     g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB), ==, 0);
++#ifdef WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4_SINCE_VERSION
+   else
+     g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4), ==, 0);
++#endif
+   g_assert_cmpuint (cicp_to_wl_transfer (8, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR), ==,
+                    WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR);
+   create_image_desc (f.color, GDK_COLOR_STATE_SRGB, FALSE, FALSE);
+@@ -220,6 +246,11 @@ static void
+ test_preferred_events (gconstpointer data)
+ {
+   guint version = GPOINTER_TO_UINT (data);
++  if (version >= 2 && !TEST_CM_V2)
++    {
++      g_test_skip ("CMv2 generated protocol declarations unavailable; this is not v2 qualification");
++      return;
++    }
+   Fixture f = fixture_new (version);
+   Snapshot seen = { 0 };
+   f.color->rendering_enabled = FALSE;
+@@ -257,11 +288,12 @@ test_preferred_events (gconstpointer data)
+ static void
+ test_normal_sdr_owner (void)
+ {
+-  Fixture f = fixture_new (2);
+-  advertise (&f, "supported_tf_named", WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4);
++  guint version = fixture_version ();
++  Fixture f = fixture_new (version);
++  advertise (&f, "supported_tf_named", fixture_exact_transfer (version));
+   create_image_desc (f.color, GDK_COLOR_STATE_SRGB, FALSE, FALSE);
+   collect (&f);
+-  ready (&f, f.description, 2, 0, 9);
++  ready (&f, f.description, version, 0, 9);
+   struct wl_surface *wl_surface = wl_registry_bind (f.registry, 4, &wl_surface_interface, 1);
+   GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, NULL, NULL);
+   gdk_wayland_color_surface_set_color_state (surface, GDK_COLOR_STATE_SRGB, DRM_FORMAT_RGBA8888, TRUE);
+@@ -278,7 +310,8 @@ test_normal_sdr_owner (void)
+ static void
+ test_owner_and_lease (void)
+ {
+-  Fixture f = fixture_new (2);
++  guint version = fixture_version ();
++  Fixture f = fixture_new (version);
+   gdk_wayland_color_set_color_representation (f.color, f.registry, 3, 1);
+   advertise (&f, "supported_feature", WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES);
+   advertise (&f, "supported_intent", WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
+@@ -289,7 +322,7 @@ test_owner_and_lease (void)
+   emit (&f, repr, &wp_color_representation_manager_v1_interface, "supported_coefficients_and_ranges", (guint32[]) { 1, 1 }, 2);
+   create_image_desc (f.color, GDK_COLOR_STATE_REC2100_PQ, FALSE, TRUE);
+   collect (&f);
+-  ready (&f, f.description, 2, 0, 8);
++  ready (&f, f.description, version, 0, 8);
+   g_assert_cmpuint (f.luminances[0], ==, 0);
+   g_assert_cmpuint (f.luminances[1], ==, 10000);
+   g_assert_cmpuint (f.luminances[2], ==, 203); /* Existing native lease normalization only. */
+@@ -322,7 +355,7 @@ test_legacy_and_unknown (void)
+   struct wl_surface *wl_surface = wl_registry_bind (f.registry, 2, &wl_surface_interface, 1);
+   GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, NULL, NULL);
+   g_assert_false (gdk_wayland_color_surface_needs_passthrough (surface));
+-  gdk_wayland_color_set_color_manager (f.color, f.registry, 1, 2);
++  gdk_wayland_color_set_color_manager (f.color, f.registry, 1, fixture_version ());
+   /* A manager arriving later must not steal a legacy WSI surface. */
+   g_assert_false (gdk_wayland_color_surface_request_hdr (surface, TRUE));
+   advertise (&f, "supported_tf_named", 32);
+-- 
+2.54.0 (Apple Git-157)
+

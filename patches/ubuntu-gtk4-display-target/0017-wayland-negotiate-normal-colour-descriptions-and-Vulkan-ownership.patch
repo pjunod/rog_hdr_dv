@@ -1,0 +1,1242 @@
+From be56f4ea27b76902a537cc238ad58485e664d67c Mon Sep 17 00:00:00 2001
+From: Codex contributors <codex@invalid>
+Date: Sat, 14 Nov 2026 01:43:37 -0500
+Subject: [PATCH] fix(wayland): negotiate normal colour descriptions with one
+ owner
+
+Use exact protocol-v2 compound power or supported v1 extended-sRGB/linear
+encodings for ordinary GTK rendering. Handle v2 ready/preferred events and
+retain live descriptions with bounded opaque identity tokens, preserving
+the existing target SDK layout and native lease contract.
+
+Require an advertised pass-through Vulkan format when GTK can manage the
+native Wayland surface, while retaining the no-manager legacy path.
+Prepare native wire regressions against the actual private producer.
+
+The unchanged four-object compiler prerequisite passed before these edits.
+Candidate compilation, test execution and runtime qualification remain held.
+---
+ gdk/gdkvulkancontext.c                   |  20 +-
+ gdk/wayland/gdksurface-wayland-private.h |   2 +
+ gdk/wayland/gdksurface-wayland.c         |   7 +
+ gdk/wayland/gdkwaylandcolor-private.h    |   2 +
+ gdk/wayland/gdkwaylandcolor.c            | 348 ++++++++++++++++------
+ gdk/wayland/gdkwaylandsurface.h          |   2 +-
+ testsuite/gdk/meson.build                |   1 +
+ testsuite/gdk/wayland-color.c            | 363 +++++++++++++++++++++++
+ 8 files changed, 653 insertions(+), 92 deletions(-)
+ create mode 100644 testsuite/gdk/wayland-color.c
+
+diff --git a/gdk/gdkvulkancontext.c b/gdk/gdkvulkancontext.c
+index 7047172..f25a454 100644
+--- a/gdk/gdkvulkancontext.c
++++ b/gdk/gdkvulkancontext.c
+@@ -36,6 +36,10 @@
+ #include "gdkprofilerprivate.h"
+ #include "gdkmemorytexture.h"
+ 
++#ifdef GDK_WINDOWING_WAYLAND
++#include "wayland/gdksurface-wayland-private.h"
++#endif
++
+ #include "gsk/gpu/gskvulkanrenderer.h"
+ #include "gsk/gskrenderer.h"
+ #include "gsk/gskrendernodeprivate.h"
+@@ -1101,6 +1105,7 @@ gdk_vulkan_context_surface_attach (GdkDrawContext  *context,
+   VkResult res;
+   VkBool32 supported;
+   uint32_t i;
++  gboolean needs_passthrough = FALSE;
+ 
+   if (!gdk_display_prepare_vulkan (display, error))
+     return FALSE;
+@@ -1124,6 +1129,11 @@ gdk_vulkan_context_surface_attach (GdkDrawContext  *context,
+       return FALSE;
+     }
+ 
++#ifdef GDK_WINDOWING_WAYLAND
++  needs_passthrough = GDK_IS_WAYLAND_SURFACE (surface) &&
++                      gdk_wayland_surface_needs_vulkan_passthrough (surface);
++#endif
++
+   res = GDK_VK_CHECK (vkGetPhysicalDeviceSurfaceSupportKHR, gdk_vulkan_context_get_physical_device (self),
+                                                             gdk_vulkan_context_get_queue_family_index (self),
+                                                             priv->surface,
+@@ -1152,6 +1162,12 @@ gdk_vulkan_context_surface_attach (GdkDrawContext  *context,
+                                                           &n_formats, formats);
+       for (i = 0; i < n_formats; i++)
+         {
++          /* GTK owns descriptions whenever Wayland color management was
++           * available for this native surface, including later HDR leases.
++           * WSI must not acquire another owner. With no manager, retain the
++           * existing legacy Vulkan path. No swapchain exists at this point. */
++          if (needs_passthrough && formats[i].colorSpace != VK_COLOR_SPACE_PASS_THROUGH_EXT)
++            continue;
+           if (formats[i].colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR &&
+               formats[i].colorSpace != VK_COLOR_SPACE_PASS_THROUGH_EXT)
+             continue;
+@@ -1212,7 +1228,9 @@ gdk_vulkan_context_surface_attach (GdkDrawContext  *context,
+       if (priv->formats[GDK_MEMORY_U8].vk_format.format == VK_FORMAT_UNDEFINED)
+         {
+           g_set_error_literal (error, GDK_VULKAN_ERROR, GDK_VULKAN_ERROR_NOT_AVAILABLE,
+-                               "No supported image format found.");
++                               needs_passthrough
++                                 ? "No advertised pass-through image format for GTK Wayland color ownership."
++                                 : "No supported image format found.");
+           goto out_surface;
+         }
+       /* Ensure all the formats exist:
+diff --git a/gdk/wayland/gdksurface-wayland-private.h b/gdk/wayland/gdksurface-wayland-private.h
+index 47d6cc2..1d4e9d9 100644
+--- a/gdk/wayland/gdksurface-wayland-private.h
++++ b/gdk/wayland/gdksurface-wayland-private.h
+@@ -190,3 +190,5 @@ void gdk_wayland_surface_hdr_frame_begin (GdkSurface *surface, GdkDrawContext *c
+ void gdk_wayland_surface_hdr_frame_presented (GdkSurface *surface, GdkDrawContext *context, gboolean submitted,
+                                              guint red, guint green, guint blue,
+                                              gboolean floating_point);
++
++gboolean gdk_wayland_surface_needs_vulkan_passthrough (GdkSurface *surface);
+diff --git a/gdk/wayland/gdksurface-wayland.c b/gdk/wayland/gdksurface-wayland.c
+index 9e66e90..b42e9dd 100644
+--- a/gdk/wayland/gdksurface-wayland.c
++++ b/gdk/wayland/gdksurface-wayland.c
+@@ -725,6 +725,13 @@ gdk_wayland_surface_sync_background_effect (GdkSurface *surface)
+   self->background_effect_dirty = FALSE;
+ }
+ 
++gboolean
++gdk_wayland_surface_needs_vulkan_passthrough (GdkSurface *surface)
++{
++  return gdk_wayland_color_surface_needs_passthrough (
++    GDK_WAYLAND_SURFACE (surface)->display_server.color);
++}
++
+ static void
+ gdk_wayland_surface_sync_color_state (GdkSurface *surface)
+ {
+diff --git a/gdk/wayland/gdkwaylandcolor-private.h b/gdk/wayland/gdkwaylandcolor-private.h
+index ab12826..423c98b 100644
+--- a/gdk/wayland/gdkwaylandcolor-private.h
++++ b/gdk/wayland/gdkwaylandcolor-private.h
+@@ -56,3 +56,5 @@ void              gdk_wayland_color_surface_unset_color_state   (GdkWaylandColor
+ gboolean gdk_wayland_color_surface_request_hdr (GdkWaylandColorSurface *self,
+                                                 gboolean requested);
+ gboolean gdk_wayland_color_surface_has_hdr_description (GdkWaylandColorSurface *self);
++
++gboolean gdk_wayland_color_surface_needs_passthrough (GdkWaylandColorSurface *self);
+diff --git a/gdk/wayland/gdkwaylandcolor.c b/gdk/wayland/gdkwaylandcolor.c
+index 8c36711..0134f9e 100644
+--- a/gdk/wayland/gdkwaylandcolor.c
++++ b/gdk/wayland/gdkwaylandcolor.c
+@@ -22,7 +22,7 @@ static const uint primaries_map[] = {
+ static uint
+ wl_to_cicp_primaries (enum wp_color_manager_v1_primaries cp)
+ {
+-  return primaries_map[cp];
++  return cp < G_N_ELEMENTS (primaries_map) ? primaries_map[cp] : 0;
+ }
+ 
+ static enum wp_color_manager_v1_primaries
+@@ -85,8 +85,11 @@ static const uint transfer_map[] = {
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_LOG_100] = 9,
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_LOG_316] = 10,
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_XVYCC] = 11,
+-  [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB] = 13,
++  /* The v1 srgb alias is ambiguous; ext_srgb specifies the signed piecewise TF. */
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB] = 13,
++#ifdef WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4_SINCE_VERSION
++  [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4] = 13,
++#endif
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ] = 16,
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST428] = 17,
+   [WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_HLG] = 18,
+@@ -95,14 +98,27 @@ static const uint transfer_map[] = {
+ static uint
+ wl_to_cicp_transfer (enum wp_color_manager_v1_transfer_function tf)
+ {
+-  return transfer_map[tf];
++  return tf < G_N_ELEMENTS (transfer_map) ? transfer_map[tf] : 0;
+ }
+ 
+ static enum wp_color_manager_v1_transfer_function
+-cicp_to_wl_transfer (uint tf)
++cicp_to_wl_transfer (uint tf,
++                     uint version,
++                     uint supported)
+ {
++  if (tf == 13)
++    {
++#ifdef WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4_SINCE_VERSION
++      if (version >= 2 &&
++          (supported & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4)))
++        return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4;
++#endif
++      if (version < 2 && (supported & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB)))
++        return WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB;
++      return 0;
++    }
+   for (uint32_t i = WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_BT1886; i < G_N_ELEMENTS (transfer_map); i++)
+-    if (transfer_map[i] == tf)
++    if (tf != 0 && transfer_map[i] == tf && (supported & (1u << i)))
+        return (enum wp_color_manager_v1_transfer_function)i;
+ 
+   return 0;
+@@ -194,12 +210,20 @@ wl_range_name (enum wp_color_representation_surface_v1_range range)
+     }
+ }
+ 
++typedef struct
++{
++  guint64 wire;
++  guint32 token;
++  guint references;
++} ImageDescriptionIdentity;
++
+ struct _GdkWaylandColor
+ {
+   GdkWaylandDisplay *display;
+ 
+   struct wp_color_manager_v1 *color_manager;
+   gboolean rendering_enabled;
++  GdkColorState *fallback_color_state; /* static built-in state */
+   struct wp_image_description_v1 *hdr_description;
+   struct {
+     unsigned int intents;
+@@ -209,7 +233,9 @@ struct _GdkWaylandColor
+   } color_manager_supported;
+ 
+   GHashTable *cs_to_desc; /* GdkColorState => wp_image_description_v1 or NULL */
+-  GHashTable *id_to_cs; /* uint32 identifier => GdkColorState */
++  GHashTable *identities_by_wire; /* guint64 => referenced ImageDescriptionIdentity */
++  GHashTable *identities_by_token; /* guint32 => same identity, without ownership */
++  guint32 next_identity;
+ 
+   struct wp_color_representation_manager_v1 *color_representation_manager;
+   struct {
+@@ -219,6 +245,48 @@ struct _GdkWaylandColor
+   } color_representation_supported;
+ };
+ 
++static struct wp_image_description_v1 *
++gdk_wayland_color_get_image_description (GdkWaylandColor *color,
++                                         GdkColorState   *cs);
++
++static ImageDescriptionIdentity *
++image_description_identity_ref (GdkWaylandColor *color,
++                                 guint64          wire)
++{
++  ImageDescriptionIdentity *identity;
++
++  identity = g_hash_table_lookup (color->identities_by_wire, &wire);
++  if (!identity)
++    {
++      identity = g_new0 (ImageDescriptionIdentity, 1);
++      identity->wire = wire;
++      do
++        {
++          color->next_identity++;
++          if (color->next_identity == 0)
++            color->next_identity++;
++        }
++      while (g_hash_table_contains (color->identities_by_token,
++                                    GUINT_TO_POINTER (color->next_identity)));
++      identity->token = color->next_identity;
++      g_hash_table_insert (color->identities_by_wire, &identity->wire, identity);
++      g_hash_table_insert (color->identities_by_token,
++                           GUINT_TO_POINTER (identity->token), identity);
++    }
++  identity->references++;
++  return identity;
++}
++
++static void
++image_description_identity_unref (GdkWaylandColor        *color,
++                                   ImageDescriptionIdentity *identity)
++{
++  if (!identity || --identity->references != 0)
++    return;
++  g_hash_table_remove (color->identities_by_token, GUINT_TO_POINTER (identity->token));
++  g_hash_table_remove (color->identities_by_wire, &identity->wire);
++}
++
+ static uint32_t
+ color_state_hash (gconstpointer data)
+ {
+@@ -264,7 +332,8 @@ wp_color_manager_v1_supported_intent (void                       *data,
+ {
+   GdkWaylandColor *color = data;
+ 
+-  color->color_manager_supported.intents |= (1 << render_intent);
++  if (render_intent < 32)
++    color->color_manager_supported.intents |= (1u << render_intent);
+ }
+ 
+ static void
+@@ -274,7 +343,8 @@ wp_color_manager_v1_supported_feature (void                       *data,
+ {
+   GdkWaylandColor *color = data;
+ 
+-  color->color_manager_supported.features |= (1 << feature);
++  if (feature < 32)
++    color->color_manager_supported.features |= (1u << feature);
+ }
+ 
+ static void
+@@ -284,7 +354,8 @@ wp_color_manager_v1_supported_tf_named (void                       *data,
+ {
+   GdkWaylandColor *color = data;
+ 
+-  color->color_manager_supported.transfers |= (1 << tf);
++  if (tf < 32)
++    color->color_manager_supported.transfers |= (1u << tf);
+ }
+ 
+ static void
+@@ -294,7 +365,8 @@ wp_color_manager_v1_supported_primaries_named (void                       *data,
+ {
+   GdkWaylandColor *color = data;
+ 
+-  color->color_manager_supported.primaries |= (1 << primaries);
++  if (primaries < 32)
++    color->color_manager_supported.primaries |= (1u << primaries);
+ }
+ 
+ static void
+@@ -319,16 +391,17 @@ gdk_wayland_color_new (GdkWaylandDisplay *display)
+   color = g_new0 (GdkWaylandColor, 1);
+ 
+   color->display = display;
+-  color->rendering_enabled = GDK_DISPLAY_DEBUG_CHECK (GDK_DISPLAY (display), COLOR_MANAGEMENT);
++  /* Capability negotiation below decides whether normal rendering is managed. */
++  color->rendering_enabled = TRUE;
++  color->fallback_color_state = GDK_COLOR_STATE_SRGB;
+ 
+   color->cs_to_desc = g_hash_table_new_full (color_state_hash,
+                                              color_state_equal,
+                                              (GDestroyNotify) gdk_color_state_unref,
+                                              (GDestroyNotify) wp_image_description_v1_destroy);
+-  color->id_to_cs = g_hash_table_new_full (g_direct_hash,
+-                                           g_direct_equal,
+-                                           NULL,
+-                                           (GDestroyNotify) gdk_color_state_unref);
++  color->identities_by_wire = g_hash_table_new_full (g_int64_hash, g_int64_equal,
++                                                     NULL, g_free);
++  color->identities_by_token = g_hash_table_new (g_direct_hash, g_direct_equal);
+ 
+   return color;
+ }
+@@ -342,7 +415,11 @@ gdk_wayland_color_set_color_manager (GdkWaylandColor    *color,
+   color->color_manager = wl_registry_bind (registry,
+                                            id,
+                                            &wp_color_manager_v1_interface,
++#ifdef WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4_SINCE_VERSION
++                                           MIN (version, 2));
++#else
+                                            MIN (version, 1));
++#endif
+ 
+   wp_color_manager_v1_add_listener (color->color_manager,
+                                     &color_manager_listener,
+@@ -356,7 +433,8 @@ gdk_wayland_color_free (GdkWaylandColor *color)
+ 
+   g_clear_pointer (&color->hdr_description, wp_image_description_v1_destroy);
+   g_hash_table_unref (color->cs_to_desc);
+-  g_hash_table_unref (color->id_to_cs);
++  g_hash_table_unref (color->identities_by_token);
++  g_hash_table_unref (color->identities_by_wire);
+ 
+   g_clear_pointer (&color->color_representation_manager, wp_color_representation_manager_v1_destroy);
+ 
+@@ -390,7 +468,8 @@ wp_color_representation_manager_v1_supported_alpha_mode (void *data,
+ {
+   GdkWaylandColor *color = data;
+ 
+-  color->color_representation_supported.alpha_modes |= 1 << alpha_mode;
++  if (alpha_mode < 32)
++    color->color_representation_supported.alpha_modes |= 1u << alpha_mode;
+ }
+ 
+ static void
+@@ -401,18 +480,21 @@ wp_color_representation_manager_v1_supported_coefficients_and_ranges (void *data
+ {
+   GdkWaylandColor *color = data;
+ 
++  if (coefficients >= 32)
++    return;
++
+   switch (range)
+     {
+     case WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL:
+-      color->color_representation_supported.coefficients_full |= 1 << coefficients;
++      color->color_representation_supported.coefficients_full |= 1u << coefficients;
+       break;
+ 
+     case WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED:
+-      color->color_representation_supported.coefficients_limited |= 1 << coefficients;
++      color->color_representation_supported.coefficients_limited |= 1u << coefficients;
+       break;
+ 
+     default:
+-      g_assert_not_reached ();
++      break;
+     }
+ }
+ 
+@@ -487,16 +569,28 @@ cs_image_desc_ready (void                           *data,
+   else
+     g_hash_table_insert (csi->color->cs_to_desc,
+                          gdk_color_state_ref (csi->color_state), desc);
+-  g_hash_table_insert (csi->color->id_to_cs,
+-                       GUINT_TO_POINTER (identity),
+-                       gdk_color_state_ref (csi->color_state));
+  
+   cs_image_listener_data_free (csi);
+ }
+ 
++#ifdef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
++static void
++cs_image_desc_ready2 (void                           *data,
++                       struct wp_image_description_v1 *desc,
++                       uint32_t                        identity_hi,
++                       uint32_t                        identity_lo)
++{
++  /* This cache is keyed by color state, not by the compositor identity. */
++  cs_image_desc_ready (data, desc, 0);
++}
++#endif
++
+ static struct wp_image_description_v1_listener cs_image_desc_listener = {
+-  cs_image_desc_failed,
+-  cs_image_desc_ready,
++  .failed = cs_image_desc_failed,
++  .ready = cs_image_desc_ready,
++#ifdef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
++  .ready2 = cs_image_desc_ready2,
++#endif
+ };
+ 
+ static void
+@@ -524,11 +618,14 @@ create_image_desc (GdkWaylandColor *color,
+ 
+   gdk_cicp_normalize (cicp, &norm);
+   primaries = cicp_to_wl_primaries (norm.color_primaries);
+-  tf = cicp_to_wl_transfer (norm.transfer_function);
+-
+-  if (((color->color_manager_supported.primaries & (1 << primaries)) == 0 &&
+-       (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES)) == 0) ||
+-      (color->color_manager_supported.transfers & (1 << tf)) == 0)
++  tf = cicp_to_wl_transfer (norm.transfer_function,
++                            wp_color_manager_v1_get_version (color->color_manager),
++                            color->color_manager_supported.transfers);
++
++  if (primaries == 0 || tf == 0 ||
++      ((color->color_manager_supported.primaries & (1u << primaries)) == 0 &&
++       (color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES)) == 0) ||
++      (color->color_manager_supported.transfers & (1u << tf)) == 0)
+     {
+       GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC,
+                          "Unsupported color state %s: Primaries or transfer function unsupported",
+@@ -547,7 +644,7 @@ create_image_desc (GdkWaylandColor *color,
+ 
+   creator = wp_color_manager_v1_create_parametric_creator (color->color_manager);
+ 
+-  if (color->color_manager_supported.primaries & (1 << primaries))
++  if (color->color_manager_supported.primaries & (1u << primaries))
+     {
+       wp_image_description_creator_params_v1_set_primaries_named (creator, primaries);
+     }
+@@ -664,7 +761,7 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+                                intents[i].value,
+                                intents[i].name,
+                                (int) (len - strlen (intents[i].name)), "",
+-                               color->color_manager_supported.intents & (1 << intents[i].value) ? "✓" : "✗");
++                               color->color_manager_supported.intents & (1u << intents[i].value) ? "✓" : "✗");
+ 
+          len = 0;
+          for (int i = 0; i < G_N_ELEMENTS (features); i++)
+@@ -675,7 +772,7 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+                                features[i].value,
+                                features[i].name,
+                                (int) (len - strlen (features[i].name)), "",
+-                               color->color_manager_supported.features & (1 << features[i].value) ? "✓" : "✗");
++                               color->color_manager_supported.features & (1u << features[i].value) ? "✓" : "✗");
+ 
+          len = 0;
+          for (int i = 0; i < G_N_ELEMENTS (primaries); i++)
+@@ -686,7 +783,7 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+                                primaries[i].value,
+                                primaries[i].name,
+                                (int) (len - strlen (primaries[i].name)), "",
+-                               color->color_manager_supported.primaries & (1 << primaries[i].value) ? "✓" : "✗");
++                               color->color_manager_supported.primaries & (1u << primaries[i].value) ? "✓" : "✗");
+ 
+          len = 0;
+          for (int i = 0; i < G_N_ELEMENTS (tf); i++)
+@@ -697,42 +794,56 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+                                tf[i].value,
+                                tf[i].name,
+                                (int) (len - strlen (tf[i].name)), "",
+-                               color->color_manager_supported.transfers & (1 << tf[i].value) ? "✓" : "✗");
++                               color->color_manager_supported.transfers & (1u << tf[i].value) ? "✓" : "✗");
+         }
+     }
+ 
+   if (color->color_manager && color->rendering_enabled &&
+-      !(color->color_manager_supported.intents & (1 << WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)))
++      !(color->color_manager_supported.intents & (1u << WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)))
+     {
+       GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color-managed rendering: Missing perceptual render intent");
+       color->rendering_enabled = FALSE;
+     }
+ 
+   if (color->color_manager && color->rendering_enabled &&
+-      (!(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) ||
+-       !(color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB)) ||
+-       !((color->color_manager_supported.primaries & (1 << WP_COLOR_MANAGER_V1_PRIMARIES_SRGB)) ||
+-         (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES)))))
++      (!(color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) ||
++       (!cicp_to_wl_transfer (13, wp_color_manager_v1_get_version (color->color_manager),
++                              color->color_manager_supported.transfers) &&
++        !(color->color_manager_supported.transfers & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR))) ||
++       !((color->color_manager_supported.primaries & (1u << WP_COLOR_MANAGER_V1_PRIMARIES_SRGB)) ||
++         (color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES)))))
+ 
+     {
+-      GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color-managed rendering: Can't create srgb image description");
++      GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color-managed rendering: No supported exact RGB encoding");
+       color->rendering_enabled = FALSE;
+     }
+ 
+   if (color->color_manager && color->rendering_enabled)
+     {
+-      create_image_desc (color, GDK_COLOR_STATE_SRGB, FALSE, FALSE);
+-
+-      if (color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR))
++      /* A fallback is usable only after the compositor accepted its exact
++       * encoding. Never render linear pixels with an untagged sRGB fallback. */
++      color->fallback_color_state =
++        cicp_to_wl_transfer (13, wp_color_manager_v1_get_version (color->color_manager),
++                             color->color_manager_supported.transfers)
++        ? GDK_COLOR_STATE_SRGB : GDK_COLOR_STATE_SRGB_LINEAR;
++      create_image_desc (color, color->fallback_color_state, TRUE, FALSE);
++      if (!g_hash_table_lookup (color->cs_to_desc, color->fallback_color_state))
++        {
++          color->rendering_enabled = FALSE;
++          color->fallback_color_state = GDK_COLOR_STATE_SRGB;
++        }
++      else if (color->fallback_color_state != GDK_COLOR_STATE_SRGB_LINEAR &&
++               (color->color_manager_supported.transfers & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR)))
+         create_image_desc (color, GDK_COLOR_STATE_SRGB_LINEAR, FALSE, FALSE);
+ 
+-      if ((color->color_manager_supported.primaries & (1 << WP_COLOR_MANAGER_V1_PRIMARIES_BT2020) ||
+-          (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES))))
++      if (color->rendering_enabled &&
++          ((color->color_manager_supported.primaries & (1u << WP_COLOR_MANAGER_V1_PRIMARIES_BT2020)) ||
++           (color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES))))
+         {
+-          if (color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ))
++          if (color->color_manager_supported.transfers & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ))
+             create_image_desc (color, GDK_COLOR_STATE_REC2100_PQ, FALSE, FALSE);
+ 
+-          if (color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR))
++          if (color->color_manager_supported.transfers & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR))
+             create_image_desc (color, GDK_COLOR_STATE_REC2100_LINEAR, FALSE, FALSE);
+         }
+     }
+@@ -752,7 +863,7 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+                               alpha_modes[i].wp,
+                               alpha_modes[i].name,
+                               (int) (len - strlen (alpha_modes[i].name)), "",
+-                              color->color_representation_supported.alpha_modes & (1 << alpha_modes[i].wp) ? "✓" : "✗");
++                              color->color_representation_supported.alpha_modes & (1u << alpha_modes[i].wp) ? "✓" : "✗");
+ 
+          len = 0;
+          for (int i = 0; i < G_N_ELEMENTS (coefficients_map); i++)
+@@ -763,19 +874,19 @@ gdk_wayland_color_prepare (GdkWaylandColor *color)
+                               coefficients_map[i].wp,
+                               coefficients_map[i].name,
+                               (int) (len - strlen (coefficients_map[i].name)), "",
+-                              color->color_representation_supported.coefficients_full & (1 << coefficients_map[i].wp) ? "✓" : "✗");
++                              color->color_representation_supported.coefficients_full & (1u << coefficients_map[i].wp) ? "✓" : "✗");
+ 
+          for (int i = 0; i < G_N_ELEMENTS (coefficients_map); i++)
+            gdk_debug_message ("Coefficients (limited range) %2u (%s): %*s%s",
+                               coefficients_map[i].wp,
+                               coefficients_map[i].name,
+                               (int) (len - strlen (coefficients_map[i].name)), "",
+-                              color->color_representation_supported.coefficients_limited & (1 << coefficients_map[i].wp) ? "✓" : "✗");
++                              color->color_representation_supported.coefficients_limited & (1u << coefficients_map[i].wp) ? "✓" : "✗");
+         }
+     }
+ 
+   if (color->color_representation_manager &&
+-      !(color->color_representation_supported.coefficients_full & (1 << WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_IDENTITY)))
++      !(color->color_representation_supported.coefficients_full & (1u << WP_COLOR_REPRESENTATION_SURFACE_V1_COEFFICIENTS_IDENTITY)))
+     {
+       GDK_DISPLAY_DEBUG (GDK_DISPLAY (color->display), MISC, "Not using color representation: Can't create identity transform");
+       g_clear_pointer (&color->color_representation_manager, wp_color_representation_manager_v1_destroy);
+@@ -789,6 +900,11 @@ struct _GdkWaylandColorSurface
+   GdkWaylandColor *color;
+   struct wl_surface *wl_surface;
+   struct wp_color_management_surface_v1 *mgmt_surface;
++  /* Fixed at wl_surface creation: a legacy WSI may subsequently own color.
++   * Do not retrofit a GTK owner after a manager appears on that surface. */
++  gboolean can_manage;
++  ImageDescriptionIdentity *published_identity;
++  struct wp_image_description_v1 *published_description;
+   gboolean hdr_requested;
+   gboolean hdr_description_bound;
+   struct wp_color_management_surface_feedback_v1 *mgmt_feedback;
+@@ -806,7 +922,7 @@ struct _ImageDescription
+   struct wp_image_description_v1 *image_desc;
+   struct wp_image_description_info_v1 *info;
+ 
+-  uint32_t identity;
++  ImageDescriptionIdentity *identity;
+ 
+   int32_t icc;
+   uint32_t icc_size;
+@@ -843,6 +959,8 @@ gdk_color_state_from_image_description_bits (ImageDescription *desc)
+       cicp.matrix_coefficients = 0;
+       cicp.range = GDK_CICP_RANGE_FULL;
+ 
++      if (cicp.color_primaries == 0 || cicp.transfer_function == 0)
++        return NULL;
+       return gdk_color_state_new_for_cicp (&cicp, NULL);
+     }
+   else
+@@ -859,6 +977,7 @@ gdk_wayland_color_surface_clear_image_desc (GdkWaylandColorSurface *self)
+ 
+   g_clear_pointer (&desc->image_desc, wp_image_description_v1_destroy);
+   g_clear_pointer (&desc->info, wp_image_description_info_v1_destroy);
++  image_description_identity_unref (self->color, desc->identity);
+   g_free (desc);
+ 
+   self->current_desc = NULL;
+@@ -881,7 +1000,14 @@ image_desc_info_done (void *data,
+ 
+   if (has_target)
+     {
+-      target.identity = desc->identity;
++      image_description_identity_unref (self->color, self->published_identity);
++      self->published_identity = desc->identity;
++      self->published_identity->references++;
++      /* Keep the protocol description alive too: v1 may recycle its identity
++       * only after all referring objects are destroyed. */
++      g_clear_pointer (&self->published_description, wp_image_description_v1_destroy);
++      self->published_description = g_steal_pointer (&desc->image_desc);
++      target.identity = desc->identity->token;
+       target.primaries[0] = desc->target_r_x / 1000000.0;
+       target.primaries[1] = desc->target_r_y / 1000000.0;
+       target.primaries[2] = desc->target_g_x / 1000000.0;
+@@ -895,21 +1021,13 @@ image_desc_info_done (void *data,
+       target.reference_luminance = desc->ref_lum;
+     }
+ 
+-  /* Target discovery must not opt the surface into experimental rendering.
+-   * Its existing sRGB encoding remains in use unless rendering was requested
+-   * and its independent compositor capability checks succeeded. */
++  /* Feedback is a preference, not a ready-to-submit description. Select only
++   * an encoding we can describe; its source white follows GDK's normal state. */
+   cs = self->color->rendering_enabled ? gdk_color_state_from_image_description_bits (desc) : NULL;
+-  if (cs)
+-    {
+-      g_hash_table_insert (self->color->id_to_cs,
+-                           GUINT_TO_POINTER (desc->identity),
+-                           gdk_color_state_ref (cs));
+-    }
+-  else
+-    {
+-      cs = GDK_COLOR_STATE_SRGB;
+-      g_clear_pointer (&desc->image_desc, wp_image_description_v1_destroy);
+-    }
++  if (cs && !gdk_wayland_color_get_image_description (self->color, cs))
++    g_clear_pointer (&cs, gdk_color_state_unref);
++  if (!cs)
++    cs = gdk_color_state_ref (self->color->fallback_color_state);
+ 
+   /* Retire the query before notifying application code, which may destroy
+    * the native surface and its color feedback owner. */
+@@ -1090,13 +1208,13 @@ image_desc_failed (void                           *data,
+   gpointer callback_data = self->data;
+ 
+   gdk_wayland_color_surface_clear_image_desc (self);
+-  callback (self, GDK_COLOR_STATE_SRGB, NULL, callback_data);
++  callback (self, self->color->fallback_color_state, NULL, callback_data);
+ }
+ 
+ static void
+-image_desc_ready (void                           *data,
+-                  struct wp_image_description_v1 *image_desc,
+-                  uint32_t                        identity)
++image_desc_ready_common (void                           *data,
++                         struct wp_image_description_v1 *image_desc,
++                         guint64                         identity)
+ {
+   ImageDescription *desc = data;
+   GdkWaylandColorSurface *self = desc->surface;
+@@ -1105,14 +1223,36 @@ image_desc_ready (void                           *data,
+   /* The encoding cache does not contain the physical target. Always fetch
+    * the complete immutable description before publishing a target. */
+   desc->info = wp_image_description_v1_get_information (image_desc);
+-  desc->identity = identity;
++  desc->identity = image_description_identity_ref (self->color, identity);
+ 
+   wp_image_description_info_v1_add_listener (desc->info, &info_listener, desc);
+ }
+ 
++static void
++image_desc_ready (void                           *data,
++                  struct wp_image_description_v1 *image_desc,
++                  uint32_t                        identity)
++{
++  image_desc_ready_common (data, image_desc, identity);
++}
++
++#ifdef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
++static void
++image_desc_ready2 (void                           *data,
++                   struct wp_image_description_v1 *image_desc,
++                   uint32_t                        identity_hi,
++                   uint32_t                        identity_lo)
++{
++  image_desc_ready_common (data, image_desc, ((guint64) identity_hi << 32) | identity_lo);
++}
++#endif
++
+ static const struct wp_image_description_v1_listener image_desc_listener = {
+-  image_desc_failed,
+-  image_desc_ready
++  .failed = image_desc_failed,
++  .ready = image_desc_ready,
++#ifdef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
++  .ready2 = image_desc_ready2,
++#endif
+ };
+ 
+ static void
+@@ -1126,6 +1266,10 @@ preferred_changed (void *data,
+   if (!self->callback)
+     return;
+ 
++  /* An invalidated snapshot no longer keeps an identity token live. */
++  image_description_identity_unref (self->color, self->published_identity);
++  self->published_identity = NULL;
++  g_clear_pointer (&self->published_description, wp_image_description_v1_destroy);
+   /* If there's still an ongoing query, cancel it. It's outdated. */
+   gdk_wayland_color_surface_clear_image_desc (self);
+ 
+@@ -1143,8 +1287,23 @@ preferred_changed (void *data,
+   self->callback (self, NULL, NULL, self->data);
+ }
+ 
++#ifdef WP_COLOR_MANAGEMENT_SURFACE_FEEDBACK_V1_PREFERRED_CHANGED2_SINCE_VERSION
++static void
++preferred_changed2 (void *data,
++                     struct wp_color_management_surface_feedback_v1 *feedback,
++                     uint32_t identity_hi,
++                     uint32_t identity_lo)
++{
++  /* Always query the immutable description. ready2 supplies the full identity. */
++  preferred_changed (data, feedback, 0);
++}
++#endif
++
+ static const struct wp_color_management_surface_feedback_v1_listener color_listener = {
+-  preferred_changed,
++  .preferred_changed = preferred_changed,
++#ifdef WP_COLOR_MANAGEMENT_SURFACE_FEEDBACK_V1_PREFERRED_CHANGED2_SINCE_VERSION
++  .preferred_changed2 = preferred_changed2,
++#endif
+ };
+ 
+ GdkWaylandColorSurface *
+@@ -1159,12 +1318,13 @@ gdk_wayland_color_surface_new (GdkWaylandColor      *color,
+ 
+   self->color = color;
+   self->wl_surface = wl_surface;
++  self->can_manage = color->color_manager != NULL;
+ 
+-  if (color->color_manager && color->rendering_enabled)
++  if (self->can_manage && color->rendering_enabled)
+     self->mgmt_surface = wp_color_manager_v1_get_surface (color->color_manager, wl_surface);
+ 
+   if (color->color_manager && callback &&
+-      (color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)))
++      (color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)))
+     {
+       self->mgmt_feedback = wp_color_manager_v1_get_surface_feedback (color->color_manager, wl_surface);
+       self->callback = callback;
+@@ -1183,18 +1343,18 @@ gdk_wayland_color_surface_request_hdr (GdkWaylandColorSurface *self,
+ {
+   GdkWaylandColor *color = self->color;
+   self->hdr_requested = FALSE;
+-  if (!requested)
++  if (!requested || !self->can_manage)
+     return FALSE;
+ 
+   if (!color->color_manager || !color->color_representation_manager ||
+-      !(color->color_representation_supported.coefficients_full & (1 << cicp_to_wl_coefficients (0))) ||
+-      !(color->color_representation_supported.alpha_modes & (1 << gdk_alpha_to_wl_alpha (GDK_MEMORY_ALPHA_PREMULTIPLIED))) ||
+-      !(color->color_manager_supported.intents & (1 << WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)) ||
+-      !(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) ||
+-      !(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES)) ||
+-      !(color->color_manager_supported.transfers & (1 << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ)) ||
+-      (!(color->color_manager_supported.primaries & (1 << WP_COLOR_MANAGER_V1_PRIMARIES_BT2020)) &&
+-       !(color->color_manager_supported.features & (1 << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES))))
++      !(color->color_representation_supported.coefficients_full & (1u << cicp_to_wl_coefficients (0))) ||
++      !(color->color_representation_supported.alpha_modes & (1u << gdk_alpha_to_wl_alpha (GDK_MEMORY_ALPHA_PREMULTIPLIED))) ||
++      !(color->color_manager_supported.intents & (1u << WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL)) ||
++      !(color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC)) ||
++      !(color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES)) ||
++      !(color->color_manager_supported.transfers & (1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ)) ||
++      (!(color->color_manager_supported.primaries & (1u << WP_COLOR_MANAGER_V1_PRIMARIES_BT2020)) &&
++       !(color->color_manager_supported.features & (1u << WP_COLOR_MANAGER_V1_FEATURE_SET_PRIMARIES))))
+     return FALSE;
+ 
+   if (!color->hdr_description)
+@@ -1207,6 +1367,12 @@ gdk_wayland_color_surface_request_hdr (GdkWaylandColorSurface *self,
+   return TRUE;
+ }
+ 
++gboolean
++gdk_wayland_color_surface_needs_passthrough (GdkWaylandColorSurface *self)
++{
++  return self && self->can_manage;
++}
++
+ gboolean
+ gdk_wayland_color_surface_has_hdr_description (GdkWaylandColorSurface *self)
+ {
+@@ -1217,6 +1383,8 @@ void
+ gdk_wayland_color_surface_free (GdkWaylandColorSurface *self)
+ {
+   gdk_wayland_color_surface_clear_image_desc (self);
++  image_description_identity_unref (self->color, self->published_identity);
++  g_clear_pointer (&self->published_description, wp_image_description_v1_destroy);
+ 
+   g_clear_pointer (&self->mgmt_surface, wp_color_management_surface_v1_destroy);
+   g_clear_pointer (&self->mgmt_feedback, wp_color_management_surface_feedback_v1_destroy);
+@@ -1264,7 +1432,7 @@ gdk_wayland_color_get_color_representation (GdkWaylandColor *color,
+   if (gdk_cicp_params_get_range (cicp) == GDK_CICP_RANGE_NARROW)
+     {
+       *range = WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_LIMITED;
+-      if (color->color_representation_supported.coefficients_limited & (1 << c))
++      if (color->color_representation_supported.coefficients_limited & (1u << c))
+         *coefficients = c;
+       else
+         return FALSE;
+@@ -1272,14 +1440,14 @@ gdk_wayland_color_get_color_representation (GdkWaylandColor *color,
+   else
+     {
+       *range = WP_COLOR_REPRESENTATION_SURFACE_V1_RANGE_FULL;
+-      if (color->color_representation_supported.coefficients_full & (1 << c))
++      if (color->color_representation_supported.coefficients_full & (1u << c))
+         *coefficients = c;
+       else
+         return FALSE;
+     }
+ 
+   a = gdk_alpha_to_wl_alpha (gdk_memory_format_alpha (format));
+-  if (color->color_representation_supported.alpha_modes & (1 << a))
++  if (color->color_representation_supported.alpha_modes & (1u << a))
+     *alpha = a;
+   else
+     return FALSE;
+diff --git a/gdk/wayland/gdkwaylandsurface.h b/gdk/wayland/gdkwaylandsurface.h
+index 24e2976..2eebc41 100644
+--- a/gdk/wayland/gdkwaylandsurface.h
++++ b/gdk/wayland/gdkwaylandsurface.h
+@@ -49,7 +49,7 @@ void                     gdk_wayland_surface_force_next_commit    (GdkSurface *s
+ /**
+  * GdkWaylandColorTarget:
+  * @generation: surface-local generation, including while unavailable
+- * @identity: Wayland image-description identity, local to this connection
++ * @identity: opaque connection-local description token, valid for @generation
+  * @primaries: CIE 1931 xy pairs for red, green, blue and white, in that order
+  * @min_luminance: target black luminance in cd/m², including ambient flare
+  * @max_luminance: target peak luminance in cd/m²
+diff --git a/testsuite/gdk/meson.build b/testsuite/gdk/meson.build
+index cd24204..c4c1747 100644
+--- a/testsuite/gdk/meson.build
++++ b/testsuite/gdk/meson.build
+@@ -98,6 +98,7 @@ if os_linux
+   internal_tests += { 'name': 'dmabuftexture', 'suites': 'failing' }
+ 
+   if wayland_enabled
++    internal_tests += { 'name': 'wayland-color' }
+     internal_test_executables += { 'name': 'waylandsocket' }
+   endif
+ endif
+diff --git a/testsuite/gdk/wayland-color.c b/testsuite/gdk/wayland-color.c
+new file mode 100644
+index 0000000..ff486e9
+--- /dev/null
++++ b/testsuite/gdk/wayland-color.c
+@@ -0,0 +1,363 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "config.h"
++#include <gtk/gtk.h>
++#include <errno.h>
++#include <drm_fourcc.h>
++#include <fcntl.h>
++#include <sys/socket.h>
++#include <unistd.h>
++
++/* Exercise the actual private producer and its generated protocol listeners.
++ * No copied transfer/identity implementation and no test-only product API. */
++#include "../../gdk/wayland/gdkwaylandcolor.c"
++
++#ifndef WP_IMAGE_DESCRIPTION_V1_READY2_SINCE_VERSION
++#error This regression fixture requires color-management-v1 XML version 2
++#endif
++
++typedef struct {
++  struct wl_display *display;
++  struct wl_registry *registry;
++  GdkWaylandColor *color;
++  int peer;
++  GByteArray *requests;
++  guint owners, bindings, luminance_requests;
++  guint32 creator, description, transfer;
++  guint32 luminances[3];
++} Fixture;
++
++typedef struct {
++  guint invalidated, published;
++  GdkWaylandColorTarget target;
++} Snapshot;
++
++static int
++message_index (const struct wl_interface *interface, gboolean event, const char *name)
++{
++  const struct wl_message *messages = event ? interface->events : interface->methods;
++  int count = event ? interface->event_count : interface->method_count;
++  for (int i = 0; i < count; i++)
++    if (g_str_equal (messages[i].name, name))
++      return i;
++  g_assert_not_reached ();
++}
++
++static void
++emit (Fixture *f, guint32 object, const struct wl_interface *interface,
++      const char *name, const guint32 *values, guint n_values)
++{
++  guint32 packet[16];
++  g_assert_cmpuint (n_values, <=, G_N_ELEMENTS (packet) - 2);
++  packet[0] = object;
++  packet[1] = ((n_values + 2) * 4 << 16) | message_index (interface, TRUE, name);
++  if (n_values)
++    memcpy (packet + 2, values, n_values * 4);
++  g_assert_cmpint (write (f->peer, packet, (n_values + 2) * 4), ==, (n_values + 2) * 4);
++  g_assert_cmpint (wl_display_dispatch (f->display), >=, 0);
++}
++
++static void
++advertise (Fixture *f, const char *name, guint32 value)
++{
++  emit (f, wl_proxy_get_id ((struct wl_proxy *) f->color->color_manager),
++        &wp_color_manager_v1_interface, name, &value, 1);
++}
++
++static void
++collect (Fixture *f)
++{
++  guint8 bytes[4096];
++  ssize_t n;
++  g_assert_cmpint (wl_display_flush (f->display), >=, 0);
++  while ((n = read (f->peer, bytes, sizeof bytes)) > 0)
++    g_byte_array_append (f->requests, bytes, n);
++  g_assert_true (n < 0 && errno == EAGAIN);
++  while (f->requests->len >= 8)
++    {
++      guint32 header[2], value;
++      memcpy (header, f->requests->data, 8);
++      guint size = header[1] >> 16, opcode = header[1] & 0xffff;
++      g_assert_cmpuint (size, >=, 8);
++      if (size > f->requests->len)
++        break;
++      value = 0;
++      if (size >= 12)
++        memcpy (&value, f->requests->data + 8, 4);
++      guint32 manager = f->color->color_manager
++                      ? wl_proxy_get_id ((struct wl_proxy *) f->color->color_manager) : 0;
++      if (header[0] == manager)
++        {
++          if (opcode == message_index (&wp_color_manager_v1_interface, FALSE, "get_surface"))
++            f->owners++;
++          if (opcode == message_index (&wp_color_manager_v1_interface, FALSE, "create_parametric_creator"))
++            f->creator = value;
++        }
++      if (header[0] == f->creator && f->creator)
++        {
++          if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "set_tf_named"))
++            f->transfer = value;
++          if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "set_luminances"))
++            {
++              f->luminance_requests++;
++              memcpy (f->luminances, f->requests->data + 8, sizeof f->luminances);
++            }
++          if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "create"))
++            {
++              f->description = value;
++              f->creator = 0;
++            }
++        }
++      g_byte_array_remove_range (f->requests, 0, size);
++    }
++}
++
++static Fixture
++fixture_new (guint version)
++{
++  Fixture f = { 0 };
++  int sockets[2];
++  g_assert_cmpint (socketpair (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets), ==, 0);
++  f.display = wl_display_connect_to_fd (sockets[0]);
++  g_assert_nonnull (f.display);
++  f.peer = sockets[1];
++  g_assert_cmpint (fcntl (f.peer, F_SETFL, O_NONBLOCK), ==, 0);
++  f.registry = wl_display_get_registry (f.display);
++  f.requests = g_byte_array_new ();
++  /* No GDK display/window is opened. Successful asynchronous paths below do
++   * not dereference the display; all protocol objects use this socket pair. */
++  f.color = gdk_wayland_color_new (NULL);
++  if (version)
++    {
++      gdk_wayland_color_set_color_manager (f.color, f.registry, 1, version);
++      g_assert_cmpuint (wp_color_manager_v1_get_version (f.color->color_manager), ==, version);
++      advertise (&f, "supported_feature", WP_COLOR_MANAGER_V1_FEATURE_PARAMETRIC);
++      advertise (&f, "supported_primaries_named", WP_COLOR_MANAGER_V1_PRIMARIES_SRGB);
++    }
++  return f;
++}
++
++static void
++fixture_free (Fixture *f)
++{
++  gdk_wayland_color_free (f->color);
++  wl_registry_destroy (f->registry);
++  wl_display_disconnect (f->display);
++  close (f->peer);
++  g_byte_array_unref (f->requests);
++}
++
++static void
++ready (Fixture *f, guint32 object, guint version, guint32 hi, guint32 lo)
++{
++  if (version >= 2)
++    emit (f, object, &wp_image_description_v1_interface, "ready2", (guint32[]) { hi, lo }, 2);
++  else
++    emit (f, object, &wp_image_description_v1_interface, "ready", &lo, 1);
++}
++
++static void
++snapshot (GdkWaylandColorSurface *surface, GdkColorState *cs,
++          const GdkWaylandColorTarget *target, gpointer data)
++{
++  Snapshot *seen = data;
++  if (!cs)
++    seen->invalidated++;
++  if (target)
++    {
++      seen->published++;
++      seen->target = *target;
++    }
++}
++
++static void
++test_exact_transfer (gconstpointer data)
++{
++  guint version = GPOINTER_TO_UINT (data);
++  Fixture f = fixture_new (version);
++  guint exact = version >= 2 ? WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4
++                            : WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB;
++  advertise (&f, "supported_tf_named", exact);
++  g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB), ==, 0);
++  g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << exact), ==, exact);
++  if (version >= 2)
++    g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_SRGB), ==, 0);
++  else
++    g_assert_cmpuint (cicp_to_wl_transfer (13, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4), ==, 0);
++  g_assert_cmpuint (cicp_to_wl_transfer (8, version, 1u << WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR), ==,
++                   WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR);
++  create_image_desc (f.color, GDK_COLOR_STATE_SRGB, FALSE, FALSE);
++  collect (&f);
++  g_assert_cmpuint (f.transfer, ==, exact);
++  /* Ordinary SDR uses protocol defaults, not the observed output white203. */
++  g_assert_cmpuint (f.luminance_requests, ==, 0);
++  ready (&f, f.description, version, 1, 7);
++  g_assert_nonnull (g_hash_table_lookup (f.color->cs_to_desc, GDK_COLOR_STATE_SRGB));
++  fixture_free (&f);
++}
++
++static void
++test_tokens (void)
++{
++  GdkWaylandColor *color = gdk_wayland_color_new (NULL);
++  ImageDescriptionIdentity *a = image_description_identity_ref (color, G_GUINT64_CONSTANT (0x100000007));
++  ImageDescriptionIdentity *same = image_description_identity_ref (color, G_GUINT64_CONSTANT (0x100000007));
++  color->next_identity = G_MAXUINT32; /* Exercise wrap while token1 is live. */
++  ImageDescriptionIdentity *b = image_description_identity_ref (color, G_GUINT64_CONSTANT (0x200000007));
++  g_assert_true (a == same);
++  g_assert_cmpuint (a->token, !=, b->token);
++  image_description_identity_unref (color, same);
++  g_assert_cmpuint (g_hash_table_size (color->identities_by_wire), ==, 2);
++  image_description_identity_unref (color, a);
++  image_description_identity_unref (color, b);
++  for (guint i = 0; i < 1000; i++)
++    image_description_identity_unref (color, image_description_identity_ref (color, i + 1));
++  g_assert_cmpuint (g_hash_table_size (color->identities_by_wire), ==, 0);
++  g_assert_cmpuint (g_hash_table_size (color->identities_by_token), ==, 0);
++  gdk_wayland_color_free (color);
++}
++
++static void
++test_preferred_events (gconstpointer data)
++{
++  guint version = GPOINTER_TO_UINT (data);
++  Fixture f = fixture_new (version);
++  Snapshot seen = { 0 };
++  f.color->rendering_enabled = FALSE;
++  struct wl_surface *wl_surface = wl_registry_bind (f.registry, 2, &wl_surface_interface, 1);
++  GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, snapshot, &seen);
++  g_assert_cmpuint (seen.invalidated, ==, 1);
++  guint32 image = wl_proxy_get_id ((struct wl_proxy *) surface->current_desc->image_desc);
++  ready (&f, image, version, 1, 7);
++  g_assert_cmpuint (surface->current_desc->identity->wire, ==,
++                   version >= 2 ? G_GUINT64_CONSTANT (0x100000007) : 7);
++  guint32 info = wl_proxy_get_id ((struct wl_proxy *) surface->current_desc->info);
++  emit (&f, info, &wp_image_description_info_v1_interface, "luminances", (guint32[]) { 2000, 80, 80 }, 3);
++  emit (&f, info, &wp_image_description_info_v1_interface, "target_primaries",
++        (guint32[]) { 708000,292000,170000,797000,131000,46000,312700,329000 }, 8);
++  emit (&f, info, &wp_image_description_info_v1_interface, "target_luminance", (guint32[]) { 5, 616 }, 2);
++  emit (&f, info, &wp_image_description_info_v1_interface, "done", NULL, 0);
++  g_assert_cmpuint (seen.published, ==, 1);
++  g_assert_cmpfloat (seen.target.reference_luminance, ==, 80);
++  g_assert_cmpfloat (seen.target.min_luminance, ==, 0.0005);
++  g_assert_nonnull (surface->published_description); /* Prevent v1 wire-ID recycling while published. */
++  g_assert_cmpuint (g_hash_table_size (f.color->identities_by_wire), ==, 1);
++  guint32 feedback = wl_proxy_get_id ((struct wl_proxy *) surface->mgmt_feedback);
++  if (version >= 2)
++    emit (&f, feedback, &wp_color_management_surface_feedback_v1_interface, "preferred_changed2", (guint32[]) { 2, 7 }, 2);
++  else
++    emit (&f, feedback, &wp_color_management_surface_feedback_v1_interface, "preferred_changed", (guint32[]) { 7 }, 1);
++  g_assert_cmpuint (seen.invalidated, ==, 2);
++  g_assert_null (surface->published_description);
++  g_assert_cmpuint (g_hash_table_size (f.color->identities_by_wire), ==, 0);
++  gdk_wayland_color_surface_free (surface); /* Cancels the pending replacement safely. */
++  wl_surface_destroy (wl_surface);
++  fixture_free (&f);
++}
++
++static void
++test_normal_sdr_owner (void)
++{
++  Fixture f = fixture_new (2);
++  advertise (&f, "supported_tf_named", WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4);
++  create_image_desc (f.color, GDK_COLOR_STATE_SRGB, FALSE, FALSE);
++  collect (&f);
++  ready (&f, f.description, 2, 0, 9);
++  struct wl_surface *wl_surface = wl_registry_bind (f.registry, 4, &wl_surface_interface, 1);
++  GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, NULL, NULL);
++  gdk_wayland_color_surface_set_color_state (surface, GDK_COLOR_STATE_SRGB, DRM_FORMAT_RGBA8888, TRUE);
++  g_assert_false (gdk_wayland_color_surface_has_hdr_description (surface));
++  g_assert_false (gdk_wayland_color_surface_request_hdr (surface, FALSE));
++  collect (&f);
++  g_assert_cmpuint (f.owners, ==, 1);
++  g_assert_cmpuint (f.luminance_requests, ==, 0);
++  gdk_wayland_color_surface_free (surface);
++  wl_surface_destroy (wl_surface);
++  fixture_free (&f);
++}
++
++static void
++test_owner_and_lease (void)
++{
++  Fixture f = fixture_new (2);
++  gdk_wayland_color_set_color_representation (f.color, f.registry, 3, 1);
++  advertise (&f, "supported_feature", WP_COLOR_MANAGER_V1_FEATURE_SET_LUMINANCES);
++  advertise (&f, "supported_intent", WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++  advertise (&f, "supported_tf_named", WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_ST2084_PQ);
++  advertise (&f, "supported_primaries_named", WP_COLOR_MANAGER_V1_PRIMARIES_BT2020);
++  guint32 repr = wl_proxy_get_id ((struct wl_proxy *) f.color->color_representation_manager);
++  emit (&f, repr, &wp_color_representation_manager_v1_interface, "supported_alpha_mode", (guint32[]) { 0 }, 1);
++  emit (&f, repr, &wp_color_representation_manager_v1_interface, "supported_coefficients_and_ranges", (guint32[]) { 1, 1 }, 2);
++  create_image_desc (f.color, GDK_COLOR_STATE_REC2100_PQ, FALSE, TRUE);
++  collect (&f);
++  ready (&f, f.description, 2, 0, 8);
++  g_assert_cmpuint (f.luminances[0], ==, 0);
++  g_assert_cmpuint (f.luminances[1], ==, 10000);
++  g_assert_cmpuint (f.luminances[2], ==, 203); /* Existing native lease normalization only. */
++  struct wl_surface *wl_surface = wl_registry_bind (f.registry, 4, &wl_surface_interface, 1);
++  f.color->rendering_enabled = FALSE;
++  GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, NULL, NULL);
++  collect (&f);
++  g_assert_cmpuint (f.owners, ==, 0);
++  /* Even before a lease, the renderer must reserve the GTK/pass-through path. */
++  g_assert_true (gdk_wayland_color_surface_needs_passthrough (surface));
++  g_assert_true (gdk_wayland_color_surface_request_hdr (surface, TRUE));
++  collect (&f);
++  g_assert_cmpuint (f.owners, ==, 1);
++  gdk_wayland_color_surface_set_color_state (surface, GDK_COLOR_STATE_REC2100_PQ, DRM_FORMAT_RGBA8888, TRUE);
++  g_assert_true (gdk_wayland_color_surface_has_hdr_description (surface));
++  g_assert_false (gdk_wayland_color_surface_request_hdr (surface, FALSE));
++  g_assert_false (gdk_wayland_color_surface_has_hdr_description (surface));
++  g_assert_true (gdk_wayland_color_surface_request_hdr (surface, TRUE));
++  collect (&f);
++  g_assert_cmpuint (f.owners, ==, 1); /* Native transition never acquires a second owner. */
++  gdk_wayland_color_surface_free (surface);
++  wl_surface_destroy (wl_surface);
++  fixture_free (&f);
++}
++
++static void
++test_legacy_and_unknown (void)
++{
++  Fixture f = fixture_new (0);
++  struct wl_surface *wl_surface = wl_registry_bind (f.registry, 2, &wl_surface_interface, 1);
++  GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, NULL, NULL);
++  g_assert_false (gdk_wayland_color_surface_needs_passthrough (surface));
++  gdk_wayland_color_set_color_manager (f.color, f.registry, 1, 2);
++  /* A manager arriving later must not steal a legacy WSI surface. */
++  g_assert_false (gdk_wayland_color_surface_request_hdr (surface, TRUE));
++  advertise (&f, "supported_tf_named", 32);
++  advertise (&f, "supported_feature", G_MAXUINT32);
++  advertise (&f, "supported_primaries_named", 32);
++  advertise (&f, "supported_intent", 32);
++  g_assert_cmpuint (f.color->color_manager_supported.transfers, ==, 0);
++  g_assert_cmpuint (f.color->color_manager_supported.features, ==, 0);
++  g_assert_cmpuint (f.color->color_manager_supported.primaries, ==, 0);
++  g_assert_cmpuint (f.color->color_manager_supported.intents, ==, 0);
++  g_assert_cmpuint (wl_to_cicp_transfer (G_MAXUINT32), ==, 0);
++  gdk_wayland_color_set_color_representation (f.color, f.registry, 3, 1);
++  guint32 repr = wl_proxy_get_id ((struct wl_proxy *) f.color->color_representation_manager);
++  emit (&f, repr, &wp_color_representation_manager_v1_interface, "supported_alpha_mode", (guint32[]) { 32 }, 1);
++  emit (&f, repr, &wp_color_representation_manager_v1_interface, "supported_coefficients_and_ranges", (guint32[]) { 32, 1 }, 2);
++  g_assert_cmpuint (f.color->color_representation_supported.alpha_modes, ==, 0);
++  g_assert_cmpuint (f.color->color_representation_supported.coefficients_full, ==, 0);
++  collect (&f);
++  g_assert_cmpuint (f.owners, ==, 0);
++  gdk_wayland_color_surface_free (surface);
++  wl_surface_destroy (wl_surface);
++  fixture_free (&f);
++}
++
++int
++main (int argc, char **argv)
++{
++  g_test_init (&argc, &argv, NULL);
++  g_test_add_data_func ("/wayland/color/v1-exact-transfer", GUINT_TO_POINTER (1), test_exact_transfer);
++  g_test_add_data_func ("/wayland/color/v2-exact-transfer", GUINT_TO_POINTER (2), test_exact_transfer);
++  g_test_add_func ("/wayland/color/bounded-identities", test_tokens);
++  g_test_add_data_func ("/wayland/color/v1-preferred-events", GUINT_TO_POINTER (1), test_preferred_events);
++  g_test_add_data_func ("/wayland/color/v2-preferred-events", GUINT_TO_POINTER (2), test_preferred_events);
++  g_test_add_func ("/wayland/color/normal-sdr-owner", test_normal_sdr_owner);
++  g_test_add_func ("/wayland/color/native-lease-owner", test_owner_and_lease);
++  g_test_add_func ("/wayland/color/legacy-and-unknown", test_legacy_and_unknown);
++  return g_test_run ();
++}
+-- 
+2.54.0 (Apple Git-157)
+

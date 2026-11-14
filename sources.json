@@ -788,9 +788,9 @@
       "component": "ubuntu-gtk4-display-target",
       "base_commit": "06c57761c0d36e1301d11da4ac95cf21c7ceb99b",
       "base_tree": "2cdc31ea1024ca24df50809c5f56a8cbba922094",
-      "candidate_commit": "4f7262cbd4083a34b74985943182ac0041a8094c",
-      "candidate_tree": "1bcc5a55318f9ebd1da7aaa840e47d7d7d918514",
-      "patch_count": 16,
+      "candidate_commit": "7f96212c6f3006f399e1947c725ed7a79616265e",
+      "candidate_tree": "e933cfcf86cd6e22638983708d12ce5e030ac4a5",
+      "patch_count": 19,
       "patch_order": [
         "0001-wayland-expose-preferred-color-target-snapshots.patch",
         "0002-debian-stage-preferred-target-snapshots.patch",
@@ -807,7 +807,10 @@
         "0013-gtkvideo-grade-each-view-to-its-declared-HDR-or-SDR-destination.patch",
         "0014-debian-package-destination-aware-GtkVideo-as-rogdv5.patch",
         "0015-gtkvideo-require-a-composed-view-for-native-HDR.patch",
-        "0016-debian-recommend-the-destination-aware-mapper-runtime.patch"
+        "0016-debian-recommend-the-destination-aware-mapper-runtime.patch",
+        "0017-wayland-negotiate-normal-colour-descriptions-and-Vulkan-ownership.patch",
+        "0018-tests-keep-colour-regressions-buildable-with-v1-protocols.patch",
+        "0019-debian-package-normal-image-colour-as-rogdv6.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -840,10 +843,17 @@
           "include_ignored": true
         }
       },
-      "candidate_status": "Sixteen-patch source candidate declares authoritative HDR or logical SDR output, requires a composed view for native HDR, and recommends the matching destination-aware runtime. Independent source review, old/new SDK configuration and normal compilation/link/GIR/symbol staging pass. Package output and HDR/SDR retarget runtime qualification remain pending; no installation.",
-      "candidate_package_version": "4.24.1+ds-1+rogdv5",
-      "previous_candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
-      "previous_candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980"
+      "candidate_status": "Nineteen-patch normal-colour source candidate: exact CMv1/v2 transfer negotiation, ABI-preserving target tokens and one GTK/Vulkan owner. Four unchanged baseline objects passed before edits. New candidate compilation/linking, independent final review, focused tests, package build and runtime acceptance remain pending; no rogdv6 installation. Installed rogdv5 and its historical receipts remain separate.",
+      "candidate_package_version": "4.24.1+ds-1+rogdv6",
+      "previous_candidate_commit": "4f7262cbd4083a34b74985943182ac0041a8094c",
+      "previous_candidate_tree": "1bcc5a55318f9ebd1da7aaa840e47d7d7d918514",
+      "historical_candidate_pins": [
+        {
+          "candidate_commit": "2568b2176cab5e64bc1e01dc5a6fdfbc946f833c",
+          "candidate_tree": "46ef2e57785d9651050e2f2620c913423eb8a980",
+          "scope": "Inherited earlier source pin; historical receipts retain their original scope."
+        }
+      ]
     },
     {
       "component": "libplacebo-fel-system-dv",
@@ -1148,7 +1158,7 @@
           "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
         }
       },
-      "candidate_status": "Single product patch (41 paths; reviewed ad531204 plus the viewport state-restore fix, source-policy attestation logging, arming of byte holders autoplugged after typefinding and a mapper-led page video sink (b0ec7ff0), a GStreamer registry of the sandbox’s own (1d380b37), the NVIDIA unified-memory device bind and decoder ordering by the rendering GPU unless only another decoder composes the enhancement layer (0175a11c), and flushing loops for media pushed by WebKitWebSrc, whose segment-done marks the end of the download rather than of playback (ec69ce27, c1fcae69)) for ordinary clear HTML video with an explicit 100-nit SDR page destination and a tagged native HDR plane under a current GTK view lease. Packaged by packaging/webkitgtk-native-hdr as 2.52.6-1ubuntu1+rogdv6.",
+      "candidate_status": "Single product patch (41 paths; reviewed ad531204 plus the viewport state-restore fix, source-policy attestation logging, arming of byte holders autoplugged after typefinding and a mapper-led page video sink (b0ec7ff0), a GStreamer registry of the sandbox\u2019s own (1d380b37), the NVIDIA unified-memory device bind and decoder ordering by the rendering GPU unless only another decoder composes the enhancement layer (0175a11c), and flushing loops for media pushed by WebKitWebSrc, whose segment-done marks the end of the download rather than of playback (ec69ce27, c1fcae69)) for ordinary clear HTML video with an explicit 100-nit SDR page destination and a tagged native HDR plane under a current GTK view lease. Packaged by packaging/webkitgtk-native-hdr as 2.52.6-1ubuntu1+rogdv6.",
       "candidate_package_version": "2.52.6-1ubuntu1+rogdv6"
     }
   ]

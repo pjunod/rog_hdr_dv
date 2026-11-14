@@ -15,8 +15,10 @@ median PQ10 code across all 48 channels; Web differed by up to 140 on saturated
 patches, with neutral patches equal. A source-derived clamp/quantization plus
 untagged gamma-2.2 model predicts the Web medians exactly. The proposed GTK/
 WebKit shared source correction is in progress. Four unchanged GTK compiler
-objects passed with pinned dependencies authenticated; the WebKit prerequisite
-is separately pending. No candidate is deployed. Target feedback
+objects passed with pinned dependencies authenticated; the four selected
+unchanged WebKit objects also passed with Clang 22.1.8. GTK source/regression
+preparation is committed; WebKit implementation is active. Candidate builds,
+final review and focused tests remain open. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 
