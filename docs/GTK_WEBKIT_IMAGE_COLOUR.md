@@ -1,6 +1,6 @@
 # GTK and WebKit image colour — preserve values and describe the surface
 
-**Status:** Proposed; diagnosis reproduced, implementation not started.
+**Status:** Proposed; diagnosis reproduced, GTK compiler prerequisite passed; implementation in progress.
 **Date:** November 13, 2026 Eastern / November 14 UTC.
 **Deciders:** Project maintainer and coordinating agent. No upstream acceptance
 or deployment is claimed.
@@ -81,15 +81,36 @@ all sixteen existing patches into a private index; relevant WebKit files match
 its exact recorded Git object. The qualified Mesa manifest reconstructs the
 pinned Merkle tree, and its canonical WSI file matches the qualified receipt;
 the different stale working copy is not used. Original stores were unchanged.
-These checks authenticate inputs, not a new compiler or runtime-actor proof.
-Relevant unchanged compiler loops, package/runtime binding and exact Vulkan
-ownership still need their targeted evidence before source changes/deployment.
+These checks authenticate inputs. The four selected unchanged GTK translation
+units subsequently compiled with GCC 15.3 and authenticated pinned source
+dependencies. This is an object-level compiler prerequisite, not a full
+link/package or runtime proof. The separate WebKit compiler prerequisite,
+package/runtime binding and exact Vulkan ownership remain open. The GTK
+implementation is in progress; nothing from this batch is installed.
 
 The live compositor advertises colour-manager version 2 and transfer function
 14 (`compound_power_2_4`). A version-2 output-only client receives that precise
 capability, while the normal GTK applications bind version 1 and receive the
 deprecated named-sRGB alias. No new display surface or setting was needed for
 that capability query.
+
+## Compiler prerequisite and implementation scope
+
+Four unchanged GTK objects compiled with GCC 15.3, with pinned source
+dependencies authenticated. The owned compiler container was stopped after
+confirming it was idle, and its original resource limits were restored.
+This establishes the selected object loop; it grants no link, package or
+runtime colour claim. WebKit's separate compiler phase is waiting for the
+shared CI reservation to release. No candidate is installed.
+
+Further source tracing found RGBA8 assumptions in coordinated tiles and
+native-image uploads as well as the final page buffer. The selected design
+uses one nonlinear-sRGB F16 working contract across supported accelerated
+pages and tiles. This doubles pixel-buffer storage but avoids a new
+content-promotion and first-draw repaint state machine. Actual allocation
+and import support must be negotiated. Unsupported transports retain an
+explicitly limited fallback. Colour metadata travels separately from pixel
+format, preserving native Dolby/PQ buffers' distinct contract.
 
 ## Proposed decision
 

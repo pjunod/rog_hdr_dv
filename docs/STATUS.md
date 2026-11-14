@@ -14,7 +14,9 @@ comparison matched Image Viewer to the retained float reference within 0.5
 median PQ10 code across all 48 channels; Web differed by up to 140 on saturated
 patches, with neutral patches equal. A source-derived clamp/quantization plus
 untagged gamma-2.2 model predicts the Web medians exactly. The proposed GTK/
-WebKit shared source correction is not implemented or deployed. Target feedback
+WebKit shared source correction is in progress. Four unchanged GTK compiler
+objects passed with pinned dependencies authenticated; the WebKit prerequisite
+is separately pending. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 
