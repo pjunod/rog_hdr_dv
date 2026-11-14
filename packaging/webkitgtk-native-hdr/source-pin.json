@@ -1,10 +1,9 @@
 {
   "source_package": "webkit2gtk",
   "source_version": "2.52.6-1ubuntu1",
-  "package_version": "2.52.6-1ubuntu1+rogdv6",
+  "package_version": "2.52.6-1ubuntu1+rogdv7",
   "base_commit": "5e156fdf2d8daf0485d3b20ffbdde9725bb57d26",
-  "candidate_commit": "c1fcae696a4d2eb53258f7c9f2d23d1011b94dca",
-  "product_patch_sha256": "3ee76329bda9eee9efd9d5920ca88e3a648c7b86249db07e9222e0231cf472be",
+  "candidate_commit": "1d88fd6352ad4394ed3a3c205c2f142f2328b660",
   "common": {
     "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
     "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
@@ -16,8 +15,8 @@
     "debian": "09410beddb1b5d11e4776e0f3ac64757675fb17d"
   },
   "candidate": {
-    "Source": "e4520468f0a7b22926d1512cf59e749ab459f002",
-    "Tools": "a2b93a24e58662878c2bf7c4e3b2e18800d9cbea"
+    "Source": "d840a5776ed7616317a16695ba4cd9c6c8cac941",
+    "Tools": "53a794a4a76ca50cede3198dd197ff9cbbba62ae"
   },
   "binary_packages": [
     "libjavascriptcoregtk-6.0-1",
@@ -51,6 +50,11 @@
     "Source/WebCore/PlatformGTK.cmake",
     "Source/WebCore/html/HTMLMediaElement.cpp",
     "Source/WebCore/html/HTMLMediaElement.h",
+    "Source/WebCore/platform/graphics/BitmapImageSource.cpp",
+    "Source/WebCore/platform/graphics/ImageBackingStore.h",
+    "Source/WebCore/platform/graphics/ImageBufferBackend.h",
+    "Source/WebCore/platform/graphics/ImageFrame.cpp",
+    "Source/WebCore/platform/graphics/ImageFrame.h",
     "Source/WebCore/platform/graphics/MediaPlayer.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDecoderPreference.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h",
@@ -60,18 +64,45 @@
     "Source/WebCore/platform/graphics/gstreamer/GStreamerSDRVideoDestination.h",
     "Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp",
     "Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h",
+    "Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp",
+    "Source/WebCore/platform/graphics/skia/ImageBufferSkiaAcceleratedBackend.cpp",
+    "Source/WebCore/platform/graphics/skia/ImageBufferSkiaBackend.cpp",
+    "Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp",
+    "Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.h",
+    "Source/WebCore/platform/graphics/skia/ImageBufferSkiaUnacceleratedBackend.cpp",
+    "Source/WebCore/platform/graphics/skia/NativeImageSkia.cpp",
+    "Source/WebCore/platform/graphics/skia/SkiaPaintingEngine.cpp",
+    "Source/WebCore/platform/graphics/texmap/BitmapTexture.cpp",
+    "Source/WebCore/platform/graphics/texmap/BitmapTexture.h",
+    "Source/WebCore/platform/graphics/texmap/BitmapTexturePool.cpp",
+    "Source/WebCore/platform/graphics/texmap/BitmapTexturePool.h",
     "Source/WebCore/platform/graphics/texmap/GTKNativeVideo.h",
     "Source/WebCore/platform/graphics/texmap/GTKNativeVideoLimits.h",
     "Source/WebCore/platform/graphics/texmap/GTKVideoSourceRegistry.h",
     "Source/WebCore/platform/graphics/texmap/TextureMapper.cpp",
     "Source/WebCore/platform/graphics/texmap/TextureMapper.h",
+    "Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h",
     "Source/WebCore/platform/graphics/texmap/coordinated/GTKNativeVideoSource.h",
     "Source/WebCore/platform/graphics/texmap/tests/GTKVideoSourceRegistry.cpp",
+    "Source/WebCore/platform/image-decoders/ScalableImageDecoder.cpp",
+    "Source/WebCore/platform/image-decoders/ScalableImageDecoder.h",
+    "Source/WebCore/platform/image-decoders/jpeg/JPEGImageDecoder.cpp",
+    "Source/WebCore/platform/image-decoders/jpegxl/JPEGXLImageDecoder.cpp",
+    "Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp",
+    "Source/WebCore/platform/image-decoders/png/PNGImageDecoder.h",
+    "Source/WebCore/platform/image-decoders/skia/ImageBackingStoreSkia.cpp",
     "Source/WebKit/PlatformGTK.cmake",
     "Source/WebKit/Scripts/webkit/messages.py",
     "Source/WebKit/Shared/WebCoreArgumentCoders.serialization.in",
+    "Source/WebKit/Shared/glib/RendererBufferFormat.h",
+    "Source/WebKit/Shared/glib/RendererBufferFormat.serialization.in",
+    "Source/WebKit/Shared/gtk/RendererBufferFrame.h",
     "Source/WebKit/UIProcess/API/gtk/WebKitWebViewBase.cpp",
     "Source/WebKit/UIProcess/API/gtk/WebKitWebViewBasePrivate.h",
     "Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp",
@@ -86,6 +117,10 @@
     "Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.messages.in",
     "Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/ThreadedCompositor.cpp",
     "Source/WebKit/WebProcess/glib/WebProcessGLib.cpp",
+    "Tools/TestWebKitAPI/PlatformGTK.cmake",
+    "Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp",
+    "Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp",
+    "Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp",
     "Tools/dovi-input-history-probe.cpp",
     "Tools/dovi-input-setup-probe.cpp",
     "Tools/dovi-original-source-probe.cpp"
@@ -96,5 +131,39 @@
     "distribution_only_path": "Documentation/webkitgtk-6.0/type_func.WebExtensionMatchPattern.register_custom_URL_scheme.html",
     "distribution_only_blob": "eda6d2dd2df64b54144889788ce8700ebd86d162",
     "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
-  }
+  },
+  "product_patch_series": [
+    {
+      "name": "0001-webkitgtk-clear-video-and-native-hdr.patch",
+      "sha256": "3ee76329bda9eee9efd9d5920ca88e3a648c7b86249db07e9222e0231cf472be"
+    },
+    {
+      "name": "0002-skia-preserve-image-profiles-and-png16.patch",
+      "sha256": "87f07dfe4795aa39b86a9e7fa986305ec159ff3f1134273e3af1399012c21bdf"
+    },
+    {
+      "name": "0003-skia-use-typed-float-working-buffers.patch",
+      "sha256": "d2948c1a9cea3699a5aeccd49bdc68219b7ea357c7146a815d4b668ccbdc4c62"
+    },
+    {
+      "name": "0004-tests-cover-decoded-images-and-float-storage.patch",
+      "sha256": "d07335248a4d6e73ba884cadfb27ce032c9800098ba7d824edb0eaa500b7fa37"
+    },
+    {
+      "name": "0005-skia-preserve-float-through-coordinated-pages.patch",
+      "sha256": "7ab10a07adfc1ab8655a080a828e118d9866f36dbf8f2211abfe740e00ee4c2d"
+    },
+    {
+      "name": "0006-tests-cover-coordinated-image-precision.patch",
+      "sha256": "b9ff08a7cd35b7ed7aae7bf49214098f0c5e7264f7fdee1579c0e0ee63d888ac"
+    },
+    {
+      "name": "0007-skia-preserve-typed-solid-fills-and-cache-cost.patch",
+      "sha256": "b715c2177a6d9eb34f76f466fa1e717539b8f2b35e16a57b08ba4e5c2ca12420"
+    },
+    {
+      "name": "0008-webkit-bind-native-frame-metadata-to-page-buffer-ownership.patch",
+      "sha256": "a96251e76d118426f4e1718c3a51a52b5535317de04f6aee9589eb6c055433d1"
+    }
+  ]
 }

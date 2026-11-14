@@ -1,13 +1,15 @@
 # WebKitGTK packages — replay the reviewed GTK4 source on Ubuntu
 
-**Status:** source preparation/replay qualified; binary/runtime qualification pending ·
-**Updated:** 2026-11-09
+**Status:** ordered-series source integration prepared; new replay, binary and runtime
+qualification pending · **Updated:** 2026-11-14
 
 This recipe prepares Ubuntu `webkit2gtk 2.52.6-1ubuntu1` plus the reviewed
-clear-video/native HDR browser patch as `2.52.6-1ubuntu1+rogdv2`. It keeps
+native HDR video and image-colour patch series as
+`2.52.6-1ubuntu1+rogdv7`. It keeps
 Ubuntu's debhelper generation, symbols, GIR dependency generation and
 `dh_shlibdeps`. It selects GTK4 only, with standard `/usr` multiarch paths.
-The product patch and [source pin](source-pin.json) identify the separate
+The ordered product series and [source pin](source-pin.json) identify the
+separate
 browser implementation; this directory contains no decoder, rendering
 provider, proprietary SDK, media, binary package or captured reference data.
 
@@ -42,13 +44,24 @@ cd "$source_parent"
 apt-get source --download-only webkit2gtk=2.52.6-1ubuntu1
 # Unpack with Ubuntu's existing quilt patches applied.
 dpkg-source -x webkit2gtk_2.52.6-1ubuntu1.dsc "$task_source"
-# Add the exact reviewed public product patch and the packaging overlay.
+# Add the exact reviewed public product series and the packaging overlay.
 python3 "$recipe/prepare-source.py" --source "$task_source" \
-  --product-patch "$product_patch"
+  --product-series "$product_series"
 # Produce a normal 3.0 (quilt) source package next to the source tree.
 cd "$task_source"
 dpkg-buildpackage -S -us -uc -d
 ```
+
+Set `product_series` to the public
+[`patches/ubuntu-webkitgtk-native-hdr/series`](../../patches/ubuntu-webkitgtk-native-hdr/series)
+manifest, with all eight named patch files beside it. The helper compares its
+exact names and order with `product_patch_series` in [the pin](source-pin.json),
+then checks every regular patch file's SHA256 before changing the source.
+Reordering, omission, duplicate names, quilt options, traversal, symlink inputs
+and digest changes fail closed. It applies authenticated components in order
+with GNU patch, then verifies the complete final `Source` and `Tools` trees.
+`--product-patch` remains available for historical single-patch pins; it cannot
+substitute one patch or an unverified bundle for this eight-component series.
 
 Preparation refuses a different product patch digest, source tree, executable
 mode or Ubuntu `debian/` input. Its full top-level inventory permits only the
@@ -57,7 +70,7 @@ files, including private notes at the source root, fail before quilt records
 a delta. Original `debian/` identity is byte-closed: its Python caches are
 not ignored during pin verification. Explicit tar exclusions also prevent
 Python caches from entering the generated Debian source archive. The
-recorded patch must touch exactly the 39 pinned regular product
+recorded patch must touch exactly the 77 pinned regular product
 paths, with no binary patch, traversal, deletion or rename. Quilt metadata
 cannot contain symlinks or special files. Generated Python caches are excluded
 from source diffs explicitly; they never enter the public source package. It prints success only after generated control
@@ -67,8 +80,8 @@ do not run it again over the same partially prepared source.
 
 Keep the original `.orig.tar.xz` next to the prepared source. The resulting
 `.dsc` and its named source archives can be extracted using `dpkg-source -x`
-on a fresh Ubuntu builder. The product patch, packaging files, profile and
-verifier travel in the Debian source archive. No Git checkout, symlink to an
+on a fresh Ubuntu builder. The recorded product delta, packaging files,
+profile and verifier travel in the Debian source archive. No Git checkout, symlink to an
 external source directory, provider payload or private builder path is needed.
 The official archive contains both `register_custom_URL_scheme.html` and
 `register_custom_url_scheme.html` documentation siblings. The Git import on a
@@ -82,10 +95,11 @@ Source package generation does not establish binary or runtime acceptance.
 
 The native path needs the public `libgstgtk-dovi-core-dev` package at
 `0.1.0+rogdv5` or newer and public GTK development headers at
-`4.24.1+ds-1+rogdv5` or newer. The generated control records those minimum
-build dependencies. It also records the corresponding native mapping plugin
-and GTK runtime minima; coordinated runtime qualification still uses the
-exact package set retained privately by the release owner.
+`4.24.1+ds-1+rogdv6` or newer. The generated control records those minimum
+build dependencies. The GTK4 runtime explicitly requires
+`libgtk-4-1 (>= 4.24.1+ds-1+rogdv6)` alongside the native mapping plugin.
+Coordinated runtime qualification still uses the exact package set retained
+privately by the release owner.
 
 ```bash
 # Install declared build dependencies in the existing isolated Ubuntu builder.
@@ -112,7 +126,7 @@ An active compiler continues to own its source and headers. Add
 reviewed product tree. Preparation records the quilt delta using normal `dpkg-source --commit`.
 That tool normalizes patched source timestamps. The helper snapshots every
 public path, content identity, exact permission mode and timestamp. After the
-commit it proves the closed source inventory, pinned trees, exact 39 patch
+commit it proves the closed source inventory, pinned trees, exact 77 patch
 paths and all per-file identities still match, then restores only changed
 mtime metadata from its pre-commit snapshot. Final timestamps must equal the
 original snapshot, preserving completed objects. It does not alter the compiler cache. Before recording the delta it writes an
@@ -133,7 +147,7 @@ active product files. It refuses partial or unexpected quilt state.
 ```bash
 # Run after the active guarded build stops; keep the same source pathname.
 python3 "$recipe/prepare-source.py" --source "$task_source" \
-  --product-patch "$product_patch" --already-patched
+  --product-series "$product_series" --already-patched
 cd "$task_source"
 # Explicitly name the existing absolute cache and the public SDK search roots
 # that actually produced it. These are build inputs, not installation paths.
@@ -215,7 +229,18 @@ silence a refusal. Private receipts and source archives stay outside Git.
 
 ## Source replay qualification
 
-The [source-only qualification receipt](source-replay-receipt.json) records
+The `+rogdv7` series integration has not run a new source-package replay,
+focused tests, candidate compilation, binary packaging or browser runtime
+qualification. The regression sources in
+[`tests/test_webkit_ubuntu_packaging.py`](../../tests/test_webkit_ubuntu_packaging.py)
+cover sequential replay and early refusal of reordered, missing, duplicate,
+unsafe, symlinked and digest-mismatched patch inputs. They remain unexecuted
+for this integration pending final adversarial review and build admission.
+Unchanged compiler-loop receipts do not qualify this candidate.
+
+The retained [source-only qualification receipt](source-replay-receipt.json)
+records an earlier `+rogdv1` product and recipe revision, not this candidate.
+It records
 17 covered focused cases and a normal source-package roundtrip on an owned
 Ubuntu extraction. All 34,386 public source files and modes matched after
 fresh `.dsc` extraction. The generated control parsed as exactly the six GTK4
@@ -262,6 +287,6 @@ panel/optical acceptance.
 
 The focused regression is
 `python3 -m unittest discover -s tests -p 'test_webkit_ubuntu_packaging.py'`;
-it exercises source/mode corruption,
+it exercises ordered-series replay and refusal, source/mode corruption,
 profile/path mismatches and the overlay's GTK4/debhelper contract without
 compiling WebKit or contacting a builder.

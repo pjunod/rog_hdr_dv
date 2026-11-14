@@ -197,6 +197,99 @@ class WebKitPackagingTests(unittest.TestCase):
         with self.assertRaises(prepare.verify.VerificationError):
             prepare.validate_recorded_patch(valid.replace('+++ source/Source/code.cpp', '+++ /dev/null'), ['Source/code.cpp'])
 
+    def test_public_product_series_matches_packaging_pin(self):
+        pin = json.loads((RECIPE / 'source-pin.json').read_text())
+        files = prepare.product_patches(pin, series=ROOT / 'patches/ubuntu-webkitgtk-native-hdr/series')
+        self.assertEqual(len(files), 8)
+        self.assertEqual(files[0].name, '0001-webkitgtk-clear-video-and-native-hdr.patch')
+
+    def product_series_fixture(self):
+        directory = self.root / 'product-patches'
+        directory.mkdir()
+        names = ['0001-first.patch', '0002-second.patch']
+        records = []
+        for name, old, new in zip(names, ('original', 'middle'), ('middle', 'final')):
+            file = directory / name
+            file.write_text('--- a/Source/code.cpp\n+++ b/Source/code.cpp\n'
+                            '@@ -1 +1 @@\n-' + old + '\n+' + new + '\n')
+            records.append({'name': name, 'sha256': hashlib.sha256(file.read_bytes()).hexdigest()})
+        series = directory / 'series'
+        series.write_text(''.join(name + '\n' for name in names))
+        return {'product_patch_series': records}, series
+
+    def test_ordered_product_series_replays_sequential_changes(self):
+        pin, series = self.product_series_fixture()
+        (self.source / 'Source').mkdir()
+        code = self.source / 'Source/code.cpp'
+        code.write_text('original\n')
+        files = prepare.product_patches(pin, series=series)
+        prepare.apply_product_patches(self.source, files)
+        self.assertEqual(code.read_text(), 'final\n')
+        self.assertEqual([file.name for file in files], [item['name'] for item in pin['product_patch_series']])
+
+    def test_product_series_rejects_reordered_missing_duplicate_and_unsafe_entries(self):
+        pin, series = self.product_series_fixture()
+        names = [item['name'] for item in pin['product_patch_series']]
+        for entries in (names[::-1], names[:-1], names + names[:1],
+                        ['../' + names[0], names[1]],
+                        [str((series.parent / names[0]).resolve()), names[1]],
+                        [names[0] + ' -p0', names[1]]):
+            with self.subTest(entries=entries), patch.object(prepare, 'run') as run:
+                series.write_text(''.join(name + '\n' for name in entries))
+                with self.assertRaisesRegex(prepare.verify.VerificationError, 'names and order'):
+                    prepare.product_patches(pin, series=series)
+                run.assert_not_called()
+
+    def test_product_series_checks_every_file_before_source_mutation(self):
+        pin, series = self.product_series_fixture()
+        last = series.parent / pin['product_patch_series'][-1]['name']
+        saved = last.read_bytes()
+        # Exercise the preparation entry point: a late missing/corrupt patch
+        # must fail before archive/source checks, quilt recording or GNU patch.
+        recipe = self.root / 'recipe'
+        recipe.mkdir()
+        (recipe / 'source-pin.json').write_text(json.dumps(pin))
+        for bad in ('missing', 'digest', 'symlink'):
+            with self.subTest(bad=bad):
+                last.unlink()
+                if bad == 'digest':
+                    last.write_bytes(saved + b'changed')
+                elif bad == 'symlink':
+                    target = self.root / 'redirect.patch'
+                    target.write_bytes(saved)
+                    last.symlink_to(target)
+                with patch.object(prepare, 'HERE', recipe), patch.object(prepare, 'run') as run, \
+                        patch.object(prepare.verify, 'verify_source') as verify_source:
+                    with self.assertRaises(prepare.verify.VerificationError):
+                        prepare.prepare(self.source, product_series=series)
+                    run.assert_not_called()
+                    verify_source.assert_not_called()
+                if last.is_symlink() or last.exists():
+                    last.unlink()
+                last.write_bytes(saved)
+
+    def test_product_series_refuses_manifest_symlink_and_unsafe_pin_names(self):
+        pin, series = self.product_series_fixture()
+        link = self.root / 'series-link'
+        link.symlink_to(series)
+        with self.assertRaisesRegex(prepare.verify.VerificationError, 'regular file'):
+            prepare.product_patches(pin, series=link)
+        for name in ('../outside.patch', '/outside.patch', 'nested/file.patch', 'file.patch -p0'):
+            pin['product_patch_series'][0]['name'] = name
+            with self.subTest(name=name), self.assertRaisesRegex(prepare.verify.VerificationError, 'manifest'):
+                prepare.product_patches(pin, series=series)
+
+    def test_legacy_single_product_patch_remains_digest_pinned(self):
+        pin, series = self.product_series_fixture()
+        file = series.parent / pin['product_patch_series'][0]['name']
+        legacy = {'product_patch_sha256': pin['product_patch_series'][0]['sha256']}
+        self.assertEqual(prepare.product_patches(legacy, patch=file), [file])
+        with self.assertRaisesRegex(prepare.verify.VerificationError, '--product-series'):
+            prepare.product_patches(pin, patch=file)
+        file.write_text('unreviewed replacement')
+        with self.assertRaisesRegex(prepare.verify.VerificationError, 'reviewed source pin'):
+            prepare.product_patches(legacy, patch=file)
+
     def producer_fixture(self):
         pin = json.loads((RECIPE / 'source-pin.json').read_text())
         def record(path):
@@ -356,6 +449,8 @@ class WebKitPackagingTests(unittest.TestCase):
         self.assertIn('${shlibs:Depends}', control)
         self.assertIn('${gir:Depends}', control)
         self.assertIn('gstreamer1.0-gtk-dovi (>= 0.1.0+rogdv5)', control)
+        self.assertIn('libgtk-4-1 (>= 4.24.1+ds-1+rogdv6)', control)
+        self.assertIn('libgtk-4-dev (>= 4.24.1+ds-1+rogdv6)', control)
 
 
 if __name__ == '__main__':
