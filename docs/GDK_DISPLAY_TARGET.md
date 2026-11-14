@@ -257,7 +257,7 @@ stopped after the pass.
 
 ## Normal colour candidate — November 14
 
-The source registry now appends three patches for `4.24.1+ds-1+rogdv6`.
+The source registry now appends four patches for `4.24.1+ds-1+rogdv6`.
 Normal rendering negotiates an exact supported transfer instead of requiring
 a debug variable: CMv2 compound-power, precise CMv1 extended-sRGB, or an
 accepted linear fallback. Both protocol event versions retain the full wire
@@ -276,5 +276,13 @@ separate linked checks. No candidate package or installed/runtime pass is
 claimed. Existing rogdv5 receipts do not qualify this source.
 
 The original sixteen patches and their authorship are unchanged. Checksum
-entries were appended deliberately for the three new patch exports; imported
+entries were appended deliberately for the four new patch exports; imported
 patch digests were not regenerated. [Shared image pipeline design](GTK_WEBKIT_IMAGE_COLOUR.md).
+
+Final source review requested full normal-startup coverage in addition to
+direct creator calls. The prepared wire fixture now registers15 cases: eight
+existing cases plus accepted exact-transfer, accepted-linear and rejected
+description for each protocol version, and no-manager startup. The actual
+producer dispatches on the main thread; a peer only reads/writes protocol
+messages. Five declaration-dependent v2 cases skip with v1-only headers;
+qualification requires all15 cases without those skips. No tests have run.

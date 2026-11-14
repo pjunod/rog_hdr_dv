@@ -1,0 +1,310 @@
+From 51153e2fe738c3ca9df80b6e0517dbc223d1b7ef Mon Sep 17 00:00:00 2001
+From: Codex contributors <codex@invalid>
+Date: Sat, 14 Nov 2026 03:33:22 -0500
+Subject: [PATCH] test(wayland): exercise normal colour prepare startup
+
+Run the real synchronous producer on a typed private display with a wire-only peer thread. Cover accepted exact and linear encodings, graceful description rejection, and no-manager legacy startup while retaining the existing identity and owner cases. Bound each startup subprocess and document legitimate v1-only skips.
+---
+ testsuite/gdk/wayland-color.c | 258 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 255 insertions(+), 3 deletions(-)
+
+diff --git a/testsuite/gdk/wayland-color.c b/testsuite/gdk/wayland-color.c
+index 109d679..d93a861 100644
+--- a/testsuite/gdk/wayland-color.c
++++ b/testsuite/gdk/wayland-color.c
+@@ -4,6 +4,7 @@
+ #include <errno.h>
+ #include <drm_fourcc.h>
+ #include <fcntl.h>
++#include <poll.h>
+ #include <sys/socket.h>
+ #include <unistd.h>
+ 
+@@ -39,6 +40,7 @@ typedef struct {
+   struct wl_display *display;
+   struct wl_registry *registry;
+   GdkWaylandColor *color;
++  GdkWaylandDisplay *gdk_display;
+   int peer;
+   GByteArray *requests;
+   guint owners, bindings, luminance_requests;
+@@ -159,9 +161,14 @@ fixture_new (guint version)
+ static void
+ fixture_free (Fixture *f)
+ {
+-  gdk_wayland_color_free (f->color);
+-  wl_registry_destroy (f->registry);
+-  wl_display_disconnect (f->display);
++  if (f->gdk_display)
++    g_object_unref (f->gdk_display); /* Owns color, registry and client socket. */
++  else
++    {
++      gdk_wayland_color_free (f->color);
++      wl_registry_destroy (f->registry);
++      wl_display_disconnect (f->display);
++    }
+   close (f->peer);
+   g_byte_array_unref (f->requests);
+ }
+@@ -380,10 +387,248 @@ test_legacy_and_unknown (void)
+   fixture_free (&f);
+ }
+ 
++/* The normal prepare path waits synchronously on a separate client queue.
++ * Only the test's main thread dispatches that client. This peer thread writes
++ * wire events, never calls a client proxy or dispatches any Wayland queue. */
++typedef struct {
++  int peer, stop;
++  guint version;
++  gboolean reject;
++  guint32 manager, creator, transfer, primaries;
++  guint descriptions, tf_requests, primaries_requests, luminance_requests;
++  const char *error;
++} PreparePeer;
++
++static gboolean
++prepare_peer_emit (PreparePeer *peer, guint32 object, const char *name,
++                   const guint32 *values, guint n_values)
++{
++  guint32 packet[32] = { 0 };
++  gsize length = (n_values + 2) * 4, sent = 0;
++  g_assert_cmpuint (n_values, <=, G_N_ELEMENTS (packet) - 2);
++  packet[0] = object;
++  packet[1] = (length << 16) |
++              message_index (&wp_image_description_v1_interface, TRUE, name);
++  memcpy (packet + 2, values, n_values * 4);
++  while (sent < length)
++    {
++      ssize_t n = send (peer->peer, (guint8 *) packet + sent, length - sent, MSG_NOSIGNAL);
++      if (n < 0 && errno == EINTR)
++        continue;
++      if (n <= 0)
++        return FALSE;
++      sent += n;
++    }
++  return TRUE;
++}
++
++static gboolean
++prepare_peer_reply (PreparePeer *peer, guint32 description)
++{
++  if (peer->reject)
++    {
++      const char message[] = "fixture rejection";
++      guint32 values[16] = { WP_IMAGE_DESCRIPTION_V1_CAUSE_UNSUPPORTED, sizeof message };
++      memcpy (values + 2, message, sizeof message);
++      return prepare_peer_emit (peer, description, "failed", values,
++                                2 + (sizeof message + 3) / 4);
++    }
++  if (peer->version >= 2)
++    return prepare_peer_emit (peer, description, "ready2", (guint32[]) { 1, 7 }, 2);
++  return prepare_peer_emit (peer, description, "ready", (guint32[]) { 7 }, 1);
++}
++
++static gpointer
++prepare_peer_thread (gpointer data)
++{
++  PreparePeer *peer = data;
++  GByteArray *requests = g_byte_array_new ();
++  gint64 deadline = g_get_monotonic_time () + 3 * G_USEC_PER_SEC;
++
++  while (g_get_monotonic_time () < deadline)
++    {
++      struct pollfd fds[] = { { peer->stop, POLLIN, 0 }, { peer->peer, POLLIN, 0 } };
++      guint8 bytes[4096];
++      ssize_t n;
++      int result = poll (fds, G_N_ELEMENTS (fds), 100);
++      if (result < 0 && errno == EINTR)
++        continue;
++      if (result < 0)
++        { peer->error = "peer poll failed"; break; }
++      if (fds[0].revents & POLLIN)
++        {
++          g_byte_array_unref (requests);
++          return NULL;
++        }
++      if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
++        { peer->error = "invalid stop pipe"; break; }
++      if (!(fds[1].revents & (POLLIN | POLLERR | POLLHUP | POLLNVAL)))
++        continue;
++      n = read (peer->peer, bytes, sizeof bytes);
++      if (n < 0 && (errno == EAGAIN || errno == EINTR))
++        continue;
++      if (n <= 0)
++        { peer->error = "client closed before fixture stop"; break; }
++      g_byte_array_append (requests, bytes, n);
++      if (requests->len > 8192)
++        { peer->error = "unbounded client request"; break; }
++      while (requests->len >= 8)
++        {
++          guint32 header[2], value = 0;
++          memcpy (header, requests->data, sizeof header);
++          guint size = header[1] >> 16, opcode = header[1] & 0xffff;
++          if (size < 8 || size % 4 || size > 4096)
++            { peer->error = "malformed client request"; goto failed; }
++          if (size > requests->len)
++            break;
++          if (size >= 12)
++            memcpy (&value, requests->data + 8, sizeof value);
++          if (header[0] == peer->manager &&
++              opcode == message_index (&wp_color_manager_v1_interface, FALSE, "create_parametric_creator"))
++            peer->creator = value;
++          else if (peer->creator && header[0] == peer->creator)
++            {
++              if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "set_tf_named"))
++                { peer->transfer = value; peer->tf_requests++; }
++              else if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "set_primaries_named"))
++                { peer->primaries = value; peer->primaries_requests++; }
++              else if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "set_luminances"))
++                peer->luminance_requests++;
++              else if (opcode == message_index (&wp_image_description_creator_params_v1_interface, FALSE, "create"))
++                {
++                  peer->descriptions++;
++                  peer->creator = 0;
++                  if (!prepare_peer_reply (peer, value))
++                    { peer->error = "description event write failed"; goto failed; }
++                }
++            }
++          g_byte_array_remove_range (requests, 0, size);
++        }
++    }
++  if (!peer->error)
++    peer->error = "prepare peer exceeded three-second bound";
++failed:
++  /* Wake an actual blocked producer dispatch on a fixture failure. The outer
++   * subprocess bound also catches producer hangs before/after that dispatch. */
++  shutdown (peer->peer, SHUT_RDWR);
++  g_byte_array_unref (requests);
++  return NULL;
++}
++
++enum {
++  PREPARE_EXACT = 1,
++  PREPARE_LINEAR,
++  PREPARE_REJECTED
++};
++
++static void
++test_prepare (gconstpointer data)
++{
++  guint scenario = GPOINTER_TO_UINT (data) / 10;
++  guint version = GPOINTER_TO_UINT (data) % 10;
++  if (version >= 2 && !TEST_CM_V2)
++    {
++      g_test_skip ("CMv2 generated protocol declarations unavailable; this is not v2 qualification");
++      return;
++    }
++  if (!g_test_subprocess ())
++    {
++      g_test_trap_subprocess (NULL, 5 * G_USEC_PER_SEC, G_TEST_SUBPROCESS_DEFAULT);
++      g_test_trap_assert_passed ();
++      return;
++    }
++
++  Fixture f = fixture_new (version);
++  /* Instantiate the real type, but do not open a desktop display or install
++   * GSources. Its normal dispatcher consumes the private queue over our fd. */
++  f.gdk_display = g_object_new (GDK_TYPE_WAYLAND_DISPLAY, NULL);
++  f.gdk_display->wl_display = f.display;
++  f.gdk_display->wl_registry = f.registry;
++  f.gdk_display->color = f.color;
++  f.color->display = f.gdk_display;
++
++  if (version)
++    {
++      guint transfer = scenario == PREPARE_LINEAR
++                     ? WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_EXT_LINEAR
++                     : fixture_exact_transfer (version);
++      GdkColorState *expected = scenario == PREPARE_LINEAR
++                              ? GDK_COLOR_STATE_SRGB_LINEAR : GDK_COLOR_STATE_SRGB;
++      int stop[2];
++      advertise (&f, "supported_intent", WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
++      advertise (&f, "supported_tf_named", transfer);
++      collect (&f); /* Drain setup before handing the peer fd to the thread. */
++      g_assert_cmpint (pipe (stop), ==, 0);
++      g_assert_cmpint (fcntl (stop[0], F_SETFD, FD_CLOEXEC), ==, 0);
++      g_assert_cmpint (fcntl (stop[1], F_SETFD, FD_CLOEXEC), ==, 0);
++      PreparePeer peer = {
++        .peer = f.peer, .stop = stop[0], .version = version,
++        .reject = scenario == PREPARE_REJECTED,
++        .manager = wl_proxy_get_id ((struct wl_proxy *) f.color->color_manager)
++      };
++      GThread *thread = g_thread_new ("color-prepare-peer", prepare_peer_thread, &peer);
++      if (peer.reject)
++        g_test_expect_message (G_LOG_DOMAIN, G_LOG_LEVEL_WARNING,
++                               "*Failed to get one of the standard image descriptions: fixture rejection*");
++      g_assert_true (gdk_wayland_color_prepare (f.color));
++      if (peer.reject)
++        g_test_assert_expected_messages ();
++      g_assert_cmpint (write (stop[1], "s", 1), ==, 1);
++      g_thread_join (thread);
++      close (stop[0]);
++      close (stop[1]);
++      g_assert_null (peer.error);
++      g_assert_cmpuint (peer.descriptions, ==, 1);
++      g_assert_cmpuint (peer.tf_requests, ==, 1);
++      g_assert_cmpuint (peer.transfer, ==, transfer);
++      g_assert_cmpuint (peer.primaries_requests, ==, 1);
++      g_assert_cmpuint (peer.primaries, ==, WP_COLOR_MANAGER_V1_PRIMARIES_SRGB);
++      g_assert_cmpuint (peer.luminance_requests, ==, 0);
++      g_assert_cmpint (f.color->rendering_enabled, ==, !peer.reject);
++      g_assert_true (f.color->fallback_color_state == expected);
++      g_assert_cmpuint (g_hash_table_size (f.color->cs_to_desc), ==, 1);
++      if (peer.reject)
++        {
++          g_assert_true (g_hash_table_contains (f.color->cs_to_desc, expected));
++          g_assert_null (g_hash_table_lookup (f.color->cs_to_desc, expected));
++        }
++      else
++        g_assert_nonnull (g_hash_table_lookup (f.color->cs_to_desc, expected));
++    }
++  else
++    {
++      g_assert_false (gdk_wayland_color_prepare (f.color));
++      g_assert_true (f.color->fallback_color_state == GDK_COLOR_STATE_SRGB);
++      g_assert_cmpuint (g_hash_table_size (f.color->cs_to_desc), ==, 0);
++    }
++
++  struct wl_surface *wl_surface = wl_registry_bind (f.registry, 4, &wl_surface_interface, 1);
++  GdkWaylandColorSurface *surface = gdk_wayland_color_surface_new (f.color, wl_surface, NULL, NULL);
++  g_assert_cmpint (gdk_wayland_color_surface_needs_passthrough (surface), ==, version != 0);
++  if (version && scenario != PREPARE_REJECTED)
++    {
++      g_assert_nonnull (surface->mgmt_surface);
++      gdk_wayland_color_surface_set_color_state (surface, f.color->fallback_color_state,
++                                                 DRM_FORMAT_RGBA8888, TRUE);
++      g_assert_false (gdk_wayland_color_surface_has_hdr_description (surface));
++    }
++  else
++    g_assert_null (surface->mgmt_surface);
++  collect (&f);
++  g_assert_cmpuint (f.owners, ==, version && scenario != PREPARE_REJECTED ? 1 : 0);
++  g_assert_false (gdk_wayland_color_surface_request_hdr (surface, TRUE));
++  gdk_wayland_color_surface_free (surface);
++  wl_surface_destroy (wl_surface);
++  fixture_free (&f);
++}
++
+ int
+ main (int argc, char **argv)
+ {
+   g_test_init (&argc, &argv, NULL);
++  /* Fifteen registered cases: eight retained and seven normal prepare cases.
++   * With v1-only declarations, exactly five explicit v2 cases skip (two
++   * retained, three prepare). Qualification requires v2 and zero such skips. */
+   g_test_add_data_func ("/wayland/color/v1-exact-transfer", GUINT_TO_POINTER (1), test_exact_transfer);
+   g_test_add_data_func ("/wayland/color/v2-exact-transfer", GUINT_TO_POINTER (2), test_exact_transfer);
+   g_test_add_func ("/wayland/color/bounded-identities", test_tokens);
+@@ -392,5 +637,12 @@ main (int argc, char **argv)
+   g_test_add_func ("/wayland/color/normal-sdr-owner", test_normal_sdr_owner);
+   g_test_add_func ("/wayland/color/native-lease-owner", test_owner_and_lease);
+   g_test_add_func ("/wayland/color/legacy-and-unknown", test_legacy_and_unknown);
++  g_test_add_data_func ("/wayland/color/prepare/v1-exact", GUINT_TO_POINTER (11), test_prepare);
++  g_test_add_data_func ("/wayland/color/prepare/v2-exact", GUINT_TO_POINTER (12), test_prepare);
++  g_test_add_data_func ("/wayland/color/prepare/v1-linear", GUINT_TO_POINTER (21), test_prepare);
++  g_test_add_data_func ("/wayland/color/prepare/v2-linear", GUINT_TO_POINTER (22), test_prepare);
++  g_test_add_data_func ("/wayland/color/prepare/v1-rejected", GUINT_TO_POINTER (31), test_prepare);
++  g_test_add_data_func ("/wayland/color/prepare/v2-rejected", GUINT_TO_POINTER (32), test_prepare);
++  g_test_add_data_func ("/wayland/color/prepare/legacy", GUINT_TO_POINTER (0), test_prepare);
+   return g_test_run ();
+ }
