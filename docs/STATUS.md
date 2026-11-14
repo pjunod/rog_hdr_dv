@@ -4,7 +4,7 @@
 with a clean package audit. Bounded owner-attended desktop checks returned to
 baseline; two suspend attempts failed in the kernel freezer on an NFS media
 read, without actual sleep. The Plurx Player 0.5.1 control-sequence fix is
-merged but not installed; its deployment artifact is being prepared. Physical
+merged but not installed; its package is prepared for owner deployment. Physical
 Player/product acceptance and optical acceptance remain open.
 
 **Showtime precision-filter correction and installation (November 13).**
