@@ -9,6 +9,15 @@ kernel, owner-started Profile 7 playback advanced through a seek with native
 DV active. Text-subtitle handoff also passed. Runtime session replacement,
 successful suspend and optical acceptance remain open.
 
+**Cross-app image mismatch reproduced (November 13).** The installed P3
+comparison matched Image Viewer to the retained float reference within 0.5
+median PQ10 code across all 48 channels; Web differed by up to 140 on saturated
+patches, with neutral patches equal. A source-derived clamp/quantization plus
+untagged gamma-2.2 model predicts the Web medians exactly. The proposed GTK/
+WebKit shared source correction is not implemented or deployed. Target feedback
+is separate from committed source metadata; no optical claim follows.
+[Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
+
 **Showtime precision-filter correction and installation (November 13).**
 Review approved the overlay-feature correction; three affected packaging
 regressions and 38 linked native caps checks passed. Implementation integrity

@@ -1,0 +1,135 @@
+# GTK and WebKit image colour — preserve values and describe the surface
+
+**Status:** Proposed; diagnosis reproduced, implementation not started.
+**Date:** November 13, 2026 Eastern / November 14 UTC.
+**Deciders:** Project maintainer and coordinating agent. No upstream acceptance
+or deployment is claimed.
+
+Companion to [image colour](GNOME_IMAGE_COLOUR.md), [WebKit delivery](WEBKIT_NATIVE_HDR.md)
+and [current status](STATUS.md). This topic owns a normal image/page pipeline
+correction, separate from the completed Player session-control repair.
+
+## Context: appearance agreement hid a measurable mismatch
+
+A bounded owner-approved installed-desktop comparison used one ICC-tagged
+Display P3 chart and its retained unclipped float reference. Image Viewer
+presented both; GNOME Web presented the original. The reference is normal
+CoreGraphics output retained privately, not inspection of a reference binary.
+The source profile, reference files and desktop captures remain outside Git.
+
+The chart has sixteen opaque patches in an eight-column, two-row layout.
+Registration used grid geometry before paired errors were inspected. Every
+patch contributed its central 32×32 physical pixels; no gain, white adjustment,
+channel fitting or patch exclusion was applied. The diagnostic bound of two
+PQ10 median codes was fixed before capture.
+
+| Comparison | Maximum absolute patch-median channel difference | Mean absolute difference |
+|---|---:|---:|
+| Installed Image Viewer original versus float reference | 0.5 PQ10 code | 0.01042 |
+| GNOME Web original versus float reference | 140 PQ10 codes | 13.1667 |
+
+These are all 48 median channels, not every pixel or an optical measurement.
+Neutral patches agree exactly; saturated colours differ. Both captures were
+2560×1600 packed ten-bit RGB with BT.2020/PQ capture metadata. The output's
+reference-white declaration was 203 cd/m² around each capture and returned to
+142 after the test windows closed. Coding-volume extrema and physical target
+extrema are separate fields; none measures emitted panel light.
+
+The first Web capture was invalid because a default-browser prompt dimmed the
+image. Only that scene was repeated, with the prompt disabled in an isolated
+test configuration. Passing Image Viewer captures were retained. Exact temporary
+Pictures copies, owned test windows and private browser profiles were removed;
+monitor configuration and Night Light were unchanged. Confinement remained in
+place. The earlier appearance-only check retains its limited scope.
+
+## Source contracts explain the diagnostic
+
+The installed WebKit source/build records select the libpng decoder with LCMS.
+Its RGB-profile branch converts ICC input into 8-bit BGRA sRGB using relative
+colorimetric intent. The common backing store holds uint32 pixels; its Skia
+bridge uses N32/sRGB. The ordinary page framebuffer uses RGBA8, and its GTK
+DMA-BUF import supplies no explicit colour state. Correcting only PNG decoding
+would leave other precision/clipping boundaries in place.
+
+Valid client traces show Image Viewer attaching ABGR16161616F buffers while
+Web uses ARGB8888. They contain preferred-target feedback, but no explicit
+surface image-description setter. Preferred PQ/BT.2020 information does not
+establish the encoding of a submitted client buffer. Float storage alone does
+not establish linear encoding or HDR.
+
+Retained Mutter source gives untagged actors sRGB primaries with gamma 2.2.
+Retained GDK source distinguishes that from its own piecewise-sRGB state and
+separates target discovery from experimental managed rendering. Protocol v1's
+named-sRGB mapping is also gamma 2.2 here; the v2 compound-power transfer or an
+unambiguous supported linear representation is needed for the piecewise
+contract. Simply flipping the rendering flag is insufficient.
+
+An independent prediction used public P3/sRGB/BT.2020 matrices, the verified
+source-profile sRGB transfer curve, sRGB clamp/quantize-to-eight-bit, the
+source-audited gamma-2.2 fallback and the witnessed output white. It predicts
+all 48 Web median channels exactly, without fitted parameters. Ignoring the
+ICC profile instead misses by up to 39 codes. An earlier prediction assuming
+a proper sRGB final EOTF failed near black and is retained privately as a
+rejected model. This supports the clipping plus transfer-contract diagnosis
+for this fixture; it does not qualify other formats or all rendering paths.
+
+[Selected PNG implementation](https://github.com/WebKit/WebKit/blob/webkitgtk-2.52.6/Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp#L347)
+and [protocol definitions](https://github.com/wayland-mirror/wayland-protocols/blob/1.48/staging/color-management/color-management-v1.xml)
+are explanatory public anchors. The private receipts bind retained package,
+configuration and source identities. Fresh source-to-running-binary
+reconstruction, exact actor/Vulkan state and relevant unchanged compiler
+proofs remain prerequisites before implementation/deployment. A retained Mesa
+source/qualified-receipt mismatch must be resolved before assigning its WSI
+ownership logic to the installed library.
+
+## Proposed decision
+
+GTK should own the normal negotiated surface-description and render-state
+contract. Vulkan transport must have one colour-description owner; an
+advertised pass-through WSI path is a candidate, not permission to force an
+unsupported colour space. Negotiate exact transfer/primaries/reference-white
+semantics and retain an honest legacy path when the contract is unavailable.
+Do not rely on an environment debug flag or change the global untagged fallback
+to conceal a missing producer description.
+
+WebKit must preserve source colour and precision through decoding, backing
+store, Skia, page rendering, buffer transport and GTK import. Preserve original
+samples/profile where supported, with a profile-aware float conversion path
+where needed. Evaluate extended nonlinear sRGB in non-clamped half-float
+storage to retain existing encoded-sRGB CSS composition semantics. A global
+linear-BT.2020 page conversion is not accepted without proving that blending,
+filters, alpha and canvas semantics remain correct. The exact implementation
+choice is still proposed, not a qualified capability.
+
+## Options and trade-offs
+
+| Option | Assessment |
+|---|---|
+| Debug environment override | Does not repair the default contract, protocol-v1 ambiguity or WebKit's earlier clipping; rejected as a shipped solution. |
+| Change Mutter's global untagged default | Changes unrelated legacy clients and leaves eight-bit clipping; rejected for this batch. |
+| PNG-only float conversion | Leaves shared backing-store, page and import boundaries; insufficient. |
+| Shared profile/precision transport plus negotiated GTK ownership | Addresses the demonstrated boundaries; requires broader source/build and semantic qualification. Proposed. |
+
+Float buffers increase memory/bandwidth and affect shared decoder/compositor
+code. Content precision and actual transport capabilities must be handled
+truthfully. No new user feature gate, forced decoder/renderer rank or watchdog
+belongs in the correction.
+
+## Implementation and acceptance work
+
+1. Authenticate exact source/package inputs and WSI ownership; confirm there is
+   no overlapping implementation owner. Coordinate compiler resources with CI.
+2. Establish unchanged native GTK and WebKit object compiler loops before any
+   C/C++ or build-metadata edit; historical package passes are not those loops.
+3. Resolve the working-space/blending contract, then implement related source
+   changes as normal commits in one larger draft PR.
+4. Retain correct SDR startup, profile fallback, alpha, animation and other
+   decoder paths. Qualify normal negotiated and legacy behaviour without
+   shipping debug overrides or suppressing unsupported-path evidence.
+5. When merge-ready, obtain independent adversarial review, address findings,
+   then run the required affected lane once. Retain passing receipts and rerun
+   only failures or checks invalidated by later changes.
+6. Prepare exact candidate/recovery packages before requesting a coordinated
+   installed acceptance window. No live compositor/session/boot or package
+   activation follows from this document. Optical and full cross-app/video
+   qualification remain separate.

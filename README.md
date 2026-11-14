@@ -56,6 +56,12 @@ through the existing packaged mapper. The corrected entry passed a bounded Novem
 while preserving all eight implicit mpv defaults; no other-application or optical
 acceptance is inferred.
 
+The [GTK/WebKit image-colour diagnosis](docs/GTK_WEBKIT_IMAGE_COLOUR.md)
+records the later installed comparison: Image Viewer retained the float
+reference within 0.5 median PQ10 code, while Web differed by up to 140 on
+saturated patches. The proposed shared correction is not implemented or
+installed; appearance agreement is not numerical acceptance.
+
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
 page-flip fix and the outstanding hardware checks.
