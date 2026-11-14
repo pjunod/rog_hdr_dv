@@ -76,11 +76,20 @@ for this fixture; it does not qualify other formats or all rendering paths.
 [Selected PNG implementation](https://github.com/WebKit/WebKit/blob/webkitgtk-2.52.6/Source/WebCore/platform/image-decoders/png/PNGImageDecoder.cpp#L347)
 and [protocol definitions](https://github.com/wayland-mirror/wayland-protocols/blob/1.48/staging/color-management/color-management-v1.xml)
 are explanatory public anchors. The private receipts bind retained package,
-configuration and source identities. Fresh source-to-running-binary
-reconstruction, exact actor/Vulkan state and relevant unchanged compiler
-proofs remain prerequisites before implementation/deployment. A retained Mesa
-source/qualified-receipt mismatch must be resolved before assigning its WSI
-ownership logic to the installed library.
+configuration and source identities. Exact source authentication has now reproduced GTK's pinned tree by replaying
+all sixteen existing patches into a private index; relevant WebKit files match
+its exact recorded Git object. The qualified Mesa manifest reconstructs the
+pinned Merkle tree, and its canonical WSI file matches the qualified receipt;
+the different stale working copy is not used. Original stores were unchanged.
+These checks authenticate inputs, not a new compiler or runtime-actor proof.
+Relevant unchanged compiler loops, package/runtime binding and exact Vulkan
+ownership still need their targeted evidence before source changes/deployment.
+
+The live compositor advertises colour-manager version 2 and transfer function
+14 (`compound_power_2_4`). A version-2 output-only client receives that precise
+capability, while the normal GTK applications bind version 1 and receive the
+deprecated named-sRGB alias. No new display surface or setting was needed for
+that capability query.
 
 ## Proposed decision
 
