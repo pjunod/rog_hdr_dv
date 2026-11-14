@@ -20,7 +20,7 @@ repository owns the operating-system display work.
 
 ## What works today (2026-11-13)
 
-Showtime `50.0-2+rogdv5.12` is installed with a clean package audit. Bounded owner-attended HDR, brightness, fullscreen, tiling, DPMS and Night Light checks returned to baseline. Two suspend attempts failed before actual sleep because an NFS media read blocked kernel freezing; suspend acceptance remains open. [Current results and limits](docs/STATUS.md) · [NFS suspend diagnosis](docs/SUSPEND_NFS_READER.md).
+Showtime `50.0-2+rogdv5.12` is installed with a clean package audit. Bounded owner-attended HDR, brightness, fullscreen, tiling, DPMS and Night Light checks returned to baseline. One suspend request produced two kernel freezer failures on an NFS media read, without actual sleep; suspend acceptance remains open. [Current results and limits](docs/STATUS.md) · [NFS suspend diagnosis](docs/SUSPEND_NFS_READER.md).
 
 The historical coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. At that install, versions included mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance was pending at that historical handoff; the bounded November 13 checks are recorded above and in the current status. Historical private-compositor playback receipts retain their original scope. [Release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop handoff](docs/SOFTWARE_DELIVERY.md).
 
@@ -206,7 +206,7 @@ has the remote and branch rules.
 | [GTK display target](docs/GDK_DISPLAY_TARGET.md) | Proposed native preferred-target snapshot API, source pins and remaining GTK/GStreamer checks |
 | [HDR foundations](docs/QUALIFIED_HDR_FOUNDATIONS.md) | The reviewed main-targeting source batch and its provenance |
 | [Display diagnostics](docs/DISPLAY_DIAGNOSTICS.md) | The read-only inspector and Wayland colour probe |
-| [Suspend with an NFS reader](docs/SUSPEND_NFS_READER.md) | Why two attended attempts stopped in the kernel freezer, integration ownership and the remaining qualification |
+| [Suspend with an NFS reader](docs/SUSPEND_NFS_READER.md) | Why an attended request produced two kernel freezer failures, integration ownership and the remaining qualification |
 | [ICC characterisation](docs/ICC_CHARACTERISATION.md) | Reading factory profiles without applying them |
 | [Panel measurement](docs/PANEL_MEASUREMENT.md) | The optical procedure required before any calibration claim |
 

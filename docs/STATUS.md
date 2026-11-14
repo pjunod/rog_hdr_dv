@@ -2,8 +2,8 @@
 
 **Updated November 13, 2026.** Showtime `50.0-2+rogdv5.12` is installed
 with a clean package audit. Bounded owner-attended desktop checks returned to
-baseline; two suspend attempts failed in the kernel freezer on an NFS media
-read, without actual sleep. The Plurx Player 0.5.1 control-sequence fix is
+baseline; one suspend request produced two kernel freezer failures on an NFS
+media read, without actual sleep. The Plurx Player 0.5.1 control-sequence fix is
 merged but not installed; its package is prepared for owner deployment. Physical
 Player/product acceptance and optical acceptance remain open.
 
@@ -29,10 +29,11 @@ the owner used the normal UI. These are bounded operational observations;
 startup subtitle-index-0 and JavaScript rounding warnings remain unassigned,
 and no error-free, optical or per-frame fidelity claim follows.
 
-Two normal GNOME suspend attempts took the network transport down before an
-owned Showtime hard-NFS buffered read prevented kernel user-task freezing.
-Both timed out after about 20 seconds with `-EBUSY`, before device PM; neither
-entered actual sleep. Playback recovered after the failure and network
+One normal GNOME suspend request produced two kernel suspend/freezer attempts
+within one sleep-service invocation and one NetworkManager sleep/wake cycle.
+After transport teardown, an owned Showtime hard-NFS buffered read prevented
+user-task freezing. Each attempt timed out after about 20 seconds with
+`-EBUSY`, before device PM; neither entered actual sleep. Playback recovered after the failure and network
 restoration. This is an unresolved suspend qualification failure, not a
 proved GPU cause. The installed NVIDIA session-prefreeze drop-in is a separate
 contract and was not overridden. The owner window has ended; further physical

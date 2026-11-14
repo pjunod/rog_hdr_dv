@@ -7,10 +7,11 @@ submission or repair.
 
 ## The kernel stopped at the user-task freezer
 
-Two normal GNOME suspend attempts followed the same sequence: NetworkManager
-took the network transport down, an owned installed Showtime player remained
-blocked in a hard-NFS buffered read, and the kernel user-task freezer timed
-out after about 20 seconds with `-EBUSY`. The refusing thread was the media
+One normal GNOME suspend request produced two kernel suspend/freezer attempts
+within one sleep-service invocation and one NetworkManager sleep/wake cycle.
+After NetworkManager took the transport down, an owned installed Showtime
+player remained blocked in a hard-NFS buffered read; each kernel attempt
+timed out after about 20 seconds with `-EBUSY`. The refusing thread was the media
 demuxer; its stack ran through locked-folio waiting, generic buffered reads
 and `nfs_file_read`. Suspend statistics recorded two freeze failures, no
 failed device and no actual sleep in either attempt. Playback resumed after
