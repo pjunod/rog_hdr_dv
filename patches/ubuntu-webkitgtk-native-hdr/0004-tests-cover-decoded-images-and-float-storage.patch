@@ -1,0 +1,384 @@
+From 794b2b718943d7407a51da67de5336150cf0404c Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:08:47 -0500
+Subject: [PATCH 3/7] Add native decoded-image and Skia working-storage
+ regressions
+
+Prepare public synthetic ICC, PNG16/interlace/APNG and JPEG controls, profile-aware float fallback and alpha checks, plus encoded-sRGB working-buffer composition, mask precision and logical Canvas readback boundaries. The coordinator will register and execute the focused lane after final adversarial review; no checks were run while preparing this source.
+---
+ .../Tests/WebCore/SkiaDecodedImageColour.cpp  | 363 ++++++++++++++++++
+ 1 file changed, 363 insertions(+)
+ create mode 100644 Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+new file mode 100644
+index 00000000..9f1c92b8
+--- /dev/null
++++ b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+@@ -0,0 +1,363 @@
++/* SPDX-License-Identifier: BSD-2-Clause */
++
++#include "config.h"
++#include "Test.h"
++
++#if USE(SKIA) && USE(LCMS)
++#include <WebCore/ImageBackingStore.h>
++#include <WebCore/ImageBuffer.h>
++#include <WebCore/GraphicsContext.h>
++#include <WebCore/NativeImage.h>
++#include <WebCore/PixelBuffer.h>
++#include <WebCore/ImageTypes.h>
++#include <WebCore/JPEGImageDecoder.h>
++#include <WebCore/PNGImageDecoder.h>
++#include <WebCore/SharedBuffer.h>
++#include <skia/core/SkBitmap.h>
++#include <skia/core/SkCanvas.h>
++#include <skia/core/SkImage.h>
++#include <skia/core/SkSurface.h>
++#include <lcms2.h>
++#include <cstdio>
++#include <jpeglib.h>
++#include <algorithm>
++#include <array>
++#include <cmath>
++#include <cstdlib>
++#include <span>
++#include <vector>
++
++namespace TestWebKitAPI {
++using namespace WebCore;
++
++// Fixtures are generated from public colourimetry and PNG/JPEG container rules.
++// No private profile, vendor output or production transform supplies the oracle.
++static std::vector<uint8_t> linearP3Profile(bool useLUT = false)
++{
++    cmsHPROFILE profile;
++    if (!useLUT) {
++        cmsCIExyY white { 0.3127, 0.3290, 1 };
++        cmsCIExyYTRIPLE primaries { { 0.68, 0.32, 1 }, { 0.265, 0.69, 1 }, { 0.15, 0.06, 1 } };
++        auto* curve = cmsBuildGamma(nullptr, 1);
++        cmsToneCurve* curves[] { curve, curve, curve };
++        profile = cmsCreateRGBProfile(&white, &primaries, curves);
++        cmsFreeToneCurve(curve);
++    } else {
++        profile = cmsCreateProfilePlaceholder(nullptr);
++        cmsSetProfileVersion(profile, 4.3);
++        cmsSetDeviceClass(profile, cmsSigInputClass);
++        cmsSetColorSpace(profile, cmsSigRgbData);
++        cmsSetPCS(profile, cmsSigXYZData);
++        cmsWriteTag(profile, cmsSigMediaWhitePointTag, cmsD50_XYZ());
++        // Public linear Display-P3 to D50 XYZ matrix, sampled at the eight
++        // corners. A LUT-only profile cannot be represented by SkColorSpace.
++        constexpr float matrix[3][3] {
++            { 0.515102f, 0.291965f, 0.157153f },
++            { 0.241182f, 0.692236f, 0.066582f },
++            { -0.001049f, 0.041882f, 0.784378f }
++        };
++        std::array<float, 24> table;
++        unsigned offset = 0;
++        for (unsigned r = 0; r < 2; ++r) {
++            for (unsigned g = 0; g < 2; ++g) {
++                for (unsigned b = 0; b < 2; ++b) {
++                    for (unsigned c = 0; c < 3; ++c)
++                        // ICC LUT PCS XYZ uses 0x8000 for physical XYZ 1.0.
++                        table[offset++] = std::max(0.f, matrix[c][0] * r + matrix[c][1] * g + matrix[c][2] * b) / (65535.f / 32768.f);
++                }
++            }
++        }
++        auto* pipeline = cmsPipelineAlloc(nullptr, 3, 3);
++        cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocToneCurves(nullptr, 3, nullptr));
++        cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocCLutFloat(nullptr, 2, 3, 3, table.data()));
++        cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocToneCurves(nullptr, 3, nullptr));
++        EXPECT_TRUE(cmsWriteTag(profile, cmsSigAToB0Tag, pipeline));
++        cmsPipelineFree(pipeline);
++    }
++    cmsUInt32Number length = 0;
++    EXPECT_TRUE(cmsSaveProfileToMem(profile, nullptr, &length));
++    std::vector<uint8_t> bytes(length);
++    EXPECT_TRUE(cmsSaveProfileToMem(profile, bytes.data(), &length));
++    cmsCloseProfile(profile);
++    return bytes;
++}
++
++static void append32(std::vector<uint8_t>& bytes, uint32_t value)
++{
++    for (int shift = 24; shift >= 0; shift -= 8)
++        bytes.push_back(value >> shift);
++}
++
++static std::vector<uint8_t> storedZlib(std::span<const uint8_t> bytes)
++{
++    EXPECT_LT(bytes.size(), 65536u);
++    std::vector<uint8_t> result { 0x78, 0x01, 1, static_cast<uint8_t>(bytes.size()), static_cast<uint8_t>(bytes.size() >> 8), static_cast<uint8_t>(~bytes.size()), static_cast<uint8_t>(~bytes.size() >> 8) };
++    result.insert(result.end(), bytes.begin(), bytes.end());
++    uint32_t a = 1, b = 0;
++    for (auto value : bytes) {
++        a = (a + value) % 65521;
++        b = (b + a) % 65521;
++    }
++    append32(result, (b << 16) | a);
++    return result;
++}
++
++static void appendChunk(std::vector<uint8_t>& png, const char* type, std::span<const uint8_t> data)
++{
++    append32(png, data.size());
++    auto first = png.size();
++    png.insert(png.end(), type, type + 4);
++    png.insert(png.end(), data.begin(), data.end());
++    uint32_t crc = 0xffffffff;
++    for (size_t i = first; i < png.size(); ++i) {
++        crc ^= png[i];
++        for (unsigned bit = 0; bit < 8; ++bit)
++            crc = (crc >> 1) ^ (0xedb88320u & (0u - (crc & 1)));
++    }
++    append32(png, ~crc);
++}
++
++static std::vector<uint8_t> frameControl(uint32_t sequence, uint32_t width, uint32_t x, uint8_t blend)
++{
++    std::vector<uint8_t> result;
++    for (auto value : { sequence, width, 1u, x, 0u })
++        append32(result, value);
++    result.insert(result.end(), { 0, 1, 0, 10, 0, blend });
++    return result;
++}
++
++static std::vector<uint8_t> png16(bool animated = false, bool interlaced = false, std::span<const uint8_t> profile = { })
++{
++    std::vector<uint8_t> result { 137, 80, 78, 71, 13, 10, 26, 10 };
++    std::vector<uint8_t> header;
++    append32(header, 2);
++    append32(header, 1);
++    header.insert(header.end(), { 16, 6, 0, 0, static_cast<uint8_t>(interlaced) });
++    appendChunk(result, "IHDR", header);
++    if (!profile.empty()) {
++        std::vector<uint8_t> gamma;
++        append32(gamma, 100000); // Linear source: an eager gamma pass would alter 0.25.
++        appendChunk(result, "gAMA", gamma);
++        std::vector<uint8_t> icc { 's', 'y', 'n', 't', 'h', 'e', 't', 'i', 'c', 0, 0 };
++        auto compressed = storedZlib(profile);
++        icc.insert(icc.end(), compressed.begin(), compressed.end());
++        appendChunk(result, "iCCP", icc);
++    }
++    if (animated) {
++        std::vector<uint8_t> animation;
++        append32(animation, 2);
++        append32(animation, 1);
++        appendChunk(result, "acTL", animation);
++        appendChunk(result, "fcTL", frameControl(0, 2, 0, 0));
++    }
++    // Red samples 0x4000 and 0x4040 share an eight-bit high byte but must
++    // remain distinct after F16 decode. Alpha is opaque in the first frame.
++    std::vector<uint8_t> row { 0, 0x40, 0, 0, 0, 0, 0, 0xff, 0xff };
++    if (interlaced)
++        row.push_back(0); // Adam7: x=0 in pass1, x=1 in pass6, each with filter0.
++    row.insert(row.end(), { 0x40, 0x40, 0, 0, 0, 0, 0xff, 0xff });
++    appendChunk(result, "IDAT", storedZlib(row));
++    if (animated) {
++        appendChunk(result, "fcTL", frameControl(1, 1, 1, 1));
++        std::vector<uint8_t> frame;
++        append32(frame, 2);
++        auto data = storedZlib(std::array<uint8_t, 9> { 0, 0, 0, 0, 0, 0xff, 0xff, 0x80, 0 });
++        frame.insert(frame.end(), data.begin(), data.end());
++        appendChunk(result, "fdAT", frame);
++    }
++    appendChunk(result, "IEND", { });
++    return result;
++}
++
++static std::array<float, 8> pixels(const sk_sp<SkImage>& image)
++{
++    std::array<float, 8> result { };
++    auto info = SkImageInfo::Make(2, 1, kRGBA_F32_SkColorType, kUnpremul_SkAlphaType, image->refColorSpace());
++    EXPECT_TRUE(image->readPixels(nullptr, info, result.data(), sizeof(result), 0, 0));
++    return result;
++}
++
++TEST(SkiaDecodedImageColour, FloatFrameCopyClearAndPremultiplication)
++{
++    auto store = ImageBackingStore::create({ 2, 1 }, true);
++    ASSERT_TRUE(store);
++    ASSERT_TRUE(store->setStorageFormat(kRGBA_F16_SkColorType));
++    store->setFrameRect({ { 1, 0 }, { 1, 1 } });
++    store->setPixelFloat(0, 0, -0.125f, 1.25f, 0.2f, 0.5f);
++    store->setPixelFloat(1, 0, 0.25f, 0.5f, 0.75f, 1);
++    auto copy = ImageBackingStore::create(*store);
++    EXPECT_EQ(copy->frameRect(), store->frameRect());
++    EXPECT_EQ(copy->imageInfo().colorType(), kRGBA_F16_SkColorType);
++    auto readback = pixels(copy->image());
++    EXPECT_NEAR(readback[0], -0.125f, 0.0005f);
++    EXPECT_NEAR(readback[1], 1.25f, 0.001f);
++    EXPECT_EQ(readback[3], 0.5f);
++    copy->clearRect({ { 1, 0 }, { 1, 1 } });
++    EXPECT_EQ(pixels(copy->image())[7], 0);
++    EXPECT_EQ(pixels(store->image())[7], 1);
++}
++
++TEST(SkiaDecodedImageColour, PNG16InterlaceAndAPNGKeepPrecisionAndAlpha)
++{
++    for (bool interlaced : { false, true }) {
++        auto bytes = png16(false, interlaced);
++        auto buffer = SharedBuffer::create(std::span { bytes });
++        auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, GammaAndColorProfileOption::Ignored);
++        decoder->setData(buffer, true);
++        auto image = decoder->createFrameImageAtIndex(0);
++        ASSERT_TRUE(image);
++        EXPECT_EQ(image->colorType(), kRGBA_F16_SkColorType);
++        auto readback = pixels(image);
++        EXPECT_NEAR(readback[0], 0.25f, 0.00025f);
++        EXPECT_NEAR(readback[4], 0.2509765625f, 0.00025f);
++        EXPECT_GT(readback[4] - readback[0], 0.0005f);
++    }
++    auto bytes = png16(true);
++    auto buffer = SharedBuffer::create(std::span { bytes });
++    auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, GammaAndColorProfileOption::Ignored);
++    decoder->setData(buffer, true);
++    auto image = decoder->createFrameImageAtIndex(1);
++    ASSERT_TRUE(image);
++    auto readback = pixels(image);
++    EXPECT_NEAR(readback[0], 0.25f, 0.00025f);
++    EXPECT_NEAR(readback[4], 0.12548828125f, 0.0005f);
++    EXPECT_NEAR(readback[6], 0.5f, 0.0005f);
++    EXPECT_EQ(readback[7], 1);
++}
++
++TEST(SkiaDecodedImageColour, SourceProfileSurvivesN32AndUnsupportedProfileUsesFloatPCS)
++{
++    for (bool useLUT : { false, true }) {
++        auto bytes = linearP3Profile(useLUT);
++        auto store = ImageBackingStore::create({ 2, 1 }, true);
++        ASSERT_TRUE(store);
++        ASSERT_TRUE(store->setColorProfile(SharedBuffer::create(std::span { bytes })));
++        store->setPixel(0, 0, 255, 0, 0, 128);
++        store->setPixel(1, 0, 255, 0, 0, 255);
++        auto copy = ImageBackingStore::create(*store);
++        auto image = copy->image();
++        ASSERT_TRUE(image);
++        EXPECT_EQ(image->colorType(), useLUT ? kRGBA_F32_SkColorType : kN32_SkColorType);
++        auto output = SkSurfaces::Raster(SkImageInfo::Make(2, 1, kRGBA_F16_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB()));
++        ASSERT_TRUE(output);
++        output->getCanvas()->clear(SK_ColorTRANSPARENT);
++        output->getCanvas()->drawImage(image, 0, 0);
++        auto readback = pixels(output->makeImageSnapshot());
++        // Public linear-P3 to linear-sRGB red column: [1.224745,-.042058,-.019642].
++        // Extended sRGB transfer is odd-symmetric for negative values.
++        auto encode = [](float value) {
++            float absolute = std::abs(value);
++            return std::copysign(absolute <= 0.0031308f ? 12.92f * absolute : 1.055f * std::pow(absolute, 1.f / 2.4f) - 0.055f, value);
++        };
++        EXPECT_NEAR(readback[4], encode(1.224745f), useLUT ? 0.012f : 0.003f);
++        EXPECT_NEAR(readback[5], encode(-0.042058f), useLUT ? 0.012f : 0.003f);
++        EXPECT_NEAR(readback[6], encode(-0.019642f), useLUT ? 0.012f : 0.003f);
++        EXPECT_NEAR(readback[3], 128.f / 255, 0.001f);
++    }
++    auto store = ImageBackingStore::create({ 1, 1 });
++    std::array<uint8_t, 4> invalid { 1, 2, 3, 4 };
++    EXPECT_FALSE(store->setColorProfile(SharedBuffer::create(std::span { invalid })));
++    EXPECT_TRUE(store->imageInfo().colorSpace()->isSRGB());
++}
++
++TEST(SkiaDecodedImageColour, PNGICCTransferOwnsTheSamplesBeforeGamma)
++{
++    auto profile = linearP3Profile();
++    auto bytes = png16(false, false, profile);
++    auto buffer = SharedBuffer::create(std::span { bytes });
++    for (auto option : { GammaAndColorProfileOption::Applied, GammaAndColorProfileOption::Ignored }) {
++        auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, option);
++        decoder->setData(buffer, true);
++        auto image = decoder->createFrameImageAtIndex(0);
++        ASSERT_TRUE(image);
++        EXPECT_EQ(image->colorSpace()->isSRGB(), option == GammaAndColorProfileOption::Ignored);
++        EXPECT_NEAR(pixels(image)[0], 0.25f, 0.00025f);
++    }
++}
++
++TEST(SkiaDecodedImageColour, WorkingBufferKeepsEncodedBlendAndFloatMaskBeforeLogicalReadback)
++{
++    auto store = ImageBackingStore::create({ 2, 1 });
++    ASSERT_TRUE(store->setStorageFormat(kRGBA_F16_SkColorType));
++    store->setPixelFloat(0, 0, 1.2f, -0.1f, 0.2f, 0.5f);
++    store->setPixelFloat(1, 0, 1.2f, -0.1f, 0.2f, 1);
++    auto source = NativeImage::create(store->image());
++    auto page = ImageBuffer::create({ 2, 1 }, RenderingMode::Unaccelerated, RenderingPurpose::Unspecified,
++        1, DestinationColorSpace::SRGB(), PixelFormat::BGRA8);
++    ASSERT_TRUE(page);
++    page->context().fillRect({ 0, 0, 2, 1 }, Color::blue);
++    page->context().drawNativeImage(*source, { 0, 0, 2, 1 }, { 0, 0, 2, 1 }, { });
++    auto native = page->copyNativeImage();
++    ASSERT_TRUE(native);
++    EXPECT_EQ(native->platformImage()->colorType(), kRGBA_F16_SkColorType);
++    auto readback = pixels(native->platformImage());
++    // Encoded-sRGB source-over. A linear working-space substitution differs.
++    EXPECT_NEAR(readback[0], 0.6f, 0.001f);
++    EXPECT_NEAR(readback[1], -0.05f, 0.001f);
++    EXPECT_NEAR(readback[2], 0.6f, 0.001f);
++    auto logical = page->getPixelBuffer({ AlphaPremultiplication::Unpremultiplied, PixelFormat::RGBA8, DestinationColorSpace::SRGB() }, { { }, { 2, 1 } });
++    ASSERT_TRUE(logical);
++    EXPECT_NEAR(logical->bytes()[0], 153, 1);
++    EXPECT_EQ(logical->bytes()[1], 0);
++    EXPECT_NEAR(logical->bytes()[2], 153, 1);
++    page->convertToLuminanceMask();
++    native = page->copyNativeImage();
++    ASSERT_TRUE(native);
++    readback = pixels(native->platformImage());
++    EXPECT_NEAR(readback[7], 1.2f * 0.2125f - 0.1f * 0.7154f + 0.2f * 0.0721f, 0.001f);
++    auto canvas = ImageBuffer::create({ 2, 1 }, RenderingMode::Unaccelerated, RenderingPurpose::Canvas,
++        1, DestinationColorSpace::SRGB(), PixelFormat::BGRA8);
++    ASSERT_TRUE(canvas);
++    EXPECT_NE(canvas->copyNativeImage()->platformImage()->colorType(), kRGBA_F16_SkColorType);
++
++    // Storage controls prove that normalized F16 and UNORM8 cannot carry the
++    // same extended values. These controls are deliberately lossy boundaries.
++    for (auto type : { kRGBA_F16Norm_SkColorType, kRGBA_8888_SkColorType }) {
++        auto control = SkSurfaces::Raster(SkImageInfo::Make(2, 1, type, kPremul_SkAlphaType, SkColorSpace::MakeSRGB()));
++        ASSERT_TRUE(control);
++        control->getCanvas()->drawImage(store->image(), 0, 0);
++        auto values = pixels(control->makeImageSnapshot());
++        EXPECT_GE(values[5], 0);
++        EXPECT_LE(values[4], 1);
++    }
++}
++
++TEST(SkiaDecodedImageColour, JPEGUsesSharedICCProfileAndIgnoredProfileStaysSRGB)
++{
++    auto profile = linearP3Profile();
++    jpeg_compress_struct encoder;
++    jpeg_error_mgr error;
++    encoder.err = jpeg_std_error(&error);
++    jpeg_create_compress(&encoder);
++    unsigned char* memory = nullptr;
++    unsigned long length = 0;
++    jpeg_mem_dest(&encoder, &memory, &length);
++    encoder.image_width = 2;
++    encoder.image_height = 1;
++    encoder.input_components = 3;
++    encoder.in_color_space = JCS_RGB;
++    jpeg_set_defaults(&encoder);
++    jpeg_set_quality(&encoder, 100, true);
++    jpeg_start_compress(&encoder, true);
++    std::vector<uint8_t> marker { 'I', 'C', 'C', '_', 'P', 'R', 'O', 'F', 'I', 'L', 'E', 0, 1, 1 };
++    marker.insert(marker.end(), profile.begin(), profile.end());
++    jpeg_write_marker(&encoder, JPEG_APP0 + 2, marker.data(), marker.size());
++    std::array<uint8_t, 6> row { 255, 0, 0, 255, 0, 0 };
++    JSAMPROW rowPointer = row.data();
++    jpeg_write_scanlines(&encoder, &rowPointer, 1);
++    jpeg_finish_compress(&encoder);
++    auto data = SharedBuffer::create(std::span<const uint8_t> { memory, length });
++    jpeg_destroy_compress(&encoder);
++    free(memory);
++    for (auto option : { GammaAndColorProfileOption::Applied, GammaAndColorProfileOption::Ignored }) {
++        auto decoder = JPEGImageDecoder::create(AlphaOption::Premultiplied, option);
++        decoder->setData(data, true);
++        auto image = decoder->createFrameImageAtIndex(0);
++        ASSERT_TRUE(image);
++        EXPECT_EQ(image->colorSpace()->isSRGB(), option == GammaAndColorProfileOption::Ignored);
++        EXPECT_EQ(image->colorType(), kN32_SkColorType);
++    }
++}
++
++} // namespace TestWebKitAPI
++#endif
+-- 
+2.54.0 (Apple Git-157)
+

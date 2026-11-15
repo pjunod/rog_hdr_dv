@@ -9,6 +9,51 @@ kernel, owner-started Profile 7 playback advanced through a seek with native
 DV active. Text-subtitle handoff also passed. Runtime session replacement,
 successful suspend and optical acceptance remain open.
 
+**Cross-app image mismatch reproduced (November 13).** The installed P3
+comparison matched Image Viewer to the retained float reference within 0.5
+median PQ10 code across all 48 channels; Web differed by up to 140 on saturated
+patches, with neutral patches equal. A source-derived clamp/quantization plus
+untagged gamma-2.2 model predicts the Web medians exactly. The proposed GTK/
+WebKit shared source correction is in progress. Four unchanged GTK compiler
+objects passed with pinned dependencies authenticated; the four selected
+unchanged WebKit objects also passed with Clang 22.1.8. GTK and WebKit source/regressions are prepared. The single independent
+adversarial review is complete; its shipping corrections and the targeted
+test-only teardown correction are integrated. GTK `+rogdv6` is now
+built and its 15 protocol cases pass. The first run found and fixed a
+display-teardown crash after a compositor rejection, shared with upstream.
+The first full WebKit `+rogdv7` compile and test run found five
+compile errors in the series (four 2.52.6 API mismatches, and the mapper
+SDK root reaching the compile line as `-isystem /usr/include`), three
+focused-fixture defects, and a product teardown defect: 2.52.6's defaulted
+`~SkiaGLContext` released Skia's GL objects with no context current. Four
+added patches fix them; the teardown fix backports WebKit `63f86c394bc8` and
+`c5b6ec5b34d7`. All 19 normal cases and the actual ES 2.0 legacy case pass
+once with clean process exits, under software Mesa llvmpipe (surfaceless EGL;
+ES 2.0 via Mesa's version override, declared). That is API and storage
+evidence, not physical-GPU or on-screen acceptance. The GTK sink and
+Showtime pin `libgtk-4-1 (= …)` exactly, so they are rebuilt as
+`0.15.2-1ubuntu2+rogdv5.7` and `50.0-2+rogdv5.13` against GTK `+rogdv6`.
+Installing GTK alone would remove them; installs use `--no-remove`.
+
+**Installed and runtime-checked on the ROG (November 15).** GTK `+rogdv6`,
+WebKit/JavaScriptCore `+rogdv7`, the sink `+rogdv5.7` and Showtime `5.13`
+are installed in one `--no-remove` transaction (10 upgraded, none removed,
+clean audit), with byte-verified rollback retained. In a private headless
+Mutter session on the NVIDIA laptop:
+- The GTK colour-owner fixture passes both scenes. With real pass-through,
+  default GSK is Vulkan and every swapchain declares pass-through. With
+  pass-through removed from the real format list, GTK falls back to GL and
+  attempts no swapchain. Each scene has exactly one colour-management owner
+  for its surface.
+- The WebKit UI import fixture passes. The positive A→B run imports F16 for
+  both pages. With one injected import error on B, A stays committed without
+  blanking, and B arrives through the SHM fallback. That fallback call is bound
+  to the installed library's exact code bytes.
+
+These are private-compositor results, not optical or physical-panel claims. No candidate is deployed. Target feedback
+is separate from committed source metadata; no optical claim follows.
+[Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
+
 **Image-quality source stimuli (November 14).** A stdlib generator now emits
 deterministic Y4M sources for chroma siting, scaling/aliasing, 10-to-8-bit
 banding and 24/25/30/50/60 fps cadence, with expected values in its manifest

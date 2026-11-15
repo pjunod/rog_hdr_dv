@@ -92,11 +92,55 @@ def write_private_json(path, value):
         os.close(directory)
 
 
-def prepare(source, patch, already_patched=False, quilt_state_from=None):
+def product_patches(pin, patch=None, series=None):
+    """Authenticate the complete ordered input before any source mutation."""
+    if (patch is None) == (series is None):
+        raise verify.VerificationError('supply exactly one product patch or product series')
+    records = pin.get('product_patch_series')
+    if records is None:
+        # Retain the original interface for historical single-patch pins.
+        if series is not None:
+            raise verify.VerificationError('this source pin requires a single product patch')
+        records = [{'name': patch.name, 'sha256': pin['product_patch_sha256']}]
+    names = []
+    for record in records:
+        if (set(record) != {'name', 'sha256'}
+                or not isinstance(record['name'], str)
+                or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._+-]*[.]patch', record['name'])
+                or not isinstance(record['sha256'], str)
+                or not re.fullmatch(r'[0-9a-f]{64}', record['sha256'])):
+            raise verify.VerificationError('invalid reviewed product patch manifest')
+        names.append(record['name'])
+    if not names or len(set(names)) != len(names):
+        raise verify.VerificationError('reviewed product patch manifest is empty or duplicated')
+    if series is not None:
+        if series.is_symlink() or not series.is_file():
+            raise verify.VerificationError('product series must be a regular file')
+        # No quilt options, traversal, duplicates or reordered components.
+        if series.read_text().splitlines() != names:
+            raise verify.VerificationError('product series differs from reviewed names and order')
+        patches = [series.parent / name for name in names]
+    else:
+        if len(records) != 1:
+            raise verify.VerificationError('this source pin requires --product-series for all ordered patches')
+        patches = [patch]
+    for file, record in zip(patches, records):
+        if file.is_symlink() or not file.is_file():
+            raise verify.VerificationError('product patch must be a regular file: ' + str(file))
+        if hashlib.sha256(file.read_bytes()).hexdigest() != record['sha256']:
+            raise verify.VerificationError('product patch differs from reviewed source pin: ' + record['name'])
+    return patches
+
+
+def apply_product_patches(source, patches):
+    for patch in patches:
+        run(['patch', '--batch', '--forward', '-p1', '-i', str(patch.resolve())], source)
+
+
+def prepare(source, patch=None, already_patched=False, quilt_state_from=None, product_series=None):
     source = source.resolve()
     pin = json.loads((HERE / 'source-pin.json').read_text())
-    if hashlib.sha256(patch.read_bytes()).hexdigest() != pin['product_patch_sha256']:
-        raise verify.VerificationError('product patch differs from reviewed source pin')
+    patches = product_patches(pin, patch, product_series)
     original = source.parent / 'webkit2gtk_2.52.6.orig.tar.xz'
     expected = pin['ubuntu_source_archives'][original.name]
     if not original.is_file():
@@ -124,7 +168,7 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
         shutil.copytree(baseline / '.pc', source / '.pc')
     verify_quilt(source / '.pc', series)
     if not already_patched:
-        run(['patch', '--batch', '--forward', '-p1', '-i', str(patch.resolve())], source)
+        apply_product_patches(source, patches)
     verify.verify_source(source, pin)
     # dpkg-source records the existing product delta in the ordinary quilt
     # series and .pc state. This supports both a freshly patched extraction
@@ -179,9 +223,9 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
     marker = body.find('\n--- ')
     if marker < 0:
         raise verify.VerificationError('dpkg-source did not record a source patch')
-    recorded.write_text('Description: Clear-video destination and native GTK HDR plane\n'
+    recorded.write_text('Description: Native GTK HDR video and typed image colour\n'
                         'Origin: other, reviewed source ' + pin['candidate_commit'] + '\n'
-                        'Forwarded: no\nLast-Update: 2026-11-09\n' + body[marker:])
+                        'Forwarded: no\nLast-Update: 2026-11-14\n' + body[marker:])
     verify.verify_source(source, pin)
     run(['patch', '--batch', '--forward', '-p1', '-i', str(HERE / 'ubuntu-packaging.diff')], source)
     (source / 'debian/source/options').write_text(
@@ -194,9 +238,9 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
         shutil.copy2(HERE / name, target / name)
     old = source / 'debian/changelog'
     old.write_text('webkit2gtk (' + pin['package_version'] + ') stonking; urgency=medium\n\n'
-                   '  * Build reviewed clear-video/native HDR source as GTK4-only packages.\n'
+                   '  * Build reviewed native HDR video and image-colour source as GTK4-only packages.\n'
                    '  * Preserve distribution debhelper, symbols and generated dependencies.\n\n'
-                   ' -- ROG HDR contributors <rog-hdr@example.invalid>  Mon, 09 Nov 2026 00:00:00 +0000\n\n'
+                   ' -- ROG HDR contributors <rog-hdr@example.invalid>  Sat, 14 Nov 2026 00:00:00 +0000\n\n'
                    + old.read_text())
     run(['make', '-f', 'debian/rules', 'debian/control'], source)
     names = [line.split(': ', 1)[1] for line in (source / 'debian/control').read_text().splitlines()
@@ -209,16 +253,19 @@ def prepare(source, patch, already_patched=False, quilt_state_from=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', required=True, type=Path)
-    parser.add_argument('--product-patch', required=True, type=Path)
+    product = parser.add_mutually_exclusive_group(required=True)
+    product.add_argument('--product-patch', type=Path, help='single-patch source pins only')
+    product.add_argument('--product-series', type=Path,
+                         help='ordered series manifest; patch files must be adjacent')
     parser.add_argument('--already-patched', action='store_true')
     parser.add_argument('--quilt-state-from', type=Path,
                         help='clean authenticated Ubuntu extraction; restores absent .pc metadata only')
     args = parser.parse_args()
-    prepare(args.source, args.product_patch, args.already_patched, args.quilt_state_from)
+    prepare(args.source, args.product_patch, args.already_patched, args.quilt_state_from, args.product_series)
 
 
 if __name__ == '__main__':
     try:
         main()
-    except (verify.VerificationError, subprocess.CalledProcessError, OSError, ValueError) as error:
+    except (verify.VerificationError, subprocess.CalledProcessError, OSError, ValueError, KeyError, TypeError) as error:
         sys.exit(f'WebKit source preparation refused: {error}')

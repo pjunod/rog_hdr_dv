@@ -1,0 +1,52 @@
+From 0c052c6888ce5d4563849206d7445b7e42141e00 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 04:11:14 -0500
+Subject: [PATCH 12/12] Keep fixture EGL and wrapper context state aligned at
+ teardown
+
+Unbind the surviving current wrapper before destroying the owned ordinary context. Record explicit unbind failures and check both EGL and wrapper state after destruction. This preserves the frozen case inventory; native execution remains pending.
+---
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+index 21a05fcd..d14fc03c 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+@@ -38,6 +38,7 @@
+ #include <WebCore/TextureMapper.h>
+ #include <array>
+ #include <cstring>
++#include <epoxy/egl.h>
+ #include <epoxy/gl.h>
+ #include <skia/core/SkCanvas.h>
+ #include <skia/core/SkColorSpace.h>
+@@ -68,7 +69,25 @@ protected:
+ 
+     void TearDown() override
+     {
++        // The derived fixture may leave the surviving shared Skia context
++        // current. Unbind through its wrapper before the owned ordinary
++        // context's destructor independently unbinds EGL.
++        if (auto* current = GLContextWrapper::currentContext()) {
++            bool unbound = current->unmakeCurrentImpl();
++            EXPECT_TRUE(unbound) << "Failed to unbind the fixture's current GL context";
++            if (unbound)
++                current->didUnmakeContextCurrent();
++        }
+         m_context = nullptr;
++        // If the explicit unbind failed, destruction may still have unbound
++        // EGL. Keep bookkeeping consistent with that observed state, while
++        // retaining the failure above instead of falsely reporting success.
++        if (eglGetCurrentContext() == EGL_NO_CONTEXT) {
++            if (auto* current = GLContextWrapper::currentContext())
++                current->didUnmakeContextCurrent();
++        }
++        EXPECT_EQ(nullptr, GLContextWrapper::currentContext());
++        EXPECT_EQ(EGL_NO_CONTEXT, eglGetCurrentContext());
+         m_processType = std::nullopt;
+     }
+ 
+-- 
+2.54.0 (Apple Git-157)
+

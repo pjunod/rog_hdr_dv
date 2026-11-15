@@ -1,0 +1,398 @@
+From 5c42eca75c309ceb0b45c31c1a627e78f6e36434 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:02:05 -0500
+Subject: [PATCH 2/7] Use typed float Skia working buffers without changing
+ Canvas formats
+
+Allocate non-Canvas Skia working surfaces in extended nonlinear-sRGB-capable F16 storage with actual stride and memory accounting. Keep logical pixel-buffer APIs at their existing formats and convert through Skia instead of copying raw float bytes. Preserve float pattern and luminance-mask intermediates while retaining normal unsupported-renderer fallback.
+
+Source implementation only; native compile, vtable/link and behavioral checks remain pending coordinator admission.
+---
+ .../platform/graphics/ImageBufferBackend.h    |  2 +-
+ .../graphics/skia/GraphicsContextSkia.cpp     |  4 +-
+ .../ImageBufferSkiaAcceleratedBackend.cpp     | 97 ++----------------
+ .../graphics/skia/ImageBufferSkiaBackend.cpp  |  6 +-
+ .../skia/ImageBufferSkiaSurfaceBackend.cpp    | 99 ++++++++++++++++++-
+ .../skia/ImageBufferSkiaSurfaceBackend.h      |  7 +-
+ .../ImageBufferSkiaUnacceleratedBackend.cpp   | 11 +--
+ 7 files changed, 123 insertions(+), 103 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/ImageBufferBackend.h b/Source/WebCore/platform/graphics/ImageBufferBackend.h
+index d719447e..28ee8f4e 100644
+--- a/Source/WebCore/platform/graphics/ImageBufferBackend.h
++++ b/Source/WebCore/platform/graphics/ImageBufferBackend.h
+@@ -126,7 +126,7 @@ public:
+     virtual RefPtr<NativeImage> createNativeImageReference() = 0;
+     WEBCORE_EXPORT virtual RefPtr<NativeImage> sinkIntoNativeImage();
+ 
+-    WEBCORE_EXPORT void convertToLuminanceMask();
++    WEBCORE_EXPORT virtual void convertToLuminanceMask();
+     virtual void transformToColorSpace(const DestinationColorSpace&) { }
+ 
+     virtual void getPixelBuffer(const IntRect& srcRect, PixelBuffer& destination) = 0;
+diff --git a/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp b/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp
+index 1432b8ab..04dbd382 100644
+--- a/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp
++++ b/Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp
+@@ -1142,7 +1142,9 @@ static sk_sp<SkSurface> createAcceleratedSurface(const IntSize& size)
+     auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
+     RELEASE_ASSERT(grContext);
+ 
+-    auto imageInfo = SkImageInfo::Make(size.width(), size.height(), kRGBA_8888_SkColorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++    // Unsupported float renderers retain the normal reduced-gamut pattern path.
++    auto colorType = grContext->colorTypeSupportedAsSurface(kRGBA_F16_SkColorType) ? kRGBA_F16_SkColorType : kRGBA_8888_SkColorType;
++    auto imageInfo = SkImageInfo::Make(size.width(), size.height(), colorType, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+     SkSurfaceProps properties = FontRenderOptions::singleton().createSurfaceProps();
+     auto surface = SkSurfaces::RenderTarget(grContext, skgpu::Budgeted::kNo, imageInfo, PlatformDisplay::sharedDisplay().msaaSampleCount(), kTopLeft_GrSurfaceOrigin, &properties);
+     if (!surface || !surface->getCanvas())
+diff --git a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaAcceleratedBackend.cpp b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaAcceleratedBackend.cpp
+index 5731b7e2..f4e5abce 100644
+--- a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaAcceleratedBackend.cpp
++++ b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaAcceleratedBackend.cpp
+@@ -114,7 +114,9 @@ std::unique_ptr<ImageBufferSkiaAcceleratedBackend> ImageBufferSkiaAcceleratedBac
+     auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
+     RELEASE_ASSERT(grContext);
+ 
+-    auto imageInfo = SkImageInfo::Make(backendSize.width(), backendSize.height(), kRGBA_8888_SkColorType, kPremul_SkAlphaType, parameters.colorSpace.platformColorSpace());
++    auto imageInfo = physicalImageInfo(parameters);
++    if (!grContext->colorTypeSupportedAsSurface(imageInfo.colorType()))
++        return nullptr;
+     auto msaaSampleCount = PlatformDisplay::sharedDisplay().msaaSampleCount();
+     uint32_t flags = 0;
+     if (parameters.purpose == RenderingPurpose::Canvas && msaaSampleCount && shouldEnableDynamicMSAA()) {
+@@ -315,6 +317,7 @@ RefPtr<NativeImage> ImageBufferSkiaAcceleratedBackend::createNativeImageReferenc
+ 
+ void ImageBufferSkiaAcceleratedBackend::getPixelBuffer(const IntRect& srcRect, PixelBuffer& destination)
+ {
++    destination.zeroFill();
+     if (!PlatformDisplay::sharedDisplay().skiaGLContext()->makeContextCurrent())
+         return;
+ 
+@@ -322,99 +325,19 @@ void ImageBufferSkiaAcceleratedBackend::getPixelBuffer(const IntRect& srcRect, P
+     if (auto fence = flushCanvasRecordingContextIfNeeded())
+         fence->serverWait();
+ 
+-    const IntRect backendRect { { }, size() };
+-    const auto sourceRectClipped = intersection(backendRect, srcRect);
+-    IntRect destinationRect { IntPoint::zero(), sourceRectClipped.size() };
+-
+-    if (srcRect.x() < 0)
+-        destinationRect.setX(destinationRect.x() - srcRect.x());
+-    if (srcRect.y() < 0)
+-        destinationRect.setY(destinationRect.y() - srcRect.y());
+-
+-    if (destination.size() != sourceRectClipped.size())
+-        destination.zeroFill();
+-
+-    const auto destinationColorType = (destination.format().pixelFormat == PixelFormat::RGBA8)
+-        ? SkColorType::kRGBA_8888_SkColorType : SkColorType::kBGRA_8888_SkColorType;
+-
+-    const auto destinationAlphaType = (destination.format().alphaFormat == AlphaPremultiplication::Premultiplied)
+-        ? SkAlphaType::kPremul_SkAlphaType : SkAlphaType::kUnpremul_SkAlphaType;
+-
+-    auto destinationInfo = SkImageInfo::Make(destination.size().width(), destination.size().height(),
+-        destinationColorType, destinationAlphaType, destination.format().colorSpace.platformColorSpace());
+-    SkPixmap pixmap(destinationInfo, destination.bytes().data(), destination.size().width() * 4);
+-
+-    SkPixmap dstPixmap;
+-    if (!pixmap.extractSubset(&dstPixmap, destinationRect)) [[unlikely]]
+-        return;
+-
+-    m_surface->readPixels(dstPixmap, sourceRectClipped.x(), sourceRectClipped.y());
+-}
+-
+-static std::span<uint8_t> mutableSpan(SkData* data)
+-{
+-    return unsafeMakeSpan(static_cast<uint8_t*>(data->writable_data()), data->size());
++    readPixelBuffer(srcRect, destination);
+ }
+ 
+ void ImageBufferSkiaAcceleratedBackend::putPixelBuffer(const PixelBufferSourceView& pixelBuffer, const IntRect& srcRect, const IntPoint& destPoint, AlphaPremultiplication destFormat)
+ {
+-    // CPU needs to write pixels now, wait for GPU completion.
+-    if (auto fence = flushCanvasRecordingContextIfNeeded())
+-        fence->serverWait();
+-
+     UNUSED_PARAM(destFormat);
+-
+     if (!PlatformDisplay::sharedDisplay().skiaGLContext()->makeContextCurrent())
+         return;
+-
+-    ASSERT(IntRect({ 0, 0 }, pixelBuffer.size()).contains(srcRect));
+-    ASSERT(pixelBuffer.format().pixelFormat == PixelFormat::RGBA8 || pixelBuffer.format().pixelFormat == PixelFormat::BGRA8);
+-    ASSERT(pixelBuffer.format().alphaFormat == AlphaPremultiplication::Premultiplied || pixelBuffer.format().alphaFormat == AlphaPremultiplication::Unpremultiplied);
+-
+-    const auto colorType = (pixelBuffer.format().pixelFormat == PixelFormat::RGBA8)
+-        ? SkColorType::kRGBA_8888_SkColorType : SkColorType::kBGRA_8888_SkColorType;
+-
+-    const auto alphaType = (pixelBuffer.format().alphaFormat == AlphaPremultiplication::Premultiplied)
+-        ? SkAlphaType::kPremul_SkAlphaType : SkAlphaType::kUnpremul_SkAlphaType;
+-
+-    const IntRect backendRect { { }, size() };
+-    auto sourceRectClipped = intersection({ IntPoint::zero(), pixelBuffer.size() }, srcRect);
+-    auto destinationRect = sourceRectClipped;
+-    destinationRect.moveBy(destPoint);
+-
+-    if (srcRect.x() < 0)
+-        destinationRect.setX(destinationRect.x() - srcRect.x());
+-    if (srcRect.y() < 0)
+-        destinationRect.setY(destinationRect.y() - srcRect.y());
+-
+-    destinationRect.intersect(backendRect);
+-    sourceRectClipped.setSize(destinationRect.size());
+-
+-    auto pixelBufferInfo = SkImageInfo::Make(pixelBuffer.size().width(), pixelBuffer.size().height(),
+-        colorType, alphaType, pixelBuffer.format().colorSpace.platformColorSpace());
+-    SkPixmap pixmap(pixelBufferInfo, pixelBuffer.bytes().data(), pixelBuffer.size().width() * 4);
+-
+-    SkPixmap srcPixmap;
+-    if (!pixmap.extractSubset(&srcPixmap, sourceRectClipped)) [[unlikely]]
+-        return;
+-
+-    const auto destAlphaType = (destFormat == AlphaPremultiplication::Premultiplied)
+-        ? SkAlphaType::kPremul_SkAlphaType : SkAlphaType::kUnpremul_SkAlphaType;
+-
+-    // If all the pixels in the source rectangle are opaque, it does not matter which kind
+-    // of alpha is involved: the destination pixels will be replaced by the source ones.
+-    if (m_surface->imageInfo().alphaType() == destAlphaType || srcPixmap.computeIsOpaque()) {
+-        m_surface->writePixels(srcPixmap, destinationRect.x(), destinationRect.y());
+-        return;
+-    }
+-
+-    // Fall back to converting, but only the part covered by sourceRectClipped/srcPixmap.
+-    auto data = SkData::MakeUninitialized(srcPixmap.computeByteSize());
+-    ImageBufferBackend::putPixelBuffer(pixelBuffer, sourceRectClipped, IntPoint::zero(), destFormat, mutableSpan(data.get()));
+-    auto convertedSrcInfo = SkImageInfo::Make(srcPixmap.dimensions(), SkColorType::kBGRA_8888_SkColorType,
+-        SkAlphaType::kPremul_SkAlphaType, colorSpace().platformColorSpace());
+-    SkPixmap convertedSrcPixmap(convertedSrcInfo, data->writable_data(), convertedSrcInfo.minRowBytes64());
+-    m_surface->writePixels(convertedSrcPixmap, destinationRect.x(), destinationRect.y());
++    if (auto fence = flushCanvasRecordingContextIfNeeded())
++        fence->serverWait();
++    // Skia converts from the declared logical source alpha/colour format into
++    // the actual physical surface representation, including premultiplication.
++    writePixelBuffer(pixelBuffer, srcRect, destPoint);
+ }
+ 
+ #if USE(COORDINATED_GRAPHICS)
+diff --git a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaBackend.cpp b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaBackend.cpp
+index 366529a2..81fea00d 100644
+--- a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaBackend.cpp
++++ b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaBackend.cpp
+@@ -25,8 +25,10 @@
+ 
+ #include "config.h"
+ #include "ImageBufferSkiaBackend.h"
+-
+ #if USE(SKIA)
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
++#include <skia/core/SkSurface.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
+ 
+ namespace WebCore {
+ 
+@@ -36,6 +38,8 @@ String ImageBufferSkiaBackend::debugDescription() const
+ {
+     TextStream stream;
+     stream << "ImageBufferSkiaBackend " << this;
++    if (auto* physicalSurface = surface())
++        stream << " physicalColorType=" << static_cast<unsigned>(physicalSurface->imageInfo().colorType()) << " physicalRowBytes=" << physicalSurface->imageInfo().minRowBytes64();
+     return stream.release();
+ }
+ 
+diff --git a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp
+index 4912d132..2e60affe 100644
+--- a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp
++++ b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.cpp
+@@ -27,6 +27,12 @@
+ #include "ImageBufferSkiaSurfaceBackend.h"
+ 
+ #if USE(SKIA)
++#include "PixelBuffer.h"
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_BEGIN
++#include <skia/core/SkBitmap.h>
++#include <skia/core/SkPixmap.h>
++WTF_IGNORE_WARNINGS_IN_THIRD_PARTY_CODE_END
++#include <algorithm>
+ 
+ namespace WebCore {
+ 
+@@ -36,7 +42,7 @@ IntSize ImageBufferSkiaSurfaceBackend::calculateSafeBackendSize(const Parameters
+     if (backendSize.isEmpty())
+         return backendSize;
+ 
+-    auto bytesPerRow = 4 * CheckedUint32(backendSize.width());
++    auto bytesPerRow = physicalImageInfo(parameters).bytesPerPixel() * CheckedUint32(backendSize.width());
+     if (bytesPerRow.hasOverflowed())
+         return { };
+ 
+@@ -47,15 +53,24 @@ IntSize ImageBufferSkiaSurfaceBackend::calculateSafeBackendSize(const Parameters
+     return backendSize;
+ }
+ 
+-unsigned ImageBufferSkiaSurfaceBackend::calculateBytesPerRow(const IntSize& backendSize)
++SkImageInfo ImageBufferSkiaSurfaceBackend::physicalImageInfo(const Parameters& parameters)
+ {
+-    ASSERT(!backendSize.isEmpty());
+-    return CheckedUint32(backendSize.width()) * 4;
++    // Public Canvas/ImageData formats remain unchanged. Non-Canvas buffers are
++    // working storage, whose native image and stride carry their actual type.
++    auto colorType = parameters.purpose == RenderingPurpose::Canvas ? kRGBA_8888_SkColorType : kRGBA_F16_SkColorType;
++    return SkImageInfo::Make(parameters.backendSize.width(), parameters.backendSize.height(), colorType,
++        kPremul_SkAlphaType, parameters.colorSpace.platformColorSpace());
++}
++
++unsigned ImageBufferSkiaSurfaceBackend::calculateBytesPerRow(const Parameters& parameters)
++{
++    ASSERT(!parameters.backendSize.isEmpty());
++    return physicalImageInfo(parameters).minRowBytes64();
+ }
+ 
+ size_t ImageBufferSkiaSurfaceBackend::calculateMemoryCost(const Parameters& parameters)
+ {
+-    return ImageBufferBackend::calculateMemoryCost(parameters.backendSize, calculateBytesPerRow(parameters.backendSize));
++    return ImageBufferBackend::calculateMemoryCost(parameters.backendSize, calculateBytesPerRow(parameters));
+ }
+ 
+ ImageBufferSkiaSurfaceBackend::ImageBufferSkiaSurfaceBackend(const Parameters& parameters, sk_sp<SkSurface>&& surface, RenderingMode renderingMode)
+@@ -73,6 +88,80 @@ unsigned ImageBufferSkiaSurfaceBackend::bytesPerRow() const
+     return m_surface->imageInfo().minRowBytes64();
+ }
+ 
++static std::optional<SkImageInfo> pixelBufferImageInfo(const PixelBufferFormat& format, const IntSize& size)
++{
++    SkColorType colorType;
++    switch (format.pixelFormat) {
++    case PixelFormat::RGBA8:
++        colorType = kRGBA_8888_SkColorType;
++        break;
++    case PixelFormat::BGRA8:
++        colorType = kBGRA_8888_SkColorType;
++        break;
++    default:
++        return std::nullopt;
++    }
++    return SkImageInfo::Make(size.width(), size.height(), colorType,
++        format.alphaFormat == AlphaPremultiplication::Premultiplied ? kPremul_SkAlphaType : kUnpremul_SkAlphaType,
++        format.colorSpace.platformColorSpace());
++}
++
++void ImageBufferSkiaSurfaceBackend::readPixelBuffer(const IntRect& sourceRect, PixelBuffer& destination)
++{
++    // This is the intentional logical API conversion, never a raw F16 byte copy.
++    destination.zeroFill();
++    auto info = pixelBufferImageInfo(destination.format(), destination.size());
++    if (!info)
++        return;
++    const auto clippedSource = intersection(IntRect { { }, size() }, sourceRect);
++    if (clippedSource.isEmpty())
++        return;
++    IntRect destinationRect { IntPoint { clippedSource.x() - sourceRect.x(), clippedSource.y() - sourceRect.y() }, clippedSource.size() };
++    SkPixmap pixels(*info, destination.bytes().data(), info->minRowBytes64());
++    SkPixmap subset;
++    if (pixels.extractSubset(&subset, destinationRect))
++        m_surface->readPixels(subset, clippedSource.x(), clippedSource.y());
++}
++
++void ImageBufferSkiaSurfaceBackend::writePixelBuffer(const PixelBufferSourceView& source, const IntRect& sourceRect, const IntPoint& destinationOffset)
++{
++    auto info = pixelBufferImageInfo(source.format(), source.size());
++    if (!info)
++        return;
++    auto clippedSource = intersection(IntRect { { }, source.size() }, sourceRect);
++    if (clippedSource.isEmpty())
++        return;
++    IntRect destinationRect = clippedSource;
++    destinationRect.moveBy(destinationOffset);
++    destinationRect.move(-std::min(0, sourceRect.x()), -std::min(0, sourceRect.y()));
++    auto clippedDestination = intersection(IntRect { { }, size() }, destinationRect);
++    if (clippedDestination.isEmpty())
++        return;
++    clippedSource.move(clippedDestination.x() - destinationRect.x(), clippedDestination.y() - destinationRect.y());
++    clippedSource.setSize(clippedDestination.size());
++    SkPixmap pixels(*info, source.bytes().data(), info->minRowBytes64());
++    SkPixmap subset;
++    if (pixels.extractSubset(&subset, clippedSource))
++        m_surface->writePixels(subset, clippedDestination.x(), clippedDestination.y());
++}
++
++void ImageBufferSkiaSurfaceBackend::convertToLuminanceMask()
++{
++    flushContext();
++    auto info = m_surface->imageInfo().makeColorType(kRGBA_F32_SkColorType).makeAlphaType(kUnpremul_SkAlphaType);
++    SkBitmap pixels;
++    if (!pixels.tryAllocPixels(info) || !m_surface->readPixels(info, pixels.getPixels(), pixels.rowBytes(), 0, 0))
++        return;
++    for (int y = 0; y < size().height(); ++y) {
++        auto row = unsafeMakeSpan(static_cast<float*>(pixels.getAddr(0, y)), size().width() * 4);
++        for (int x = 0; x < size().width(); ++x) {
++            unsigned offset = x * 4;
++            row[offset + 3] = std::clamp((row[offset] * 0.2125f + row[offset + 1] * 0.7154f + row[offset + 2] * 0.0721f) * row[offset + 3], 0.f, 1.f);
++        }
++    }
++    m_surface->writePixels(pixels.pixmap(), 0, 0);
++}
++
+ bool ImageBufferSkiaSurfaceBackend::canMapBackingStore() const
+ {
+     return true;
+diff --git a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.h b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.h
+index 5c5ce5c2..7a545e33 100644
+--- a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.h
++++ b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaSurfaceBackend.h
+@@ -42,7 +42,8 @@ public:
+     virtual ~ImageBufferSkiaSurfaceBackend();
+ 
+     static IntSize calculateSafeBackendSize(const Parameters&);
+-    static unsigned calculateBytesPerRow(const IntSize&);
++    static unsigned calculateBytesPerRow(const Parameters&);
++    static SkImageInfo physicalImageInfo(const Parameters&);
+     static size_t calculateMemoryCost(const Parameters&);
+ 
+     SkSurface* surface() const final { return m_surface.get(); }
+@@ -50,6 +51,10 @@ public:
+ protected:
+     ImageBufferSkiaSurfaceBackend(const Parameters&, sk_sp<SkSurface>&&, RenderingMode);
+ 
++    void convertToLuminanceMask() final;
++    void readPixelBuffer(const IntRect&, PixelBuffer&);
++    void writePixelBuffer(const PixelBufferSourceView&, const IntRect&, const IntPoint&);
++
+     GraphicsContext& context() override { return m_context; }
+     unsigned bytesPerRow() const final;
+     bool canMapBackingStore() const final;
+diff --git a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaUnacceleratedBackend.cpp b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaUnacceleratedBackend.cpp
+index 22be6f2d..70a9df37 100644
+--- a/Source/WebCore/platform/graphics/skia/ImageBufferSkiaUnacceleratedBackend.cpp
++++ b/Source/WebCore/platform/graphics/skia/ImageBufferSkiaUnacceleratedBackend.cpp
+@@ -45,7 +45,7 @@ std::unique_ptr<ImageBufferSkiaUnacceleratedBackend> ImageBufferSkiaUnaccelerate
+     if (backendSize.isEmpty())
+         return nullptr;
+ 
+-    auto imageInfo = SkImageInfo::MakeN32Premul(backendSize.width(), backendSize.height(), parameters.colorSpace.platformColorSpace());
++    auto imageInfo = physicalImageInfo(parameters);
+     SkSurfaceProps properties = FontRenderOptions::singleton().createSurfaceProps();
+     auto surface = SkSurfaces::Raster(imageInfo, &properties);
+     if (!surface || !surface->getCanvas())
+@@ -82,16 +82,13 @@ RefPtr<NativeImage> ImageBufferSkiaUnacceleratedBackend::createNativeImageRefere
+ 
+ void ImageBufferSkiaUnacceleratedBackend::getPixelBuffer(const IntRect& srcRect, PixelBuffer& destination)
+ {
+-    SkPixmap pixmap;
+-    if (m_surface->peekPixels(&pixmap))
+-        ImageBufferBackend::getPixelBuffer(srcRect, span(pixmap), destination);
++    readPixelBuffer(srcRect, destination);
+ }
+ 
+ void ImageBufferSkiaUnacceleratedBackend::putPixelBuffer(const PixelBufferSourceView& pixelBuffer, const IntRect& srcRect, const IntPoint& destPoint, AlphaPremultiplication destFormat)
+ {
+-    SkPixmap pixmap;
+-    if (m_surface->peekPixels(&pixmap))
+-        ImageBufferBackend::putPixelBuffer(pixelBuffer, srcRect, destPoint, destFormat, mutableSpan(pixmap));
++    UNUSED_PARAM(destFormat);
++    writePixelBuffer(pixelBuffer, srcRect, destPoint);
+ }
+ 
+ } // namespace WebCore
+-- 
+2.54.0 (Apple Git-157)
+

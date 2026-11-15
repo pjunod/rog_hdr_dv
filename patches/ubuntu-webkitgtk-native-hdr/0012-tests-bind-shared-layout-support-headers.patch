@@ -1,0 +1,26 @@
+From 09a2e65eb2ea59680e5a19ca36ff1225bdaf8b77 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 03:50:59 -0500
+Subject: [PATCH 11/11] Bind reviewed layout regressions in the focused
+ consumer
+
+Expose the existing private Shared/glib headers only to TestWebCoreImageColour so the production layout admission policy is exercised by its prepared regression sources. Shipping feature flags, SDK exports, producer objects and the original Debian tree remain unchanged. No configure, compilation or tests were run.
+---
+ Tools/TestWebKitAPI/ImageColour/CMakeLists.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt b/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt
+index 1105b33d..c04ac804 100644
+--- a/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt
++++ b/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt
+@@ -35,6 +35,7 @@ set(TestWebCoreImageColour_PRIVATE_INCLUDE_DIRECTORIES
+     "${CMAKE_BINARY_DIR}"
+     "${TESTWEBKITAPI_DIR}"
+     "${WEBKIT_DIR}/Shared/gtk"
++    "${WEBKIT_DIR}/Shared/glib"
+     "$<TARGET_PROPERTY:WebCore,INCLUDE_DIRECTORIES>"
+ )
+ set(TestWebCoreImageColour_PRIVATE_DEFINITIONS BUILDING_TestWebCore)
+-- 
+2.54.0 (Apple Git-157)
+

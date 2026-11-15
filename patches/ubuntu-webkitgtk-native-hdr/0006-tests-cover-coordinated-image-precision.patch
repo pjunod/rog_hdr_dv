@@ -1,0 +1,229 @@
+From fd80ca4f73865726aaf19b37af90ab944f8d61aa Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:11:05 -0500
+Subject: [PATCH 5/7] Prepare native coordinated image precision regressions
+
+Exercise real floating GL upload/copy, source-profile conversion, pool identity and raster tile blending, with normalized storage controls. Register these and the coordinating decoder regression in the existing GTK harness under their normal Skia/LCMS conditions.
+
+Regression sources are prepared but have not been compiled or executed.
+---
+ Tools/TestWebKitAPI/PlatformGTK.cmake         |  11 ++
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp | 184 ++++++++++++++++++
+ 2 files changed, 195 insertions(+)
+ create mode 100644 Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+
+diff --git a/Tools/TestWebKitAPI/PlatformGTK.cmake b/Tools/TestWebKitAPI/PlatformGTK.cmake
+index 957aef11..98ebbea4 100644
+--- a/Tools/TestWebKitAPI/PlatformGTK.cmake
++++ b/Tools/TestWebKitAPI/PlatformGTK.cmake
+@@ -51,6 +51,17 @@ list(APPEND TestWebCore_SOURCES
+     generic/main.cpp
+ )
+ 
++if (USE_SKIA)
++    list(APPEND TestWebCore_SOURCES
++        Tests/WebCore/glib/SkiaWorkingTexture.cpp
++    )
++    if (USE_LCMS)
++        list(APPEND TestWebCore_SOURCES
++            Tests/WebCore/SkiaDecodedImageColour.cpp
++        )
++    endif ()
++endif ()
++
+ list(APPEND TestWebCore_SYSTEM_INCLUDE_DIRECTORIES
+     ${GSTREAMER_INCLUDE_DIRS}
+     ${GSTREAMER_AUDIO_INCLUDE_DIRS}
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+new file mode 100644
+index 00000000..052fda80
+--- /dev/null
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+@@ -0,0 +1,184 @@
++/*
++ * Copyright (C) 2021 Apple Inc. All rights reserved.
++ * Copyright (C) 2025 Igalia, S.L.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include "config.h"
++#include "Test.h"
++
++#if USE(SKIA) && USE(COORDINATED_GRAPHICS)
++#include "WebCoreTestUtilities.h"
++#include <WebCore/BitmapTexturePool.h>
++#include <WebCore/CoordinatedTileBuffer.h>
++#include <WebCore/GLContext.h>
++#include <WebCore/PlatformDisplaySurfaceless.h>
++#include <array>
++#include <epoxy/gl.h>
++#include <skia/core/SkCanvas.h>
++#include <skia/core/SkColorSpace.h>
++#include <skia/core/SkPixmap.h>
++#include <skia/core/SkSurface.h>
++#include <skia/gpu/ganesh/GrDirectContext.h>
++
++namespace TestWebKitAPI {
++using namespace WebCore;
++
++namespace {
++
++class SkiaWorkingTextureTest : public testing::Test {
++protected:
++    void SetUp() override
++    {
++        m_processType = ScopedSetAuxiliaryProcessTypeForTesting { WTF::AuxiliaryProcessType::WebContent };
++        if (!PlatformDisplay::sharedDisplayIfExists()) {
++            auto display = PlatformDisplaySurfaceless::create();
++            ASSERT_TRUE(display);
++            PlatformDisplay::setSharedDisplay(WTF::move(display));
++        }
++        auto* context = PlatformDisplay::sharedDisplay().skiaGLContext();
++        if (!context || !context->makeContextCurrent())
++            GTEST_SKIP() << "No actual Skia GL context";
++        if (!BitmapTexture::supportsExtendedColor())
++            GTEST_SKIP() << "No floating colour attachment support";
++    }
++
++    void TearDown() override { m_processType = std::nullopt; }
++
++    static std::array<float, 4> readPixel(const BitmapTexture& texture, int x = 0, int y = 0)
++    {
++        GLint previousFBO;
++        glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
++        GLuint framebuffer;
++        glGenFramebuffers(1, &framebuffer);
++        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
++        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture.id(), 0);
++        EXPECT_EQ(static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE), glCheckFramebufferStatus(GL_FRAMEBUFFER));
++        std::array<float, 4> result { };
++        glReadPixels(x, y, 1, 1, GL_RGBA, GL_FLOAT, result.data());
++        glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
++        glDeleteFramebuffers(1, &framebuffer);
++        return result;
++    }
++
++private:
++    std::optional<ScopedSetAuxiliaryProcessTypeForTesting> m_processType;
++};
++
++static SkImageInfo workingInfo(int width, int height, SkColorType type = kRGBA_F16_SkColorType)
++{
++    return SkImageInfo::Make(width, height, type, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
++}
++
++TEST_F(SkiaWorkingTextureTest, UploadAndPartialCopyRetainExtendedValuesAndAlpha)
++{
++    // Independent physical samples, not a colour transform computed by the
++    // production path. Half-float storage must retain both sign and headroom.
++    std::array<float, 8> samples { 1.25f, -0.125f, 0.375f, 0.5f, -0.25f, 1.5f, 0.25f, 1.f };
++    SkPixmap source(workingInfo(2, 1, kRGBA_F32_SkColorType), samples.data(), 8 * sizeof(float));
++    auto texture = BitmapTexturePool::singleton().acquireTexture(workingInfo(2, 1), { BitmapTexture::Flags::SupportsAlpha });
++    ASSERT_TRUE(texture->updateContents(source, { { }, { 2, 1 } }, { }));
++    auto result = readPixel(texture.get());
++    for (size_t c = 0; c < 4; ++c)
++        EXPECT_NEAR(samples[c], result[c], 0.001f);
++    EXPECT_EQ(16u, texture->sizeInBytes());
++
++    auto copy = BitmapTexturePool::singleton().acquireTexture(workingInfo(2, 1), { BitmapTexture::Flags::SupportsAlpha });
++    copy->copyFromTexture(texture.get(), { { }, { 1, 1 } }, { 1, 0 });
++    result = readPixel(copy.get());
++    for (size_t c = 0; c < 4; ++c)
++        EXPECT_NEAR(samples[c + 4], result[c], 0.001f);
++}
++
++TEST_F(SkiaWorkingTextureTest, P3PixelsAreConvertedBeforeRawTextureSampling)
++{
++    std::array<uint8_t, 4> red { 255, 0, 0, 255 };
++    auto p3 = SkColorSpace::MakeRGB(SkNamedTransferFn::kSRGB, SkNamedGamut::kDisplayP3);
++    ASSERT_TRUE(p3);
++    SkPixmap source(SkImageInfo::Make(1, 1, kRGBA_8888_SkColorType, kPremul_SkAlphaType, WTF::move(p3)), red.data(), 4);
++    auto texture = BitmapTexturePool::singleton().acquireTexture(workingInfo(1, 1), { BitmapTexture::Flags::SupportsAlpha });
++    ASSERT_TRUE(texture->updateContents(source, { { }, { 1, 1 } }, { }));
++    auto result = readPixel(texture.get());
++    // Public P3 red lies outside sRGB. These bounds independently reject
++    // retagging, RGB8 clamping and a normalized-F16 destination.
++    EXPECT_GT(result[0], 1.01f);
++    EXPECT_LT(result[1], -0.01f);
++    EXPECT_LT(result[2], -0.01f);
++    EXPECT_NEAR(1.f, result[3], 0.001f);
++}
++
++TEST_F(SkiaWorkingTextureTest, PoolKeepsFixedAndFloatStorageDistinct)
++{
++    auto floatInfo = workingInfo(7, 3);
++    RefPtr<BitmapTexture> floating = BitmapTexturePool::singleton().acquireTexture(floatInfo, { BitmapTexture::Flags::SupportsAlpha });
++    auto floatID = floating->id();
++    floating = nullptr;
++    auto fixed = BitmapTexturePool::singleton().acquireTexture(floatInfo.makeColorType(kRGBA_8888_SkColorType), { BitmapTexture::Flags::SupportsAlpha });
++    EXPECT_NE(floatID, fixed->id());
++    EXPECT_EQ(kRGBA_8888_SkColorType, fixed->imageInfo().colorType());
++    auto again = BitmapTexturePool::singleton().acquireTexture(floatInfo, { BitmapTexture::Flags::SupportsAlpha });
++    EXPECT_EQ(floatID, again->id());
++    EXPECT_EQ(kRGBA_F16_SkColorType, again->imageInfo().colorType());
++}
++
++TEST(SkiaWorkingTile, RasterStrideAndEncodedSourceOver)
++{
++    auto base = CoordinatedUnacceleratedTileBuffer::create({ 2, 1 }, CoordinatedTileBuffer::SupportsAlpha);
++    auto& tile = static_cast<CoordinatedUnacceleratedTileBuffer&>(base.get());
++    EXPECT_EQ(kRGBA_F16_SkColorType, tile.imageInfo().colorType());
++    EXPECT_EQ(16u, tile.stride());
++    tile.beginPainting();
++    auto* canvas = tile.canvas();
++    ASSERT_TRUE(canvas);
++    canvas->drawColor(SkColor4f { 0.2f, 0.4f, 0.6f, 1.f }, SkBlendMode::kSrc);
++    canvas->drawColor(SkColor4f { 1.2f, -0.1f, 0.5f, 0.5f }, SkBlendMode::kSrcOver);
++    tile.completePainting();
++
++    SkPixmap stored(tile.imageInfo(), tile.data(), tile.stride());
++    std::array<float, 8> result { };
++    ASSERT_TRUE(stored.readPixels(workingInfo(2, 1, kRGBA_F32_SkColorType), result.data(), 8 * sizeof(float)));
++    // Encoded-sRGB source-over. A linear working-space substitution gives a
++    // materially different result and must fail this expectation.
++    EXPECT_NEAR(0.7f, result[0], 0.001f);
++    EXPECT_NEAR(0.15f, result[1], 0.001f);
++    EXPECT_NEAR(0.55f, result[2], 0.001f);
++    EXPECT_NEAR(1.f, result[3], 0.001f);
++}
++
++TEST(SkiaWorkingTile, NormalizedControlsDemonstrateTheLossBoundary)
++{
++    for (auto type : { kRGBA_8888_SkColorType, kRGBA_F16Norm_SkColorType }) {
++        auto surface = SkSurfaces::Raster(workingInfo(1, 1, type));
++        ASSERT_TRUE(surface);
++        surface->getCanvas()->drawColor(SkColor4f { 1.25f, -0.125f, 0.375f, 1.f }, SkBlendMode::kSrc);
++        std::array<float, 4> result { };
++        ASSERT_TRUE(surface->readPixels(workingInfo(1, 1, kRGBA_F32_SkColorType), result.data(), 4 * sizeof(float), 0, 0));
++        EXPECT_LE(result[0], 1.f);
++        EXPECT_GE(result[1], 0.f);
++        EXPECT_NEAR(1.f, result[3], 0.001f);
++    }
++}
++
++} // namespace
++} // namespace TestWebKitAPI
++#endif
+-- 
+2.54.0 (Apple Git-157)
+

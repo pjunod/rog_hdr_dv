@@ -1,0 +1,727 @@
+From 1d88fd6352ad4394ed3a3c205c2f142f2328b660 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:27:46 -0500
+Subject: [PATCH 7/7] Keep page buffer ownership and native frame metadata
+ together
+
+Move pending and committed page ownership, fence transfer and native metadata through one production frame helper. Retain the same allocation without clearing its rebuilt texture, then return its release credit once at real replacement. Reassert ordinary sRGB import state per update and clear reusable target native metadata before each render attempt.
+
+Prepare actual GDK texture, descriptor-ownership and allocation-credit transition coverage, plus GPU one-pixel extended-colour readback. Compilation and tests remain unexecuted.
+---
+ .../WebKit/Shared/gtk/RendererBufferFrame.h   | 124 ++++++++++++++
+ .../UIProcess/gtk/AcceleratedBackingStore.cpp | 103 ++++++------
+ .../UIProcess/gtk/AcceleratedBackingStore.h   |  13 +-
+ .../AcceleratedSurface.cpp                    |   6 +
+ Tools/TestWebKitAPI/PlatformGTK.cmake         |   5 +
+ .../WebCore/glib/RendererBufferFrame.cpp      | 151 ++++++++++++++++++
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp |  22 +++
+ 7 files changed, 363 insertions(+), 61 deletions(-)
+ create mode 100644 Source/WebKit/Shared/gtk/RendererBufferFrame.h
+ create mode 100644 Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp
+
+diff --git a/Source/WebKit/Shared/gtk/RendererBufferFrame.h b/Source/WebKit/Shared/gtk/RendererBufferFrame.h
+new file mode 100644
+index 00000000..c58daea0
+--- /dev/null
++++ b/Source/WebKit/Shared/gtk/RendererBufferFrame.h
+@@ -0,0 +1,124 @@
++/*
++ * Copyright (C) 2016, 2023 Igalia S.L.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
++ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
++ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
++ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
++ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#pragma once
++
++#include <WebCore/DestinationColorSpace.h>
++#include <optional>
++#include <utility>
++#include <wtf/RefPtr.h>
++#include <wtf/unix/UnixFileDescriptor.h>
++
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include <WebCore/GTKNativeVideo.h>
++#include <gtk/gtk.h>
++#include <wtf/glib/GRefPtr.h>
++#endif
++
++namespace WebKit {
++
++// One page-buffer ownership interval. Its source colour contract belongs to
++// the allocation; optional native-video metadata belongs to the individual
++// frame and never retags the ordinary page texture.
++template<typename Buffer> class RendererBufferFrame {
++public:
++    RefPtr<Buffer> buffer;
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    bool nativeVideoCandidate { false };
++    uint64_t nativeVideoSerial { 0 };
++    std::optional<WebCore::GTKVideoPlane> plane;
++    GRefPtr<GdkTexture> nativeTexture;
++
++    void clearNativeVideo()
++    {
++        nativeVideoCandidate = false;
++        invalidateNativePlane();
++    }
++
++    void invalidateNativePlane()
++    {
++        nativeVideoSerial = 0;
++        plane.reset();
++        nativeTexture = nullptr;
++    }
++
++    void setNativeVideo(uint64_t serial, std::optional<WebCore::GTKVideoPlane>&& nextPlane)
++    {
++        ASSERT(buffer);
++        nativeVideoCandidate = true;
++        nativeVideoSerial = serial;
++        plane = WTF::move(nextPlane);
++        nativeTexture = nullptr;
++    }
++#endif
++
++    const WebCore::DestinationColorSpace& colorSpace() const
++    {
++        ASSERT(buffer);
++        return buffer->colorSpace();
++    }
++
++    void attach(RefPtr<Buffer>&& nextBuffer, UnixFileDescriptor&& renderingFence)
++    {
++        ASSERT(!buffer);
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++        clearNativeVideo();
++#endif
++        buffer = WTF::move(nextBuffer);
++        m_renderingFence = WTF::move(renderingFence);
++    }
++
++    UnixFileDescriptor takeRenderingFence()
++    {
++        return std::exchange(m_renderingFence, UnixFileDescriptor { });
++    }
++
++    void commitFrom(RendererBufferFrame&& next)
++    {
++        // FenceMonitor owns the transferred fence and the caller waits for it
++        // before reaching this commit. ReleaseBuffer is an allocation credit,
++        // not a frame credit: retaining the same allocation must not make it
++        // available to the producer while this frame still samples it.
++        ASSERT(!next.m_renderingFence);
++        if (buffer && buffer != next.buffer)
++            buffer->release();
++        *this = WTF::move(next);
++        next.clear();
++    }
++
++    void clear()
++    {
++        buffer = nullptr;
++        m_renderingFence = { };
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++        clearNativeVideo();
++#endif
++    }
++
++private:
++    UnixFileDescriptor m_renderingFence;
++};
++
++} // namespace WebKit
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+index 84a7976c..62717285 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.cpp
+@@ -460,6 +460,12 @@ AcceleratedBackingStore::BufferDMABuf::BufferDMABuf(WebPageProxy& webPage, uint6
+ 
+ void AcceleratedBackingStore::BufferDMABuf::didUpdateContents(Buffer* previousBuffer, const Rects& damageRects)
+ {
++#if GTK_CHECK_VERSION(4, 16, 0)
++    // Reassert the ordinary page contract when this buffer is reused. The
++    // separately built native-video texture may be PQ; it never changes this
++    // builder's source state, even for a native-to-ordinary frame transition.
++    gdk_dmabuf_texture_builder_set_color_state(m_builder.get(), gdk_color_state_get_srgb());
++#endif
+     if (!damageRects.isEmpty() && previousBuffer && previousBuffer->texture()) {
+         gdk_dmabuf_texture_builder_set_update_texture(m_builder.get(), previousBuffer->texture());
+         RefPtr<cairo_region_t> region = adoptRef(cairo_region_create());
+@@ -875,9 +881,8 @@ void AcceleratedBackingStore::clearVideoBinding()
+         g_signal_handlers_disconnect_by_data(m_videoSurface.get(), this);
+     m_videoLease = nullptr;
+     m_videoSurface = nullptr;
+-    m_videoTexture = nullptr;
+-    m_committedPlane.reset();
+-    m_pendingPlane.reset();
++    m_committedFrame.invalidateNativePlane();
++    m_pendingFrame.invalidateNativePlane();
+ }
+ 
+ void AcceleratedBackingStore::updateVideoTarget(bool candidate)
+@@ -901,7 +906,7 @@ void AcceleratedBackingStore::updateVideoTarget(bool candidate)
+             m_videoLease = adoptGRef(G_OBJECT(request(surface)));
+             if (m_videoLease) {
+                 auto changed = +[](AcceleratedBackingStore* self) {
+-                    self->updateVideoTarget(self->m_videoCandidate);
++                    self->updateVideoTarget(self->m_committedFrame.nativeVideoCandidate);
+                     if (self->m_webPage)
+                         gtk_widget_queue_draw(self->m_webPage->viewWidget());
+                 };
+@@ -933,7 +938,7 @@ void AcceleratedBackingStore::updateVideoTarget(bool candidate)
+         return;
+     target.revision = m_videoTarget.revision + 1;
+     m_videoTarget = target;
+-    m_videoTexture = nullptr;
++    m_committedFrame.nativeTexture = nullptr;
+     if (m_surfaceID) {
+         if (RefPtr process = m_legacyMainFrameProcess.get())
+             process->send(Messages::AcceleratedSurface::SetVideoTarget(target), m_surfaceID);
+@@ -961,10 +966,10 @@ void AcceleratedBackingStore::setVideoSourceState(ProcessIdentifier process, uin
+         return m_sourceProcess == plane.sourceProcess
+             && m_activeVideoSources.accepts(plane.sourceRevision, plane.sourceSelection);
+     };
+-    if (m_pendingPlane && !accepts(*m_pendingPlane))
+-        m_pendingPlane.reset();
+-    if (m_committedPlane && !accepts(*m_committedPlane)) {
+-        m_committedPlane.reset(); m_videoTexture = nullptr;
++    if (m_pendingFrame.plane && !accepts(*m_pendingFrame.plane))
++        m_pendingFrame.plane.reset();
++    if (m_committedFrame.plane && !accepts(*m_committedFrame.plane)) {
++        m_committedFrame.plane.reset(); m_committedFrame.nativeTexture = nullptr;
+     }
+     gtk_widget_queue_draw(m_webPage->viewWidget());
+ }
+@@ -972,28 +977,27 @@ void AcceleratedBackingStore::setVideoSourceState(ProcessIdentifier process, uin
+ void AcceleratedBackingStore::videoFrame(uint64_t id, Rects&& damage, UnixFileDescriptor&& fence, uint64_t serial, std::optional<GTKVideoPlane>&& plane)
+ {
+     frame(id, WTF::move(damage), WTF::move(fence));
+-    if (!m_pendingBuffer || m_pendingBuffer->id() != id || serial <= m_lastVideoSerial)
++    if (!m_pendingFrame.buffer || m_pendingFrame.buffer->id() != id || serial <= m_lastVideoSerial)
+         return;
+     m_lastVideoSerial = serial;
+-    m_pendingVideoCandidate = true;
+     if (plane && (m_sourceProcess != plane->sourceProcess || !m_activeVideoSources.accepts(plane->sourceRevision, plane->sourceSelection)))
+         plane.reset();
+-    m_pendingPlane = WTF::move(plane);
++    m_pendingFrame.setNativeVideo(serial, WTF::move(plane));
+ }
+ 
+ bool AcceleratedBackingStore::snapshotNativeVideo(GtkSnapshot* snapshot)
+ {
+ #if GTK_CHECK_VERSION(4, 16, 0) && G_BYTE_ORDER == G_LITTLE_ENDIAN
+-    if (!m_videoTarget.ready || !m_committedPlane || !m_committedBuffer->texture())
++    if (!m_videoTarget.ready || !m_committedFrame.plane || !m_committedFrame.buffer->texture())
+         return false;
+-    auto& plane = *m_committedPlane;
+-    const auto& extent = m_committedBuffer->pixelSize();
++    auto& plane = *m_committedFrame.plane;
++    const auto& extent = m_committedFrame.buffer->pixelSize();
+     const auto& rect = plane.destination;
+     if (m_sourceProcess != plane.sourceProcess || !m_activeVideoSources.accepts(plane.sourceRevision, plane.sourceSelection)
+         || plane.revision != m_videoTarget.revision || plane.generation != m_videoTarget.generation || rect.isEmpty()
+         || rect.x() < 0 || rect.y() < 0 || rect.width() > extent.width() - rect.x() || rect.height() > extent.height() - rect.y())
+         return false;
+-    if (!m_videoTexture) {
++    if (!m_committedFrame.nativeTexture) {
+         size_t bytes = GTKVideoPlane::byteLength(plane.size, plane.stride);
+         struct stat st { };
+         constexpr int requiredSeals = F_SEAL_WRITE | F_SEAL_SHRINK | F_SEAL_GROW;
+@@ -1013,17 +1017,17 @@ bool AcceleratedBackingStore::snapshotNativeVideo(GtkSnapshot* snapshot)
+         gdk_memory_texture_builder_set_stride(builder.get(), plane.stride);
+         gdk_memory_texture_builder_set_format(builder.get(), GDK_MEMORY_R16G16B16A16);
+         gdk_memory_texture_builder_set_color_state(builder.get(), gdk_color_state_get_rec2100_pq());
+-        m_videoTexture = adoptGRef(gdk_memory_texture_builder_build(builder.get()));
+-        if (!m_videoTexture)
++        m_committedFrame.nativeTexture = adoptGRef(gdk_memory_texture_builder_build(builder.get()));
++        if (!m_committedFrame.nativeTexture)
+             return false;
+     }
+ 
+-    float scale = m_committedBuffer->deviceScaleFactor();
++    float scale = m_committedFrame.buffer->deviceScaleFactor();
+     auto clip = [scale](const IntRect& r) -> graphene_rect_t {
+         return GRAPHENE_RECT_INIT(r.x() / scale, r.y() / scale, r.width() / scale, r.height() / scale);
+     };
+     auto bounds = clip(rect);
+-    gtk_snapshot_append_texture(snapshot, m_videoTexture.get(), &bounds);
++    gtk_snapshot_append_texture(snapshot, m_committedFrame.nativeTexture.get(), &bounds);
+     // Keep the full SDR page available. Construct the hole in this GTK snapshot
+     // only; a revoked target can immediately present the very same SDR frame.
+     const IntRect bands[] = {
+@@ -1035,7 +1039,7 @@ bool AcceleratedBackingStore::snapshotNativeVideo(GtkSnapshot* snapshot)
+             continue;
+         auto bounds = clip(band);
+         gtk_snapshot_push_clip(snapshot, &bounds);
+-        m_committedBuffer->snapshot(snapshot);
++        m_committedFrame.buffer->snapshot(snapshot);
+         gtk_snapshot_pop(snapshot);
+     }
+     return true;
+@@ -1048,10 +1052,9 @@ bool AcceleratedBackingStore::snapshotNativeVideo(GtkSnapshot* snapshot)
+ 
+ void AcceleratedBackingStore::frame(uint64_t bufferID, Rects&& damageRects, WTF::UnixFileDescriptor&& renderingFenceFD)
+ {
+-    ASSERT(!m_pendingBuffer);
++    ASSERT(!m_pendingFrame.buffer);
+ #if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+-    m_pendingVideoCandidate = false;
+-    m_pendingPlane.reset();
++    m_pendingFrame.clearNativeVideo();
+ #endif
+     auto* buffer = m_buffers.get(bufferID);
+     if (!buffer) {
+@@ -1059,9 +1062,9 @@ void AcceleratedBackingStore::frame(uint64_t bufferID, Rects&& damageRects, WTF:
+         return;
+     }
+ 
+-    m_pendingBuffer = buffer;
++    m_pendingFrame.attach(RefPtr { buffer }, WTF::move(renderingFenceFD));
+     m_pendingDamageRects = WTF::move(damageRects);
+-    m_fenceMonitor.addFileDescriptor(WTF::move(renderingFenceFD));
++    m_fenceMonitor.addFileDescriptor(m_pendingFrame.takeRenderingFence());
+ }
+ 
+ void AcceleratedBackingStore::frameDone()
+@@ -1077,12 +1080,12 @@ void AcceleratedBackingStore::realize()
+ void AcceleratedBackingStore::unrealize()
+ {
+ #if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+-    m_videoCandidate = false;
+-    m_pendingVideoCandidate = false;
++    m_committedFrame.nativeVideoCandidate = false;
++    m_pendingFrame.nativeVideoCandidate = false;
+     updateVideoTarget(false);
+     clearVideoBinding();
+ #endif
+-    m_committedBuffer = nullptr;
++    m_committedFrame.clear();
+ 
+     if (m_gdkGLContext && m_gdkGLContext.get() == gdk_gl_context_get_current())
+         gdk_gl_context_clear_current();
+@@ -1116,9 +1119,9 @@ void AcceleratedBackingStore::update(const LayerTreeContext& context)
+         return;
+ 
+     if (m_surfaceID) {
+-        if (m_pendingBuffer) {
++        if (m_pendingFrame.buffer) {
+             frameDone();
+-            m_pendingBuffer = nullptr;
++            m_pendingFrame.clear();
+             m_pendingDamageRects = { };
+         }
+ 
+@@ -1135,8 +1138,8 @@ void AcceleratedBackingStore::update(const LayerTreeContext& context)
+     clearVideoBinding();
+     ++m_videoTarget.revision;
+     m_videoTarget.ready = false;
+-    m_videoCandidate = false;
+-    m_pendingVideoCandidate = false;
++    m_committedFrame.nativeVideoCandidate = false;
++    m_pendingFrame.nativeVideoCandidate = false;
+     m_lastVideoSerial = 0;
+ #endif
+ #if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+@@ -1153,25 +1156,17 @@ void AcceleratedBackingStore::update(const LayerTreeContext& context)
+ 
+ bool AcceleratedBackingStore::swapBuffersIfNeeded()
+ {
+-    if (!m_pendingBuffer || m_fenceMonitor.hasFileDescriptor())
++    if (!m_pendingFrame.buffer || m_fenceMonitor.hasFileDescriptor())
+         return false;
+ 
+-    if (m_pendingBuffer->type() == Buffer::Type::EglImage) {
++    if (m_pendingFrame.buffer->type() == Buffer::Type::EglImage) {
+         ensureGLContext();
+         gdk_gl_context_make_current(m_gdkGLContext.get());
+     }
+-    m_pendingBuffer->didUpdateContents(m_committedBuffer.get(), m_pendingDamageRects);
++    m_pendingFrame.buffer->didUpdateContents(m_committedFrame.buffer.get(), m_pendingDamageRects);
+     m_pendingDamageRects = { };
+ 
+-    if (m_committedBuffer)
+-        m_committedBuffer->release();
+-
+-    m_committedBuffer = WTF::move(m_pendingBuffer);
+-#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+-    m_videoCandidate = std::exchange(m_pendingVideoCandidate, false);
+-    m_committedPlane = std::exchange(m_pendingPlane, std::nullopt);
+-    m_videoTexture = nullptr;
+-#endif
++    m_committedFrame.commitFrom(WTF::move(m_pendingFrame));
+     return true;
+ }
+ 
+@@ -1179,14 +1174,14 @@ bool AcceleratedBackingStore::swapBuffersIfNeeded()
+ bool AcceleratedBackingStore::snapshot(GtkSnapshot* gtkSnapshot)
+ {
+     bool didSwapBuffers = swapBuffersIfNeeded();
+-    if (!m_committedBuffer)
++    if (!m_committedFrame.buffer)
+         return false;
+ 
+ #if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+-    updateVideoTarget(m_videoCandidate);
++    updateVideoTarget(m_committedFrame.nativeVideoCandidate);
+     if (!snapshotNativeVideo(gtkSnapshot))
+ #endif
+-        m_committedBuffer->snapshot(gtkSnapshot);
++        m_committedFrame.buffer->snapshot(gtkSnapshot);
+     if (didSwapBuffers)
+         frameDone();
+ 
+@@ -1196,10 +1191,10 @@ bool AcceleratedBackingStore::snapshot(GtkSnapshot* gtkSnapshot)
+ bool AcceleratedBackingStore::paint(cairo_t* cr, const IntRect& clipRect)
+ {
+     bool didSwapBuffers = swapBuffersIfNeeded();
+-    if (!m_committedBuffer)
++    if (!m_committedFrame.buffer)
+         return false;
+ 
+-    m_committedBuffer->paint(cr, clipRect);
++    m_committedFrame.buffer->paint(cr, clipRect);
+     if (didSwapBuffers)
+         frameDone();
+ 
+@@ -1209,23 +1204,23 @@ bool AcceleratedBackingStore::paint(cairo_t* cr, const IntRect& clipRect)
+ 
+ RendererBufferDescription AcceleratedBackingStore::bufferDescription() const
+ {
+-    auto* buffer = m_committedBuffer ? m_committedBuffer.get() : m_pendingBuffer.get();
++    auto* buffer = m_committedFrame.buffer ? m_committedFrame.buffer.get() : m_pendingFrame.buffer.get();
+     return buffer ? buffer->description() : RendererBufferDescription { };
+ }
+ 
+ RefPtr<NativeImage> AcceleratedBackingStore::bufferAsNativeImageForTesting() const
+ {
+-    if (!m_committedBuffer)
++    if (!m_committedFrame.buffer)
+         return nullptr;
+ 
+ #if USE(CAIRO)
+     // Scaling the surface is not supported with cairo, so in that case we will fall back to
+     // get the snapshot from the web view widget.
+-    if (m_committedBuffer->deviceScaleFactor() != 1)
++    if (m_committedFrame.buffer->deviceScaleFactor() != 1)
+         return nullptr;
+ #endif
+ 
+-    return m_committedBuffer->asNativeImageForTesting();
++    return m_committedFrame.buffer->asNativeImageForTesting();
+ }
+ 
+ } // namespace WebKit
+diff --git a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+index e0bc5b87..97b7df64 100644
+--- a/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
++++ b/Source/WebKit/UIProcess/gtk/AcceleratedBackingStore.h
+@@ -28,6 +28,7 @@
+ #include "FenceMonitor.h"
+ #include "MessageReceiver.h"
+ #include "RendererBufferDescription.h"
++#include "RendererBufferFrame.h"
+ #include <WebCore/DestinationColorSpace.h>
+ #include <WebCore/IntRect.h>
+ #include <WebCore/IntSize.h>
+@@ -147,6 +148,7 @@ private:
+         virtual void release() = 0;
+ 
+         uint64_t id() const { return m_id; }
++        const WebCore::DestinationColorSpace& colorSpace() const { return m_colorSpace; }
+         const WebCore::IntSize& pixelSize() const { return m_size; }
+         float deviceScaleFactor() const;
+         void setSurfaceID(uint64_t surfaceID) { m_surfaceID = surfaceID; }
+@@ -165,6 +167,8 @@ private:
+         uint64_t m_surfaceID { 0 };
+         WebCore::IntSize m_size;
+         RendererBufferFormat::Usage m_usage { RendererBufferFormat::Usage::Rendering };
++        // Every ordinary import is validated/converted to this page contract.
++        const WebCore::DestinationColorSpace m_colorSpace { WebCore::DestinationColorSpace::SRGB() };
+     };
+ 
+ #if GTK_CHECK_VERSION(4, 13, 4)
+@@ -265,8 +269,8 @@ private:
+     bool m_glContextInitialized { false };
+     uint64_t m_surfaceID { 0 };
+     WeakPtr<WebProcessProxy> m_legacyMainFrameProcess;
+-    RefPtr<Buffer> m_pendingBuffer;
+-    RefPtr<Buffer> m_committedBuffer;
++    RendererBufferFrame<Buffer> m_pendingFrame;
++    RendererBufferFrame<Buffer> m_committedFrame;
+ #if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+     WebCore::GTKVideoTarget m_videoTarget;
+     std::optional<WebCore::ProcessIdentifier> m_sourceProcess;
+@@ -274,11 +278,6 @@ private:
+     GRefPtr<GdkSurface> m_videoSurface;
+     GRefPtr<GObject> m_videoLease;
+     uint64_t m_lastVideoSerial { 0 };
+-    bool m_videoCandidate { false };
+-    bool m_pendingVideoCandidate { false };
+-    std::optional<WebCore::GTKVideoPlane> m_pendingPlane;
+-    std::optional<WebCore::GTKVideoPlane> m_committedPlane;
+-    GRefPtr<GdkTexture> m_videoTexture;
+ #endif
+     Rects m_pendingDamageRects;
+     HashMap<uint64_t, RefPtr<Buffer>> m_buffers;
+diff --git a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+index b2998dfc..37f89d1b 100644
+--- a/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
++++ b/Source/WebKit/WebProcess/WebPage/CoordinatedGraphics/AcceleratedSurface.cpp
+@@ -270,6 +270,12 @@ GraphicsContext* AcceleratedSurface::RenderTargetShareableBuffer::graphicsContex
+ 
+ void AcceleratedSurface::RenderTargetShareableBuffer::willRenderFrame()
+ {
++#if PLATFORM(GTK) && USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++    // Native metadata belongs to this rendering attempt, not to the reusable
++    // allocation. An interrupted prior attempt must not tag an ordinary frame.
++    m_videoSerial = 0;
++    m_videoPlane.reset();
++#endif
+     if (m_releaseFenceFD) {
+         if (auto fence = GLFence::importFD(PlatformDisplay::sharedDisplay().glDisplay(), WTF::move(m_releaseFenceFD)))
+             fence->serverWait();
+diff --git a/Tools/TestWebKitAPI/PlatformGTK.cmake b/Tools/TestWebKitAPI/PlatformGTK.cmake
+index 98ebbea4..b0472fdf 100644
+--- a/Tools/TestWebKitAPI/PlatformGTK.cmake
++++ b/Tools/TestWebKitAPI/PlatformGTK.cmake
+@@ -54,7 +54,12 @@ list(APPEND TestWebCore_SOURCES
+ if (USE_SKIA)
+     list(APPEND TestWebCore_SOURCES
+         Tests/WebCore/glib/SkiaWorkingTexture.cpp
++        Tests/WebCore/glib/RendererBufferFrame.cpp
+     )
++    list(APPEND TestWebCore_PRIVATE_INCLUDE_DIRECTORIES
++        "${WEBKIT_DIR}/Shared/gtk"
++    )
++    list(APPEND TestWebCore_LIBRARIES GTK::GTK)
+     if (USE_LCMS)
+         list(APPEND TestWebCore_SOURCES
+             Tests/WebCore/SkiaDecodedImageColour.cpp
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp
+new file mode 100644
+index 00000000..5f93cde4
+--- /dev/null
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp
+@@ -0,0 +1,151 @@
++/*
++ * Copyright (C) 2021 Apple Inc. All rights reserved.
++ * Copyright (C) 2025 Igalia, S.L.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS''
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL APPLE INC. OR ITS CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
++ * THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include "config.h"
++#include "Test.h"
++
++#if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
++#include "RendererBufferFrame.h"
++#include <WebCore/GTKNativeVideo.h>
++#include <array>
++#include <cerrno>
++#include <fcntl.h>
++#include <gtk/gtk.h>
++#include <unistd.h>
++#include <wtf/RefCounted.h>
++
++#if GTK_CHECK_VERSION(4, 16, 0)
++
++namespace TestWebKitAPI {
++namespace {
++
++static GRefPtr<GdkTexture> memoryTexture(bool pq)
++{
++    std::array<uint16_t, 4> pixels = pq ? std::array<uint16_t, 4> { 65535, 0, 0, 65535 } : std::array<uint16_t, 4> { 0x3c00, 0, 0, 0x3c00 };
++    auto bytes = adoptGRef(g_bytes_new(pixels.data(), sizeof(pixels)));
++    auto builder = adoptGRef(gdk_memory_texture_builder_new());
++    gdk_memory_texture_builder_set_bytes(builder.get(), bytes.get());
++    gdk_memory_texture_builder_set_width(builder.get(), 1);
++    gdk_memory_texture_builder_set_height(builder.get(), 1);
++    gdk_memory_texture_builder_set_stride(builder.get(), sizeof(pixels));
++    gdk_memory_texture_builder_set_format(builder.get(), pq ? GDK_MEMORY_R16G16B16A16 : GDK_MEMORY_R16G16B16A16_FLOAT_PREMULTIPLIED);
++    gdk_memory_texture_builder_set_color_state(builder.get(), pq ? gdk_color_state_get_rec2100_pq() : gdk_color_state_get_srgb());
++    return adoptGRef(gdk_memory_texture_builder_build(builder.get()));
++}
++
++// This replaces only the hardware allocation/import. Frame state, metadata
++// movement, colour-contract binding, and retirement are the production helper.
++class TestBuffer final : public RefCounted<TestBuffer> {
++public:
++    static Ref<TestBuffer> create(uint64_t id)
++    {
++        return adoptRef(*new TestBuffer(id));
++    }
++    const WebCore::DestinationColorSpace& colorSpace() const { return m_colorSpace; }
++    uint64_t id() const { return m_id; }
++    void rebuildTexture() { texture = memoryTexture(false); }
++    void release()
++    {
++        ++releaseCredits;
++        texture = nullptr;
++    }
++    GRefPtr<GdkTexture> texture;
++    unsigned releaseCredits { 0 };
++private:
++    explicit TestBuffer(uint64_t id) : m_id(id) { rebuildTexture(); }
++    uint64_t m_id;
++    WebCore::DestinationColorSpace m_colorSpace { WebCore::DestinationColorSpace::SRGB() };
++};
++
++TEST(RendererBufferFrame, SameIDNativeToOrdinaryRetainsTextureAndRetiresAllocationOnce)
++{
++    using Frame = WebKit::RendererBufferFrame<TestBuffer>;
++    auto page = TestBuffer::create(7);
++    ASSERT_TRUE(page->texture);
++    Frame pending;
++    pending.attach(RefPtr { page.ptr() }, { });
++    // Pixel seals and source authorization are separate acceptance boundaries;
++    // this case exercises the committed metadata and allocation ownership.
++    WebCore::GTKVideoPlane plane { 1, 1, WebCore::ProcessIdentifier::generate(), 1, 1, 1, 1, { { }, { 1, 1 } }, { 1, 1 }, 8, { } };
++    pending.setNativeVideo(11, std::make_optional(WTF::move(plane)));
++    Frame committed;
++    committed.commitFrom(WTF::move(pending));
++    ASSERT_TRUE(committed.plane);
++    EXPECT_TRUE(committed.nativeVideoCandidate);
++    EXPECT_EQ(11u, committed.nativeVideoSerial);
++    committed.nativeTexture = memoryTexture(true);
++    ASSERT_TRUE(committed.nativeTexture);
++    EXPECT_TRUE(gdk_color_state_equal(gdk_texture_get_color_state(committed.nativeTexture.get()), gdk_color_state_get_rec2100_pq()));
++
++    // The next ordinary frame uses the identical allocation and a fresh page
++    // texture. Its fence transfers to the monitor exactly once and must finish
++    // before the caller commits, as in swapBuffersIfNeeded().
++    int pipeFDs[2];
++    ASSERT_EQ(0, pipe(pipeFDs));
++    UnixFileDescriptor readEnd { pipeFDs[0], UnixFileDescriptor::Adopt };
++    UnixFileDescriptor writeEnd { pipeFDs[1], UnixFileDescriptor::Adopt };
++    int fenceFD = readEnd.value();
++    page->rebuildTexture();
++    auto* rebuilt = page->texture.get();
++    pending.attach(RefPtr { page.ptr() }, WTF::move(readEnd));
++    auto waitingFence = pending.takeRenderingFence();
++    EXPECT_EQ(fenceFD, waitingFence.value());
++    EXPECT_FALSE(pending.takeRenderingFence());
++    EXPECT_GE(fcntl(fenceFD, F_GETFD), 0);
++    waitingFence = { }; // FenceMonitor completion releases its owned descriptor.
++    errno = 0;
++    EXPECT_EQ(-1, fcntl(fenceFD, F_GETFD));
++    EXPECT_EQ(EBADF, errno);
++    committed.commitFrom(WTF::move(pending));
++
++    EXPECT_EQ(7u, committed.buffer->id());
++    EXPECT_EQ(rebuilt, committed.buffer->texture.get());
++    EXPECT_EQ(0u, page->releaseCredits);
++    EXPECT_FALSE(committed.nativeVideoCandidate);
++    EXPECT_FALSE(committed.plane);
++    EXPECT_FALSE(committed.nativeTexture);
++    EXPECT_EQ(0u, committed.nativeVideoSerial);
++    EXPECT_TRUE(committed.colorSpace() == WebCore::DestinationColorSpace::SRGB());
++    EXPECT_TRUE(gdk_color_state_equal(gdk_texture_get_color_state(committed.buffer->texture.get()), gdk_color_state_get_srgb()));
++
++    // ReleaseBuffer credits belong to the allocation. Return the old credit
++    // only when a different allocation replaces it, then never return it again.
++    auto replacement = TestBuffer::create(8);
++    pending.attach(RefPtr { replacement.ptr() }, { });
++    committed.commitFrom(WTF::move(pending));
++    EXPECT_EQ(1u, page->releaseCredits);
++    EXPECT_FALSE(page->texture);
++    auto third = TestBuffer::create(9);
++    pending.attach(RefPtr { third.ptr() }, { });
++    committed.commitFrom(WTF::move(pending));
++    EXPECT_EQ(1u, page->releaseCredits);
++    EXPECT_EQ(1u, replacement->releaseCredits);
++}
++
++} // namespace
++} // namespace TestWebKitAPI
++#endif // GTK_CHECK_VERSION(4, 16, 0)
++#endif
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+index 052fda80..c8a5f6f7 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+@@ -30,8 +30,10 @@
+ #if USE(SKIA) && USE(COORDINATED_GRAPHICS)
+ #include "WebCoreTestUtilities.h"
+ #include <WebCore/BitmapTexturePool.h>
++#include <WebCore/Color.h>
+ #include <WebCore/CoordinatedTileBuffer.h>
+ #include <WebCore/GLContext.h>
++#include <WebCore/NativeImage.h>
+ #include <WebCore/PlatformDisplaySurfaceless.h>
+ #include <array>
+ #include <epoxy/gl.h>
+@@ -40,6 +42,7 @@
+ #include <skia/core/SkPixmap.h>
+ #include <skia/core/SkSurface.h>
+ #include <skia/gpu/ganesh/GrDirectContext.h>
++#include <skia/gpu/ganesh/SkSurfaceGanesh.h>
+ 
+ namespace TestWebKitAPI {
+ using namespace WebCore;
+@@ -127,6 +130,25 @@ TEST_F(SkiaWorkingTextureTest, P3PixelsAreConvertedBeforeRawTextureSampling)
+     EXPECT_NEAR(1.f, result[3], 0.001f);
+ }
+ 
++TEST_F(SkiaWorkingTextureTest, GPUOnePixelSolidColorRetainsExtendedRGBAndAlpha)
++{
++    auto* grContext = PlatformDisplay::sharedDisplay().skiaGrContext();
++    if (!grContext->colorTypeSupportedAsSurface(kRGBA_F16_SkColorType))
++        GTEST_SKIP() << "No Skia F16 render target support";
++    auto surface = SkSurfaces::RenderTarget(grContext, skgpu::Budgeted::kNo, workingInfo(1, 1), 0, kTopLeft_GrSurfaceOrigin, nullptr);
++    ASSERT_TRUE(surface);
++    surface->getCanvas()->drawColor(SkColor4f { 1.2f, -0.1f, 0.2f, 0.5f }, SkBlendMode::kSrc);
++    auto image = NativeImage::create(surface->makeImageSnapshot(), grContext);
++    ASSERT_TRUE(image);
++    auto color = image->singlePixelSolidColor();
++    ASSERT_TRUE(color);
++    auto rgba = color->toColorTypeLossy<ExtendedSRGBA<float>>().resolved();
++    EXPECT_NEAR(1.2f, rgba.red, 0.002f);
++    EXPECT_NEAR(-0.1f, rgba.green, 0.002f);
++    EXPECT_NEAR(0.2f, rgba.blue, 0.002f);
++    EXPECT_NEAR(0.5f, rgba.alpha, 0.002f);
++}
++
+ TEST_F(SkiaWorkingTextureTest, PoolKeepsFixedAndFloatStorageDistinct)
+ {
+     auto floatInfo = workingInfo(7, 3);
+-- 
+2.54.0 (Apple Git-157)
+

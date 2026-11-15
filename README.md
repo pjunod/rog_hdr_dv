@@ -20,7 +20,7 @@ repository owns the operating-system display work.
 
 ## What works today (2026-11-13)
 
-Showtime `50.0-2+rogdv5.12` is installed with a clean package audit. Bounded owner-attended HDR, brightness, fullscreen, tiling, DPMS and Night Light checks returned to baseline. One suspend request produced two kernel freezer failures on an NFS media read, without actual sleep; suspend acceptance remains open. Player 0.5.1 is installed; owner-started P7 playback advanced through a seek with native DV active after the approved corrected-kernel boot. [Current results and limits](docs/STATUS.md) · [NFS suspend diagnosis](docs/SUSPEND_NFS_READER.md). Installed Image Viewer and GNOME Web also passed a bounded owner-observed chart-loading check; measured cross-app equivalence remains open ([image route](docs/GNOME_IMAGE_COLOUR.md#installed-normal-desktop-route-check--november-13)).
+Showtime `50.0-2+rogdv5.12` is installed with a clean package audit. Bounded owner-attended HDR, brightness, fullscreen, tiling, DPMS and Night Light checks returned to baseline. One suspend request produced two kernel freezer failures on an NFS media read, without actual sleep; suspend acceptance remains open. Player 0.5.1 is installed; owner-started P7 playback advanced through a seek with native DV active after the approved corrected-kernel boot. [Current results and limits](docs/STATUS.md) · [NFS suspend diagnosis](docs/SUSPEND_NFS_READER.md). Installed Image Viewer and GNOME Web passed a bounded owner-observed chart-loading check. A later measured comparison reproduced browser gamut loss; the shared GTK/WebKit correction is in progress and cross-app equivalence remains open ([image route](docs/GNOME_IMAGE_COLOUR.md#installed-normal-desktop-route-check--november-13)).
 
 The historical coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. At that install, versions included mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance was pending at that historical handoff; the bounded November 13 checks are recorded above and in the current status. Historical private-compositor playback receipts retain their original scope. [Release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop handoff](docs/SOFTWARE_DELIVERY.md).
 
@@ -55,6 +55,12 @@ the fix and retains Ubuntu security policies; see the
 through the existing packaged mapper. The corrected entry passed a bounded November 7 local-file launch/playback trial
 while preserving all eight implicit mpv defaults; no other-application or optical
 acceptance is inferred.
+
+The [GTK/WebKit image-colour diagnosis](docs/GTK_WEBKIT_IMAGE_COLOUR.md)
+records the later installed comparison: Image Viewer retained the float
+reference within 0.5 median PQ10 code, while Web differed by up to 140 on
+saturated patches. The proposed shared correction is not implemented or
+installed; appearance agreement is not numerical acceptance.
 
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
@@ -156,6 +162,7 @@ has the remote and branch rules.
 | Document | Answers |
 |---|---|
 | [GNOME image colour](docs/GNOME_IMAGE_COLOUR.md) | Ordinary Image Viewer ICC gamut, precision, sandboxed TIFF metadata, package source and recovery |
+| [GTK colour-owner fixture](docs/GTK_COLOUR_OWNER_FIXTURE.md) | Testing default Vulkan rejection and renderer fallback without invented capabilities |
 | [GStreamer per-picture RPU transport](docs/GSTREAMER_DOLBY_TRANSPORT.md) | Picture-owned RPU contract, Software/VA/NVIDIA transport and phase boundaries |
 | [GStreamer resolved Dolby pictures](docs/GSTREAMER_DOLBY_RECONSTRUCTION.md) | Decoder-owned frame state, native software and Intel controls, and the ABI for renderers |
 | [Status](docs/STATUS.md) · [status page](docs/STATUS.html) | What is proven, what is installed, what remains |

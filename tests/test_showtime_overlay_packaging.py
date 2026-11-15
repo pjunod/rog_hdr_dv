@@ -46,10 +46,10 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             root = Path(directory); play = self.workspace(root)
             packages.prepare(root)
             receipt = json.loads((root / 'showtime-source-preparation.json').read_text())
-            self.assertEqual(receipt['source_version'], '50.0-2+rogdv5.12')
+            self.assertEqual(receipt['source_version'], '50.0-2+rogdv5.13')
             self.assertEqual(receipt['patches'], self.series['patches'])
             self.assertEqual(hashlib.sha256(play.read_bytes()).hexdigest(), self.series['patches'][-1]['result_play_sha256'])
-            self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.12)'))
+            self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.13)'))
             self.assertIn('gstreamer1.0-plugins-base (= 1.28.7-1+rogdv3)',
                           (root / 'showtime-50.0/debian/control').read_text())
             inventory = json.loads((root / 'package-output-inventory.json').read_text())
@@ -58,7 +58,7 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             packages.prepare(root)
             self.assertEqual(play.read_bytes(), before, 'prepared source rerun is idempotent')
             self.assertEqual(packages.CORE_VERSION, '0.1.0+rogdv10')
-            self.assertEqual(packages.GTK_VERSION, '0.15.2-1ubuntu2+rogdv5.6')
+            self.assertEqual(packages.GTK_VERSION, '0.15.2-1ubuntu2+rogdv5.7')
 
     def test_showtime_only_preparation_preserves_unrelated_gtk_workspace(self):
         with tempfile.TemporaryDirectory() as directory:

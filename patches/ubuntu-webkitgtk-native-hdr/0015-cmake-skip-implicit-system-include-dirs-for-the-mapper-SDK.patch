@@ -1,0 +1,47 @@
+From 563a77c850b15834e6002f3ad77a0aaecafbf9fb Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 14 Nov 2026 21:28:01 +0000
+Subject: [PATCH] Skip implicit system include directories for the mapper SDK
+ root
+
+The native-video source adds GTK_DOVI_SDK_ROOT to one file's include
+directories. With the SDK from the distribution -dev package, packaging
+defaults that root to /usr/include, which reached the compile line as
+-isystem /usr/include and broke libstdc++'s #include_next <stdlib.h>.
+That directory is already searched implicitly. Compare real paths against
+the compiler's implicit include directories and add the root only when it
+is not one of them; a non-system SDK root is unchanged.
+
+Agent-Model: claude-opus-5-5
+Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ Source/WebCore/PlatformGTK.cmake | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/Source/WebCore/PlatformGTK.cmake b/Source/WebCore/PlatformGTK.cmake
+index 620edaec..ad5c3f3c 100644
+--- a/Source/WebCore/PlatformGTK.cmake
++++ b/Source/WebCore/PlatformGTK.cmake
+@@ -9,7 +9,21 @@ include(platform/TextureMapper.cmake)
+ # ABI/symbol lookup, never a new codec/provider link dependency in WebKit.
+ if (ENABLE_VIDEO AND USE_GSTREAMER)
+     find_path(GTK_DOVI_SDK_ROOT NAMES gst-gtk-dovi-1.0/mapper.h)
++    # A distribution -dev package installs the SDK under an implicit system
++    # include directory, which is searched already. Re-adding it reaches the
++    # compile line as -isystem /usr/include and breaks libstdc++'s
++    # #include_next <stdlib.h>, so compare real paths and skip that case.
++    set(_gtk_dovi_sdk_is_implicit FALSE)
+     if (GTK_DOVI_SDK_ROOT)
++        file(REAL_PATH "${GTK_DOVI_SDK_ROOT}" _gtk_dovi_sdk_root)
++        foreach (_gtk_dovi_dir IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES)
++            file(REAL_PATH "${_gtk_dovi_dir}" _gtk_dovi_dir)
++            if (_gtk_dovi_dir STREQUAL _gtk_dovi_sdk_root)
++                set(_gtk_dovi_sdk_is_implicit TRUE)
++            endif ()
++        endforeach ()
++    endif ()
++    if (GTK_DOVI_SDK_ROOT AND NOT _gtk_dovi_sdk_is_implicit)
+         set_property(SOURCE "${WEBCORE_DIR}/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp"
+             APPEND PROPERTY INCLUDE_DIRECTORIES "${GTK_DOVI_SDK_ROOT}")
+     endif ()

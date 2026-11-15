@@ -1,0 +1,129 @@
+From 3a36d41e05708abafad13baa528ae597ea101878 Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 02:58:53 -0500
+Subject: [PATCH 8/8] Keep focused image-colour checks outside the default
+ shipping build
+
+Add one excluded executable using the existing TestWebCore controller and main, the three image-colour regression sources, the normal framework link macros and the shipping WebCore OBJECT producer. Make the existing gtest wrapper available as an excluded dependency with API tests disabled. Bind existing private headers only within the consumer target and use candidate build-tree runtime dependencies.
+
+No ENABLE_/USE_ feature setting or product SDK export changes. Configuration, compilation, linked dependency validation and tests remain unexecuted pending coordinator review/admission.
+---
+ Source/CMakeLists.txt                         |  4 +
+ Tools/CMakeLists.txt                          |  6 ++
+ .../TestWebKitAPI/ImageColour/CMakeLists.txt  | 75 +++++++++++++++++++
+ 3 files changed, 85 insertions(+)
+ create mode 100644 Tools/TestWebKitAPI/ImageColour/CMakeLists.txt
+
+diff --git a/Source/CMakeLists.txt b/Source/CMakeLists.txt
+index 614318ab..b28722fc 100644
+--- a/Source/CMakeLists.txt
++++ b/Source/CMakeLists.txt
+@@ -25,6 +25,10 @@ endif ()
+ 
+ if (ENABLE_API_TESTS)
+     add_subdirectory(ThirdParty/gtest)
++elseif (PORT STREQUAL "GTK" AND USE_GTK4 AND USE_SKIA AND USE_LCMS)
++    # The focused image-colour executable reuses the shipping producer objects.
++    # Neither it nor gtest belongs to the default build or changes API features.
++    add_subdirectory(ThirdParty/gtest EXCLUDE_FROM_ALL)
+ endif ()
+ 
+ if (USE_XDGMIME)
+diff --git a/Tools/CMakeLists.txt b/Tools/CMakeLists.txt
+index deb83da8..f62e6c62 100644
+--- a/Tools/CMakeLists.txt
++++ b/Tools/CMakeLists.txt
+@@ -24,3 +24,9 @@ endif ()
+ if (ENABLE_API_TESTS)
+     add_subdirectory(TestWebKitAPI)
+ endif ()
++
++# Keep focused native producer checks available with the shipping API-test
++# feature disabled. Directory exclusion also excludes all helper targets.
++if (PORT STREQUAL "GTK" AND USE_GTK4 AND USE_SKIA AND USE_LCMS)
++    add_subdirectory(TestWebKitAPI/ImageColour EXCLUDE_FROM_ALL)
++endif ()
+diff --git a/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt b/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt
+new file mode 100644
+index 00000000..1105b33d
+--- /dev/null
++++ b/Tools/TestWebKitAPI/ImageColour/CMakeLists.txt
+@@ -0,0 +1,75 @@
++# One focused executable, using the existing TestWebCore harness and the exact
++# WebCore OBJECT producer compiled for this build. Do not enable API_TESTS or
++# change any shipping ENABLE_/USE_ setting to build these checks.
++set(TESTWEBKITAPI_DIR "${TOOLS_DIR}/TestWebKitAPI")
++
++set(TestWebCoreImageColour_SOURCES
++    "${TESTWEBKITAPI_DIR}/TestsController.cpp"
++    "${TESTWEBKITAPI_DIR}/generic/main.cpp"
++    "${TESTWEBKITAPI_DIR}/Tests/WebCore/SkiaDecodedImageColour.cpp"
++    "${TESTWEBKITAPI_DIR}/Tests/WebCore/glib/SkiaWorkingTexture.cpp"
++    "${TESTWEBKITAPI_DIR}/Tests/WebCore/glib/RendererBufferFrame.cpp"
++)
++
++# These existing private headers are not all in the framework header inventory.
++# Bind only this target's WebCore/ include spelling to the actual source header;
++# no header or symbol is added to a product SDK or export list.
++set(imageColourForwardingHeaders "${CMAKE_CURRENT_BINARY_DIR}/PrivateHeaders")
++foreach (header IN ITEMS
++    platform/graphics/egl/GLContext.h
++    platform/graphics/texmap/BitmapTexture.h
++    platform/graphics/texmap/BitmapTexturePool.h
++    platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h
++    platform/image-decoders/jpeg/JPEGImageDecoder.h
++    platform/image-decoders/png/PNGImageDecoder.h
++)
++    get_filename_component(headerName "${header}" NAME)
++    file(GENERATE
++        OUTPUT "${imageColourForwardingHeaders}/WebCore/${headerName}"
++        CONTENT "#include \"${WEBCORE_DIR}/${header}\"\n"
++    )
++endforeach ()
++
++set(TestWebCoreImageColour_PRIVATE_INCLUDE_DIRECTORIES
++    "${imageColourForwardingHeaders}"
++    "${CMAKE_BINARY_DIR}"
++    "${TESTWEBKITAPI_DIR}"
++    "${WEBKIT_DIR}/Shared/gtk"
++    "$<TARGET_PROPERTY:WebCore,INCLUDE_DIRECTORIES>"
++)
++set(TestWebCoreImageColour_PRIVATE_DEFINITIONS BUILDING_TestWebCore)
++set(TestWebCoreImageColour_DEFINITIONS WEBKIT_SRC_DIR="${CMAKE_SOURCE_DIR}")
++set(TestWebCoreImageColour_LIBRARIES
++    WebKit::gtest
++    GTK::GTK
++    JPEG::JPEG
++    LCMS2::LCMS2
++    Epoxy::Epoxy
++)
++set(TestWebCoreImageColour_FRAMEWORKS JavaScriptCore PAL WTF WebCore)
++if (NOT USE_SYSTEM_MALLOC)
++    list(APPEND TestWebCoreImageColour_FRAMEWORKS bmalloc)
++endif ()
++
++add_executable(TestWebCoreImageColour EXCLUDE_FROM_ALL "${CMAKE_BINARY_DIR}/cmakeconfig.h")
++# Use the normal executable framework macro: on GTK this includes the existing
++# $<TARGET_OBJECTS:WebCore> rather than compiling replacement producer sources.
++WEBKIT_EXECUTABLE(TestWebCoreImageColour)
++set_target_properties(TestWebCoreImageColour PROPERTIES
++    EXCLUDE_FROM_ALL TRUE
++    # Debian's shipping targets use install RPATHs. This noninstalled consumer
++    # must resolve its linked candidate libraries in the existing build tree.
++    BUILD_WITH_INSTALL_RPATH FALSE
++    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/TestWebKitAPI"
++)
++if (COMPILER_IS_GCC_OR_CLANG)
++    WEBKIT_ADD_TARGET_CXX_FLAGS(TestWebCoreImageColour
++        -Wno-dangling-else
++        -Wno-sign-compare
++        -Wno-undef
++        -Wno-unused-parameter
++    )
++endif ()
++
++# Run this executable explicitly with GoogleTest filter/XML arguments. Do not
++# enable the global API-test feature or register an implicit default test run.
+-- 
+2.54.0 (Apple Git-157)
+

@@ -1,0 +1,110 @@
+From 277f494d00f76fab52e2056469ee847396ccf577 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Sat, 14 Nov 2026 21:28:02 +0000
+Subject: [PATCH] Make the focused image-colour regressions build in 2.52.6
+
+The first build and run of TestWebCoreImageColour found three fixture
+defects; no shipping code changes:
+
+- pass ICC bytes as explicit const spans, and spell the draw rectangle as
+  a FloatRect; both calls are ambiguous in 2.52.6
+- build the LUT-only P3 test profile with a 16-bit CLUT. lutAtoBType
+  serialises only 8/16-bit CLUTs, so the float CLUT made
+  cmsSaveProfileToMem fail. The u1Fixed15 table keeps the same XYZ
+
+Agent-Model: claude-opus-5-5
+Agent-Session: 01BCWL9zQ3AH5jz3cWrpdXCg
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../Tests/WebCore/SkiaDecodedImageColour.cpp   | 18 ++++++++++--------
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp  |  2 +-
+ 2 files changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+index 3808aa18..2f1232b1 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp
+@@ -58,20 +58,22 @@ static std::vector<uint8_t> linearP3Profile(bool useLUT = false)
+             { 0.241182f, 0.692236f, 0.066582f },
+             { -0.001049f, 0.041882f, 0.784378f }
+         };
+-        std::array<float, 24> table;
++        std::array<cmsUInt16Number, 24> table;
+         unsigned offset = 0;
+         for (unsigned r = 0; r < 2; ++r) {
+             for (unsigned g = 0; g < 2; ++g) {
+                 for (unsigned b = 0; b < 2; ++b) {
+                     for (unsigned c = 0; c < 3; ++c)
+                         // ICC LUT PCS XYZ uses 0x8000 for physical XYZ 1.0.
+-                        table[offset++] = std::max(0.f, matrix[c][0] * r + matrix[c][1] * g + matrix[c][2] * b) / (65535.f / 32768.f);
++                        table[offset++] = static_cast<cmsUInt16Number>(std::lround(std::clamp(matrix[c][0] * r + matrix[c][1] * g + matrix[c][2] * b, 0.f, 65535.f / 32768.f) * 32768.f));
+                 }
+             }
+         }
+         auto* pipeline = cmsPipelineAlloc(nullptr, 3, 3);
+         cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocToneCurves(nullptr, 3, nullptr));
+-        cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocCLutFloat(nullptr, 2, 3, 3, table.data()));
++        // lutAtoBType serializes only 8/16-bit CLUTs; a float CLUT stage makes
++        // cmsSaveProfileToMem fail. 16-bit u1Fixed15 keeps the same XYZ.
++        cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocCLut16bit(nullptr, 2, 3, 3, table.data()));
+         cmsPipelineInsertStage(pipeline, cmsAT_END, cmsStageAllocToneCurves(nullptr, 3, nullptr));
+         EXPECT_TRUE(cmsWriteTag(profile, cmsSigAToB0Tag, pipeline));
+         cmsPipelineFree(pipeline);
+@@ -203,7 +205,7 @@ TEST(SkiaDecodedImageColour, PNG16InterlaceAndAPNGKeepPrecisionAndAlpha)
+ {
+     for (bool interlaced : { false, true }) {
+         auto bytes = png16(false, interlaced);
+-        auto buffer = SharedBuffer::create(std::span { bytes });
++        auto buffer = SharedBuffer::create(std::span<const uint8_t> { bytes });
+         auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, GammaAndColorProfileOption::Ignored);
+         decoder->setData(buffer, true);
+         auto image = decoder->createFrameImageAtIndex(0);
+@@ -215,7 +217,7 @@ TEST(SkiaDecodedImageColour, PNG16InterlaceAndAPNGKeepPrecisionAndAlpha)
+         EXPECT_GT(readback[4] - readback[0], 0.0005f);
+     }
+     auto bytes = png16(true);
+-    auto buffer = SharedBuffer::create(std::span { bytes });
++    auto buffer = SharedBuffer::create(std::span<const uint8_t> { bytes });
+     auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, GammaAndColorProfileOption::Ignored);
+     decoder->setData(buffer, true);
+     auto image = decoder->createFrameImageAtIndex(1);
+@@ -233,7 +235,7 @@ TEST(SkiaDecodedImageColour, SourceProfileSurvivesN32AndUnsupportedProfileUsesFl
+         auto bytes = linearP3Profile(useLUT);
+         auto store = ImageBackingStore::create({ 2, 1 }, true);
+         ASSERT_TRUE(store);
+-        ASSERT_TRUE(store->setColorProfile(SharedBuffer::create(std::span { bytes })));
++        ASSERT_TRUE(store->setColorProfile(SharedBuffer::create(std::span<const uint8_t> { bytes })));
+         store->setPixel(0, 0, 255, 0, 0, 128);
+         store->setPixel(1, 0, 255, 0, 0, 255);
+         auto copy = ImageBackingStore::create(*store);
+@@ -258,7 +260,7 @@ TEST(SkiaDecodedImageColour, SourceProfileSurvivesN32AndUnsupportedProfileUsesFl
+     }
+     auto store = ImageBackingStore::create({ 1, 1 });
+     std::array<uint8_t, 4> invalid { 1, 2, 3, 4 };
+-    EXPECT_FALSE(store->setColorProfile(SharedBuffer::create(std::span { invalid })));
++    EXPECT_FALSE(store->setColorProfile(SharedBuffer::create(std::span<const uint8_t> { invalid })));
+     EXPECT_TRUE(store->imageInfo().colorSpace()->isSRGB());
+ }
+ 
+@@ -266,7 +268,7 @@ TEST(SkiaDecodedImageColour, PNGICCTransferOwnsTheSamplesBeforeGamma)
+ {
+     auto profile = linearP3Profile();
+     auto bytes = png16(false, false, profile);
+-    auto buffer = SharedBuffer::create(std::span { bytes });
++    auto buffer = SharedBuffer::create(std::span<const uint8_t> { bytes });
+     for (auto option : { GammaAndColorProfileOption::Applied, GammaAndColorProfileOption::Ignored }) {
+         auto decoder = PNGImageDecoder::create(AlphaOption::Premultiplied, option);
+         decoder->setData(buffer, true);
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+index d14fc03c..f5c63e5d 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+@@ -153,7 +153,7 @@ TEST_F(SkiaTextureContextTest, LegacyU8AllocationUploadCopySampleHasNoGLError)
+     auto sampled = BitmapTexturePool::singleton().acquireTexture(info, { BitmapTexture::Flags::SupportsAlpha });
+     auto mapper = TextureMapper::create();
+     mapper->beginPainting(TextureMapper::FlipY::No, sampled.ptr());
+-    mapper->drawTexture(copied.get(), { { }, { 2, 1 } }, { }, 1.f, TextureMapper::AllEdgesExposed::No);
++    mapper->drawTexture(copied.get(), FloatRect { 0, 0, 2, 1 }, { }, 1.f, TextureMapper::AllEdgesExposed::No);
+     mapper->endPainting();
+     GLuint framebuffer;
+     glGenFramebuffers(1, &framebuffer);

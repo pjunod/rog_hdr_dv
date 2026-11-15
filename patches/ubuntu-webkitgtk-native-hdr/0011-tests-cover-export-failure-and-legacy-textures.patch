@@ -1,0 +1,311 @@
+From 010db130de49628a040e89083f369e9beecd86ea Mon Sep 17 00:00:00 2001
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 14 Nov 2026 03:50:08 -0500
+Subject: [PATCH 10/11] Cover rejected page layouts and ordinary legacy
+ fallback
+
+Prepare six focused cases for actual tuple admission before publication, legal fallback, transactional late import failure, ownership acknowledgements, bounded static-page recovery, and the ordinary U8 GL allocation/upload/copy/sample path. Fix the process-type scope lifetime and record actual GL API/version/renderer.
+
+All regression sources are prepared only; no compiler, configure or tests were executed.
+---
+ Tools/TestWebKitAPI/PlatformGTK.cmake         |   1 +
+ .../WebCore/glib/RendererBufferFrame.cpp      | 144 ++++++++++++++++++
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp |  72 ++++++++-
+ 3 files changed, 209 insertions(+), 8 deletions(-)
+
+diff --git a/Tools/TestWebKitAPI/PlatformGTK.cmake b/Tools/TestWebKitAPI/PlatformGTK.cmake
+index b0472fdf..a4274f32 100644
+--- a/Tools/TestWebKitAPI/PlatformGTK.cmake
++++ b/Tools/TestWebKitAPI/PlatformGTK.cmake
+@@ -58,6 +58,7 @@ if (USE_SKIA)
+     )
+     list(APPEND TestWebCore_PRIVATE_INCLUDE_DIRECTORIES
+         "${WEBKIT_DIR}/Shared/gtk"
++        "${WEBKIT_DIR}/Shared/glib"
+     )
+     list(APPEND TestWebCore_LIBRARIES GTK::GTK)
+     if (USE_LCMS)
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp
+index 5f93cde4..e1086eeb 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp
+@@ -29,10 +29,12 @@
+ 
+ #if USE(GTK4) && ENABLE(VIDEO) && USE(GSTREAMER)
+ #include "RendererBufferFrame.h"
++#include "RendererBufferFormat.h"
+ #include <WebCore/GTKNativeVideo.h>
+ #include <array>
+ #include <cerrno>
+ #include <fcntl.h>
++#include <memory>
+ #include <gtk/gtk.h>
+ #include <unistd.h>
+ #include <wtf/RefCounted.h>
+@@ -145,6 +147,148 @@ TEST(RendererBufferFrame, SameIDNativeToOrdinaryRetainsTextureAndRetiresAllocati
+     EXPECT_EQ(1u, replacement->releaseCredits);
+ }
+ 
++TEST(RendererBufferLayouts, RejectsActualModifierOrFourccBeforePublishingLegalFallback)
++{
++    constexpr uint32_t f16 = 0x48344241; // DRM AB4H
++    constexpr uint32_t otherF16 = 0x48345241; // DRM AR4H
++    constexpr uint32_t u8 = 0x34325241; // DRM AR24
++    Vector<WebKit::RendererBufferFormat::Format> allowed { { f16, { 17 } }, { u8, { 23 } } };
++    struct Allocation {
++        uint32_t format;
++        uint64_t layout;
++        unsigned& destroyed;
++        Allocation(uint32_t format, uint64_t layout, unsigned& destroyed) : format(format), layout(layout), destroyed(destroyed) { }
++        ~Allocation() { ++destroyed; }
++        uint32_t fourcc() const { return format; }
++        uint64_t modifier() const { return layout; }
++    };
++    for (bool wrongFourcc : { false, true }) {
++        unsigned destroyed = 0;
++        unsigned published = 0;
++        auto result = WebKit::createAllowedRendererBuffer(allowed.span(), true, [&](bool floating) {
++            return std::make_unique<Allocation>(floating ? (wrongFourcc ? otherF16 : f16) : u8, floating ? (wrongFourcc ? 17u : 19u) : 23u, destroyed);
++        }, [&](std::unique_ptr<Allocation>&& allocation) {
++            EXPECT_EQ(1u, destroyed); // The rejected export was disposed before IPC.
++            EXPECT_EQ(u8, allocation->fourcc());
++            EXPECT_EQ(23u, allocation->modifier());
++            ++published;
++            return WTF::move(allocation);
++        });
++        ASSERT_TRUE(result);
++        EXPECT_EQ(1u, published);
++        result = nullptr;
++        EXPECT_EQ(2u, destroyed);
++    }
++}
++
++TEST(RendererBufferLayouts, RejectedActualFloatAndPackedLayoutsReachSHMWithoutPublication)
++{
++    constexpr uint32_t f16 = 0x48344241;
++    constexpr uint32_t u8 = 0x34325241;
++    Vector<WebKit::RendererBufferFormat::Format> allowed { { f16, { 17 } }, { u8, { 23 } } };
++    struct Allocation {
++        uint32_t format;
++        uint32_t fourcc() const { return format; }
++        uint64_t modifier() const { return 99; }
++    };
++    unsigned publications = 0;
++    auto result = WebKit::createAllowedRendererBuffer(allowed.span(), true, [&](bool floating) {
++        return std::make_unique<Allocation>(Allocation { floating ? f16 : u8 });
++    }, [&](std::unique_ptr<Allocation>&& allocation) {
++        ++publications;
++        return WTF::move(allocation);
++    });
++    EXPECT_FALSE(result);
++    EXPECT_EQ(0u, publications);
++    // The production caller selects its existing SHM allocator when no actual
++    // export is admitted; that leaf never publishes either illegal tuple.
++    WebKit::RendererBufferImportState route;
++    EXPECT_TRUE(route.reject(false));
++    EXPECT_TRUE(route.usesSharedMemory());
++}
++
++TEST(RendererBufferFrame, FailedSameAllocationImportPreservesTextureAndAcknowledgesOnce)
++{
++    using Frame = WebKit::RendererBufferFrame<TestBuffer>;
++    auto page = TestBuffer::create(7);
++    Frame pending;
++    pending.attach(RefPtr { page.ptr() }, { });
++    Frame committed;
++    committed.commitFrom(WTF::move(pending));
++    committed.nativeTexture = memoryTexture(true);
++    committed.nativeVideoCandidate = true;
++    auto* valid = page->texture.get();
++    auto* native = committed.nativeTexture.get();
++    pending.attach(RefPtr { page.ptr() }, { });
++    unsigned rejects = 0;
++    unsigned acknowledgements = 0;
++    EXPECT_FALSE(committed.importAndCommitFrom(WTF::move(pending), [&](TestBuffer& buffer, TestBuffer*) {
++        return WebKit::updateRendererBufferTexture(buffer.texture, [] { return GRefPtr<GdkTexture> { }; });
++    }, [&](TestBuffer& buffer, bool retained) {
++        EXPECT_EQ(page.ptr(), &buffer);
++        EXPECT_TRUE(retained);
++        ++rejects;
++    }, [&] { ++acknowledgements; }));
++    EXPECT_EQ(valid, page->texture.get());
++    EXPECT_EQ(native, committed.nativeTexture.get());
++    EXPECT_TRUE(committed.nativeVideoCandidate);
++    EXPECT_EQ(0u, page->releaseCredits);
++    EXPECT_EQ(1u, rejects);
++    EXPECT_EQ(1u, acknowledgements);
++    EXPECT_FALSE(pending.buffer);
++}
++
++TEST(RendererBufferFrame, RejectedNewImportPreservesCommittedOwnershipWithoutFreeCredit)
++{
++    using Frame = WebKit::RendererBufferFrame<TestBuffer>;
++    auto held = TestBuffer::create(7);
++    auto rejected = TestBuffer::create(8);
++    Frame pending;
++    pending.attach(RefPtr { held.ptr() }, { });
++    Frame committed;
++    committed.commitFrom(WTF::move(pending));
++    auto* valid = held->texture.get();
++    pending.attach(RefPtr { rejected.ptr() }, { });
++    unsigned retired = 0;
++    unsigned acknowledgements = 0;
++    EXPECT_FALSE(committed.importAndCommitFrom(WTF::move(pending), [&](TestBuffer& buffer, TestBuffer*) {
++        return WebKit::updateRendererBufferTexture(buffer.texture, [] { return GRefPtr<GdkTexture> { }; });
++    }, [&](TestBuffer& buffer, bool retained) {
++        EXPECT_FALSE(retained);
++        EXPECT_EQ(rejected.ptr(), &buffer);
++        ++retired; // Rejection retires the locked allocation; never returns free credit.
++    }, [&] { ++acknowledgements; }));
++    EXPECT_EQ(held.ptr(), committed.buffer.get());
++    EXPECT_EQ(valid, held->texture.get());
++    EXPECT_EQ(0u, held->releaseCredits);
++    EXPECT_EQ(0u, rejected->releaseCredits);
++    EXPECT_EQ(1u, retired);
++    EXPECT_EQ(1u, acknowledgements);
++    EXPECT_FALSE(pending.buffer);
++}
++
++TEST(RendererBufferFrame, StaticPageFallbackRequestsOneRedrawAndSHMFailureTerminates)
++{
++    WebKit::RendererBufferImportState route;
++    unsigned ordinaryRedraws = 0;
++    auto reject = [&](bool shm) {
++        if (route.reject(shm))
++            ++ordinaryRedraws; // The real handler invokes ordinary RenderingUpdate.
++    };
++    reject(false);
++    EXPECT_EQ(1u, ordinaryRedraws);
++    EXPECT_TRUE(route.usesSharedMemory());
++    reject(false); // A second old in-flight allocation cannot start another chain.
++    EXPECT_EQ(1u, ordinaryRedraws);
++    reject(true);
++    EXPECT_TRUE(route.terminal());
++    EXPECT_FALSE(route.usesSharedMemory());
++    reject(true);
++    reject(false);
++    EXPECT_EQ(1u, ordinaryRedraws);
++    EXPECT_TRUE(route.terminal());
++}
++
+ } // namespace
+ } // namespace TestWebKitAPI
+ #endif // GTK_CHECK_VERSION(4, 16, 0)
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+index c8a5f6f7..21a05fcd 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+@@ -35,7 +35,9 @@
+ #include <WebCore/GLContext.h>
+ #include <WebCore/NativeImage.h>
+ #include <WebCore/PlatformDisplaySurfaceless.h>
++#include <WebCore/TextureMapper.h>
+ #include <array>
++#include <cstring>
+ #include <epoxy/gl.h>
+ #include <skia/core/SkCanvas.h>
+ #include <skia/core/SkColorSpace.h>
+@@ -49,24 +51,26 @@ using namespace WebCore;
+ 
+ namespace {
+ 
+-class SkiaWorkingTextureTest : public testing::Test {
++class SkiaTextureContextTest : public testing::Test {
+ protected:
+     void SetUp() override
+     {
+-        m_processType = ScopedSetAuxiliaryProcessTypeForTesting { WTF::AuxiliaryProcessType::WebContent };
++        m_processType.emplace(WTF::AuxiliaryProcessType::WebContent);
+         if (!PlatformDisplay::sharedDisplayIfExists()) {
+             auto display = PlatformDisplaySurfaceless::create();
+             ASSERT_TRUE(display);
+             PlatformDisplay::setSharedDisplay(WTF::move(display));
+         }
+-        auto* context = PlatformDisplay::sharedDisplay().skiaGLContext();
+-        if (!context || !context->makeContextCurrent())
+-            GTEST_SKIP() << "No actual Skia GL context";
+-        if (!BitmapTexture::supportsExtendedColor())
+-            GTEST_SKIP() << "No floating colour attachment support";
++        m_context = GLContext::create(PlatformDisplay::sharedDisplay(), 0);
++        if (!m_context || !m_context->makeContextCurrent())
++            GTEST_SKIP() << "No actual ordinary GL context";
+     }
+ 
+-    void TearDown() override { m_processType = std::nullopt; }
++    void TearDown() override
++    {
++        m_context = nullptr;
++        m_processType = std::nullopt;
++    }
+ 
+     static std::array<float, 4> readPixel(const BitmapTexture& texture, int x = 0, int y = 0)
+     {
+@@ -86,6 +90,22 @@ protected:
+ 
+ private:
+     std::optional<ScopedSetAuxiliaryProcessTypeForTesting> m_processType;
++    std::unique_ptr<GLContext> m_context;
++};
++
++class SkiaWorkingTextureTest : public SkiaTextureContextTest {
++protected:
++    void SetUp() override
++    {
++        SkiaTextureContextTest::SetUp();
++        if (HasFatalFailure() || IsSkipped())
++            return;
++        auto* context = PlatformDisplay::sharedDisplay().skiaGLContext();
++        if (!context || !context->makeContextCurrent())
++            GTEST_SKIP() << "No actual Skia GL context";
++        if (!BitmapTexture::supportsExtendedColor())
++            GTEST_SKIP() << "No floating colour attachment support";
++    }
+ };
+ 
+ static SkImageInfo workingInfo(int width, int height, SkColorType type = kRGBA_F16_SkColorType)
+@@ -93,6 +113,42 @@ static SkImageInfo workingInfo(int width, int height, SkColorType type = kRGBA_F
+     return SkImageInfo::Make(width, height, type, kPremul_SkAlphaType, SkColorSpace::MakeSRGB());
+ }
+ 
++TEST_F(SkiaTextureContextTest, LegacyU8AllocationUploadCopySampleHasNoGLError)
++{
++    auto* version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
++    auto* renderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
++    RecordProperty("actualGLVersion", version ? version : "unavailable");
++    RecordProperty("actualGLAPI", version && std::strstr(version, "OpenGL ES") ? "OpenGL ES" : "OpenGL");
++    RecordProperty("actualGLRenderer", renderer ? renderer : "unavailable");
++    RecordProperty("actualGLNumericVersion", static_cast<int>(GLContext::current()->version()));
++    // This always executes the production unsized RGBA/UNSIGNED_BYTE branch.
++    // GL3 execution is useful U8 coverage, not a claim of a genuine GLES2 run.
++    EXPECT_EQ(static_cast<GLenum>(GL_NO_ERROR), glGetError());
++    auto info = workingInfo(2, 1, kRGBA_8888_SkColorType);
++    auto source = BitmapTexturePool::singleton().acquireTexture(info, { BitmapTexture::Flags::SupportsAlpha });
++    std::array<uint8_t, 8> pixels { 64, 128, 192, 255, 192, 64, 128, 255 };
++    SkPixmap pixmap(info, pixels.data(), pixels.size());
++    ASSERT_TRUE(source->updateContents(pixmap, { { }, { 2, 1 } }, { }));
++    auto copied = BitmapTexturePool::singleton().acquireTexture(info, { BitmapTexture::Flags::SupportsAlpha });
++    copied->copyFromTexture(source.get(), { { }, { 2, 1 } }, { });
++    auto sampled = BitmapTexturePool::singleton().acquireTexture(info, { BitmapTexture::Flags::SupportsAlpha });
++    auto mapper = TextureMapper::create();
++    mapper->beginPainting(TextureMapper::FlipY::No, sampled.ptr());
++    mapper->drawTexture(copied.get(), { { }, { 2, 1 } }, { }, 1.f, TextureMapper::AllEdgesExposed::No);
++    mapper->endPainting();
++    GLuint framebuffer;
++    glGenFramebuffers(1, &framebuffer);
++    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
++    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sampled->id(), 0);
++    EXPECT_EQ(static_cast<GLenum>(GL_FRAMEBUFFER_COMPLETE), glCheckFramebufferStatus(GL_FRAMEBUFFER));
++    std::array<uint8_t, 8> actual { };
++    glReadPixels(0, 0, 2, 1, GL_RGBA, GL_UNSIGNED_BYTE, actual.data());
++    EXPECT_EQ(pixels, actual);
++    EXPECT_EQ(static_cast<GLenum>(GL_NO_ERROR), glGetError());
++    glBindFramebuffer(GL_FRAMEBUFFER, 0);
++    glDeleteFramebuffers(1, &framebuffer);
++}
++
+ TEST_F(SkiaWorkingTextureTest, UploadAndPartialCopyRetainExtendedValuesAndAlpha)
+ {
+     // Independent physical samples, not a colour transform computed by the
+-- 
+2.54.0 (Apple Git-157)
+
