@@ -9,6 +9,18 @@ kernel, owner-started Profile 7 playback advanced through a seek with native
 DV active. Text-subtitle handoff also passed. Runtime session replacement,
 successful suspend and optical acceptance remain open.
 
+**Cross-app image mismatch fixed on the real screen (November 15).** With
+GTK `+rogdv6` and WebKit `+rogdv7` installed, the P3 chart was captured from
+the ROG's compositor output (10-bit, before scanout) in a normal unlocked
+session. On this chart GNOME Web matches Image Viewer within 1 median PQ10
+code on all 48 channels, against up to 140 before. All three scenes are also
+within 1.04 codes of an independent model (the chart's linear BT.2020 values
+PQ-encoded at 203 nits). Before the fix, even Image Viewer was off from that
+model by up to 125 on red; it only matched its own reference because both were
+drawn by the same viewer and GTK path. The same tool fails the November 13 captures and
+passes these. No optical, gradient or other-size claim.
+[Receipt](../evidence/image-colour-screen-20261115.json).
+
 **Cross-app image mismatch reproduced (November 13).** The installed P3
 comparison matched Image Viewer to the retained float reference within 0.5
 median PQ10 code across all 48 channels; Web differed by up to 140 on saturated
