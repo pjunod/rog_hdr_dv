@@ -33,7 +33,24 @@ ES 2.0 via Mesa's version override, declared). That is API and storage
 evidence, not physical-GPU or on-screen acceptance. The GTK sink and
 Showtime pin `libgtk-4-1 (= …)` exactly, so they are rebuilt as
 `0.15.2-1ubuntu2+rogdv5.7` and `50.0-2+rogdv5.13` against GTK `+rogdv6`.
-Installing GTK alone would remove them; installs use `--no-remove`. No candidate is deployed. Target feedback
+Installing GTK alone would remove them; installs use `--no-remove`.
+
+**Installed and runtime-checked on the ROG (November 15).** GTK `+rogdv6`,
+WebKit/JavaScriptCore `+rogdv7`, the sink `+rogdv5.7` and Showtime `5.13`
+are installed in one `--no-remove` transaction (10 upgraded, none removed,
+clean audit), with byte-verified rollback retained. In a private headless
+Mutter session on the NVIDIA laptop:
+- The GTK colour-owner fixture passes both scenes. With real pass-through,
+  default GSK is Vulkan and every swapchain declares pass-through. With
+  pass-through removed from the real format list, GTK falls back to GL and
+  attempts no swapchain. Each scene has exactly one colour-management owner
+  for its surface.
+- The WebKit UI import fixture passes. The positive A→B run imports F16 for
+  both pages. With one injected import error on B, A stays committed without
+  blanking, and B arrives through the SHM fallback. That fallback call is bound
+  to the installed library's exact code bytes.
+
+These are private-compositor results, not optical or physical-panel claims. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 
