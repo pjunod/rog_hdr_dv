@@ -199,8 +199,11 @@ The final package hashes, exact source replay and retained native receipts belon
 in the [machine-readable qualification](../evidence/gnome-image-colour-20261108.json).
 No live compositor, viewer default, display profile or GNOME setting is changed
 by the preparation or diagnostics. The packages are now installed and the bounded ordinary-desktop route check
-is recorded above. Physical panel measurements, real external-monitor coverage
-and measured cross-app equivalence remain separate acceptance work.
+is recorded above. Measured cross-app equivalence passed on the internal panel
+on November 15, after the GTK/WebKit fix: Web matches Image Viewer within 1
+PQ10 code on the P3 chart ([receipt](../evidence/image-colour-screen-20261115.json),
+measured with `tools/xr30_fixed_roi.py`). Physical panel measurements and real
+external-monitor coverage remain separate acceptance work.
 
 ## Retain exact offline recovery
 
