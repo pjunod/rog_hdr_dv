@@ -1,0 +1,56 @@
+From 2751f81a402a4d8abc0faf24cfda5fb31f4f7ac7 Mon Sep 17 00:00:00 2001
+From: Paul Junod <donujp@gmail.com>
+Date: Sun, 15 Nov 2026 12:00:00 -0500
+Subject: [PATCH] wayland: Accept absent image descriptions when freeing color
+ state
+
+GdkWaylandColor.cs_to_desc maps a color state to NULL when the
+compositor rejected a standard image description (cs_image_desc_failed)
+or the state cannot be described (a non-CICP color state, or an
+unsupported primaries or transfer function). The table was created with
+wp_image_description_v1_destroy as its value destructor, which
+dereferences the proxy, so disposing the GdkWaylandDisplay after any
+such entry called wl_proxy_get_version (NULL) and crashed in
+gdk_wayland_color_free().
+
+Use a destructor that ignores NULL. Real descriptions are still
+destroyed.
+
+Link: TBD-MR
+---
+ gdk/wayland/gdkwaylandcolor.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/gdk/wayland/gdkwaylandcolor.c b/gdk/wayland/gdkwaylandcolor.c
+index 9c39f48..ee4ba91 100644
+--- a/gdk/wayland/gdkwaylandcolor.c
++++ b/gdk/wayland/gdkwaylandcolor.c
+@@ -309,6 +309,16 @@ static struct wp_color_manager_v1_listener color_manager_listener = {
+   wp_color_manager_v1_done,
+ };
+ 
++/* cs_to_desc maps a color state to NULL when the compositor rejected or
++ * cannot describe it, so its value destructor must accept NULL.
++ */
++static void
++cs_desc_destroy (gpointer data)
++{
++  if (data)
++    wp_image_description_v1_destroy (data);
++}
++
+ GdkWaylandColor *
+ gdk_wayland_color_new (GdkWaylandDisplay *display)
+ {
+@@ -321,7 +331,7 @@ gdk_wayland_color_new (GdkWaylandDisplay *display)
+   color->cs_to_desc = g_hash_table_new_full (color_state_hash,
+                                              color_state_equal,
+                                              (GDestroyNotify) gdk_color_state_unref,
+-                                             (GDestroyNotify) wp_image_description_v1_destroy);
++                                             cs_desc_destroy);
+   color->id_to_cs = g_hash_table_new_full (g_direct_hash,
+                                            g_direct_equal,
+                                            NULL,
+-- 
+2.34.1
+

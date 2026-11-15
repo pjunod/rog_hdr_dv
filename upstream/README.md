@@ -4,7 +4,7 @@
 preparation holds · **Updated:** 2026-11-09.
 
 Start with the [submission ledger](../docs/UPSTREAM_SUBMISSIONS.md), which
-covers 124 entries across 27 upstream destinations, plus local converter
+covers 126 entries across 27 upstream destinations, plus local converter
 observations. The [November review](november-2026/README.md) adds 35 entries
 from the newer Linux display and Runner work. The
 [catalog](catalog.json) connects each entry to its preparation material.
@@ -47,6 +47,7 @@ anything; it does not rerun the project's build or tests.
 |---|---|---|
 | [libdisplay-info](libdisplay-info/README.md) | `./upstream/libdisplay-info/submit.sh 01 --dry-run` | Six units; 02 overlaps !210 and stays draft |
 | [Mutter](mutter/README.md) | `./upstream/mutter/submit.sh 00 --dry-run` | Design issue, then standalone units 01–04; later stacks have release/design prerequisites |
+| [GTK](gtk/README.md) | `./upstream/gtk/submit.sh 01 --dry-run` | One unit: NULL-tolerant color-state description destructor; no upstream test |
 | [bitvec_helpers](bitvec_helpers/README.md) | `./upstream/bitvec_helpers/submit.sh 01 --dry-run` | Reader overflow and endpoint regressions |
 | [dovi_tool](dovi_tool/README.md) | `./upstream/dovi_tool/submit.sh 01 --dry-run` | Mixed mapping methods; other bounds fixes were superseded |
 | [gemm](gemm/README.md) | `./upstream/gemm/submit.sh 01 --dry-run` | Existing PRs already cover the fix; exact-PR validation reply prepared, no duplicate PR |
