@@ -1,0 +1,17 @@
+{
+  "project": "GNOME/gtk",
+  "base": "2c32595f20d987869e9122e9be901aaf2191f844",
+  "base_date": "2026-11-14",
+  "file": "gdk/wayland/gdkwaylandcolor.c",
+  "file_last_changed_upstream": "cf6b6de955b1397b024304f490bb27dc7834367d",
+  "patch": "upstream/gtk/01-cs-desc-null-destructor/0001-wayland-Accept-absent-image-descriptions-when-freeing.patch",
+  "patch_sha256": "dda3bfd220ead69770b6ba656b7292f2dde43a22c9317605b7c936d4e908087e",
+  "checks": {
+    "git_apply_check_on_minimal_repo_with_only_that_file": "passed",
+    "gdb_backtrace_gtk_4_24_1": "gdk_wayland_color_free -> g_hash_table_unref -> wp_image_description_v1_destroy(NULL)",
+    "full_gtk_build": "not run",
+    "gtk_tests_or_ci": "not run",
+    "upstream_main_reproduction": "not run; same table construction and NULL insertions inspected"
+  },
+  "product_patch": "patches/ubuntu-gtk4-display-target/0021-wayland-accept-absent-image-descriptions-when-freeing.patch"
+}
