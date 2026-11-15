@@ -11,7 +11,10 @@ unsupported primaries or transfer function). The table was created with
 wp_image_description_v1_destroy as its value destructor, which
 dereferences the proxy, so disposing the GdkWaylandDisplay after any
 such entry called wl_proxy_get_version (NULL) and crashed in
-gdk_wayland_color_free().
+gdk_wayland_color_free(). The same destructor also runs at insert time: if
+a synchronous lookup and the asynchronous prepare both fail for one color
+state, the second failure replaces a NULL value and calls
+wp_image_description_v1_destroy (NULL) without any display disposal.
 
 Use a destructor that ignores NULL. Real descriptions are still
 destroyed.

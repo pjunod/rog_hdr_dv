@@ -12,7 +12,7 @@ The patch is authored by Paul Junod, has a body and a `Link:` line, and has no `
 
 | NN | Slice | Unit | Commits | Stacked on | Status | Overlap / notes |
 |---|---|---|---|---|---|---|
-| 01 | GTK-6 | gdk/wayland: NULL-tolerant color-state description destructor | 1 | - | ready | No upstream test; no MR or issue found for it |
+| 01 | GTK-6 | gdk/wayland: NULL-tolerant color-state description destructor | 1 | - | held | No upstream test; no MR or issue found for it |
 
 The product-side form of this fix is `patches/ubuntu-gtk4-display-target/0021-*`, written for
 GTK 4.24.1. The upstream patch is the same change adapted to current `main` (whose table has
@@ -34,10 +34,17 @@ From this directory:
     ./submit.sh 01             # fork if missing, push hdr-01-slug, open the MR
 
 Before the first run: GNOME GitLab account, and a personal access token with `api` and
-`write_repository` in `~/.config/upstream/gitlab.gnome.org.token` (mode 600). GTK has no written
-AI rule that was found at preparation time; GNOME-wide policy is being debated. The description
-discloses AI assistance without claiming human review. Edit it into your own words and check the
-current policy first. A real submission also requires upstream `main` to still equal the base
+`write_repository` in `~/.config/upstream/gitlab.gnome.org.token` (mode 600). GTK's
+`CONTRIBUTING.md` (at the base above) has an AI Contribution Policy: the submitter must verify the
+behaviour and correctness personally and be able to explain the change, AI use must be disclosed in
+the MR, commits carry no `Co-authored-by`/`Assisted-by` AI trailers (this patch has none), and
+review feedback must not be relayed through an LLM. Maintainers are told to require
+reproducibility.
+
+**Pre-submit gate (held until done):** build `main` at the recorded base, reproduce the crash on
+unpatched `main` (a compositor failing a standard description, then display disposal or a repeated
+failed lookup), apply the patch, confirm the crash is gone, and write those results into the
+description's evidence section. A real submission also requires upstream `main` to still equal the base
 above, or a rebuild and retest on the newer tree.
 
 The shared helper tests (`../../tests/test_upstream_gitlab_submit.py`) use local Git and a fake
