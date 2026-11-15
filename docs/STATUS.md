@@ -30,7 +30,10 @@ added patches fix them; the teardown fix backports WebKit `63f86c394bc8` and
 `c5b6ec5b34d7`. All 19 normal cases and the actual ES 2.0 legacy case pass
 once with clean process exits, under software Mesa llvmpipe (surfaceless EGL;
 ES 2.0 via Mesa's version override, declared). That is API and storage
-evidence, not physical-GPU or on-screen acceptance. No candidate is deployed. Target feedback
+evidence, not physical-GPU or on-screen acceptance. The GTK sink and
+Showtime pin `libgtk-4-1 (= …)` exactly, so they are rebuilt as
+`0.15.2-1ubuntu2+rogdv5.7` and `50.0-2+rogdv5.13` against GTK `+rogdv6`.
+Installing GTK alone would remove them; installs use `--no-remove`. No candidate is deployed. Target feedback
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 

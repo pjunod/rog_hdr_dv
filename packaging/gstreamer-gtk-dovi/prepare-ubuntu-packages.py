@@ -12,9 +12,9 @@ import subprocess
 import tempfile
 
 CORE_VERSION = "0.1.0+rogdv10"
-GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.6"
-SHOWTIME_VERSION = "50.0-2+rogdv5.12"
-FIXED_GTK = "4.24.1+ds-1+rogdv5"
+GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.7"
+SHOWTIME_VERSION = "50.0-2+rogdv5.13"
+FIXED_GTK = "4.24.1+ds-1+rogdv6"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
 INPUT_FILES = ("control", "rules", "changelog")
@@ -299,7 +299,8 @@ def prepare(workspace, showtime_only=False):
                 "Preserve native 16-bit mapped pictures and retarget visible paused frames.",
                 "Publish completed pictures to each view's declared HDR or SDR destination.",
                 "Build full plugin features offline from the Ubuntu vendored source.",
-            ], inputs["gtk"]["changelog"]),
+                "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour.",
+            ], inputs["gtk"]["changelog"], date="Sun, 15 Nov 2026 00:00:00 +0000"),
         showtime / "debian/control": showtime_control(inputs["showtime"]["control"]),
         showtime / "debian/rules": inputs["showtime"]["rules"],
         showtime / "debian/changelog": changelog(
@@ -307,8 +308,9 @@ def prepare(workspace, showtime_only=False):
             ["Bind Dolby streams to their native surface target and HDR lease.",
              "Require the matching sink and mapper with paused overlay preservation.",
              "Start the shared producer with an explicit SDR destination.",
-             "Preserve overlay composition features through the RGBA precision filter."],
-            inputs["showtime"]["changelog"], date="Fri, 13 Nov 2026 00:00:00 +0000"),
+             "Preserve overlay composition features through the RGBA precision filter.",
+             "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour."],
+            inputs["showtime"]["changelog"], date="Sun, 15 Nov 2026 00:00:00 +0000"),
     }
     sources = [("showtime", showtime)] if showtime_only else [("gtk", gtk), ("showtime", showtime)]
     if showtime_only:
