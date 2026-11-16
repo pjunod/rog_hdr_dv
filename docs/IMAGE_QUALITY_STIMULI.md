@@ -211,3 +211,102 @@ determinism:
 ```bash
 python3 -B -m unittest discover -s tests -p test_generate_quality_stimuli.py
 ```
+
+## Capture and analyze a private compositor run
+
+The [runner](../tools/iq_run.py) captures selected stimuli through Mutter's
+PipeWire screen-cast interface. It requires an active, unlocked graphical
+session and an owner-coordinated screen window. It does not unlock the session,
+change display settings or monitor for a window. Use the session's system
+Python with PyGObject/Gio; the analyzer also requires NumPy. Keep
+`XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS` and `WAYLAND_DISPLAY` from that
+session when invoking the tools.
+
+Build the timestamped [crop helper](../tools/iq_pw_seq.c) in task-owned storage.
+The inherited `pw-read` is a separate external prerequisite, not this helper;
+it must produce packed XR30 BT.2020/PQ captures. Record its SHA-256 in the
+private receipt.
+
+```bash
+mkdir -p "$HDR_WORK/tmp"
+export TMPDIR="$HDR_WORK/tmp"
+gcc -std=gnu11 -Wall -Wextra -Werror -O2 \
+  $(pkg-config --cflags libpipewire-0.3) tools/iq_pw_seq.c \
+  -o "$HDR_WORK/iq-pw-seq" \
+  $(pkg-config --libs libpipewire-0.3)
+python3 tools/iq_run.py "$HDR_WORK/run" \
+  --stim-dir "$HDR_WORK/stim" --stim4k-dir "$HDR_WORK/stim4k" \
+  --pw-read "$PW_READ" --pw-seq "$HDR_WORK/iq-pw-seq" --session-id auto
+```
+
+The output directory must be new. Repeat `--scene` to select scenes; omitting
+it selects all supported scenes: `dither`, `siting-c420mpeg2`,
+`siting-c420jpeg`, `siting-c420paldv`, `scaling4k` and `cadence-24` through
+`cadence-60`. The runner uses the fixed 2560×1600 monitor capture, 8× placement
+for 192×108 stimuli, and 2/3 scaling preset. Still images are extracted into
+one-frame Y4M files and played in fresh mpv processes, so end-of-stream cannot
+leave the last scaling frame identical to the prior grating. mpv keeps the
+normal user configuration and receives explicit BT.2020 non-constant-
+luminance, limited-range and PQ tags because Y4M does not carry them.
+
+The runner records source and helper hashes, arguments, capture statuses and
+`run.json`. Its cadence files are timestamped software captures. For each
+rate, the helper writes `cadence-<fps>.raw` and `.ts`; cadence sources request
+eight seconds (`fps × 8` frames). This does not sample panel refreshes or
+qualify optical output. The runner's cadence crop is only 160 output pixels
+high; the moving bar is visible there, but tears below that crop remain
+unobserved.
+
+Run the [analyzer](../tools/iq_analyze.py) into the same run directory. Supply
+measured green-channel PQ10 levels from the known low and high barcode marker
+blocks. These endpoints calibrate decoding; do not tune them to maximize the
+number of accepted frames.
+
+```bash
+python3 tools/iq_analyze.py "$HDR_WORK/run" "$HDR_WORK/stim" "$HDR_WORK/stim4k" \
+  --barcode-low "$LOW_PQ10" --barcode-high "$HIGH_PQ10"
+```
+
+The analyzer verifies the supplied manifests and source hashes, then creates
+`analysis.json` exclusively; an existing report is an error. The 4K source is
+used for scaling diagnostics only, not general 4K qualification.
+It reports software diagnostics without a universal IQ threshold. Barcode
+indices and timestamps can reveal software delivery repeats, drops and
+sequence damage, but cannot establish panel cadence. A missing lower tear,
+an RGB midpoint shifted by tone or gamut mapping, or a clean compositor capture
+does not prove source-domain chroma siting, optical accuracy or Dolby Vision
+acceptance.
+
+The focused pre-merge lane runs after adversarial review. Its outcome belongs
+in the PR receipt, separately from the measurements below.
+
+```bash
+python3 scripts/check_repository.py
+PYTHONPATH=tests python3 -m unittest -v \
+  test_check_repository test_generate_quality_stimuli test_iq_run test_iq_analyze
+```
+
+## November 16 digital capture — bounded findings
+
+The [receipt](../evidence/image-quality-digital-20261116.json) records the first
+normal-session compositor captures. The 33 source-code plateaus remain distinct
+and increasing in both ramps; maximum green residual versus identity PQ is
+4.00 codes near black and 1.20 codes at mid grey. These residuals include the
+normal display mapping and do not classify bit depth or dithering. JPEG versus
+MPEG-2 horizontal chroma edges shift by 0.488–0.512 source px; PAL-DV versus
+MPEG-2 vertical edges shift by −0.488 to −0.512 source px. These are relative
+RGB-midpoint diagnostics after mapping, not source-domain siting acceptance.
+
+The original final scaling capture duplicated the preceding grating. It is
+rejected, with its hash retained. An exact one-frame extraction in a fresh
+player produced the missing edge. Fixed interior endpoint regions avoid the
+visible desktop dock, and the edge search follows the manifest's expected
+slant. Its median 10–90% width is 1.178 output px at 2/3 scaling; no filter
+quality threshold is inferred.
+
+Explicit measured start-marker endpoints decode all 192/200/240/400/480
+captured frames at 24/25/30/50/60 fps. A few source-index gaps and repeats
+remain in the capture stream. Median PTS intervals are about
+41.655/40.008/33.344/19.987/16.646 ms: this stream follows content damage,
+not 240 Hz refresh. Panel cadence, lower-screen tearing, temporal dither and
+optical qualification remain open. No package or display configuration changed.
