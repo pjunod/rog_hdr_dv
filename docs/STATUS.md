@@ -1,6 +1,10 @@
 # Status — what is working and what remains
 
-**Updated November 13, 2026 (Eastern; postboot probes November 14 UTC).**
+**Updated November 16, 2026 (Eastern).**
+Latest: item-7 digital diagnostics recorded; physical cadence and optical
+quality remain open. The following November 13 observations are historical.
+
+**November 13 installed baseline.**
 Showtime `50.0-2+rogdv5.12` and Plurx Player `0.5.1-1` are installed with
 clean package audits and retained rollback packages. Owner-attended display
 transitions returned to baseline, but suspend failed before device PM on an
@@ -66,12 +70,19 @@ These are private-compositor results, not optical or physical-panel claims. No c
 is separate from committed source metadata; no optical claim follows.
 [Cause, limits and proposed contract](GTK_WEBKIT_IMAGE_COLOUR.md).
 
-**Image-quality source stimuli (November 14).** A stdlib generator now emits
-deterministic Y4M sources for chroma siting, scaling/aliasing, 10-to-8-bit
-banding and 24/25/30/50/60 fps cadence, with expected values in its manifest
-([stimuli](IMAGE_QUALITY_STIMULI.md)). These are sources only. No capture has
-run, so range, siting, scaling, dither and cadence qualification on the laptop
-remains open.
+**Image-quality digital capture (November 16).** The synthetic sources now
+have normal-session XR30 compositor captures and bounded diagnostics. Both
+ramps retain 33 distinct, increasing source-code plateau means; identity-PQ
+residuals are at most 4.00 near black and 1.20 at mid grey. Chroma tag pairs
+shift the observed RGB edges by about half a source pixel. A rejected duplicate
+final scaling frame was replaced by an exact one-frame extraction; its median
+10–90% edge width is 1.178 output px at 2/3 scale. Explicit mapped-white
+calibration decodes every captured barcode. PTS intervals follow source rate,
+not 240 Hz refresh, with some index gaps/repeats in the capture stream; their
+cause is not isolated to playback. These are digital diagnostics, not a quality
+pass, optical calibration, dither classification or panel-cadence acceptance.
+[Method and limits](IMAGE_QUALITY_STIMULI.md#november-16-digital-capture--bounded-findings)
+· [Receipt](../evidence/image-quality-digital-20261116.json).
 
 **Showtime precision-filter correction and installation (November 13).**
 Review approved the overlay-feature correction; three affected packaging

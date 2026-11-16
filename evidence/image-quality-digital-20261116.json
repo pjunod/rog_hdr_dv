@@ -1,0 +1,325 @@
+{
+  "schema": "image-quality-digital-diagnostic-v1",
+  "item": "Item 7 image-quality compositor capture",
+  "date": "2026-11-16",
+  "owner": "Codex",
+  "status": "digital_diagnostics_recorded_physical_quality_open",
+  "capture_time_utc": {
+    "started": "2026-11-16T19:02:21Z",
+    "finished": "2026-11-16T19:03:44Z"
+  },
+  "capture": {
+    "route": "Normal unlocked GNOME session; mpv gpu-next Vulkan; Mutter eDP-2 screen-cast via PipeWire; XR30 BT.2020/PQ before scanout",
+    "dimensions": [
+      2560,
+      1600
+    ],
+    "display_mode_hz": 240,
+    "cadence_stream": "Damage-driven; observed timestamps near source rate, not refresh rate",
+    "small_stimulus_rect": [
+      512,
+      368,
+      1536,
+      864
+    ],
+    "scaling_rect": [
+      0,
+      80,
+      2560,
+      1440
+    ],
+    "cadence_crop": [
+      512,
+      368,
+      1536,
+      160
+    ],
+    "configuration_changed": false,
+    "configuration_note": "No package, monitor setting, boot selection, compositor or session replacement performed by this task. mpv used the normal user configuration with explicit BT.2020 NCL/PQ/limited tags.",
+    "concurrent_work": "An existing CPU packet-copy/remux process remained active after the owner confirmed screen availability; it was neither terminated nor modified. Timing measurements are not an isolated playback-performance benchmark."
+  },
+  "installed_packages": {
+    "libgtk-4-1:amd64": "4.24.1+ds-1+rogdv6",
+    "libwebkitgtk-6.0-4:amd64": "2.52.6-1ubuntu1+rogdv7",
+    "mpv": "0.42.0-0ubuntu0+rogdv5.5",
+    "mutter-common": "51.0-1ubuntu3+nativehdr15"
+  },
+  "sources": {
+    "generator_sha256": "6ab71d984a017ff7055f5b74f5919f529b5fb05029747b268b19ecbaae39ed45",
+    "small_manifest_sha256": "602c34c1871a010b78f96cdff95c04bb98b31242e561bc542996ec046ff528f2",
+    "scaling_manifest_sha256": "b615cecae6c05d9e0a1289b2523517a70b0557bcd6979c4b14a34769c47d6335",
+    "verification": {
+      "stim": {
+        "manifest_sha256": "602c34c1871a010b78f96cdff95c04bb98b31242e561bc542996ec046ff528f2",
+        "verified_source_paths": [
+          "chroma_siting/chroma_siting_c420mpeg2_8bit.y4m",
+          "chroma_siting/chroma_siting_c420jpeg_8bit.y4m",
+          "chroma_siting/chroma_siting_c420paldv_8bit.y4m",
+          "dither/dither_ramps_p10.y4m",
+          "cadence/cadence_24fps_p10.y4m",
+          "cadence/cadence_25fps_p10.y4m",
+          "cadence/cadence_30fps_p10.y4m",
+          "cadence/cadence_50fps_p10.y4m",
+          "cadence/cadence_60fps_p10.y4m"
+        ],
+        "all_source_hashes_verified": false
+      },
+      "stim4k": {
+        "manifest_sha256": "b615cecae6c05d9e0a1289b2523517a70b0557bcd6979c4b14a34769c47d6335",
+        "verified_source_paths": [
+          "scaling/scaling_p10.y4m"
+        ],
+        "all_source_hashes_verified": false
+      }
+    }
+  },
+  "tools": {
+    "capture_runner": "Inherited Claude November 15 runner; missing edge recaptured with exact source-frame extraction in a fresh mpv. New portable runner is source/unit qualification only; it did not produce the original run.",
+    "inherited_sha256": {
+      "iq_run.py": "cd3385fdf67698e7420f53e3ca98a385c6dc32dae0d298eea3f3929e2eaf7b56",
+      "pw-seq": "07684df15a4502a348069297c5f95ad7dba632f6c69886c3eb2fb45fe4ad9b64",
+      "iq_analyze.py": "b38c64db5c7b24005253dd0bd7397063d6bf424ef7bcc5aca61ba925b7604561"
+    },
+    "pw_read_sha256": "676c2ffbf86cd42e2999505663dd0066267662c47c10cd0336aaee474eef844a",
+    "analysis_sha256": "f10681572c44f11b39f848e136b1a79b085dfba97c0a4fff5104df83cc6a83cc",
+    "new_recorder_capture_claim": "None; captures used the inherited pw-seq binary. The imported/hardened source has separate compiler and pre-merge qualification.",
+    "analysis_arguments": [
+      "RUN",
+      "STIM",
+      "STIM4K",
+      "--barcode-low",
+      "4.857638888888889",
+      "--barcode-high",
+      "710.2378472222222"
+    ],
+    "analysis_output_sha256": "161d3cabe81c0a9cb4ca8d53169543fe8fe026ea6aa496e75dc25607257c6aef"
+  },
+  "rejected_capture": {
+    "name": "original scaling4k-f2.xr30",
+    "reason": "Byte-identical to preceding grating; frame-step at EOS did not present final edge.",
+    "sha256": "172c02c7180b429d1a36b97c15819461626efc221bd434724ce965b67563f725",
+    "same_as_grating_sha256": "172c02c7180b429d1a36b97c15819461626efc221bd434724ce965b67563f725",
+    "replacement": "Exact final source frame extracted into one-frame Y4M, opened in a fresh paused mpv; inspected private preview.",
+    "extracted_y4m_sha256": "d1e9c19c1aed2468654939bac360b6b08e9df88d0451452cf289c76eaa91b5b5"
+  },
+  "result": {
+    "range_and_dither": {
+      "near_black": {
+        "source_code_plateaus": 33,
+        "distinct_plateau_means": 33,
+        "plateau_means_strictly_increasing": true,
+        "max_abs_green_residual_vs_identity_pq10": 4.0,
+        "max_green_spatial_std_pq10": 0.4820382140906984,
+        "first_last_green_mean_pq10": [
+          4.0,
+          33.817708333333336
+        ]
+      },
+      "mid_grey": {
+        "source_code_plateaus": 33,
+        "distinct_plateau_means": 33,
+        "plateau_means_strictly_increasing": true,
+        "max_abs_green_residual_vs_identity_pq10": 1.1917808219178028,
+        "max_green_spatial_std_pq10": 0.49255938331712856,
+        "first_last_green_mean_pq10": [
+          449.0,
+          487.0
+        ]
+      }
+    },
+    "chroma_tag_relative_shifts_source_px": {
+      "c420jpeg_minus_c420mpeg2_vertical_edges": [
+        0.5121109550086089,
+        0.4877568903652616,
+        0.5121109550086373
+      ],
+      "c420paldv_minus_c420mpeg2_horizontal_edges": [
+        -0.5122390947467181,
+        -0.48776090525328186,
+        -0.5122390947467181
+      ]
+    },
+    "scaling": {
+      "scale": 0.6666666666666666,
+      "configured_rect": [
+        0,
+        80,
+        2560,
+        1440
+      ],
+      "observed_endpoints_pq10": [
+        0.0,
+        755.0
+      ],
+      "endpoint_spatial_std_pq10": [
+        0.0,
+        0.0
+      ],
+      "endpoint_rois_output_px": [
+        [
+          640,
+          360,
+          213,
+          720
+        ],
+        [
+          1706,
+          360,
+          214,
+          720
+        ]
+      ],
+      "endpoint_sanity": "usable",
+      "placement_sanity": {
+        "edge_rows_with_midpoint": 720,
+        "edge_midpoint_median_output_px": 1279.3296703296703,
+        "configured_centre_output_px": 1280.0,
+        "search_radius_source_px": 4,
+        "rejected_edge_rows": 0,
+        "limitation": "Configured rectangle and central edge are sanity diagnostics, not independent placement registration."
+      },
+      "grating_modulation_relative_to_observed_endpoints": {
+        "vertical_1px": 0.054304635761589407,
+        "vertical_2px": 0.36423841059602646,
+        "horizontal_1px": 0.054304635761589407,
+        "horizontal_2px": 0.36423841059602646
+      },
+      "slanted_edge_status": "diagnostic_only",
+      "slanted_edge_10_90_width_out_px_median": 1.177880177685438,
+      "alias_boundary_abs_dx_out": 979.0698533699102,
+      "limitation": "Observed slanted-edge endpoints normalize modulation because PQ source white is 10000 nits and may tone map. Tone/gamut mapping, capture placement and scaler phase confound these diagnostics; no quality acceptance threshold established."
+    },
+    "software_cadence": {
+      "24": {
+        "captured": 192,
+        "decoded": 192,
+        "rejection_counts": {},
+        "source_index_range": [
+          0,
+          192
+        ],
+        "source_index_gaps": [
+          [
+            0,
+            3
+          ]
+        ],
+        "adjacent_repeat_pairs": 1,
+        "median_spa_pts_interval_ms": 41.655
+      },
+      "25": {
+        "captured": 200,
+        "decoded": 200,
+        "rejection_counts": {},
+        "source_index_range": [
+          0,
+          199
+        ],
+        "source_index_gaps": [],
+        "adjacent_repeat_pairs": 0,
+        "median_spa_pts_interval_ms": 40.008
+      },
+      "30": {
+        "captured": 240,
+        "decoded": 240,
+        "rejection_counts": {},
+        "source_index_range": [
+          0,
+          239
+        ],
+        "source_index_gaps": [],
+        "adjacent_repeat_pairs": 0,
+        "median_spa_pts_interval_ms": 33.344
+      },
+      "50": {
+        "captured": 400,
+        "decoded": 400,
+        "rejection_counts": {},
+        "source_index_range": [
+          0,
+          400
+        ],
+        "source_index_gaps": [
+          [
+            3,
+            5
+          ]
+        ],
+        "adjacent_repeat_pairs": 0,
+        "median_spa_pts_interval_ms": 19.987
+      },
+      "60": {
+        "captured": 480,
+        "decoded": 480,
+        "rejection_counts": {},
+        "source_index_range": [
+          0,
+          482
+        ],
+        "source_index_gaps": [
+          [
+            1,
+            3
+          ],
+          [
+            5,
+            7
+          ],
+          [
+            16,
+            18
+          ],
+          [
+            132,
+            134
+          ],
+          [
+            146,
+            148
+          ]
+        ],
+        "adjacent_repeat_pairs": 2,
+        "median_spa_pts_interval_ms": 16.646
+      }
+    },
+    "barcode_calibration": {
+      "method": "Fixed start markers: first high block and second low block. Median measured green means agree across all five rates; endpoints were measured before repaired decode, not optimized for accepted counts.",
+      "low_pq10": 4.857638888888889,
+      "high_pq10": 710.2378472222222,
+      "legacy_identity_decode": "Rejected every frame because mapped white was below the identity-PQ dead-band threshold.",
+      "spatial_transition_guard": "One source pixel around expected horizontal bar boundaries; top bar transition row [16,17) excluded. Remaining captured rows checked; edge-guard/lower-screen tears remain unobserved."
+    }
+  },
+  "capture_sha256": {
+    "cadence-24.raw": "90e33816eaed38d56ef8e16836536b39ac654eeed255f92e46cfc6841c7082af",
+    "cadence-24.ts": "d57ea34c69b7031a55857403895a155963b43a2afdc07632a62e067da09a5f17",
+    "cadence-25.raw": "5e46919da577a14668bcf6a0649e138063c355e9f365169f68e0e453bb700c91",
+    "cadence-25.ts": "cd257de475bc61d071677918924bfdda6ab92ede55202488badf08e54b980ee3",
+    "cadence-30.raw": "eca9de4b4c4ef3128dd74d251f9d31932e4eaae554d25da3e632b056cd1b7c62",
+    "cadence-30.ts": "7fd5dcf3070a46664b2e5b478036a8aa56293ad323a11b1e23cd7f19ec5cc06b",
+    "cadence-50.raw": "270781efd509ababfaa81d87f3213cbfdca0fd4f2e0b9793bd6946ba14132793",
+    "cadence-50.ts": "5c6633c16eeae1ce7937eed9c770b9698ab6a2f4179c5adbf9b9346c9432ca2c",
+    "cadence-60.raw": "7503355bbd26f66a806d0d9e2fe9d0739044745a7a3f6da659b149a6a16d95ad",
+    "cadence-60.ts": "6c5d35976a7a26c51fb34225ea7b7dc3c6c78782101f5ada8a707cfc51d32613",
+    "dither-f0.xr30": "3c94b350b4f83d2fbf1baad6402f097291c5f7ea46fbcbefd8df153e7d1ea0ac",
+    "dither-f1.xr30": "e994e1a7c0349a790215be836eff4aebad74cd1820806b295d304272406be2ee",
+    "scaling4k-f0.xr30": "925e20b6ae9b18a922d18055a713a2328ec186fe742302c0689503f7006a3531",
+    "scaling4k-f1.xr30": "172c02c7180b429d1a36b97c15819461626efc221bd434724ce965b67563f725",
+    "scaling4k-f2.xr30": "123281d1a61a122b7045483c795c7182244301037b6d28b72660490cbb66b6e8",
+    "siting-c420jpeg-f0.xr30": "0511a9a9ae5e1e3fe49be78d8224b5ba843c2b9400ad35d6b22c39ab41ba8293",
+    "siting-c420jpeg-f1.xr30": "35f37c6779603d0a92bfa567b130e98b6ea1b9559b2fa4e77f082a29475dc659",
+    "siting-c420mpeg2-f0.xr30": "589c22c829490b55bb2a171cb5686b0e109804d18711c97f575ca866dcfe3e0b",
+    "siting-c420mpeg2-f1.xr30": "c0c5424031e09d0e5d264fae10a4f26c0d02d6a42eba1b02ba4ebc0a530262cf",
+    "siting-c420paldv-f0.xr30": "589c22c829490b55bb2a171cb5686b0e109804d18711c97f575ca866dcfe3e0b",
+    "siting-c420paldv-f1.xr30": "042043d8e9c2fd5884596dcc307a6ce45f0882406a8bf387812d93d768dc9afa"
+  },
+  "limits": [
+    "No universal image-quality acceptance threshold was established; all new results are diagnostics.",
+    "No optical measurement, panel calibration, emitted-light near-black, temporal dither, scanout-refresh cadence or Dolby Vision acceptance follows.",
+    "33 distinct source-code plateau means and spatial texture do not alone classify retained bit depth or dither; identity-PQ residual includes display mapping.",
+    "Chroma relative shifts are observed RGB edge midpoints after tone/gamut mapping; they do not establish source-code-domain siting accuracy.",
+    "Scaling endpoints, fixed interior ROIs and predicted edge search avoid dock contamination; different content can receive different tone mapping, confounding filter-quality comparisons.",
+    "Source-index gaps/repeats are observed in the capture stream; they do not isolate player drops from compositor/capture omissions.",
+    "Raw captures and generated stimuli stay private and are removed after the sanitized receipt and private analysis/provenance are retained."
+  ]
+}
