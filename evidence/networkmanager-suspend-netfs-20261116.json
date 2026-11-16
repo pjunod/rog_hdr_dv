@@ -1,0 +1,86 @@
+{
+ "item": "NetworkManager keeps network-filesystem devices up through suspend: VM integration test",
+ "date_utc": "2026-11-16",
+ "component": "patches/ubuntu-network-manager-suspend",
+ "candidate_version": "1.58.1-1ubuntu3+rogsleep1",
+ "package_build": {
+  "command": "dpkg-buildpackage -us -uc -b in ubuntu:26.10 with the package test suite",
+  "tests": "85 OK, 0 fail",
+  "nm_manager_c_warnings": 0,
+  "binary_sha256": {
+   "network-manager_1.58.1-1ubuntu3+rogsleep1_amd64.deb": "0af64211cd43fc967b67b2952b4df273985552bc09910d8d6dc137ac335e56af",
+   "libnm0_1.58.1-1ubuntu3+rogsleep1_amd64.deb": "90a53f716ea0b37d7d32540d65cc59e6dfbb9b128ce750126c66dd13e6d2089b"
+  }
+ },
+ "vm": {
+  "kernel": "7.3.0-10-generic",
+  "topology": "two virtio-net NICs joined by QEMU unix dgram sockets; eth0 managed by NetworkManager (keyfile, static 192.0.2.2/24); eth1 moved to a network namespace running the NFS 4.1 server, 200 Mbit/s shaped",
+  "mount": "vers=4.1,hard,proto=tcp,nconnect=8,timeo=600,retrans=2",
+  "sleep_trigger": "org.freedesktop.NetworkManager.Sleep(true), the same do_sleep_wake path logind's PrepareForSleep drives",
+  "freezer": "pm_test=freezer, state=freeze, default 20 s timeout, pm_debug_messages=1",
+  "scripts": "tools/suspend_nfs_repro/nm/"
+ },
+ "results": {
+  "stock 1.58.1-1ubuntu3 with NFS reader": {
+   "eth0_after_sleep": "unmanaged, DOWN",
+   "freezer": "failed after 20.002 s, refusing task dd, errno -16",
+   "after_wake": "eth0 connected in 2 s, reader completed"
+  },
+  "candidate with NFS reader": {
+   "eth0_after_sleep": "connected, UP",
+   "freezer": "completed in 0.013 s",
+   "after_wake": "eth0 connected in 2 s, reader completed"
+  },
+  "candidate without a network filesystem": {
+   "eth0_after_sleep": "unmanaged, DOWN (unchanged behaviour)",
+   "freezer": "completed in 0.001 s",
+   "after_wake": "eth0 connected in 2 s"
+  }
+ },
+ "serial_log_lines": {
+  "stock": [
+   "kernel 7.3.0-10-generic scenario stock",
+   "NetworkManager 1.58.1-1ubuntu3",
+   "eth0 before: eth0:connected eth0             UP             192.0.2.2/24",
+   "reader wchan=folio_wait_bit_common",
+   "eth0 after Sleep(true): eth0:unmanaged eth0             DOWN",
+   "pm_test=freezer rc=1 failed_freeze 0 -> 1 errno=-16",
+   "dmesg: [   25.663812] Freezing user space processes",
+   "dmesg: [   45.666711] Freezing user space processes failed after 20.002 seconds (1 tasks refusing to freeze, wq_busy=0):",
+   "dmesg: [   45.666731] task:dd              state:D stack:0     pid:326   tgid:326   ppid:1      task_flags:0x400000 flags:0x00080002",
+   "eth0 after wake: eth0:connected after 2s",
+   "reader finished=yes exit=0 after 60s",
+   "DONE"
+  ],
+  "patched": [
+   "kernel 7.3.0-10-generic scenario patched",
+   "NetworkManager 1.58.1-1ubuntu3+rogsleep1",
+   "eth0 before: eth0:connected eth0             UP             192.0.2.2/24",
+   "reader wchan=folio_wait_bit_common",
+   "eth0 after Sleep(true): eth0:connected eth0             UP             192.0.2.2/24",
+   "pm_test=freezer rc=0 failed_freeze 0 -> 0 errno=0",
+   "dmesg: [   27.059514] Freezing user space processes",
+   "dmesg: [   27.073073] Freezing user space processes completed (elapsed 0.013 seconds)",
+   "eth0 after wake: eth0:connected after 2s",
+   "reader finished=yes exit=0 after 60s",
+   "DONE"
+  ],
+  "patched-nomount": [
+   "kernel 7.3.0-10-generic scenario patched-nomount",
+   "NetworkManager 1.58.1-1ubuntu3+rogsleep1",
+   "eth0 before: eth0:connected eth0             UP             192.0.2.2/24",
+   "eth0 after Sleep(true): eth0:unmanaged eth0             DOWN",
+   "pm_test=freezer rc=0 failed_freeze 0 -> 0 errno=0",
+   "dmesg: [   22.453445] Freezing user space processes",
+   "dmesg: [   22.454662] Freezing user space processes completed (elapsed 0.001 seconds)",
+   "eth0 after wake: eth0:connected after 2s",
+   "DONE"
+  ]
+ },
+ "serial_log_sha256": {
+  "stock": "b065b13666f8c8b0f22ecad941d52a41cc8f81a9d4b317565dd6dfa530857042",
+  "patched": "4f4818b1d6f036c1268f5a0eb14d9e1b7355ed721db708686f1b31c94bedcb5a",
+  "patched-nomount": "7deba91f9a64eace375368064fb54d1c6bdaf8424ec7f7eb883e2f21cc008016"
+ },
+ "not_yet": "Real suspend and resume on the ROG with its Wi-Fi link and four NFS mounts."
+}
