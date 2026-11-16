@@ -8,8 +8,10 @@ not an established current defect or a repair claim.
 
 ## Observe ordinary playback before changing a variable
 
-The owner starts titles through the normal Plurx Player handoff in an unlocked
-GNOME session. A separate read-only IPC client subscribes to native-target and
+Two title starts through the normal Plurx Player handoff were recorded in an
+unlocked GNOME session. The launch initiator and physical attendance were not
+verified; the earlier attribution to the owner is withdrawn. There is no
+verified owner visual observation. A separate IPC client subscribes to native-target and
 video-parameter changes, captures mpv diagnostics, and samples progress,
 selected tracks, cache and drop counters at a requested 4 Hz. It does not
 change capabilities, options, source, pause or seek during each three-minute
@@ -56,7 +58,7 @@ The named creative/CM29 gamut strategy is also distinct from HDR10 fallback.
 
 Display configuration (apart from its generation serial), Night Light, boot
 identity, mpv binary and kernel tracing policy are unchanged; measurement
-services are inactive. The user's Player is left running. No code repair,
+services are inactive. The observed Player process was left running. No code repair,
 forced capability, watchdog or package change is justified by this result.
 
 Raw journals, media identity and runtime state stay private; public evidence

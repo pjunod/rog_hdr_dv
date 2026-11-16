@@ -30,6 +30,8 @@ a hard-NFS reader passed in two invocations, with one setup-only stop retained.
 The inherited DV-loss claim remains unconfirmed: normal Profile 8/Profile 7
 playback retained DV state, and a seek reproduced the reset log while mapped
 callbacks continued. [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
+These are technical traces; launch initiator and owner visual observation were
+not verified, and earlier personal attribution is withdrawn.
 [Current status](docs/STATUS.md) ·
 [Image-quality methods and findings](docs/IMAGE_QUALITY_STIMULI.md).
 

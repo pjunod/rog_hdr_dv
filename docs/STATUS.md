@@ -140,6 +140,11 @@ were restored or unchanged; visual/optical, long-duration, battery and other
 topology acceptance remain open.
 [Per-cycle receipt](../evidence/networkmanager-suspend-rog-soak-20261116.json).
 
+**DV observation attribution corrected (November 16).** The playback records
+are machine traces only. Earlier wording attributing the launches or physical
+attendance to the owner is withdrawn; neither the launch initiator nor an owner
+visual observation was verified. No visual acceptance follows.
+
 **DV-loss reproduction check (November 16).** Two normal 180-second Profile 8
 and Profile 7 starts retained active target generation 1 and decoded Dolby
 representation after their first mapped picture. Two separate indexed
