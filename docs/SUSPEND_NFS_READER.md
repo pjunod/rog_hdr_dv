@@ -187,3 +187,23 @@ post-resume state. Local-file success would qualify only that case. NFS
 acceptance requires actual sleep and resume, correct reader continuation,
 normal network recovery and restored display state, with freezer, device PM
 and NVIDIA results recorded separately. No such follow-up test has run.
+
+## Ten-cycle ROG soak — November 16 protocol
+
+The owner authorized a bounded repeated-cycle run on the installed
+`+rogsleep1` package. The planned run is ten normal `systemctl suspend`
+cycles, each with a 30-second RTC wake alarm, on the existing s2idle kernel.
+Each cycle starts a buffered reader at a different offset of a large hard-NFS
+file and must observe `folio_wait` before requesting sleep.
+
+The acceptance checks are one new suspend success, every exposed failure
+counter unchanged, at least ten seconds actually suspended measured by the
+BOOTTIME-minus-MONOTONIC clock difference, unchanged boot identity and GNOME
+Shell process, Wi-Fi connected within 60 seconds, and reader I/O advancing
+from a fresh post-connection sample within ten seconds. The harness stops at
+the first failure without retrying. It preserves private per-cycle kernel and
+service journals, then restores the exact NetworkManager logging state, clears
+only its own RTC alarm and terminates its owned reader.
+
+Results are pending. This protocol does not grant a long-duration, alternate
+network topology, hibernate, display-quality or upstream acceptance claim.
