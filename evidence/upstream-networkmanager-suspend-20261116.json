@@ -1,0 +1,15 @@
+{
+ "item": "NetworkManager upstream unit NM-1 (code only)",
+ "date_utc": "2026-11-16",
+ "base": "62c8e8b2caebbb86182c79223c0109048eac154e",
+ "diff": "upstream/networkmanager/01-suspend-netfs/code.diff",
+ "source": "src/core/nm-manager.c hunks of patches/ubuntu-network-manager-suspend, applied to main with git apply --3way (direct application fallback, clean), then nm-code-format.sh (clang-format 22.1.8: two declaration alignments changed)",
+ "checks": {
+  "build": "meson setup -Dcrypto=gnutls -Dppp=false -Dnbft=false; ninja: ok, 0 warnings in nm-manager.c",
+  "tests": "meson test: 82 OK, 0 fail, 7 skipped (checkpoint-rollback, exit 77 without privileges)",
+  "checkpatch": "contrib/scripts/checkpatch.pl: no findings",
+  "behaviour_on_main": "not run; verified on the Ubuntu 1.58.1 backport (VM and one real suspend)"
+ },
+ "policy": "NetworkManager AGENTS.md: the author writes the commit message, MR description and review replies; no Signed-off-by or tool trailers; disclose AI assistance in the MR.",
+ "diff_sha256": "23282827d5a9212f7b1526dd897a74b0c6c1831679ae6de52e44f150e4391760"
+}

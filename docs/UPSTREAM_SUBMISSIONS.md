@@ -1,8 +1,9 @@
 # Upstream submissions — material, evidence and remaining decisions
 
-**Updated:** 2026-11-15 · **Scope:** 126 inventory entries: the original 85,
+**Updated:** 2026-11-16 · **Scope:** 127 inventory entries: the original 85,
 four mobile/converter observations, 35 additions from the November audit and
-two later additions (WK-2 on November 12, GTK-6 on November 15).
+three later additions (WK-2 on November 12, GTK-6 on November 15, NM-1 on
+November 16).
 The original inventory covered 20 upstream projects; seven new destinations
 bring that coverage to 27, plus local converter observations. No submission
 is performed by this inventory refresh.
@@ -307,6 +308,7 @@ Venue: https://gitlab.gnome.org/GNOME/gtk · GNOME MR; public API contracts need
 | GTK-4 | Query implementation read format/type using GLES-supported framebuffer state | rog_hdr_dv | Held | [November material](../upstream/november-2026/DISPLAY.md) · A one-pixel normalized16-bit PQ source reproduced transparent black under the normal Vulkan GTK consumer when NVIDIA rejected EGL export. glGetFramebufferParameteriv generated GL_INVALID_ENUM; glGetIntegerv recovered the exact four stored16-bit words. Correction also gates desktop GL at4.5. Extract/rebase minimal generic fix and add upstream regression; combined package/player controls do not substitute for standalone current-upstream proof. |
 | GTK-5 | Bind original video pictures and asynchronous target regrading to each GtkVideo view | rog_hdr_dv | Discussion draft | [November material](../upstream/november-2026/DISPLAY.md) · Each realized view has copied target, lease and mapper; original pictures retained before playsink and stale stream/caps/view/target generations rejected. Default Vulkan two-view paused616→308→616 exact-return, source replacement, one-view destruction and absent/incompatible/incomplete SDK SDR startup pass. Agree generic upstream mapper/destination integration rather than sending the private provider or distribution SDK coupling. No private mapper equations or implementation belong in submission. |
 | GTK-6 | wayland: accept absent image descriptions when freeing color state (NULL `cs_to_desc` values crash display disposal) | rog_hdr_dv | Held | [kit](../upstream/gtk/README.md) · Unit 01; same fix as product patch 0021 adapted to GTK main `2c32595f20d9`. GTK's AI policy requires the submitter to build, reproduce and verify on main first; not done yet. |
+| NM-1 | core: keep devices carrying a network filesystem up through suspend (NFS reader blocks the freezer once NM takes the link down) | rog_hdr_dv | Held | [kit](../upstream/networkmanager/README.md) · Unit 01, code only: NetworkManager's AGENTS.md requires the author to write the commit message and MR. Built and tested on main `62c8e8b2caeb` (82/0, 7 skipped); behaviour verified on the Ubuntu 1.58.1 backport (VM and one real ROG suspend). Needs a freedesktop account. |
 
 ## Glycin
 
