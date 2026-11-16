@@ -2,7 +2,9 @@
 
 These notes explain the change for the author's own line-by-line review. They
 are not a commit message or an MR description; NetworkManager requires the
-author to write those.
+author to write those. Do not paste these notes into the MR or a commit; the
+links point into this repository, and NetworkManager wants the author's own
+wording.
 
 ## The problem it addresses
 
