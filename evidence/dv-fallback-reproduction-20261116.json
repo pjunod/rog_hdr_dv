@@ -1,0 +1,402 @@
+{
+  "schema": "dv-fallback-reproduction-v1",
+  "date": "2026-11-16",
+  "owner": "Codex",
+  "status": "sustained_spontaneous_loss_not_reproduced_reset_log_inference_disproved_by_control",
+  "finding": "The reset diagnostic was reproduced at an explicit seek. It is insufficient evidence of sustained DV-to-HDR10 fallback: the PID-scoped control observed mapped-return callbacks in every full post-seek second checked. No production fix is justified by these measurements.",
+  "context": "The inherited 6\u201324-second loss entry was not a confirmed timestamped failure in the current attended window. Earlier client control-sequence fixes remain separate.",
+  "installed": {
+    "mpv": "0.42.0-0ubuntu0+rogdv5.5",
+    "plurx-player": "0.5.1-1",
+    "kernel": "7.3.0-nativehdr3",
+    "mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6",
+    "project_provider387_sha256": "cd8dedcd7351ffaa6c21b20027b503f02a10284ec7cd001c7a0a34c1cfd7042a",
+    "plurx_client_modules_sha256": {
+      "__init__.py": "5ade5c42b7e4bef1571b1401c5e6c194eca397200bdddeeb998aa1f653b58b96",
+      "__main__.py": "66088f44c7c3ad8bdc97cadffb1f77bbd35f3d1b5cfdd1725fd0c1b6381731aa",
+      "api.py": "a5afc170287133bcf025e5462cacdeeb87d04306a58e378a852508d2d8aa3aee",
+      "caps.py": "b2d24fc01eb004b5e24fc79e45d0a7fa4a5d972f09b157d9732a395900a086df",
+      "cinema.py": "dfb43dd996b3885ba1fe46f74ca14d8e53d30970697812cc1e531bd37327911f",
+      "handoff.py": "eb8ae57d289a2c21b0773e1717a8cdf16e45a389dfc90a1c5b9141ce952b0f41",
+      "launcher.py": "ad894f30c928e2c6cd94a4cd345ce7c7df8d787e4592bd7f67ce81127bc68c80",
+      "mpv.py": "7651d3103447bc67a83eac571d4e356f62a233c3826109216c15da64d1ee39c8",
+      "playback.py": "43cdd6c9fc31476f54ad9d92743a337cc3c073fdb6c60c7cf99c061afdfcc689",
+      "trust.py": "1d1ef4706cd510710624caf1918e6cfcb794c2bc440265074e18bea4864fbfd4"
+    },
+    "cinema_lua_sha256": "20e0785ba1440e3038f4a6c0772c2a380a76432c581408890bb323c24023214f"
+  },
+  "method": {
+    "normal_entry": "Owner started both titles via ordinary Plurx Play in Player, normal installed options/capabilities; no synthetic route or forced DV flag.",
+    "startup_cases": "180 seconds each, untouched. Profile8 3840x1608 and Profile7 3840x2160, HEVC Main10, HLS remux; titles/URLs/tokens retained privately.",
+    "read_only_observer": "Property-event subscription plus requested4Hz samples; no change to options, capabilities, source, pause or seek during startup cases.",
+    "target_contract": "active is physical-target eligibility, not proof of each frame mapped. Each startup analysis begins at its first matching-generation successful-map log.",
+    "seek_controls": [
+      {
+        "kind": "one current-position +60s absolute+exact mpv seek",
+        "target_seconds": 672.237,
+        "control_record_sha256": "1e44908fbcb617b5913ba1adf80a9dd3a84f35764c9a042896c2d1ba5d49b529"
+      },
+      {
+        "kind": "one current-position +60s absolute+exact mpv seek",
+        "target_seconds": 1498.187,
+        "control_record_sha256": "c456f80c10f534e5094366685f9a2de79472aacd98e5e6e8d781858b34e266bc"
+      }
+    ],
+    "tracing": "Existing bpftrace0.25, PID/starttime-scoped uprobes/uretprobes on our project dv_provider387_map_v2/reset ABI; aggregate input-length/EL flags and return codes only. No RPU bytes, vendor reference binaries, package changes or kernel policy changes.",
+    "abi_reference": "packaging/system-dv/include/dv_provider387.h: 1=mapped,0=unsupported,-1=mapping error."
+  },
+  "cases": [
+    {
+      "case": "run1",
+      "delivered_profile": 8,
+      "purpose": "untouched normal startup",
+      "observer_elapsed_seconds": 180.00009066201164,
+      "requested_sample_hz": 4,
+      "total_snapshots": 715,
+      "analysis_anchor": "first matching-generation successful-map log",
+      "seconds_after_anchor_to_observer_end": 167.2792076980113,
+      "snapshots_after_anchor": 669,
+      "initial_idle_active_false_is_not_fallback": true,
+      "all_analyzed_target_active": true,
+      "analyzed_generations": [
+        1
+      ],
+      "all_analyzed_decoder_colormatrix_dolbyvision": true,
+      "window_6_to_24_seconds": {
+        "anchor": "after analysis anchor",
+        "snapshots": 72,
+        "target_active_snapshots": 72
+      },
+      "position_first_last_seconds": [
+        291.624,
+        458.458
+      ],
+      "drop_counters": {
+        "frame-drop-count": {
+          "valid_samples": 669,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "decoder-frame-drop-count": {
+          "valid_samples": 669,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "vo-delayed-frame-count": {
+          "valid_samples": 669,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        }
+      },
+      "seek_event_count": 1,
+      "source_start_event_count": 1,
+      "raw_trace_sha256": "55a6ebf5e03ac498332a08b8cae006531199727f41683beb49c32776fba00a19",
+      "manifest_sha256": "40529cc1d5097267166d043f5388d276ed30be7f6f33c61b12389f9509abf24e",
+      "mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6"
+    },
+    {
+      "case": "run2",
+      "delivered_profile": 7,
+      "purpose": "untouched normal startup",
+      "observer_elapsed_seconds": 180.00014244101476,
+      "requested_sample_hz": 4,
+      "total_snapshots": 717,
+      "analysis_anchor": "first matching-generation successful-map log",
+      "seconds_after_anchor_to_observer_end": 169.60082411201438,
+      "snapshots_after_anchor": 679,
+      "initial_idle_active_false_is_not_fallback": true,
+      "all_analyzed_target_active": true,
+      "analyzed_generations": [
+        1
+      ],
+      "all_analyzed_decoder_colormatrix_dolbyvision": true,
+      "window_6_to_24_seconds": {
+        "anchor": "after analysis anchor",
+        "snapshots": 72,
+        "target_active_snapshots": 72
+      },
+      "position_first_last_seconds": [
+        375.5,
+        544.878
+      ],
+      "drop_counters": {
+        "frame-drop-count": {
+          "valid_samples": 679,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "decoder-frame-drop-count": {
+          "valid_samples": 679,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "vo-delayed-frame-count": {
+          "valid_samples": 679,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        }
+      },
+      "seek_event_count": 1,
+      "source_start_event_count": 1,
+      "raw_trace_sha256": "9bd69a12665ea346e64be31bdb8b6caae34544a0f1c2e9f2f00fdd406b260deb",
+      "manifest_sha256": "1741217fc39e8a706f202ade0441be5a29a5a835493a58c889d8c1fa78e944cf",
+      "mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6"
+    },
+    {
+      "case": "run3",
+      "delivered_profile": 7,
+      "purpose": "separate explicit +60-second seek control",
+      "observer_elapsed_seconds": 90.00014962701243,
+      "requested_sample_hz": 4,
+      "total_snapshots": 360,
+      "analysis_anchor": "already-playing observer first snapshot",
+      "seconds_after_anchor_to_observer_end": 89.90364496299298,
+      "snapshots_after_anchor": 360,
+      "initial_idle_active_false_is_not_fallback": false,
+      "all_analyzed_target_active": true,
+      "analyzed_generations": [
+        1
+      ],
+      "all_analyzed_decoder_colormatrix_dolbyvision": true,
+      "window_6_to_24_seconds": {
+        "anchor": "after analysis anchor",
+        "snapshots": 72,
+        "target_active_snapshots": 72
+      },
+      "position_first_last_seconds": [
+        609.276,
+        758.717
+      ],
+      "drop_counters": {
+        "frame-drop-count": {
+          "valid_samples": 360,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "decoder-frame-drop-count": {
+          "valid_samples": 360,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "vo-delayed-frame-count": {
+          "valid_samples": 360,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        }
+      },
+      "seek_event_count": 1,
+      "source_start_event_count": 0,
+      "raw_trace_sha256": "3a4e011161a70954781de133f518674eb942b7209efdc849bf0e6845a1f4941d",
+      "manifest_sha256": "34fceaf39149e5a4010714c2318a2515d2f2e116609490c9c5ba30a1fc860215",
+      "mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6"
+    },
+    {
+      "case": "run4",
+      "delivered_profile": 7,
+      "purpose": "separate explicit +60-second seek control",
+      "observer_elapsed_seconds": 45.000200345995836,
+      "requested_sample_hz": 4,
+      "total_snapshots": 180,
+      "analysis_anchor": "already-playing observer first snapshot",
+      "seconds_after_anchor_to_observer_end": 44.928465719975065,
+      "snapshots_after_anchor": 180,
+      "initial_idle_active_false_is_not_fallback": false,
+      "all_analyzed_target_active": true,
+      "analyzed_generations": [
+        1
+      ],
+      "all_analyzed_decoder_colormatrix_dolbyvision": true,
+      "window_6_to_24_seconds": {
+        "anchor": "after analysis anchor",
+        "snapshots": 72,
+        "target_active_snapshots": 72
+      },
+      "position_first_last_seconds": [
+        1435.184,
+        1539.58
+      ],
+      "drop_counters": {
+        "frame-drop-count": {
+          "valid_samples": 180,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "decoder-frame-drop-count": {
+          "valid_samples": 180,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        },
+        "vo-delayed-frame-count": {
+          "valid_samples": 180,
+          "first_last": [
+            0,
+            0
+          ],
+          "max": 0
+        }
+      },
+      "seek_event_count": 1,
+      "source_start_event_count": 0,
+      "raw_trace_sha256": "534a38d60b23fc5cf316d577d7e06a7c9b3bab0b74d4a2b6c246a5e5809a4166",
+      "manifest_sha256": "76eb48f371d25a7c09643b90861974b3a4a246d6d2fa7af62a26f86eaf23c15e",
+      "mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6"
+    }
+  ],
+  "provider_journal": {
+    "initial_successes": [
+      {
+        "delivered_profile": 8,
+        "target_peak_nits": 616,
+        "caller_EL_composed": false
+      },
+      {
+        "delivered_profile": 7,
+        "target_peak_nits": 616,
+        "caller_EL_composed": true
+      }
+    ],
+    "reset_diagnostics_for_P7": 2,
+    "first_reset_seconds_after_first_seek_unit_request": 0.382810115814209,
+    "no_spontaneous_reset_diagnostic_during_untouched_startup_cases": true,
+    "gamut_strategy_note": "Named creative/CM29 target strategy is distinct from ordinary HDR10 fallback."
+  },
+  "later_probe": {
+    "requested_seconds": 20,
+    "nonzero_RPU_length_EL1_entries": 485,
+    "completed_mapped_returns": 483,
+    "fallback_or_error_returns_observed": 0,
+    "limitation": "Taken several minutes after first seek; cannot establish its immediate recovery latency. Entry/return counters are unpaired at attach/detach boundaries.",
+    "log_sha256": "657d3e62028ee7da968cd2bb67e89936a5b1afbca0dcbe62f9241393ef5e0f44"
+  },
+  "seek_spanning_probe": {
+    "requested_seconds": 45,
+    "reset_calls_by_elapsed_second": {
+      "3": 1
+    },
+    "nonzero_RPU_length_EL1_entries": 1077,
+    "completed_mapped_returns": 1075,
+    "fallback_returns_observed": 0,
+    "error_returns_observed": 0,
+    "mapped_returns_by_elapsed_second": {
+      "0": 24,
+      "1": 24,
+      "2": 24,
+      "3": 17,
+      "4": 24,
+      "5": 24,
+      "6": 24,
+      "7": 24,
+      "8": 24,
+      "9": 24,
+      "10": 24,
+      "11": 24,
+      "12": 24,
+      "13": 24,
+      "14": 24,
+      "15": 24,
+      "16": 24,
+      "17": 24,
+      "18": 24,
+      "19": 24,
+      "20": 24,
+      "21": 24,
+      "22": 24,
+      "23": 24,
+      "24": 24,
+      "25": 24,
+      "26": 24,
+      "27": 24,
+      "28": 24,
+      "29": 24,
+      "30": 24,
+      "31": 24,
+      "32": 24,
+      "33": 24,
+      "34": 24,
+      "35": 24,
+      "36": 24,
+      "37": 24,
+      "38": 24,
+      "39": 24,
+      "40": 24,
+      "41": 24,
+      "42": 24,
+      "43": 24,
+      "44": 24,
+      "45": 2
+    },
+    "trace_warning_or_lost_event_notice": false,
+    "all_children_exit_zero": true,
+    "action_verified": true,
+    "library_same_as_later_probe": true,
+    "source_sha256": "644fba8e6b8b76f6346fbb67d2a28b688a9c7b18bad6977f5f5147303f68690b",
+    "log_sha256": "378ee2a5ca9e97cc2ecc8782059999e3526f3cb2a7906cc18c27c0525699b826",
+    "manifest_sha256": "1e9d793ba3d3da49cbedf5f3fe2d08acb907bff65a4d456749b617f75b236c79",
+    "probe_elapsed_full_second_bins_checked_after_seek": [
+      4,
+      43
+    ],
+    "successful_full_probe_bins_after_seek": 40,
+    "time_origin": "Bucket indexes are whole elapsed seconds from BPF BEGIN, not from the seek; reset was in probe bucket 3. Buckets 4\u201343 are all after that seek."
+  },
+  "restoration": {
+    "display_configuration_unchanged_excluding_generation_serial": true,
+    "night_light_unchanged": true,
+    "boot_identity_unchanged": true,
+    "mpv_binary_unchanged": true,
+    "kernel_perf_event_paranoid_unchanged": true,
+    "measurement_services_inactive": true,
+    "user_player_not_terminated_or_reconfigured": true,
+    "only_playback_actions": "Two explicit +60-second seek controls, separate from untouched startup observations."
+  },
+  "provenance": {
+    "private_archive_sha256": "6cdcbe00b6bf58a686457b7f6bc603b1d9ca3a66520ee53d8cec992bab40ad4f",
+    "application_journal_sha256": "b99ac131d9298d44aa51c639d6c61fd2bc119868e25c8780c495d953d45a16da",
+    "server_log_sha256": "4ddfced7e6a71baa8ae9fd2368e29e8455519a5f1c520b6c431ad67a9502e849",
+    "observer_v1_sha256": "e630ea8993d40e5655e74e96fd681e4ca461f88e81aba4221614aa2f047fd5e4",
+    "observer_v2_sha256": "c668c79651a3a09c3ab10a7f43e741da8f20f7cec926d30c44d7e53d761ce933",
+    "seek_mapper_helper_sha256": "b53e0ce6a1f64402c9a89b1510005260e7e3314d445b53f747c56b43e62923ab"
+  },
+  "limits": [
+    "No sustained spontaneous loss reproduced on these two streams/current binaries; this does not prove a historical or intermittent failure impossible.",
+    "Mapped ABI returns prove successful callback results, not every decoded or displayed frame, optical output or uninterrupted full-film Dolby Vision accuracy.",
+    "One-second buckets can miss shorter gaps. Entry/return counts are not individually paired, and no meaning is assigned to their boundary difference.",
+    "Initial idle active=false and unavailable startup properties are recorded separately from post-first-map state. Manifest missing-property list means missing at least once, not absent throughout.",
+    "Direct mpv indexed +60s controls do not qualify outside-range OSC seeks, session replacement, other titles/routes or every future source transition.",
+    "No new owner-reported visual failure or optical pass is asserted; independent technical records are the basis of these conclusions.",
+    "No production code, capabilities, watchdogs, display settings, packages, source pins or patches changed."
+  ]
+}

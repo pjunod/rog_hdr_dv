@@ -27,7 +27,9 @@ have bounded digital diagnostics; the damage-driven stream cannot establish
 240 Hz panel cadence or optical accuracy. Ten actual s2idle suspend/resume cycles with the corrected NetworkManager and
 a hard-NFS reader passed in two invocations, with one setup-only stop retained.
 [Per-cycle results and limits](docs/SUSPEND_NFS_READER.md#ten-cycle-rog-soak--november-16-protocol).
-The original intermittent DV loss remains unreproduced.
+The inherited DV-loss claim remains unconfirmed: normal Profile 8/Profile 7
+playback retained DV state, and a seek reproduced the reset log while mapped
+callbacks continued. [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
 [Current status](docs/STATUS.md) ·
 [Image-quality methods and findings](docs/IMAGE_QUALITY_STIMULI.md).
 
@@ -205,6 +207,7 @@ has the remote and branch rules.
 | [Headless harness](docs/DOLBY_HARNESS.md) | How references are rendered and scored, and the private boundary |
 | [HDR reference corpus](docs/HDR_REFERENCE_CORPUS.md) | Reproducible test images, and what may leave the private area |
 | [Image-quality source stimuli](docs/IMAGE_QUALITY_STIMULI.md) | Y4M chroma-siting, scaling, dither and cadence sources; not a measurement |
+| [DV fallback reproduction](docs/DV_FALLBACK_REPRODUCTION.md) | Bounded playback checks separating metadata, target eligibility and successful mapping |
 | [Authored-master transport](docs/AUTHORED_MASTER_BASELINE.md) · [frame-owned mapping](docs/OPEN_XML205_CANDIDATE.md) · [absolute-PQ](docs/OPEN_ABSOLUTE_PQ_SOP.md) · [public RGB/Y](docs/PUBLIC_RGB_MAPPING.md) | Earlier mapping candidates, kept for their evidence |
 | [Historical native player](tools/native_player/README.md) · [qualification](tools/native_player/QUALIFICATION.md) | Retained experimental work, not the current install path; use external plurx Player |
 | [Activation probe](docs/DOLBY_ACTIVATION_PROBE.md) · [Wine API contract](docs/WINE_API_CONTRACT.md) · [Wine file API](docs/WINE_FILE_FROMAPP.md) · [Wine monitor discovery](docs/WINE_DISPLAY_MONITOR.md) | The Windows-processor-under-Wine route and its prerequisites |
