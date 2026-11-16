@@ -140,6 +140,17 @@ were restored or unchanged; visual/optical, long-duration, battery and other
 topology acceptance remain open.
 [Per-cycle receipt](../evidence/networkmanager-suspend-rog-soak-20261116.json).
 
+**DV-loss reproduction check (November 16).** Two normal 180-second Profile 8
+and Profile 7 starts retained active target generation 1 and decoded Dolby
+representation after their first mapped picture. Two separate indexed
++60-second seeks reproduced the provider's reset notice. The seek-spanning
+45-second probe observed 1,075 mapped callback returns, no unsupported/error
+returns and successful maps in each full post-seek second checked. A reset
+notice alone therefore does not establish sustained HDR10 fallback. The
+inherited 6–24-second claim remains unconfirmed; no production fix is claimed.
+[Method and limits](DV_FALLBACK_REPRODUCTION.md) ·
+[Receipt](../evidence/dv-fallback-reproduction-20261116.json).
+
 **Installed Player and corrected-kernel acceptance (November 13).**
 The owner explicitly instructed installation of Player `0.5.1-1` from the
 merged source. Package verification, dependency checks and preservation of

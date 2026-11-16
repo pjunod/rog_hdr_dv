@@ -27,7 +27,9 @@ have bounded digital diagnostics; the damage-driven stream cannot establish
 240 Hz panel cadence or optical accuracy. Ten actual s2idle suspend/resume cycles with the corrected NetworkManager and
 a hard-NFS reader passed in two invocations, with one setup-only stop retained.
 [Per-cycle results and limits](docs/SUSPEND_NFS_READER.md#ten-cycle-rog-soak--november-16-protocol).
-The original intermittent DV loss remains unreproduced.
+The inherited DV-loss claim remains unconfirmed: normal Profile 8/Profile 7
+playback retained DV state, and a seek reproduced the reset log while mapped
+callbacks continued. [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
 [Current status](docs/STATUS.md) ·
 [Image-quality methods and findings](docs/IMAGE_QUALITY_STIMULI.md).
 
