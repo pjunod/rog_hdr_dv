@@ -1,5 +1,5 @@
 #!/bin/bash
-for s in ${@:-stock patched patched-nomount}; do
+for s in ${@:-stock patched patched-nomount stock-bridge patched-bridge}; do
   rm -f /w/vm/a.sock /w/vm/b.sock
   timeout 900 qemu-system-x86_64 -enable-kvm -m 4096 -smp 2 -nographic -no-reboot \
     -kernel /w/vm/vmlinuz -initrd /w/vm/initrd.img -drive file=/w/vm/root.img,format=raw,if=virtio,snapshot=on \

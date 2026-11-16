@@ -1,5 +1,6 @@
 #!/bin/sh
-# PID 1 in the NetworkManager suspend test VM. scenario=stock|patched|patched-nomount
+# PID 1 in the NetworkManager suspend test VM.
+# scenario=stock|patched|patched-nomount|stock-bridge|patched-bridge
 mount -t proc proc /proc; mount -t sysfs sys /sys; mount -t devtmpfs dev /dev; mount -t tmpfs tmp /run; mount -t tmpfs tmp /tmp
 mkdir -p /run/dbus /run/rpcbind /var/lib/nfs/v4recovery /mnt/nfs /proc/fs/nfsd
 SCEN=$(sed -n 's/.*scenario=\([a-z-]*\).*/\1/p' /proc/cmdline)
@@ -19,13 +20,21 @@ ip netns exec srv tc qdisc add dev eth1 root tbf rate 200mbit burst 64kb latency
 dbus-daemon --system --fork
 mkdir -p /etc/NetworkManager/system-connections
 printf '[main]\nplugins=keyfile\nauth-polkit=false\n[logging]\nlevel=DEBUG\ndomains=SUSPEND,DEVICE,CORE\n' > /etc/NetworkManager/NetworkManager.conf
-printf '[connection]\nid=c\ntype=ethernet\ninterface-name=eth0\n[ipv4]\nmethod=manual\naddress1=192.0.2.2/24\n[ipv6]\nmethod=disabled\n' > /etc/NetworkManager/system-connections/c.nmconnection
-chmod 600 /etc/NetworkManager/system-connections/c.nmconnection
+case "$SCEN" in
+  *-bridge)
+    # The server is reached through a bridge; eth0 is only its port.
+    printf '[connection]\nid=br\ntype=bridge\ninterface-name=br0\n[bridge]\nstp=false\n[ipv4]\nmethod=manual\naddress1=192.0.2.2/24\n[ipv6]\nmethod=disabled\n' > /etc/NetworkManager/system-connections/br.nmconnection
+    printf '[connection]\nid=c\ntype=ethernet\ninterface-name=eth0\ncontroller=br0\nport-type=bridge\n' > /etc/NetworkManager/system-connections/c.nmconnection;;
+  *)
+    printf '[connection]\nid=c\ntype=ethernet\ninterface-name=eth0\n[ipv4]\nmethod=manual\naddress1=192.0.2.2/24\n[ipv6]\nmethod=disabled\n' > /etc/NetworkManager/system-connections/c.nmconnection;;
+esac
+chmod 600 /etc/NetworkManager/system-connections/*.nmconnection
 mkdir -p /etc/NetworkManager/conf.d; printf '[keyfile]\nunmanaged-devices=none\n' > /etc/NetworkManager/conf.d/99-test-managed.conf
 NetworkManager --no-daemon > /run/nm.log 2>&1 &
 for i in $(seq 1 30); do [ "$(nmcli -t -f DEVICE,STATE dev 2>/dev/null | grep '^eth0:')" = "eth0:connected" ] && break; sleep 1; done
 log "conf.d: $(ls /usr/lib/NetworkManager/conf.d /etc/NetworkManager/conf.d | tr '\n' ' ')"
-log "eth0 before: $(nmcli -t -f DEVICE,STATE dev | grep ^eth0:) $(ip -br addr show eth0)"
+sleep 3
+log "before: $(nmcli -t -f DEVICE,STATE dev | grep -E '^(eth0|br0):' | tr '\n' ' ')$(ip -br addr show eth0) $(ip -br addr show br0 2>/dev/null)"
 sleep 10
 if [ "$SCEN" != patched-nomount ]; then
   mount -t nfs4 -o vers=4.1,hard,proto=tcp,nconnect=8,timeo=600,retrans=2 192.0.2.1:/ /mnt/nfs || { log "mount failed"; fin; }
@@ -36,7 +45,7 @@ if [ "$SCEN" != patched-nomount ]; then
 fi
 busctl call org.freedesktop.NetworkManager /org/freedesktop/NetworkManager org.freedesktop.NetworkManager Sleep b true || log "Sleep(true) failed"
 sleep 4
-log "eth0 after Sleep(true): $(nmcli -t -f DEVICE,STATE dev | grep ^eth0:) $(ip -br addr show eth0)"
+log "after Sleep(true): $(nmcli -t -f DEVICE,STATE dev | grep -E '^(eth0|br0):' | tr '\n' ' ')$(ip -br link show eth0)"
 grep -E "sleep: |carries a network filesystem|wake-on-lan" /run/nm.log | tail -4 | while read l; do log "nm: $l"; done
 echo 1 > /sys/power/pm_debug_messages; echo freezer > /sys/power/pm_test; dmesg -C
 F0=$(cat /sys/power/suspend_stats/failed_freeze)

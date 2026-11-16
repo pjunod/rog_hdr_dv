@@ -4,13 +4,14 @@
  "component": "patches/ubuntu-network-manager-suspend",
  "candidate_version": "1.58.1-1ubuntu3+rogsleep1",
  "package_build": {
-  "command": "dpkg-buildpackage -us -uc -b in ubuntu:26.10 with the package test suite",
-  "tests": "85 OK, 0 fail",
+  "command": "dpkg-buildpackage -us -uc -b in ubuntu:26.10 with the package test suite, clean run exit 0",
+  "tests": "85 OK, 0 fail (no test exercises the new function)",
   "nm_manager_c_warnings": 0,
   "binary_sha256": {
-   "network-manager_1.58.1-1ubuntu3+rogsleep1_amd64.deb": "0af64211cd43fc967b67b2952b4df273985552bc09910d8d6dc137ac335e56af",
-   "libnm0_1.58.1-1ubuntu3+rogsleep1_amd64.deb": "90a53f716ea0b37d7d32540d65cc59e6dfbb9b128ce750126c66dd13e6d2089b"
-  }
+   "network-manager_1.58.1-1ubuntu3+rogsleep1_amd64.deb": "89ba0d9f5092947453aff35ff06f6bf65e42ba6ed8771f37ddcd808345915a48",
+   "libnm0_1.58.1-1ubuntu3+rogsleep1_amd64.deb": "b587c3095f1f638143653728eb72457d7552f4ea417b7de2ec7fad06d670d86f"
+  },
+  "note": "These are the exact debs installed in the VM runs below."
  },
  "vm": {
   "kernel": "7.3.0-10-generic",
@@ -18,24 +19,31 @@
   "mount": "vers=4.1,hard,proto=tcp,nconnect=8,timeo=600,retrans=2",
   "sleep_trigger": "org.freedesktop.NetworkManager.Sleep(true), the same do_sleep_wake path logind's PrepareForSleep drives",
   "freezer": "pm_test=freezer, state=freeze, default 20 s timeout, pm_debug_messages=1",
-  "scripts": "tools/suspend_nfs_repro/nm/"
+  "scripts": "tools/suspend_nfs_repro/nm/",
+  "scenarios": "stock|patched|patched-nomount: eth0 managed directly; stock-bridge|patched-bridge: eth0 is the port of an NM-managed bridge br0 that carries the address"
  },
  "results": {
-  "stock 1.58.1-1ubuntu3 with NFS reader": {
-   "eth0_after_sleep": "unmanaged, DOWN",
-   "freezer": "failed after 20.002 s, refusing task dd, errno -16",
-   "after_wake": "eth0 connected in 2 s, reader completed"
+  "stock, NIC": {
+   "port_after_sleep": "unmanaged, DOWN",
+   "freezer": "failed after 20.002 s, refusing task dd, errno -16"
   },
-  "candidate with NFS reader": {
-   "eth0_after_sleep": "connected, UP",
-   "freezer": "completed in 0.013 s",
-   "after_wake": "eth0 connected in 2 s, reader completed"
+  "candidate, NIC": {
+   "port_after_sleep": "connected, UP",
+   "freezer": "completed in 0.022 s"
   },
-  "candidate without a network filesystem": {
-   "eth0_after_sleep": "unmanaged, DOWN (unchanged behaviour)",
-   "freezer": "completed in 0.001 s",
-   "after_wake": "eth0 connected in 2 s"
-  }
+  "candidate, NIC, no network filesystem": {
+   "port_after_sleep": "unmanaged, DOWN (unchanged behaviour)",
+   "freezer": "completed"
+  },
+  "stock, bridge port": {
+   "port_after_sleep": "eth0 unmanaged and DOWN while br0 stays connected",
+   "freezer": "failed after 20.004 s, refusing task dd, errno -16"
+  },
+  "candidate, bridge port": {
+   "port_after_sleep": "eth0 connected, UP",
+   "freezer": "completed in 0.007 s"
+  },
+  "all": "link back within 2 s of Sleep(false); the reader finished in every run with a reader"
  },
  "serial_log_lines": {
   "stock": [
@@ -55,12 +63,12 @@
   "patched": [
    "kernel 7.3.0-10-generic scenario patched",
    "NetworkManager 1.58.1-1ubuntu3+rogsleep1",
-   "eth0 before: eth0:connected eth0             UP             192.0.2.2/24",
+   "before: eth0:connected eth0             UP             192.0.2.2/24",
    "reader wchan=folio_wait_bit_common",
-   "eth0 after Sleep(true): eth0:connected eth0             UP             192.0.2.2/24",
+   "after Sleep(true): eth0:connected eth0             UP             52:54:00:00:00:01 <BROADCAST,MULTICAST,UP,LOWER_UP>",
    "pm_test=freezer rc=0 failed_freeze 0 -> 0 errno=0",
-   "dmesg: [   27.059514] Freezing user space processes",
-   "dmesg: [   27.073073] Freezing user space processes completed (elapsed 0.013 seconds)",
+   "dmesg: [   29.977342] Freezing user space processes",
+   "dmesg: [   29.999777] Freezing user space processes completed (elapsed 0.022 seconds)",
    "eth0 after wake: eth0:connected after 2s",
    "reader finished=yes exit=0 after 60s",
    "DONE"
@@ -68,19 +76,49 @@
   "patched-nomount": [
    "kernel 7.3.0-10-generic scenario patched-nomount",
    "NetworkManager 1.58.1-1ubuntu3+rogsleep1",
-   "eth0 before: eth0:connected eth0             UP             192.0.2.2/24",
-   "eth0 after Sleep(true): eth0:unmanaged eth0             DOWN",
+   "before: eth0:connected eth0             UP             192.0.2.2/24",
+   "after Sleep(true): eth0:unmanaged eth0             DOWN           52:54:00:00:00:01 <BROADCAST,MULTICAST>",
    "pm_test=freezer rc=0 failed_freeze 0 -> 0 errno=0",
-   "dmesg: [   22.453445] Freezing user space processes",
-   "dmesg: [   22.454662] Freezing user space processes completed (elapsed 0.001 seconds)",
+   "dmesg: [   33.392045] Freezing user space processes",
+   "dmesg: [   33.392788] Freezing user space processes completed (elapsed 0.000 seconds)",
    "eth0 after wake: eth0:connected after 2s",
+   "DONE"
+  ],
+  "stock-bridge": [
+   "kernel 7.3.0-10-generic scenario stock-bridge",
+   "NetworkManager 1.58.1-1ubuntu3",
+   "before: br0:connected eth0:connected eth0             UP              br0              UP             192.0.2.2/24",
+   "reader wchan=folio_wait_bit_common",
+   "after Sleep(true): br0:connected eth0:unmanaged eth0             DOWN           52:54:00:00:00:01 <BROADCAST,MULTICAST>",
+   "pm_test=freezer rc=1 failed_freeze 0 -> 1 errno=-16",
+   "dmesg: [   32.311882] Freezing user space processes",
+   "dmesg: [   52.316565] Freezing user space processes failed after 20.004 seconds (1 tasks refusing to freeze, wq_busy=0):",
+   "dmesg: [   52.316576] task:dd              state:D stack:0     pid:331   tgid:331   ppid:1      task_flags:0x400000 flags:0x00080002",
+   "eth0 after wake: eth0:connected after 1s",
+   "reader finished=yes exit=0 after 60s",
+   "DONE"
+  ],
+  "patched-bridge": [
+   "kernel 7.3.0-10-generic scenario patched-bridge",
+   "NetworkManager 1.58.1-1ubuntu3+rogsleep1",
+   "before: br0:connected eth0:connected eth0             UP              br0              UP             192.0.2.2/24",
+   "reader wchan=folio_wait_bit_common",
+   "after Sleep(true): br0:connected eth0:connected eth0             UP             52:54:00:00:00:01 <BROADCAST,MULTICAST,UP,LOWER_UP>",
+   "pm_test=freezer rc=0 failed_freeze 0 -> 0 errno=0",
+   "dmesg: [   30.827061] Freezing user space processes",
+   "dmesg: [   30.834990] Freezing user space processes completed (elapsed 0.007 seconds)",
+   "eth0 after wake: eth0:connected after 1s",
+   "reader finished=yes exit=0 after 60s",
    "DONE"
   ]
  },
  "serial_log_sha256": {
   "stock": "b065b13666f8c8b0f22ecad941d52a41cc8f81a9d4b317565dd6dfa530857042",
-  "patched": "4f4818b1d6f036c1268f5a0eb14d9e1b7355ed721db708686f1b31c94bedcb5a",
-  "patched-nomount": "7deba91f9a64eace375368064fb54d1c6bdaf8424ec7f7eb883e2f21cc008016"
+  "patched": "c95dc00b95a91f6fa9e8317f10b40691c2d6bb2b19c11475c293d1a3d603a6ac",
+  "patched-nomount": "4d640f12d638e1fe2c2ae13bff20b7961eb42af6ee7a333c6d30f71eebc272e6",
+  "stock-bridge": "e1db6f1ea03ec9f3513ae25ef7565c3dc7f19925ab8383d2a1a8da48e8681f85",
+  "patched-bridge": "4e34f328239a4659b238a9a08b19fe6b025092442cb6576e2b8cf626c5fe30eb"
  },
- "not_yet": "Real suspend and resume on the ROG with its Wi-Fi link and four NFS mounts."
+ "candidate_commit": "8c9269bf355763d4ec8eea31ba114ce88cb852ff",
+ "not_covered": "Real suspend and driver suspend, Wi-Fi, DHCP, NetworkManager under its systemd unit, VPN underlays, policy routing."
 }

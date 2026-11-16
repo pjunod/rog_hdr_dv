@@ -86,28 +86,44 @@ direction (wake-on-WLAN, which changes what wakes the laptop) were not taken.
 
 [`ubuntu-network-manager-suspend`](../patches/ubuntu-network-manager-suspend/series)
 patches Ubuntu's `network-manager 1.58.1-1ubuntu3` as `1.58.1-1ubuntu3+rogsleep1`.
-Before sleep, a device is now skipped, like a Wake-on-LAN device, when it routes
-to the server of a mounted NFS or SMB filesystem. The check reads
-`/proc/self/mountinfo`, takes each `nfs`, `nfs4`, `cifs` or `smb3` mount's
-`addr=` option, and asks the kernel which interface reaches that address. On wake
-such a device is re-checked exactly as NetworkManager already re-checks
-Wake-on-LAN devices. Devices without such a mount are taken down as before.
+Once per suspend, NetworkManager reads the init namespace's mount table
+(`/proc/1/mountinfo`; its own unit runs in a private mount namespace). It takes
+each `nfs`, `nfs4`, `cifs` or `smb3` mount's `addr=` option, including IPv6
+link-local `addr%iface`, and asks the kernel which link reaches that server.
+That link, its VLAN parent and its bridge or bond ports are then skipped before
+sleep, as Wake-on-LAN devices already are. They are recorded, and on wake exactly
+those devices are re-checked the way NetworkManager re-checks Wake-on-LAN
+devices. That wake-time reset is no more disruptive than stock behaviour, which
+takes them down before sleep. Devices that carry no such mount are taken down as
+before.
 
-The package builds with its test suite (85 OK, 0 fail). In a KVM guest
+Known limits: a server reached through a VPN tunnel keeps the tunnel's software
+device but not the underlay, because the patch does not follow the VPN endpoint's
+route. The lookup uses the kernel's default routing for the server address, so
+source-based policy routing that steers the NFS socket elsewhere is not modelled.
+
+The package builds with its test suite (85 OK, 0 fail); the suite has no test of
+the new function. In a KVM guest
 ([`tools/suspend_nfs_repro/nm/`](../tools/suspend_nfs_repro/nm/)), NetworkManager
-manages a virtio NIC, a hard NFS 4.1 reader is running, and sleep is entered
-through NetworkManager's own `Sleep(true)`:
+manages a virtio NIC with a static address, a hard NFS 4.1 reader is running, and
+sleep is entered through NetworkManager's own `Sleep(true)` D-Bus method followed
+by `pm_test=freezer`:
 
-| NetworkManager | NFS reader | Device after `Sleep(true)` | Freezer |
-|---|---|---|---|
-| stock `1.58.1-1ubuntu3` | yes | taken down | failed after 20 s, `dd` refusing, `-EBUSY` |
-| `+rogsleep1` | yes | kept up | completed in 0.013 s |
-| `+rogsleep1` | none | taken down, as before | completed in 0.001 s |
+| NetworkManager | Topology | NFS reader | Hardware port after `Sleep(true)` | Freezer |
+|---|---|---|---|---|
+| stock `1.58.1-1ubuntu3` | NIC | yes | taken down | failed after 20 s, `dd` refusing, `-EBUSY` |
+| `+rogsleep1` | NIC | yes | kept up | completed in 0.022 s |
+| `+rogsleep1` | NIC | none | taken down, as before | completed |
+| stock | bridge with the NIC as port | yes | taken down (bridge stays up) | failed after 20 s, `-EBUSY` |
+| `+rogsleep1` | bridge with the NIC as port | yes | kept up | completed in 0.007 s |
 
-In all three runs the device reconnected within 2 s of wake and the reader
-finished. [Receipt](../evidence/networkmanager-suspend-netfs-20261116.json).
-Still to do: a real suspend and resume on the ROG with its Wi-Fi link and
-four NFS mounts, and an upstream NetworkManager merge request.
+In every run the link was back within 2 s of wake and the reader finished.
+[Receipt](../evidence/networkmanager-suspend-netfs-20261116.json). The test did
+not cover a real suspend, a driver suspend, Wi-Fi, DHCP or NetworkManager under
+its systemd unit. Wi-Fi drivers may also drop the link during device suspend,
+after tasks are frozen, which the freezer tolerates; that is still untested.
+Next: install on the ROG and qualify with a real suspend and resume over its
+Wi-Fi link and four NFS mounts, then propose the change upstream.
 
 ## A delay inhibitor does not order consumers before NetworkManager
 
