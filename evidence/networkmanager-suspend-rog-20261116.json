@@ -1,0 +1,37 @@
+{
+ "item": "NetworkManager 1.58.1-1ubuntu3+rogsleep1: real suspend and resume on the ROG with a hard-NFS reader",
+ "date_utc": "2026-11-16",
+ "host": "ROG laptop, kernel 7.3.0-nativehdr3, Wi-Fi (wlo1), four hard NFS 4.1 mounts with nconnect=8",
+ "installed": {
+  "network-manager": "1.58.1-1ubuntu3+rogsleep1",
+  "libnm0:amd64": "1.58.1-1ubuntu3+rogsleep1",
+  "libnm0:i386": "1.58.1-1ubuntu3+rogsleep1 (native i386 build in a debootstrap chroot, nocheck; Multi-Arch: same shared files byte-identical to amd64)",
+  "network-manager-tui": "1.58.1-1ubuntu3+rogsleep1",
+  "transaction": "4 upgraded, 0 removed, dpkg --audit clean; stock 1.58.1-1ubuntu3 packages retained for rollback",
+  "deb_sha256": {
+   "network-manager_amd64": "89ba0d9f5092947453aff35ff06f6bf65e42ba6ed8771f37ddcd808345915a48",
+   "libnm0_amd64": "b587c3095f1f638143653728eb72457d7552f4ea417b7de2ec7fad06d670d86f",
+   "libnm0_i386": "755c655255b18852ed97e52a335e562d93f08a3a3985c8031ab58bf89dc5e42e"
+  }
+ },
+ "procedure": "Buffered dd from the middle of a 20 GB file on the media NFS mount; reader in folio_wait_bit_common; RTC alarm 75 s; systemctl suspend (the normal logind PrepareForSleep path); NetworkManager SUSPEND logging at DEBUG for the run, then restored.",
+ "results": {
+  "networkmanager": "sleep: device wlo1 carries a network filesystem, skipping",
+  "kernel": [
+   "PM: suspend entry (s2idle)",
+   "Freezing user space processes completed (elapsed 0.025 seconds)",
+   "Freezing remaining freezable tasks completed (elapsed 0.001 seconds)",
+   "PM: suspend exit"
+  ],
+  "suspend_stats": {
+   "success": "0 -> 1",
+   "failed_freeze": "0 -> 0",
+   "fail": "0 -> 0"
+  },
+  "sleep": "systemd-sleep performed 'suspend' and returned on the RTC alarm after about 78 s wall time",
+  "wake": "wlo1 re-checked as designed (activated -> unmanaged -> disconnected -> activated with a new DHCP lease) and connected about 5 s after wake",
+  "reader": "alive after resume; read_bytes sampled twice after Wi-Fi reconnected, 5 s apart: 169889792 then 271601664"
+ },
+ "baseline": "On November 13 on this same ROG, with stock NetworkManager and the installed Showtime player reading from the NFS mount, one suspend request made two kernel freezer attempts, both failing with -EBUSY and no sleep (docs/SUSPEND_NFS_READER.md).",
+ "limits": "One suspend cycle, one reader, digital records only; no long-duration or repeated-cycle soak."
+}
