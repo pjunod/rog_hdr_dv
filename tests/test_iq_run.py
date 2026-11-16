@@ -75,7 +75,7 @@ class ExtractY4MFrameTests(unittest.TestCase):
                 tools.append(path)
             args = SimpleNamespace(out_dir=root / "run", stim_dir=root / "stim",
                 stim4k_dir=root / "stim4k", pw_read=tools[0], pw_seq=tools[1],
-                session_id="auto", scene=None, monitor="eDP-2")
+                session_id="auto", scene=["dither"], monitor="eDP-2")
             with patch.object(iq_run, "unlocked"), patch.object(iq_run, "ScreenCast", side_effect=RuntimeError("setup failed")):
                 self.assertEqual(iq_run.run(args), 1)
             record = json.loads((args.out_dir / "run.json").read_text())

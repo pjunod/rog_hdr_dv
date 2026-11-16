@@ -503,24 +503,56 @@ class FailureTests(unittest.TestCase):
         checked = []
         with tempfile.TemporaryDirectory() as temporary:
             parent = Path(temporary)
+            real_open = Path.open
+            writers = {}
+
+            class AuditedWriter:
+                def __init__(self, stream):
+                    self.stream = stream
+                    self.bytes_written = 0
+
+                def write(self, data):
+                    written = self.stream.write(data)
+                    self.bytes_written += written
+                    return written
+
+                def __enter__(self):
+                    self.stream.__enter__()
+                    return self
+
+                def __exit__(self, *args):
+                    return self.stream.__exit__(*args)
 
             def wrapper(record, width, height):
                 generator = real(record, width, height)
                 self.assertTrue(inspect.isgenerator(generator))
+                writer = writers[Path(record["path"]).name]
 
                 def inner():
                     sent = 0
-                    for chunk in generator:
-                        staged = list(parent.glob(".quality-stimuli-*/" + record["path"]))
-                        # everything yielded earlier is already on disk (8 KiB buffer slack)
-                        self.assertGreaterEqual(staged[0].stat().st_size,
-                                                len(record["header"]) + sent - 8192)
+                    while True:
+                        # The header and every prior chunk must have reached write()
+                        # before the next source chunk is requested, independent of
+                        # the platform's filesystem buffering policy.
+                        self.assertEqual(writer.bytes_written, len(record["header"]) + sent)
+                        try:
+                            chunk = next(generator)
+                        except StopIteration:
+                            return
                         sent += len(chunk)
                         checked.append(sent)
                         yield chunk
                 return inner()
 
-            with mock.patch.object(stimuli, "frames_for", side_effect=wrapper):
+            def audit_open(path, mode="r", *args, **kwargs):
+                stream = real_open(path, mode, *args, **kwargs)
+                if mode == "xb" and path.suffix == ".y4m":
+                    writers[path.name] = AuditedWriter(stream)
+                    return writers[path.name]
+                return stream
+
+            with mock.patch.object(Path, "open", new=audit_open), \
+                    mock.patch.object(stimuli, "frames_for", side_effect=wrapper):
                 stimuli.generate_stimuli(parent / "out", W, H, FPS, 1)
         self.assertGreater(len(checked), 60)
 
