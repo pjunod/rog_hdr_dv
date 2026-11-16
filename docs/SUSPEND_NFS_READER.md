@@ -47,6 +47,55 @@ A transport-dependent read can therefore outlast the freezer budget. The
 captured stack does not prove which folio branch, held lock or outstanding
 RPC caused this instance, nor whether server latency preceded disconnection.
 
+## Reproduced in an isolated VM (November 16)
+
+A freezer failure with the same reader stack reproduces without the ROG.
+[`tools/suspend_nfs_repro/`](../tools/suspend_nfs_repro/) boots an Ubuntu
+7.3.0-10 guest under KVM, with an NFS 4.1 server in a network namespace behind
+a rate-limited veth link. The client mounts it hard over TCP with the ROG's
+options (`nconnect=8`, `timeo=600`). A buffered `dd` reads a large file. The
+kernel freezer then runs with `pm_test=freezer` (freeze tasks, no sleep), the
+default 20 s timeout, and `pm_debug_messages` on so it names refusing tasks.
+
+| Scenario | Reader, before the freeze | Freezer |
+|---|---|---|
+| link left up | D in `folio_wait_bit_common` ← `filemap_read` ← `nfs_file_read`; 2 READ RPCs queued | completed in 0.039 s |
+| addresses flushed and link down first, approximating NetworkManager's deactivation | same | failed after 20.007 s: the refusing task is `dd`, in the same wait, `-EBUSY` |
+
+The only difference is whether the transport can complete the queued READs.
+Runs that caught the reader in an `OPEN` RPC wait froze even with the link
+down, so NFS's own RPC waits are freezable and the generic folio wait is not.
+Differences from the ROG: veth rather than Wi-Fi, one mount rather than four,
+and NetworkManager not running in the guest. The ROG's exact folio, held locks
+and RPC state were never captured.
+[Receipt](../evidence/suspend-nfs-freezer-repro-20261116.json).
+
+NetworkManager 1.58.1's `do_sleep_wake` takes every managed hardware device
+down before sleep. It skips software devices and devices whose driver currently
+reports wake-on-LAN or wake-on-WLAN; its comment says those are "taken down
+post-suspend rather than pre-", and in practice they are re-checked on wake. Its
+sleep design therefore already allows a device to stay up through the freeze.
+The ROG uses Wi-Fi, with WoWLAN supported but disabled, so its link is taken
+down first.
+
+### Fix directions (not yet chosen)
+
+1. **NetworkManager (recommended).** Treat a device that carries a mounted
+   network filesystem like a wake-on-LAN device: leave it up through the freeze
+   and re-check it on wake. This fixes the ordering at its source, reuses an
+   existing NM path, and needs an upstream patch, a local NM package and a real
+   suspend on the ROG to qualify. Untested so far: a Wi-Fi driver may still
+   drop the link during device suspend, after tasks are frozen, which the
+   freezer tolerates.
+2. **Kernel.** Let the folio-lock wait in buffered reads freeze for network
+   filesystems, as NFS RPC waits already do with `TASK_FREEZABLE_UNSAFE`. The
+   task would freeze while NFS holds the inode `i_rwsem` shared. This needs a
+   lock audit, and the change touches generic page-cache code used by every
+   filesystem.
+3. **Configuration only.** Enabling wake-on-WLAN would route the ROG's link
+   through NM's existing exception. It changes what wakes the laptop and costs
+   power while asleep, so it is a policy choice rather than a repair.
+
 ## A delay inhibitor does not order consumers before NetworkManager
 
 [NetworkManager's power monitor](https://github.com/NetworkManager/NetworkManager/blob/1.58.1/src/core/nm-power-monitor.c#L132)
@@ -87,8 +136,7 @@ from this NFS stack.
 
 The source loop belongs with distribution NFS/MM/PM kernel maintainers and
 NetworkManager/logind integration, with NVIDIA integration audited separately.
-First establish the exact-source compiler loop and a small ordinary read-only
-NFS reproducer in an isolated lab. Audit wait and lock lifetimes before
+The isolated reproducer above now exists. Next, establish the exact-source compiler loop for the chosen fix. Audit wait and lock lifetimes before
 considering safe filesystem cancellation/freezing behavior or a coordinated
 transport lifecycle change. No source fix or upstream submission is claimed.
 Soft mounts, longer freezer timeouts, blanket freezer disablement and a
