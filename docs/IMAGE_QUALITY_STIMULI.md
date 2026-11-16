@@ -241,8 +241,9 @@ python3 tools/iq_run.py "$HDR_WORK/run" \
 
 The output directory must be new. Repeat `--scene` to select scenes; omitting
 it selects all supported scenes: `dither`, `siting-c420mpeg2`,
-`siting-c420jpeg`, `siting-c420paldv`, `scaling4k` and `cadence-24` through
-`cadence-60`. The runner uses the fixed 2560×1600 monitor capture, 8× placement
+`siting-c420jpeg`, `siting-c420paldv`, `scaling4k`, `cadence-24`, `cadence-25`,
+`cadence-30`, `cadence-50` and `cadence-60`. The runner uses the fixed
+2560×1600 monitor capture, 8× placement
 for 192×108 stimuli, and 2/3 scaling preset. Still images are extracted into
 one-frame Y4M files and played in fresh mpv processes, so end-of-stream cannot
 leave the last scaling frame identical to the prior grating. mpv keeps the
@@ -251,11 +252,14 @@ luminance, limited-range and PQ tags because Y4M does not carry them.
 
 The runner records source and helper hashes, arguments, capture statuses and
 `run.json`. Its cadence files are timestamped software captures. For each
-rate, the helper writes `cadence-<fps>.raw` and `.ts`; cadence sources request
-eight seconds (`fps × 8` frames). This does not sample panel refreshes or
-qualify optical output. The runner's cadence crop is only 160 output pixels
-high; the moving bar is visible there, but tears below that crop remain
-unobserved.
+rate, the helper writes `cadence-<fps>.raw` and `.ts`; the request is up to
+eight seconds (`fps × 8` frames), capped at the complete frames available in
+the Y4M source. The default two-second source therefore requests only two
+seconds. The receipt records the available source frames and actual requested
+frame count and duration. The runner does not loop the source. This does not
+sample panel refreshes or qualify optical output. Its cadence crop is only 160
+output pixels high; the moving bar is visible there, but tears below that crop
+remain unobserved.
 
 Run the [analyzer](../tools/iq_analyze.py) into the same run directory. Supply
 measured green-channel PQ10 levels from the known low and high barcode marker

@@ -262,14 +262,39 @@ def file_entry(manifest, path):
     return matches[0]
 
 
+def scene_present(run, names):
+    """Absent scenes are allowed; a partial capture is never silently skipped."""
+    present = [(run / name).exists() for name in names]
+    if any(present) and not all(present):
+        missing = [name for name, exists in zip(names, present) if not exists]
+        raise AnalysisError('incomplete captured scene; missing: ' + ', '.join(missing))
+    return all(present)
+
+
 def analyze(args):
-    man, verified = validate_manifest(args.stim)
-    man4, verified4 = validate_manifest(args.stim4k, ['scaling/scaling_p10.y4m'])
+    dither_present = scene_present(args.run, ['dither-f0.xr30', 'dither-f1.xr30'])
+    scaling_present = scene_present(args.run, [f'scaling4k-f{n}.xr30' for n in range(3)])
+    tags = ('c420mpeg2', 'c420jpeg', 'c420paldv')
+    siting_present = {tag: scene_present(args.run, [f'siting-{tag}-f{n}.xr30' for n in range(2)]) for tag in tags}
+    # Validate complete metadata but hash only sources used by captured scenes.
+    required = ['dither/dither_ramps_p10.y4m'] if dither_present else []
+    required += [f'chroma_siting/chroma_siting_{tag}_8bit.y4m' for tag in tags if siting_present[tag]]
+    preliminary = json.loads((args.stim / 'manifest.json').read_text())
+    if not isinstance(preliminary, dict) or not isinstance(preliminary.get('dimensions_and_timing'), dict):
+        raise AnalysisError('malformed stimulus manifest dimensions_and_timing')
+    rates = preliminary['dimensions_and_timing'].get('cadence_fps')
+    if not isinstance(rates, list) or any(type(fps) is not int for fps in rates):
+        raise AnalysisError('malformed stimulus manifest cadence_fps')
+    for fps in rates:
+        if scene_present(args.run, [f'cadence-{fps}.raw', f'cadence-{fps}.ts']):
+            required.append(f'cadence/cadence_{fps}fps_p10.y4m')
+    man, verified = validate_manifest(args.stim, required)
+    man4, verified4 = validate_manifest(args.stim4k, ['scaling/scaling_p10.y4m'] if scaling_present else [])
     sw, sh = (man['dimensions_and_timing'][k] for k in ('width', 'height'))
     scale = args.stim_scale
     x, y = args.stim_x, args.stim_y
     width, height = sw * scale, sh * scale
-    if min(x, y) < 0 or x + width > args.width or y + height > args.height:
+    if (dither_present or any(siting_present.values())) and (min(x, y) < 0 or x + width > args.width or y + height > args.height):
         raise AnalysisError('stimulus placement exceeds capture frame')
     def still(name):
         return rgb(map_xr30(args.run / (name + '.xr30'), args.width, args.height, single=True)[0])
@@ -277,14 +302,19 @@ def analyze(args):
            'scope': 'Compositor XR30 RGB code diagnostics; no optical accuracy, Dolby Vision or physical panel cadence claim.',
            'source_verification': {'stim': verified, 'stim4k': verified4},
            'geometry': {'capture': [args.width, args.height], 'stim_rect': [x, y, width, height], 'stim_scale': scale}}
-    d = file_entry(man, 'dither/dither_ramps_p10.y4m')['expected']
-    out['range_and_dither'] = {}
-    for n, name in enumerate(('near_black', 'mid_grey')):
-        ramp = d['ramps'][n] if 'ramps' in d else d[name]
-        image = still('dither-f' + str(n))[y + height // 4:y + 3 * height // 4, x:x + width]
-        out['range_and_dither'][name] = plateau_report(image, ramp['column_codes'], scale)
+    out['range_and_dither'] = {'status': 'not_captured'}
+    if dither_present:
+        d = file_entry(man, 'dither/dither_ramps_p10.y4m')['expected']
+        out['range_and_dither'] = {}
+        for n, name in enumerate(('near_black', 'mid_grey')):
+            ramp = d['ramps'][n] if 'ramps' in d else d[name]
+            image = still('dither-f' + str(n))[y + height // 4:y + 3 * height // 4, x:x + width]
+            out['range_and_dither'][name] = plateau_report(image, ramp['column_codes'], scale)
     sit = {}
-    for tag in ('c420mpeg2', 'c420jpeg', 'c420paldv'):
+    for tag in tags:
+        if not siting_present[tag]:
+            sit[tag] = {'status': 'not_captured'}
+            continue
         e = file_entry(man, f'chroma_siting/chroma_siting_{tag}_8bit.y4m')['expected']
         sit[tag] = {'tag_implied': e['siting_tag_implied']}
         for n, key, axis in ((0, 'vertical_edges', 'x'), (1, 'horizontal_edges', 'y')):
@@ -304,12 +334,14 @@ def analyze(args):
             sit[tag][key] = observed
     pairs = {}
     for tag, key in (('c420jpeg', 'vertical_edges'), ('c420paldv', 'horizontal_edges')):
+        if not siting_present[tag] or not siting_present['c420mpeg2']:
+            continue
         pairs[tag + '_minus_c420mpeg2_' + key] = [None if a['observed_rgb_midpoint_source_px'] is None or b['observed_rgb_midpoint_source_px'] is None
                                                else a['observed_rgb_midpoint_source_px'] - b['observed_rgb_midpoint_source_px']
                                                for a, b in zip(sit[tag][key], sit['c420mpeg2'][key])]
-    out['chroma_siting'] = {'observed': sit, 'tag_pair_relative_shifts_source_px': pairs,
+    out['chroma_siting'] = {'status': 'diagnostic_only' if any(siting_present.values()) else 'not_captured', 'observed': sit, 'tag_pair_relative_shifts_source_px': pairs,
                             'limitation': 'RGB midpoints after tone/gamut mapping are not source-code chroma midpoints; no source-domain siting correctness inferred.'}
-    out['scaling'] = scaling_report(still, man4, args)
+    out['scaling'] = scaling_report(still, man4, args) if scaling_present else {'status': 'not_captured'}
     cadence = {}
     crop_width = sw * scale
     for fps in man['dimensions_and_timing']['cadence_fps']:

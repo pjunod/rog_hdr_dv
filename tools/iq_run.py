@@ -71,6 +71,41 @@ def extract_y4m_frame(data: bytes, index: int) -> tuple[bytes, dict]:
     return header + selected + b"\n" + selected_payload, {"width": width, "height": height, "chroma": chroma}
 
 
+def cadence_capture_plan(data: bytes, fps: int) -> dict:
+    """Validate a fixed-geometry cadence stream and cap capture at available frames."""
+    nl = data.find(b"\n")
+    if nl < 0 or not data[:nl].startswith(b"YUV4MPEG2 "):
+        raise ValueError("invalid cadence Y4M stream header")
+    try:
+        fields = data[:nl].decode("ascii", "strict").split()[1:]
+        values = {field[0]: field[1:] for field in fields if len(field) > 1}
+        width, height = int(values["W"]), int(values["H"])
+        rate_num, rate_den = map(int, values["F"].split(":"))
+    except (UnicodeDecodeError, KeyError, ValueError) as exc:
+        raise ValueError("cadence header needs valid dimensions and frame rate") from exc
+    if width != 192 or height != 108 or values.get("C") != "420p10":
+        raise ValueError("cadence source must be 192x108 C420p10")
+    if rate_num <= 0 or rate_den <= 0 or rate_num != fps * rate_den:
+        raise ValueError(f"cadence header frame rate does not match {fps} fps")
+    frame_size = width * height * 3
+    pos, available = nl + 1, 0
+    while pos < len(data):
+        end = data.find(b"\n", pos)
+        if end < 0:
+            raise ValueError("truncated cadence frame header")
+        if data[pos:end] != b"FRAME":
+            raise ValueError("unsupported cadence per-frame tags or frame marker")
+        pos = end + 1 + frame_size
+        if pos > len(data):
+            raise ValueError("truncated cadence frame payload")
+        available += 1
+    if not available:
+        raise ValueError("cadence source contains no frames")
+    requested = min(fps * 8, available)
+    return {"available_source_frames": available, "requested_frames": requested,
+            "requested_duration_seconds": requested / fps}
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("out_dir", type=Path)
@@ -201,6 +236,12 @@ def run(args) -> int:
     for tool in (args.pw_read, args.pw_seq):
         if not tool.is_file() or not os.access(tool, os.X_OK):
             raise FileNotFoundError(f"capture helper is not executable: {tool}")
+    cadence_plans = {}
+    for name in selected:
+        if name.startswith("cadence-"):
+            fps = int(name.split("-")[1])
+            src = args.stim_dir / "cadence" / f"cadence_{fps}fps_p10.y4m"
+            cadence_plans[name] = (src, cadence_capture_plan(src.read_bytes(), fps))
     unlocked(args.session_id)
     out.mkdir()
     frame_dir = out / "source-frames"
@@ -219,9 +260,12 @@ def run(args) -> int:
         for name in selected:
             if name.startswith("cadence-"):
                 fps = int(name.split("-")[1])
-                src = args.stim_dir / "cadence" / f"cadence_{fps}fps_p10.y4m"
+                src, plan = cadence_plans[name]
                 rec = {"scene": name, "source": src.name, "source_sha256": sha256(src),
-                       "requested_frames": fps * 8, "fps": fps, "frames": []}
+                       "available_source_frames": plan["available_source_frames"],
+                       "requested_frames": plan["requested_frames"],
+                       "requested_duration_seconds": plan["requested_duration_seconds"],
+                       "fps": fps, "frames": []}
                 cmd = ["mpv", "--fs", "--no-audio", "--pause", "--keep-open=always", "--osc=no",
                        "--osd-level=0", "--cursor-autohide=always", "--loop-file=no", TAGS,
                        *ZOOM8, str(src)]
@@ -237,7 +281,7 @@ def run(args) -> int:
                         raise RuntimeError("mpv did not start for cadence capture")
                     time.sleep(.1)
                 seq = subprocess.Popen([str(args.pw_seq), str(cast.node), str(out / name),
-                                        str(fps * 8), str(VIDEO8[0]), str(VIDEO8[1]), str(VIDEO8[2]), "160"],
+                                        str(plan["requested_frames"]), str(VIDEO8[0]), str(VIDEO8[1]), str(VIDEO8[2]), "160"],
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 children.append(seq)
                 time.sleep(1)

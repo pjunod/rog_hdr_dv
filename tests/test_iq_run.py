@@ -14,6 +14,11 @@ SPEC.loader.exec_module(iq_run)
 
 
 class ExtractY4MFrameTests(unittest.TestCase):
+    @staticmethod
+    def cadence_fixture(fps, seconds):
+        frame = b"FRAME\n" + bytes(192 * 108 * 3)
+        return f"YUV4MPEG2 W192 H108 F{fps}:1 Ip A1:1 C420p10\n".encode() + frame * (fps * seconds)
+
     def test_session_id_must_be_explicit(self):
         with self.assertRaises(SystemExit):
             iq_run.parser().parse_args(["out", "--stim-dir", "stim", "--stim4k-dir", "stim4k",
@@ -33,6 +38,23 @@ class ExtractY4MFrameTests(unittest.TestCase):
             iq_run.extract_y4m_frame(header + b"FRAME Xfoo=bar\n" + bytes(6), 0)
         with self.assertRaisesRegex(ValueError, "truncated"):
             iq_run.extract_y4m_frame(header + b"FRAME\n" + bytes(5), 0)
+
+    def test_cadence_request_is_bounded_by_source_frames_and_eight_seconds(self):
+        default = iq_run.cadence_capture_plan(self.cadence_fixture(24, 2), 24)
+        self.assertEqual(default, {"available_source_frames": 48, "requested_frames": 48,
+                                   "requested_duration_seconds": 2.0})
+        long = iq_run.cadence_capture_plan(self.cadence_fixture(24, 10), 24)
+        self.assertEqual(long, {"available_source_frames": 240, "requested_frames": 192,
+                                "requested_duration_seconds": 8.0})
+
+    def test_cadence_preflight_rejects_wrong_rate_geometry_and_truncation(self):
+        valid = self.cadence_fixture(24, 1)
+        with self.assertRaisesRegex(ValueError, "frame rate"):
+            iq_run.cadence_capture_plan(valid.replace(b"F24:1", b"F25:1", 1), 24)
+        with self.assertRaisesRegex(ValueError, "192x108"):
+            iq_run.cadence_capture_plan(valid.replace(b"W192", b"W190", 1), 24)
+        with self.assertRaisesRegex(ValueError, "truncated"):
+            iq_run.cadence_capture_plan(valid[:-1], 24)
 
     def test_existing_output_is_never_reused(self):
         with tempfile.TemporaryDirectory() as tmp:

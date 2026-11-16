@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -178,6 +179,80 @@ class AnalyzerTests(unittest.TestCase):
         self.assertEqual(report['slanted_edge_status'], 'diagnostic_only')
         self.assertLess(abs(report['placement_sanity']['edge_midpoint_median_output_px'] - 128), 1)
         self.assertLess(report['slanted_edge_10_90_width_out_px_median'], 4)
+
+    def selected_args_and_manifest(self):
+        args = iq.parser().parse_args([str(self.root), str(self.root), str(self.root),
+                    '--width', '192', '--height', '72', '--stim-scale', '1', '--stim-x', '0', '--stim-y', '0',
+                    '--cadence-height', '20'])
+        args.calibrated, args.barcode_low, args.barcode_high = True, 5, 710
+        manifest = {'dimensions_and_timing': {'width': 192, 'height': 72, 'cadence_fps': [24]},
+                    'files': [{'path': 'cadence/cadence_24fps_p10.y4m', 'frame_count': 48}]}
+        (self.root / 'manifest.json').write_text(json.dumps(manifest))
+        return args, manifest
+
+    def test_cadence_only_skips_all_still_scenes_and_unused_sources(self):
+        args, manifest = self.selected_args_and_manifest()
+        green = barcode(0).astype(np.uint32)
+        ((green << 20) | (green << 10) | green).astype('<u4').tofile(self.root / 'cadence-24.raw')
+        (self.root / 'cadence-24.ts').write_text('0 100 1 110\n')
+        with mock.patch.object(iq, 'validate_manifest', return_value=(manifest, {})) as validate:
+            out = iq.analyze(args)
+        self.assertEqual(out['software_cadence']['24']['decoded_frames'], 1)
+        for section in ('range_and_dither', 'chroma_siting', 'scaling'):
+            self.assertEqual(out[section]['status'], 'not_captured')
+        self.assertEqual(validate.call_args_list[0].args[1], ['cadence/cadence_24fps_p10.y4m'])
+        self.assertEqual(validate.call_args_list[1].args[1], [])
+
+    def test_scaling_only_skips_all_other_scenes(self):
+        args, manifest = self.selected_args_and_manifest()
+        for n in range(3):
+            (self.root / f'scaling4k-f{n}.xr30').touch()
+        with mock.patch.object(iq, 'validate_manifest', return_value=(manifest, {})) as validate, \
+             mock.patch.object(iq, 'scaling_report', return_value={'status': 'diagnostic_only'}) as scaling:
+            out = iq.analyze(args)
+        scaling.assert_called_once()
+        self.assertEqual(out['scaling']['status'], 'diagnostic_only')
+        self.assertEqual(out['range_and_dither']['status'], 'not_captured')
+        self.assertEqual(out['chroma_siting']['status'], 'not_captured')
+        self.assertEqual(out['software_cadence']['24']['status'], 'not_captured')
+        self.assertEqual(validate.call_args_list[0].args[1], [])
+
+    def test_dither_only_and_single_siting_tag(self):
+        args, manifest = self.selected_args_and_manifest()
+        codes = np.repeat(np.arange(64, 97), 6)[:192].tolist()
+        manifest['files'].append({'path': 'dither/dither_ramps_p10.y4m',
+                                  'expected': {'ramps': [{'column_codes': codes}] * 2}})
+        for n in range(2):
+            (self.root / f'dither-f{n}.xr30').touch()
+        packed = np.zeros((1, 72, 192), dtype=np.uint32)
+        with mock.patch.object(iq, 'validate_manifest', return_value=(manifest, {})), \
+             mock.patch.object(iq, 'map_xr30', return_value=packed), \
+             mock.patch.object(iq, 'plateau_report', return_value={'source_code_plateau_count': 33}):
+            out = iq.analyze(args)
+        self.assertEqual(out['range_and_dither']['near_black']['source_code_plateau_count'], 33)
+        for n in range(2):
+            (self.root / f'dither-f{n}.xr30').unlink()
+            (self.root / f'siting-c420jpeg-f{n}.xr30').touch()
+        manifest['files'].append({'path': 'chroma_siting/chroma_siting_c420jpeg_8bit.y4m',
+                                  'expected': {'siting_tag_implied': {}, 'vertical_edges': [], 'horizontal_edges': []}})
+        with mock.patch.object(iq, 'validate_manifest', return_value=(manifest, {})), \
+             mock.patch.object(iq, 'map_xr30', return_value=packed):
+            out = iq.analyze(args)
+        self.assertEqual(out['chroma_siting']['status'], 'diagnostic_only')
+        self.assertEqual(out['chroma_siting']['tag_pair_relative_shifts_source_px'], {})
+        self.assertEqual(out['chroma_siting']['observed']['c420mpeg2']['status'], 'not_captured')
+
+    def test_incomplete_scene_pairs_fail_clearly(self):
+        for names in (['dither-f0.xr30', 'dither-f1.xr30'],
+                      ['siting-c420jpeg-f0.xr30', 'siting-c420jpeg-f1.xr30'],
+                      ['scaling4k-f0.xr30', 'scaling4k-f1.xr30', 'scaling4k-f2.xr30'],
+                      ['cadence-24.raw', 'cadence-24.ts']):
+            with self.subTest(names=names):
+                first = self.root / names[0]
+                first.touch()
+                with self.assertRaisesRegex(iq.AnalysisError, 'incomplete captured scene; missing:'):
+                    iq.scene_present(self.root, names)
+                first.unlink()
 
     def test_duplicate_scaling_scenes_reject_edge_measurement(self):
         args = iq.parser().parse_args(['run', 'stim', 'stim4k', '--width', '64', '--height', '64',
