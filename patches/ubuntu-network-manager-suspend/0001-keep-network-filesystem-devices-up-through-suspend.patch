@@ -1,0 +1,427 @@
+From 8c9269bf355763d4ec8eea31ba114ce88cb852ff Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Mon, 16 Nov 2026 08:00:00 +0000
+Subject: [PATCH] keep devices carrying a network filesystem up through suspend
+
+NetworkManager takes managed hardware devices down when the system
+prepares to sleep, before the kernel freezes user tasks. A task blocked
+in a buffered read of a hard NFS or SMB mount then waits on a page lock
+that only the outstanding READ can release; with the transport gone it
+never freezes and the kernel refuses to suspend (-EBUSY).
+
+Treat a device that routes to the server of a mounted network
+filesystem like a Wake-on-LAN device: skip it before sleep and re-check
+it on wake. The links such a device depends on (VLAN parent, bridge
+or bond ports) are kept too. Version 1.58.1-1ubuntu3+rogsleep1.
+---
+ debian/changelog                              |   8 +
+ ...ilesystem-devices-up-through-suspend.patch | 191 ++++++++++++++++++
+ debian/patches/series                         |   1 +
+ src/core/nm-manager.c                         | 129 +++++++++++-
+ 4 files changed, 328 insertions(+), 1 deletion(-)
+ create mode 100644 debian/patches/Keep-network-filesystem-devices-up-through-suspend.patch
+
+diff --git a/debian/changelog b/debian/changelog
+index 1341bec..ce2b06d 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,11 @@
++network-manager (1.58.1-1ubuntu3+rogsleep1) stonking; urgency=medium
++
++  * Keep devices carrying a network filesystem, or a link it depends on, up
++    through suspend, so tasks blocked on NFS/SMB I/O can freeze (ROG suspend
++    failure).
++
++ -- Claude Agent <claude-agent@invalid>  Mon, 16 Nov 2026 02:00:24 +0000
++
+ network-manager (1.58.1-1ubuntu3) stonking; urgency=low
+ 
+   * Merge from Debian unstable. Remaining changes:
+diff --git a/debian/patches/Keep-network-filesystem-devices-up-through-suspend.patch b/debian/patches/Keep-network-filesystem-devices-up-through-suspend.patch
+new file mode 100644
+index 0000000..d2a9db4
+--- /dev/null
++++ b/debian/patches/Keep-network-filesystem-devices-up-through-suspend.patch
+@@ -0,0 +1,191 @@
++Description: keep devices carrying a network filesystem up through suspend
++ NetworkManager takes managed hardware devices down when the system prepares to
++ sleep, before the kernel freezes user tasks. A task blocked in a buffered read
++ of a hard NFS or SMB mount then waits on a page lock that only the outstanding
++ READ can release; with the transport gone it never freezes and the kernel
++ refuses to suspend (-EBUSY). Treat a device that routes to the server of a
++ mounted network filesystem, or a link it depends on, like a Wake-on-LAN device:
++ skip it before sleep and re-check it on wake.
++Forwarded: not-yet
++Last-Update: 2026-11-16
++---
++--- a/src/core/nm-manager.c
+++++ b/src/core/nm-manager.c
++@@ -226,6 +226,10 @@ typedef struct {
++ 
++     GHashTable *sleep_devices;
++ 
+++    /* ifindexes kept up through suspend because they carry a network
+++     * filesystem; re-checked on wake like Wake-on-LAN devices. */
+++    GHashTable *sleep_netfs_ifindexes;
+++
++     /* Firmware dir monitor */
++     GFileMonitor *fw_monitor;
++     guint         fw_changed_id;
++@@ -2321,6 +2325,112 @@ device_is_wake_on_lan(NMPlatform *platfo
++ }
++ 
++ static void
+++netfs_add_link(NMPlatform *platform, GHashTable *set, int ifindex, guint depth)
+++{
+++    gs_unref_ptrarray GPtrArray *links = NULL;
+++    const NMPlatformLink        *link;
+++    guint                        i;
+++
+++    if (ifindex <= 0 || depth > 4 || !g_hash_table_add(set, GINT_TO_POINTER(ifindex)))
+++        return;
+++    link = nm_platform_link_get(platform, ifindex);
+++    if (!link)
+++        return;
+++    /* A VLAN, MACsec or similar link depends on its parent... */
+++    if (link->parent > 0)
+++        netfs_add_link(platform, set, link->parent, depth + 1);
+++    /* ...and a bridge or bond on its ports. */
+++    links = nm_platform_link_get_all(platform);
+++    for (i = 0; links && i < links->len; i++) {
+++        const NMPlatformLink *port = NMP_OBJECT_CAST_LINK(links->pdata[i]);
+++
+++        if (port->controller == ifindex)
+++            netfs_add_link(platform, set, port->ifindex, depth + 1);
+++    }
+++}
+++
+++/* Tasks blocked on I/O to a network filesystem cannot be frozen once its
+++ * transport is gone: a buffered read waits for a page lock that only the
+++ * outstanding READ can release, so the kernel refuses to suspend (-EBUSY).
+++ * Return the ifindexes that carry the traffic of mounted NFS and SMB
+++ * filesystems: the link the kernel routes each server address through, plus
+++ * the links that one depends on. NULL when there are none.
+++ *
+++ * NetworkManager may run in its own mount namespace (PrivateTmp and other
+++ * systemd sandboxing), so read the init namespace's mount table first. */
+++static GHashTable *
+++network_filesystem_ifindexes(NMPlatform *platform)
+++{
+++    gs_free char        *contents = NULL;
+++    gs_free const char **lines    = NULL;
+++    GHashTable          *set      = NULL;
+++    gsize                i;
+++
+++    if (!g_file_get_contents("/proc/1/mountinfo", &contents, NULL, NULL)
+++        && !g_file_get_contents("/proc/self/mountinfo", &contents, NULL, NULL))
+++        return NULL;
+++
+++    lines = nm_strsplit_set(contents, "\n");
+++    for (i = 0; lines && lines[i]; i++) {
+++        gs_free const char **fields = NULL;
+++        gs_free const char **opts   = NULL;
+++        const char          *sep;
+++        gsize                j;
+++
+++        /* "... - fstype source superoptions"; paths escape spaces as \040. */
+++        sep = strstr(lines[i], " - ");
+++        if (!sep)
+++            continue;
+++        fields = nm_strsplit_set(sep + 3, " ");
+++        if (!fields || !fields[0] || !fields[1] || !fields[2])
+++            continue;
+++        if (!NM_IN_STRSET(fields[0], "nfs", "nfs4", "cifs", "smb3"))
+++            continue;
+++
+++        opts = nm_strsplit_set(fields[2], ",");
+++        for (j = 0; opts && opts[j]; j++) {
+++            nm_auto_nmpobj const NMPObject *route  = NULL;
+++            gs_free char                   *text   = NULL;
+++            char                           *scope;
+++            NMIPAddr                        addr;
+++            int                             addr_family = AF_UNSPEC;
+++            int                             oif         = 0;
+++
+++            if (!g_str_has_prefix(opts[j], "addr="))
+++                continue;
+++            text = g_strdup(&opts[j][NM_STRLEN("addr=")]);
+++            /* An IPv6 link-local server is printed as fe80::1%ifname. */
+++            scope = strchr(text, '%');
+++            if (scope) {
+++                *scope = '\0';
+++                oif    = nm_platform_link_get_ifindex(platform, scope + 1);
+++            }
+++            if (nm_inet_parse_bin(AF_UNSPEC, text, &addr_family, &addr)
+++                && nm_platform_ip_route_get(platform,
+++                                            addr_family,
+++                                            &addr,
+++                                            0,
+++                                            oif > 0 ? oif : 0,
+++                                            (NMPObject **) &route)
+++                       >= 0) {
+++                if (!set)
+++                    set = g_hash_table_new(nm_direct_hash, NULL);
+++                netfs_add_link(platform, set, NMP_OBJECT_CAST_IPX_ROUTE(route)->rx.ifindex, 0);
+++            }
+++        }
+++    }
+++    return set;
+++}
+++
+++static gboolean
+++device_in_ifindex_set(GHashTable *set, NMDevice *device)
+++{
+++    return set
+++           && (g_hash_table_contains(set, GINT_TO_POINTER(nm_device_get_ifindex(device)))
+++               || g_hash_table_contains(set, GINT_TO_POINTER(nm_device_get_ip_ifindex(device))));
+++}
+++
+++static void
++ remove_device(NMManager *self, NMDevice *device, gboolean quitting)
++ {
++     NMManagerPrivate *priv     = NM_MANAGER_GET_PRIVATE(self);
++@@ -7368,6 +7478,10 @@ do_sleep_wake(NMManager *self, gboolean
++         /* FIXME: are there still hardware devices that need to be disabled around
++          * suspend/resume?
++          */
+++        if (suspending) {
+++            nm_clear_pointer(&priv->sleep_netfs_ifindexes, g_hash_table_unref);
+++            priv->sleep_netfs_ifindexes = network_filesystem_ifindexes(priv->platform);
+++        }
++         c_list_for_each_entry (device, &priv->devices_lst_head, devices_lst) {
++             if (nm_device_is_software(device)) {
++                 /* If a user disables networking we consider that as an
++@@ -7386,6 +7500,15 @@ do_sleep_wake(NMManager *self, gboolean
++                 continue;
++             }
++ 
+++            /* So are devices carrying a network filesystem: user tasks blocked
+++             * on it must be able to finish their I/O and freeze. */
+++            if (suspending && device_in_ifindex_set(priv->sleep_netfs_ifindexes, device)) {
+++                _LOGD(LOGD_SUSPEND,
+++                      "sleep: device %s carries a network filesystem, skipping",
+++                      nm_device_get_iface(device));
+++                continue;
+++            }
+++
++             _handle_device_takedown(self, device, suspending, FALSE);
++         }
++     } else {
++@@ -7403,7 +7526,8 @@ do_sleep_wake(NMManager *self, gboolean
++                 /* Belatedly take down Wake-on-LAN devices; ideally we wouldn't have to do this
++                  * but for now it's the only way to make sure we re-check their connectivity.
++                  */
++-                if (device_is_wake_on_lan(priv->platform, device))
+++                if (device_is_wake_on_lan(priv->platform, device)
+++                    || device_in_ifindex_set(priv->sleep_netfs_ifindexes, device))
++                     nm_device_set_unmanaged_by_flags(device,
++                                                      NM_UNMANAGED_MANAGER_DISABLED,
++                                                      NM_UNMAN_FLAG_OP_SET_UNMANAGED,
++@@ -7422,6 +7546,8 @@ do_sleep_wake(NMManager *self, gboolean
++             }
++         }
++ 
+++        nm_clear_pointer(&priv->sleep_netfs_ifindexes, g_hash_table_unref);
+++
++         /* Ensure rfkill state is up-to-date since we don't respond to state
++          * changes during sleep.
++          */
++@@ -9441,6 +9567,7 @@ dispose(GObject *object)
++         sleep_devices_clear(self);
++         nm_clear_pointer(&priv->sleep_devices, g_hash_table_unref);
++     }
+++    nm_clear_pointer(&priv->sleep_netfs_ifindexes, g_hash_table_unref);
++ 
++     if (priv->power_monitor) {
++         g_signal_handlers_disconnect_by_func(priv->power_monitor, sleeping_cb, self);
+diff --git a/debian/patches/series b/debian/patches/series
+index 13e7d1f..880d0a9 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -10,3 +10,4 @@ netplan/0001-netplan-Adopt-buildsystems-for-Netplan-integration.patch
+ netplan/0002-netplan-make-use-of-libnetplan-for-YAML-backend.patch
+ netplan/0003-Allow-the-NetworkManager-daemon-to-write-to-lib-netp.patch
+ netplan/keyfile-update-test-for-expected-netplan-output.patch
++Keep-network-filesystem-devices-up-through-suspend.patch
+diff --git a/src/core/nm-manager.c b/src/core/nm-manager.c
+index 31b6c25..914f33c 100644
+--- a/src/core/nm-manager.c
++++ b/src/core/nm-manager.c
+@@ -226,6 +226,10 @@ typedef struct {
+ 
+     GHashTable *sleep_devices;
+ 
++    /* ifindexes kept up through suspend because they carry a network
++     * filesystem; re-checked on wake like Wake-on-LAN devices. */
++    GHashTable *sleep_netfs_ifindexes;
++
+     /* Firmware dir monitor */
+     GFileMonitor *fw_monitor;
+     guint         fw_changed_id;
+@@ -2320,6 +2324,112 @@ device_is_wake_on_lan(NMPlatform *platform, NMDevice *device)
+     return nm_platform_link_get_wake_on_lan(platform, ifindex);
+ }
+ 
++static void
++netfs_add_link(NMPlatform *platform, GHashTable *set, int ifindex, guint depth)
++{
++    gs_unref_ptrarray GPtrArray *links = NULL;
++    const NMPlatformLink        *link;
++    guint                        i;
++
++    if (ifindex <= 0 || depth > 4 || !g_hash_table_add(set, GINT_TO_POINTER(ifindex)))
++        return;
++    link = nm_platform_link_get(platform, ifindex);
++    if (!link)
++        return;
++    /* A VLAN, MACsec or similar link depends on its parent... */
++    if (link->parent > 0)
++        netfs_add_link(platform, set, link->parent, depth + 1);
++    /* ...and a bridge or bond on its ports. */
++    links = nm_platform_link_get_all(platform);
++    for (i = 0; links && i < links->len; i++) {
++        const NMPlatformLink *port = NMP_OBJECT_CAST_LINK(links->pdata[i]);
++
++        if (port->controller == ifindex)
++            netfs_add_link(platform, set, port->ifindex, depth + 1);
++    }
++}
++
++/* Tasks blocked on I/O to a network filesystem cannot be frozen once its
++ * transport is gone: a buffered read waits for a page lock that only the
++ * outstanding READ can release, so the kernel refuses to suspend (-EBUSY).
++ * Return the ifindexes that carry the traffic of mounted NFS and SMB
++ * filesystems: the link the kernel routes each server address through, plus
++ * the links that one depends on. NULL when there are none.
++ *
++ * NetworkManager may run in its own mount namespace (PrivateTmp and other
++ * systemd sandboxing), so read the init namespace's mount table first. */
++static GHashTable *
++network_filesystem_ifindexes(NMPlatform *platform)
++{
++    gs_free char        *contents = NULL;
++    gs_free const char **lines    = NULL;
++    GHashTable          *set      = NULL;
++    gsize                i;
++
++    if (!g_file_get_contents("/proc/1/mountinfo", &contents, NULL, NULL)
++        && !g_file_get_contents("/proc/self/mountinfo", &contents, NULL, NULL))
++        return NULL;
++
++    lines = nm_strsplit_set(contents, "\n");
++    for (i = 0; lines && lines[i]; i++) {
++        gs_free const char **fields = NULL;
++        gs_free const char **opts   = NULL;
++        const char          *sep;
++        gsize                j;
++
++        /* "... - fstype source superoptions"; paths escape spaces as \040. */
++        sep = strstr(lines[i], " - ");
++        if (!sep)
++            continue;
++        fields = nm_strsplit_set(sep + 3, " ");
++        if (!fields || !fields[0] || !fields[1] || !fields[2])
++            continue;
++        if (!NM_IN_STRSET(fields[0], "nfs", "nfs4", "cifs", "smb3"))
++            continue;
++
++        opts = nm_strsplit_set(fields[2], ",");
++        for (j = 0; opts && opts[j]; j++) {
++            nm_auto_nmpobj const NMPObject *route  = NULL;
++            gs_free char                   *text   = NULL;
++            char                           *scope;
++            NMIPAddr                        addr;
++            int                             addr_family = AF_UNSPEC;
++            int                             oif         = 0;
++
++            if (!g_str_has_prefix(opts[j], "addr="))
++                continue;
++            text = g_strdup(&opts[j][NM_STRLEN("addr=")]);
++            /* An IPv6 link-local server is printed as fe80::1%ifname. */
++            scope = strchr(text, '%');
++            if (scope) {
++                *scope = '\0';
++                oif    = nm_platform_link_get_ifindex(platform, scope + 1);
++            }
++            if (nm_inet_parse_bin(AF_UNSPEC, text, &addr_family, &addr)
++                && nm_platform_ip_route_get(platform,
++                                            addr_family,
++                                            &addr,
++                                            0,
++                                            oif > 0 ? oif : 0,
++                                            (NMPObject **) &route)
++                       >= 0) {
++                if (!set)
++                    set = g_hash_table_new(nm_direct_hash, NULL);
++                netfs_add_link(platform, set, NMP_OBJECT_CAST_IPX_ROUTE(route)->rx.ifindex, 0);
++            }
++        }
++    }
++    return set;
++}
++
++static gboolean
++device_in_ifindex_set(GHashTable *set, NMDevice *device)
++{
++    return set
++           && (g_hash_table_contains(set, GINT_TO_POINTER(nm_device_get_ifindex(device)))
++               || g_hash_table_contains(set, GINT_TO_POINTER(nm_device_get_ip_ifindex(device))));
++}
++
+ static void
+ remove_device(NMManager *self, NMDevice *device, gboolean quitting)
+ {
+@@ -7368,6 +7478,10 @@ do_sleep_wake(NMManager *self, gboolean sleeping_changed)
+         /* FIXME: are there still hardware devices that need to be disabled around
+          * suspend/resume?
+          */
++        if (suspending) {
++            nm_clear_pointer(&priv->sleep_netfs_ifindexes, g_hash_table_unref);
++            priv->sleep_netfs_ifindexes = network_filesystem_ifindexes(priv->platform);
++        }
+         c_list_for_each_entry (device, &priv->devices_lst_head, devices_lst) {
+             if (nm_device_is_software(device)) {
+                 /* If a user disables networking we consider that as an
+@@ -7386,6 +7500,15 @@ do_sleep_wake(NMManager *self, gboolean sleeping_changed)
+                 continue;
+             }
+ 
++            /* So are devices carrying a network filesystem: user tasks blocked
++             * on it must be able to finish their I/O and freeze. */
++            if (suspending && device_in_ifindex_set(priv->sleep_netfs_ifindexes, device)) {
++                _LOGD(LOGD_SUSPEND,
++                      "sleep: device %s carries a network filesystem, skipping",
++                      nm_device_get_iface(device));
++                continue;
++            }
++
+             _handle_device_takedown(self, device, suspending, FALSE);
+         }
+     } else {
+@@ -7403,7 +7526,8 @@ do_sleep_wake(NMManager *self, gboolean sleeping_changed)
+                 /* Belatedly take down Wake-on-LAN devices; ideally we wouldn't have to do this
+                  * but for now it's the only way to make sure we re-check their connectivity.
+                  */
+-                if (device_is_wake_on_lan(priv->platform, device))
++                if (device_is_wake_on_lan(priv->platform, device)
++                    || device_in_ifindex_set(priv->sleep_netfs_ifindexes, device))
+                     nm_device_set_unmanaged_by_flags(device,
+                                                      NM_UNMANAGED_MANAGER_DISABLED,
+                                                      NM_UNMAN_FLAG_OP_SET_UNMANAGED,
+@@ -7422,6 +7546,8 @@ do_sleep_wake(NMManager *self, gboolean sleeping_changed)
+             }
+         }
+ 
++        nm_clear_pointer(&priv->sleep_netfs_ifindexes, g_hash_table_unref);
++
+         /* Ensure rfkill state is up-to-date since we don't respond to state
+          * changes during sleep.
+          */
+@@ -9441,6 +9567,7 @@ dispose(GObject *object)
+         sleep_devices_clear(self);
+         nm_clear_pointer(&priv->sleep_devices, g_hash_table_unref);
+     }
++    nm_clear_pointer(&priv->sleep_netfs_ifindexes, g_hash_table_unref);
+ 
+     if (priv->power_monitor) {
+         g_signal_handlers_disconnect_by_func(priv->power_monitor, sleeping_cb, self);

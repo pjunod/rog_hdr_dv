@@ -1181,6 +1181,50 @@
       "candidate_package_version": "2.52.6-1ubuntu1+rogdv7",
       "previous_candidate_commit": "c1fcae696a4d2eb53258f7c9f2d23d1011b94dca",
       "previous_candidate_tree": "d540726b883a6f21596105ebb55d43729da7afc1"
+    },
+    {
+      "component": "ubuntu-network-manager-suspend",
+      "base_commit": "752d39234cec23c836e865775639da91b290f480",
+      "base_tree": "e551e1ad4d39d19acad8a19e82e0a80c9b729eb1",
+      "candidate_commit": "8c9269bf355763d4ec8eea31ba114ce88cb852ff",
+      "candidate_tree": "92ffc992b3ea08e1e8d04a4de5d911f170668323",
+      "patch_count": 1,
+      "patch_order": [
+        "0001-keep-network-filesystem-devices-up-through-suspend.patch"
+      ],
+      "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "network-manager",
+        "version": "1.58.1-1ubuntu3",
+        "authentication": "Source archive hashes obtained through configured signed Ubuntu APT metadata; original dsc OpenPGP signature not independently verified. Locally generated candidate packages are unsigned.",
+        "import_recipe": "dpkg-source extraction with distribution patches; every extracted file except .pc imported with neutral identity and fixed 2026-11-16T08:00:00+00:00 timestamp.",
+        "artifacts": [
+          {
+            "file": "network-manager_1.58.1-1ubuntu3.dsc",
+            "sha256": "a4be5efd83fb97cf633bb21e87a329c8aa591858debdc5c216a3f4ba1b3a4955",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/n/network-manager/network-manager_1.58.1-1ubuntu3.dsc"
+          },
+          {
+            "file": "network-manager_1.58.1.orig.tar.bz2",
+            "sha256": "50f0beefa02ff16159177e88379d7819edf6527b2cc25639ab4e62d8a15ca127",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/n/network-manager/network-manager_1.58.1.orig.tar.bz2"
+          },
+          {
+            "file": "network-manager_1.58.1-1ubuntu3.debian.tar.xz",
+            "sha256": "bac60dbb0d5c789d758ebda8e5143c583f195877126f21b6c6a0a985aef5a947",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/n/network-manager/network-manager_1.58.1-1ubuntu3.debian.tar.xz"
+          }
+        ],
+        "source_import": {
+          "git_identity": "ROG HDR contributors <rog-hdr@invalid>",
+          "author_and_committer_date": "2026-11-16T08:00:00+00:00",
+          "commit_subject": "Import Ubuntu network-manager 1.58.1-1ubuntu3 after distribution patches, excluding .pc",
+          "include": "git add -f -- . ':(exclude).pc'",
+          "include_ignored": true
+        }
+      },
+      "candidate_package_version": "1.58.1-1ubuntu3+rogsleep1",
+      "candidate_status": "Built cleanly with the package test suite (85 OK, 0 fail; no test of the new function). In a KVM guest with NetworkManager running, a hard-NFS buffered reader, Sleep(true) and pm_test=freezer: stock 1.58.1-1ubuntu3 takes the NIC (or the bridge port) down and the freeze fails (-EBUSY); the candidate keeps it up and the freeze completes; without an NFS mount the candidate takes the device down as before. Real suspend on the ROG not yet run."
     }
   ]
 }

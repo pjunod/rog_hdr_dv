@@ -107,7 +107,10 @@ tests need a new coordinated window. On November 16 the same freezer failure
 was reproduced in an isolated VM: the reader in the same folio wait freezes in
 0.039 s with the link up and refuses for the full 20 s once the transport is
 removed first. NetworkManager removes it first for every managed hardware
-device without wake-on-LAN/WLAN. A fix direction is not yet chosen.
+device without wake-on-LAN/WLAN. The chosen fix, NetworkManager
+`1.58.1-1ubuntu3+rogsleep1`, is meant to keep devices carrying a network
+filesystem up through the freeze. It passed the VM freezer test (direct NIC and
+bridge port); a real suspend over the ROG's Wi-Fi is still to run.
 [NFS source diagnosis, reproducer and fix options](SUSPEND_NFS_READER.md).
 
 **Installed Player and corrected-kernel acceptance (November 13).**

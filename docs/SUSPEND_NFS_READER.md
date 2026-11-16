@@ -78,23 +78,52 @@ sleep design therefore already allows a device to stay up through the freeze.
 The ROG uses Wi-Fi, with WoWLAN supported but disabled, so its link is taken
 down first.
 
-### Fix directions (not yet chosen)
+### The fix: NetworkManager keeps network-filesystem devices up
 
-1. **NetworkManager (recommended).** Treat a device that carries a mounted
-   network filesystem like a wake-on-LAN device: leave it up through the freeze
-   and re-check it on wake. This fixes the ordering at its source, reuses an
-   existing NM path, and needs an upstream patch, a local NM package and a real
-   suspend on the ROG to qualify. Untested so far: a Wi-Fi driver may still
-   drop the link during device suspend, after tasks are frozen, which the
-   freezer tolerates.
-2. **Kernel.** Let the folio-lock wait in buffered reads freeze for network
-   filesystems, as NFS RPC waits already do with `TASK_FREEZABLE_UNSAFE`. The
-   task would freeze while NFS holds the inode `i_rwsem` shared. This needs a
-   lock audit, and the change touches generic page-cache code used by every
-   filesystem.
-3. **Configuration only.** Enabling wake-on-WLAN would route the ROG's link
-   through NM's existing exception. It changes what wakes the laptop and costs
-   power while asleep, so it is a policy choice rather than a repair.
+Paul chose the NetworkManager direction on November 16. The kernel direction
+(freezable folio waits in generic page-cache code) and the configuration-only
+direction (wake-on-WLAN, which changes what wakes the laptop) were not taken.
+
+[`ubuntu-network-manager-suspend`](../patches/ubuntu-network-manager-suspend/series)
+patches Ubuntu's `network-manager 1.58.1-1ubuntu3` as `1.58.1-1ubuntu3+rogsleep1`.
+Once per suspend, NetworkManager reads the init namespace's mount table
+(`/proc/1/mountinfo`; its own unit runs in a private mount namespace). It takes
+each `nfs`, `nfs4`, `cifs` or `smb3` mount's `addr=` option, including IPv6
+link-local `addr%iface`, and asks the kernel which link reaches that server.
+That link, its VLAN parent and its bridge or bond ports are then skipped before
+sleep, as Wake-on-LAN devices already are. They are recorded, and on wake exactly
+those devices are re-checked the way NetworkManager re-checks Wake-on-LAN
+devices. That wake-time reset is no more disruptive than stock behaviour, which
+takes them down before sleep. Devices that carry no such mount are taken down as
+before.
+
+Known limits: a server reached through a VPN tunnel keeps the tunnel's software
+device but not the underlay, because the patch does not follow the VPN endpoint's
+route. The lookup uses the kernel's default routing for the server address, so
+source-based policy routing that steers the NFS socket elsewhere is not modelled.
+
+The package builds with its test suite (85 OK, 0 fail); the suite has no test of
+the new function. In a KVM guest
+([`tools/suspend_nfs_repro/nm/`](../tools/suspend_nfs_repro/nm/)), NetworkManager
+manages a virtio NIC with a static address, a hard NFS 4.1 reader is running, and
+sleep is entered through NetworkManager's own `Sleep(true)` D-Bus method followed
+by `pm_test=freezer`:
+
+| NetworkManager | Topology | NFS reader | Hardware port after `Sleep(true)` | Freezer |
+|---|---|---|---|---|
+| stock `1.58.1-1ubuntu3` | NIC | yes | taken down | failed after 20 s, `dd` refusing, `-EBUSY` |
+| `+rogsleep1` | NIC | yes | kept up | completed in 0.022 s |
+| `+rogsleep1` | NIC | none | taken down, as before | completed |
+| stock | bridge with the NIC as port | yes | taken down (bridge stays up) | failed after 20 s, `-EBUSY` |
+| `+rogsleep1` | bridge with the NIC as port | yes | kept up | completed in 0.007 s |
+
+In every run the link was back within 2 s of wake and the reader finished.
+[Receipt](../evidence/networkmanager-suspend-netfs-20261116.json). The test did
+not cover a real suspend, a driver suspend, Wi-Fi, DHCP or NetworkManager under
+its systemd unit. Wi-Fi drivers may also drop the link during device suspend,
+after tasks are frozen, which the freezer tolerates; that is still untested.
+Next: install on the ROG and qualify with a real suspend and resume over its
+Wi-Fi link and four NFS mounts, then propose the change upstream.
 
 ## A delay inhibitor does not order consumers before NetworkManager
 
