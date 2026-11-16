@@ -1,9 +1,9 @@
 # Suspend with an NFS reader — why the attended attempts did not sleep
 
 Companion to [Status](STATUS.md) and [Operations](OPERATIONS.md). This records
-the bounded November 13, 2026 suspend failure and the source work needed to
-resolve it. It does not prescribe a host policy change or claim an upstream
-submission or repair.
+the bounded November 13, 2026 suspend failure, its VM reproduction, the
+NetworkManager fix and later physical qualification. Upstream submission and
+other hardware/topology acceptance remain separate.
 
 ## The kernel stopped at the user-task freezer
 
@@ -173,9 +173,11 @@ from this NFS stack.
 
 The source loop belongs with distribution NFS/MM/PM kernel maintainers and
 NetworkManager/logind integration, with NVIDIA integration audited separately.
-The isolated reproducer above now exists. Next, establish the exact-source compiler loop for the chosen fix. Audit wait and lock lifetimes before
-considering safe filesystem cancellation/freezing behavior or a coordinated
-transport lifecycle change. No source fix or upstream submission is claimed.
+The isolated reproducer, exact-source NetworkManager build, VM controls and
+first ROG suspend above supersede the earlier source-work prerequisite. Further
+kernel changes would still require a fresh exact-source compiler loop and
+wait/lock-lifetime audit. The distribution fix is installed; no upstream
+submission is claimed.
 Soft mounts, longer freezer timeouts, blanket freezer disablement and a
 keep-network policy shortcut do not establish a repair.
 
@@ -184,9 +186,11 @@ of the same player and segment on an ordinary local file versus NFS can
 isolate filesystem dependence while preserving normal suspend/network policy.
 Capture service order, task stacks, read activity, suspend counters and
 post-resume state. Local-file success would qualify only that case. NFS
-acceptance requires actual sleep and resume, correct reader continuation,
-normal network recovery and restored display state, with freezer, device PM
-and NVIDIA results recorded separately. No such follow-up test has run.
+acceptance requires actual sleep and resume, correct reader continuation and
+normal network recovery, with freezer, device PM and display/session results
+recorded separately. The first real NFS cycle above passed; repeated-cycle
+results are recorded below. Visual display restoration remains distinct from
+unchanged compositor process/configuration state.
 
 ## Ten-cycle ROG soak — November 16 protocol
 
@@ -194,7 +198,9 @@ The owner authorized a bounded repeated-cycle run on the installed
 `+rogsleep1` package. The planned run is ten normal `systemctl suspend`
 cycles, each with a 30-second RTC wake alarm, on the existing s2idle kernel.
 Each cycle starts a buffered reader at a different offset of a large hard-NFS
-file and must observe `folio_wait` before requesting sleep.
+file and must observe `folio_wait` before requesting sleep. The continuation
+separates a bounded I/O startup phase from the five-second folio observation
+window; time waiting for the input open/read to begin is recorded separately.
 
 The acceptance checks are one new suspend success, every exposed failure
 counter unchanged, at least ten seconds actually suspended measured by the
@@ -205,5 +211,29 @@ the first failure without retrying. It preserves private per-cycle kernel and
 service journals, then restores the exact NetworkManager logging state, clears
 only its own RTC alarm and terminates its owned reader.
 
-Results are pending. This protocol does not grant a long-duration, alternate
-network topology, hibernate, display-quality or upstream acceptance claim.
+**Result: ten actual suspend/resume cycles passed.** They advanced the kernel
+success count from 1 to 11 with every failure counter unchanged. Every cycle
+logged the network-filesystem skip, entered/exited s2idle, preserved the boot,
+GNOME Shell and reader identities, and advanced reader I/O after connection.
+User-space freezing took 0.005–5.337 seconds; actual suspended durations were
+24.10–29.50 seconds. Wi-Fi was observed connected within 4.41 seconds after
+the harness observed resume; that is not timing from hardware wake.
+
+The first invocation passed four cycles, then stopped before a fifth suspend
+because its reader remained in an RPC wait with zero read bytes through the
+five-second setup deadline. No suspend was requested. A fresh diagnostic
+reader showed an initial RPC before input-open and then folio wait/read I/O.
+The continuation separates bounded I/O startup from the unchanged folio-wait
+check and completed six further actual cycles. The original setup-only stop
+and both harness versions remain in private receipts. No failed suspend was
+retried and this is not labelled an uninterrupted ten-cycle harness run.
+
+Exact logging state was restored, the RTC alarm is empty, owned readers were
+reaped and transient services are inactive. The NetworkManager binary, boot
+and GNOME Shell identities and display configuration (excluding its generation
+serial) are unchanged. Visual display restoration is not inferred.
+[Per-cycle receipt](../evidence/networkmanager-suspend-rog-soak-20261116.json).
+
+This bounded result does not grant long-duration, alternate-topology, battery,
+hibernate, display-quality or upstream acceptance. The NetworkManager
+submission still needs the owner's freedesktop account and author review.

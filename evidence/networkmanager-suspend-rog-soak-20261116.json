@@ -1,0 +1,420 @@
+{
+  "schema": "networkmanager-rog-suspend-soak-v1",
+  "item": "Installed NetworkManager +rogsleep1 bounded multi-cycle hard-NFS suspend soak",
+  "date": "2026-11-16",
+  "owner": "Codex",
+  "status": "ten_actual_cycles_passed_with_recorded_setup_interruption",
+  "installed": {
+    "network-manager": "1.58.1-1ubuntu3+rogsleep1",
+    "libnm0:amd64": "1.58.1-1ubuntu3+rogsleep1",
+    "libnm0:i386": "1.58.1-1ubuntu3+rogsleep1",
+    "network-manager-tui": "1.58.1-1ubuntu3+rogsleep1",
+    "kernel": "7.3.0-nativehdr3",
+    "NetworkManager_sha256": "915b326f3bfeea1f716d639222b256041066901f2c24b8dcc28209c668c7387b",
+    "matches_retained_candidate_package": true,
+    "binary_unchanged_after_soak": true,
+    "stock_rollback_packages_hash_verified": 4
+  },
+  "environment": {
+    "host": "ROG laptop, internal panel",
+    "power": "AC",
+    "sleep_mode": "s2idle",
+    "transport": "Wi-Fi wlo1",
+    "source": "Read-only 20,445,134,848-byte file on hard NFS 4.1 over TCP, nconnect=8; server/name/path retained privately.",
+    "network_filesystem_mounts": 5,
+    "no_package_kernel_display_or_network_policy_change": true
+  },
+  "protocol": {
+    "planned_actual_suspend_cycles": 10,
+    "actual_suspend_cycles": 10,
+    "harness_invocations": 2,
+    "setup_only_stops": 1,
+    "rtc_alarm_seconds": 30,
+    "minimum_actual_sleep_seconds": 10,
+    "maximum_wifi_connection_observation_seconds": 60,
+    "post_connection_reader_progress_deadline_seconds": 10,
+    "reader": "Buffered dd, 1 MiB blocks, up to 6000 blocks from spread source offsets; require observed folio_wait before suspend.",
+    "acceptance": "Each actual cycle must add exactly one success, leave every exposed numeric failure counter unchanged, preserve boot/GNOME Shell and reader identity, sleep >=10 s, observe connected Wi-Fi, and show reader bytes increasing from a fresh post-connection sample.",
+    "continuation": "After four passes, one setup-only attempt stopped before any suspend request. Reader startup is now a separate <=60 s phase requiring I/O progress, followed by the unchanged five-second folio observation window. Six further cycles completed the ten actual cycles; no suspend failure was retried.",
+    "clock_measurement": "Actual suspended duration is change in CLOCK_BOOTTIME minus CLOCK_MONOTONIC. Wi-Fi wait starts when the user-space harness observes the completed resume; it is not latency from the hardware wake instant."
+  },
+  "summary": {
+    "suspend_success_before_after": [
+      1,
+      11
+    ],
+    "all_failure_counters_before_after": {
+      "failed_resume": [
+        0,
+        0
+      ],
+      "failed_suspend_noirq": [
+        0,
+        0
+      ],
+      "failed_freeze": [
+        0,
+        0
+      ],
+      "failed_resume_early": [
+        0,
+        0
+      ],
+      "failed_suspend_late": [
+        0,
+        0
+      ],
+      "failed_resume_noirq": [
+        0,
+        0
+      ],
+      "failed_prepare": [
+        0,
+        0
+      ],
+      "failed_suspend": [
+        0,
+        0
+      ],
+      "fail": [
+        0,
+        0
+      ]
+    },
+    "user_freeze_seconds_min_max": [
+      0.005,
+      5.337
+    ],
+    "actual_sleep_seconds_min_max": [
+      24.09792500702315,
+      29.498166386969388
+    ],
+    "total_actual_sleep_seconds": 282.8826589869568,
+    "wifi_connection_observation_seconds_min_max": [
+      0.04488527000648901,
+      4.40070684501552
+    ],
+    "all_post_connection_readers_advanced": true,
+    "nm_netfs_skip_logged_cycles": 10,
+    "kernel_suspend_entry_exit_pairs": 10,
+    "selected_kernel_error_signature_matches": 0
+  },
+  "cycles": [
+    {
+      "cycle": 1,
+      "segment": "run1",
+      "segment_cycle": 1,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:48:46.697729+00:00",
+      "suspend_success_before_after": [
+        1,
+        2
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 26.885585216979962,
+      "user_freeze_seconds": 2.174,
+      "wifi_connected_wait_after_observed_resume_seconds": 3.7111282530240715,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 2097152,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": null,
+      "receipt_sha256": {
+        "cycle.json": "71e43fdda0179acfb221550ce679fbed45c1338702be184453a3ad8111e16b3e",
+        "kernel.journal": "f7844985eeafdeb3758b987c2cdb486ba5fc8eaa9d339210ae386d0d733969ee",
+        "services.journal": "ab91e50d8214617852ce0a2e7591919c1fde6166d14c886fc52f86d335c9aa77"
+      }
+    },
+    {
+      "cycle": 2,
+      "segment": "run1",
+      "segment_cycle": 2,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:49:26.051000+00:00",
+      "suspend_success_before_after": [
+        2,
+        3
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 27.825081505987328,
+      "user_freeze_seconds": 2.164,
+      "wifi_connected_wait_after_observed_resume_seconds": 0.05004674900555983,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 15728640,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": null,
+      "receipt_sha256": {
+        "cycle.json": "479eb6e6678994c8009261442aa515c7dc89961ba9487c7e004e63081c5a3891",
+        "kernel.journal": "4f892608626146a75a6726af9097da1b543f1e69cea95a5d5699dc6791310e0d",
+        "services.journal": "50c4e5bb5e8c2962e9ef7fbef6ee81cb2bbfeef9131cf24d38265f86af7f8a86"
+      }
+    },
+    {
+      "cycle": 3,
+      "segment": "run1",
+      "segment_cycle": 3,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:50:05.575118+00:00",
+      "suspend_success_before_after": [
+        3,
+        4
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 24.09792500702315,
+      "user_freeze_seconds": 5.337,
+      "wifi_connected_wait_after_observed_resume_seconds": 4.344584962993395,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 1048576,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": null,
+      "receipt_sha256": {
+        "cycle.json": "2dceecb7b76d7ac4c2140703ebe50b4157e4dc0dbc430ce1fe4f6b9426d966e3",
+        "kernel.journal": "d837e57ee5b879bf2609c8b1169322410f4839794f3a5b24b67152e5070619ad",
+        "services.journal": "c25749e635902a64f5d661af3143be0240fa1b1b321658ac775254ab1250a38f"
+      }
+    },
+    {
+      "cycle": 4,
+      "segment": "run1",
+      "segment_cycle": 4,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:50:46.609836+00:00",
+      "suspend_success_before_after": [
+        4,
+        5
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 29.453216691006673,
+      "user_freeze_seconds": 0.017,
+      "wifi_connected_wait_after_observed_resume_seconds": 0.04488527000648901,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 1048576,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": null,
+      "receipt_sha256": {
+        "cycle.json": "e6659e4a0f6b3a9ecc81d378856861da619de361a28b5bfe2223adf1807ae8c3",
+        "kernel.journal": "4e69e8209e6752ed718de1b8c02bd531799b384aa113d353cda5d80ed4c556bc",
+        "services.journal": "3b9fda24b2b2ce2249ffd904d40d262c1afc6b293a5594fe27e769cfa15ca2b7"
+      }
+    },
+    {
+      "cycle": 5,
+      "segment": "run2",
+      "segment_cycle": 1,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:55:01.559496+00:00",
+      "suspend_success_before_after": [
+        5,
+        6
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 29.45056779801962,
+      "user_freeze_seconds": 0.008,
+      "wifi_connected_wait_after_observed_resume_seconds": 4.167252040002495,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 7340032,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": 0.20060160299181007,
+      "receipt_sha256": {
+        "cycle.json": "5851fed50a7529a94bde8f8257431f048b5be9231650a6674f76729647e776cf",
+        "kernel.journal": "d5374dec1191738511fb901ea1ce299fb06b2adebf909a17bb65a6f4babf8b6c",
+        "services.journal": "b7c0e2a7d71cc9e107c9cb70edd91614feb8b1050ea2f125c3237af810c16dca"
+      }
+    },
+    {
+      "cycle": 6,
+      "segment": "run2",
+      "segment_cycle": 2,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:55:41.992321+00:00",
+      "suspend_success_before_after": [
+        6,
+        7
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 29.073893799009966,
+      "user_freeze_seconds": 0.034,
+      "wifi_connected_wait_after_observed_resume_seconds": 0.0464826789975632,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 4194304,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": 0.20057158800773323,
+      "receipt_sha256": {
+        "cycle.json": "d8c31b22e834283bf4ecab21cd91eb1be1b47330319078809b59c5a02d6b7e43",
+        "kernel.journal": "6dcf6575824bd31b7605b4fd9039d71442db9eaa42cb191605d26298e0361617",
+        "services.journal": "fcb50f814600be9a478e79a5b675193f77fef81d9dc18fdaa214cd3eb2f5773c"
+      }
+    },
+    {
+      "cycle": 7,
+      "segment": "run2",
+      "segment_cycle": 3,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:56:21.568704+00:00",
+      "suspend_success_before_after": [
+        7,
+        8
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 29.498166386969388,
+      "user_freeze_seconds": 0.017,
+      "wifi_connected_wait_after_observed_resume_seconds": 4.40070684501552,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 12582912,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": 0.20054714300204068,
+      "receipt_sha256": {
+        "cycle.json": "eed3c81ce5bd53d96e18b74a3718db7f1984563ee406e809b6eeb3ee2a7c8581",
+        "kernel.journal": "ab2b161651e5346d39c8f7edad5fd201096990491c6f49ae2e80b14b216745d4",
+        "services.journal": "248bbfc6bb82439510ebf074636250aca95a90a0d80b72bf8c0567a8c7226e2a"
+      }
+    },
+    {
+      "cycle": 8,
+      "segment": "run2",
+      "segment_cycle": 4,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:57:02.024165+00:00",
+      "suspend_success_before_after": [
+        8,
+        9
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 28.657527361996472,
+      "user_freeze_seconds": 0.016,
+      "wifi_connected_wait_after_observed_resume_seconds": 4.144761608011322,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 14680064,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": 0.20048677301383577,
+      "receipt_sha256": {
+        "cycle.json": "cba491bbb9dac48a48421fb7b63a89b2c197a2eb89f5f819e66fa96ade921984",
+        "kernel.journal": "69c566a9c41d3887862e969e1fae2bee88810dd58ce454653d5426b1698359ab",
+        "services.journal": "d39575b0fc6cba39102fef5b82cd93829da57b69457c915f765d1008d0bc25e0"
+      }
+    },
+    {
+      "cycle": 9,
+      "segment": "run2",
+      "segment_cycle": 5,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:57:41.963800+00:00",
+      "suspend_success_before_after": [
+        9,
+        10
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 29.056041805975838,
+      "user_freeze_seconds": 0.016,
+      "wifi_connected_wait_after_observed_resume_seconds": 4.1820216109917965,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 13631488,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": 0.20044438799959607,
+      "receipt_sha256": {
+        "cycle.json": "61d6c0fee2550968de6a67cafbbe369ba9e4174bc6781ebee47e1dd3beb1157c",
+        "kernel.journal": "aeaec7d24adbcc08b6fbba6e75e72b2eb55a91550d93511f50e7bce86a364039",
+        "services.journal": "7ee8cf47e11e106c2eae0ff85fc065af25a0772d7d1306efc02b58ca446deed2"
+      }
+    },
+    {
+      "cycle": 10,
+      "segment": "run2",
+      "segment_cycle": 6,
+      "status": "passed",
+      "request_utc": "2026-11-16T19:58:22.209757+00:00",
+      "suspend_success_before_after": [
+        10,
+        11
+      ],
+      "failure_counters_unchanged": true,
+      "actual_sleep_seconds": 28.884653413988417,
+      "user_freeze_seconds": 0.005,
+      "wifi_connected_wait_after_observed_resume_seconds": 4.13250172699918,
+      "reader_wait_before": "folio_wait_bit_common",
+      "reader_post_connection_read_bytes_delta": 1048576,
+      "reader_identity_unchanged": true,
+      "boot_and_gnome_shell_identity_unchanged": true,
+      "nm_netfs_skip_logged": true,
+      "kernel_suspend_entry_exit": true,
+      "selected_kernel_error_signature_matches": 0,
+      "reader_startup_seconds": 0.20055203200899996,
+      "receipt_sha256": {
+        "cycle.json": "0177763f30734a84e78726af97ebd42f99afecb174db9fa06739e46f352384e0",
+        "kernel.journal": "4e42dd6e2e76dc8561c41e5f816f6b30ebd3bcf340eaed4719afba4c83eb5264",
+        "services.journal": "c147898f4c3d706ba3977c8a56d1a53680f46c82fa7ade74a3af065582191970"
+      }
+    }
+  ],
+  "setup_only_stop": {
+    "segment": "run1",
+    "attempt": 5,
+    "stage": "before_suspend_request",
+    "reason": "Reader remained in rpc_wait_bit_killable with read_bytes=0 during the original five-second setup window.",
+    "kernel_suspend_requested": false,
+    "cleanup_restored": true,
+    "cycle_record_sha256": "58dc15888ad7a1d1d4a1a8052d0fa0ba4ca505053612a47ef7c9ec95691c7ae4"
+  },
+  "cleanup": {
+    "logging_restored_exactly": true,
+    "rtc_wakealarm_empty": true,
+    "owned_readers_reaped": true,
+    "transient_services_inactive": true,
+    "boot_identity_unchanged": true,
+    "gnome_shell_identity_unchanged": true,
+    "display_configuration_unchanged_excluding_generation_serial": true,
+    "display_configuration_sha256": "aa4ae904e3aa1a7d0b639e606d8c3d0653dfade8e31059fb74c71651f3d8cc8d"
+  },
+  "provenance": {
+    "private_harness_sha256": {
+      "soak.py": "5dae1bbc71978ca4d218936c533b450ebb32200598dd45d24e2382c236fb3bf1",
+      "soak-v2.py": "468908b992a8183945aaa0a4931a535338c65c1e60e90b1b2b6e2c6259c3a498"
+    },
+    "private_archive_sha256": "58a9819da7b802f1f76195ebffdf414fbd77d427103391178946048de360ae98",
+    "prior_single_cycle_receipt": "networkmanager-suspend-rog-20261116.json",
+    "prior_vm_controls": "networkmanager-suspend-netfs-20261116.json"
+  },
+  "limits": [
+    "Ten actual short s2idle cycles on one laptop and one Wi-Fi/NFS route; four initial plus six continuation cycles, not an uninterrupted single harness run or long-duration soak.",
+    "The setup-only stop is retained as an incomplete attempt; it was not relabelled a suspend pass or removed. Its precise original RPC was not stack-captured; a separate fresh reader showed RPC-before-input-open then folio/read progress.",
+    "No stock package retest on this physical window, VPN or policy routing, bridge/bond topology, SMB, hibernate, alternate sleep mode or battery-power qualification.",
+    "Unchanged GNOME Shell identity/display configuration does not establish owner-observed visual restoration, optical accuracy, Dolby Vision continuity or full playback endurance.",
+    "Selected journal error-signature scan found no matches; this is not an exhaustive absence-of-errors claim.",
+    "No package/source fix, upstream submission, regulator certification or universal suspend reliability claim."
+  ]
+}

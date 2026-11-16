@@ -1,8 +1,9 @@
 # Status — what is working and what remains
 
 **Updated November 16, 2026 (Eastern).**
-Latest: item-7 digital diagnostics recorded; physical cadence and optical
-quality remain open. The following November 13 observations are historical.
+Latest: ten actual NFS-reader suspend cycles passed with the installed
+NetworkManager fix; item-7 digital diagnostics recorded. Physical cadence,
+optical quality and long-duration/other-topology suspend acceptance remain open. The following November 13 observations are historical.
 
 **November 13 installed baseline.**
 Showtime `50.0-2+rogdv5.12` and Plurx Player `0.5.1-1` are installed with
@@ -125,6 +126,19 @@ bridge port) and, installed on the ROG, one real suspend and resume with an NFS
 reader blocked mid-read: freeze in 0.025 s, Wi-Fi back in about 5 s, and the
 read continued.
 [NFS source diagnosis, reproducer and fix options](SUSPEND_NFS_READER.md).
+
+**NetworkManager repeated-cycle qualification (November 16).** Ten actual
+s2idle cycles with a hard-NFS reader passed: success count 1→11, all kernel
+failure counters unchanged, netfs skip logged each cycle and post-connection
+reader I/O advancing each time. User freezing took 0.005–5.337 s; actual sleep
+24.10–29.50 s. Wi-Fi was observed connected within 4.41 s of the harness's
+resume observation. Four initial plus six continuation cycles are recorded
+separately: a setup-only RPC wait stopped the first invocation before any fifth
+suspend, and the continuation separated reader startup from folio observation.
+Exact logging/RTC state, process identities, binary and display configuration
+were restored or unchanged; visual/optical, long-duration, battery and other
+topology acceptance remain open.
+[Per-cycle receipt](../evidence/networkmanager-suspend-rog-soak-20261116.json).
 
 **Installed Player and corrected-kernel acceptance (November 13).**
 The owner explicitly instructed installation of Player `0.5.1-1` from the
