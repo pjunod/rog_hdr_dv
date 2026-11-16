@@ -1,0 +1,109 @@
+{
+ "item": "Suspend freezer failure with a hard-NFS buffered reader, reproduced in an isolated VM",
+ "date_utc": "2026-11-16",
+ "environment": {
+  "guest_kernel": "7.3.0-10-generic (Ubuntu 7.3.0-10.10)",
+  "nfs": "nfs-kernel-server/nfs-common 1:2.9.1-1ubuntu1; client mount vers=4.1,hard,proto=tcp,nconnect=8,timeo=600,retrans=2 (the ROG options; one mount, not four)",
+  "qemu": "1:11.0.3+ds-2ubuntu2, KVM, 2 vCPU, 4 GiB",
+  "topology": "NFS server in a network namespace behind a veth pair (not Wi-Fi), server-side 200 Mbit/s token-bucket shaper so the read is in flight; reader is dd with buffered 1 MiB reads of a 1.5 GiB file",
+  "freezer": "pm_test=freezer, state=freeze (s2idle), pm_freeze_timeout 20000 ms (the default, as on the ROG), pm_debug_messages=1 so the refusing task is printed",
+  "addresses": "RFC 5737 documentation range 192.0.2.0/24, guest-internal only",
+  "transport_removal": "ip addr flush + ip link set down on the client side; this approximates NetworkManager deactivation, NetworkManager itself does not run in the guest"
+ },
+ "scripts": "tools/suspend_nfs_repro/",
+ "results": {
+  "link-up": {
+   "reader": "D in folio_wait_bit_common <- filemap_update_page <- filemap_get_pages <- filemap_read <- generic_file_read_iter <- nfs_file_read",
+   "outstanding_rpc": "2 READ tasks queued on the transport (xprt_pending)",
+   "freeze": "completed in 0.039 s",
+   "rc": 0
+  },
+  "link-down": {
+   "reader": "same",
+   "outstanding_rpc": "2 READ tasks queued on the transport (xprt_pending)",
+   "freeze": "failed after 20.007 s, 1 task refusing to freeze",
+   "refusing_task": "dd (the reader), state D, trace io_schedule <- folio_wait_bit_common <- filemap_update_page <- filemap_read <- nfs_file_read",
+   "rc": 1,
+   "last_failed_errno": -16
+  }
+ },
+ "earlier_runs": "Earlier iterations (5 s timeout, no nconnect, link down without address flush) gave the same outcome: link up froze in 0.006-0.010 s, link down failed. Two first runs hit the server grace period with the reader in an OPEN RPC wait (rpc_wait_bit_killable); those froze even with the link down. Their logs were not retained; they are context, not evidence.",
+ "serial_log_lines": {
+  "link-up": [
+   "kernel 7.3.0-10-generic scenario link-up",
+   "mounted 192.0.2.1:/ /mnt/nfs nfs4 rw,relatime,vers=4.1,rsize=524288,wsize=524288,namlen=255,hard,fatal_neterrors=none,proto=tcp,nconnect=8,timeo=600,retrans=2,sec=sys,clientaddr=192.0.2.2,local_lock=none,addr=192.0.2.1 0 0",
+   "pm_freeze_timeout=20000 ms",
+   "reader pid 238 read_bytes=96079872",
+   "transport left up",
+   "reader wchan=folio_wait_bit_common state=D",
+   "reader stack: [<0>] folio_wait_bit_common+0x133/0x330|[<0>] filemap_update_page+0x347/0x350|[<0>] filemap_get_pages+0x40f/0x4d0|[<0>] filemap_read+0x112/0x4f0|[<0>] generic_file_read_iter+0xc6/0x120|[<0>] nfs_file_read+0x131/0x160 [nfs]|[<0>] vfs_read+0x270/0x3a0|[<0>] ksys_read+0x71/0xf0|",
+   "outstanding RPC tasks: 2 READ, 3 total",
+   "rpc: 330 c805      0 0x3 0x71e4a5a7    59967 nfs_pgio_common_ops [nfs] nfsv4 READ a:call_status [sunrpc] q:xprt_pending",
+   "rpc: 331 c805      0 0x3 0xf9edcbde    59967 nfs_pgio_common_ops [nfs] nfsv4 READ a:call_status [sunrpc] q:xprt_pending",
+   "rpc: clnt[192.0.2.1:2049] RPC tasks[2]",
+   "pm_test=freezer state=freeze rc=0 failed_freeze 0 -> 0 last_failed_errno=0",
+   "dmesg: [   25.848923] PM: suspend entry (s2idle)",
+   "dmesg: [   25.849683] Filesystems sync: 0.000 seconds",
+   "dmesg: [   25.856055] Freezing user space processes",
+   "dmesg: [   25.895213] Freezing user space processes completed (elapsed 0.039 seconds)",
+   "dmesg: [   25.895218] OOM killer disabled.",
+   "dmesg: [   25.895219] Freezing remaining freezable tasks",
+   "dmesg: [   25.896262] Freezing remaining freezable tasks completed (elapsed 0.001 seconds)",
+   "dmesg: [   25.896270] PM: suspend debug: Waiting for 5 second(s).",
+   "dmesg: [   31.057045] OOM killer enabled.",
+   "dmesg: [   31.057051] Restarting tasks: Starting",
+   "dmesg: [   31.057191] Restarting tasks: Done",
+   "dmesg: [   31.057224] random: crng reseeded on system resumption",
+   "dmesg: [   31.063752] PM: suspend exit",
+   "reader alive=yes",
+   "DONE"
+  ],
+  "link-down": [
+   "kernel 7.3.0-10-generic scenario link-down",
+   "mounted 192.0.2.1:/ /mnt/nfs nfs4 rw,relatime,vers=4.1,rsize=524288,wsize=524288,namlen=255,hard,fatal_neterrors=none,proto=tcp,nconnect=8,timeo=600,retrans=2,sec=sys,clientaddr=192.0.2.2,local_lock=none,addr=192.0.2.1 0 0",
+   "pm_freeze_timeout=20000 ms",
+   "reader pid 240 read_bytes=96079872",
+   "transport down: addresses flushed, link down (as NetworkManager deactivation does)",
+   "reader wchan=folio_wait_bit_common state=D",
+   "reader stack: [<0>] folio_wait_bit_common+0x133/0x330|[<0>] filemap_update_page+0x347/0x350|[<0>] filemap_get_pages+0x40f/0x4d0|[<0>] filemap_read+0x112/0x4f0|[<0>] generic_file_read_iter+0xc6/0x120|[<0>] nfs_file_read+0x131/0x160 [nfs]|[<0>] vfs_read+0x270/0x3a0|[<0>] ksys_read+0x71/0xf0|",
+   "outstanding RPC tasks: 2 READ, 3 total",
+   "rpc: 192 c805      0 0x3 0xc81d56ab    56935 nfs_pgio_common_ops [nfs] nfsv4 READ a:call_status [sunrpc] q:xprt_pending",
+   "rpc: 193 c805      0 0x3 0xd064bf9a    56935 nfs_pgio_common_ops [nfs] nfsv4 READ a:call_status [sunrpc] q:xprt_pending",
+   "rpc: clnt[192.0.2.1:2049] RPC tasks[2]",
+   "pm_test=freezer state=freeze rc=1 failed_freeze 0 -> 1 last_failed_errno=-16",
+   "dmesg: [   25.228607] PM: suspend entry (s2idle)",
+   "dmesg: [   25.230040] Filesystems sync: 0.001 seconds",
+   "dmesg: [   25.238439] Freezing user space processes",
+   "dmesg: [   45.245553] Freezing user space processes failed after 20.007 seconds (1 tasks refusing to freeze, wq_busy=0):",
+   "dmesg: [   45.245563] task:dd              state:D stack:0     pid:240   tgid:240   ppid:1      task_flags:0x400000 flags:0x00080002",
+   "dmesg: [   45.245642]  __x64_sys_read+0x19/0x30",
+   "dmesg: [   45.245643]  x64_sys_call+0x2029/0x23d0",
+   "dmesg: [   45.245645]  do_syscall_64+0xba/0x480",
+   "dmesg: [   45.245670]  entry_SYSCALL_64_after_hwframe+0x76/0x7e",
+   "dmesg: [   45.245672] RIP: 0033:0x712306cac4a2",
+   "dmesg-trace: [   45.245572]  __schedule+0x2b8/0x700",
+   "dmesg-trace: [   45.245580]  schedule+0x28/0xb0",
+   "dmesg-trace: [   45.245581]  io_schedule+0x4c/0x80",
+   "dmesg-trace: [   45.245583]  folio_wait_bit_common+0x133/0x330",
+   "dmesg-trace: [   45.245590]  filemap_update_page+0x347/0x350",
+   "dmesg-trace: [   45.245592]  filemap_get_pages+0x40f/0x4d0",
+   "dmesg-trace: [   45.245597]  filemap_read+0x112/0x4f0",
+   "dmesg-trace: [   45.245599]  generic_file_read_iter+0xc6/0x120",
+   "dmesg-trace: [   45.245601]  nfs_file_read+0x131/0x160 [nfs]",
+   "dmesg-trace: [   45.245637]  vfs_read+0x270/0x3a0",
+   "dmesg-trace: [   45.245640]  ksys_read+0x71/0xf0",
+   "reader alive=yes",
+   "DONE"
+  ]
+ },
+ "networkmanager_1_58_1": {
+  "file": "src/core/nm-manager.c",
+  "function": "do_sleep_wake",
+  "finding": "do_sleep_wake takes every managed hardware device down on suspend, skipping software devices and devices for which device_is_wake_on_lan() is true. That reads the live driver state (ethtool WoL, or Wi-Fi WoWLAN not NONE/IGNORE), not the NM setting. Skipped devices are unmanaged on wake to re-check connectivity; the code comment calls this taking them down post-suspend."
+ },
+ "rog_context": {
+  "transport": "Wi-Fi (wlo1), WoWLAN supported but disabled",
+  "mounts": "four NFS 4.1 hard mounts from the media server, nconnect=8, timeo=600"
+ },
+ "comparison_to_rog": "Same refusing-task stack from folio_wait_bit_common through nfs_file_read and the same -EBUSY outcome. Not shown identical: the ROG used Wi-Fi, four mounts, and NetworkManager itself; its exact folio, held locks and RPC state were not captured."
+}
