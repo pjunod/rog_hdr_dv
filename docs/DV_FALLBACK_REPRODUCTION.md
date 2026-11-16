@@ -40,11 +40,12 @@ at zero. Profile 7 initially logged enhancement composition; Profile 8 did not.
 Two separate +60-second indexed seek controls reproduced the reset diagnostic.
 The first appeared 0.383 seconds after the seek control was launched, without
 a native-target generation or decoder-colour change. A later 20-second ABI
-probe observed483 completed mapped returns, but was too late to measure
+probe observed 483 completed mapped returns, but was too late to measure
 immediate recovery. The final 45-second trace spanned the second seek: one
 reset call in second 3, 1,077 positive-RPU-length/EL-composed entries and 1,075
 completed mapped returns. There were no observed unsupported/error returns,
-and every full-second bucket 4–43 after the seek contained mapped returns.
+and every probe-elapsed full-second bucket 4–43, all after the seek, contained
+mapped returns.
 Counters are unpaired at probe boundaries; their difference is not a drop count.
 
 The [project mapper ABI](../packaging/system-dv/include/dv_provider387.h) defines
