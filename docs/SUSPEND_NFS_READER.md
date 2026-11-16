@@ -122,8 +122,17 @@ In every run the link was back within 2 s of wake and the reader finished.
 not cover a real suspend, a driver suspend, Wi-Fi, DHCP or NetworkManager under
 its systemd unit. Wi-Fi drivers may also drop the link during device suspend,
 after tasks are frozen, which the freezer tolerates; that is still untested.
-Next: install on the ROG and qualify with a real suspend and resume over its
-Wi-Fi link and four NFS mounts, then propose the change upstream.
+**Qualified on the ROG (November 16).** With `+rogsleep1` installed (4 packages
+upgraded, none removed; `libnm0` built for both amd64 and i386, because Steam's
+32-bit libraries use it), a buffered reader on the media NFS mount was blocked in
+`folio_wait_bit_common` when `systemctl suspend` ran. NetworkManager logged
+`device wlo1 carries a network filesystem, skipping`. The kernel froze user space
+in 0.025 s, entered s2idle and woke on an RTC alarm, and suspend statistics
+recorded one success and no freeze failure. On wake NetworkManager re-checked
+`wlo1`, which reconnected in about 5 s, and the reader carried on.
+[Receipt](../evidence/networkmanager-suspend-rog-20261116.json). This is one
+cycle, not a soak. Still to do: propose the change upstream, which needs a
+freedesktop GitLab account.
 
 ## A delay inhibitor does not order consumers before NetworkManager
 

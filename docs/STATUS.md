@@ -110,7 +110,9 @@ removed first. NetworkManager removes it first for every managed hardware
 device without wake-on-LAN/WLAN. The chosen fix, NetworkManager
 `1.58.1-1ubuntu3+rogsleep1`, is meant to keep devices carrying a network
 filesystem up through the freeze. It passed the VM freezer test (direct NIC and
-bridge port); a real suspend over the ROG's Wi-Fi is still to run.
+bridge port) and, installed on the ROG, one real suspend and resume with an NFS
+reader blocked mid-read: freeze in 0.025 s, Wi-Fi back in about 5 s, and the
+read continued.
 [NFS source diagnosis, reproducer and fix options](SUSPEND_NFS_READER.md).
 
 **Installed Player and corrected-kernel acceptance (November 13).**
