@@ -120,9 +120,8 @@ by `pm_test=freezer`:
 In every run the link was back within 2 s of wake and the reader finished.
 [Receipt](../evidence/networkmanager-suspend-netfs-20261116.json). The test did
 not cover a real suspend, a driver suspend, Wi-Fi, DHCP or NetworkManager under
-its systemd unit. Wi-Fi drivers may also drop the link during device suspend,
-after tasks are frozen, which the freezer tolerates; that is still untested.
-**Qualified on the ROG (November 16).** With `+rogsleep1` installed (4 packages
+its systemd unit. The single ROG run below covers those once.
+**One real suspend passed on the ROG (November 16).** With `+rogsleep1` installed (4 packages
 upgraded, none removed; `libnm0` built for both amd64 and i386, because Steam's
 32-bit libraries use it), a buffered reader on the media NFS mount was blocked in
 `folio_wait_bit_common` when `systemctl suspend` ran. NetworkManager logged

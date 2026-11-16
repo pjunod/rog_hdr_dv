@@ -30,8 +30,8 @@
   },
   "sleep": "systemd-sleep performed 'suspend' and returned on the RTC alarm after about 78 s wall time",
   "wake": "wlo1 re-checked as designed (activated -> unmanaged -> disconnected -> activated with a new DHCP lease) and connected about 5 s after wake",
-  "reader": "alive after resume; read_bytes 169889792 -> 271601664 over 5 s"
+  "reader": "alive after resume; read_bytes sampled twice after Wi-Fi reconnected, 5 s apart: 169889792 then 271601664"
  },
- "baseline": "On November 13 the same kind of reader with stock NetworkManager made the freezer fail twice with -EBUSY and no sleep.",
+ "baseline": "On November 13 on this same ROG, with stock NetworkManager and the installed Showtime player reading from the NFS mount, one suspend request made two kernel freezer attempts, both failing with -EBUSY and no sleep (docs/SUSPEND_NFS_READER.md).",
  "limits": "One suspend cycle, one reader, digital records only; no long-duration or repeated-cycle soak."
 }
