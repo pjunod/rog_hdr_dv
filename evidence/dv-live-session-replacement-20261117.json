@@ -1,0 +1,368 @@
+{
+  "schema": "dv-live-session-replacement-v1",
+  "date": "2026-11-17",
+  "date_eastern": "2026-11-17",
+  "owner": "Codex",
+  "status": "one_bounded_normal_live_OSC_replacement_and_sequence_acceptance_observed",
+  "finding": "A normal catalog Play selected live HLS through the existing vod_index_pending fallback. An actual Lua OSC timeline hit replaced its session; captured normal HTTP 200 responses accepted sequence 1 on the changed session/generation with the same client. Advancing DV state and successful mapper callbacks were subsequently observed. This qualifies one runtime boundary of the previously merged Player repair, not a new production fix or a reproduction of spontaneous DV loss.",
+  "measurement_window_utc": {
+    "normal_play_action": "2026-11-17T15:34:30.553777+00:00",
+    "main_mouse_click": "2026-11-17T15:34:50.394523+00:00",
+    "replacement_first_response_packet": "2026-11-17T15:34:54.584474+00:00",
+    "helper_observed_replacement_first_sequence1": "2026-11-17T15:34:55.013959+00:00",
+    "qualification_endpoint": "2026-11-17T15:35:25.071887+00:00",
+    "owned_player_quit_request": "2026-11-17T15:36:00.073025+00:00"
+  },
+  "method": {
+    "launch": "Agent activated Play in a task-created ordinary Chrome catalog window after confirmed unlock. Existing authentication, normal installed Player options and capabilities.",
+    "route": "Fresh server stdout contains three typed vod_index_pending recoveries for the selected source/window. Correct authoritative Hiqlite route rows and actual live film metadata independently confirm live presentation. The earlier catalog/index census is not represented as an immediately-before-play measurement.",
+    "route_changes": "No quality choice, settings change, forced capability, index removal or synthetic handoff.",
+    "main_gesture": "Agent sent ordinary mpv mouse movement, waited 0.3 s, then button0 single at the actual Cinema timeline. This executes the Lua hit test and normal Python outside-range handler, rather than directly injecting osc-film-seek.",
+    "control_observation": "Passive loopback capture of normal Player request/response traffic; no observer-generated HTTP control POSTs.",
+    "scope": "Software IPC, authoritative route state, sanitized HTTP fields and the project mapper ABI. No optical or attended visual acceptance."
+  },
+  "normal_route": {
+    "delivered_profile": 7,
+    "live_film_initial_origin_seconds": 0.0,
+    "live_film_duration_seconds": 11707.744,
+    "authoritative_initial_vod": false,
+    "initial_media_origin_ms": 0,
+    "initial_native_target_active": true,
+    "initial_native_target_generation": 1,
+    "initial_decoder_colormatrix": "dolbyvision",
+    "typed_live_fallback_events": 3,
+    "typed_live_fallback_code": "vod_index_pending",
+    "fallback_collector_json_sha256": "6ced51567bd6b1359fa6e155e5533a692c1f6b4c559b3b55848166381790966f"
+  },
+  "osc_replacement": {
+    "timeline_fraction": 0.5,
+    "pointer_expected_film_seconds": 5853.872,
+    "actual_replacement_media_origin_seconds": 5853.639,
+    "authoritative_replacement_vod": false,
+    "session_changed": true,
+    "control_generation_changed": true,
+    "control_epoch_initial": 1,
+    "control_epoch_replacement": 1,
+    "same_client_sha256_across_all_bindings": true,
+    "renderer_target_generation_note": "Physical target generation1 is separate from control generation UUIDs and control epoch1. A new control session need not change the physical target generation."
+  },
+  "captured_control_exchanges": {
+    "safely_parsed_requests": 18,
+    "paired_responses": 18,
+    "all_http200": true,
+    "all_request_sequence_equals_accepted_sequence": true,
+    "all_generation_epoch_protocol_match": true,
+    "http409_count": 0,
+    "first_sequence1_acceptances": 3,
+    "symbolic_binding_groups": {
+      "A": {
+        "role": "normal initial live playback",
+        "request_sequences": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "accepted_sequences": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "first_response_packet_utc": "2026-11-17T15:34:34.597103+00:00",
+        "first_sequence1_http200": true,
+        "session_and_control_generation_distinct_from_other_groups": true,
+        "same_client_as_initial": true
+      },
+      "B": {
+        "role": "main actual OSC replacement",
+        "request_sequences": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "accepted_sequences": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "first_response_packet_utc": "2026-11-17T15:34:54.584474+00:00",
+        "first_sequence1_http200": true,
+        "session_and_control_generation_distinct_from_other_groups": true,
+        "same_client_as_initial": true
+      },
+      "C": {
+        "role": "cleanup seek replacement",
+        "request_sequences": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "accepted_sequences": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7
+        ],
+        "first_response_packet_utc": "2026-11-17T15:35:29.703109+00:00",
+        "first_sequence1_http200": true,
+        "session_and_control_generation_distinct_from_other_groups": true,
+        "same_client_as_initial": true
+      }
+    },
+    "control_receipt_hashes": {
+      "initial": "17cbaf46519520d66042c9af94a4d9167f65a9cf87bf2e44e5150955cbedb45b",
+      "main_replacement": "473334b5235ccf8e4e18888e0d9472338b4d440fdf460b4be2276c481c969933"
+    },
+    "helper_control_window_seconds": 30.057937905017752,
+    "later_sequences_seen_by_helper_before_its_window_closed": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "sequence7_time_origin_note": "BindingB sequence7 packet UTC15:35:24.619010 precedes the helper endpoint15:35:25.071887, but its capture-processing event was emitted about 0.530 s after that endpoint. The completed trace containsB1\u20137; the helper summary had observed only B2\u20136 as later accepts at its cutoff.",
+    "no409_limit": "No409 in the captured known normal-control exchanges. This is scoped to this capture, not a guarantee for future sessions.",
+    "distinct_control_generation_count": 3
+  },
+  "post_replacement_DV_observation": {
+    "runner_samples": 15,
+    "first_sample_utc": "2026-11-17T15:35:17.477686+00:00",
+    "last_sample_utc": "2026-11-17T15:35:25.071689+00:00",
+    "sample_elapsed_seconds": 7.593998028954957,
+    "film_position_first_last_seconds": [
+      5854.598,
+      5862.064
+    ],
+    "film_position_advance_seconds": 7.466000000000349,
+    "decoder_colormatrix": "dolbyvision",
+    "target_active": true,
+    "target_generation": 1,
+    "scope": "The 30.0579-second control observation is not 30 seconds of continuous DV progression or mapping. Only the later 7.594-second sampled span shows the reported 7.466-second DV clock advance."
+  },
+  "mapper_probe": {
+    "configured_maximum_seconds": 180,
+    "probe_clock_ns": 307086958787784,
+    "clock_alignment": "The raw probe origin numerically aligns with recorded CLOCK_BOOTTIME. It is not assumed equal to Python CLOCK_MONOTONIC; full-second buckets start at BPF BEGIN.",
+    "measured_click_boottime_minus_python_monotonic_seconds": 356.73932626098394,
+    "main_click_seconds_after_probe_BEGIN": 18.80624959501438,
+    "replacement_first_sequence1_observed_seconds_after_probe_BEGIN": 23.425670525000896,
+    "cleanup_seek_seconds_after_probe_BEGIN": 53.52517122402787,
+    "seconds_to_probe_child_finished_event": 88.96673532103887,
+    "positive_RPU_length_EL1_entries_by_probe_second": {
+      "59": 2,
+      "17": 4,
+      "45": 5,
+      "53": 14,
+      "18": 22,
+      "49": 24,
+      "47": 24,
+      "46": 24,
+      "50": 24,
+      "52": 24,
+      "51": 24,
+      "48": 24
+    },
+    "completed_mapped_returns_by_probe_second": {
+      "59": 2,
+      "17": 4,
+      "45": 5,
+      "53": 14,
+      "18": 22,
+      "50": 24,
+      "48": 24,
+      "49": 24,
+      "46": 24,
+      "52": 24,
+      "47": 24,
+      "51": 24
+    },
+    "reset_calls_by_probe_second": {
+      "59": 1,
+      "45": 1,
+      "17": 2
+    },
+    "positive_RPU_length_EL1_entries": 215,
+    "completed_mapped_returns": 215,
+    "reset_calls": 4,
+    "unsupported_returns_observed": 0,
+    "error_returns_observed": 0,
+    "chronological_regions": {
+      "early_bins17_18_mapped_returns": 26,
+      "after_main_replacement_bins45_53_mapped_returns": 187,
+      "after_cleanup_seek_bin59_mapped_returns": 2
+    },
+    "abi_return_codes": {
+      "1": "mapped",
+      "0": "unsupported",
+      "-1": "error"
+    },
+    "limits": "PID-scoped project ABI aggregate callbacks, not paired individual frames or proof of displayed output. Phase labels follow time alignment; callback records carry no session identifier. Resets surround deliberate startup/replacement/cleanup. Configured180seconds and post-exit walltime are not playback coverage."
+  },
+  "capture_quality": {
+    "capture_elapsed_seconds": 92.64514460304054,
+    "capture_stop_reason": "interrupted",
+    "tcpdump_exit_code": 0,
+    "packets_captured": 17530,
+    "packets_received_by_filter": 35138,
+    "packets_dropped_by_kernel": 0,
+    "known_incomplete_controls": 0,
+    "raw_packets_headers_bodies_persisted": false,
+    "retained_fields": "Only protocol, sequence, accepted_sequence, control generation/epoch, hashed session/client identity, HTTP status and clocks. Public receipt replaces correlation identities with A/B/C.",
+    "counter_interpretation": "Tool-reported receive/captured counters are not used as a packet-loss ratio. Tcpdump reports zero packets dropped by kernel.",
+    "parser_limits": "First HTTPexchange per connection (normal installed urllib requests close connections); bounded reassembly. No chunked/close-delimited bodies, IP fragments or IPv6 extension headers. Not PID-attributed; request identities correlate with authoritative session rows.",
+    "clock_note": "PacketUTC is PCAP capture time; observed monotonic/boottime are later processing clocks and can lag packet delivery."
+  },
+  "observer": {
+    "requested_seconds": 180,
+    "sample_count": 350,
+    "observed_elapsed_seconds": 89.04995543998666,
+    "reason": "ipc_closed",
+    "exit_code": 1,
+    "interpretation": "Ended when the agent quit the task-owned Player. IPCclosure/exit1 is not a test pass or an unexplained playback failure."
+  },
+  "cleanup": {
+    "primary_helper_target_position_seconds": 0,
+    "original_watch_position_absent": true,
+    "primary_paused_stable_and_watch_near_satisfied": false,
+    "primary_wait_maximum_seconds": 35,
+    "primary_cleanup_failure_retained": true,
+    "follow_up_actions": [
+      "normal UI Mark watched",
+      "normal UI Mark unwatched"
+    ],
+    "follow_up_position_ms": 0,
+    "follow_up_watched": false,
+    "follow_up_zero_unwatched_verified": true,
+    "original_absent_watch_row_restored": false,
+    "watch_restoration_scope": "Normal UI semantic reset to zero/unwatched, not byte-identical restoration of the initially absent watch row. A new zero-position row exists. No direct database write was used.",
+    "task_owned_page_closed": true,
+    "preferences_exact_bytes_equal": true,
+    "owned_player_absent": true,
+    "player_process_count": 0,
+    "ffmpeg_process_count": 0,
+    "runner_unit_inactive": true,
+    "provider_probe_exit_code": 0,
+    "capture_child_exit_code": 1,
+    "idle_inhibitor_released": true,
+    "only_task_owned_tab_targeted_for_closure": true,
+    "owned_remote_staging_removed_after_archive_verification": true
+  },
+  "setup_attempt": {
+    "separate_unlock_wait_timeout_retained": true,
+    "playback_started": false,
+    "counted_as_playback_trial": false
+  },
+  "software_provenance": {
+    "deployed_server_revision": "f83484653428754a4a67dd8cbd795863cfb6e515",
+    "private_source_clone_matches_deployed_revision": true,
+    "deployed_server_image_sha256": "c181ccc35ecd15a74bb8718c068205279694ee5d162b963e2072761d9bc148ad",
+    "installed_mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6",
+    "installed_player_modules_sha256": {
+      "__init__.py": "5ade5c42b7e4bef1571b1401c5e6c194eca397200bdddeeb998aa1f653b58b96",
+      "__main__.py": "66088f44c7c3ad8bdc97cadffb1f77bbd35f3d1b5cfdd1725fd0c1b6381731aa",
+      "api.py": "a5afc170287133bcf025e5462cacdeeb87d04306a58e378a852508d2d8aa3aee",
+      "caps.py": "b2d24fc01eb004b5e24fc79e45d0a7fa4a5d972f09b157d9732a395900a086df",
+      "cinema.py": "dfb43dd996b3885ba1fe46f74ca14d8e53d30970697812cc1e531bd37327911f",
+      "handoff.py": "eb8ae57d289a2c21b0773e1717a8cdf16e45a389dfc90a1c5b9141ce952b0f41",
+      "launcher.py": "ad894f30c928e2c6cd94a4cd345ce7c7df8d787e4592bd7f67ce81127bc68c80",
+      "mpv.py": "7651d3103447bc67a83eac571d4e356f62a233c3826109216c15da64d1ee39c8",
+      "playback.py": "43cdd6c9fc31476f54ad9d92743a337cc3c073fdb6c60c7cf99c061afdfcc689",
+      "trust.py": "1d1ef4706cd510710624caf1918e6cfcb794c2bc440265074e18bea4864fbfd4"
+    },
+    "installed_cinema_lua_sha256": "20e0785ba1440e3038f4a6c0772c2a380a76432c581408890bb323c24023214f",
+    "project_provider_sha256": "cd8dedcd7351ffaa6c21b20027b503f02a10284ec7cd001c7a0a34c1cfd7042a",
+    "sequence_repair": {
+      "version": "0.5.1-1",
+      "pr": 1577,
+      "landing": "a4c316d0baac2f2aa880f94966031996d6de8f80",
+      "qualification": "Earlier 105 affected tests/main-lane receipts are inherited; no Player source tests were rerun. This new result adds one bounded actual replacement observation."
+    }
+  },
+  "provenance": {
+    "private_complete_archive_sha256": "02918d7182c7dc9b7313d1070eaf91a1c8448ffb3e862614d26a745afdc86e21",
+    "private_members_sha256": {
+      "deployed-image.json": "a08f5a808e8c1b2cb3f1f0846898234da11be3e53b1003fff58314438dc086ce",
+      "run1/manifest.json": "4d6b1a53c6ed342f51c6b1a953a942c5dee6c5e79b63ece6781b7c2482947cec",
+      "run1/events.jsonl": "067f5200c3354380c0081e3cdcbee89ad42caf0d86122b2f40de1eb2bcb4c4ef",
+      "runner/events.jsonl": "0849cf6ee3c6c42300b6598c9b110edecefa716c0cb8c9b081606345a2e67bd7",
+      "capture/events.jsonl": "a25713a577e2d712d07cc5df2dedfefbb3d3bd668f8e595fd11180f179014cb0",
+      "capture/summary.json": "4197f67aef2490d02ca38745e818197f872172ecc20e0594b7ba3318c1a0ef18",
+      "capture/tcpdump.stderr": "0b3d09ee5d5899999e218e61d413e044ae1f58d8418803c483faf480cac6e68d",
+      "provider-probe.bt": "60691418089d8286cf6fa8aa2dfa0e8a10ca38b18c03ff3c057eb092fdf7b146",
+      "provider-probe.log": "eef314d88481630ad78f6548d7e392f3e252e9b2ae3fe146122a5bd29cea62c2",
+      "provider-probe-identity.json": "92dc9776db8ed9388f9163599e987f722280656f2229038320505be56afa5af0",
+      "normal-ui-cleanup.json": "333855826e7cfb00b0b5e7105f5507ffe3ff2000788ee8e143f4d75137932746",
+      "postflight.json": "39dad6f002b85ec3b375552d8c1dcf8271c2a5a4dd4364731a96d0ad27578789",
+      "application-journal-private.jsonl": "beb9eec8416b78528ea4277ae1d171b170d1204926e68d319f828dba56b5363f",
+      "live_route_runner.py": "11512808f20de12c20a3c350cb8d65bd2d48c87335b273a175749a78ee5f566f",
+      "capture_controls.py": "06f2f3b2247625f1a33d5d6093c84e0bebe4af7a5e88c7f73912800ea4c05782",
+      "observe_player-v3.py": "cb04261d11e0c03385bf131a0dad20cd9a621407527817044c7f2a9d7b916b25",
+      "setup-unlock-wait-1/events.jsonl": "d54aa074b2a304ab528405dc8844fbc749f484be04b6117ea70dbfe91b0f5da3"
+    },
+    "fresh_server_fallback_summary_sha256": "854beaec853a9fd1b07a5b48d36e42b267bc3edd2e5997aacdd77875e0ee0419",
+    "fallback_hash_input_definition": "Exact UTF-8 bytes of retained server-fallback-private.json: collector JSON stdout containing selected, ANSI-stripped deployed log lines. Not the entire unfiltered server log.",
+    "remote_cleanup_receipt_sha256": "1c1d2b7080864dd80c457ba3f4da878f9a9a011088e724cb42ffb06e95d257ab"
+  },
+  "observation_attribution": {
+    "launch_and_OSC_input_initiator": "agent",
+    "owner_physical_attendance_verified": false,
+    "owner_visual_observation_verified": false
+  },
+  "limits": [
+    "One ordinary live-source replacement, not every title, route, future replacement or full-film acceptance.",
+    "The original spontaneous 6\u201324-second persistent DV-loss claim remains unreproduced; this trial adds acceptance for the separate already-merged control-sequence repair.",
+    "A successful control receipt is independent of video-frame readiness. The observed 30-second control window must not be described as 30 seconds continuously mapped DV.",
+    "Target-active/decoder properties and mapped ABI returns do not prove every decoded or displayed frame, optical accuracy or full Dolby Vision fidelity.",
+    "The primary helper failed its cleanup criterion; follow-up normal UI reset changed watch state semantically and did not restore an absent row.",
+    "No production patch, package change, forced capability, manual index invalidation or display-setting change was introduced; no new production fix is claimed.",
+    "This measurement grants no new Player unit-test qualification; repository integrity validation is recorded separately."
+  ],
+  "latency_observation": {
+    "initial_Play_to_first_mapping_diagnostic_seconds": 18.950678377004806,
+    "initial_Play_to_normal_initial_sequence1_response_packet_seconds": 4.043326,
+    "OSC_click_to_replacement_sequence1_response_packet_seconds": 4.189951,
+    "OSC_click_to_earliest_main_mapped_return_bin_seconds": {
+      "lower_inclusive": 26.19375040498562,
+      "upper_exclusive": 27.19375040498562
+    },
+    "OSC_click_to_first_new_origin_active_Dolby_snapshot_seconds": 27.083162654016633,
+    "replacement_sequence1_packet_UTC_to_first_active_Dolby_snapshot_UTC_seconds": 22.893212,
+    "replacement_sequence1_capture_processing_to_first_active_Dolby_snapshot_monotonic_seconds": 22.875993015011773,
+    "replacement_sequence1_helper_observation_to_first_active_Dolby_snapshot_monotonic_seconds": 22.463740651030093,
+    "clock_limits": "BPF bin bounds use its measured alignment with recorded boottime; packet UTC differences compare capture realtime with runner realtime. Capture-processing/helper-observation differences use their separately recorded monotonic times. No subsecond recovery latency is inferred from full-second callback buckets.",
+    "interpretation": "Control acceptance precedes resumed mapped playback. About 27 seconds of recovery is characterized here, not fixed or accepted as low-latency UX; its cause is not established.",
+    "diagnostic_log_order_after_click_seconds": {
+      "replacement_curl_opening": 1.161,
+      "first_MIME_type": 26.711,
+      "demux_detection_and_stream_info": [
+        26.712,
+        26.743
+      ],
+      "decoder_setup_to_Dolby_output": [
+        26.745,
+        26.892
+      ],
+      "first_video_frame_shown": 26.993,
+      "playback_restart_complete": 26.996
+    },
+    "diagnostic_narrowing": "About 25.55 seconds separates the replacement curl Opening diagnostic from the first MIME-type diagnostic, before the visible demux and decoder setup. This narrows the observed delay to stream opening/startup, but does not isolate its underlying cause.",
+    "diagnostic_timestamp_limit": "These are observer receipt timestamps and retained log ordering; buffering may affect timing. They are not wire time-to-first-byte or proof that server bytes were unavailable. The interval is not demonstrated to be spent in client probing, decoding or mapping."
+  }
+}

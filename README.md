@@ -18,7 +18,7 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-11-16)
+## What works today (2026-11-17)
 
 GTK `+rogdv6`, WebKit `+rogdv7` and Showtime `+rogdv5.13` are installed.
 On the measured P3 chart GNOME Web and Image Viewer agree within one PQ10
@@ -32,9 +32,11 @@ playback retained DV state, and a seek reproduced the reset log while mapped
 callbacks continued. Recovered historical logs place the original resets
 6.470154/23.864949 seconds after first mapping, followed by outside-range
 session-recreation notices and stale controls; they do not establish persistent
-fallback. A fresh agent-issued Resume and normal quality round trip returned
-to DV, but both routes used VOD and exposed no live film range; outside-range
-replacement remains unexercised.
+fallback. On November 17 an ordinary live fallback and actual OSC timeline
+click replaced the session; captured normal HTTP responses accepted sequence 1
+on the new binding; DV progression/mapped returns resumed about 27 seconds
+after the click. This adds one bounded runtime acceptance for the existing
+Player repair; full-film, every-frame and optical acceptance remain open.
 [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
 These are technical traces; earlier launch initiators and owner visual
 observation were not verified, and earlier personal attribution is withdrawn.

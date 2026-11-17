@@ -1,12 +1,33 @@
 # Status — what is working and what remains
 
-**Updated November 16, 2026 (Eastern; November 17 UTC).**
-Latest: a fresh agent-issued normal Resume produced a bounded 180-second P7
+**Updated November 17, 2026 (UTC and Eastern).**
+Latest: a normal catalog Play selected live HLS through fresh
+`vod_index_pending` recovery. An actual Lua OSC timeline click replaced the
+session; passive normal HTTP responses directly accepted sequence 1 on the
+changed binding, then later sequences with the same client and no captured
+409. All 18 captured exchanges were HTTP 200 across initial/main/cleanup
+bindings. The 30.0579-second control window is separate from the later
+7.594-second sampled DV progression and successful mapper callbacks. Mapping
+resumed in a 26.194–27.194-second bucket interval after the click; the first
+new-origin active-Dolby snapshot arrived at 27.083 seconds. This characterizes
+slow recovery, without accepting low-latency UX or establishing its cause. It
+qualifies one bounded runtime boundary of the already-merged Player 0.5.1
+repair; spontaneous DV loss remains unreproduced and no new production fix is
+claimed. The helper's cleanup criterion failed; follow-up normal UI reset
+verified zero/unwatched state, preserving a new row rather than restoring the
+original absence. Preferences are byte-identical and owned processes stopped.
+No owner visual or optical acceptance is claimed.
+[Actual live replacement and limits](DV_FALLBACK_REPRODUCTION.md#actual-live-osc-replacement--one-bounded-control-acceptance)
+· [Receipt](../evidence/dv-live-session-replacement-20261117.json).
+
+Earlier indexed-VOD check (November 16 Eastern / November 17 UTC): a fresh
+agent-issued normal Resume produced a bounded 180-second P7
 startup with retained DV state after startup transition. Normal quality 1080
 settled as transcode/HLS/VOD; Auto restoration settled with native DV generation
 3 and Dolby decoder representation. Neither route exposed live film metadata,
-so no outside-range OSC seek was issued: the live replacement boundary remains
-unexercised. The obsolete SQLite helper poll is excluded; no authoritative
+so no outside-range OSC seek was issued: that earlier trial left the live
+replacement boundary unexercised. The obsolete SQLite helper poll is excluded;
+no authoritative
 control-sequence receipt follows. Preferences are byte-identical and owned
 processes/measurement units are stopped. Cleanup seek acceptance does not prove
 exact restored or persisted position. No owner visual acceptance or production
@@ -21,8 +42,8 @@ establishes reset diagnostics
 This is historical software-log analysis, not fresh playback; persistent
 fallback and action initiators/owner attendance remain unverified. The separate
 Player `0.5.1-1` sequence repair (Plurx PR 1577, `a4c316d0baac`) retains inherited
-source/test qualification; Player tests were not rerun, and actual outside-range/session
-replacement runtime remains unqualified.
+source/test qualification; Player tests were not rerun. The later actual live
+trial above supplies one bounded runtime replacement observation.
 [Timeline and limits](DV_FALLBACK_REPRODUCTION.md#original-timing-recovered--persistent-fallback-remains-unproved)
 · [Receipt](../evidence/dv-historical-journal-timeline-20261117.json).
 Ten NFS-reader suspend cycles and item-7 digital diagnostics remain bounded;
