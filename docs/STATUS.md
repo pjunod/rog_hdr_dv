@@ -1,9 +1,19 @@
 # Status — what is working and what remains
 
-**Updated November 16, 2026 (Eastern).**
-Latest: ten actual NFS-reader suspend cycles passed with the installed
-NetworkManager fix; item-7 digital diagnostics recorded. Physical cadence,
-optical quality and long-duration/other-topology suspend acceptance remain open. The following November 13 observations are historical.
+**Updated November 16, 2026 (Eastern; November 17 UTC).**
+Latest: read-only recovery of the original journal establishes reset diagnostics
+23.864949/6.470154 s after first mapping, then outside-range recreation logs
+1.577518/0.811647 s later and 9/10 stale-fence 409 responses before session end.
+This is historical software-log analysis, not fresh playback; persistent
+fallback and action initiators/owner attendance remain unverified. The separate
+Player `0.5.1-1` sequence repair (Plurx PR 1577, `a4c316d0baac`) retains inherited
+source/test qualification; Player tests were not rerun, and actual outside-range/session
+replacement runtime remains unqualified.
+[Timeline and limits](DV_FALLBACK_REPRODUCTION.md#original-timing-recovered--persistent-fallback-remains-unproved)
+· [Receipt](../evidence/dv-historical-journal-timeline-20261117.json).
+Ten NFS-reader suspend cycles and item-7 digital diagnostics remain bounded;
+physical cadence, optical quality and long-duration/other-topology suspend
+acceptance remain open. The following November 13 observations are historical.
 
 **November 13 installed baseline.**
 Showtime `50.0-2+rogdv5.12` and Plurx Player `0.5.1-1` are installed with
@@ -152,7 +162,8 @@ representation after their first mapped picture. Two separate indexed
 45-second probe observed 1,075 mapped callback returns, no unsupported/error
 returns and successful maps in each full post-seek second checked. A reset
 notice alone therefore does not establish sustained HDR10 fallback. The
-inherited 6–24-second claim remains unconfirmed; no production fix is claimed.
+inherited persistent-fallback claim remains unconfirmed; the recovered original
+6–24-second log intervals are documented above. No production fix is claimed.
 [Method and limits](DV_FALLBACK_REPRODUCTION.md) ·
 [Receipt](../evidence/dv-fallback-reproduction-20261116.json).
 
