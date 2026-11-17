@@ -1,0 +1,231 @@
+{
+  "schema": "dv-normal-route-boundary-v1",
+  "date": "2026-11-17",
+  "date_eastern": "2026-11-16",
+  "owner": "Codex",
+  "status": "bounded_startup_and_normal_quality_round_trip_observed_live_boundary_unexercised",
+  "finding": "Agent-issued normal Resume retained bounded DV startup state. Normal quality1080 selected transcode/HLS/VOD, then Auto restored native DV. No live film range appeared; no osc-film-seek was issued and no live outside-range replacement acceptance follows.",
+  "attribution": {
+    "launch": "Agent activated the existing Chrome Resume accessibility action after explicit unlock confirmation.",
+    "quality_controls": "Agent dispatched standard cinema-quality script messages via IPC, not physical pointer clicks.",
+    "owner_visual_observation_verified": false,
+    "owner_physical_attendance_verified": false
+  },
+  "method": {
+    "normal_source": "Existing Profile7 title, identity retained privately. Normal installed options/capabilities; no synthetic handoff or forced DV.",
+    "observer": "Read-only property subscription and requested4Hz samples; per-process identity and source hashes retained privately.",
+    "startup_anchor": "First successful-map diagnostic in retained application journal, same-boot journal monotonic clock. Sample emission time follows sequential property reads; snapshots are not atomic.",
+    "live_predicate": "Actual numeric origin/duration under user-data/osc/film, published by installed show_film_timeline for a live session. A null presentation session field does not establish live mode.",
+    "controls": "Normal supported quality1080 then Auto restoration. Outside-range OSC dispatch conditional on live film metadata and valid outside-held target; predicate never met.",
+    "software_scope": "Fresh software playback/IPC/ABI observations, separate from historical journal recovery and inherited Player sequence-repair source/test qualification."
+  },
+  "startup": {
+    "requested_seconds": 180,
+    "observed_elapsed_seconds": 180.0001458740153,
+    "sample_count": 715,
+    "observer_reason": "duration_complete",
+    "first_last_numeric_time_pos_seconds": [
+      375.417,
+      533.95
+    ],
+    "first_map_monotonic_seconds": 258799.323376,
+    "seconds_from_first_map_to_observer_end": 158.77333585201995,
+    "snapshots_emitted_after_first_map": 635,
+    "post_map_decoder_dolby_snapshots": 635,
+    "post_map_target_active_generation1_snapshots": 634,
+    "transitional_post_map_snapshot_count": 1,
+    "transition_caveat": "One sequentially read snapshot emitted0.106s after map reported an inactive generation0 target while decoder representation was Dolby. Then634 snapshots retained active generation1. This single mixed startup snapshot does not establish sustained fallback.",
+    "first_target_active_sample_monotonic_seconds": 258799.720262695,
+    "all_samples_from_first_active_through_end_active_generation1": true,
+    "first_map_6_to_24_second_window": {
+      "samples": 72,
+      "active_generation1_samples": 72
+    },
+    "initial_mapping_log": {
+      "target_peak_nits": 616,
+      "enhancement_composed": true
+    },
+    "drop_counters": {
+      "frame-drop-count": {
+        "valid_post_map_samples": 635,
+        "maximum": 0
+      },
+      "decoder-frame-drop-count": {
+        "valid_post_map_samples": 635,
+        "maximum": 0
+      },
+      "vo-delayed-frame-count": {
+        "valid_post_map_samples": 635,
+        "maximum": 0
+      }
+    },
+    "film_metadata_present_samples": 0,
+    "initial_missing_properties": "Recorded separately; a manifest missing-property entry means unavailable at least once, not absent for the entire run."
+  },
+  "quality_round_trip": {
+    "initial": {
+      "quality": "auto",
+      "mode": "remux",
+      "transport": "hls",
+      "presentation_session": null,
+      "film_metadata": false,
+      "native_active": true,
+      "native_generation": 1,
+      "decoder_colormatrix": "dolbyvision"
+    },
+    "initial_route_interpretation": "Indexed VOD remux; initial presentation session null is not used as evidence of live mode. No live film metadata was advertised.",
+    "quality1080_settled": {
+      "mode": "transcode",
+      "transport": "hls",
+      "presentation_session": "vod",
+      "native_active": false,
+      "native_generation": 2,
+      "decoder_colormatrix": "bt.709",
+      "time_pos_first_settled_seconds": 1226.350125,
+      "time_pos_last_settled_seconds": 1228.393833
+    },
+    "restored_auto_settled": {
+      "mode": "remux",
+      "transport": "hls",
+      "presentation_session": "vod",
+      "native_active": true,
+      "native_generation": 3,
+      "decoder_colormatrix": "dolbyvision",
+      "time_pos_seconds": 1229.395
+    },
+    "osc_film_seek_dispatch_count": 0,
+    "live_boundary": "unexercised",
+    "control_runner_elapsed_seconds": 23.246463657997083,
+    "observer_requested_seconds": 150,
+    "observer_actual_seconds": 23.106962699996075,
+    "observer_samples": 91,
+    "observer_reason": "ipc_closed",
+    "observer_exit_code": 1,
+    "observer_exit_interpretation": "IPC closed after the agent quit the task-owned Player. Not a test pass or failed live-mapping result.",
+    "transition_interpretation": "Intentional transcode output is distinct from spontaneous DV loss. Native eligibility can retain prior state during pipeline transition; decoder representation and settled states are recorded separately."
+  },
+  "mapper_probe": {
+    "scope": "PID-scoped existing project provider ABI only; no raw metadata/vendor binary inspection.",
+    "abi_return_codes": {
+      "1": "mapped",
+      "0": "unsupported",
+      "-1": "error"
+    },
+    "positive_rpu_length_el1_entries_by_probe_second": {
+      "1": 6,
+      "23": 9,
+      "22": 11,
+      "0": 24
+    },
+    "positive_rpu_length_el1_entries": 50,
+    "mapped_returns_by_probe_second": {
+      "1": 6,
+      "23": 9,
+      "22": 11,
+      "0": 24
+    },
+    "completed_mapped_returns": 50,
+    "reset_calls_by_probe_second": {
+      "22": 2,
+      "18": 3,
+      "19": 20,
+      "21": 23,
+      "20": 23
+    },
+    "reset_calls": 71,
+    "unsupported_returns_observed": 0,
+    "error_returns_observed": 0,
+    "clock_alignment": "Numerically aligns with recorded CLOCK_BOOTTIME, not Python CLOCK_MONOTONIC. Bucket indexes are elapsed seconds from BPF BEGIN, not from quality control. No assumption that these absolute clock names are equivalent.",
+    "quality1080_dispatch_seconds_after_probe_begin": 0.2531600869842805,
+    "quality1080_dispatch_boottime_minus_python_monotonic_seconds": 356.73932529299054,
+    "auto_restore_dispatch_seconds_after_probe_begin": 21.548556541994913,
+    "owned_quit_request_seconds_after_probe_begin": 23.37410192299285,
+    "interpretation": "Maps occurred in buckets0/1 and22/23. Resets in buckets18\u201322 overlap intentional transcode, restoration and cleanup. No continuity or spontaneous-loss claim follows across those controls; unpaired entry/return counts are not displayed-frame or dropped-frame counts.",
+    "configured_lifetime_seconds": 150,
+    "probe_clock_ns": 260006571177456,
+    "raw_log_clock_label": "probe_monotonic_ns",
+    "coverage_limit": "150 seconds is configured trace lifetime, not playback coverage. The owned Player quit about23.374 seconds after probe BEGIN; callback buckets0/1/22/23 cover only the bounded quality round trip. Trace walltime after process exit supplies no playback evidence."
+  },
+  "excluded_observations": {
+    "legacy_database_poll": "All server_bindings/server_session_sample results excluded. Helper polled an unused old SQLite store after production migrated to Hiqlite. It supplies no authoritative session binding, generation, epoch or sequence receipt.",
+    "authoritative_control_sequence_receipt": false
+  },
+  "cleanup": {
+    "original_quality_settled": true,
+    "cleanup_indexed_seek_requested_seconds": 375.417,
+    "cleanup_seek_accepted_by_mpv": true,
+    "cleanup_seek_exact_restored_position_verified": false,
+    "cleanup_seek_limitation": "Accepted seek was immediately followed by quit; no independent frame or persisted watch-position receipt proves exact restoration.",
+    "preferences_exact_bytes_equal": true,
+    "preferences_semantic_equal": true,
+    "preferences_overwritten_by_measurement_helper": false,
+    "owned_player_absent_postflight": true,
+    "player_process_count_postflight": 0,
+    "ffmpeg_process_count_postflight": 0,
+    "measurement_units_inactive": true,
+    "idle_inhibitor_released": true,
+    "remote_staging_removed_after_archive_verification": true,
+    "control_event_archive_hash_matched": true
+  },
+  "setup_attempt": {
+    "retained_separately": true,
+    "reason": "unlock_wait_timeout",
+    "playback_started_in_failed_attempt": false,
+    "not_counted_as_playback_case": true
+  },
+  "provenance": {
+    "private_archive_sha256": "9e61a58cac86f9e4e62c8b97be6ed19455037d3f1b7dc98452813b235235113b",
+    "private_members_sha256": {
+      "run1/events.jsonl": "c9a9fa936a3d9a22737e12e04276dbed24ba7a10056069caa254960392f28898",
+      "run1/manifest.json": "1b9fb6a09f842eb43137b7e05ef08b0ca8217b8a1887ef26d563e0be3d3d643a",
+      "run2/events.jsonl": "47a9f98e7c05e6e509ecac314bf15d431a72a3940f0ef46588452eb9858e6d9a",
+      "run2/manifest.json": "3d050eb53d13e8adcadc983031e49810fa9d7612df3c91eae76efcc4a44a0cd9",
+      "control-phase/events.jsonl": "1de7407bea9dbe8f0ac3563a36cfdbc3c9fb9ef20b1c343de942e387b6c5befc",
+      "launch-events.jsonl": "a9428be58bf653ea03e90ca25e0fbfedd7fb81ecf59a5d9c1cba67ddbdfe065a",
+      "control-probe.log": "f5449d781f8c5365e61d88fa76b98d8b606862c2d01230837793281185f0b7e3",
+      "control-probe.bt": "bdfa5619300b735c381ba37af2e8c412fa94de37eca7ce3b3bbd396014d508f1",
+      "postflight.json": "d784321e9d3a5a870e476fb1fbb6d335b807182dfe9d8e12d2f7ea7c64d1222b",
+      "application-journal-private.jsonl": "be7afa31a7879bc6851eb7069ee28db8bef87baa3ad9f4f5824bcc7a416283e5",
+      "observe_player-v3.py": "cb04261d11e0c03385bf131a0dad20cd9a621407527817044c7f2a9d7b916b25",
+      "control_phase.py": "3d3dfe94a6fa0e2c20dcd22833ec2655f67a4ef5cd1e2cdde5130edc2120db7d",
+      "bounded_launch.py": "5e726fd1a6a91ce935a8c2dbb1def650999771faaf875e38ed9128ca4b31fd1f"
+    },
+    "installed_mpv_sha256": "5c26c01aec4878db99812636e1f43b5e91904e7b35698b4d33588e6d7ebe58e6",
+    "installed_player_modules_sha256": {
+      "__init__.py": "5ade5c42b7e4bef1571b1401c5e6c194eca397200bdddeeb998aa1f653b58b96",
+      "__main__.py": "66088f44c7c3ad8bdc97cadffb1f77bbd35f3d1b5cfdd1725fd0c1b6381731aa",
+      "api.py": "a5afc170287133bcf025e5462cacdeeb87d04306a58e378a852508d2d8aa3aee",
+      "caps.py": "b2d24fc01eb004b5e24fc79e45d0a7fa4a5d972f09b157d9732a395900a086df",
+      "cinema.py": "dfb43dd996b3885ba1fe46f74ca14d8e53d30970697812cc1e531bd37327911f",
+      "handoff.py": "eb8ae57d289a2c21b0773e1717a8cdf16e45a389dfc90a1c5b9141ce952b0f41",
+      "launcher.py": "ad894f30c928e2c6cd94a4cd345ce7c7df8d787e4592bd7f67ce81127bc68c80",
+      "mpv.py": "7651d3103447bc67a83eac571d4e356f62a233c3826109216c15da64d1ee39c8",
+      "playback.py": "43cdd6c9fc31476f54ad9d92743a337cc3c073fdb6c60c7cf99c061afdfcc689",
+      "trust.py": "1d1ef4706cd510710624caf1918e6cfcb794c2bc440265074e18bea4864fbfd4"
+    },
+    "installed_cinema_lua_sha256": "20e0785ba1440e3038f4a6c0772c2a380a76432c581408890bb323c24023214f",
+    "project_provider_sha256": "cd8dedcd7351ffaa6c21b20027b503f02a10284ec7cd001c7a0a34c1cfd7042a",
+    "backend_observation_provenance_sha256": "c67e8902fb1ab2938e06c4f7eeb7f4804e35559588486a131cc1661b69d10ca9",
+    "remote_cleanup_receipt_sha256": "c5bdf9f5f34c0109dacf77415844ce962ebeb7b55b464d9fe0374dadbf5f572a"
+  },
+  "limits": [
+    "No live-session outside-range seek or its actual replacement boundary was exercised.",
+    "No authoritative session/control sequence telemetry was obtained from the helper database poll.",
+    "ABI mapped returns are successful callbacks, not every decoded/displayed frame or optical output.",
+    "Bounded samples cannot establish full-film continuity, calibration, full Dolby Vision accuracy or impossibility of intermittent failure.",
+    "No owner visual attendance or visual acceptance is claimed.",
+    "No production code, packages, source pins, display configuration or forced capabilities changed. No production fix is justified by this result.",
+    "This measurement receipt grants no new Player unit-test qualification; repository integrity validation is recorded separately."
+  ],
+  "backend_telemetry": {
+    "source": "Current Hiqlite telemetry, tested title and bounded launch/quality window; identifiers remain private.",
+    "event_counts": {
+      "session_start": 3,
+      "start_attempt": 3,
+      "native_mapper": 1,
+      "session_end": 3
+    },
+    "raw_utf8_stdout_sha256": "446eb3c29bffe57517d6f05a4507211b2515bee471db2ed41282f91dfdff6147",
+    "interpretation": "Three session-start and three session-end events support route activity only; one native_mapper event is separate software telemetry. These are not control generation/epoch/sequence acceptance receipts and do not qualify live outside-range replacement."
+  }
+}
