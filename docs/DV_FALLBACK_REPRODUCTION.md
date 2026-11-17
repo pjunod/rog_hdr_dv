@@ -39,9 +39,9 @@ a new binary attestation. The separate run-wide control-sequence defect was
 repaired in Player `0.5.1-1`, merged as Plurx PR 1577, landing `a4c316d0baac`:
 sequence state binds to session/generation/epoch. The 105 affected tests and
 required main lane recorded in [status](STATUS.md) are inherited source/test
-qualification, not newly rerun checks. Actual outside-range OSC seeking and
-session-replacement runtime acceptance remain unqualified. That boundary needs
-control identity and mapper returns on one timeline. Read-only inspection of
+qualification, not newly rerun checks. The November 17 normal live trial below
+adds one bounded actual OSC replacement observation with direct control
+receipts and time-aligned mapper returns. Read-only inspection of
 the installed source (hashes in the receipt) shows that both seek handlers
 bypass recreation for VOD; the OSC sends its film-seek message only outside
 the held live-film range. A normal live-session route is therefore needed to
@@ -132,7 +132,7 @@ settled as transcode/HLS/VOD with BT.709 decoder representation and inactive
 target generation 2. Returning to Auto settled as remux/HLS/VOD, Dolby decoder
 representation and active generation 3. No numeric live-film origin/duration
 was advertised in either observer run. The helper therefore issued no
-`osc-film-seek`: actual live outside-range replacement remains unqualified.
+`osc-film-seek`: that VOD trial did not qualify live outside-range replacement.
 Intentional transcoding is not evidence of spontaneous DV loss.
 
 A concurrent PID-scoped mapper probe with a configured 150-second lifetime
@@ -164,6 +164,99 @@ staging was removed after archive verification; the idle inhibitor was released.
 The second observer ended after 23.107 seconds with
 91 samples and `ipc_closed`/exit 1 because the owned Player quit; this is neither
 a test pass nor a failed live-mapping result. No production fix is justified.
+
+## Actual live OSC replacement — one bounded control acceptance
+
+[The November 17 live-replacement receipt](../evidence/dv-live-session-replacement-20261117.json)
+records a fresh normal-route trial at 15:34–15:36 UTC (also November 17 Eastern).
+The agent opened an ordinary catalog window and activated its standard Play
+button. Fresh server records report three `vod_index_pending` fallback events
+across initial play, main replacement and cleanup. Authoritative Hiqlite route
+rows report `vod=false`; the Player advertises live film origin 0 and duration
+11707.744 seconds, with advancing Dolby decoder state. No quality/settings
+change, forced capability, index deletion or synthetic handoff selected the
+route. The earlier index census is separate from this fresh route evidence.
+
+The agent moved mpv's mouse to the actual Cinema timeline, waited 0.3 seconds,
+then issued an ordinary left-button single click. This executes the installed
+Lua hit test and its normal outside-range handler; the main gesture was not a
+direct `osc-film-seek` injection. The expected midpoint was 5853.872 seconds;
+the new session's actual film origin was 5853.639 seconds.
+
+A passive capture retained whitelisted control fields without writing raw
+packets, HTTP headers or bodies. Symbolic bindings below replace all private
+session and client identifiers. All 18 requests paired with HTTP 200 responses;
+every accepted sequence equals its request, with matching protocol, control
+generation and epoch. One client identity persisted across all three bindings.
+
+| Binding | Normal operation | Accepted sequences | Control epoch |
+|---|---|---|---|
+| A | Initial live playback | 1–4 | 1 |
+| B | Actual OSC outside-range replacement | 1–7 | 1 |
+| C | Cleanup seek replacement | 1–7 | 1 |
+
+The session and control generation changed at replacement; epoch 1 did not
+need to change. Each binding's first normal response directly accepted
+sequence 1. The helper observed B's first acceptance at 15:34:55 UTC, then
+sequences 2–6 during its 30.0579-second control window, with no captured 409.
+The completed capture also contains B7: its packet UTC precedes the helper's
+cutoff, but processing emitted that record about 0.530 seconds after the
+cutoff. Packet time and processing time are distinct. No observer-generated
+HTTP control POSTs were sent. Tcpdump reports 17,530 captured packets, 35,138
+received by the filter and zero kernel drops; those tool counters are not used
+to infer a packet-loss ratio here. No known
+incomplete control messages were reported.
+
+Playback recovery was slow despite prompt control acceptance. Initial Play to
+first mapping took 18.951 seconds. For the main replacement, sequence 1 was
+accepted on the wire about 4.190 seconds after the click, but the earliest
+mapped-return bucket bounds resumption to 26.194–27.194 seconds after that
+click. The first new-origin active-Dolby snapshot arrived after 27.083 seconds:
+22.893 seconds after the response packet's UTC, or 22.464 seconds after the
+helper observed that acceptance on its monotonic clock. Packet capture,
+processing and helper-observation clocks are kept distinct in the receipt.
+This characterizes recovery latency; it does not establish its cause or accept
+it as low-latency playback UX.
+
+Retained diagnostics narrow most of the observed delay to stream opening:
+`curl Opening` appears at +1.161 seconds, first MIME type at +26.711,
+demux/stream-info work at +26.712–26.743, decoder setup at +26.745–26.892,
+first shown frame at +26.993 and completed restart at +26.996. These are
+observer receipt timestamps and log ordering, which may be buffered. They are
+not wire time-to-first-byte or proof of unavailable server bytes; the underlying
+cause is not isolated, and the long interval is not demonstrated to be spent
+in client probing, decoding or mapping.
+
+This control window is not 30 seconds of continuous DV progression. Fifteen
+later snapshots span 7.594 seconds, with active physical target generation 1,
+Dolby decoder representation and film position 5854.598→5862.064 seconds
+(+7.466 seconds). Physical-target generation and control-generation identity
+are separate facts. The project-provider ABI probe recorded 215 positive-RPU/
+EL1 entries and 215 mapped returns: 26 in early buckets 17–18, 187 after main
+replacement in buckets 45–53, and two after cleanup seeking in bucket 59.
+Four resets accompanied startup/replacement/cleanup; no unsupported/error
+return was observed. These are unpaired callback counts, not frame counts or
+proof of displayed output. Buckets start at BPF BEGIN and numerically align
+with recorded boottime, not Python monotonic time. The configured 180-second
+probe lifetime is not playback coverage; the owned Player and probe stopped
+with the bounded helper.
+
+The primary helper did **not** satisfy its paused/stable/watch-near-zero cleanup
+criterion within 35 seconds. That result is retained. Follow-up normal UI
+`Mark watched` then `Mark unwatched` verified zero position and unwatched state
+and closed only the task-owned page. This is a semantic UI reset: the initially
+absent watch row was not restored to absence, and a new zero-position row
+exists. Preferences remained byte-identical; postflight found no Player or
+ffmpeg processes, the runner was inactive and the idle inhibitor was released.
+The observer ended with `ipc_closed` when the owned Player quit; capture ended
+on deliberate interruption. Those exit statuses are not new test results.
+
+This adds one bounded runtime acceptance for Player 0.5.1's already-merged
+sequence repair. Its inherited source tests were not rerun. The original
+spontaneous 6–24-second DV-loss claim remains unreproduced, and no new production
+fix follows. No owner physical attendance, visual acceptance, full-film
+continuity, every-frame mapping or optical accuracy is claimed. A separate
+failed unlock wait is retained without counting it as a playback trial.
 
 Raw journals, media identity and runtime state stay private; public evidence
 contains software hashes and aggregate observations.

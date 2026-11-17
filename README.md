@@ -18,7 +18,7 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-11-16)
+## What works today (2026-11-17)
 
 GTK `+rogdv6`, WebKit `+rogdv7` and Showtime `+rogdv5.13` are installed.
 On the measured P3 chart GNOME Web and Image Viewer agree within one PQ10
@@ -32,9 +32,11 @@ playback retained DV state, and a seek reproduced the reset log while mapped
 callbacks continued. Recovered historical logs place the original resets
 6.470154/23.864949 seconds after first mapping, followed by outside-range
 session-recreation notices and stale controls; they do not establish persistent
-fallback. A fresh agent-issued Resume and normal quality round trip returned
-to DV, but both routes used VOD and exposed no live film range; outside-range
-replacement remains unexercised.
+fallback. On November 17 an ordinary live fallback and actual OSC timeline
+click replaced the session; captured normal HTTP responses accepted sequence 1
+on the new binding; DV progression/mapped returns resumed about 27 seconds
+after the click. This adds one bounded runtime acceptance for the existing
+Player repair; full-film, every-frame and optical acceptance remain open.
 [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
 These are technical traces; earlier launch initiators and owner visual
 observation were not verified, and earlier personal attribution is withdrawn.
@@ -66,7 +68,7 @@ the fix and retains Ubuntu security policies; see the
 | Shared Dolby Vision playback and export | **mpv Wayland and FFmpeg Intel export verified** | Normal Ubuntu mpv and FFmpeg’s libplacebo filter consume per-frame metadata through the same target-aware renderer. [Packages, commands and qualification](docs/SYSTEM_DOLBY_VISION.md) |
 | GStreamer per-picture RPU transport | **Staged GNOME playback; native FEL candidate digitally qualified** | Software, Intel VA and NVIDIA preserve picture-owned metadata. The uninstalled NVIDIA/GTK Profile 7 candidate paired 140 enhancement pictures and preserved the same mapped picture across seek in a private GPU compositor. All 18 normal candidate packages built; full-rate playback, rebuilt-client runtime checks and deployment remain open. [Source, controls and limits](docs/GSTREAMER_DOLBY_RECONSTRUCTION.md#profile-7-native-source-and-digital-qualification) |
 | GtkVideo per-view Dolby Vision | **Normal +4 packages digitally qualified** | Profile 5 retained its paused source across target changes, independent views and source replacement on default Vulkan. Optional SDK absence preserves SDR startup. [View binding and evidence](docs/GDK_DISPLAY_TARGET.md#gtkvideo-owns-the-view-target) |
-| Dolby Vision playback | **Showtime 5.12 installed; bounded attended checks** | The earlier uninstalled 1× whole-feature run reached regular EOS in the retained virtual-HDR fixture. Installed desktop checks are bounded; Plurx Player 0.5.1 is installed and bounded P7/seek playback passed on the verified corrected kernel; text-subtitle handoff also passed, while session replacement, frame-level RPU/drop counts and optical acceptance remain open ([current scope](docs/STATUS.md)). |
+| Dolby Vision playback | **Installed; bounded playback checks** | The earlier uninstalled 1× whole-feature run reached regular EOS in the retained virtual-HDR fixture. Plurx Player 0.5.1 has bounded P7/seek/text-subtitle checks and one November 17 agent-issued normal live OSC replacement with direct control receipts and resumed mapping. Full-film, every-frame RPU/drop and optical acceptance remain open ([current scope](docs/STATUS.md)). |
 | Panel calibration | **Not started** | Needs a colourimeter; the [procedure](docs/PANEL_MEASUREMENT.md) is defined |
 | Tiling animation accounting | **Installed November 2; bounded visible pass** | `51.26.10.6ubuntu+nativehdr2` installed and dpkg-verified November 2 after PR14 merged at `663a0a2`; package and kernel `7.3.0-nativehdr3` reconfirmed November 7. Normal logout/login, system extension ACTIVE, and owner-observed tile/restore/drag/maximize/rapid left-right passed; no animation errors in that interval. Stock rollback retained, not executed; November 7 visible stages passed with two centering JS TypeErrors; nativehdr3 correction built, not activated; fullscreen/cross-mode unverified; historical warning attribution remains open ([handoff](docs/TILING_ANIMATION_OWNERSHIP.md)) |
 
