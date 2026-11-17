@@ -1,7 +1,21 @@
 # Status — what is working and what remains
 
 **Updated November 16, 2026 (Eastern; November 17 UTC).**
-Latest: read-only recovery of the original journal establishes reset diagnostics
+Latest: a fresh agent-issued normal Resume produced a bounded 180-second P7
+startup with retained DV state after startup transition. Normal quality 1080
+settled as transcode/HLS/VOD; Auto restoration settled with native DV generation
+3 and Dolby decoder representation. Neither route exposed live film metadata,
+so no outside-range OSC seek was issued: the live replacement boundary remains
+unexercised. The obsolete SQLite helper poll is excluded; no authoritative
+control-sequence receipt follows. Preferences are byte-identical and owned
+processes/measurement units are stopped. Cleanup seek acceptance does not prove
+exact restored or persisted position. No owner visual acceptance or production
+fix is claimed.
+[Normal-route boundary and limits](DV_FALLBACK_REPRODUCTION.md#normal-quality-round-trip--live-boundary-unexercised)
+· [Receipt](../evidence/dv-normal-route-boundary-20261117.json).
+
+Historical timing recovery: read-only recovery of the original journal
+establishes reset diagnostics
 23.864949/6.470154 s after first mapping, then outside-range recreation logs
 1.577518/0.811647 s later and 9/10 stale-fence 409 responses before session end.
 This is historical software-log analysis, not fresh playback; persistent

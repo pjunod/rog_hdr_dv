@@ -104,6 +104,67 @@ identity, mpv binary and kernel tracing policy are unchanged; measurement
 services are inactive. The observed Player process was left running. No code repair,
 forced capability, watchdog or package change is justified by this result.
 
+## Normal quality round trip — live boundary unexercised
+
+[The November 17 UTC receipt](../evidence/dv-normal-route-boundary-20261117.json)
+(November 16 Eastern) records a fresh, bounded normal-route check. After the
+operator explicitly confirmed unlock, the agent activated the existing Chrome
+Resume accessibility action. This launch is agent-attributed; no owner visual
+attendance or acceptance is asserted. A preceding unlock-wait timeout is
+retained separately and is not counted as a playback attempt.
+
+The 180-second Profile 7 startup produced 715 samples. The initial mapping
+journal reports target 616 and enhancement composition. After that first map,
+635 emitted samples had Dolby decoder representation; 634 had active target
+generation 1. One transition snapshot reported an inactive generation
+0 target beside Dolby decoder data: property reads are sequential, so this is
+not an atomic state observation or proof of sustained fallback. From the first
+active sample onward all 634 snapshots retained active generation 1. The
+6–24-second window after first map contains 72 active samples. All 635 valid
+post-map renderer/decoder/delayed-frame drop-counter samples were zero. First
+and last numeric positions were 375.417 and 533.950 seconds. Initial null and
+inactive startup values remain separate from sustained playback observations.
+
+The agent then used the normal `cinema-quality` controls over IPC, not pointer
+clicks. The initial Auto remux/HLS route had no live film metadata; its null
+presentation session field alone does not establish live mode. Selecting 1080
+settled as transcode/HLS/VOD with BT.709 decoder representation and inactive
+target generation 2. Returning to Auto settled as remux/HLS/VOD, Dolby decoder
+representation and active generation 3. No numeric live-film origin/duration
+was advertised in either observer run. The helper therefore issued no
+`osc-film-seek`: actual live outside-range replacement remains unqualified.
+Intentional transcoding is not evidence of spontaneous DV loss.
+
+A concurrent PID-scoped mapper probe with a configured 150-second lifetime
+recorded 50 positive-RPU/EL1 entries and 50 completed mapped returns, with no
+observed unsupported/error returns, plus 71 resets. Mapped returns occurred in probe buckets 0/1 and 22/23;
+resets in buckets 18–22 overlapped intentional transcode, restoration and
+cleanup. Counts are unpaired callback observations, not displayed-frame or
+frame-drop counts. The BPF origin numerically aligns with recorded boottime,
+not Python monotonic time; quality selection was 0.253 seconds after that
+origin. Buckets start at BPF BEGIN and cannot be read as seconds after a control.
+The owned Player quit about 23.374 seconds after probe BEGIN; remaining trace
+walltime after process exit supplies no playback coverage.
+
+The helper's legacy SQLite database poll is excluded from all conclusions: it
+read an unused old store after production migrated to Hiqlite. Neither empty
+results nor recorded bindings supply authoritative session, epoch or sequence
+evidence. A separate bounded query of current Hiqlite telemetry recorded three
+session starts, three session ends, three start attempts and one native-mapper
+event. Those counts contain no control generation/epoch/sequence acceptance
+receipt. There is no new runtime qualification of the previously repaired
+control-sequence defect.
+
+Auto restoration was observed settled before cleanup. The ordinary indexed
+cleanup seek to 375.417 seconds was accepted, then immediately followed by the
+agent's quit request; exact restored position and persisted watch position were
+not independently verified. Postflight confirms byte-identical preferences,
+no remaining Player/ffmpeg processes and inactive measurement units. Remote
+staging was removed after archive verification; the idle inhibitor was released.
+The second observer ended after 23.107 seconds with
+91 samples and `ipc_closed`/exit 1 because the owned Player quit; this is neither
+a test pass nor a failed live-mapping result. No production fix is justified.
+
 Raw journals, media identity and runtime state stay private; public evidence
 contains software hashes and aggregate observations.
 This is not optical calibration, full-film endurance, every-frame metadata

@@ -32,9 +32,12 @@ playback retained DV state, and a seek reproduced the reset log while mapped
 callbacks continued. Recovered historical logs place the original resets
 6.470154/23.864949 seconds after first mapping, followed by outside-range
 session-recreation notices and stale controls; they do not establish persistent
-fallback. [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
-These are technical traces; launch initiator and owner visual observation were
-not verified, and earlier personal attribution is withdrawn.
+fallback. A fresh agent-issued Resume and normal quality round trip returned
+to DV, but both routes used VOD and exposed no live film range; outside-range
+replacement remains unexercised.
+[Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
+These are technical traces; earlier launch initiators and owner visual
+observation were not verified, and earlier personal attribution is withdrawn.
 [Current status](docs/STATUS.md) ·
 [Image-quality methods and findings](docs/IMAGE_QUALITY_STIMULI.md).
 
