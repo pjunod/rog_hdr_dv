@@ -2,9 +2,51 @@
 
 Companion to [system playback](SYSTEM_DOLBY_VISION.md) and
 [current status](STATUS.md). This records bounded normal-player attempts to
-reproduce the inherited claim of DV loss after 6–24 seconds. The original
-entry has no confirmed timestamped failure; it is an investigation target,
-not an established current defect or a repair claim.
+reproduce the inherited claim of DV loss after 6–24 seconds. Exact original
+map/reset log timing has now been recovered; no timestamped persistent
+fallback is established. The claim remains an investigation target, not an
+established current defect or a repair claim.
+
+## Original timing recovered — persistent fallback remains unproved
+
+[The historical journal timeline](../evidence/dv-historical-journal-timeline-20261117.json)
+was retrieved read-only on November 17 UTC (November 16 Eastern). This is new
+analysis of retained software logs, not fresh playback or a physical
+measurement. The two original cases occurred on November 13 UTC, equivalent
+to November 12 Eastern. Intervals use same-boot journal monotonic timestamps;
+each starts at that renderer's first successful-map diagnostic.
+
+| Case | First map (UTC, November 13) | First reset after map | Outside-range recreation log after reset | Subsequent stale-fence 409 responses |
+|---|---|---|---|---|
+| A | 02:50:51.616889 | 23.864949 s | 1.577518 s | 9, then session ended/superseded |
+| B | 02:52:23.096283 | 6.470154 s | 0.811647 s | 10, then session ended/superseded |
+
+The original 6–24 seconds therefore describes first-map-to-reset intervals,
+not observed fallback durations. Initial maps reported enhancement composition.
+The reset diagnostic preceded the outside-range session-recreation log in both
+cases. Message ordering does not locate the initiating seek/control action or
+establish an inter-process cause. Launch and seek initiators, owner attendance
+and owner visual observations are unverified.
+
+No recovered record proves a server route change, spontaneous metadata loss
+or persistent HDR10 base output. Successful-map return traces and displayed
+frames were not recorded after reset; successful mapping can be silent. The
+November 16 seek-spanning trace below independently demonstrates why the reset
+message alone cannot establish persistent fallback.
+
+The historical Player `0.5.0-1` identity comes from the inherited handoff, not
+a new binary attestation. The separate run-wide control-sequence defect was
+repaired in Player `0.5.1-1`, merged as Plurx PR 1577, landing `a4c316d0baac`:
+sequence state binds to session/generation/epoch. The 105 affected tests and
+required main lane recorded in [status](STATUS.md) are inherited source/test
+qualification, not newly rerun checks. Actual outside-range OSC seeking and
+session-replacement runtime acceptance remain unqualified. That boundary needs
+control identity and mapper returns on one timeline. Read-only inspection of
+the installed source (hashes in the receipt) shows that both seek handlers
+bypass recreation for VOD; the OSC sends its film-seek message only outside
+the held live-film range. A normal live-session route is therefore needed to
+exercise replacement. Indexed direct-mpv VOD seeks do not qualify it, and no
+forced DV capability is part of this diagnostic.
 
 ## Observe ordinary playback before changing a variable
 
@@ -53,7 +95,8 @@ Counters are unpaired at probe boundaries; their difference is not a drop count.
 The [project mapper ABI](../packaging/system-dv/include/dv_provider387.h) defines
 return 1 as mapped, 0 as unsupported and −1 as error. This control is a
 counterexample to inferring sustained HDR10 fallback from the reset message
-alone. It does not prove what happened in the original unrecorded interval.
+alone. It does not establish mapping continuity in the original interval,
+which has journal diagnostics but no mapper-return trace.
 The named creative/CM29 gamut strategy is also distinct from HDR10 fallback.
 
 Display configuration (apart from its generation serial), Night Light, boot

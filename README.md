@@ -29,7 +29,10 @@ a hard-NFS reader passed in two invocations, with one setup-only stop retained.
 [Per-cycle results and limits](docs/SUSPEND_NFS_READER.md#ten-cycle-rog-soak--november-16-protocol).
 The inherited DV-loss claim remains unconfirmed: normal Profile 8/Profile 7
 playback retained DV state, and a seek reproduced the reset log while mapped
-callbacks continued. [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
+callbacks continued. Recovered historical logs place the original resets
+6.470154/23.864949 seconds after first mapping, followed by outside-range
+session-recreation notices and stale controls; they do not establish persistent
+fallback. [Reproduction evidence and limits](docs/DV_FALLBACK_REPRODUCTION.md).
 These are technical traces; launch initiator and owner visual observation were
 not verified, and earlier personal attribution is withdrawn.
 [Current status](docs/STATUS.md) ·

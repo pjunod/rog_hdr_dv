@@ -1,0 +1,211 @@
+{
+  "schema": "dv-historical-journal-timeline-v1",
+  "date": "2026-11-17",
+  "owner": "Codex",
+  "status": "original_timing_recovered_fallback_causation_unconfirmed",
+  "observation_date_utc": "2026-11-13",
+  "method": {
+    "kind": "read-only retrieval and analysis of retained historical journal; no playback started",
+    "host": "lab5",
+    "query_window_utc": [
+      "2026-11-13T02:47:00Z",
+      "2026-11-13T03:05:00Z"
+    ],
+    "source": "system journal, operator UID; only Player/DV-related records retained privately",
+    "scanned_records": 221,
+    "selected_records": 41,
+    "clock": "same-boot journal monotonic microseconds for intervals; journal realtime for UTC anchors",
+    "pairing": "Each case pairs a distinct renderer process and its Player control process. Process identifiers remain private.",
+    "measurement_scope": "Historical software log ordering, not a fresh playback or optical measurement.",
+    "private_extraction_provenance": {
+      "compressed_artifact": "historical-player-journal-system-private.jsonl.gz",
+      "compressed_sha256": "7ba65b0227c60202b5abe2df48a3f764f2ce73f32513547e7d412d5d041f378e",
+      "uncompressed_stdout_sha256": "3044195d3502b12f23055938c017a427ed109012a92b61cef9733ef68ec3bfea",
+      "uncompressed_stdout_definition": "Exact UTF-8 stdout bytes: one coverage JSONL record followed by 41 selected journal JSONL records, including original spaces, escapes and line-ending bytes. Coverage metadata remains private.",
+      "selected_journal_jsonl_sha256": "39f691a386b61bad70f985422f275e8f80dc6cd5af375c09c105e27d73f4ae7a",
+      "selected_journal_jsonl_definition": "Decompress the retained artifact, split into lines retaining line endings, select lines whose parsed kind is journal, and concatenate their original bytes without reserialization."
+    }
+  },
+  "cases": [
+    {
+      "case": "A",
+      "first_map_utc": "2026-11-13T02:50:51.616889+00:00",
+      "events": [
+        {
+          "event": "map",
+          "seconds_after_first_map": 0.0
+        },
+        {
+          "event": "reset",
+          "seconds_after_first_map": 23.864949
+        },
+        {
+          "event": "session_recreation",
+          "seconds_after_first_map": 25.442467
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 28.283745
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 33.064529
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 38.107355
+        },
+        {
+          "event": "reset",
+          "seconds_after_first_map": 42.801517
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 43.248988
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 48.272684
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 53.047659
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 58.103337
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 63.137725
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 68.176339
+        },
+        {
+          "event": "session_ended",
+          "seconds_after_first_map": 73.199553
+        }
+      ],
+      "reset_to_session_recreation_seconds": 1.577518,
+      "stale_fence_409_count": 9,
+      "log_reports_enhancement_composed": true,
+      "inference": "Reset preceded the outside-range recreation log; no successful-map return trace or displayed-frame evidence was recorded after reset."
+    },
+    {
+      "case": "B",
+      "first_map_utc": "2026-11-13T02:52:23.096283+00:00",
+      "events": [
+        {
+          "event": "map",
+          "seconds_after_first_map": 0.0
+        },
+        {
+          "event": "reset",
+          "seconds_after_first_map": 6.470154
+        },
+        {
+          "event": "session_recreation",
+          "seconds_after_first_map": 7.281801
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 10.207629
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 15.237556
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 20.277158
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 25.308528
+        },
+        {
+          "event": "reset",
+          "seconds_after_first_map": 27.639601
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 30.180101
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 35.234715
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 40.26847
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 45.29832
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 50.328761
+        },
+        {
+          "event": "stale_fence_409",
+          "seconds_after_first_map": 55.113868
+        },
+        {
+          "event": "session_ended",
+          "seconds_after_first_map": 60.157678
+        }
+      ],
+      "reset_to_session_recreation_seconds": 0.811647,
+      "stale_fence_409_count": 10,
+      "log_reports_enhancement_composed": true,
+      "inference": "Reset preceded the outside-range recreation log; no successful-map return trace or displayed-frame evidence was recorded after reset."
+    }
+  ],
+  "historical_software_claims": {
+    "player_version": "0.5.0-1",
+    "version_provenance": "inherited November 13 handoff; not attested by the recovered log subset",
+    "sequence_repair": {
+      "project": "Plurx Player",
+      "pr": 1577,
+      "landing": "a4c316d0baac2f2aa880f94966031996d6de8f80",
+      "version": "0.5.1-1",
+      "scope": "Controls bind sequence state to session/generation/epoch; this fixes the separate historical run-wide sequence defect.",
+      "qualification": "Inherited source/test receipts in docs/STATUS.md; no tests rerun or new runtime replacement acceptance."
+    }
+  },
+  "findings": [
+    "The original 6\u201324-second values are intervals from first successful-map diagnostic to first reset diagnostic: 23.864949 and 6.470154 seconds. They are not observed durations of fallback.",
+    "Outside-range session recreation was logged 1.577518 and 0.811647 seconds after the first reset. This orders messages, not the initiating seek/control action or an inter-process cause.",
+    "The two cases then logged 9 and 10 stale-fence HTTP409 responses followed by session-ended/superseded notices.",
+    "No recovered record proves a server route change, persistent HDR10 base output, spontaneous metadata loss, or what any person saw.",
+    "The November 16 seek-spanning mapper trace remains a counterexample to inferring persistent fallback from this reset diagnostic alone."
+  ],
+  "observation_attribution": {
+    "launch_initiator": "unverified",
+    "seek_initiator": "unverified",
+    "verified_owner_visual_observation": false,
+    "verified_physical_attendance": false
+  },
+  "next_boundary": "On an unlocked, available ROG, qualify a normal live-session route and ordinary OSC outside-range seeking with control session/generation/epoch and mapper returns on one timeline. Installed handlers bypass session recreation for VOD. No capability forcing is part of the diagnostic.",
+  "limits": [
+    "Filtered journals can omit context or silent successful mapping. Absence of another map log is not absence of mapping.",
+    "Historical installed-client identity is inherited, not newly hash-verified.",
+    "Current installed Player0.5.1 and bounded November16 runs are separate from these historical records.",
+    "No packages, capabilities, display settings, sessions, source pins or production code changed."
+  ],
+  "current_source_inspection": {
+    "installed_player": "0.5.1-1",
+    "playback_py_sha256": "43cdd6c9fc31476f54ad9d92743a337cc3c073fdb6c60c7cf99c061afdfcc689",
+    "cinema_lua_sha256": "20e0785ba1440e3038f4a6c0772c2a380a76432c581408890bb323c24023214f",
+    "method": "Read-only installed source inspection; hashes match the separate November16 receipt. No runtime branch execution.",
+    "observations": [
+      "Both on_film_seek and on_seek return without recreation for a VOD session.",
+      "The ordinary OSC sends osc-film-seek when its live-film timeline target is outside the held local duration; otherwise it issues a local absolute+exact mpv seek.",
+      "control_body resets sequence to zero before incrementing when the session/generation/control_epoch binding changes."
+    ],
+    "acceptance_requirement": "Observe an ordinary route that actually creates a live session and a real outside-range OSC seek. Do not force DV capabilities or relabel an indexed VOD seek as replacement acceptance."
+  }
+}
