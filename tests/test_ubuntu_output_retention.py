@@ -43,7 +43,7 @@ class UbuntuOutputRetentionTests(unittest.TestCase):
         self.mutter_version = origins["ubuntu-mutter"]["version"]
         self.revision = (self.here / "REVISION").read_text().strip()
         self.write(self.root / "repo/scripts/check_repository.py", "# fake offline prerequisite\n")
-        self.executable(self.bin / "docker", '#!/bin/sh\nprintf "testrelease %s %s\\n" "$LDI_VERSION" "$MUTTER_VERSION"\n')
+        self.executable(self.bin / "docker", '#!/bin/sh\n[ "${FAIL_DISCOVERY:-no}" != yes ] || exit 19\nprintf "testrelease %s %s\\n" "$LDI_VERSION" "$MUTTER_VERSION"\n')
         self.executable(self.bin / "curl", r'''#!/usr/bin/env python3
 import json
 import os
@@ -110,7 +110,9 @@ if arch == "amd64":
 import os
 import sys
 from pathlib import Path
-# Actual producer outputs must still be present at the publication boundary.
+# Actual producer outputs and task-owned external TMPDIR must exist before prune.
+assert os.environ.get("TMPDIR") and Path(os.environ["TMPDIR"]).is_dir()
+assert Path(os.environ["TMPDIR"]).name == "tmp"
 for item in sys.argv[1:]:
     path = Path(item)
     if path.is_dir():
@@ -159,6 +161,13 @@ if os.environ.get("FAIL_PUBLISH") == "yes":
 
     def runs(self):
         return sorted(self.work.glob("run-*"))
+
+    def test_authenticated_source_discovery_failure_propagates_before_mutation(self):
+        self.old_outputs()
+        before = self.snapshot()
+        self.run_rebuild(expected=19, FAIL_DISCOVERY="yes")
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.runs(), [])
 
     def test_unreviewed_ubuntu_source_refuses_before_any_mutation(self):
         self.old_outputs()

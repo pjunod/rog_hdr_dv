@@ -5,6 +5,7 @@ Run freshness only after a successful authenticated Ubuntu apt-get update. It
 reads that APT cache, never scrapes a website or accepts new source identities.
 """
 import argparse
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -52,6 +53,47 @@ def source_name(row):
     return row.get('Source', row['Package']).split(' ', 1)[0]
 
 
+
+
+def source_matches(row, source, version):
+    field = row.get('Source', row['Package'])
+    match = re.fullmatch(r'([^\s(]+)(?: \(([^)]+)\))?', field)
+    return bool(match and match.group(1) == source and (match.group(2) is None or match.group(2) == version))
+
+
+def expected_version(source, spec):
+    """Resolve the reviewed full derivative version, never just a suffix."""
+    if spec.get('policy_only'):
+        raise ValueError(f'{source}: policy-only release has no managed publication version')
+    if 'expected_package_version' in spec:
+        return spec['expected_package_version']  # Explicit small offline fixture/release metadata.
+    if spec.get('automatic'):
+        return reviewed_version(source, spec) + '+nativehdr' + (HERE / 'REVISION').read_text().strip()
+    if 'pin' in spec:
+        return json.loads((ROOT / spec['pin']).read_text())['package_version']
+    if source in ('gst-plugins-base1.0', 'gst-plugins-bad1.0', 'gst-plugins-good1.0', 'gst-libav1.0'):
+        pipeline = json.loads((ROOT / 'packaging/gstreamer-gtk-dovi/package-inputs/qualified-pipeline.json').read_text())
+        return pipeline['source_families'][source]['source_version']
+    if source == 'gtk4':
+        entries = json.loads((ROOT / 'sources.json').read_text())['series']
+        return next(e['candidate_package_version'] for e in entries if e['component'] == spec['component'])
+    if source in ('rust-gst-plugin-gtk4', 'showtime'):
+        constant = 'GTK_VERSION' if source == 'rust-gst-plugin-gtk4' else 'SHOWTIME_VERSION'
+        recipe = ast.parse((ROOT / 'packaging/gstreamer-gtk-dovi/prepare-ubuntu-packages.py').read_text())
+        for node in recipe.body:
+            if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == constant for t in node.targets):
+                version = ast.literal_eval(node.value)
+                if isinstance(version, str):
+                    return version
+        raise ValueError(f'{source}: missing literal public recipe version {constant}')
+    if source == 'gst-gtk-dovi-map':
+        changelog = (ROOT / 'packaging/gstreamer-gtk-dovi/debian/changelog').read_text()
+        match = re.match(r'gst-gtk-dovi-map \(([^)]+)\)', changelog)
+        if match:
+            return match.group(1)
+    raise ValueError(f'{source}: missing authoritative full candidate version')
+
+
 def validate_bundle(rows, data):
     """Reject unknown, duplicate, mixed or incomplete source-family uploads."""
     groups = {}
@@ -67,8 +109,12 @@ def validate_bundle(rows, data):
         base = name.removesuffix('-dbgsym')
         if (base, arch) not in expected(spec, optional=True):
             raise ValueError(f'unmanaged binary/architecture {name}:{arch} in {source}')
-        if spec['derivative'] not in version:
-            raise ValueError(f'{source}: version {version} lacks reviewed derivative suffix')
+        intended = expected_version(source, spec)
+        if version != intended:
+            raise ValueError(f'{source}: version {version} differs from intended full candidate {intended}')
+        source_field = row.get('Source', '')
+        if '(' in source_field and source_field.split('(', 1)[1].rstrip(')') != intended:
+            raise ValueError(f'{source}: Source version differs from intended full candidate {intended}')
         identity = name, arch
         if identity in seen:
             raise ValueError(f'duplicate binary {name}:{arch}')
@@ -91,8 +137,21 @@ def verify_index(rows, index):
     for row in rows:
         identity = row['Package'], row['Version'], row['Architecture']
         actual = by_id.get(identity)
-        if actual is None or actual.get('SHA256') != row['SHA256']:
+        if (actual is None or actual.get('SHA256') != row['SHA256']
+                or not source_matches(actual, source_name(row), row['Version'])):
             raise ValueError(f'published index missing or hash differs: {identity}')
+
+
+
+def preflight_existing(rows, index):
+    """Check every existing target before ANY deletion or upload, including partial releases."""
+    targets = {(r['Package'], r['Version'], r['Architecture']): r for r in rows}
+    for actual in index:
+        identity = actual['Package'], actual['Version'], actual['Architecture']
+        target = targets.get(identity)
+        if target is not None and (not source_matches(actual, source_name(target), target['Version'])
+                                   or actual.get('SHA256') != target['SHA256']):
+            raise ValueError(f'immutable version conflict before publication: {identity}; retain the existing bytes and use a new reviewed revision')
 
 
 def local_rows(directories):
@@ -116,13 +175,14 @@ def preferences(data, host):
         raise ValueError('invalid registry host')
     sections = ['# Generated from managed-families.json. No permanent dpkg holds.']
     for source, spec in data.items():
-        names = ' '.join(sorted({name for name, _ in expected(spec, optional=True)}))
+        names = ' '.join(sorted({f'{name}:{arch if arch != "all" else "any"}'
+                                 for name, arch in expected(spec, optional=True)}))
         # The version pin also protects an installed derivative when its registry
         # entry disappears. Source monitoring must keep this safety wait visible.
         sections.append(f'# {source}' + (' (separate release: installed derivative protection only)' if spec.get('policy_only') else ''))
         if not spec.get('policy_only'):
-            sections.append(f'Package: {names}\nPin: origin "{host}"\nPin-Priority: 1001\n')
-        sections.append(f'Package: {names}\nPin: version *{spec["derivative"]}*\nPin-Priority: 1001\n')
+            sections.append(f'Package: {names}\nPin: origin "{host}"\nPin-Priority: 999\n')
+        sections.append(f'Package: {names}\nPin: version *{spec["derivative"]}*\nPin-Priority: 999\n')
     return '\n'.join(sections)
 
 
@@ -147,14 +207,15 @@ def preflight(installed, index, data):
             arches = {'amd64'}
         wanted = {(n, a) for n, a in expected(spec) if a in arches or a == 'all'}
         wanted.update((r['Package'], r['Architecture']) for r in installed_rows)
+        intended = expected_version(source, spec)
         candidates = {}
         for row in index:
-            if (source_name(row) == source and spec['derivative'] in row['Version']
+            if (source_matches(row, source, intended) and row['Version'] == intended
                     and re.fullmatch('[0-9a-f]{64}', row.get('SHA256', ''))):
                 candidates.setdefault(row['Version'], set()).add((row['Package'], row['Architecture']))
         versions = [v for v, members in candidates.items() if wanted <= members]
         if not versions:
-            raise ValueError(f'{source}: project registry has no complete family for {sorted(arches)}; holds and installed packages unchanged')
+            raise ValueError(f'{source}: project registry has no complete family at intended {intended} for {sorted(arches)}; holds and installed packages unchanged')
         version = versions[0]
         for other in versions[1:]:
             if subprocess.run(['dpkg', '--compare-versions', other, 'gt', version]).returncode == 0:
@@ -228,18 +289,11 @@ def publication_freshness(data, index, current):
     for source, spec in data.items():
         if spec.get('policy_only'):
             continue
-        pinned_package = None
-        if 'pin' in spec:
-            pinned_package = json.loads((ROOT / spec['pin']).read_text())['package_version']
-        if spec.get('project'):
-            # The public mapper has no Ubuntu source. Its own changelog supplies
-            # the current reviewed project release, without provider inventories.
-            changelog = (ROOT / 'packaging/gstreamer-gtk-dovi/debian/changelog').read_text()
-            pinned_package = re.match(r'gst-gtk-dovi-map \(([^)]+)\)', changelog).group(1)
+        pinned_package = expected_version(source, spec)
         versions = {}
         for row in index:
             version = row['Version']
-            if (source_name(row) != source or spec['derivative'] not in version
+            if (not source_matches(row, source, pinned_package) or spec['derivative'] not in version
                     or not re.fullmatch('[0-9a-f]{64}', row.get('SHA256', ''))):
                 continue
             if pinned_package is not None and version != pinned_package:
@@ -259,6 +313,41 @@ def publication_freshness(data, index, current):
     print('Complete current-source public project families verified in authenticated APT indexes.')
 
 
+
+def validate_simulation(body, index, data):
+    """Every simulated install must belong to an exact authenticated candidate closure."""
+    approved = {s: f for s, f in data.items() if not f.get('policy_only')}
+    mapping = package_map(approved)
+    indexed = {}
+    for row in index:
+        indexed.setdefault((row['Package'], row['Version'], row['Architecture']), []).append(row)
+    for line in body.splitlines():
+        if line.startswith('Remv '):
+            raise ValueError('simulation removes a package: ' + line)
+        if not line.startswith('Inst '):
+            continue
+        match = re.fullmatch(r'Inst (\S+)(?: \[[^\]]+\])? \((\S+).* \[([^\]]+)\]\)(?: \[[^\]]*\])?', line)
+        if not match:
+            raise ValueError('cannot validate simulated install identity: ' + line)
+        binary, version, arch = match.groups()
+        name, _, named_arch = binary.partition(':')
+        if named_arch and named_arch != arch:
+            raise ValueError('simulation architecture mismatch: ' + line)
+        if name not in mapping:
+            raise ValueError('simulation changes an unmanaged dependency; review it separately: ' + line)
+        source, spec = mapping[name]
+        intended = expected_version(source, spec)
+        candidates = indexed.get((name, version, arch), [])
+        if version != intended or not any(source_matches(r, source, intended) and re.fullmatch('[0-9a-f]{64}', r.get('SHA256', '')) for r in candidates):
+            raise ValueError('simulation install lacks exact intended authenticated source/version/architecture: ' + line)
+        wanted = {(n, a) for n, a in expected(spec) if a == arch or a == 'all'}
+        available = {(r['Package'], r['Architecture']) for r in index
+                     if source_matches(r, source, intended) and r['Version'] == intended
+                     and re.fullmatch('[0-9a-f]{64}', r.get('SHA256', ''))}
+        if not wanted <= available:
+            raise ValueError('simulation dependency family is incomplete: ' + line)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -271,9 +360,13 @@ def main():
     complete.add_argument('source')
     complete.add_argument('version')
     complete.add_argument('architectures', nargs='+')
-    sub.add_parser('simulation')
+    simulation = sub.add_parser('simulation')
+    simulation.add_argument('index')
     bundle = sub.add_parser('bundle')
     bundle.add_argument('directories', nargs='+')
+    collision = sub.add_parser('preflight-existing')
+    collision.add_argument('bundle')
+    collision.add_argument('indices', nargs='+')
     check = sub.add_parser('verify-index')
     check.add_argument('bundle')
     check.add_argument('indices', nargs='+')
@@ -296,17 +389,14 @@ def main():
         spec = data[args.source]
         wanted = {(n, a) for n, a in expected(spec) if a in args.architectures or a == 'all'}
         available = {(r['Package'], r['Architecture']) for r in records(sys.stdin.read())
-                     if source_name(r) == args.source and r['Version'] == args.version
+                     if source_matches(r, args.source, args.version) and r['Version'] == args.version
                      and re.fullmatch('[0-9a-f]{64}', r.get('SHA256', ''))}
+        if args.version != expected_version(args.source, spec):
+            raise ValueError(f'{args.source}: completion requested for an unintended full version')
         if not wanted <= available:
             sys.exit(1)
     elif args.command == 'simulation':
-        mapping = package_map({s: f for s, f in data.items() if not f.get('policy_only')})
-        for line in sys.stdin:
-            if line.startswith('Remv '):
-                raise ValueError('simulation removes a package: ' + line.strip())
-            if line.startswith('Inst ') and line.split()[1].split(':')[0] not in mapping:
-                raise ValueError('simulation changes an unmanaged dependency; review it separately: ' + line.strip())
+        validate_simulation(sys.stdin.read(), records(Path(args.index).read_text()), data)
     elif args.command == 'freshness':
         current = freshness(data)
         if args.registry:
@@ -315,6 +405,10 @@ def main():
         rows = local_rows(args.directories)
         validate_bundle(rows, data)
         print(json.dumps(rows))
+    elif args.command == 'preflight-existing':
+        rows = json.loads(Path(args.bundle).read_text())
+        index = [r for p in args.indices for r in records(Path(p).read_text())]
+        preflight_existing(rows, index)
     elif args.command == 'verify-index':
         rows = json.loads(Path(args.bundle).read_text())
         index = [r for p in args.indices for r in records(Path(p).read_text())]
@@ -323,7 +417,9 @@ def main():
         installed = [dict(zip(('Package', 'Architecture', 'InstalledVersion'), line.split()))
                      for line in Path(args.installed).read_text().splitlines() if line.strip()]
         index = [r for p in args.indices for r in records(Path(p).read_text())]
-        print('\n'.join(preflight(installed, index, data)))
+        targets = preflight(installed, index, data)
+        if targets:
+            sys.stdout.write('\n'.join(targets) + '\n')
 
 
 if __name__ == '__main__':

@@ -3,18 +3,15 @@
 #
 #   FORGEJO_TOKEN=... packaging/ubuntu/rebuild.sh WORK [--release 26.10]
 #
-# For libdisplay-info and Mutter, asks Ubuntu which source version it
-# publishes now, and builds and publishes that version plus this
-# repository's series when the registry does not have it complete yet: after
-# an Ubuntu update, or after packaging/ubuntu/REVISION was raised for a series
-# change. Mutter builds against the registry's libdisplay-info. Once a new
-# version has built, the source's older versions are deleted from the registry
-# and the new one is uploaded, so machines move to it even when Ubuntu's new
-# version sorts below the old build (0.3.0-1ubuntu0.1 sorts below 0.3.0-1, so
-# 0.3.0-1ubuntu0.1+nativehdrN sorts below 0.3.0-1+nativehdrN): the registry
-# holds one version per source. The deletions come before the uploads because
-# Forgejo (v16) does not rebuild the index when it deletes a version's last
-# file; each upload rebuilds its architecture's index.
+# For libdisplay-info and Mutter, discover current authenticated Ubuntu sources
+# and require equality with the reviewed source pins before any build or write.
+# Build missing current derivatives or a reviewed series revision, validate the
+# complete family and all existing target bytes, then prune superseded versions
+# and publish. Retain exact prior payloads independently for rollback.
+# Forgejo v16 refreshes its indexes on upload, not reliably after deleting the
+# final file of a version. Pruning therefore precedes upload only after full
+# publication preflight. Numeric source-order downgrades require a separate
+# reviewed exact-version install; generic setup and the 999 pins do not force one.
 # WORK is a private durable retention root, never emptied. A run-* child is
 # reserved exclusively when a build is needed; an already-published no-op
 # leaves WORK untouched. Keep failed/partial runs as well as successful ones.
@@ -32,18 +29,22 @@ revision=$(tr -d '[:space:]' < "$here/REVISION")
 # A series change without a REVISION bump would look published and never ship.
 python3 "$here/../../scripts/check_repository.py" >/dev/null
 
-read -r CODENAME ldi_ubuntu mutter_ubuntu < <(docker run --rm "ubuntu:$release" bash -c '
+discovered=$(docker run --rm "ubuntu:$release" bash -euo pipefail -c '
   sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
   apt-get update -qq -o APT::Update::Error-Mode=any >/dev/null
   newest() {
     local versions version newest=
-    versions=$(apt-cache showsrc "$1" | sed -n "s/^Version: //p")
+    versions=$(apt-cache showsrc "$1" | sed -n "s/^Version: //p") || return
     for version in $versions; do
       if [ -z "$newest" ] || dpkg --compare-versions "$version" gt "$newest"; then newest=$version; fi
     done
     echo "$newest"
   }
-  . /etc/os-release; echo "$VERSION_CODENAME $(newest libdisplay-info) $(newest mutter)"')
+  . /etc/os-release
+  ldi=$(newest libdisplay-info)
+  mutter=$(newest mutter)
+  echo "$VERSION_CODENAME $ldi $mutter"')
+read -r CODENAME ldi_ubuntu mutter_ubuntu <<< "$discovered"
 [ -n "$mutter_ubuntu" ] || { echo "rebuild.sh: could not read Ubuntu's source versions" >&2; exit 1; }
 # Source changes require a reviewed pin refresh even when patches still apply.
 python3 "$here/managed.py" require-reviewed "libdisplay-info=$ldi_ubuntu" "mutter=$mutter_ubuntu"
@@ -67,6 +68,9 @@ prune() {  # prune SOURCE KEEP ARCH...
 ensure_work() {
   [ -z "$work" ] || return 0
   work=$(python3 "$here/outputs.py" reserve "$root")
+  mkdir -m 0700 "$work/tmp"
+  TMPDIR=$work/tmp
+  export TMPDIR
   echo "retained build outputs: $work"
 }
 
@@ -103,6 +107,7 @@ else
       "$work"/libdisplay-info-i386/"$name"_*.deb
   done
   python3 "$here/managed.py" bundle "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" >/dev/null
+  "$here/publish.sh" --preflight-only "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" --release "$release"
   prune libdisplay-info "$ldi" amd64 i386
   "$here/publish.sh" "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" --release "$release"
 fi
@@ -119,6 +124,7 @@ else
   done
   build_retained mutter amd64 "$mutter_ubuntu" "$mutter" --with "$work/with"
   python3 "$here/managed.py" bundle "$work/mutter-amd64" >/dev/null
+  "$here/publish.sh" --preflight-only "$work/mutter-amd64" --release "$release"
   prune mutter "$mutter" amd64 all
   "$here/publish.sh" "$work/mutter-amd64" --release "$release"
 fi
