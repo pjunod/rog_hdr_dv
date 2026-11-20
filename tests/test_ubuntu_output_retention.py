@@ -34,12 +34,13 @@ class UbuntuOutputRetentionTests(unittest.TestCase):
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.work = self.root / "retained outputs"
-        for name in ("rebuild.sh", "registry.sh", "outputs.py", "REVISION"):
+        for name in ("rebuild.sh", "registry.sh", "outputs.py", "REVISION", "managed.py", "managed-families.json"):
             shutil.copy2(PACKAGING / name, self.here / name)
         self.revision = (self.here / "REVISION").read_text().strip()
         self.write(self.root / "repo/scripts/check_repository.py", "# fake offline prerequisite\n")
         self.executable(self.bin / "docker", "#!/bin/sh\nprintf 'testrelease 1.0-1 2.0-1\\n'\n")
         self.executable(self.bin / "curl", r'''#!/usr/bin/env python3
+import json
 import os
 import sys
 from pathlib import Path
@@ -47,13 +48,25 @@ args = sys.argv[1:]
 if "-o" in args:
     Path(args[args.index("-o") + 1]).write_bytes(b"fake registry dependency")
 else:
-    if os.environ.get("PUBLISHED") == "yes":
-        version = os.environ["REVISION"]
-        print(f"Package: libdisplay-info3\nSource: libdisplay-info\nVersion: 1.0-1+nativehdr{version}\n")
-        print(f"Package: mutter\nVersion: 2.0-1+nativehdr{version}\n")
+    if os.environ.get("PUBLISHED") in ("yes", "old"):
+        version = os.environ["REVISION"] if os.environ.get("PUBLISHED") == "yes" else "0"
+        manifest = Path(os.environ["MANAGED_MANIFEST"])
+        data = json.loads(manifest.read_text())["families"]
+        for source, base in (("libdisplay-info", "1.0-1"), ("mutter", "2.0-1")):
+            for arch, names in data[source]["packages"].items():
+                for name in names:
+                    print(f"Package: {name}\nSource: {source}\nVersion: {base}+nativehdr{version}\nArchitecture: {arch}\nSHA256: {'a' * 64}\n")
     print("200")
 ''')
+        self.executable(self.bin / "dpkg-deb", r'''#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+assert sys.argv[1] == "-f"
+row = json.loads(Path(sys.argv[2]).read_text())
+print("".join(f"{key}: {value}\n" for key, value in row.items()))
+''')
         self.executable(self.here / "build.sh", r'''#!/usr/bin/env python3
+import json
 import hashlib
 import os
 import sys
@@ -68,8 +81,17 @@ print("private full build diagnostic", flush=True)
 if os.environ.get("FAIL_BUILD") == "yes":
     sys.exit(9)
 (out / "partial").unlink()
-for suffix in ("deb", "changes", "buildinfo"):
+for suffix in ("changes", "buildinfo"):
     (out / f"{src}_{version}_{arch}.{suffix}").write_bytes(b"fake " + suffix.encode())
+spec = json.loads(Path(os.environ["MANAGED_MANIFEST"]).read_text())["families"][src]
+for package_arch, names in spec["packages"].items():
+    if package_arch != arch and not (arch == "amd64" and package_arch == "all"):
+        continue
+    for name in names:
+        (out / f"{name}_{version}_{package_arch}.deb").write_text(json.dumps({
+            "Package": name, "Source": src, "Version": version, "Architecture": package_arch}))
+if os.environ.get("MISSING_BINARY") == "yes" and src == "libdisplay-info" and arch == "amd64":
+    next(out.glob("libdisplay-info3_*.deb")).unlink()
 if arch == "amd64":
     archive = f"{src}_{ubuntu}.orig.tar.xz"
     data = b"fake original source archive"
@@ -94,6 +116,7 @@ if os.environ.get("FAIL_PUBLISH") == "yes":
         self.env = os.environ.copy()
         self.env.pop("FORGEJO_TOKEN", None)
         self.env.update(PATH=str(self.bin) + os.pathsep + self.env["PATH"],
+                        MANAGED_MANIFEST=str(self.here / "managed-families.json"),
                         REVISION=self.revision, FORGEJO_URL="http://registry.invalid",
                         FORGEJO_OWNER="operator", PUBLISHED="no", FAIL_BUILD="no",
                         FAIL_PUBLISH="no")
@@ -176,6 +199,12 @@ if os.environ.get("FAIL_PUBLISH") == "yes":
         self.assertFalse((run / "mutter-amd64").exists())
         for path, data in before.items():
             self.assertEqual(path.read_bytes(), data)
+
+    def test_incomplete_local_family_fails_before_pruning_published_packages(self):
+        stdout, stderr = self.run_rebuild(expected=1, PUBLISHED="old", MISSING_BINARY="yes")
+        self.assertIn("incomplete family", stderr)
+        self.assertNotIn("removed superseded", stdout)
+        self.assertFalse((self.runs()[0] / "mutter-amd64").exists())
 
     def test_build_failure_preserves_partial_output_and_diagnostics(self):
         self.run_rebuild(expected=1, FAIL_BUILD="yes")

@@ -13,6 +13,10 @@ on:
       - "packaging/ubuntu/**"
       - "patches/ubuntu-mutter/**"
       - "patches/ubuntu-libdisplay-info/**"
+      - "packaging/webkitgtk-native-hdr/**"
+      - "packaging/gstreamer-gtk-dovi/**"
+      - "sources.json"
+      - ".github/workflows/ubuntu-packages.yml"
   workflow_dispatch:
 
 concurrency:
@@ -39,3 +43,6 @@ jobs:
           # Resolve the host account home independently of job-level HOME overrides.
           retention_home=$(python3 -c 'import os, pwd; print(pwd.getpwuid(os.getuid()).pw_dir)')
           packaging/ubuntu/rebuild.sh "$retention_home/.local/state/rog-hdr-dv/ubuntu-packages"
+      - name: Refuse an unnoticed Ubuntu security/source update
+        if: always()
+        run: bash packaging/ubuntu/monitor.sh

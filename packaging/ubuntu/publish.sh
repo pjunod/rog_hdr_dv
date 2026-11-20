@@ -1,20 +1,7 @@
 #!/usr/bin/env bash
-# Upload built .debs to the Forgejo Debian registry.
-#
-#   FORGEJO_TOKEN=... packaging/ubuntu/publish.sh DIR... [--release 26.10]
-#
-# Every .deb in each DIR goes to $FORGEJO_URL/api/packages/$FORGEJO_OWNER/debian
-# (defaults: http://forge.lan:3000, owner pjunod), suite <codename>, component
-# main. The token needs the write:package scope.
-#
-# The source's sentinel package (the one named like the source: mutter,
-# libdisplay-info3) is uploaded last, on its last architecture, so a version
-# whose sentinel is in the registry is complete. A version without its
-# sentinel is a partial upload from an earlier failed run: its files are
-# replaced. A complete version is never replaced, and a different file under
-# it is an error.
+# Publish complete public derivative families. Versions and bytes are immutable;
+# an interrupted upload may resume only with the same retained package payloads.
 set -euo pipefail
-
 release=26.10 dirs=()
 while [ $# -gt 0 ]; do
   case $1 in
@@ -22,58 +9,44 @@ while [ $# -gt 0 ]; do
     *) dirs+=("$1"); shift ;;
   esac
 done
-[ ${#dirs[@]} -gt 0 ] || { echo "usage: publish.sh DIR... [--release R]" >&2; exit 2; }
+[ ${#dirs[@]} -gt 0 ] || { echo 'usage: publish.sh DIR... [--release R]' >&2; exit 2; }
+here=$(cd "$(dirname "$0")" && pwd)
 FORGEJO_URL=${FORGEJO_URL:-http://forge.lan:3000} FORGEJO_OWNER=${FORGEJO_OWNER:-pjunod}
 CODENAME=$(docker run --rm "ubuntu:$release" sh -c '. /etc/os-release; echo "$VERSION_CODENAME"')
-# shellcheck source=registry.sh
-. "$(dirname "$0")/registry.sh"
-
-field() { dpkg-deb -f "$1" "$2"; }
-source_of() { local s; s=$(field "$1" Source 2>/dev/null || true); s=${s%% *}; echo "${s:-$(field "$1" Package)}"; }
-
-# Upload order: everything but sentinels, then the sentinels.
-debs=() sentinels=()
-for dir in "${dirs[@]}"; do
-  for deb in "$dir"/*.deb; do
-    [ -e "$deb" ] || continue
-    name=$(field "$deb" Package)
-    case $name in mutter|libdisplay-info3) sentinels+=("$deb") ;; *) debs+=("$deb") ;; esac
-  done
-done
-[ ${#debs[@]} -gt 0 ] || [ ${#sentinels[@]} -gt 0 ] || { echo "publish.sh: no .deb in ${dirs[*]}" >&2; exit 1; }
-
-complete() {  # complete SOURCE ARCHS VERSION: is every architecture's sentinel published?
-  local sentinel=$1 arch rc
-  [ "$1" = libdisplay-info ] && sentinel=libdisplay-info3
-  for arch in $2; do
-    if is_published "$sentinel" "$3" "$arch"; then continue; else rc=$?; fi
-    [ "$rc" = 1 ] || exit 1   # the registry could not be read
-    return 1
-  done
-}
-
-for deb in "${debs[@]}" "${sentinels[@]}"; do
-  name=$(field "$deb" Package) version=$(field "$deb" Version) arch=$(field "$deb" Architecture)
+. "$here/registry.sh"
+: "${TMPDIR:?set TMPDIR to private external task storage}"
+work=$(mktemp -d "$TMPDIR/managed-publish.XXXXXXXX")
+trap 'rm -rf -- "$work"' EXIT
+# Validate the entire transaction before the first registry mutation.
+python3 "$here/managed.py" bundle "${dirs[@]}" > "$work/bundle.json"
+python3 - "$work/bundle.json" > "$work/upload-list" <<'PY'
+import json, sys
+for row in json.load(open(sys.argv[1])):
+    print('\t'.join(row[k] for k in ('Package', 'Version', 'Architecture', 'SHA256', 'Path')))
+PY
+while IFS=$'\t' read -r name version arch digest deb; do
   code=$(authed_curl -s -o /dev/null -w '%{http_code}' -X PUT --upload-file "$deb" "$pool/upload")
   case $code in
-    201) echo "published $name $version $arch"; continue ;;
-    409) ;;
-    *) echo "publish.sh: upload of $deb answered HTTP $code" >&2; exit 1 ;;
+    201) echo "published $name $version $arch" ;;
+    409)
+      published=$(curl -fsS "$pool/${name}_${version}_${arch}.deb" | sha256sum | cut -d' ' -f1)
+      [ "$published" = "$digest" ] || {
+        echo "publish.sh: immutable version conflict: $name $version $arch; use a new revision" >&2; exit 1;
+      }
+      echo "already published $name $version $arch" ;;
+    *) echo "publish.sh: upload answered HTTP $code for $name $version $arch" >&2; exit 1 ;;
   esac
-  published=$(curl -sf "$pool/${name}_${version}_${arch}.deb" | sha256sum | cut -d' ' -f1) \
-    || { echo "publish.sh: cannot download the published $name $version $arch" >&2; exit 1; }
-  if [ "$published" = "$(sha256sum < "$deb" | cut -d' ' -f1)" ]; then
-    echo "already published $name $version $arch"
-    continue
-  fi
-  src=$(source_of "$deb")
-  archs=amd64; [ "$src" = libdisplay-info ] && archs="amd64 i386"
-  if complete "$src" "$archs" "$version"; then
-    echo "publish.sh: $name $version $arch is published with different contents" >&2; exit 1
-  fi
-  echo "replacing $name $version $arch from an incomplete earlier upload"
-  delete_package "$name" "$version" "$arch"
-  code=$(authed_curl -s -o /dev/null -w '%{http_code}' -X PUT --upload-file "$deb" "$pool/upload")
-  [ "$code" = 201 ] || { echo "publish.sh: re-upload of $deb answered HTTP $code" >&2; exit 1; }
-  echo "published $name $version $arch"
-done
+done < "$work/upload-list"
+# Forgejo indexes Architecture: all in each architecture's Packages index.
+indices=()
+while read -r arch; do
+  packages_index "$arch" > "$work/$arch.Packages"
+  indices+=("$work/$arch.Packages")
+done < <(python3 - "$work/bundle.json" <<'PY'
+import json, sys
+print('\n'.join(sorted({r['Architecture'] if r['Architecture'] != 'all' else 'amd64'
+                         for r in json.load(open(sys.argv[1]))})))
+PY
+)
+python3 "$here/managed.py" verify-index "$work/bundle.json" "${indices[@]}"
+echo 'Published complete family inventory and SHA256 identities verified.'

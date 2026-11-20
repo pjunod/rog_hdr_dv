@@ -1,0 +1,176 @@
+"""Managed public package families: completeness, immutability and stale pins.
+
+The companion APT integration cases use the real apt-get solver and dpkg's
+version comparison; they never modify the host package database.
+"""
+import copy
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).resolve().parents[1]
+SPEC = importlib.util.spec_from_file_location('managed_ubuntu', ROOT / 'packaging/ubuntu/managed.py')
+managed = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(managed)
+
+
+def fixture():
+    data = {'webkit2gtk': {'derivative': '+rogdv', 'packages': {'amd64': ['libwebkitgtk-6.0-4', 'libjavascriptcoregtk-6.0-1']}}}
+    rows = [{'Package': name, 'Source': 'webkit2gtk', 'Version': '2.52.6-1ubuntu1+rogdv7',
+             'Architecture': 'amd64', 'SHA256': 'a' * 64}
+            for name in data['webkit2gtk']['packages']['amd64']]
+    return data, rows
+
+
+class ManagedPolicyTests(unittest.TestCase):
+    def test_complete_family_and_exact_index_hash(self):
+        data, rows = fixture()
+        managed.validate_bundle(rows, data)
+        managed.verify_index(rows, rows)
+        corrupt = copy.deepcopy(rows)
+        corrupt[1]['SHA256'] = 'b' * 64
+        with self.assertRaisesRegex(ValueError, 'hash differs'):
+            managed.verify_index(rows, corrupt)
+
+    def test_missing_mixed_duplicate_and_foreign_refused(self):
+        data, rows = fixture()
+        for bad in (rows[:1], rows + [rows[0]], [dict(rows[0], Version='stock'), rows[1]],
+                    [dict(rows[0], Source='private-provider'), rows[1]],
+                    [dict(rows[0], Version='2.52.6-1ubuntu1+rogdv8'), rows[1]]):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                managed.validate_bundle(bad, data)
+
+    def test_preflight_refuses_missing_companion_before_targets(self):
+        data, rows = fixture()
+        installed = [{'Package': rows[0]['Package'], 'Architecture': 'amd64'}]
+        with self.assertRaisesRegex(ValueError, 'no complete family'):
+            managed.preflight(installed, rows[:1], data)
+        self.assertEqual(managed.preflight(installed, rows, data),
+                         ['libwebkitgtk-6.0-4:amd64=2.52.6-1ubuntu1+rogdv7'])
+
+    @unittest.skipUnless(shutil.which('dpkg'), 'requires Debian comparator')
+    def test_preflight_refuses_newer_installed_patchset_downgrade(self):
+        data, rows = fixture()
+        installed = [{'Package': rows[0]['Package'], 'Architecture': 'amd64',
+                      'InstalledVersion': '2.52.6-1ubuntu1+rogdv15'}]
+        with self.assertRaisesRegex(ValueError, 'automatic downgrade refused'):
+            managed.preflight(installed, rows, data)
+
+    def test_preferences_are_scoped_and_cover_companions(self):
+        data, rows = fixture()
+        result = managed.preferences(data, 'forge.lan')
+        self.assertNotIn('Package: *', result)
+        self.assertIn('Pin: version *+rogdv*', result)
+        for row in rows:
+            self.assertIn(row['Package'], result)
+
+    @unittest.skipUnless(shutil.which('dpkg'), 'requires Debian comparator')
+    def test_source_monitor_fails_for_newer_authenticated_revision(self):
+        data, _ = fixture()
+        with patch.object(managed, 'reviewed_version', return_value='2.52.6-1ubuntu1'), patch.object(
+                managed, 'run', return_value='Package: webkit2gtk\nVersion: 2.52.6-1ubuntu1.1\n\n'):
+            with self.assertRaisesRegex(ValueError, 'Ubuntu fixes are waiting'):
+                managed.freshness(data)
+
+    def test_source_monitor_refuses_empty_metadata(self):
+        data, _ = fixture()
+        with patch.object(managed, 'reviewed_version', return_value='2.52.6-1ubuntu1'), patch.object(
+                managed, 'run', return_value=''):
+            with self.assertRaisesRegex(ValueError, 'source index is missing'):
+                managed.freshness(data)
+
+    def test_separate_playback_releases_get_scoped_fallback_without_origin(self):
+        data = {s: f for s, f in managed.families().items() if f.get('policy_only')}
+        self.assertEqual(set(data), {'mpv', 'ffmpeg', 'mesa', 'gnome-shell-ubuntu-extensions', 'network-manager'})
+        policy = managed.preferences(data, 'forge.lan')
+        self.assertNotIn('Pin: origin', policy)
+        self.assertIn('Pin: version *+rogwsi*', policy)
+        self.assertIn('Pin: version *+nativehdr*', policy)
+        self.assertIn('Pin: version *+rogsleep*', policy)
+        for name in ('mpv', 'libavcodec62', 'libavdevice62', 'libavformat62', 'libavfilter11', 'mesa-vulkan-drivers', 'gnome-shell-ubuntu-extensions', 'network-manager'):
+            self.assertIn(name, policy)
+        self.assertEqual(managed.preflight([{'Package': 'mpv', 'Architecture': 'amd64'}], [], data), [])
+        with self.assertRaisesRegex(ValueError, 'preference/monitor only'):
+            managed.validate_bundle([{'Package': 'mpv', 'Source': 'mpv'}], data)
+        self.assertEqual(managed.reviewed_version('mpv', data['mpv']), '0.41.0-2ubuntu5')
+        self.assertEqual(managed.reviewed_version('gnome-shell-ubuntu-extensions', data['gnome-shell-ubuntu-extensions']), '51.26.10.6ubuntu')
+        self.assertEqual(managed.reviewed_version('network-manager', data['network-manager']), '1.58.1-1ubuntu3')
+
+    @unittest.skipUnless(shutil.which('dpkg'), 'requires Debian comparator')
+    def test_separate_playback_source_drift_is_actionable(self):
+        data = {'mpv': managed.families()['mpv']}
+        with patch.object(managed, 'run', return_value='Package: mpv\nVersion: 0.41.0-2ubuntu6\n\n'):
+            with self.assertRaisesRegex(ValueError, 'separate project release') as error:
+                managed.freshness(data)
+        self.assertIn('Ubuntu packaging base only', str(error.exception))
+
+    def test_webkit_inventory_is_exact_recipe_inventory(self):
+        data = managed.families()
+        pin = json.loads((ROOT / data['webkit2gtk']['pin']).read_text())
+        self.assertEqual(set(pin['binary_packages']), set(data['webkit2gtk']['packages']['amd64']))
+        for source, spec in data.items():
+            if not spec.get('project'):
+                self.assertTrue(managed.reviewed_version(source, spec))
+
+
+@unittest.skipUnless(shutil.which('apt-get') and shutil.which('dpkg'), 'requires Ubuntu APT/dpkg')
+class RealAptPolicyTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(dir=os.environ['TMPDIR'])
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        for folder in ('state/lists/partial', 'cache/archives/partial', 'etc/preferences.d', 'etc/sources.list.d', 'repo'):
+            (self.root / folder).mkdir(parents=True)
+        self.data, self.rows = fixture()
+        self.name = self.rows[0]['Package']
+        (self.root / 'etc/preferences').write_text(managed.preferences(self.data, 'project.invalid'))
+        (self.root / 'etc/sources.list').write_text(f'deb [trusted=yes] file:{self.root}/repo ./\n')
+        # Trusted local fixture indexes contain no network source or system key.
+        # Production setup uses signed APT metadata and has no trusted override.
+        self.options = [f'-oDir={self.root}', '-oDir::State=state', '-oDir::State::status=state/status',
+                        '-oDir::Cache=cache', '-oDir::Etc=etc', '-oAPT::Architecture=amd64',
+                        '-oAPT::Architectures::=amd64', '-oDebug::NoLocking=1', '-oAPT::Sandbox::User=root',
+                        '-oAcquire::AllowInsecureRepositories=true']
+        self.installed = '2.52.6-1ubuntu1+rogdv7'
+        (self.root / 'state/status').write_text(f'Package: {self.name}\nStatus: install ok installed\nArchitecture: amd64\nVersion: {self.installed}\nDescription: isolated fixture\n\n')
+
+    def solve(self, versions):
+        entries = []
+        for version in versions:
+            entries.append(f'Package: {self.name}\nVersion: {version}\nArchitecture: amd64\nFilename: fixture.deb\nSize: 1\nSHA256: {"a" * 64}\nDescription: isolated fixture\n\n')
+        (self.root / 'repo/Packages').write_text(''.join(entries))
+        subprocess.run(['apt-get', *self.options, 'update'], check=True, capture_output=True, text=True)
+        return subprocess.check_output(['apt-get', *self.options, '-s', 'install', self.name], text=True)
+
+    def test_absent_registry_keeps_installed_derivative_over_newer_stock(self):
+        result = self.solve(['2.52.6-1ubuntu1.1'])
+        self.assertNotIn('Inst ' + self.name, result)
+
+    def test_present_registry_keeps_derivative_over_newer_stock(self):
+        result = self.solve([self.installed, '2.52.6-1ubuntu1.1'])
+        self.assertNotIn('Inst ' + self.name, result)
+
+    def test_newer_derivative_is_automatically_selected(self):
+        version = '2.52.6-1ubuntu1.1+rogdv8'
+        result = self.solve(['2.52.6-1ubuntu1.1', version])
+        self.assertIn('Inst ' + self.name, result)
+        self.assertIn(version, result)
+
+    def test_older_project_origin_keeps_newer_installed_derivative(self):
+        # file repositories have an empty origin hostname. Exercise the real
+        # origin record as well as fallback with equal priorities.
+        policy = managed.preferences(self.data, 'project.invalid').replace('origin "project.invalid"', 'origin ""')
+        (self.root / 'etc/preferences').write_text(policy)
+        version = '2.52.6-1ubuntu1+rogdv6'
+        result = self.solve([version, '2.52.6-1ubuntu1.1'])
+        self.assertNotIn('Inst ' + self.name, result)
+
+    def test_debian_epoch_and_revision_ordering(self):
+        self.assertEqual(subprocess.run(['dpkg', '--compare-versions', '1:2.0-1', 'gt', '9.0-1']).returncode, 0)
+        self.assertEqual(subprocess.run(['dpkg', '--compare-versions', '2.52.6-1ubuntu1.1', 'gt', '2.52.6-1ubuntu1+rogdv7']).returncode, 0)

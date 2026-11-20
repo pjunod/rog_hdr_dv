@@ -82,9 +82,10 @@ echo "Ubuntu $CODENAME: libdisplay-info $ldi_ubuntu, mutter $mutter_ubuntu; seri
 
 # Both architectures: a Multi-Arch: same library must ship byte-identical
 # shared files (its changelog, copyright) on each.
-if is_published libdisplay-info3 "$ldi" amd64 && is_published libdisplay-info3 "$ldi" i386; then
+if family_is_published libdisplay-info "$ldi" amd64 i386; then
   echo "libdisplay-info $ldi: published"
 else
+  rc=$?; [ "$rc" = 1 ] || exit "$rc"
   for arch in amd64 i386; do
     build_retained libdisplay-info "$arch" "$ldi_ubuntu" "$ldi"
   done
@@ -92,13 +93,15 @@ else
     "$here/multiarch-same.sh" "$work"/libdisplay-info-amd64/"$name"_*.deb \
       "$work"/libdisplay-info-i386/"$name"_*.deb
   done
+  python3 "$here/managed.py" bundle "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" >/dev/null
   prune libdisplay-info "$ldi" amd64 i386
   "$here/publish.sh" "$work/libdisplay-info-amd64" "$work/libdisplay-info-i386" --release "$release"
 fi
 
-if is_published mutter "$mutter" amd64; then
+if family_is_published mutter "$mutter" amd64; then
   echo "mutter $mutter: published"
 else
+  rc=$?; [ "$rc" = 1 ] || exit "$rc"
   # The libdisplay-info Mutter builds against: the registry's.
   ensure_work
   mkdir -p "$work/with"
@@ -106,6 +109,7 @@ else
     curl -sf -o "$work/with/${name}_${ldi}_amd64.deb" "$pool/${name}_${ldi}_amd64.deb"
   done
   build_retained mutter amd64 "$mutter_ubuntu" "$mutter" --with "$work/with"
+  python3 "$here/managed.py" bundle "$work/mutter-amd64" >/dev/null
   prune mutter "$mutter" amd64 all
   "$here/publish.sh" "$work/mutter-amd64" --release "$release"
 fi

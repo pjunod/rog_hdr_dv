@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "families": {
+    "mutter": {
+      "component": "ubuntu-mutter",
+      "automatic": true,
+      "derivative": "+nativehdr",
+      "packages": {
+        "amd64": [
+          "mutter",
+          "mutter-common-bin",
+          "mutter-dev-bin",
+          "libmutter-51-0",
+          "libmutter-51-dev",
+          "gir1.2-mutter-51",
+          "libmutter-test-51",
+          "mutter-51-tests"
+        ],
+        "all": [
+          "mutter-common"
+        ]
+      }
+    },
+    "libdisplay-info": {
+      "component": "ubuntu-libdisplay-info",
+      "automatic": true,
+      "derivative": "+nativehdr",
+      "packages": {
+        "amd64": [
+          "libdisplay-info3",
+          "libdisplay-info-dev",
+          "libdisplay-info-bin"
+        ],
+        "i386": [
+          "libdisplay-info3",
+          "libdisplay-info-dev",
+          "libdisplay-info-bin"
+        ]
+      }
+    },
+    "webkit2gtk": {
+      "pin": "packaging/webkitgtk-native-hdr/source-pin.json",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "libjavascriptcoregtk-6.0-1",
+          "libjavascriptcoregtk-6.0-dev",
+          "gir1.2-javascriptcoregtk-6.0",
+          "libwebkitgtk-6.0-4",
+          "libwebkitgtk-6.0-dev",
+          "gir1.2-webkit-6.0"
+        ]
+      }
+    },
+    "gtk4": {
+      "component": "ubuntu-gtk4-display-target",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "libgtk-4-1",
+          "libgtk-4-bin",
+          "libgtk-4-dev",
+          "gir1.2-gtk-4.0",
+          "gtk-update-icon-cache"
+        ],
+        "all": [
+          "libgtk-4-common"
+        ]
+      },
+      "optional_packages": {
+        "amd64": [
+          "libgtk-4-media-gstreamer",
+          "gtk-4-examples",
+          "gtk-4-tests"
+        ],
+        "all": [
+          "libgtk-4-doc"
+        ]
+      }
+    },
+    "gst-plugins-base1.0": {
+      "component": "ubuntu-gst-plugins-base-rpu",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "gstreamer1.0-alsa",
+          "gstreamer1.0-gl",
+          "gstreamer1.0-plugins-base",
+          "gstreamer1.0-plugins-base-apps",
+          "gstreamer1.0-x",
+          "libgstreamer-gl1.0-0",
+          "libgstreamer-plugins-base1.0-0",
+          "gir1.2-gst-plugins-base-1.0"
+        ]
+      },
+      "optional_packages": {
+        "amd64": [
+          "libgstreamer-plugins-base1.0-dev"
+        ]
+      }
+    },
+    "gst-plugins-bad1.0": {
+      "component": "ubuntu-gst-plugins-bad-rpu",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "gstreamer1.0-plugins-bad",
+          "gstreamer1.0-plugins-extra",
+          "libgstreamer-plugins-bad1.0-0",
+          "gir1.2-gst-plugins-extra-1.0",
+          "libgstreamer-plugins-extra1.0-0"
+        ]
+      },
+      "optional_packages": {
+        "amd64": [
+          "libgstreamer-plugins-bad1.0-dev",
+          "gir1.2-gst-plugins-bad-1.0",
+          "libgstreamer-plugins-extra1.0-dev"
+        ]
+      }
+    },
+    "gst-plugins-good1.0": {
+      "component": "ubuntu-gst-plugins-good-dovi",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "gstreamer1.0-plugins-good"
+        ]
+      },
+      "optional_packages": {
+        "amd64": [
+          "gstreamer1.0-qt5",
+          "gstreamer1.0-qt6",
+          "gstreamer1.0-pulseaudio",
+          "gstreamer1.0-gtk3"
+        ]
+      }
+    },
+    "gst-libav1.0": {
+      "component": "ubuntu-gst-libav-dovi-picture",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "gstreamer1.0-libav"
+        ]
+      }
+    },
+    "rust-gst-plugin-gtk4": {
+      "provenance": "gtk",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "gstreamer1.0-gtk4"
+        ]
+      }
+    },
+    "showtime": {
+      "provenance": "showtime",
+      "derivative": "+rogdv",
+      "packages": {
+        "all": [
+          "showtime"
+        ]
+      }
+    },
+    "gst-gtk-dovi-map": {
+      "project": true,
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "libgstgtk-dovi-core0",
+          "libgstgtk-dovi-core-dev",
+          "gstreamer1.0-gtk-dovi"
+        ]
+      }
+    },
+    "mpv": {
+      "policy_only": true,
+      "component": "ubuntu-mpv-system-dv",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "mpv"
+        ]
+      },
+      "monitor_scope": "Ubuntu packaging base only; upstream 0.42 convergence is a separate reviewed release."
+    },
+    "ffmpeg": {
+      "policy_only": true,
+      "component": "ubuntu-ffmpeg-system-dv",
+      "derivative": "+rogdv",
+      "packages": {
+        "amd64": [
+          "libavcodec62",
+          "libavdevice62",
+          "libavformat62",
+          "libavfilter11"
+        ],
+        "i386": [
+          "libavcodec62"
+        ]
+      }
+    },
+    "mesa": {
+      "policy_only": true,
+      "component": "ubuntu-mesa-wayland-hdr",
+      "derivative": "+rogwsi",
+      "packages": {
+        "amd64": [
+          "mesa-vulkan-drivers"
+        ],
+        "i386": [
+          "mesa-vulkan-drivers"
+        ]
+      }
+    },
+    "gnome-shell-ubuntu-extensions": {
+      "policy_only": true,
+      "component": "ubuntu-tiling-assistant",
+      "derivative": "+nativehdr",
+      "packages": {
+        "all": [
+          "gnome-shell-ubuntu-extensions"
+        ]
+      }
+    },
+    "network-manager": {
+      "policy_only": true,
+      "component": "ubuntu-network-manager-suspend",
+      "derivative": "+rogsleep",
+      "packages": {
+        "amd64": [
+          "network-manager"
+        ]
+      }
+    }
+  }
+}

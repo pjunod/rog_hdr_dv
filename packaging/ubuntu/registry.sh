@@ -55,3 +55,16 @@ delete_package() {  # delete_package NAME VERSION ARCH
     *) echo "registry.sh: deleting $1 $2 $3 answered HTTP $code" >&2; return 1 ;;
   esac
 }
+
+# Full required family coverage replaces sentinel-only completion. Failure to
+# read an index is distinct from an absent/partial version.
+family_is_published() {  # family_is_published SOURCE VERSION ARCH...
+  local source=$1 version=$2 arch body index; shift 2
+  index=
+  for arch in "$@"; do
+    body=$(packages_index "$arch") || return 2
+    index+="$body"$'\n\n'
+  done
+  printf '%s' "$index" | python3 "$(dirname "${BASH_SOURCE[0]}")/managed.py" \
+    complete-index "$source" "$version" "$@"
+}
