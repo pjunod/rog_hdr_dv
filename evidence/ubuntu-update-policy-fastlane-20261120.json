@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "date": "2026-11-20",
+  "scope": "Affected Ubuntu policy and WebKit/Showtime packaging Python fast lane; valid passing checks retained and only failed or invalidated methods rerun.",
+  "logical_method_count": 69,
+  "qualified_method_count": 69,
+  "modules": {
+    "test_managed_ubuntu": 31,
+    "test_ubuntu_output_retention": 10,
+    "test_webkit_ubuntu_packaging": 25,
+    "test_showtime_overlay_packaging": 3
+  },
+  "attempts": [
+    {
+      "repository_commit": "0f4382fa1fd9bd9024841254d15d28f5147acfd9",
+      "selected_methods": 69,
+      "failure_events": 5,
+      "error_events": 2,
+      "outcome": "Failed. Retained valid passes; APT status fixture and UTC test exception mismatch required corrections. Failure events can include subtests."
+    },
+    {
+      "repository_commit": "dc0b44736053d54e17a464335937c5f5af591287",
+      "selected_methods": 7,
+      "failures": 4,
+      "errors": 0,
+      "outcome": "Three passed. Correct fixtures exposed four actual APT pin-expression failures."
+    },
+    {
+      "repository_commit": "15cbda429359f7908e5e0129cc1581b09363e64f",
+      "selected_methods": 8,
+      "failures": 0,
+      "errors": 0,
+      "outcome": "Passed. Six actual APT scenarios plus two expression assertions affected by the production correction. Other 61 qualified methods retained from prior valid runs.",
+      "targets": [
+        "test_managed_ubuntu.RealAptPolicyTests.test_absent_registry_keeps_installed_derivative_over_newer_stock",
+        "test_managed_ubuntu.RealAptPolicyTests.test_present_registry_keeps_derivative_over_newer_stock",
+        "test_managed_ubuntu.RealAptPolicyTests.test_older_project_origin_keeps_newer_installed_derivative",
+        "test_managed_ubuntu.RealAptPolicyTests.test_foreign_i386_derivative_is_protected",
+        "test_managed_ubuntu.RealAptPolicyTests.test_derivative_priority_beats_target_release_990",
+        "test_managed_ubuntu.RealAptPolicyTests.test_newer_derivative_is_automatically_selected",
+        "test_managed_ubuntu.ManagedPolicyTests.test_preferences_are_scoped_and_cover_companions",
+        "test_managed_ubuntu.ManagedPolicyTests.test_separate_playback_releases_get_scoped_fallback_without_origin"
+      ]
+    }
+  ],
+  "actual_apt_findings": {
+    "unsupported_expression": "*+rogdv*",
+    "correct_expression": "/.*[+]rogdv.*/",
+    "installed_derivative_priority": 999,
+    "target_release_priority_control": 990,
+    "boundary": "999 exceeds target-release990 and stays below APT\u2019s forced-downgrade range."
+  },
+  "qualification_accounting": {
+    "retained_qualified_methods": 61,
+    "final_affected_methods_passed": 8,
+    "fresh_full_suite_rerun": false,
+    "review": "Same independent adversarial reviewer approved each affected retry selection after findings were addressed."
+  },
+  "limits": [
+    "The 69-method figure is aggregate retained qualification, not a single clean full-suite execution on the final repository commit.",
+    "Source and package-policy tests do not qualify browser playback, compositor output or optical color accuracy.",
+    "Unrelated unit suites were outside this affected fast lane.",
+    "A current full-source compile, package verification and installed runtime acceptance remain separate evidence."
+  ]
+}

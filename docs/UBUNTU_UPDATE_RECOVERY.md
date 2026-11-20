@@ -76,6 +76,12 @@ must expose drift from reviewed source pins and missing current-source
 publication as actionable CI failures;
 changed source is never accepted merely because the patch applies.
 
+The policy/packaging fast lane qualifies 69 methods by retaining 61 valid
+passes and rerunning eight affected methods after the actual APT expression
+correction. All eight passed; earlier failed attempts remain recorded. This
+is aggregate qualification, not a clean full-suite rerun on the final commit.
+[Policy fast-lane accounting](../evidence/ubuntu-update-policy-fastlane-20261120.json).
+
 Required remaining evidence: authenticated source replay, normal warnings-enabled
 compile/package build, final independent review and affected fast lane,
 coherent APT install/rollback rehearsal, publication and mirror verification,
