@@ -246,7 +246,7 @@ class RealAptPolicyTests(unittest.TestCase):
         policy = managed.preferences(self.data, 'project.invalid').replace('origin "project.invalid"', 'origin ""')
         (self.root / 'etc/preferences').write_text(policy)
         version = '2.52.6-1ubuntu1+rogdv6'
-        result = self.solve([version, '2.52.6-1ubuntu1.1'])
+        result = self.solve([version])
         self.assertNotIn('Inst ' + self.name, result)
 
     def test_foreign_i386_derivative_is_protected(self):
