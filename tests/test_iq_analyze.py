@@ -205,28 +205,41 @@ class AnalyzerTests(unittest.TestCase):
 
     def test_fractional_manifest_and_barcode_analysis_keep_exact_source_pts(self):
         stimuli = self.root / 'stimuli'
-        iq.STIMULI.generate_stimuli(stimuli, 192, 72, ["24000/1001", "30000/1001", "60000/1001"], 1)
+        iq.STIMULI.generate_stimuli(stimuli, 192, 72, [24, "24000/1001", "60000/1001"], 1)
         args = iq.parser().parse_args([str(self.root), str(stimuli), str(stimuli),
                     '--width', '192', '--height', '72', '--stim-scale', '1', '--stim-x', '0', '--stim-y', '0',
                     '--cadence-height', '20', '--barcode-low', '5', '--barcode-high', '710'])
         args.calibrated = True
-        indices = [0, 1, 3, 3, 59]  # last index lies just outside this 59-frame source
-        frames = np.stack([barcode(index).astype(np.uint32) for index in indices])
-        ((frames << 20) | (frames << 10) | frames).astype('<u4').tofile(self.root / 'cadence-60000_1001.raw')
-        (self.root / 'cadence-60000_1001.ts').write_text(''.join(
-            f'{n} {n * 16683333} {n + 1} {n * 16683333 + 100}\n' for n in range(len(indices))))
+        # Capture integer24 and the middle fractional rate, with different sample
+        # counts/timestamps. The last rate stays uncaptured: stale loop bindings
+        # cannot silently select its file, rate, timestamp stream or source count.
+        for slug, indices, step_ns, origin_ns in (
+                ('24', [1, 2], 41666667, 1000000000),
+                ('24000_1001', [0, 1, 3, 3, 23], 41708333, 0)):
+            frames = np.stack([barcode(index).astype(np.uint32) for index in indices])
+            ((frames << 20) | (frames << 10) | frames).astype('<u4').tofile(self.root / f'cadence-{slug}.raw')
+            (self.root / f'cadence-{slug}.ts').write_text(''.join(
+                f'{n} {origin_ns + n * step_ns} {n + 1} {origin_ns + n * step_ns + 100}\n'
+                for n in range(len(indices))))
         out = iq.analyze(args)
-        report = out['software_cadence']['60000/1001']
+        report = out['software_cadence']['24000/1001']
         self.assertEqual(report['decoded_indices'], [0, 1, 3, 3, None])
-        self.assertEqual(report['source_frame_rate'], {'numerator': 60000, 'denominator': 1001})
-        self.assertEqual(report['source_frame_period_seconds'], {'numerator': 1001, 'denominator': 60000})
+        self.assertEqual(report['source_frame_rate'], {'numerator': 24000, 'denominator': 1001})
+        self.assertEqual(report['source_frame_period_seconds'], {'numerator': 1001, 'denominator': 24000})
         self.assertEqual(report['decoded_source_pts_seconds'], [
-            {'numerator': 0, 'denominator': 1}, {'numerator': 1001, 'denominator': 60000},
-            {'numerator': 1001, 'denominator': 20000}, {'numerator': 1001, 'denominator': 20000}, None])
+            {'numerator': 0, 'denominator': 1}, {'numerator': 1001, 'denominator': 24000},
+            {'numerator': 1001, 'denominator': 8000}, {'numerator': 1001, 'denominator': 8000}, None])
         self.assertEqual(report['observed_source_changes'][1]['source_pts_delta_seconds'],
-                         {'numerator': 1001, 'denominator': 30000})
+                         {'numerator': 1001, 'denominator': 12000})
         self.assertEqual(report['rejection_counts']['index_outside_source'], 1)
-        self.assertEqual(out['software_cadence']['24000/1001']['status'], 'not_captured')
+        self.assertEqual(out['software_cadence']['60000/1001']['status'], 'not_captured')
+        integer = out['software_cadence']['24']
+        self.assertEqual(integer['decoded_indices'], [1, 2])
+        self.assertEqual(integer['source_frame_rate'], {'numerator': 24, 'denominator': 1})
+        self.assertEqual(integer['decoded_source_pts_seconds'], [
+            {'numerator': 1, 'denominator': 24}, {'numerator': 1, 'denominator': 12}])
+        self.assertEqual(integer['timestamp_deltas_ns']['spa_pts'], [41666667])
+        self.assertEqual(report['timestamp_deltas_ns']['spa_pts'], [41708333] * 4)
         manifest = json.loads((stimuli / 'manifest.json').read_text())
         manifest['schema'] = 'image-quality-stimuli-v1'
         (stimuli / 'manifest.json').write_text(json.dumps(manifest))
@@ -235,9 +248,9 @@ class AnalyzerTests(unittest.TestCase):
         manifest['schema'] = 'image-quality-stimuli-v2'
         (stimuli / 'manifest.json').write_text(json.dumps(manifest))
         self.assertEqual(out['source_verification']['stim']['verified_source_paths'],
-                         ['cadence/cadence_60000_1001fps_p10.y4m'])
-        source = stimuli / 'cadence/cadence_60000_1001fps_p10.y4m'
-        source.write_bytes(source.read_bytes().replace(b'F60000:1001', b'F60:1', 1))
+                         ['cadence/cadence_24fps_p10.y4m', 'cadence/cadence_24000_1001fps_p10.y4m'])
+        source = stimuli / 'cadence/cadence_24000_1001fps_p10.y4m'
+        source.write_bytes(source.read_bytes().replace(b'F24000:1001', b'F24:1', 1))
         with self.assertRaisesRegex(iq.AnalysisError, 'size/hash mismatch'):
             iq.analyze(args)
 

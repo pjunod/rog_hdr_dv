@@ -360,7 +360,9 @@ def analyze(args):
     cadence = {}
     crop_width = sw * scale
     for fps in man['dimensions_and_timing']['cadence_fps']:
-        raw = args.run / f'cadence-{fps}.raw'
+        slug = STIMULI.cadence_slug(fps)
+        rate = STIMULI.cadence_rate(fps)
+        raw = args.run / f'cadence-{slug}.raw'
         if not raw.exists():
             cadence[str(fps)] = {'status': 'not_captured'}
             continue
