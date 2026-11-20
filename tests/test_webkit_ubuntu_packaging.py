@@ -49,6 +49,15 @@ class WebKitPackagingTests(unittest.TestCase):
             f'{key}:{"BOOL" if key in self.features or key == "ENABLE_UNREVIEWED_FEATURE" else "STRING"}={value}\n'
             for key, value in self.cache.items()))
 
+    def test_packaging_metadata_dates_follow_reviewed_utc_pin(self):
+        pin = {'packaging_timestamp': '2026-11-20T00:00:00+00:00'}
+        self.assertEqual(prepare.packaging_dates(pin),
+                         ('2026-11-20', 'Fri, 20 Nov 2026 00:00:00 +0000'))
+        for value in ('2026-11-20T00:00:00', '2026-11-20T00:00:00-05:00'):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(verify.VerificationError, 'UTC'):
+                    prepare.packaging_dates({'packaging_timestamp': value})
+
     def test_cache_accepts_compiler_discovery_and_usr_gi_destinations(self):
         self.cache.update(CMAKE_C_COMPILER='/usr/bin/clang',
                           CMAKE_CXX_COMPILER='/usr/bin/clang++')
@@ -215,7 +224,8 @@ class WebKitPackagingTests(unittest.TestCase):
             records.append({'name': name, 'sha256': hashlib.sha256(file.read_bytes()).hexdigest()})
         series = directory / 'series'
         series.write_text(''.join(name + '\n' for name in names))
-        return {'product_patch_series': records}, series
+        return {'product_patch_series': records,
+                'packaging_timestamp': '2026-11-20T00:00:00+00:00'}, series
 
     def test_ordered_product_series_replays_sequential_changes(self):
         pin, series = self.product_series_fixture()

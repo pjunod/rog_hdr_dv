@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Prepare pinned Ubuntu source; no download, compilation or installation."""
 import argparse
+from datetime import datetime, timedelta
+from email.utils import format_datetime
 import hashlib
 import importlib.util
 import json
@@ -137,9 +139,18 @@ def apply_product_patches(source, patches):
         run(['patch', '--batch', '--forward', '-p1', '-i', str(patch.resolve())], source)
 
 
+def packaging_dates(pin):
+    """Derive both metadata dates from the reviewed pin, never wall-clock time."""
+    timestamp = datetime.fromisoformat(pin['packaging_timestamp'])
+    if timestamp.tzinfo is None or timestamp.utcoffset() != timedelta(0):
+        raise verify.VerificationError('packaging timestamp must explicitly use UTC')
+    return timestamp.date().isoformat(), format_datetime(timestamp)
+
+
 def prepare(source, patch=None, already_patched=False, quilt_state_from=None, product_series=None):
     source = source.resolve()
     pin = json.loads((HERE / 'source-pin.json').read_text())
+    last_update, changelog_date = packaging_dates(pin)
     patches = product_patches(pin, patch, product_series)
     original = source.parent / 'webkit2gtk_2.52.6.orig.tar.xz'
     expected = pin['ubuntu_source_archives'][original.name]
@@ -225,7 +236,7 @@ def prepare(source, patch=None, already_patched=False, quilt_state_from=None, pr
         raise verify.VerificationError('dpkg-source did not record a source patch')
     recorded.write_text('Description: Native GTK HDR video and typed image colour\n'
                         'Origin: other, reviewed source ' + pin['candidate_commit'] + '\n'
-                        'Forwarded: no\nLast-Update: 2026-11-14\n' + body[marker:])
+                        'Forwarded: no\nLast-Update: ' + last_update + '\n' + body[marker:])
     verify.verify_source(source, pin)
     run(['patch', '--batch', '--forward', '-p1', '-i', str(HERE / 'ubuntu-packaging.diff')], source)
     (source / 'debian/source/options').write_text(
@@ -240,7 +251,7 @@ def prepare(source, patch=None, already_patched=False, quilt_state_from=None, pr
     old.write_text('webkit2gtk (' + pin['package_version'] + ') stonking; urgency=medium\n\n'
                    '  * Build reviewed native HDR video and image-colour source as GTK4-only packages.\n'
                    '  * Preserve distribution debhelper, symbols and generated dependencies.\n\n'
-                   ' -- ROG HDR contributors <rog-hdr@example.invalid>  Sat, 14 Nov 2026 00:00:00 +0000\n\n'
+                   ' -- ROG HDR contributors <rog-hdr@example.invalid>  ' + changelog_date + '\n\n'
                    + old.read_text())
     run(['make', '-f', 'debian/rules', 'debian/control'], source)
     names = [line.split(': ', 1)[1] for line in (source / 'debian/control').read_text().splitlines()

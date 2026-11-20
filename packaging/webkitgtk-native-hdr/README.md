@@ -1,11 +1,25 @@
 # WebKitGTK packages — replay the reviewed GTK4 source on Ubuntu
 
-**Status:** ordered-series source integration prepared; final independent review,
-new replay, binary and runtime qualification pending · **Updated:** 2026-11-14
+**Status:** current Ubuntu source replay prepared; binary and runtime
+qualification pending · **Updated:** 2026-11-20
 
-This recipe prepares Ubuntu `webkit2gtk 2.52.6-1ubuntu1` plus the inherited
+The historical WebKit7 nineteen-case focused run and actual ES2 legacy case
+passed, followed by private-compositor import/fallback checks and a bounded
+real-screen P3 comparison. A November 18 stock WebKit replacement superseded
+that installed correction. Those receipts qualify the historical source and
+package set only; see [status](../../docs/STATUS.md) and
+[image-colour acceptance](../../docs/GTK_WEBKIT_IMAGE_COLOUR.md).
+
+The recipe below rebases the same seventeen product patches onto Ubuntu
+`2.52.6-1ubuntu1.1`, preserving its NVIDIA shared-memory fallback correction.
+No product patch bytes changed. Current binary compilation, focused tests,
+package binding and runtime acceptance remain pending. Optical, full-film
+and every-frame acceptance remain separate; encrypted DRM/CDM browser
+delivery is outside this recipe's clear-video scope.
+
+This recipe prepares Ubuntu `webkit2gtk 2.52.6-1ubuntu1.1` plus the inherited
 native HDR video patch and proposed image-colour series as
-`2.52.6-1ubuntu1+rogdv7`. It keeps
+`2.52.6-1ubuntu1.1+rogdv8`. It keeps
 Ubuntu's debhelper generation, symbols, GIR dependency generation and
 `dh_shlibdeps`. It selects GTK4 only, with standard `/usr` multiarch paths.
 The ordered product series and [source pin](source-pin.json) identify the
@@ -23,6 +37,14 @@ fixtures pinned by SHA256; preparation verifies the entire original
 checks source contents and modes against Git tree IDs without requiring Git
 metadata. Read [the explicit CMake profile](cmake-profile.json) and the complete
 [Boolean feature receipt](cmake-features.json) before use.
+The pin records the UTC packaging timestamp used for both the Debian
+changelog and DEP-3 Last-Update field. It preserves the historical WebKit7
+source provenance separately; local import commits identify this replay and
+are not advertised as fetchable upstream revisions. The authenticated current
+Ubuntu descriptor names two source archives, with no detached `.asc` member.
+The retained Ubuntu packaging input snapshots are byte-identical to this
+update's rules and control templates.
+
 This is an amd64 clang `Release` derivative with empty C/C++ base flags,
 `-O2 -DNDEBUG -g0` release flags and empty linker flags. It does not claim
 Ubuntu's default compiler or hardening flags.
@@ -31,7 +53,7 @@ Ubuntu's default compiler or hardening flags.
 
 Use an owned task directory on the configured external storage volume and
 Ubuntu's authenticated source metadata. The
-[official source descriptor](https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.dsc)
+[official source descriptor](https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.1.dsc)
 names the exact archives and hashes recorded in [the pin](source-pin.json).
 Verify the descriptor through your authenticated Ubuntu source setup; the
 recipe's hash check does not replace archive signature verification. Set the absolute paths below before
@@ -41,9 +63,9 @@ compiler slot.
 ```bash
 # Download the exact published Ubuntu source into your owned source directory.
 cd "$source_parent"
-apt-get source --download-only webkit2gtk=2.52.6-1ubuntu1
+apt-get source --download-only webkit2gtk=2.52.6-1ubuntu1.1
 # Unpack with Ubuntu's existing quilt patches applied.
-dpkg-source -x webkit2gtk_2.52.6-1ubuntu1.dsc "$task_source"
+dpkg-source -x webkit2gtk_2.52.6-1ubuntu1.1.dsc "$task_source"
 # Add the exact reviewed public product series and the packaging overlay.
 python3 "$recipe/prepare-source.py" --source "$task_source" \
   --product-series "$product_series"
@@ -230,32 +252,30 @@ silence a refusal. Private receipts and source archives stay outside Git.
 
 ## Source replay qualification
 
-The `+rogdv7` series integration has not run a new source-package replay,
-focused tests, candidate compilation, binary packaging or browser runtime
-qualification. The regression sources in
+The [source-only receipt](source-replay-receipt.json) records the November 20
+`+rogdv8` replay: all seventeen unchanged patches applied to authenticated
+Ubuntu `2.52.6-1ubuntu1.1`, then normal source-package generation and fresh
+`.dsc` extraction passed. All 34,392 public source files and modes matched
+the pinned trees. The complete case-sensitive distribution documentation and
+Ubuntu's NVIDIA shared-memory fallback correction were preserved. Generated
+control names exactly the six GTK4 packages; the Debian archive has 55
+members with no private or Python-cache members. Quilt recording normalized
+82 source file timestamps; identity checks passed before all 82 were restored.
+The existing warm compiler cache was not changed by this source replay.
+
+Source acquisition used authenticated signed Ubuntu APT metadata. The
+archive hashes match the downloaded descriptor; this receipt does not claim
+independent maintainer-signature verification of that `.dsc`. The receipt
+retains the earlier `+rogdv1` roundtrip, negative controls and timestamp tests
+under historical qualification, with their original limits.
+
+The regression sources in
 [`tests/test_webkit_ubuntu_packaging.py`](../../tests/test_webkit_ubuntu_packaging.py)
 cover sequential replay and early refusal of reordered, missing, duplicate,
-unsafe, symlinked and digest-mismatched patch inputs. They remain unexecuted
-for this integration pending final adversarial review and build admission.
-Unchanged compiler-loop receipts do not qualify this candidate.
-
-The retained [source-only qualification receipt](source-replay-receipt.json)
-records an earlier `+rogdv1` product and recipe revision, not this candidate.
-It records
-17 covered focused cases and a normal source-package roundtrip on an owned
-Ubuntu extraction. All 34,386 public source files and modes matched after
-fresh `.dsc` extraction. The generated control parsed as exactly the six GTK4
-packages; the Debian source archive had 55 members and no Python cache or
-private members. Actual negative source controls rejected both a private
-source-root note and one hidden under `debian/__pycache__` before recording.
-
-Normal quilt recording normalized 39 file timestamps in each of the clean
-and already-patched preparation paths. After full source and patch identity
-proofs, all 39 were restored; every public source mtime remained unchanged.
-The subsequent normal source-package command also preserved those mtimes,
-and the private mode-`0600` recovery snapshot stayed immutable. These checks
-compiled nothing and did not operate on the active browser compiler slot.
-Original failures and their affected retries are retained privately.
+unsafe, symlinked and digest-mismatched patch inputs, plus deterministic UTC
+metadata dates. Current-rebase focused tests, candidate compilation, binary
+packaging and browser runtime qualification remain pending. A successful
+source roundtrip does not qualify those later stages.
 
 ## Package and qualification boundary
 
