@@ -25,6 +25,12 @@ SCENES = ["dither", "siting-c420mpeg2", "siting-c420jpeg", "siting-c420paldv",
           "scaling4k", *(f"cadence-{fps}" for fps in (24, 25, 30, 50, 60))]
 
 
+def _validate_y4m_range(fields: list[str]) -> None:
+    if any(field.startswith("XCOLORRANGE=") and field != "XCOLORRANGE=LIMITED"
+           for field in fields):
+        raise ValueError("Y4M XCOLORRANGE must be LIMITED for this capture")
+
+
 def extract_y4m_frame(data: bytes, index: int) -> tuple[bytes, dict]:
     """Return a standalone one-frame Y4M file and parsed geometry/chroma metadata."""
     if index < 0:
@@ -35,8 +41,9 @@ def extract_y4m_frame(data: bytes, index: int) -> tuple[bytes, dict]:
     header = data[:nl + 1]
     if not header.startswith(b"YUV4MPEG2 "):
         raise ValueError("unsupported Y4M stream header")
-    fields = header.decode("ascii", "strict").strip().split()
-    values = {field[0]: field[1:] for field in fields[1:] if len(field) > 1}
+    fields = header.decode("ascii", "strict").split()[1:]
+    _validate_y4m_range(fields)
+    values = {field[0]: field[1:] for field in fields if len(field) > 1}
     try:
         width, height, chroma = int(values["W"]), int(values["H"]), values["C"]
     except (KeyError, ValueError) as exc:
@@ -83,6 +90,7 @@ def cadence_capture_plan(data: bytes, fps: int) -> dict:
         rate_num, rate_den = map(int, values["F"].split(":"))
     except (UnicodeDecodeError, KeyError, ValueError) as exc:
         raise ValueError("cadence header needs valid dimensions and frame rate") from exc
+    _validate_y4m_range(fields)
     if width != 192 or height != 108 or values.get("C") != "420p10":
         raise ValueError("cadence source must be 192x108 C420p10")
     if rate_num <= 0 or rate_den <= 0 or rate_num != fps * rate_den:

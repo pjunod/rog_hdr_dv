@@ -1,5 +1,18 @@
 # Status — what is working and what remains
 
+**November 20, 2026 — source validation regression follow-up.** The existing
+subtitle-carrier verifier now compares probed pixel format and chroma location
+alongside color descriptions and exact rational packet identities. Authored
+fractional-rate remux controls cover equivalent time bases, a 1 ms shift,
+same-count loss/duplication and independent encoding-field changes. The IQ
+runner refuses an explicit range declaration that conflicts with its fixed
+limited-range interpretation; LIMITED and absent legacy declarations remain
+admissible. [Carrier boundary](SYSTEM_DOLBY_VISION.md) · [IQ input contract](IMAGE_QUALITY_STIMULI.md).
+These source-level checks do not establish decoded-sample equivalence, new
+capture or optical/display acceptance. No parked algorithm or runtime install
+is enabled by this validation-only follow-up. Earlier runtime evidence below
+retains its original date and limits.
+
 **Updated November 17, 2026 (UTC and Eastern).**
 Latest: a normal catalog Play selected live HLS through fresh
 `vod_index_pending` recovery. An actual Lua OSC timeline click replaced the

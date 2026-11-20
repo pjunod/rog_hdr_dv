@@ -9,6 +9,13 @@ import re
 import subprocess
 
 
+STREAM_DESCRIPTION_FIELDS = (
+    "codec_name", "codec_tag_string", "width", "height",
+    "color_range", "color_space", "color_transfer", "color_primaries",
+    "pix_fmt", "chroma_location",
+)
+
+
 def sha256_field(value):
     if not isinstance(value, str) or not re.fullmatch(r"SHA256:[0-9a-fA-F]{64}", value):
         raise ValueError("Expected a SHA-256 hash from ffprobe")
@@ -20,10 +27,9 @@ def stream_identity(stream):
                if item.get("side_data_type") == "DOVI configuration record"]
     if len(configs) != 1 or configs[0].get("rpu_present_flag") != 1:
         raise ValueError("Expected one Dolby Vision configuration with RPU present")
-    fields = ("codec_name", "codec_tag_string", "width", "height",
-              "color_range", "color_space", "color_transfer", "color_primaries")
+    description = tuple(stream.get(key) for key in STREAM_DESCRIPTION_FIELDS)
     config = json.dumps(configs[0], sort_keys=True, separators=(",", ":"))
-    return tuple(stream.get(key) for key in fields), sha256_field(stream["extradata_hash"]), config
+    return description, sha256_field(stream["extradata_hash"]), config
 
 
 def signature(probe, reference_packets=None):
@@ -48,8 +54,8 @@ def signature(probe, reference_packets=None):
 
 
 def inspect(path, reference_packets=None):
-    fields = ("stream=codec_name,codec_tag_string,width,height,color_range,color_space,"
-              "color_transfer,color_primaries,extradata_hash,time_base:stream_side_data:"
+    stream_fields = ",".join((*STREAM_DESCRIPTION_FIELDS, "extradata_hash", "time_base"))
+    fields = (f"stream={stream_fields}:stream_side_data:"
               "packet=pts,dts,duration,size,data_hash")
     output = subprocess.check_output([
         "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", fields,
