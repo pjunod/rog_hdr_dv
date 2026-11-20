@@ -14,7 +14,7 @@ and target evidence.
 | 03 | LNX-3 | Report draft with a real downstream VRR/PSR fix | Bounded November 2 hardware pass retained; current upstream extraction, qualification and owner mail preparation outstanding |
 
 ```bash
-export UPSTREAM_WORK_ROOT=/Volumes/Untitled/agent/workspaces/upstream-linux-mail
+export UPSTREAM_WORK_ROOT="${HDR_WORK:?set HDR_WORK to owned external storage}/upstream-linux-mail"
 ./upstream/linux/submit.sh all --dry-run  # Apply and emit cover + our two unsigned follow-ups.
 ./upstream/linux/submit.sh --lookup-thread  # Read the original public cover Message-ID.
 ./upstream/linux/submit.sh 02 --prepare --thread MESSAGE-ID  # Human: add your DCO and prepare mail.
