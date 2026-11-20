@@ -182,7 +182,11 @@ def preferences(data, host):
         sections.append(f'# {source}' + (' (separate release: installed derivative protection only)' if spec.get('policy_only') else ''))
         if not spec.get('policy_only'):
             sections.append(f'Package: {names}\nPin: origin "{host}"\nPin-Priority: 999\n')
-        sections.append(f'Package: {names}\nPin: version *{spec["derivative"]}*\nPin-Priority: 999\n')
+        # APT treats a final glob star as a prefix matcher; *+suffix*
+        # therefore does not match derivative versions. Use its explicit regex
+        # form, with a literal plus, so absent registry versions stay protected.
+        derivative_pattern = re.escape(spec['derivative']).replace(r'\+', '[+]')
+        sections.append(f'Package: {names}\nPin: version /.*{derivative_pattern}.*/\nPin-Priority: 999\n')
     return '\n'.join(sections)
 
 

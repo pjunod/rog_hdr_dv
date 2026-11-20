@@ -77,7 +77,13 @@ an authorization to publish or install a package.
 Some Ubuntu source transitions sort below the preceding derivative. Both
 origin and installed-derivative preferences use 999: above normal Ubuntu and
 target-release priorities, below APT's forced-downgrade threshold. Routine APT
-updates retain the newer installed patch generation. The generic installer
+updates retain the newer installed patch generation. The fallback uses APT's explicit version-regex form, for example
+`Pin: version /.*[+]rogdv.*/`. The leading-and-trailing wildcard form failed
+real APT matching during qualification. Solver checks verify the installed
+version actually has priority 999, including an absent project repository,
+foreign i386 packages and a target-release priority of 990.
+
+The generic installer
 refuses numerical downgrades. A lower-sorting reviewed replacement needs an
 explicit exact-version, coherent transaction after its own APT rehearsal.
 Superseded registry versions may be pruned only after complete local bundle,

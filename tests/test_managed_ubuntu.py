@@ -7,6 +7,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import shlex
@@ -106,7 +107,7 @@ class ManagedPolicyTests(unittest.TestCase):
         self.assertNotIn('Package: *', result)
         self.assertIn('Pin-Priority: 999', result)
         self.assertIn('libwebkitgtk-6.0-4:amd64', result)
-        self.assertIn('Pin: version *+rogdv*', result)
+        self.assertIn('Pin: version /.*[+]rogdv.*/', result)
         for row in rows:
             self.assertIn(row['Package'], result)
 
@@ -130,9 +131,9 @@ class ManagedPolicyTests(unittest.TestCase):
         self.assertEqual(set(data), {'mpv', 'ffmpeg', 'mesa', 'gnome-shell-ubuntu-extensions', 'network-manager'})
         policy = managed.preferences(data, 'forge.lan')
         self.assertNotIn('Pin: origin', policy)
-        self.assertIn('Pin: version *+rogwsi*', policy)
-        self.assertIn('Pin: version *+nativehdr*', policy)
-        self.assertIn('Pin: version *+rogsleep*', policy)
+        self.assertIn('Pin: version /.*[+]rogwsi.*/', policy)
+        self.assertIn('Pin: version /.*[+]nativehdr.*/', policy)
+        self.assertIn('Pin: version /.*[+]rogsleep.*/', policy)
         for name in ('mpv', 'libavcodec62', 'libavdevice62', 'libavformat62', 'libavfilter11', 'mesa-vulkan-drivers', 'gnome-shell-ubuntu-extensions', 'network-manager'):
             self.assertIn(name, policy)
         self.assertEqual(managed.preflight([{'Package': 'mpv', 'Architecture': 'amd64'}], [], data), [])
@@ -224,6 +225,7 @@ class RealAptPolicyTests(unittest.TestCase):
         subprocess.run(['apt-get', *self.options, 'update'], check=True, capture_output=True, text=True)
         policy = subprocess.check_output(['apt-cache', *self.options, 'policy', self.name], text=True)
         self.assertIn('Installed: ' + self.installed, policy)
+        self.assertRegex(policy, r'\*\*\* ' + re.escape(self.installed) + r' 999(?:\s|$)')
         return subprocess.check_output(['apt-get', *self.options, '-s', 'install', self.name], text=True)
 
     def test_absent_registry_keeps_installed_derivative_over_newer_stock(self):
@@ -266,6 +268,7 @@ class RealAptPolicyTests(unittest.TestCase):
         subprocess.run(['apt-get', *self.options, 'update'], check=True, capture_output=True, text=True)
         policy = subprocess.check_output(['apt-cache', *self.options, 'policy', self.name + ':i386'], text=True)
         self.assertIn('Installed: ' + installed, policy)
+        self.assertRegex(policy, r'\*\*\* ' + re.escape(installed) + r' 999(?:\s|$)')
         result = subprocess.check_output(['apt-get', *self.options, '-s', 'install', self.name + ':i386'], text=True)
         self.assertNotIn('Inst ' + self.name, result)
 
