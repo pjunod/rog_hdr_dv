@@ -314,3 +314,14 @@ remain in the capture stream. Median PTS intervals are about
 41.655/40.008/33.344/19.987/16.646 ms: this stream follows content damage,
 not 240 Hz refresh. Panel cadence, lower-screen tearing, temporal dither and
 optical qualification remain open. No package or display configuration changed.
+
+## Source-range preflight regression coverage
+
+The capture runner supplies an explicit BT.2020/PQ/limited interpretation.
+Its single-frame and cadence Y4M preflights reject an explicit incompatible
+`XCOLORRANGE` declaration instead of relabelling it as limited. Authored helper
+controls accept `XCOLORRANGE=LIMITED` and the legacy absence of this optional
+tag, and refuse full/conflicting declarations before source data can be used
+under that interpretation. This is a software input-contract regression,
+not new mpv, compositor, screen-capture or optical acceptance. It does not
+broaden the supported chroma formats or infer omitted physical colour tags.

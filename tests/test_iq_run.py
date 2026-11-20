@@ -1,4 +1,4 @@
-"""Source-only checks for iq_run helpers; these tests are intentionally not run here."""
+"""Source-only checks for iq_run helpers using synthetic inputs."""
 import importlib.util
 import json
 import tempfile
@@ -55,6 +55,26 @@ class ExtractY4MFrameTests(unittest.TestCase):
             iq_run.cadence_capture_plan(valid.replace(b"W192", b"W190", 1), 24)
         with self.assertRaisesRegex(ValueError, "truncated"):
             iq_run.cadence_capture_plan(valid[:-1], 24)
+
+    def test_source_range_preflight_for_still_and_cadence(self):
+        header = b"YUV4MPEG2 W192 H108 F24:1 Ip A1:1 C420p10 XYSCSS=420P10"
+        pixels = 192 * 108
+        frame = b"\nFRAME\n" + b"\x40\x00" * pixels + b"\x00\x02" * (pixels // 2)
+        for tags in (b"", b" XCOLORRANGE=LIMITED"):
+            with self.subTest(tags=tags):
+                data = header + tags + frame
+                extracted, _ = iq_run.extract_y4m_frame(data, 0)
+                self.assertEqual(extracted, data)
+                self.assertEqual(iq_run.cadence_capture_plan(data, 24)["available_source_frames"], 1)
+
+        for tags in (b" XCOLORRANGE=FULL", b" XCOLORRANGE=LIMITED XCOLORRANGE=FULL",
+                     b" XCOLORRANGE=FULL XCOLORRANGE=LIMITED"):
+            with self.subTest(tags=tags):
+                data = header + tags + frame
+                with self.assertRaisesRegex(ValueError, "XCOLORRANGE must be LIMITED"):
+                    iq_run.extract_y4m_frame(data, 0)
+                with self.assertRaisesRegex(ValueError, "XCOLORRANGE must be LIMITED"):
+                    iq_run.cadence_capture_plan(data, 24)
 
     def test_existing_output_is_never_reused(self):
         with tempfile.TemporaryDirectory() as tmp:
