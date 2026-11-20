@@ -1,6 +1,18 @@
 # Status — what is working and what remains
 
-**Updated November 17, 2026 (UTC and Eastern).**
+**Updated November 20, 2026. Recovery in progress.**
+Fresh package and ELF inspection found that the November 18 Ubuntu update
+replaced the patched WebKit and JavaScriptCore runtimes with stock
+`2.52.6-1ubuntu1.1`. GNOME Web resolves that stock library; its native HDR/DV
+entry points are absent. The November 15 chart and runtime results below
+remain historical evidence for `+rogdv7`, not acceptance of today's browser.
+GTK `+rogdv6`, the native GStreamer mapper `+rogdv10`, sink `+rogdv5.7`
+and Showtime `+rogdv5.13` remain installed. The recovery is rebasing the
+WebKit series onto the current Ubuntu source and extending managed package
+publication and update monitoring. Installation and new runtime acceptance
+are pending. [Cause and recovery](UBUNTU_UPDATE_RECOVERY.md).
+
+**November 17 historical checkpoint (UTC and Eastern).**
 Latest: a normal catalog Play selected live HLS through fresh
 `vod_index_pending` recovery. An actual Lua OSC timeline click replaced the
 session; passive normal HTTP responses directly accepted sequence 1 on the

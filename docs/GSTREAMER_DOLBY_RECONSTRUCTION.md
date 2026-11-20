@@ -1,23 +1,38 @@
 # GStreamer resolved Dolby pictures
 
-**Updated November 13, 2026.** The native picture contract carries frame-owned metadata through software, Intel VA and NVIDIA decoding. The uninstalled NVIDIA/GTK Profile 7 FEL candidate pairs decoded enhancement planes with the exact base picture and passed private-compositor pixel and seek controls. Its producer is part of the active five-patch Ubuntu source series. The coherent 18-package candidate family built normally and remains uninstalled; it is separate from the installed 45-package November 9 release. [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json) · [Current installation status](STATUS.md).
+**Updated November 20, 2026.** The native picture contract carries
+frame-owned metadata through software, Intel VA and NVIDIA decoding. The
+November 9 native FEL controls and initial eighteen-package build are
+historical qualification, followed by the browser runtime corrections below.
+The later installed family included core/mapper `0.1.0+rogdv10`, sink
+`0.15.2-1ubuntu2+rogdv5.7` and Showtime `50.0-2+rogdv5.13`; the GTK6/WebKit7
+transaction and bounded November 15 checks are recorded in
+[current status](STATUS.md). Earlier uninstalled candidate descriptions do
+not describe the latest installation state.
+[Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json).
 
-## Browser destination interface in development
+## Browser destination interface and acceptance boundary
 
-The source candidate adds an explicit logical100nit BT709/sRGB destination
-without changing the native DISPLAY_PQ witness requirement. The additive
-destination API preserves the existing core ABI and legacy entry points.
-Retained pictures keep their original dimensions and picture identity when a
-later destination requests a different output layout. The marked reverse caps
-query now derives each input candidate through its actual graded output before
+The source adds an explicit logical100nit BT709/sRGB destination without
+changing the native DISPLAY_PQ witness requirement. The additive destination
+API preserves the existing core ABI and legacy entry points. Retained
+pictures keep their original dimensions and picture identity when a later
+destination requests a different output layout. The marked reverse caps
+query derives each input candidate through its actual graded output before
 intersecting downstream constraints; unmarked passthrough remains unchanged.
 
 The extended negotiation probe exercises actual linked pad queries, normalized
-peer answers, output format/memory/width restrictions, and separate marked
-configurations. Runtime and normal-package qualification of this new source
-remain pending. These source changes do not grant native HDR browser delivery
-or physical panel acceptance. Browser source/track/CDM lifecycle qualification
-and stream-qualified VA selection are separate required parts of that work.
+peer answers, output format/memory/width restrictions and separate marked
+configurations. Later normal-package and clear-video runtime qualification
+superseded the initial source-only state; see the
+[WebKit runtime matrix](WEBKIT_NATIVE_HDR.md#runtime-qualification) for the
+exact historical P5/P8/P7, source/seek and ordinary-fallback controls.
+
+The November 18 stock WebKit replacement superseded the installed browser
+correction. Restoring WebKit requires new source/build/package and runtime
+binding; historical GStreamer and WebKit passes do not qualify that rebase.
+Full-film, every-frame RPU/drop continuity and optical panel acceptance
+remain open. Encrypted/CDM browser delivery is a separate scope.
 
 ## Normal GNOME playback
 
@@ -74,7 +89,10 @@ The actual GTK path uploaded both layers, and the provider accepted a composed 3
 
 The normal Ubuntu builds produced 18 amd64/all packages: bridge `0.2.0+rogdv2`, core/mapper `0.1.0+rogdv4`, bad plugins `1.28.6-1ubuntu1+rogdv3`, sink `0.15.2-1ubuntu2+rogdv4.2` and Showtime `50.0-2+rogdv4.2`. The normal public package preparer uses the actual bad/extra outputs and advances the exact client dependencies together. Complete private rollback archives preserve the prior build slots and package outputs.
 
-A separate GtkVideo trial used the extracted bridge/core/bad packages and reached its 2.999666-second EOS in 3.069 seconds after explicit play. Visible native redraws mapped pictures from the beginning through the end of the clip. This diagnostic rendered seven sink frames and dropped thirteen while LOG-level code hashed and scanned every visible 4K frame. It establishes clock progression and no delayed-output hang, not clean 24 fps. The upstream per-stream baseline conversion is expected before each view applies its own grade. Normal-logging throughput and runtime qualification of the matching rebuilt clients remain open; further GPU trials are stopped.
+A separate GtkVideo trial used the extracted bridge/core/bad packages and reached its 2.999666-second EOS in 3.069 seconds after explicit play. Visible native redraws mapped pictures from the beginning through the end of the clip. This diagnostic rendered seven sink frames and dropped thirteen while LOG-level code hashed and scanned every visible 4K frame. It establishes clock progression and no delayed-output hang, not clean 24 fps. The upstream per-stream baseline conversion is expected before each view applies its own grade. This early trial did not qualify normal-logging throughput. Later bounded
+browser and installed-client checks are recorded below and in
+[current status](STATUS.md); full-rate every-frame and full-film acceptance
+remain open.
 
 ## Browser runtime fixes (November 11)
 

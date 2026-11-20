@@ -3,8 +3,8 @@
 **Status:** current Ubuntu source replay prepared; binary and runtime
 qualification pending · **Updated:** 2026-11-20
 
-The historical WebKit7 nineteen-case focused run and actual ES2 legacy case
-passed, followed by private-compositor import/fallback checks and a bounded
+The historical WebKit7 nineteen-case focused run and separately declared
+software-Mesa legacy scenario passed, followed by private-compositor import/fallback checks and a bounded
 real-screen P3 comparison. A November 18 stock WebKit replacement superseded
 that installed correction. Those receipts qualify the historical source and
 package set only; see [status](../../docs/STATUS.md) and

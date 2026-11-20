@@ -1,13 +1,45 @@
 # GTK and WebKit image colour — preserve values and describe the surface
 
-**Status:** Proposed; diagnosis reproduced, GTK compiler prerequisite passed; implementation in progress.
-**Date:** November 13, 2026 Eastern / November 14 UTC.
+**Status:** Historical GTK6/WebKit7 correction qualified and installed November 15;
+restoration after the November 18 stock WebKit replacement is pending.
+**Updated:** November 20, 2026.
 **Deciders:** Project maintainer and coordinating agent. No upstream acceptance
-or deployment is claimed.
+is claimed. Historical deployment is recorded below.
 
 Companion to [image colour](GNOME_IMAGE_COLOUR.md), [WebKit delivery](WEBKIT_NATIVE_HDR.md)
 and [current status](STATUS.md). This topic owns a normal image/page pipeline
 correction, separate from the completed Player session-control repair.
+
+## November 15 acceptance and November 18 regression
+
+PR44 installed GTK `+rogdv6`, WebKit/JavaScriptCore `+rogdv7`, sink
+`+rogdv5.7` and Showtime `+rogdv5.13` on November 15: ten upgrades, no
+removals and a clean package audit. Fifteen GTK protocol cases and nineteen
+normal WebKit cases plus one separately declared software-Mesa legacy
+scenario passed on the exact
+historical source. The WebKit API checks used declared software Mesa.
+
+Private-compositor checks passed GTK's actual default Vulkan pass-through
+and GL fallback cases with one colour owner per surface. WebKit's positive
+import and injected-failure cases retained the committed picture until a
+valid replacement and exercised the bound SHM fallback. The real-screen P3
+chart agreed between Web and Image Viewer within one median PQ10 code on all
+48 channels, and within 1.04 codes of an independent model. See
+[current status](STATUS.md) and the
+[screen receipt](../evidence/image-colour-screen-20261115.json).
+
+A November 18 stock WebKit replacement superseded the installed browser
+correction. These historical passes do not establish the current browser's
+colour or native-video behaviour. Restoration is being rebased onto current
+Ubuntu source; compilation, focused regressions, package binding and runtime
+acceptance remain pending. Verify GTK/sink/Showtime and WebKit package state
+separately. Optical accuracy, full-film and every-frame fidelity remain open;
+encrypted browser DRM/CDM delivery is a separate scope.
+
+The diagnosis, proposed design and prepared-work descriptions below preserve
+the November 13 investigation. Their pending-work statements are superseded
+by the acceptance above for the exact historical source only. They do not
+qualify the current-source rebase.
 
 ## Context: appearance agreement hid a measurable mismatch
 
@@ -148,7 +180,7 @@ code. Content precision and actual transport capabilities must be handled
 truthfully. No new user feature gate, forced decoder/renderer rank or watchdog
 belongs in the correction.
 
-## Implementation and acceptance work
+## Historical implementation and acceptance plan
 
 1. Authenticate exact source/package inputs and WSI ownership; confirm there is
    no overlapping implementation owner. Coordinate compiler resources with CI.
@@ -174,8 +206,9 @@ ordinary changing scene and target-bound interposer for the eventual native
 check. It forwards actual advertisements, then removes only pass-through
 for the negative case. It never adds formats or selects a renderer. Missing
 interception, real alternatives or private-frame evidence is inconclusive.
-Source is prepared only: no compilation or execution is claimed. Run it
-only after final review and resource admission, outside the owner session.
+The historical GTK6 run passed both scenes. Changed source or packages
+require fresh binding and affected runtime checks after resource admission,
+outside the owner session.
 
 ## WebKit product and packaging integration
 
@@ -184,14 +217,14 @@ preserves meaningful PNG16 precision through interlace and animation, and
 uses typed nonlinear-sRGB F16 working storage through supported accelerated
 tiles, copies/effects, page transport and GTK import. Other codecs retain
 their explicit inherited precision limits. One-pixel image optimization and
-frame-cache accounting also follow the actual storage. No candidate build,
-link, test or runtime pass is claimed yet.
+frame-cache accounting also follow the actual storage. The exact historical WebKit7 build and bounded checks passed as recorded
+above; the current-source rebase has no inherited pass.
 
 Ordinary page colour metadata is separate from native-video PQ texture
 metadata. The production frame helper couples allocation, incoming fence
 and native serial/plane state; same-allocation updates retain ownership,
 and a later different allocation releases it once. Focused regression
-sources cover these transitions, but they have not run.
+sources cover these transitions; the historical nineteen-case run passed.
 
 The original product patch remains unchanged. The appended mail patches
 preserve their authors and the original Ubuntu Debian tree; the strict
@@ -214,8 +247,8 @@ The excluded `TestWebCoreImageColour` target reuses shipping WebCore OBJECT
 files and the existing harness. `ENABLE_API_TESTS` stays off and unified
 builds stay on; no product SDK exports or global float API are added. The
 consumer adds five harness/regression translation units, two gtest units
-and one substantial object-level executable link. Link resource fit remains
-unmeasured. Neither normal package builds nor default CTest runs execute it.
+and one substantial object-level executable link. The historical executable linked; resource fit for a new builder or changed
+source must be established separately. Neither normal package builds nor default CTest runs execute it.
 
 After final review and qualified resource admission, build the target
 explicitly and run the four prepared suites with GoogleTest XML output:
@@ -235,7 +268,7 @@ printer can label skipped cases PASS; use XML rather than that label. A
 zero-case filter or unavailable capability is not preservation qualification.
 Record source/configuration, producer objects and linked/loaded libraries.
 Actual shipping framebuffer, IPC, GDK import and native-lease checks remain
-separate. No command above has run for this candidate.
+separate. These commands passed for the historical source, not the rebase.
 
 
 The disjoint twentieth case checks legal U8 texture allocation, upload, copy,

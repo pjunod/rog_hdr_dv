@@ -18,7 +18,15 @@ repository owns the operating-system display work.
 > check. Nothing here is upstream yet, and no colour accuracy is claimed
 > without an optical measurement of the panel.
 
-## What works today (2026-11-17)
+## Current recovery (2026-11-20)
+
+Ubuntu's November 18 update replaced the patched WebKit runtimes with stock
+packages. GTK/GStreamer remain installed; browser HDR/DV and image-colour
+acceptance must be re-established after the current-source WebKit rebase.
+[Update recovery](docs/UBUNTU_UPDATE_RECOVERY.md) records the confirmed cause,
+the package-management fix and the remaining deployment checks.
+
+## Historical qualified baseline (2026-11-17)
 
 GTK `+rogdv6`, WebKit `+rogdv7` and Showtime `+rogdv5.13` are installed.
 On the measured P3 chart GNOME Web and Image Viewer agree within one PQ10

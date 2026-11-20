@@ -5,7 +5,49 @@ Companion to [operations](OPERATIONS.md) (inspecting the laptop safely) and
 before this repository existed) — this is *how a machine gets the patched
 Mutter and libdisplay-info, and how they stay current with Ubuntu*.
 
-## What it is
+## Current update contract (November 20)
+
+The November 18 WebKit replacement exposed a coverage gap: the automatic
+builder below covered only Mutter/libdisplay-info. Browser and video builds
+had been installed separately. [Recovery and evidence](UBUNTU_UPDATE_RECOVERY.md)
+records the incident; current deployment acceptance is in [status](STATUS.md).
+
+[`managed-families.json`](../packaging/ubuntu/managed-families.json) now defines
+public binary families for Mutter, libdisplay-info, WebKit/JavaScriptCore,
+GTK, GStreamer and its GTK consumers. The publisher checks required family
+members before mutation and verifies indexed hashes afterwards. A version's
+bytes are immutable: interrupted uploads resume with the same retained files;
+changed files require a new version. Rebuild output validation precedes pruning.
+
+Package-scoped origin preferences and derivative-version fallback preferences
+both use priority 999. The latter protects an installed patched version when
+the registry is unavailable or its entry is absent. Equal priorities preserve
+a numerically newer installed patch generation over an older registry build.
+The generic installer refuses downgrades and checks the complete indexed
+family before releasing holds. A genuinely newer reviewed source that sorts
+lower requires a separately reviewed exact-version transaction; it is never
+an implicit rollback by the generic installer.
+
+mpv, the patched FFmpeg library subset, Mesa Vulkan, the extension bundle and
+NetworkManager receive scoped derivative preferences and source monitoring.
+They remain separately qualified releases, excluded from generic family
+publication/installation. Private provider packages and custom kernel/boot
+selection remain separate. The mpv monitor observes its Ubuntu packaging base;
+it does not claim that the separately imported mpv 0.42 source is rebuilt
+from Ubuntu's 0.41 source.
+
+The daily workflow builds the original two desktop families only when
+authenticated Ubuntu discovery exactly matches their reviewed source pins.
+A changed Ubuntu source fails before building, pruning or publishing. An additional always-run monitor refreshes signed Ubuntu source
+indexes and fails with the exact stale source and required rebase action for
+all managed public sources. This is visible pending maintenance, not automatic
+acceptance of an unreviewed source tree. Pins protect functionality while a
+refresh is prepared; they do not prove current security fixes are installed.
+
+The following original-builder details remain useful for that narrower build
+path; source pins, family inventory and current status determine each release.
+
+## Original automatic builder
 
 Ubuntu's own Mutter and libdisplay-info, rebuilt with this repository's
 series (`patches/ubuntu-mutter`, `patches/ubuntu-libdisplay-info`) and
@@ -25,19 +67,22 @@ i386 exists for one reason: Ubuntu keeps a 32-bit `libdisplay-info3` for
 version, with byte-identical shared files, on both architectures, or dpkg
 refuses to install either.
 
-**Versions.** Ubuntu's version followed by `+nativehdrN`, N from
-[`packaging/ubuntu/REVISION`](../packaging/ubuntu/REVISION): currently Mutter
-`51.0-1ubuntu3+nativehdr13` and libdisplay-info `0.3.0-1+nativehdr13`. That
-sorts above Ubuntu's same version and above the hand-built `+nativehdr10` and
-`~hdr9`, but **not** always above the previous build: Ubuntu's next
-libdisplay-info would be `0.3.0-1ubuntu0.1`, and `0.3.0-1ubuntu0.1+nativehdr13`
-sorts below `0.3.0-1+nativehdr13`. So the registry holds one version per
-source: once a new version has built, the rebuild deletes the older ones and
-uploads it, and the priority-1001 pin (below) lets APT move to it even when
-that is a numeric downgrade. The deletions come first because Forgejo v16
-does not rebuild the index when a version's last file is deleted (its delete
-notifier reads the version's files after they are gone); every upload
-rebuilds its architecture's index.
+**Versions.** The original two families use Ubuntu's reviewed source version
+followed by `+nativehdrN`, with N from
+[`packaging/ubuntu/REVISION`](../packaging/ubuntu/REVISION). Other families use
+their own source pin, qualified binary manifest or consumer recipe. The shared
+resolver checks each full intended version; a derivative suffix alone is not
+an authorization to publish or install a package.
+
+Some Ubuntu source transitions sort below the preceding derivative. Both
+origin and installed-derivative preferences use 999: above normal Ubuntu and
+target-release priorities, below APT's forced-downgrade threshold. Routine APT
+updates retain the newer installed patch generation. The generic installer
+refuses numerical downgrades. A lower-sorting reviewed replacement needs an
+explicit exact-version, coherent transaction after its own APT rehearsal.
+Superseded registry versions may be pruned only after complete local bundle,
+prerequisite and existing-target identity checks pass. Preserve exact rollback
+archives independently; the registry is not a recovery archive.
 
 **A series change needs a new revision.** The registry refuses a second
 upload of a version it has, and the rebuild treats a published version as
@@ -68,43 +113,49 @@ diagnostic. The kernel and plurx Player are separate installations.
 
 ```bash
 git clone http://forge.lan:3000/pjunod/rog_hdr_dv.git   # or any checkout
-sudo rog_hdr_dv/packaging/ubuntu/setup-apt.sh         # key, source, pin, upgrade
+task_scratch="${HDR_WORK:?set HDR_WORK to owned durable storage}/scratch"
+install -d -m 0700 "$task_scratch"                    # private operation scratch
+sudo env TMPDIR="$task_scratch" rog_hdr_dv/packaging/ubuntu/setup-apt.sh
+# Passing TMPDIR explicitly avoids sudo dropping it under its default policy.
 # log out and back in: the running GNOME Shell keeps the old Mutter until then
 ```
 
-[`setup-apt.sh`](../packaging/ubuntu/setup-apt.sh) adds the registry's signing
-key and a deb822 source, pins every package from the registry's host at
-priority 1001, releases any `apt-mark hold` on these packages (the 2026-10-13
-hand install held them), upgrades whatever of them is installed, and keeps
-automatically installed libraries marked automatic. The key comes over plain
-HTTP from the LAN registry; that is the trust the LAN already gives the
-registry, nothing more.
+[`setup-apt.sh`](../packaging/ubuntu/setup-apt.sh) adds the signing key and
+deb822 source, generates scoped preferences, refreshes authenticated indexes,
+and preflights complete project candidates for installed fully managed
+families. It simulates the exact transaction and rejects removals, unmanaged
+dependency changes and downgrades before releasing holds. It restores automatic
+marks and failure-path holds. Separate-release policy-only packages are not
+installed or unheld by this command. Set `TMPDIR` to private durable task
+storage; keep exact rollback packages/configuration separately before running.
 
-The pin uses `Package: *` and matches the **host**, not just this registry's
-path. If that host also serves other APT repositories, their packages match
-too. Review all affected origins before enabling the pin. The setup script
-changes holds and uses `apt-get install -y`; it is not a simulation and does
-not retain a rollback archive for you. It preserves automatic marks after a
-successful transaction, but recovery must also retain the original marks in
-case an intermediate step fails.
+Failed setup restores the exact previous key/source/preferences, including
+ownership, modes, symlinks or original absence. Every simulated install must
+match an approved source/version/architecture from the authenticated project
+index; matching a managed package name alone is insufficient. The real
+transaction also refuses removals. Successful no-op setup intentionally leaves
+the configured protection in place.
 
-**Why priority 1001.** Above 1000, APT installs the registry's build even
-when Ubuntu has published a newer, unpatched version, and even when the
-registry's build sorts lower. Without the pin, an Ubuntu update would replace
-the HDR build with stock Mutter and the panel would lose HDR detection. With
-it, the machine keeps the HDR build until the rebuild (below) publishes
-Ubuntu's new version with the series. **The trade:** if a patch stops
-applying, that wait lasts until someone refreshes the patch, and Ubuntu's
-fixes to these two packages wait with it. The rebuild fails loudly when that
-happens (below).
+Forgejo carries architecture-independent packages in a separate `binary-all`
+index. Completeness and publication checks include it explicitly; the ROG's
+pre-existing APT source already acquired that index. The new source declaration
+makes this layout explicit with `Architectures-Add: all`.
+
+The signing key is initially fetched over the configured LAN HTTP connection;
+that bootstrap retains the existing LAN trust assumption. Subsequent APT
+metadata verification does not independently authenticate that first key fetch.
+The preferences scope package names, although the origin match still names the
+registry host rather than an individual URL path. Review same-name packages
+from other repositories on that host.
 
 **After a release upgrade.** `do-release-upgrade` disables third-party
 sources. Run `setup-apt.sh` again once the registry has builds for the new
 release; it rewrites the source for the new codename.
 
 **How to read the result.** `apt-cache policy mutter` should show the
-installed version ending in `+nativehdrN` and a `1001` priority line for the
-registry. `gdctl show` should report `color-mode ⇒ bt2100` on an HDR panel
+installed derivative and its `999` priority. Check WebKit and GStreamer
+companions as well as Mutter; an installed fallback is not proof of repository
+availability or source freshness. `gdctl show` should report `color-mode ⇒ bt2100` on an HDR panel
 after the next login.
 
 ## Rollback
@@ -168,7 +219,9 @@ Every night at 07:23 UTC, on any push to `main` that touches the series or
 ```
  repository check (SERIES.lock agrees with the series and REVISION)
         │
- ask Ubuntu for its current libdisplay-info and mutter source versions
+ ask signed Ubuntu indexes for libdisplay-info and mutter source versions
+        │
+ require exact equality with reviewed source pins (otherwise fail before mutation)
         │
         ▼
  registry has <ubuntu version>+nativehdr<REVISION> complete? ── yes ──▶ done
@@ -179,10 +232,15 @@ Every night at 07:23 UTC, on any push to `main` that touches the series or
  Mutter against the registry's libdisplay-info)
         │
         ▼
- verify retained output inventory
+ verify retained inventory, intended family, scratch/tools and existing-target hashes
         │
         ▼
- delete the source's older versions ──▶ publish.sh (rebuilds the indexes)
+ delete the source's older versions ──▶ publish.sh (verify indexed hashes)
+        │
+        ▼
+always-run signed-source monitor for every managed public source
+        │
+        └── stale reviewed pin ⇒ failed job with source/version/rebase action
 ```
 
 **Running it by hand.** Nothing needs waiting for the night. To run the
@@ -195,13 +253,14 @@ curl -X POST -H "Authorization: token $TOKEN" -H "Content-Type: application/json
   http://forge.lan:3000/api/v1/repos/pjunod/rog_hdr_dv/actions/workflows/ubuntu-packages.yml/dispatches
 ```
 
-Or run the same script from a checkout on any machine with Docker; it does
-exactly what the workflow does, and nothing when the registry is current:
+Or run both stages from a checkout with Docker. A current original-builder
+registry does not imply that all separately built browser/video sources are fresh:
 
 ```bash
 export FORGEJO_TOKEN=...                      # write:package scope
 export FORGEJO_URL=http://forge.lan:3000      # the default; set it if the name does not resolve
 packaging/ubuntu/rebuild.sh ~/.local/state/rog-hdr-dv/ubuntu-packages
+packaging/ubuntu/monitor.sh 26.10             # signed source drift, no install
 # Retains an exclusive run-* child here when building; never empties the root.
 ```
 
