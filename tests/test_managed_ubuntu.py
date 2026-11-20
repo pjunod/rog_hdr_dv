@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -205,10 +206,13 @@ class RealAptPolicyTests(unittest.TestCase):
         (self.root / 'etc/sources.list').write_text(f'deb [trusted=yes] file:{self.root}/repo ./\n')
         # Trusted local fixture indexes contain no network source or system key.
         # Production setup uses signed APT metadata and has no trusted override.
-        self.options = [f'-oDir={self.root}', '-oDir::State=state', '-oDir::State::status=state/status',
-                        '-oDir::Cache=cache', '-oDir::Etc=etc', '-oAPT::Architecture=amd64',
+        self.options = [f'-oDir={self.root}', f'-oDir::State={self.root / "state"}',
+                        f'-oDir::State::status={self.root / "state/status"}',
+                        f'-oDir::Cache={self.root / "cache"}', f'-oDir::Etc={self.root / "etc"}', '-oAPT::Architecture=amd64',
                         '-oAPT::Architectures::=amd64', '-oDebug::NoLocking=1', '-oAPT::Sandbox::User=root',
                         '-oAcquire::AllowInsecureRepositories=true']
+        status_config = subprocess.check_output(['apt-config', *self.options, 'shell', 'STATUS', 'Dir::State::status/f'], text=True)
+        self.assertEqual(shlex.split(status_config)[0].split('=', 1)[1], str(self.root / 'state/status'))
         self.installed = '2.52.6-1ubuntu1+rogdv7'
         (self.root / 'state/status').write_text(f'Package: {self.name}\nStatus: install ok installed\nArchitecture: amd64\nVersion: {self.installed}\nDescription: isolated fixture\n\n')
 
@@ -218,6 +222,8 @@ class RealAptPolicyTests(unittest.TestCase):
             entries.append(f'Package: {self.name}\nVersion: {version}\nArchitecture: amd64\nFilename: fixture.deb\nSize: 1\nSHA256: {"a" * 64}\nDescription: isolated fixture\n\n')
         (self.root / 'repo/Packages').write_text(''.join(entries))
         subprocess.run(['apt-get', *self.options, 'update'], check=True, capture_output=True, text=True)
+        policy = subprocess.check_output(['apt-cache', *self.options, 'policy', self.name], text=True)
+        self.assertIn('Installed: ' + self.installed, policy)
         return subprocess.check_output(['apt-get', *self.options, '-s', 'install', self.name], text=True)
 
     def test_absent_registry_keeps_installed_derivative_over_newer_stock(self):
@@ -258,6 +264,8 @@ class RealAptPolicyTests(unittest.TestCase):
             f'Package: {self.name}\nVersion: 7:8.1.2-2ubuntu3\nArchitecture: i386\nMulti-Arch: same\n'
             f'Filename: fixture.deb\nSize: 1\nSHA256: {"a" * 64}\nDescription: foreign fixture\n\n')
         subprocess.run(['apt-get', *self.options, 'update'], check=True, capture_output=True, text=True)
+        policy = subprocess.check_output(['apt-cache', *self.options, 'policy', self.name + ':i386'], text=True)
+        self.assertIn('Installed: ' + installed, policy)
         result = subprocess.check_output(['apt-get', *self.options, '-s', 'install', self.name + ':i386'], text=True)
         self.assertNotIn('Inst ' + self.name, result)
 

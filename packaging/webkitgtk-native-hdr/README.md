@@ -49,6 +49,18 @@ This is an amd64 clang `Release` derivative with empty C/C++ base flags,
 `-O2 -DNDEBUG -g0` release flags and empty linker flags. It does not claim
 Ubuntu's default compiler or hardening flags.
 
+## Compiler prerequisites
+
+Install the distribution build dependencies in the isolated builder before
+configuration. A retained Clang cache can also name the unversioned
+`/usr/bin/llvm-ar` and `/usr/bin/llvm-ranlib`; the fresh builder needs Ubuntu's
+`llvm` tools package as well as `clang`. Check every compiler, archiver,
+ranlib, linker and Ninja path selected in the CMake cache before admitting a
+long build. The November 20 first link attempt exposed the missing archiver;
+its failure receipt is retained and successfully compiled objects are reused.
+Adding the missing tool does not change the product source or justify a
+completed-build receipt before the resumed build succeeds.
+
 ## Prepare authenticated distribution source
 
 Use an owned task directory on the configured external storage volume and

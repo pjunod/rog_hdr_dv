@@ -55,7 +55,7 @@ class WebKitPackagingTests(unittest.TestCase):
                          ('2026-11-20', 'Fri, 20 Nov 2026 00:00:00 +0000'))
         for value in ('2026-11-20T00:00:00', '2026-11-20T00:00:00-05:00'):
             with self.subTest(value=value):
-                with self.assertRaisesRegex(verify.VerificationError, 'UTC'):
+                with self.assertRaisesRegex(prepare.verify.VerificationError, 'UTC'):
                     prepare.packaging_dates({'packaging_timestamp': value})
 
     def test_cache_accepts_compiler_discovery_and_usr_gi_destinations(self):
