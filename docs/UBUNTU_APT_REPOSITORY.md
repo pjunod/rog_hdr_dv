@@ -378,15 +378,20 @@ architectures' changelogs match. libdisplay-info's test suite runs on amd64;
 Mutter's does not (`nocheck`), because it needs a display server and a
 session bus. No debug-symbol packages are published.
 
-[`publish.sh`](../packaging/ubuntu/publish.sh) uploads each `.deb` and the
-source's sentinel package (`mutter`, `libdisplay-info3`) last, so a version
-whose sentinel is in the registry is complete. A version without its
-sentinel is a partial upload from a failed run, and its files are replaced
-on the next run; a complete version is never replaced. A registry that
-cannot be read stops the run instead of reading as "not published".
+[`publish.sh`](../packaging/ubuntu/publish.sh) checks the entire intended
+family, every prerequisite and all existing target identities before any
+upload. A sentinel package alone never establishes completeness. Verification
+covers each required package, version, architecture and SHA256 in the actual
+indexes, including Forgejo's separate `binary-all` index. An interrupted
+publication resumes only with the identical retained payloads. Different bytes
+under an existing version require a newly reviewed version; partial uploads
+are not permission to replace them. An unreadable registry, indexed missing
+payload or conflicting target stops the run before mutation. The rebuild
+performs the same preflight before deleting superseded versions.
 
-**When a patch stops applying.** An Ubuntu update can change the context a
-patch expects. The run then fails with `build.sh: <patch> does not apply to
+**When a patch stops applying.** A proposed Ubuntu source rebase can change the context a
+patch expects. Source discovery first refuses unreviewed versions. During the
+reviewed build, an incompatible patch then fails with `build.sh: <patch> does not apply to
 mutter <version>` and the workflow goes red; machines keep the previous HDR
 build (the pin holds them). libdisplay-info may already have moved to the
 new version; that is safe, because Mutter's dependency on it is a minimum.

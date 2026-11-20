@@ -361,6 +361,17 @@ elif name == 'apt-get' and args[0] == 'update' and os.environ.get('FAIL_UPDATE')
                 self.assertNotIn('apt-get -s', calls)
                 self.assertNotIn('apt-mark unhold', calls)
 
+    def test_existing_admin_directory_modes_survive_success_and_failure(self):
+        directories = [self.etc / path for path in ('apt/keyrings', 'apt/sources.list.d', 'apt/preferences.d')]
+        modes = (0o700, 0o750, 0o710)
+        for directory, mode in zip(directories, modes):
+            directory.chmod(mode)
+        for fail in ('no', 'yes'):
+            with self.subTest(failure=fail):
+                result = self.setup(FAIL_UPDATE=fail)
+                self.assertEqual(result.returncode, 23 if fail == 'yes' else 0, result.stdout + result.stderr)
+                self.assertEqual([directory.stat().st_mode & 0o777 for directory in directories], list(modes))
+
     def test_failed_authenticated_update_restores_bytes_modes_links_and_absence(self):
         source = self.etc / 'apt/sources.list.d/rog-hdr-dv.sources'
         source.write_bytes(b'original source bytes\n')

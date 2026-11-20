@@ -75,7 +75,9 @@ Architectures-Add: all
 Signed-By: /etc/apt/keyrings/rog-hdr-dv.asc
 EOF
 python3 "$here/managed.py" preferences "$host" > "$work/preferences"
-install -d -m 0755 /etc/apt/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d
+for directory in /etc/apt/keyrings /etc/apt/sources.list.d /etc/apt/preferences.d; do
+  [ -d "$directory" ] || install -d -m 0755 "$directory"
+done
 config_changed=1
 for i in "${!configs[@]}"; do rm -f -- "${configs[$i]}"; done
 install -m 0644 "$work/key" "${configs[0]}"
