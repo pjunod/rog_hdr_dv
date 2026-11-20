@@ -1,19 +1,32 @@
 # Status — what is working and what remains
 
-**Updated November 20, 2026. Recovery in progress.**
-Fresh package and ELF inspection found that the November 18 Ubuntu update
-replaced the patched WebKit and JavaScriptCore runtimes with stock
-`2.52.6-1ubuntu1.1`. GNOME Web resolves that stock library; its native HDR/DV
-entry points are absent. The November 15 chart and runtime results below
-remain historical evidence for `+rogdv7`, not acceptance of today's browser.
-GTK `+rogdv6`, the native GStreamer mapper `+rogdv10`, sink `+rogdv5.7`
-and Showtime `+rogdv5.13` remain installed. The recovery is rebasing the
-WebKit series onto the current Ubuntu source and extending managed package
-publication and update monitoring. The v8 normal build/package checks and nineteen focused native WebKit cases
-passed with zero skips on the declared surfaceless software provider. APT
-rehearsal then caught a GStreamer version-ordering conflict, corrected in the
-new metadata candidate without weakening its ABI floor. Installation and new
-runtime acceptance remain pending. [Cause and recovery](UBUNTU_UPDATE_RECOVERY.md).
+**Updated November 20, 2026. Recovery installed; runtime acceptance pending.**
+The exact thirteen-package recovery transaction passed: WebKit/JavaScriptCore
+`2.52.6-1ubuntu1.1+rogdv8`, eight GStreamer base packages
+`1.28.7-1+rogdv4.ubuntu0.2`, good `1.28.7-1ubuntu0.1+rogdv4`, GTK sink
+`0.15.2-1ubuntu2+rogdv5.8` and Showtime `50.0-2+rogdv5.14`.
+The owner session and unrelated package marks were preserved. The complete
+public bundle contains 33 packages across nine families; development/GIR
+companions outside the installed subset remain publication-only.
+
+Authenticated Ubuntu security changes are retained. The base derivative's
+version ordering was corrected without weakening source-declared ABI minima;
+all non-NOTE allocated sections of 49 base ELFs and 300 runtime files
+match the tested cohort. Consumer payloads are byte identical, with
+only exact dependency controls changed. The policy fast lane now qualifies
+70 methods cumulatively (66 retained plus four final passes on `0a1dd85`).
+The earlier 17 GStreamer cases, 24 API assertions and nineteen native WebKit
+cases retain their actual tested versions and limits. Scoped priority-999
+preferences protect the installed fallback; the existing Mutter 15 local
+exception remains. Publication and normal installed runtime acceptance are
+pending. Both installed ordinary-image controls passed once: F16 A/B import
+and a single failed import retaining A before source-bound SHM recovery to B.
+Their actual WebProcess engine was i915; NVIDIA-specific and optical coverage
+remain unclaimed. The browser matrix has a retained P5 clipped capture; P7
+acceptance is correcting the harness's raw-PTS/media-timeline conversion.
+The November 15 browser results below remain historical `+rogdv7`
+evidence. [Recovery and limits](UBUNTU_UPDATE_RECOVERY.md) ·
+[Sanitized install receipt](../evidence/ubuntu-recovery-install-20261120.json).
 
 **November 20, 2026 — source validation regression follow-up.** The existing
 subtitle-carrier verifier now compares probed pixel format and chroma location

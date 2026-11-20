@@ -1,6 +1,6 @@
 # Ubuntu update recovery — preserving the browser and video patches
 
-**State: recovery in progress · November 20, 2026.** This document answers
+**State: exact recovery installed; publication and runtime acceptance pending · November 20, 2026.** This document answers
 why WebKit lost the patches and how the browser/GStreamer update path is
 being corrected. [Current status](STATUS.md) separates current installation
 from earlier qualification; [APT operations](UBUNTU_APT_REPOSITORY.md) covers
@@ -31,7 +31,7 @@ No deliberate rollback is inferred.
 
 ## Confirmed effect
 
-GNOME Web resolves the installed stock WebKit shared library. Package-file
+At the initial November 20 inspection, GNOME Web resolved the installed stock WebKit shared library. Package-file
 verification is clean for that stock version, and ELF inspection finds none
 of the project's native display-target/frame-mapping entry points. This
 confirms replacement of the implementation, rather than only a stale version
@@ -65,12 +65,25 @@ reverse dependencies. The corrected package revision is
 symbol entries recover those minima after the first candidate's version
 ordering caused debhelper to clamp them.
 
-The original native-test receipt keeps its actual first-candidate version.
-Metadata-only replacements require complete executable/allocated-section and
-runtime-data equivalence, then a fresh exact forward/inverse APT rehearsal.
-Every forward transition must be a strict upgrade; downgrade permission is
-reserved for the explicitly recorded inverse. Publication monitoring compares
-the reviewed Ubuntu source origin independently of derivative version syntax.
+The original native-test receipt keeps its actual first-candidate version,
+`1.28.7-1ubuntu0.2+rogdv4`; it is not relabelled as a run against the final
+metadata revision. All 49 packaged base ELFs have identical non-NOTE allocated
+sections, and all 300 runtime data files match. Source replay and a fresh
+source-package extraction match all 1,442 source paths and modes. Sink and
+Showtime payloads and non-control files are byte identical; only their exact
+base dependency controls changed. Source-declared minima are unchanged; four
+generated symbols were restored. The original seventeen cases and 24 API
+assertions were retained rather than rerun for this metadata correction.
+
+The reviewed forward/inverse APT rehearsal passed before the exact thirteen
+installed packages were upgraded. The transaction installed the two WebKit
+runtimes at `2.52.6-1ubuntu1.1+rogdv8`, eight base packages at
+`1.28.7-1+rogdv4.ubuntu0.2`, good at `1.28.7-1ubuntu0.1+rogdv4`, sink at
+`0.15.2-1ubuntu2+rogdv5.8` and Showtime at `50.0-2+rogdv5.14`. No development
+companions were added. The owner session and unrelated package marks remained
+unchanged. Original packages and exact rollback candidates are retained.
+The final read-only bundle inventory passes for 33 packages across nine
+families. [Sanitized install receipt](../evidence/ubuntu-recovery-install-20261120.json).
 
 ## Recovery and acceptance
 
@@ -92,15 +105,19 @@ must expose drift from reviewed source pins and missing current-source
 publication as actionable CI failures;
 changed source is never accepted merely because the patch applies.
 
-The policy/packaging fast lane qualifies 69 methods by retaining 61 valid
-passes and rerunning eight affected methods after the actual APT expression
-correction. All eight passed; earlier failed attempts remain recorded. This
-is aggregate qualification, not a clean full-suite rerun on the final commit.
-[Policy fast-lane accounting](../evidence/ubuntu-update-policy-fastlane-20261120.json).
+The policy/packaging fast lane now qualifies 70 methods cumulatively: 66
+retained valid passes plus four selected methods passed once on
+`0a1dd856a6711f8e7ddd51510ddf8498af5ab28f`. Earlier failed attempts remain
+recorded. This is aggregate qualification, not a clean full-suite rerun on
+that commit. The earlier [policy fast-lane accounting](../evidence/ubuntu-update-policy-fastlane-20261120.json)
+retains its historical 69-method checkpoint; the
+[install receipt](../evidence/ubuntu-recovery-install-20261120.json) records the final increment.
 
-Required remaining evidence: authenticated source replay, normal warnings-enabled
-compile/package build, final independent review and affected fast lane,
-coherent APT install/rollback rehearsal, publication and mirror verification,
-then installed-library and normal sandboxed browser/GStreamer checks. Preserve
-the desktop session and stock recovery packages. Optical calibration and
-panel cadence remain outside software-only acceptance.
+Authenticated replay, normal compile/package builds, independent review,
+affected fast lane, forward/inverse rehearsal and the exact host installation
+are complete. Scoped priority-999 fallback protection is installed; the
+existing Mutter 15 local exception is preserved. Publication and mirror
+verification, loaded-library checks and normal sandboxed browser/GStreamer
+runtime acceptance remain pending. Preserve the desktop session and rollback
+packages. Optical calibration and panel cadence remain outside software-only
+acceptance.
