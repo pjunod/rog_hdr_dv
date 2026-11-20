@@ -682,9 +682,9 @@
       "component": "ubuntu-gst-plugins-base-rpu",
       "base_commit": "11a8782e2732b5a08dd4cfc18c678b4512e27ee4",
       "base_tree": "0a4ffe526e3ed0e5b110ea90c04cb6040a494872",
-      "candidate_commit": "cba36fc4a933e550806b7be684be4b6a2ba78d79",
-      "candidate_tree": "cec3a85a7a133be9ba69ff9eac587e817ec7d67e",
-      "patch_count": 7,
+      "candidate_commit": "f5ba2fc4ceafab3ec7be4c5d9fc27e20f3efa649",
+      "candidate_tree": "2c9509099844166b4098296ff1d6578438a532b3",
+      "patch_count": 8,
       "patch_order": [
         "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
         "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch",
@@ -692,7 +692,8 @@
         "0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch",
         "0005-playsink-keep-caps-features-when-filtering-by-the-converters.patch",
         "0006-debian-version-the-feature-preserving-playsink-converter-bin.patch",
-        "0007-debian-retain-Ubuntu-security-fixes-as-rogdv4.patch"
+        "0007-debian-retain-Ubuntu-security-fixes-as-rogdv4.patch",
+        "0008-debian-preserve-private-ABI-version-ordering-on-Ubuntu-security.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -723,19 +724,26 @@
           }
         ]
       },
-      "candidate_status": "Rebased the existing Dolby series onto Ubuntu 1.28.7-1ubuntu0.2, retaining CVE-2026-86476 audio/video meta deserialization and overlap checks plus CVE-2026-111183 channel-count bound. Strict generated git-am replay matches the complete 1442-path candidate tree cec3a85a7a133be9ba69ff9eac587e817ec7d67e. Imported authorship is retained; refreshed patch envelopes and packaging contexts bind the new source base. Focused compiler link loop established with GCC 15.3 and GStreamer 1.28.7 headers/libraries. Normal binary package compilation succeeded with unit tests disabled; every post-build quilt-applied tracked path and executable mode matches the pinned candidate. Focused test execution, runtime qualification and installation remain pending; prior acceptance receipts remain historical.",
-      "previous_candidate_commit": "deb42f8c596cd3acb524243dd5344b3464383340",
-      "previous_candidate_tree": "edf18b254ba631b507aa632b4ee0842ff6278210",
-      "candidate_package_version": "1.28.7-1ubuntu0.2+rogdv4",
+      "candidate_status": "Metadata-only ordering correction to 1.28.7-1+rogdv4.ubuntu0.2 on authenticated Ubuntu source 1.28.7-1ubuntu0.2. Source-declared minima unchanged; four generated symbols restored. All 49 packaged ELFs retain every non-NOTE allocated section from the tested unpublished cohort; 300 runtime/non-ELF paths are identical. Normal no-clean base and exact-dependency consumer packages completed; consumer payload and non-control metadata are byte-identical. Strict eight-patch replay and fresh normal source-package replay match all 1442 candidate paths/modes. Original 17-case/24-assertion receipts remain retained; no extra native test, installation or publication is claimed.",
+      "previous_candidate_commit": "cba36fc4a933e550806b7be684be4b6a2ba78d79",
+      "previous_candidate_tree": "cec3a85a7a133be9ba69ff9eac587e817ec7d67e",
+      "candidate_package_version": "1.28.7-1+rogdv4.ubuntu0.2",
       "previous_source_origin": {
         "kind": "ubuntu-source-package",
         "package": "gst-plugins-base1.0",
-        "version": "1.28.7-1",
+        "version": "1.28.7-1ubuntu0.2",
+        "authentication": "Acquired by apt-get source against authenticated Ubuntu signed APT source indexes on 2026-11-20; archive hashes below bind the acquired bytes. The dsc OpenPGP signature was not independently checked.",
+        "import_recipe": "dpkg-source extraction with distribution patches; git add -f of every extracted file except .pc; neutral identity and fixed 2026-11-20T14:00:00+0000 author/committer date.",
         "artifacts": [
           {
-            "file": "gst-plugins-base1.0_1.28.7-1.dsc",
-            "sha256": "2e9f9c6f4c3f1c7a7f4c21d9d33c0afbb5d3fdc0c3cdac1b82d62c2cec6f7343",
-            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1.dsc"
+            "file": "gst-plugins-base1.0_1.28.7-1ubuntu0.2.debian.tar.xz",
+            "sha256": "f6d5870d7a968a4e450babf7add03253e0364345982382a31451462e98f4adbd",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1ubuntu0.2.debian.tar.xz"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7-1ubuntu0.2.dsc",
+            "sha256": "73815b574f69e76a91acaae3f9ce92a2ac959b42fb2a6221d43096c173257f36",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1ubuntu0.2.dsc"
           },
           {
             "file": "gst-plugins-base1.0_1.28.7.orig.tar.xz",
@@ -746,13 +754,18 @@
             "file": "gst-plugins-base1.0_1.28.7.orig.tar.xz.asc",
             "sha256": "5f53281ad6ae154bac5e6717932b04370f0eafd2355d58b5777594b73568d1ca",
             "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7.orig.tar.xz.asc"
-          },
-          {
-            "file": "gst-plugins-base1.0_1.28.7-1.debian.tar.xz",
-            "sha256": "4e86147d3fc8f39fb476b1b9ec8ab38778ff8902eef2a2bb03e4d852f993f6c3",
-            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1.debian.tar.xz"
           }
         ]
+      },
+      "previous_candidate_package_version": "1.28.7-1ubuntu0.2+rogdv4",
+      "candidate_source_package": {
+        "kind": "unsigned-private-source-package",
+        "file": "gst-plugins-base1.0_1.28.7-1+rogdv4.ubuntu0.2.dsc",
+        "sha256": "8f2d7a3118764b6a34263106c98590e024b16b605cf8968362b124de2f71bfd9",
+        "debian_archive": {
+          "file": "gst-plugins-base1.0_1.28.7-1+rogdv4.ubuntu0.2.debian.tar.xz",
+          "sha256": "812efb8f059f2c37accf19de15b1b61ab479b0452c0ac20e801d6fac88d33a2e"
+        }
       }
     },
     {

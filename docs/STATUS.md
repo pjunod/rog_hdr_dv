@@ -9,8 +9,11 @@ remain historical evidence for `+rogdv7`, not acceptance of today's browser.
 GTK `+rogdv6`, the native GStreamer mapper `+rogdv10`, sink `+rogdv5.7`
 and Showtime `+rogdv5.13` remain installed. The recovery is rebasing the
 WebKit series onto the current Ubuntu source and extending managed package
-publication and update monitoring. Installation and new runtime acceptance
-are pending. [Cause and recovery](UBUNTU_UPDATE_RECOVERY.md).
+publication and update monitoring. The v8 normal build/package checks and nineteen focused native WebKit cases
+passed with zero skips on the declared surfaceless software provider. APT
+rehearsal then caught a GStreamer version-ordering conflict, corrected in the
+new metadata candidate without weakening its ABI floor. Installation and new
+runtime acceptance remain pending. [Cause and recovery](UBUNTU_UPDATE_RECOVERY.md).
 
 **November 20, 2026 — source validation regression follow-up.** The existing
 subtitle-carrier verifier now compares probed pixel format and chroma location

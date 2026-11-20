@@ -30,9 +30,11 @@ chart agreed between Web and Image Viewer within one median PQ10 code on all
 
 A November 18 stock WebKit replacement superseded the installed browser
 correction. These historical passes do not establish the current browser's
-colour or native-video behaviour. Restoration is being rebased onto current
-Ubuntu source; compilation, focused regressions, package binding and runtime
-acceptance remain pending. Verify GTK/sink/Showtime and WebKit package state
+colour or native-video behaviour. The current Ubuntu-source v8 normal
+build and package checks passed, followed by nineteen focused native cases
+with zero skips on the declared surfaceless software provider. Installed
+library binding and fresh ordinary-image/browser runtime acceptance remain
+pending. Verify GTK/sink/Showtime and WebKit package state
 separately. Optical accuracy, full-film and every-frame fidelity remain open;
 encrypted browser DRM/CDM delivery is a separate scope.
 

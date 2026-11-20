@@ -151,7 +151,8 @@ class ManagedPolicyTests(unittest.TestCase):
                 managed.freshness(data)
         self.assertIn('Ubuntu packaging base only', str(error.exception))
 
-    def test_current_source_requires_complete_current_published_family(self):
+    @patch.object(managed, 'reviewed_version', return_value='2.52.6-1ubuntu1')
+    def test_current_source_requires_complete_current_published_family(self, _reviewed):
         data, rows = fixture()
         current = {'webkit2gtk': '2.52.6-1ubuntu1'}
         managed.publication_freshness(data, rows, current)
@@ -162,6 +163,31 @@ class ManagedPolicyTests(unittest.TestCase):
             managed.publication_freshness(data, rows[:1], current)
         with self.assertRaisesRegex(ValueError, 'no authenticated current Ubuntu source'):
             managed.publication_freshness(data, rows, {})
+
+    @unittest.skipUnless(shutil.which('dpkg'), 'requires Debian comparator')
+    def test_base_security_revision_orders_above_installed_and_tracks_reviewed_ubuntu_source(self):
+        source = 'gst-plugins-base1.0'
+        spec = managed.families()[source]
+        candidate = managed.expected_version(source, spec)
+        self.assertEqual(candidate, '1.28.7-1+rogdv4.ubuntu0.2')
+        ubuntu_source = '1.28.7-1ubuntu0.2'
+        self.assertEqual(managed.reviewed_version(source, spec), ubuntu_source)
+        for relation, previous in (('gt', '1.28.7-1+rogdv3'), ('ge', '1.28.7-1+rogdv1')):
+            with self.subTest(relation=relation, previous=previous):
+                self.assertEqual(subprocess.run(
+                    ['dpkg', '--compare-versions', candidate, relation, previous]).returncode, 0)
+        data = {source: spec}
+        rows = [{'Package': name, 'Source': f'{source} ({candidate})', 'Version': candidate,
+                 'Architecture': arch, 'SHA256': 'a' * 64} for name, arch in managed.expected(spec)]
+        with patch.object(managed, 'run', return_value=f'Package: {source}\nVersion: {ubuntu_source}\n\n'):
+            current = managed.freshness(data)
+        managed.publication_freshness(data, rows, current)
+        newer = '1.28.7-1ubuntu0.3'
+        with patch.object(managed, 'run', return_value=f'Package: {source}\nVersion: {newer}\n\n'):
+            with self.assertRaisesRegex(ValueError, 'Ubuntu fixes are waiting'):
+                managed.freshness(data)
+        with self.assertRaisesRegex(ValueError, 'no complete published'):
+            managed.publication_freshness(data, rows, {source: newer})
 
     def test_webkit_publication_requires_exact_reviewed_package_version(self):
         spec = managed.families()['webkit2gtk']

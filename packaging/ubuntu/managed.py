@@ -305,8 +305,9 @@ def publication_freshness(data, index, current):
             if not spec.get('project'):
                 if source not in current:
                     raise ValueError(f'{source}: no authenticated current Ubuntu source identity')
-                ubuntu_version = version.rsplit(spec['derivative'], 1)[0]
-                if ubuntu_version != current[source]:
+                # Derivative revision ordering need not preserve Ubuntu's
+                # version prefix; the reviewed source identity is independent.
+                if reviewed_version(source, spec) != current[source]:
                     continue
             versions.setdefault(version, set()).add((row['Package'], row['Architecture']))
         if not any(expected(spec) <= members for members in versions.values()):

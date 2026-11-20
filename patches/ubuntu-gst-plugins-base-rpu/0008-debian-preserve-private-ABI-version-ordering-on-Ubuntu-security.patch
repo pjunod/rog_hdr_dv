@@ -1,0 +1,25 @@
+From f5ba2fc4ceafab3ec7be4c5d9fc27e20f3efa649 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Fri, 20 Nov 2026 22:51:17 +0000
+Subject: [PATCH] debian: preserve private ABI version ordering on Ubuntu
+ security source
+
+---
+ debian/changelog | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index 98e7cd0..54acfd2 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,10 @@
++gst-plugins-base1.0 (1.28.7-1+rogdv4.ubuntu0.2) stonking; urgency=medium
++
++  * Keep the downstream private ABI revision ahead of its declared minima
++    while retaining the authenticated Ubuntu security source and fixes.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Fri, 20 Nov 2026 22:51:17 +0000
++
+ gst-plugins-base1.0 (1.28.7-1ubuntu0.2+rogdv4) stonking; urgency=medium
+ 
+   * Rebase the Dolby transport and precision series onto the current Ubuntu

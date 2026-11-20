@@ -56,6 +56,22 @@ API probe passed 24 assertions for metadata ownership and public decoder
 configuration. Neither check decodes real media or qualifies browser playback.
 [Focused native test receipt](../evidence/gstreamer-security-fastlane-20261120.json).
 
+The first exact APT rehearsal caught a second packaging defect before any
+host change: `1.28.7-1ubuntu0.2+rogdv4` sorts below the existing custom API
+floor `1.28.7-1+rogdv1`. Allowing a numerical downgrade cannot satisfy those
+reverse dependencies. The corrected package revision is
+`1.28.7-1+rogdv4.ubuntu0.2`; its authenticated Ubuntu source origin remains
+`1.28.7-1ubuntu0.2`. Source-declared ABI minima stay intact. Four generated
+symbol entries recover those minima after the first candidate's version
+ordering caused debhelper to clamp them.
+
+The original native-test receipt keeps its actual first-candidate version.
+Metadata-only replacements require complete executable/allocated-section and
+runtime-data equivalence, then a fresh exact forward/inverse APT rehearsal.
+Every forward transition must be a strict upgrade; downgrade permission is
+reserved for the explicitly recorded inverse. Publication monitoring compares
+the reviewed Ubuntu source origin independently of derivative version syntax.
+
 ## Recovery and acceptance
 
 The replacement must retain Ubuntu's current source changes and replay the
