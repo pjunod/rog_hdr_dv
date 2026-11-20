@@ -1,5 +1,15 @@
 # Status — what is working and what remains
 
+**November 20, 2026 — fractional HDR source fixtures prepared.** The existing
+[IQ stimulus pipeline](IMAGE_QUALITY_STIMULI.md) now carries exact 24000/1001,
+30000/1001 and 60000/1001 cadence through Y4M headers, versioned manifests,
+capture plans and source-clock barcode diagnostics. Integer defaults and
+filenames remain compatible. Complete-frame durations and capture bounds are
+rational; nominal-rate substitution is refused. Authored source-hash and
+barcode regressions are prepared; independent review and the final focused
+batch remain pending. No new player run, display measurement or optical
+acceptance follows. Parked algorithms and observer records remain untouched.
+
 **November 20, 2026 — source validation regression follow-up.** The existing
 subtitle-carrier verifier now compares probed pixel format and chroma location
 alongside color descriptions and exact rational packet identities. Authored

@@ -16,6 +16,11 @@ import sys
 
 import numpy as np
 
+_STIMULI_SOURCE = Path(__file__).resolve().parents[1] / 'scripts/generate_quality_stimuli.py'
+_SPEC = importlib.util.spec_from_file_location('_iq_stimuli', _STIMULI_SOURCE)
+STIMULI = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(STIMULI)
+
 
 class AnalysisError(ValueError):
     """An input cannot support the requested diagnostic."""
@@ -34,17 +39,20 @@ def validate_manifest(root, required_paths=None):
     root = Path(root).resolve()
     manifest_path = root / 'manifest.json'
     m = json.loads(manifest_path.read_text())
-    if m.get('schema') != 'image-quality-stimuli-v1':
+    if m.get('schema') not in ('image-quality-stimuli-v1', 'image-quality-stimuli-v2'):
         raise AnalysisError('unsupported stimulus manifest schema')
-    source = Path(__file__).resolve().parents[1] / 'scripts/generate_quality_stimuli.py'
-    spec = importlib.util.spec_from_file_location('_iq_stimuli', source)
-    gen = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gen)
+    source, gen = _STIMULI_SOURCE, STIMULI
     try:
         timing = m['dimensions_and_timing']
         params = {k: timing[k] for k in ('width', 'height', 'cadence_fps', 'cadence_seconds')}
         gen.validate_parameters(params['width'], params['height'], params['cadence_fps'],
                                 params['cadence_seconds'], 2**63 - 1)
+        if [gen.cadence_value(fps) for fps in params['cadence_fps']] != params['cadence_fps']:
+            raise AnalysisError('manifest cadence rates are not canonical')
+        expected_schema = ('image-quality-stimuli-v2' if any(isinstance(fps, str) for fps in params['cadence_fps'])
+                           else 'image-quality-stimuli-v1')
+        if m['schema'] != expected_schema:
+            raise AnalysisError('manifest cadence rates and schema disagree')
         records = gen.plan(params['width'], params['height'], params['cadence_fps'], params['cadence_seconds'])
         design = [{k: r[k] for k in ('path', 'header', 'frames', 'size', 'stimulus', 'format', 'expected')}
                   for r in records]
@@ -283,11 +291,18 @@ def analyze(args):
     if not isinstance(preliminary, dict) or not isinstance(preliminary.get('dimensions_and_timing'), dict):
         raise AnalysisError('malformed stimulus manifest dimensions_and_timing')
     rates = preliminary['dimensions_and_timing'].get('cadence_fps')
-    if not isinstance(rates, list) or any(type(fps) is not int for fps in rates):
-        raise AnalysisError('malformed stimulus manifest cadence_fps')
+    try:
+        if not isinstance(rates, list) or not rates or len(rates) > STIMULI.MAX_CADENCE_FILES:
+            raise STIMULI.StimulusError('need a bounded list of cadence rates')
+        canonical_rates = [STIMULI.cadence_value(fps) for fps in rates]
+        if canonical_rates != rates or len(set(canonical_rates)) != len(rates):
+            raise STIMULI.StimulusError('cadence rates must be canonical and unique')
+    except STIMULI.StimulusError as exc:
+        raise AnalysisError('malformed stimulus manifest cadence_fps: ' + str(exc)) from exc
     for fps in rates:
-        if scene_present(args.run, [f'cadence-{fps}.raw', f'cadence-{fps}.ts']):
-            required.append(f'cadence/cadence_{fps}fps_p10.y4m')
+        slug = STIMULI.cadence_slug(fps)
+        if scene_present(args.run, [f'cadence-{slug}.raw', f'cadence-{slug}.ts']):
+            required.append(f'cadence/cadence_{slug}fps_p10.y4m')
     man, verified = validate_manifest(args.stim, required)
     man4, verified4 = validate_manifest(args.stim4k, ['scaling/scaling_p10.y4m'] if scaling_present else [])
     sw, sh = (man['dimensions_and_timing'][k] for k in ('width', 'height'))
@@ -350,9 +365,9 @@ def analyze(args):
             cadence[str(fps)] = {'status': 'not_captured'}
             continue
         movie = map_xr30(raw, crop_width, args.cadence_height)
-        ts = parse_timestamps(args.run / f'cadence-{fps}.ts', len(movie))
+        ts = parse_timestamps(args.run / f'cadence-{slug}.ts', len(movie))
         indices, rejects = [], Counter()
-        count_source = file_entry(man, f'cadence/cadence_{fps}fps_p10.y4m')['frame_count']
+        count_source = file_entry(man, f'cadence/cadence_{slug}fps_p10.y4m')['frame_count']
         for packed in movie:
             green = ((packed >> 10) & 1023).astype(float)
             index, reason = decode_barcode(green, scale, sw, args.barcode_low, args.barcode_high)
@@ -362,7 +377,14 @@ def analyze(args):
             if reason:
                 rejects[reason] += 1
         report = interval_report(indices, ts, args.max_timestamp_gap_ns)
-        report.update(captured_frames=len(movie), decoded_frames=sum(i is not None for i in indices),
+        for change in report['observed_source_changes']:
+            change['source_pts_delta_seconds'] = STIMULI.rational_fields(change['source_index_step'] / rate)
+        report.update(source_frame_rate=STIMULI.rational_fields(rate),
+                      source_frame_period_seconds=STIMULI.rational_fields(1 / rate),
+                      source_duration_seconds=STIMULI.rational_fields(count_source / rate),
+                      decoded_source_pts_seconds=[None if index is None else STIMULI.rational_fields(index / rate)
+                                                  for index in indices],
+                      captured_frames=len(movie), decoded_frames=sum(i is not None for i in indices),
                       rejection_counts=dict(rejects), decoded_indices=indices,
                       calibration_status='explicit_measured_endpoints' if args.calibrated else 'identity_default_unvalidated',
                       barcode_endpoints=[args.barcode_low, args.barcode_high],
