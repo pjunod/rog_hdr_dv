@@ -1,5 +1,19 @@
+From 9f24c02b2ee87268e6781ce0091396b402a3fd02 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Thu, 12 Nov 2026 03:30:00 +0000
+Subject: [PATCH] 0005-package-the-reviewed-Matroska-configuration-series
+
+---
+ debian/changelog                             |   7 +
+ debian/patches/rog-dovi-isobmff.patch        |  85 +++++++++
+ debian/patches/rog-dovi-matroska-track.patch | 172 +++++++++++++++++++
+ debian/patches/series                        |   2 +
+ 4 files changed, 266 insertions(+)
+ create mode 100644 debian/patches/rog-dovi-isobmff.patch
+ create mode 100644 debian/patches/rog-dovi-matroska-track.patch
+
 diff --git a/debian/changelog b/debian/changelog
-index e37310d..160c01e 100644
+index 980cc34..4e036d3 100644
 --- a/debian/changelog
 +++ b/debian/changelog
 @@ -1,3 +1,10 @@
@@ -283,10 +297,11 @@ index 0000000..4f965f4
 + #define GST_MATROSKA_ID_TRACKOVERLAY               0x6FAB
 + #define GST_MATROSKA_ID_TRACKTRANSLATE             0x6624
 diff --git a/debian/patches/series b/debian/patches/series
-index f203df4..fc4cee1 100644
+index 52f6f5e..251d2bb 100644
 --- a/debian/patches/series
 +++ b/debian/patches/series
-@@ -1 +1,3 @@
+@@ -1,2 +1,4 @@
  0000_remove-flv-test.patch
+ CVE-2026-111183.patch
 +rog-dovi-isobmff.patch
 +rog-dovi-matroska-track.patch

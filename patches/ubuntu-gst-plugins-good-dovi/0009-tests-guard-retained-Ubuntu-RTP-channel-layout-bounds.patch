@@ -1,0 +1,189 @@
+From a77b312a829f9896d2fb0b246cb0017e085aea6b Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Fri, 20 Nov 2026 15:00:00 +0000
+Subject: [PATCH] tests: guard the retained Ubuntu RTP channel-layout bounds
+
+---
+ debian/changelog                              |  1 +
+ ...rog-rtp-channel-layout-boundary-test.patch | 76 +++++++++++++++++++
+ debian/patches/series                         |  1 +
+ tests/check/elements/rtp-channel-layout.c     | 52 +++++++++++++
+ tests/check/meson.build                       |  2 +
+ 5 files changed, 132 insertions(+)
+ create mode 100644 debian/patches/rog-rtp-channel-layout-boundary-test.patch
+ create mode 100644 tests/check/elements/rtp-channel-layout.c
+
+diff --git a/debian/changelog b/debian/changelog
+index 80ee585..87590ed 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -2,6 +2,7 @@ gst-plugins-good1.0 (1.28.7-1ubuntu0.1+rogdv4) stonking; urgency=medium
+ 
+   * Rebase the Dolby transport and precision series onto the current Ubuntu
+     security source, retaining all distribution security fixes.
++  * Check the retained RTP channel-layout capacity with guarded arrays.
+ 
+  -- ROG HDR contributors <rog-hdr@invalid>  Fri, 20 Nov 2026 14:00:00 +0000
+ 
+diff --git a/debian/patches/rog-rtp-channel-layout-boundary-test.patch b/debian/patches/rog-rtp-channel-layout-boundary-test.patch
+new file mode 100644
+index 0000000..c688906
+--- /dev/null
++++ b/debian/patches/rog-rtp-channel-layout-boundary-test.patch
+@@ -0,0 +1,76 @@
++Description: Exercise Ubuntu RTP channel layout bounds with the actual helper
++Author: ROG HDR contributors <rog-hdr@invalid>
++Forwarded: not-needed
++Last-Update: 2026-11-20
++
++diff --git a/tests/check/elements/rtp-channel-layout.c b/tests/check/elements/rtp-channel-layout.c
++new file mode 100644
++index 0000000..3b4d32d
++--- /dev/null
+++++ b/tests/check/elements/rtp-channel-layout.c
++@@ -0,0 +1,52 @@
+++/* SPDX-License-Identifier: LGPL-2.0-or-later
+++ * Copyright (C) 2026 ROG HDR contributors
+++ * Exercise the actual RTP helper retained by Ubuntu CVE-2026-111183.
+++ */
+++#include <gst/check/gstcheck.h>
+++#include "../../../gst/rtp/gstrtpchannels.h"
+++
+++GST_START_TEST (rtp_channel_layout_respects_capacity)
+++{
+++  const gint requested[] = { 1, 64, 65, 128 };
+++  const gsize capacities[] = { 0, 1, 64 };
+++  guint i, j, k;
+++
+++  for (i = 0; i < G_N_ELEMENTS (requested); i++) {
+++    for (j = 0; j < G_N_ELEMENTS (capacities); j++) {
+++      struct {
+++        guint32 before;
+++        GstAudioChannelPosition positions[64];
+++        guint32 after;
+++      } guarded;
+++      const guint32 sentinel = 0x51a7cafe;
+++      const gsize written = MIN ((gsize) requested[i], capacities[j]);
+++
+++      guarded.before = guarded.after = sentinel;
+++      for (k = 0; k < G_N_ELEMENTS (guarded.positions); k++)
+++        guarded.positions[k] = GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT;
+++
+++      gst_rtp_channels_create_default (requested[i], guarded.positions,
+++          capacities[j]);
+++
+++      fail_unless_equals_int (guarded.before, sentinel);
+++      fail_unless_equals_int (guarded.after, sentinel);
+++      for (k = 0; k < G_N_ELEMENTS (guarded.positions); k++)
+++        fail_unless_equals_int (guarded.positions[k], k < written ?
+++            GST_AUDIO_CHANNEL_POSITION_NONE : GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT);
+++    }
+++  }
+++}
+++GST_END_TEST;
+++
+++static Suite *
+++rtp_channel_layout_suite (void)
+++{
+++  Suite *s = suite_create ("rtp-channel-layout");
+++  TCase *tc = tcase_create ("bounds");
+++
+++  suite_add_tcase (s, tc);
+++  tcase_add_test (tc, rtp_channel_layout_respects_capacity);
+++  return s;
+++}
+++
+++GST_CHECK_MAIN (rtp_channel_layout)
++diff --git a/tests/check/meson.build b/tests/check/meson.build
++index f0e3eb8..1511486 100644
++--- a/tests/check/meson.build
+++++ b/tests/check/meson.build
++@@ -121,6 +121,8 @@ if not get_option('rtp').disabled() and not get_option('rtpmanager').disabled()
++     [ 'elements/rtpulpfec' ],
++     [ 'elements/rtpssrcdemux' ],
++     [ 'elements/rtp-payloading' ],
+++    [ 'elements/rtp-channel-layout', false, [],
+++      ['../../gst/rtp/gstrtpchannels.c'] ],
++     [ 'elements/rtpst2022-1-fecdec' ],
++     [ 'elements/rtpst2022-1-fecenc' ],
++   ]
+diff --git a/debian/patches/series b/debian/patches/series
+index ce26ee4..bbd1e6d 100644
+--- a/debian/patches/series
++++ b/debian/patches/series
+@@ -3,3 +3,4 @@ CVE-2026-111183.patch
+ rog-dovi-isobmff.patch
+ rog-dovi-matroska-track.patch
+ rog-deinterlace-filter.patch
++rog-rtp-channel-layout-boundary-test.patch
+diff --git a/tests/check/elements/rtp-channel-layout.c b/tests/check/elements/rtp-channel-layout.c
+new file mode 100644
+index 0000000..3b4d32d
+--- /dev/null
++++ b/tests/check/elements/rtp-channel-layout.c
+@@ -0,0 +1,52 @@
++/* SPDX-License-Identifier: LGPL-2.0-or-later
++ * Copyright (C) 2026 ROG HDR contributors
++ * Exercise the actual RTP helper retained by Ubuntu CVE-2026-111183.
++ */
++#include <gst/check/gstcheck.h>
++#include "../../../gst/rtp/gstrtpchannels.h"
++
++GST_START_TEST (rtp_channel_layout_respects_capacity)
++{
++  const gint requested[] = { 1, 64, 65, 128 };
++  const gsize capacities[] = { 0, 1, 64 };
++  guint i, j, k;
++
++  for (i = 0; i < G_N_ELEMENTS (requested); i++) {
++    for (j = 0; j < G_N_ELEMENTS (capacities); j++) {
++      struct {
++        guint32 before;
++        GstAudioChannelPosition positions[64];
++        guint32 after;
++      } guarded;
++      const guint32 sentinel = 0x51a7cafe;
++      const gsize written = MIN ((gsize) requested[i], capacities[j]);
++
++      guarded.before = guarded.after = sentinel;
++      for (k = 0; k < G_N_ELEMENTS (guarded.positions); k++)
++        guarded.positions[k] = GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT;
++
++      gst_rtp_channels_create_default (requested[i], guarded.positions,
++          capacities[j]);
++
++      fail_unless_equals_int (guarded.before, sentinel);
++      fail_unless_equals_int (guarded.after, sentinel);
++      for (k = 0; k < G_N_ELEMENTS (guarded.positions); k++)
++        fail_unless_equals_int (guarded.positions[k], k < written ?
++            GST_AUDIO_CHANNEL_POSITION_NONE : GST_AUDIO_CHANNEL_POSITION_FRONT_LEFT);
++    }
++  }
++}
++GST_END_TEST;
++
++static Suite *
++rtp_channel_layout_suite (void)
++{
++  Suite *s = suite_create ("rtp-channel-layout");
++  TCase *tc = tcase_create ("bounds");
++
++  suite_add_tcase (s, tc);
++  tcase_add_test (tc, rtp_channel_layout_respects_capacity);
++  return s;
++}
++
++GST_CHECK_MAIN (rtp_channel_layout)
+diff --git a/tests/check/meson.build b/tests/check/meson.build
+index f0e3eb8..1511486 100644
+--- a/tests/check/meson.build
++++ b/tests/check/meson.build
+@@ -121,6 +121,8 @@ if not get_option('rtp').disabled() and not get_option('rtpmanager').disabled()
+     [ 'elements/rtpulpfec' ],
+     [ 'elements/rtpssrcdemux' ],
+     [ 'elements/rtp-payloading' ],
++    [ 'elements/rtp-channel-layout', false, [],
++      ['../../gst/rtp/gstrtpchannels.c'] ],
+     [ 'elements/rtpst2022-1-fecdec' ],
+     [ 'elements/rtpst2022-1-fecenc' ],
+   ]

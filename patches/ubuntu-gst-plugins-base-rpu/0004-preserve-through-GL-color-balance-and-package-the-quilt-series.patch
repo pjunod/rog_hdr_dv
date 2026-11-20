@@ -1,4 +1,4 @@
-From 4d7ff5c79950aef458a506395b4fe7b78345a2bd Mon Sep 17 00:00:00 2001
+From c9d53e4cd1c974ec0b765937ee10d95d2265f333 Mon Sep 17 00:00:00 2001
 From: ROG HDR contributors <rog-hdr@invalid>
 Date: Sun, 8 Nov 2026 06:22:00 +0000
 Subject: [PATCH] glcolorbalance: preserve high precision and invalidate
@@ -13,7 +13,7 @@ Subject: [PATCH] glcolorbalance: preserve high precision and invalidate
  create mode 100644 debian/patches/rog-dovi-base-api-and-gl-precision.patch
 
 diff --git a/debian/changelog b/debian/changelog
-index 6f41637..41dc12f 100644
+index e047e18..bd1cde3 100644
 --- a/debian/changelog
 +++ b/debian/changelog
 @@ -1,3 +1,10 @@
@@ -437,13 +437,13 @@ index 0000000..85abe6f
 +   'gstvideoencoder.h',
 +   'gstvideofilter.h',
 diff --git a/debian/patches/series b/debian/patches/series
-index 301ff1e..53a6a31 100644
+index c182ab6..e8dbe81 100644
 --- a/debian/patches/series
 +++ b/debian/patches/series
-@@ -4,3 +4,4 @@
- 0006_failing-test-appsrc.patch
- 0007_failing-test-compositor.patch
- 0008_failing-test-videoscale.patch
+@@ -7,3 +7,4 @@
+ CVE-2026-111183.patch
+ CVE-2026-86476.patch
+ CVE-2026-86476-post1.patch
 +rog-dovi-base-api-and-gl-precision.patch
 diff --git a/ext/gl/gstglcolorbalance.c b/ext/gl/gstglcolorbalance.c
 index e160afa..01714b4 100644

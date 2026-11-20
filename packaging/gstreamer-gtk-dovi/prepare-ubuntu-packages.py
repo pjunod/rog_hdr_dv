@@ -12,8 +12,8 @@ import subprocess
 import tempfile
 
 CORE_VERSION = "0.1.0+rogdv10"
-GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.7"
-SHOWTIME_VERSION = "50.0-2+rogdv5.13"
+GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.8"
+SHOWTIME_VERSION = "50.0-2+rogdv5.14"
 FIXED_GTK = "4.24.1+ds-1+rogdv6"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
@@ -171,7 +171,7 @@ def gtk_control(original):
     )
     # The excluded SDK stanza is named and validated above; no tail slicing.
     source = replace_field(source, "Build-Depends", "Build-Depends: " + ", ".join([
-        "debhelper-compat (= 13)", "cargo:native", "rustc:native (>= 1.92)",
+        "debhelper-compat (= 13)", "dh-sequence-cargo", "cargo:native", "rustc:native (>= 1.92)",
         "pkgconf", "libgtk-4-dev (>= 4.20)",
         "libgstreamer-plugins-base1.0-dev (>= 1.28.7)",
         f"libgstgtk-dovi-core-dev (= {CORE_VERSION})",
@@ -300,7 +300,8 @@ def prepare(workspace, showtime_only=False):
                 "Publish completed pictures to each view's declared HDR or SDR destination.",
                 "Build full plugin features offline from the Ubuntu vendored source.",
                 "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour.",
-            ], inputs["gtk"]["changelog"], date="Sun, 15 Nov 2026 00:00:00 +0000"),
+                "Refresh exact GStreamer dependencies after the Ubuntu security rebase.",
+            ], inputs["gtk"]["changelog"], date="Fri, 20 Nov 2026 14:00:00 +0000"),
         showtime / "debian/control": showtime_control(inputs["showtime"]["control"]),
         showtime / "debian/rules": inputs["showtime"]["rules"],
         showtime / "debian/changelog": changelog(
@@ -309,8 +310,9 @@ def prepare(workspace, showtime_only=False):
              "Require the matching sink and mapper with paused overlay preservation.",
              "Start the shared producer with an explicit SDR destination.",
              "Preserve overlay composition features through the RGBA precision filter.",
-             "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour."],
-            inputs["showtime"]["changelog"], date="Sun, 15 Nov 2026 00:00:00 +0000"),
+             "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour.",
+             "Refresh exact sink and GStreamer dependencies after the Ubuntu security rebase."],
+            inputs["showtime"]["changelog"], date="Fri, 20 Nov 2026 14:00:00 +0000"),
     }
     sources = [("showtime", showtime)] if showtime_only else [("gtk", gtk), ("showtime", showtime)]
     if showtime_only:

@@ -46,19 +46,28 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             root = Path(directory); play = self.workspace(root)
             packages.prepare(root)
             receipt = json.loads((root / 'showtime-source-preparation.json').read_text())
-            self.assertEqual(receipt['source_version'], '50.0-2+rogdv5.13')
+            self.assertEqual(receipt['source_version'], '50.0-2+rogdv5.14')
             self.assertEqual(receipt['patches'], self.series['patches'])
             self.assertEqual(hashlib.sha256(play.read_bytes()).hexdigest(), self.series['patches'][-1]['result_play_sha256'])
-            self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.13)'))
-            self.assertIn('gstreamer1.0-plugins-base (= 1.28.7-1+rogdv3)',
-                          (root / 'showtime-50.0/debian/control').read_text())
+            self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.14)'))
+            qualified = packages.qualified_pipeline()
+            showtime_control = (root / 'showtime-50.0/debian/control').read_text()
+            gtk_control = (root / 'source/debian/control').read_text()
+            for name in ('gstreamer1.0-gl', 'gstreamer1.0-plugins-good',
+                         'gstreamer1.0-plugins-base', 'gstreamer1.0-plugins-bad',
+                         'gstreamer1.0-plugins-extra', 'gstreamer1.0-libav'):
+                self.assertIn(f'{name} (= {qualified[name]})', showtime_control)
+            for name in ('gstreamer1.0-gl', 'libgstreamer-gl1.0-0',
+                         'libgstreamer-plugins-base1.0-0'):
+                self.assertIn(f'{name} (= {qualified[name]})', gtk_control)
+            self.assertIn(f'gstreamer1.0-gtk4 (= {packages.GTK_VERSION})', showtime_control)
             inventory = json.loads((root / 'package-output-inventory.json').read_text())
             self.assertEqual(inventory['showtime_source']['output_play_sha256'], receipt['output_play_sha256'])
             before = play.read_bytes()
             packages.prepare(root)
             self.assertEqual(play.read_bytes(), before, 'prepared source rerun is idempotent')
             self.assertEqual(packages.CORE_VERSION, '0.1.0+rogdv10')
-            self.assertEqual(packages.GTK_VERSION, '0.15.2-1ubuntu2+rogdv5.7')
+            self.assertEqual(packages.GTK_VERSION, '0.15.2-1ubuntu2+rogdv5.8')
 
     def test_showtime_only_preparation_preserves_unrelated_gtk_workspace(self):
         with tempfile.TemporaryDirectory() as directory:

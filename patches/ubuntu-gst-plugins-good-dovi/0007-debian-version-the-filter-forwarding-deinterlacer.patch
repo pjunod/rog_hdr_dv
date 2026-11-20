@@ -1,5 +1,17 @@
+From a0707fd0ca37be8b343a78499bbed233f2bd34f6 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Thu, 12 Nov 2026 03:30:00 +0000
+Subject: [PATCH] 0007-debian-version-the-filter-forwarding-deinterlacer
+
+---
+ debian/changelog                            |  7 ++
+ debian/patches/rog-deinterlace-filter.patch | 77 +++++++++++++++++++++
+ debian/patches/series                       |  1 +
+ 3 files changed, 85 insertions(+)
+ create mode 100644 debian/patches/rog-deinterlace-filter.patch
+
 diff --git a/debian/changelog b/debian/changelog
-index 160c01e..02d32aa 100644
+index 4e036d3..414a016 100644
 --- a/debian/changelog
 +++ b/debian/changelog
 @@ -1,3 +1,10 @@
@@ -97,11 +109,11 @@ index 0000000..97b4dff
 +   /* Filter any peercaps that are available with our template
 +    * to get started with the subset of caps we actually support */
 diff --git a/debian/patches/series b/debian/patches/series
-index fc4cee1..2a9d061 100644
+index 251d2bb..ce26ee4 100644
 --- a/debian/patches/series
 +++ b/debian/patches/series
-@@ -1,3 +1,4 @@
- 0000_remove-flv-test.patch
+@@ -2,3 +2,4 @@
+ CVE-2026-111183.patch
  rog-dovi-isobmff.patch
  rog-dovi-matroska-track.patch
 +rog-deinterlace-filter.patch

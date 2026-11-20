@@ -680,20 +680,54 @@
     },
     {
       "component": "ubuntu-gst-plugins-base-rpu",
-      "base_commit": "1cafd2ac126252d2316dc67d8449bb717cfd3ece",
-      "base_tree": "f80311ceca8066204866df97886d8ebf1b04e8cc",
-      "candidate_commit": "deb42f8c596cd3acb524243dd5344b3464383340",
-      "candidate_tree": "edf18b254ba631b507aa632b4ee0842ff6278210",
-      "patch_count": 6,
+      "base_commit": "11a8782e2732b5a08dd4cfc18c678b4512e27ee4",
+      "base_tree": "0a4ffe526e3ed0e5b110ea90c04cb6040a494872",
+      "candidate_commit": "cba36fc4a933e550806b7be684be4b6a2ba78d79",
+      "candidate_tree": "cec3a85a7a133be9ba69ff9eac587e817ec7d67e",
+      "patch_count": 7,
       "patch_order": [
         "0001-video-carry-owned-Dolby-RPU-with-matched-codec-frames.patch",
         "0002-parse-HEVC-Dolby-decoder-configuration-in-pbutils.patch",
         "0003-package-frame-metadata-and-configuration-interfaces.patch",
         "0004-preserve-through-GL-color-balance-and-package-the-quilt-series.patch",
         "0005-playsink-keep-caps-features-when-filtering-by-the-converters.patch",
-        "0006-debian-version-the-feature-preserving-playsink-converter-bin.patch"
+        "0006-debian-version-the-feature-preserving-playsink-converter-bin.patch",
+        "0007-debian-retain-Ubuntu-security-fixes-as-rogdv4.patch"
       ],
       "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gst-plugins-base1.0",
+        "version": "1.28.7-1ubuntu0.2",
+        "authentication": "Acquired by apt-get source against authenticated Ubuntu signed APT source indexes on 2026-11-20; archive hashes below bind the acquired bytes. The dsc OpenPGP signature was not independently checked.",
+        "import_recipe": "dpkg-source extraction with distribution patches; git add -f of every extracted file except .pc; neutral identity and fixed 2026-11-20T14:00:00+0000 author/committer date.",
+        "artifacts": [
+          {
+            "file": "gst-plugins-base1.0_1.28.7-1ubuntu0.2.debian.tar.xz",
+            "sha256": "f6d5870d7a968a4e450babf7add03253e0364345982382a31451462e98f4adbd",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1ubuntu0.2.debian.tar.xz"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7-1ubuntu0.2.dsc",
+            "sha256": "73815b574f69e76a91acaae3f9ce92a2ac959b42fb2a6221d43096c173257f36",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1ubuntu0.2.dsc"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7.orig.tar.xz",
+            "sha256": "ed6e5410f496d171818763af2265e7977154bc7f9b827e98acf8c5bed21dd5a7",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7.orig.tar.xz"
+          },
+          {
+            "file": "gst-plugins-base1.0_1.28.7.orig.tar.xz.asc",
+            "sha256": "5f53281ad6ae154bac5e6717932b04370f0eafd2355d58b5777594b73568d1ca",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7.orig.tar.xz.asc"
+          }
+        ]
+      },
+      "candidate_status": "Rebased the existing Dolby series onto Ubuntu 1.28.7-1ubuntu0.2, retaining CVE-2026-86476 audio/video meta deserialization and overlap checks plus CVE-2026-111183 channel-count bound. Strict generated git-am replay matches the complete 1442-path candidate tree cec3a85a7a133be9ba69ff9eac587e817ec7d67e. Imported authorship is retained; refreshed patch envelopes and packaging contexts bind the new source base. Focused compiler link loop established with GCC 15.3 and GStreamer 1.28.7 headers/libraries. Normal binary package compilation succeeded with unit tests disabled; every post-build quilt-applied tracked path and executable mode matches the pinned candidate. Focused test execution, runtime qualification and installation remain pending; prior acceptance receipts remain historical.",
+      "previous_candidate_commit": "deb42f8c596cd3acb524243dd5344b3464383340",
+      "previous_candidate_tree": "edf18b254ba631b507aa632b4ee0842ff6278210",
+      "candidate_package_version": "1.28.7-1ubuntu0.2+rogdv4",
+      "previous_source_origin": {
         "kind": "ubuntu-source-package",
         "package": "gst-plugins-base1.0",
         "version": "1.28.7-1",
@@ -719,11 +753,7 @@
             "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-base1.0/gst-plugins-base1.0_1.28.7-1.debian.tar.xz"
           }
         ]
-      },
-      "candidate_status": "The normal source and binary packages preserve normalized 16-bit GL color and discard color-sensitive provenance after pixel changes. The four-patch replay matches the distributed rogdv2 source tree. 0005 keeps the caps features of each raw filter structure when playsink's converter bin filters a caps query by its converters, so VA memory with a subtitle overlay reaches the Dolby mapper as such (rogdv3).",
-      "previous_candidate_commit": "4d7ff5c79950aef458a506395b4fe7b78345a2bd",
-      "previous_candidate_tree": "48967577303944e3b5dc66df978ea33e150de0ff",
-      "candidate_package_version": "1.28.7-1+rogdv3"
+      }
     },
     {
       "component": "ubuntu-gst-plugins-bad-rpu",
@@ -895,11 +925,56 @@
     },
     {
       "component": "ubuntu-gst-plugins-good-dovi",
-      "base_commit": "73d3a23875505394b9cbb0a7eca71050d0eeaaa3",
-      "base_tree": "0a06fafebcfba125e6ede43150e685215b307b5b",
-      "candidate_commit": "d19e8df9670a6ed4e60be4200dab35cfce855cef",
-      "candidate_tree": "2595a47937313572c8e3a03f92e80a16283322fd",
+      "base_commit": "3b885453eb48ba92afb374e6445ce2853dfe32af",
+      "base_tree": "c82eb36cbfd3367a4c350956c86322c1be29bd98",
+      "candidate_commit": "a77b312a829f9896d2fb0b246cb0017e085aea6b",
+      "candidate_tree": "ae1db6c29a9e547172bc7693ec698b9b5ade03dd",
       "source_origin": {
+        "kind": "ubuntu-source-package",
+        "package": "gst-plugins-good1.0",
+        "version": "1.28.7-1ubuntu0.1",
+        "authentication": "Acquired by apt-get source against authenticated Ubuntu signed APT source indexes on 2026-11-20; archive hashes below bind the acquired bytes. The dsc OpenPGP signature was not independently checked.",
+        "import_recipe": "dpkg-source extraction with distribution patches; git add -f of every extracted file except .pc; neutral identity and fixed 2026-11-20T14:00:00+0000 author/committer date.",
+        "artifacts": [
+          {
+            "file": "gst-plugins-good1.0_1.28.7-1ubuntu0.1.debian.tar.xz",
+            "sha256": "17736393eed92d45711b46542ffcb4ba824b82f9acf5ec2b5b297ab44eb5b272",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7-1ubuntu0.1.debian.tar.xz"
+          },
+          {
+            "file": "gst-plugins-good1.0_1.28.7-1ubuntu0.1.dsc",
+            "sha256": "301f2cac5394240d5394f45ce5487f068ab4c72b96af4777c02493dfc7260306",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7-1ubuntu0.1.dsc"
+          },
+          {
+            "file": "gst-plugins-good1.0_1.28.7.orig.tar.xz",
+            "sha256": "87256969c82cf3bc8574301f3e7044a90de0ac500a5a27d8ba38c4dde894dd8b",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7.orig.tar.xz"
+          },
+          {
+            "file": "gst-plugins-good1.0_1.28.7.orig.tar.xz.asc",
+            "sha256": "93ba387fd360430a21463ad416649d5feff3d8a129e235bfe074b48f5f52b147",
+            "url": "https://archive.ubuntu.com/ubuntu/pool/main/g/gst-plugins-good1.0/gst-plugins-good1.0_1.28.7.orig.tar.xz.asc"
+          }
+        ]
+      },
+      "patch_order": [
+        "0001-carry-Dolby-configuration-per-sample-entry.patch",
+        "0002-use-the-shared-HEVC-configuration-parser.patch",
+        "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
+        "0004-matroska-preserve-bounded-track-Dolby-configuration.patch",
+        "0005-package-the-reviewed-Matroska-configuration-series.patch",
+        "0006-deinterlace-forward-the-producers-candidates-to-downstream-caps-queries.patch",
+        "0007-debian-version-the-filter-forwarding-deinterlacer.patch",
+        "0008-debian-retain-Ubuntu-security-fixes-as-rogdv4.patch",
+        "0009-tests-guard-retained-Ubuntu-RTP-channel-layout-bounds.patch"
+      ],
+      "patch_count": 9,
+      "candidate_status": "Rebased the existing Dolby series onto Ubuntu 1.28.7-1ubuntu0.1, retaining CVE-2026-111183 RTP L8/L16/L24 depayloading channel-count bounds. Strict generated git-am replay matches the complete 1795-path candidate tree ae1db6c29a9e547172bc7693ec698b9b5ade03dd. Imported authorship is retained; refreshed patch envelopes and packaging contexts bind the new source base. Focused compiler link loop established with GCC 15.3 and GStreamer 1.28.7 headers/libraries. Normal binary package compilation succeeded with unit tests disabled; every post-build quilt-applied tracked path and executable mode matches the pinned candidate. Focused test execution, runtime qualification and installation remain pending; prior acceptance receipts remain historical. Adds a source-bound guarded-array regression for the retained Ubuntu RTP helper at 1/64/65/128 channels and capacities 0/1/64; test execution remains pending.",
+      "previous_candidate_commit": "d19e8df9670a6ed4e60be4200dab35cfce855cef",
+      "previous_candidate_tree": "2595a47937313572c8e3a03f92e80a16283322fd",
+      "candidate_package_version": "1.28.7-1ubuntu0.1+rogdv4",
+      "previous_source_origin": {
         "kind": "ubuntu-source-package",
         "artifacts": [
           {
@@ -927,21 +1002,7 @@
         "version": "1.28.7-1build1",
         "authentication": "Downloaded through configured Ubuntu APT source indexes and SHA256 pinned."
       },
-      "patch_order": [
-        "0001-carry-Dolby-configuration-per-sample-entry.patch",
-        "0002-use-the-shared-HEVC-configuration-parser.patch",
-        "0003-declare-the-Dolby-runtime-dependencies-in-Ubuntu-packages.patch",
-        "0004-matroska-preserve-bounded-track-Dolby-configuration.patch",
-        "0005-package-the-reviewed-Matroska-configuration-series.patch",
-        "0006-deinterlace-forward-the-producers-candidates-to-downstream-caps-queries.patch",
-        "0007-debian-version-the-filter-forwarding-deinterlacer.patch"
-      ],
-      "patch_count": 7,
-      "candidate_status": "The five-patch canonical replay matches all 1,791 paths and modes of the actual unsigned good+2 source package, including normal Debian dependency metadata. Five normal binary outputs and the recorded 25 track controls passed; P5 owned metadata transport passed on normal NVIDIA decoding. P7 is track metadata only, not FEL pixel qualification. 0006 forwards a producer's candidates through the deinterlacer to downstream caps queries, relaxed only by interlacing, field order, frame rate and the interlaced-format feature, so the Dolby mapper behind playsink's deinterlacer answers for the stream it will receive (Intel-decoded Dolby video in Showtime).",
-      "previous_candidate_commit": "7bf3d71a76fcb0697ed5bbe158e1c800b7ce1cf6",
-      "previous_candidate_tree": "ff0cc0b06d9b969a87bc2fc4926f19b28bc00eca",
-      "candidate_package_version": "1.28.7-1build1+rogdv3",
-      "candidate_source_package": {
+      "previous_candidate_source_package": {
         "kind": "unsigned-private-source-package",
         "file": "gst-plugins-good1.0_1.28.7-1build1+rogdv3.dsc",
         "sha256": "6170e14acce1988011c1750489a65ec7bc1cfe9c5ced182967671a220249b1f0",
