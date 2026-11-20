@@ -10,11 +10,16 @@ The new renderer has a distinct SONAME, `libplacebo.so.360rog1`, and distinct ex
 
 | Ubuntu client | Destination | Normal entry point |
 |---|---|---|
-| Installed mpv 0.41.0, gpu-next | HDR output described to the player by the display system | `mpv --vo=gpu-next movie.mp4` |
-| Staged mpv 0.42.0, gpu-next | Physical display target. Supports native 4K Profile 7 FEL composition | Open an MP4 or Matroska video in mpv |
-| Staged GtkVideo widget | Display target of each realized view, including views sharing a media stream | Open a local Profile 5 video in an application using GtkVideo |
-| Staged GNOME Showtime | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
+| Installed mpv `0.42.0-0ubuntu0+rogdv5.5`, gpu-next | Physical display target; native 4K Profile 7 FEL path | `mpv --vo=gpu-next movie.mp4` |
+| Installed GtkVideo widget, GTK `+rogdv6` | Display target of each realized view, including views sharing a media stream | Open a local Profile 5 video in an application using GtkVideo |
+| Installed GNOME Showtime `+rogdv5.13`, sink `+rogdv5.7` | Per-surface GTK target for a GStreamer movie | Open the video in Showtime |
 | FFmpeg 8.1.2, libplacebo video filter | Explicit export target, because a filter graph can run without a display | Example below |
+
+The installed client versions above were checked read-only on November 20.
+They do not establish fresh playback acceptance. The browser currently resolves
+stock WebKit after the November 18 update; its current-source replacement and
+the GStreamer consumer refresh are [in recovery](UBUNTU_UPDATE_RECOVERY.md).
+This recovery does not change the installed mpv package.
 
 ### One system mpv for native launchers
 

@@ -1,6 +1,12 @@
 # WebKitGTK clear video and native HDR
 
-**Status:** GTK4 Ubuntu packages built. Normal-sandbox runtime qualification passed all 30 steps, including Profile 7 FEL on NVDEC (`+rogdv3`, see below); `+rogdv6` loops pushed media with flushing seeks. · **Updated:** 2026-11-12
+**Status:** Current-source recovery in progress · **Updated:** November 20, 2026.
+The November 18 stock WebKit replacement superseded the installed native
+browser implementation. The runtime matrix below is historical qualification
+for its explicitly named package generations, including `+rogdv3` and
+`+rogdv6`; it does not qualify the current stock browser or the pending
+`2.52.6-1ubuntu1.1+rogdv8` replacement. See the
+[update recovery](UBUNTU_UPDATE_RECOVERY.md) and [current status](STATUS.md).
 
 This browser change gives ordinary clear MP4/HEVC HTML video an explicit
 100-nit BT709/sRGB destination and adds an independent tagged HDR video plane
@@ -10,13 +16,20 @@ mapping provider, decoder payload, licensed engine, binaries, media or
 reference output.
 
 The [product patch](../patches/ubuntu-webkitgtk-native-hdr/0001-webkitgtk-clear-video-and-native-hdr.patch)
-applies to Ubuntu `webkit2gtk 2.52.6-1ubuntu1` after its own patches. Its
-base and candidate trees are pinned in [sources.json](../sources.json)
-(component `ubuntu-webkitgtk-native-hdr`). For Ubuntu packages use
-[the GTK4-only packaging recipe](../packaging/webkitgtk-native-hdr/README.md);
-it records this patch in the normal quilt series.
+originally targeted Ubuntu `webkit2gtk 2.52.6-1ubuntu1` after its own patches.
+The active seventeen-patch series now replays onto `2.52.6-1ubuntu1.1`,
+retaining Ubuntu’s NVIDIA shared-memory fallback fix. Its exact base and
+candidate trees are pinned in [sources.json](../sources.json)
+(component `ubuntu-webkitgtk-native-hdr`). Current Ubuntu builds use
+[the GTK4-only packaging recipe](../packaging/webkitgtk-native-hdr/README.md),
+which records the series in normal quilt packaging and verifies its full
+source, feature profile and SDK inputs.
 
 ## Build with the real public SDKs
+
+This staged prototype recipe explains native-branch SDK selection. It is not
+the current normal Debian package build or its resource admission; use the
+GTK4-only recipe above for the current-source recovery.
 
 
 Use the destination-aware mapping SDK (destination ABI1 and source-lease ABI2; runtime core package 0.1.0+rogdv7 or newer, build headers from 0.1.0+rogdv5) and the modified GTK public development headers that declare GdkWaylandHdrRendering. The matching GTK source candidate is 4.24.1+ds-1+rogdv5. The ordinary backend remains available when optional APIs are absent. Discovery of the common gdkwaylandsurface.h filename alone does not prove the HDR declarations exist.
@@ -40,7 +53,7 @@ cmake --build "$task_build" --parallel 1 --target WebKit MiniBrowser \
 DESTDIR="$task_stage" cmake --install "$task_build"
 ```
 
-Materialize only owned files from `$task_stage$task_runtime` into the compiled `$task_runtime` path. The measured private builder uses 6GiB, two CPUs, nice15 and one job. Its host guard launches above 10GiB available memory/40GiB free disk and stops below 4GiB/20GiB. These are operational limits of this workflow.
+Materialize only owned files from `$task_stage$task_runtime` into the compiled `$task_runtime` path. The original staged prototype used 6GiB, two CPUs, nice15 and one job. Its host guard launched above 10GiB available memory/40GiB free disk and stopped below 4GiB/20GiB. These historical limits do not describe the current recovery builder.
 
 Before claiming the native branch was compiled, inspect the actual UI adapter compile command and preprocess it with those same include flags: `GDK_TYPE_WAYLAND_HDR_RENDERING` must be defined. For the native frame adapter, verify `GST_GTK_DOVI_DESTINATION_ABI >= 1` and `GST_GTK_DOVI_SOURCE_LEASE_ABI >= 2` from the same actual command. A manually added include during a diagnostic does not prove the normal target selected the new headers.
 
@@ -116,6 +129,9 @@ Selected leases carry process-qualified origin and selection tokens. Source/CDM 
 The native plane carries its own authoritative RGBA64/PQ/BT2020 tags. It is eligible only for an opaque upright unobscured axis-aligned video region with a valid current target lease. Unsupported CSS/orientation/subtitles/overlay combinations retain the intact graded SDR page. Export bounds are checked before expensive regrading and again afterward.
 
 ## Runtime qualification
+
+This historical matrix retains its original package identities and limits.
+It is not current-source rebase acceptance.
 
 The steps ran in a private headless GNOME compositor: a virtual 1280×800 monitor in colour
 mode 1 at 616 cd/m², with its own session bus. Each run used a staged MiniBrowser, the normal
