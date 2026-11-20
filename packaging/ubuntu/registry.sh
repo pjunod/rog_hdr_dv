@@ -61,7 +61,7 @@ delete_package() {  # delete_package NAME VERSION ARCH
 family_is_published() {  # family_is_published SOURCE VERSION ARCH...
   local source=$1 version=$2 arch body index; shift 2
   index=
-  for arch in "$@"; do
+  for arch in "$@" all; do
     body=$(packages_index "$arch") || return 2
     index+="$body"$'\n\n'
   done

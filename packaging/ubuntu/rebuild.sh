@@ -34,10 +34,19 @@ python3 "$here/../../scripts/check_repository.py" >/dev/null
 
 read -r CODENAME ldi_ubuntu mutter_ubuntu < <(docker run --rm "ubuntu:$release" bash -c '
   sed -i "s/^Types: deb$/Types: deb deb-src/" /etc/apt/sources.list.d/ubuntu.sources
-  apt-get update -qq >/dev/null
-  newest() { apt-cache showsrc "$1" | sed -n "s/^Version: //p" | sort -V | tail -1; }
+  apt-get update -qq -o APT::Update::Error-Mode=any >/dev/null
+  newest() {
+    local versions version newest=
+    versions=$(apt-cache showsrc "$1" | sed -n "s/^Version: //p")
+    for version in $versions; do
+      if [ -z "$newest" ] || dpkg --compare-versions "$version" gt "$newest"; then newest=$version; fi
+    done
+    echo "$newest"
+  }
   . /etc/os-release; echo "$VERSION_CODENAME $(newest libdisplay-info) $(newest mutter)"')
 [ -n "$mutter_ubuntu" ] || { echo "rebuild.sh: could not read Ubuntu's source versions" >&2; exit 1; }
+# Source changes require a reviewed pin refresh even when patches still apply.
+python3 "$here/managed.py" require-reviewed "libdisplay-info=$ldi_ubuntu" "mutter=$mutter_ubuntu"
 # shellcheck source=registry.sh
 . "$here/registry.sh"
 # Stop here, not after an hour of building, when the registry cannot be read.

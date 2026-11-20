@@ -36,9 +36,14 @@ class UbuntuOutputRetentionTests(unittest.TestCase):
         self.work = self.root / "retained outputs"
         for name in ("rebuild.sh", "registry.sh", "outputs.py", "REVISION", "managed.py", "managed-families.json"):
             shutil.copy2(PACKAGING / name, self.here / name)
+        shutil.copy2(ROOT / "sources.json", self.root / "repo/sources.json")
+        origins = {entry["component"]: entry.get("source_origin", {})
+                   for entry in json.loads((ROOT / "sources.json").read_text())["series"]}
+        self.ldi_version = origins["ubuntu-libdisplay-info"]["version"]
+        self.mutter_version = origins["ubuntu-mutter"]["version"]
         self.revision = (self.here / "REVISION").read_text().strip()
         self.write(self.root / "repo/scripts/check_repository.py", "# fake offline prerequisite\n")
-        self.executable(self.bin / "docker", "#!/bin/sh\nprintf 'testrelease 1.0-1 2.0-1\\n'\n")
+        self.executable(self.bin / "docker", '#!/bin/sh\nprintf "testrelease %s %s\\n" "$LDI_VERSION" "$MUTTER_VERSION"\n')
         self.executable(self.bin / "curl", r'''#!/usr/bin/env python3
 import json
 import os
@@ -52,7 +57,7 @@ else:
         version = os.environ["REVISION"] if os.environ.get("PUBLISHED") == "yes" else "0"
         manifest = Path(os.environ["MANAGED_MANIFEST"])
         data = json.loads(manifest.read_text())["families"]
-        for source, base in (("libdisplay-info", "1.0-1"), ("mutter", "2.0-1")):
+        for source, base in (("libdisplay-info", os.environ["LDI_VERSION"]), ("mutter", os.environ["MUTTER_VERSION"])):
             for arch, names in data[source]["packages"].items():
                 for name in names:
                     print(f"Package: {name}\nSource: {source}\nVersion: {base}+nativehdr{version}\nArchitecture: {arch}\nSHA256: {'a' * 64}\n")
@@ -117,6 +122,7 @@ if os.environ.get("FAIL_PUBLISH") == "yes":
         self.env.pop("FORGEJO_TOKEN", None)
         self.env.update(PATH=str(self.bin) + os.pathsep + self.env["PATH"],
                         MANAGED_MANIFEST=str(self.here / "managed-families.json"),
+                        LDI_VERSION=self.ldi_version, MUTTER_VERSION=self.mutter_version,
                         REVISION=self.revision, FORGEJO_URL="http://registry.invalid",
                         FORGEJO_OWNER="operator", PUBLISHED="no", FAIL_BUILD="no",
                         FAIL_PUBLISH="no")
@@ -153,6 +159,15 @@ if os.environ.get("FAIL_PUBLISH") == "yes":
 
     def runs(self):
         return sorted(self.work.glob("run-*"))
+
+    def test_unreviewed_ubuntu_source_refuses_before_any_mutation(self):
+        self.old_outputs()
+        before = self.snapshot()
+        stdout, stderr = self.run_rebuild(expected=1, MUTTER_VERSION=self.mutter_version + '.1')
+        self.assertIn('differs from reviewed', stderr)
+        self.assertNotIn('removed superseded', stdout)
+        self.assertEqual(self.snapshot(), before)
+        self.assertEqual(self.runs(), [])
 
     def test_published_noop_leaves_successful_partial_and_unknown_bytes_and_metadata(self):
         self.old_outputs()

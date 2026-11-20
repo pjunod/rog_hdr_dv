@@ -110,6 +110,39 @@ class ManagedPolicyTests(unittest.TestCase):
                 managed.freshness(data)
         self.assertIn('Ubuntu packaging base only', str(error.exception))
 
+    def test_current_source_requires_complete_current_published_family(self):
+        data, rows = fixture()
+        current = {'webkit2gtk': '2.52.6-1ubuntu1'}
+        managed.publication_freshness(data, rows, current)
+        old = [dict(row, Version='2.52.6-1ubuntu0.1+rogdv7') for row in rows]
+        with self.assertRaisesRegex(ValueError, 'waiting for publication'):
+            managed.publication_freshness(data, old, current)
+        with self.assertRaisesRegex(ValueError, 'every required binary'):
+            managed.publication_freshness(data, rows[:1], current)
+        with self.assertRaisesRegex(ValueError, 'no authenticated current Ubuntu source'):
+            managed.publication_freshness(data, rows, {})
+
+    def test_webkit_publication_requires_exact_reviewed_package_version(self):
+        spec = managed.families()['webkit2gtk']
+        pin = json.loads((ROOT / spec['pin']).read_text())
+        rows = [{'Package': name, 'Source': 'webkit2gtk', 'Version': pin['package_version'],
+                 'Architecture': arch, 'SHA256': 'a' * 64} for name, arch in managed.expected(spec)]
+        data = {'webkit2gtk': spec}
+        current = {'webkit2gtk': pin['source_version']}
+        managed.publication_freshness(data, rows, current)
+        rows[0]['Version'] = pin['package_version'] + '.older-review'
+        with self.assertRaisesRegex(ValueError, 'no complete published'):
+            managed.publication_freshness(data, rows, current)
+
+    def test_policy_only_families_need_no_registry_publication(self):
+        data = {s: f for s, f in managed.families().items() if f.get('policy_only')}
+        managed.publication_freshness(data, [], {})
+
+    def test_missing_authenticated_project_index_is_distinct(self):
+        with patch.object(managed, 'run', return_value=''):
+            with self.assertRaisesRegex(ValueError, 'index unavailable'):
+                managed.authenticated_project_index('http://forge.lan:3000/api/packages/operator/debian')
+
     def test_webkit_inventory_is_exact_recipe_inventory(self):
         data = managed.families()
         pin = json.loads((ROOT / data['webkit2gtk']['pin']).read_text())
@@ -170,6 +203,32 @@ class RealAptPolicyTests(unittest.TestCase):
         version = '2.52.6-1ubuntu1+rogdv6'
         result = self.solve([version, '2.52.6-1ubuntu1.1'])
         self.assertNotIn('Inst ' + self.name, result)
+
+    def test_separate_architecture_all_index_is_acquired_and_solved(self):
+        import hashlib
+        repo = self.root / 'repo'
+        package = ('Package: mutter-common\nVersion: 51.0-1ubuntu3+nativehdr17\n'
+                   'Architecture: all\nFilename: fixture.deb\nSize: 1\nSHA256: ' + 'a' * 64 +
+                   '\nDescription: separate all-index fixture\n\n')
+        entries = []
+        for arch, content in (('amd64', ''), ('all', package)):
+            relative = f'main/binary-{arch}/Packages'
+            target = repo / 'dists/fixture' / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content)
+            entries.append(f' {hashlib.sha256(content.encode()).hexdigest()} {len(content.encode())} {relative}\n')
+        (repo / 'dists/fixture/Release').write_text(
+            'Suite: fixture\nCodename: fixture\nArchitectures: amd64 all\nComponents: main\nSHA256:\n' + ''.join(entries))
+        (self.root / 'etc/sources.list').write_text('')
+        (self.root / 'etc/sources.list.d/project.sources').write_text(
+            f'Types: deb\nURIs: file:{repo}\nSuites: fixture\nComponents: main\n'
+            'Architectures-Add: all\nTrusted: yes\n')
+        subprocess.run(['apt-get', *self.options, 'update'], check=True, capture_output=True, text=True)
+        targets = subprocess.check_output(['apt-get', *self.options, 'indextargets', '--format', '$(URI)'], text=True)
+        self.assertIn('binary-all/Packages', targets)
+        result = subprocess.check_output(['apt-get', *self.options, '-s', 'install', 'mutter-common'], text=True)
+        self.assertIn('Inst mutter-common', result)
+        self.assertIn('51.0-1ubuntu3+nativehdr17', result)
 
     def test_debian_epoch_and_revision_ordering(self):
         self.assertEqual(subprocess.run(['dpkg', '--compare-versions', '1:2.0-1', 'gt', '9.0-1']).returncode, 0)

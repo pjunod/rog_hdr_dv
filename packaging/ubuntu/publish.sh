@@ -37,15 +37,14 @@ while IFS=$'\t' read -r name version arch digest deb; do
     *) echo "publish.sh: upload answered HTTP $code for $name $version $arch" >&2; exit 1 ;;
   esac
 done < "$work/upload-list"
-# Forgejo indexes Architecture: all in each architecture's Packages index.
+# Forgejo keeps Architecture: all packages in a separate signed binary-all index.
 indices=()
 while read -r arch; do
   packages_index "$arch" > "$work/$arch.Packages"
   indices+=("$work/$arch.Packages")
 done < <(python3 - "$work/bundle.json" <<'PY'
 import json, sys
-print('\n'.join(sorted({r['Architecture'] if r['Architecture'] != 'all' else 'amd64'
-                         for r in json.load(open(sys.argv[1]))})))
+print('\n'.join(sorted({r['Architecture'] for r in json.load(open(sys.argv[1]))})))
 PY
 )
 python3 "$here/managed.py" verify-index "$work/bundle.json" "${indices[@]}"

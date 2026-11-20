@@ -31,6 +31,7 @@ Types: deb
 URIs: $registry
 Suites: $codename
 Components: main
+Architectures-Add: all
 Signed-By: /etc/apt/keyrings/rog-hdr-dv.asc
 EOF
 python3 "$here/managed.py" preferences "$host" > /etc/apt/preferences.d/rog-hdr-dv

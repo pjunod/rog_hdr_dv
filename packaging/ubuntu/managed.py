@@ -182,6 +182,7 @@ def reviewed_version(source, spec):
 
 def freshness(data):
     stale = []
+    current = {}
     for source, spec in data.items():
         if spec.get('project'):
             continue  # Project-owned source has no Ubuntu counterpart.
@@ -193,6 +194,7 @@ def freshness(data):
         for version in versions[1:]:
             if subprocess.run(['dpkg', '--compare-versions', version, 'gt', newest]).returncode == 0:
                 newest = version
+        current[source] = newest
         if subprocess.run(['dpkg', '--compare-versions', newest, 'gt', reviewed]).returncode == 0:
             action = ('Refresh authenticated source/patch review and qualify a separate project release; generic family publication does not manage this subset.'
                       if spec.get('policy_only') else
@@ -202,14 +204,69 @@ def freshness(data):
     if stale:
         raise ValueError('\n'.join(stale))
     print('All managed Ubuntu source families match or precede their reviewed source pins.')
+    return current
+
+
+
+def authenticated_project_index(registry):
+    """Read only indexes authenticated by the immediately preceding APT update."""
+    registry = registry.rstrip('/')
+    targets = run('apt-get', 'indextargets', '--format', '$(IDENTIFIER) $(URI) $(FILENAME)')
+    paths = []
+    for line in targets.splitlines():
+        fields = line.split(' ', 2)
+        if len(fields) == 3 and fields[0] == 'Packages' and fields[1].startswith(registry + '/'):
+            paths.append(fields[2])
+    if not paths:
+        raise ValueError('authenticated project Packages index unavailable; check the registry, suite and architectures (not an empty published family)')
+    return [row for path in paths for row in records(run('/usr/lib/apt/apt-helper', 'cat-file', path))]
+
+
+def publication_freshness(data, index, current):
+    """A reviewed pin alone is insufficient: the current source must be shipped."""
+    failures = []
+    for source, spec in data.items():
+        if spec.get('policy_only'):
+            continue
+        pinned_package = None
+        if 'pin' in spec:
+            pinned_package = json.loads((ROOT / spec['pin']).read_text())['package_version']
+        if spec.get('project'):
+            # The public mapper has no Ubuntu source. Its own changelog supplies
+            # the current reviewed project release, without provider inventories.
+            changelog = (ROOT / 'packaging/gstreamer-gtk-dovi/debian/changelog').read_text()
+            pinned_package = re.match(r'gst-gtk-dovi-map \(([^)]+)\)', changelog).group(1)
+        versions = {}
+        for row in index:
+            version = row['Version']
+            if (source_name(row) != source or spec['derivative'] not in version
+                    or not re.fullmatch('[0-9a-f]{64}', row.get('SHA256', ''))):
+                continue
+            if pinned_package is not None and version != pinned_package:
+                continue
+            if not spec.get('project'):
+                if source not in current:
+                    raise ValueError(f'{source}: no authenticated current Ubuntu source identity')
+                ubuntu_version = version.rsplit(spec['derivative'], 1)[0]
+                if ubuntu_version != current[source]:
+                    continue
+            versions.setdefault(version, set()).add((row['Package'], row['Architecture']))
+        if not any(expected(spec) <= members for members in versions.values()):
+            target = pinned_package if spec.get('project') else current.get(source, 'unknown')
+            failures.append(f'{source}: no complete published project family for current source {target}; reviewed source alone is insufficient. Build, qualify and publish every required binary/architecture; Ubuntu fixes are waiting for publication.')
+    if failures:
+        raise ValueError('\n'.join(failures))
+    print('Complete current-source public project families verified in authenticated APT indexes.')
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('names')
+    reviewed = sub.add_parser('require-reviewed')
+    reviewed.add_argument('sources', nargs='+', help='SOURCE=UBUNTU-VERSION discovered from authenticated APT')
     sub.add_parser('preferences').add_argument('host')
-    sub.add_parser('freshness')
+    sub.add_parser('freshness').add_argument('--registry', help='also require complete current-source publication from authenticated APT cache')
     complete = sub.add_parser('complete-index')
     complete.add_argument('source')
     complete.add_argument('version')
@@ -225,7 +282,13 @@ def main():
     before.add_argument('indices', nargs='+')
     args = parser.parse_args()
     data = families()
-    if args.command == 'names':
+    if args.command == 'require-reviewed':
+        for item in args.sources:
+            source, version = item.split('=', 1)
+            reviewed = reviewed_version(source, data[source])
+            if version != reviewed:
+                raise ValueError(f'{source}: discovered Ubuntu {version} differs from reviewed {reviewed}; refresh authenticated source review before any build/prune/publication')
+    elif args.command == 'names':
         print('\n'.join(sorted(package_map({s: f for s, f in data.items() if not f.get('policy_only')}))))
     elif args.command == 'preferences':
         print(preferences(data, args.host))
@@ -245,7 +308,9 @@ def main():
             if line.startswith('Inst ') and line.split()[1].split(':')[0] not in mapping:
                 raise ValueError('simulation changes an unmanaged dependency; review it separately: ' + line.strip())
     elif args.command == 'freshness':
-        freshness(data)
+        current = freshness(data)
+        if args.registry:
+            publication_freshness(data, authenticated_project_index(args.registry), current)
     elif args.command == 'bundle':
         rows = local_rows(args.directories)
         validate_bundle(rows, data)

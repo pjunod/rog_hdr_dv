@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - name: Build and publish what the registry lacks
+      - name: Require reviewed sources, then build and publish missing automatic families
         env:
           FORGEJO_URL: ${{ github.server_url }}
           FORGEJO_OWNER: ${{ github.repository_owner }}
@@ -45,4 +45,7 @@ jobs:
           packaging/ubuntu/rebuild.sh "$retention_home/.local/state/rog-hdr-dv/ubuntu-packages"
       - name: Refuse an unnoticed Ubuntu security/source update
         if: always()
+        env:
+          FORGEJO_URL: ${{ github.server_url }}
+          FORGEJO_OWNER: ${{ github.repository_owner }}
         run: bash packaging/ubuntu/monitor.sh
