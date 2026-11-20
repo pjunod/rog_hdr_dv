@@ -9,6 +9,17 @@ decoder until they are played, captured and measured.** Frame cadence in
 particular needs timestamped frame or refresh capture; no source file can show
 it.
 
+**November 20, 2026 — exact fractional cadence source support.** The generator,
+capture planner and offline analyzer now retain exact rates such as
+24000/1001, 30000/1001 and 60000/1001. Independent source review and all
+54 focused checks passed (generator 26, runner 10, analyzer 18). An actual
+FFprobe 9.0.2 decode of newly generated 192×108 sources verified exact rates,
+integer PTS/time bases and frame counts 24, 23, 29 and 59 for one requested
+second at 24, 24000/1001, 30000/1001 and 60000/1001 respectively. The planner
+also refused nominal-24 substitution for 24000/1001. This is authored source
+and software-decoder evidence; no new player, capture, panel-cadence or optical
+acceptance is claimed. Repository publication checks are tracked separately.
+
 ## Generate
 
 Use Python 3 and a new output directory outside the source repository. Its
@@ -22,7 +33,7 @@ python3 scripts/generate_quality_stimuli.py "$HDR_WORK/quality-stimuli" \
 | Option | Default | Bound |
 |---|---|---|
 | `--width` / `--height` | 192 / 108 | even; width 192..3840, height 72..2160 |
-| `--cadence-fps` | 24 25 30 50 60 | unique integers 1..120, at most 16 |
+| `--cadence-fps` | 24 25 30 50 60 | unique exact integers or `N/D`, value 1..120; at most 16 |
 | `--cadence-seconds` | 2 | integer 1..10 |
 | `--max-total-bytes` | 64 MiB | checked before anything is written |
 
@@ -30,6 +41,26 @@ Large `--cadence-fps` and `--cadence-seconds` trip the 64 MiB guard: at the defa
 192x108, five rates at 10 s need about 118 MB, so the run is refused unless
 `--max-total-bytes` is raised (for example `--cadence-seconds 10 --max-total-bytes 134217728`).
 The estimate counts stimulus files only, not `manifest.json`.
+
+Fractional input is exact, so use `24000/1001` rather than `23.976`.
+Equivalent rates are reduced before naming and hashing; aliases such as
+`24` and `48/2` in the same run are refused. The reduced denominator is at
+most 1001, and each ideal-refresh model is bounded to 2400 source frames
+per repeat period; these bounds limit manifest work as well as media bytes.
+The three broadcast fractions above fit all the existing refresh models.
+
+```bash
+python3 scripts/generate_quality_stimuli.py "$HDR_WORK/fractional-stimuli" \
+  --cadence-fps 24 24000/1001 30000/1001 60000/1001 --cadence-seconds 2
+```
+
+Integer-only output retains `image-quality-stimuli-v1`, integer rate values
+and existing filenames. A run containing a fractional rate declares
+`image-quality-stimuli-v2`; its `cadence_fps` list holds integers and reduced
+`N/D` strings. Older integer-only analyzers refuse this new schema. The
+current analyzer supports both, verifies the exact generator/parameter/design
+hashes and refuses a schema/rate mismatch. As before, a manifest from a
+different generator source is not silently re-attributed to this source.
 
 
 The minimum width is 192 because the cadence barcode is 24 blocks of 8 px. The
@@ -158,10 +189,21 @@ path kept 10 bits.
 The near-black ramp is for digital (HDMI or framebuffer) capture only; under PQ
 its single-code steps are optically unmeasurable.
 
-## 4. Cadence (`cadence/cadence_<fps>fps_p10.y4m`)
+## 4. Cadence (`cadence/cadence_<rate>fps_p10.y4m`)
 
-One file per frame rate, `fps * seconds` frames, header `F<fps>:1`. Each frame
-`n` has black background (Y 64, chroma 512) and:
+One file per exact frame rate `f = N/D`, with header `FN:D` and
+`floor(f × seconds)` complete frames. This rounding chooses the frame count,
+never a replacement frame rate. Its actual duration is `frame_count × D/N`
+seconds, at most the requested duration and less than one frame shorter.
+For example, two seconds at 24000/1001 contains 47 frames and lasts
+47047/24000 seconds; it is not 48 frames at nominal 24 fps. Integer-rate media
+keep their existing frames, headers and names. Fractional filenames replace
+`/` with `_`, for example `cadence_24000_1001fps_p10.y4m`.
+
+Each cadence entry records reduced `frame_rate`, `frame_period_seconds` and
+`duration_seconds` objects with integer `numerator` and `denominator` fields.
+Each frame `n` has source PTS `n × D/N` seconds, black background (Y 64,
+chroma 512) and:
 
 - **Barcode** in rect `(x, y, w, h) = (0, 0, 192, 8)`: 24 blocks of 8 by 8 px,
   left to right, Y 64 for 0 and 940 for 1. Order: start marker `1,0`; 16-bit
@@ -206,11 +248,25 @@ positions, dither column codes, a zone-plate formula spot check, manifest hashes
 upsampled-chroma crossings against the recorded midpoints, destination protection
 (inside the repository, symlinks, existing paths, a racing destination), staging
 cleanup on failure, lazy streaming, the byte guard, parameter bounds and
-determinism:
+determinism. Fractional controls also decode every generated barcode, check
+complete-frame durations and independently reconstruct ideal refresh runs. The
+runner/analyzer tests cover exact-rate refusal, bounded capture requests, safe
+scene names, manifest schema/source hashes and rational source-PTS association:
 
 ```bash
 python3 -B -m unittest discover -s tests -p test_generate_quality_stimuli.py
+python3 -B -m unittest discover -s tests -p test_iq_run.py
+python3 -B -m unittest discover -s tests -p test_iq_analyze.py
 ```
+
+**November 20 result:** all 54 focused checks passed after independent review
+and its per-rate analyzer-binding correction. The mixed-rate control captures
+integer 24 and fractional 24000/1001 independently, leaves 60000/1001 uncaptured,
+and checks distinct source counts, timestamps and rational PTS. This prevents a
+stale loop variable from attributing one source's captures to another rate.
+The authored decode smoke above supplements these controls; it neither runs
+mpv nor samples a display. The analyzer batch used its existing NumPy-capable
+Python runtime; a default interpreter without NumPy cannot run that module.
 
 ## Capture and analyze a private compositor run
 
@@ -242,7 +298,12 @@ python3 tools/iq_run.py "$HDR_WORK/run" \
 The output directory must be new. Repeat `--scene` to select scenes; omitting
 it selects all supported scenes: `dither`, `siting-c420mpeg2`,
 `siting-c420jpeg`, `siting-c420paldv`, `scaling4k`, `cadence-24`, `cadence-25`,
-`cadence-30`, `cadence-50` and `cadence-60`. The runner uses the fixed
+`cadence-30`, `cadence-50` and `cadence-60`. These remain the default set;
+fractional captures are explicitly selected with, for example,
+`--scene cadence-24000_1001 --scene cadence-30000_1001 --scene cadence-60000_1001`.
+The source directory must contain those generated fractional files. Equivalent
+scene spellings normalize to the same safe rate slug, and duplicate selected
+scenes are captured once. The runner uses the fixed
 2560×1600 monitor capture, 8× placement
 for 192×108 stimuli, and 2/3 scaling preset. Still images are extracted into
 one-frame Y4M files and played in fresh mpv processes, so end-of-stream cannot
@@ -253,10 +314,13 @@ luminance, limited-range and PQ tags because Y4M does not carry them.
 The runner records source and helper hashes, arguments, capture statuses and
 `run.json`. Its cadence files are timestamped software captures. For each
 rate, the helper writes `cadence-<fps>.raw` and `.ts`; the request is up to
-eight seconds (`fps × 8` frames), capped at the complete frames available in
-the Y4M source. The default two-second source therefore requests only two
+eight seconds (`floor(fps × 8)` complete frames), capped at the complete
+frames available in the Y4M source. Header rates are compared by exact rational
+equality; a 60000/1001 source cannot pass as nominal 60 fps. The default two-second source therefore requests only two
 seconds. The receipt records the available source frames and actual requested
-frame count and duration. The runner does not loop the source. This does not
+frame count, exact `frame_rate` and `requested_duration_exact_seconds`, plus a
+floating-point duration for convenience. The exact fields govern interpretation;
+the float does not select or normalize frames. The runner does not loop the source. This does not
 sample panel refreshes or qualify optical output. Its cadence crop is only 160
 output pixels high; the moving bar is visible there, but tears below that crop
 remain unobserved.
@@ -279,7 +343,12 @@ indices and timestamps can reveal software delivery repeats, drops and
 sequence damage, but cannot establish panel cadence. A missing lower tear,
 an RGB midpoint shifted by tone or gamut mapping, or a clean compositor capture
 does not prove source-domain chroma siting, optical accuracy or Dolby Vision
-acceptance.
+acceptance. The cadence report also records the exact source frame period,
+source duration, decoded-source PTS for every admitted barcode, and exact source
+PTS deltas for observed transitions. Rejected samples retain a null source PTS;
+sequence gaps and rejected samples still break timing intervals. These are
+source-clock associations alongside software capture timestamps, not measured
+panel presentation times.
 
 The focused pre-merge lane runs after adversarial review. Its outcome belongs
 in the PR receipt, separately from the measurements below.

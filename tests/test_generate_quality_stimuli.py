@@ -2,6 +2,7 @@
 
 import contextlib
 import hashlib
+from fractions import Fraction
 import inspect
 import importlib.util
 import io
@@ -570,10 +571,57 @@ class FailureTests(unittest.TestCase):
             with self.assertRaises(stimuli.StimulusError):
                 stimuli.generate_stimuli(parent / "third", W, H, FPS, 1, max_total_bytes=total - 1)
 
+    def test_fractional_cadence_is_exact_and_decodable(self):
+        rates = ["24000/1001", "30000/1001", "60000/1001"]
+        with tempfile.TemporaryDirectory() as temporary:
+            output, manifest = generate(temporary, cadence_fps=rates)
+            entries = {e["path"]: e for e in manifest["files"]}
+            self.assertEqual(manifest["dimensions_and_timing"]["cadence_fps"], rates)
+            self.assertEqual(manifest["schema"], "image-quality-stimuli-v2")
+            for text in rates:
+                rate = Fraction(text)
+                path = "cadence/cadence_%sfps_p10.y4m" % text.replace("/", "_")
+                data = (output / path).read_bytes()
+                video = read_y4m(data)
+                frames = rate.numerator // rate.denominator
+                self.assertEqual(video["fps"], (rate.numerator, rate.denominator))
+                self.assertEqual(len(video["frames"]), frames)
+                expected = entries[path]["expected"]
+                self.assertEqual(expected["frame_rate"], {"numerator": rate.numerator, "denominator": rate.denominator})
+                duration = Fraction(frames, 1) / rate
+                self.assertEqual(expected["duration_seconds"], {"numerator": duration.numerator, "denominator": duration.denominator})
+                self.assertLessEqual(duration, 1)
+                self.assertLess(1 - duration, 1 / rate)
+                self.assertEqual(entries[path]["sha256"], digest(data))
+                for index, planes in enumerate(video["frames"]):
+                    self.assertEqual(decode_barcode(planes[0]), (index, True))
+                    row = planes[0][-1]
+                    white = {(4 * index + n) % W for n in range(8)}
+                    self.assertEqual({x for x, value in enumerate(row) if value == 940}, white)
+                for refresh in (60, 50, 120, 144):
+                    model = expected["refresh_runs"][str(refresh)]
+                    period = rate.numerator // math.gcd(rate.numerator, refresh * rate.denominator)
+                    starts = [math.ceil(Fraction(n * refresh, 1) / rate) for n in range(period + 1)]
+                    self.assertEqual(model["period_frames"], period)
+                    self.assertEqual(model["runs_over_period"], [b - a for a, b in zip(starts, starts[1:])])
+
+    def test_fractional_aliases_normalize_and_collisions_refuse_before_writes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output, manifest = generate(temporary, cadence_fps=["48000/2002", "48/2"])
+            self.assertEqual(manifest["dimensions_and_timing"]["cadence_fps"], ["24000/1001", 24])
+            self.assertTrue((output / "cadence/cadence_24000_1001fps_p10.y4m").is_file())
+            self.assertTrue((output / "cadence/cadence_24fps_p10.y4m").is_file())
+            for values in ([24, "48/2"], ["24000/1001", "48000/2002"]):
+                with self.assertRaisesRegex(stimuli.StimulusError, "unique"):
+                    stimuli.generate_stimuli(Path(temporary) / "refused", W, H, values, 1)
+                self.assertFalse((Path(temporary) / "refused").exists())
+
     def test_parameter_bounds(self):
         bad = [dict(width=190), dict(width=2), dict(width=3842), dict(height=70),
                dict(height=2162), dict(height=73), dict(cadence_fps=[0]), dict(cadence_fps=[121]),
-               dict(cadence_fps=[24, 24]), dict(cadence_fps=[]), dict(cadence_fps=[2.5]),
+               dict(cadence_fps=[24, 24]), dict(cadence_fps=[]), dict(cadence_fps="24"), dict(cadence_fps=[2.5]),
+               *[dict(cadence_fps=[value]) for value in (True, "23.976", "24000/0", "-24",
+                   "1/2", "120001/1001", "24000/1003", "24001/1001", "1/1/1")],
                dict(cadence_seconds=0), dict(cadence_seconds=11), dict(max_total_bytes=0)]
         with tempfile.TemporaryDirectory() as temporary:
             for index, overrides in enumerate(bad):

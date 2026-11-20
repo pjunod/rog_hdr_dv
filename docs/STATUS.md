@@ -1,5 +1,18 @@
 # Status — what is working and what remains
 
+**November 20, 2026 — fractional HDR source fixtures source-qualified.** The
+existing [IQ stimulus pipeline](IMAGE_QUALITY_STIMULI.md) carries exact
+24000/1001, 30000/1001 and 60000/1001 through Y4M headers, versioned manifests,
+capture plans and source-clock barcode diagnostics. Integer defaults and
+filenames remain compatible. Independent review and 54 focused checks passed
+(generator 26, runner 10, analyzer 18), including mixed-rate source association.
+Actual FFprobe 9.0.2 decode of authored 192×108 sources retained exact rates
+and PTS/time bases, with 24, 23, 29 and 59 frames for one requested second
+at 24, 24000/1001, 30000/1001 and 60000/1001 respectively. Nominal-24 substitution was refused.
+Repository publication checks remain separate. This is source/software-decode
+qualification, without a new player run, capture, panel-cadence or optical
+measurement. Parked algorithms and observer records remain untouched.
+
 **November 20, 2026 — source validation regression follow-up.** The existing
 subtitle-carrier verifier now compares probed pixel format and chroma location
 alongside color descriptions and exact rational packet identities. Authored

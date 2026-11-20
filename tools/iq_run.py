@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import socket
@@ -21,8 +22,24 @@ from pathlib import Path
 TAGS = "--vf=format=colormatrix=bt.2020-ncl:colorlevels=limited:primaries=bt.2020:gamma=pq"
 ZOOM8 = ["--video-unscaled=yes", "--video-zoom=3"]
 VIDEO8 = (512, 368, 1536, 864)
+_SPEC = importlib.util.spec_from_file_location(
+    "_iq_run_stimuli", Path(__file__).resolve().parents[1] / "scripts/generate_quality_stimuli.py")
+STIMULI = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(STIMULI)
 SCENES = ["dither", "siting-c420mpeg2", "siting-c420jpeg", "siting-c420paldv",
           "scaling4k", *(f"cadence-{fps}" for fps in (24, 25, 30, 50, 60))]
+
+
+def scene_name(value: str) -> str:
+    """Canonical scene names keep exact rates out of path separators."""
+    if value in SCENES:
+        return value
+    if value.startswith("cadence-"):
+        try:
+            return "cadence-" + STIMULI.cadence_slug(value[len("cadence-"):].replace("_", "/"))
+        except STIMULI.StimulusError as exc:
+            raise argparse.ArgumentTypeError(str(exc)) from exc
+    raise argparse.ArgumentTypeError("unknown capture scene")
 
 
 def _validate_y4m_range(fields: list[str]) -> None:
@@ -78,8 +95,9 @@ def extract_y4m_frame(data: bytes, index: int) -> tuple[bytes, dict]:
     return header + selected + b"\n" + selected_payload, {"width": width, "height": height, "chroma": chroma}
 
 
-def cadence_capture_plan(data: bytes, fps: int) -> dict:
+def cadence_capture_plan(data: bytes, fps: int | str) -> dict:
     """Validate a fixed-geometry cadence stream and cap capture at available frames."""
+    rate = STIMULI.cadence_rate(fps)
     nl = data.find(b"\n")
     if nl < 0 or not data[:nl].startswith(b"YUV4MPEG2 "):
         raise ValueError("invalid cadence Y4M stream header")
@@ -93,7 +111,8 @@ def cadence_capture_plan(data: bytes, fps: int) -> dict:
     _validate_y4m_range(fields)
     if width != 192 or height != 108 or values.get("C") != "420p10":
         raise ValueError("cadence source must be 192x108 C420p10")
-    if rate_num <= 0 or rate_den <= 0 or rate_num != fps * rate_den:
+    if (rate_num <= 0 or rate_den <= 0
+            or rate_num * rate.denominator != rate.numerator * rate_den):
         raise ValueError(f"cadence header frame rate does not match {fps} fps")
     frame_size = width * height * 3
     pos, available = nl + 1, 0
@@ -109,9 +128,11 @@ def cadence_capture_plan(data: bytes, fps: int) -> dict:
         available += 1
     if not available:
         raise ValueError("cadence source contains no frames")
-    requested = min(fps * 8, available)
+    requested = min(8 * rate.numerator // rate.denominator, available)
     return {"available_source_frames": available, "requested_frames": requested,
-            "requested_duration_seconds": requested / fps}
+            "requested_duration_seconds": float(requested / rate),
+            "frame_rate": STIMULI.rational_fields(rate),
+            "requested_duration_exact_seconds": STIMULI.rational_fields(requested / rate)}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -123,7 +144,8 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--pw-seq", required=True, type=Path)
     p.add_argument("--monitor", default="eDP-2")
     p.add_argument("--session-id", required=True, help="loginctl graphical session ID, or auto to discover the active seat session")
-    p.add_argument("--scene", choices=SCENES, action="append", help="repeatable; default captures all")
+    p.add_argument("--scene", type=scene_name, action="append",
+                   help="repeatable; default legacy scenes; exact cadence scene e.g. cadence-24000_1001")
     return p
 
 
@@ -240,15 +262,15 @@ def run(args) -> int:
         raise FileExistsError(f"output directory already exists: {out}")
     if not out.parent.is_dir():
         raise FileNotFoundError(f"output parent must exist: {out.parent}")
-    selected = args.scene or SCENES
+    selected = list(dict.fromkeys(scene_name(name) for name in (args.scene or SCENES)))
     for tool in (args.pw_read, args.pw_seq):
         if not tool.is_file() or not os.access(tool, os.X_OK):
             raise FileNotFoundError(f"capture helper is not executable: {tool}")
     cadence_plans = {}
     for name in selected:
         if name.startswith("cadence-"):
-            fps = int(name.split("-")[1])
-            src = args.stim_dir / "cadence" / f"cadence_{fps}fps_p10.y4m"
+            fps = STIMULI.cadence_value(name[len("cadence-"):].replace("_", "/"))
+            src = args.stim_dir / "cadence" / f"cadence_{STIMULI.cadence_slug(fps)}fps_p10.y4m"
             cadence_plans[name] = (src, cadence_capture_plan(src.read_bytes(), fps))
     unlocked(args.session_id)
     out.mkdir()
@@ -267,13 +289,14 @@ def run(args) -> int:
         log["pipewire_node"] = cast.node
         for name in selected:
             if name.startswith("cadence-"):
-                fps = int(name.split("-")[1])
+                fps = STIMULI.cadence_value(name[len("cadence-"):].replace("_", "/"))
                 src, plan = cadence_plans[name]
                 rec = {"scene": name, "source": src.name, "source_sha256": sha256(src),
                        "available_source_frames": plan["available_source_frames"],
                        "requested_frames": plan["requested_frames"],
                        "requested_duration_seconds": plan["requested_duration_seconds"],
-                       "fps": fps, "frames": []}
+                       "requested_duration_exact_seconds": plan["requested_duration_exact_seconds"],
+                       "frame_rate": plan["frame_rate"], "fps": fps, "frames": []}
                 cmd = ["mpv", "--fs", "--no-audio", "--pause", "--keep-open=always", "--osc=no",
                        "--osd-level=0", "--cursor-autohide=always", "--loop-file=no", TAGS,
                        *ZOOM8, str(src)]
