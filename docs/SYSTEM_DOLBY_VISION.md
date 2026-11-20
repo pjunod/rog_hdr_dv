@@ -32,7 +32,19 @@ Reproduce this candidate by applying all nine registered `mpv-fel-system-dv` pat
 
 On the ROG, the packaged Showtime client retained one decoded Profile 5 picture while a private GNOME monitor changed from 616 to 308 cd/m² and back. The mapper received both peaks with an unchanged 203 cd/m² reference white. GNOME’s 1280×800 PipeWire capture changed over 375,877 pixels inside the movie rectangle. The last capture matched the first byte for byte. The monitor advertised synthetic HDR capabilities, with the normal Mutter configuration, renderer and capture code. An independent late-HDR window also updated correctly on installed GNOME Shell. [Methods and measured differences](../evidence/gnome-showtime-paused-retarget.json).
 
-The normal GtkVideo widget and Showtime both showed a subtitle while grading the underlying Profile 5 picture. To reproduce the carrier check, prepare two excerpts of the same length from the start of the same video, with one cue visible at the selected frame and one outside it. This command checks the first 819 source packets against every video packet in each excerpt. It compares the Dolby configuration, codec initialization, sample sizes, encoded bytes, presentation and decode timestamps, and durations. For complete movies omit the prefix option. The test clips stay on the machine where they were obtained.
+The normal GtkVideo widget and Showtime both showed a subtitle while grading the
+underlying Profile 5 picture. To reproduce the carrier check, prepare two
+excerpts of the same length from the start of the same video, with one cue
+visible at the selected frame and one outside it. This command checks the first
+819 source packets against every video packet in each excerpt. It compares the
+Dolby configuration, codec initialization and probed video description,
+including transfer, range, primaries, matrix, pixel format and chroma location.
+It then compares packet sizes and payloads in decode order, with exact rational
+presentation and decode timestamps and durations. A match establishes encoded
+video continuity for the checked packets. Use the capture procedure to check
+rendered pixels and optical measurements to qualify the physical display. For
+complete movies omit the prefix option. The test clips stay on the machine
+where they were obtained.
 
 ```sh
 python3 packaging/quality/verify-subtitle-carrier.py --reference-prefix-packets 819 ORIGINAL ACTIVE INACTIVE
