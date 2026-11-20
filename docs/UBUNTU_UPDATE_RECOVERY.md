@@ -49,6 +49,13 @@ The GTK sink and Showtime carry exact dependency pins, so those consumer
 packages must move with the refreshed libraries. Their old qualified bundle
 cannot simply be relabelled as the new release.
 
+The rebased base/good source passed 17 focused Check cases in seven Meson
+groups: 16 against actual packaged libraries/plugins and one source-linked
+RTP capacity regression. A separate synthetic
+API probe passed 24 assertions for metadata ownership and public decoder
+configuration. Neither check decodes real media or qualifies browser playback.
+[Focused native test receipt](../evidence/gstreamer-security-fastlane-20261120.json).
+
 ## Recovery and acceptance
 
 The replacement must retain Ubuntu's current source changes and replay the

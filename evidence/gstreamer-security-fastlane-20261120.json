@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "date": "2026-11-20",
+  "scope": "Focused media-free checks: 16 cases against new packaged public GStreamer libraries/plugins and one source-linked RTP helper regression; pre-install evidence.",
+  "reviewed_repository_commit": "0f4382fa1fd9bd9024841254d15d28f5147acfd9",
+  "candidate_versions": {
+    "gst-plugins-base1.0": "1.28.7-1ubuntu0.2+rogdv4",
+    "gst-plugins-good1.0": "1.28.7-1ubuntu0.1+rogdv4"
+  },
+  "candidate_source_trees": {
+    "base": "cec3a85a7a133be9ba69ff9eac587e817ec7d67e",
+    "good": "ae1db6c29a9e547172bc7693ec698b9b5ade03dd"
+  },
+  "check_runner": {
+    "tool": "meson test --no-rebuild --num-processes 1",
+    "group_count": 7,
+    "case_count": 17,
+    "failures": 0,
+    "errors": 0,
+    "test_retries": 0,
+    "xml_receipts_retained_privately": 7,
+    "packaged_runtime_identity": "Actual test-process loader traces verified separately from plugin-scanner traces for 16 cases. The one RTP capacity regression links the actual source helper and loads no candidate library."
+  },
+  "groups": [
+    {
+      "source_family": "base",
+      "meson_group": "libs_audio",
+      "GST_CHECKS": "test_audio_meta_deserialize,test_audio_meta_serialize_65_chans,test_multichannel_checks",
+      "cases": 3,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    },
+    {
+      "source_family": "base",
+      "meson_group": "libs_video",
+      "GST_CHECKS": "test_video_meta_deserialize",
+      "cases": 1,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    },
+    {
+      "source_family": "base",
+      "meson_group": "libs_pbutils",
+      "GST_CHECKS": "test_pb_utils_h265_profiles,test_pb_utils_caps_mime_codec,test_pb_utils_caps_from_mime_codec",
+      "cases": 3,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    },
+    {
+      "source_family": "base",
+      "meson_group": "elements_playsink",
+      "GST_CHECKS": "test_volume_in_sink",
+      "cases": 1,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    },
+    {
+      "source_family": "good",
+      "meson_group": "elements_rtp_channel_layout",
+      "GST_CHECKS": "rtp_channel_layout_respects_capacity",
+      "cases": 1,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    },
+    {
+      "source_family": "good",
+      "meson_group": "elements_rtp_payloading",
+      "GST_CHECKS": "rtp_L16,rtp_L24",
+      "cases": 2,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    },
+    {
+      "source_family": "good",
+      "meson_group": "elements_deinterlace",
+      "GST_CHECKS": "test_mode_auto_accept_caps,test_mode_forced_accept_caps,test_mode_disabled_accept_caps,test_mode_disabled_expected_caps,test_mode_interlaced_expected_caps,test_mode_auto_expected_caps",
+      "cases": 6,
+      "failures": 0,
+      "errors": 0,
+      "exit_code": 0
+    }
+  ],
+  "synthetic_api_probe": {
+    "executions": 1,
+    "assertions": 24,
+    "failures": 0,
+    "exit_code": 0,
+    "source_sha256": "16435a77a598f2274b7b1fc8ce09afdb4d18a5e1dba260084550a0587f4d48b0",
+    "scope": [
+      "Opaque caller-owned RPU bytes are copied; shallow and deep buffer copies preserve ownership semantics.",
+      "Region copying drops picture-owned metadata; held GBytes outlives original buffers.",
+      "Wrapped buffer-memory finalizer runs once. This is not an RPU destroy callback.",
+      "Public profile-5/profile-8 decoder configuration accepts valid synthetic layouts, preserves unknown compatibility for a valid short record, and rejects truncated, oversized and reserved inputs."
+    ],
+    "wrapped_memory_releases": 1,
+    "rpu_destroy_callback_exposed": false
+  },
+  "rtp_capacity_boundary": {
+    "implementation": "Actual public gstrtpchannels.c helper linked by the regression target.",
+    "destination_capacities": [
+      0,
+      1,
+      64
+    ],
+    "requested_channels": [
+      1,
+      64,
+      65,
+      128
+    ],
+    "checks": "Guarded prefix/suffix and capacity-limited writes. The Ubuntu fix permits unpositioned channels; rejection of every count above64 is not asserted."
+  },
+  "limits": [
+    "No codec decode or real media playback in this fast lane.",
+    "Synthetic opaque bytes are not evidence of a valid RPU payload.",
+    "No browser, compositor or desktop application launched by these checks.",
+    "No installation, optical calibration, every-frame/full-film acceptance or certification claim.",
+    "Focused cases are not the full GStreamer unit suite."
+  ]
+}
