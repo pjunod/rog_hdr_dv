@@ -11,9 +11,14 @@ it.
 
 **November 20, 2026 — exact fractional cadence source support.** The generator,
 capture planner and offline analyzer now retain exact rates such as
-24000/1001, 30000/1001 and 60000/1001. Source implementation and authored
-regressions are prepared; independent review and the final focused batch are
-pending. No new playback, capture or physical cadence acceptance is claimed.
+24000/1001, 30000/1001 and 60000/1001. Independent source review and all
+54 focused checks passed (generator 26, runner 10, analyzer 18). An actual
+FFprobe 9.0.2 decode of newly generated 192×108 sources verified exact rates,
+integer PTS/time bases and frame counts 24, 23, 29 and 59 for one requested
+second at 24, 24000/1001, 30000/1001 and 60000/1001 respectively. The planner
+also refused nominal-24 substitution for 24000/1001. This is authored source
+and software-decoder evidence; no new player, capture, panel-cadence or optical
+acceptance is claimed. Repository publication checks are tracked separately.
 
 ## Generate
 
@@ -253,6 +258,15 @@ python3 -B -m unittest discover -s tests -p test_generate_quality_stimuli.py
 python3 -B -m unittest discover -s tests -p test_iq_run.py
 python3 -B -m unittest discover -s tests -p test_iq_analyze.py
 ```
+
+**November 20 result:** all 54 focused checks passed after independent review
+and its per-rate analyzer-binding correction. The mixed-rate control captures
+integer 24 and fractional 24000/1001 independently, leaves 60000/1001 uncaptured,
+and checks distinct source counts, timestamps and rational PTS. This prevents a
+stale loop variable from attributing one source's captures to another rate.
+The authored decode smoke above supplements these controls; it neither runs
+mpv nor samples a display. The analyzer batch used its existing NumPy-capable
+Python runtime; a default interpreter without NumPy cannot run that module.
 
 ## Capture and analyze a private compositor run
 

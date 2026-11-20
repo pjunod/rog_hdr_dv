@@ -43,9 +43,10 @@ observation were not verified, and earlier personal attribution is withdrawn.
 [Current status](docs/STATUS.md) ·
 [Image-quality methods and findings](docs/IMAGE_QUALITY_STIMULI.md).
 The offline source generator also supports exact broadcast fractional cadences;
-its capture planner and barcode analyzer retain rational frame timing. This is
-source-tool support; review/final checks and actual playback/capture acceptance
-are tracked separately in the [status page](docs/STATUS.md).
+its capture planner and barcode analyzer retain rational frame timing.
+Independent source review, 54 focused checks and an authored FFprobe decode
+passed. Source/software-decode evidence and remaining playback/capture
+acceptance are distinguished in the [status page](docs/STATUS.md).
 
 The historical coordinated November 9 install completed all 45 planned package changes with zero removals and a clean `dpkg --audit`. At that install, versions included mpv 0.42 `+rogdv5.1`, FFmpeg libavfilter `+rogdv4.2` and Mutter `nativehdr15`. The running GNOME Shell PID remained unchanged during installation. A later normal login loaded the installed Mutter library. Its display state reports the internal panel at 2560×1600 and 240 Hz with colour mode 1. Post-login visual acceptance was pending at that historical handoff; the bounded November 13 checks are recorded above and in the current status. Historical private-compositor playback receipts retain their original scope. [Release and recovery](docs/SYSTEM_DOLBY_VISION.md) · [Desktop handoff](docs/SOFTWARE_DELIVERY.md).
 
