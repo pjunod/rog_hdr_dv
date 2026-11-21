@@ -4,8 +4,14 @@
 The installed v8 recovery is being followed by a reviewed v9 correction for
 lost YUV range and independently specified colour metadata. The original
 twenty-eight-case capture run is retained; its final analysis exposed these
-source defects and several test-harness assumptions. A normal paused-subtitle
-selection correction is also being prepared for GstPlay. No complete browser
+source defects and several test-harness assumptions. The v9 shader correction now qualifies 25 focused native cases: 23 retained
+passes plus the corrected P010 and affected NV12 GPU passes, with unchanged
+assertions. The normal six-package WebKit build passed. The normal eleven-output
+GStreamer bad v10 build also passed; only GstPlay changes among 178 runtime
+ELFs compared with v9. Its real API regression reproduces the old paused
+subtitle failure and passes with the correction, including alternate selection
+and an overriding explicit seek. The selected seven host upgrades and live
+acceptance are being prepared. No complete browser
 or normal-player runtime acceptance is claimed yet.
 
 The exact thirteen-package recovery transaction passed: WebKit/JavaScriptCore
