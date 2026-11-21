@@ -1196,11 +1196,11 @@
     },
     {
       "component": "ubuntu-webkitgtk-native-hdr",
-      "base_commit": "5e156fdf2d8daf0485d3b20ffbdde9725bb57d26",
-      "base_tree": "42cb56170bd8e122c8632b3616fd3a2e707bb458",
-      "candidate_commit": "277f494d00f76fab52e2056469ee847396ccf577",
-      "candidate_tree": "9676b87e977c8f1e13f73044f28aa3a5b3715712",
-      "patch_count": 17,
+      "base_commit": "52e6d6acaeb608dcdc2b7950a4f72183dba960d7",
+      "base_tree": "6365406c9499327edcdbb5e73fe126ab481fa440",
+      "candidate_commit": "b90afb195d73ac6dfdae84b54acb4a545a76ef42",
+      "candidate_tree": "d625b837343ed0d036dc33dc849c8961d4b9b10e",
+      "patch_count": 18,
       "patch_order": [
         "0001-webkitgtk-clear-video-and-native-hdr.patch",
         "0002-skia-preserve-image-profiles-and-png16.patch",
@@ -1218,29 +1218,25 @@
         "0014-webkit-build-the-image-colour-series-against-2.52.6-APIs.patch",
         "0015-cmake-skip-implicit-system-include-dirs-for-the-mapper-SDK.patch",
         "0016-skia-release-gl-resources-with-their-own-context-current.patch",
-        "0017-tests-make-the-focused-image-colour-regressions-build.patch"
+        "0017-tests-make-the-focused-image-colour-regressions-build.patch",
+        "0018-webkit-preserve-YUV-range-and-independent-colorimetry.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
         "package": "webkit2gtk",
-        "version": "2.52.6-1ubuntu1",
-        "authentication": "Archive hashes match the pinned official descriptor; dsc OpenPGP signature not independently checked.",
-        "descriptor": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.dsc",
+        "version": "2.52.6-1ubuntu1.1",
+        "authentication": "Archive hashes match the pinned official descriptor and the retained authenticated Ubuntu archive inputs; no new dsc OpenPGP signature claim.",
+        "descriptor": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.1.dsc",
         "artifacts": [
-          {
-            "file": "webkit2gtk_2.52.6-1ubuntu1.debian.tar.xz",
-            "sha256": "6a6299568055c96438a801ba5f13300bb6dc3e4256f34f3a1f6be25452c4392e",
-            "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.debian.tar.xz"
-          },
           {
             "file": "webkit2gtk_2.52.6.orig.tar.xz",
             "sha256": "179a2ea3f8f6edd4be7f31fdc55afc57bd0729f1fba648c61d4181539ac116fc",
             "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6.orig.tar.xz"
           },
           {
-            "file": "webkit2gtk_2.52.6.orig.tar.xz.asc",
-            "sha256": "6694b1f87b10c4b799f2aadf20da7a0b6725b9c3b41b598ecba8bc35d54e7090",
-            "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6.orig.tar.xz.asc"
+            "file": "webkit2gtk_2.52.6-1ubuntu1.1.debian.tar.xz",
+            "sha256": "bed73c3adcf65dcde171416c1174d412bc4c1c04994feb0420481f959ac9de75",
+            "url": "https://security.ubuntu.com/ubuntu/pool/main/w/webkit2gtk/webkit2gtk_2.52.6-1ubuntu1.1.debian.tar.xz"
           }
         ],
         "documentation_provenance": {
@@ -1251,10 +1247,10 @@
           "reason": "The case-insensitive Git import omitted the uppercase URL sibling. Packaging preserves the complete official archive documentation; reviewed Source and Tools tree identities are unchanged."
         }
       },
-      "candidate_status": "Thirteen-patch product source candidate: typed profile/PNG16 and nonlinear-sRGB working pipeline plus adversarial-review corrections for actual export layouts, transactional import failure/ownership, GLES2 fallback and test RAII/current-context teardown. Source and prepared focused regressions now comprise nineteen normal/F16 cases plus one requiring actual GLES2. Original Debian tree remains unchanged before separate Ubuntu overlay. Candidate compile/link, affected tests, package and runtime acceptance remain pending; no rogdv7 installation. Historical rogdv6 receipts remain separate.",
-      "candidate_package_version": "2.52.6-1ubuntu1+rogdv7",
-      "previous_candidate_commit": "c1fcae696a4d2eb53258f7c9f2d23d1011b94dca",
-      "previous_candidate_tree": "d540726b883a6f21596105ebb55d43729da7afc1"
+      "candidate_status": "Current-Ubuntu-source eighteen-patch candidate adds independent YUV matrix/range/transfer and physical R8/P010 conversion after the reviewed v8 recovery. Isolated incremental compile, focused regressions and refreshed runtime acceptance are pending; v8 installation and historical results are recorded separately.",
+      "candidate_package_version": "2.52.6-1ubuntu1.1+rogdv9",
+      "previous_candidate_commit": "277f494d00f76fab52e2056469ee847396ccf577",
+      "previous_candidate_tree": "9676b87e977c8f1e13f73044f28aa3a5b3715712"
     },
     {
       "component": "ubuntu-network-manager-suspend",

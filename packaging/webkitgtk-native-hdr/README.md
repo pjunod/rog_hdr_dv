@@ -10,7 +10,7 @@ that installed correction. Those receipts qualify the historical source and
 package set only; see [status](../../docs/STATUS.md) and
 [image-colour acceptance](../../docs/GTK_WEBKIT_IMAGE_COLOUR.md).
 
-The recipe below rebases the same seventeen product patches onto Ubuntu
+The recipe below rebases the original seventeen product patches plus the reviewed YUV colour correction onto Ubuntu
 `2.52.6-1ubuntu1.1`, preserving its NVIDIA shared-memory fallback correction.
 No product patch bytes changed. Current binary compilation, focused tests,
 package binding and runtime acceptance remain pending. Optical, full-film
@@ -19,7 +19,7 @@ delivery is outside this recipe's clear-video scope.
 
 This recipe prepares Ubuntu `webkit2gtk 2.52.6-1ubuntu1.1` plus the inherited
 native HDR video patch and proposed image-colour series as
-`2.52.6-1ubuntu1.1+rogdv8`. It keeps
+`2.52.6-1ubuntu1.1+rogdv9`. It keeps
 Ubuntu's debhelper generation, symbols, GIR dependency generation and
 `dh_shlibdeps`. It selects GTK4 only, with standard `/usr` multiarch paths.
 The ordered product series and [source pin](source-pin.json) identify the
@@ -88,14 +88,14 @@ dpkg-buildpackage -S -us -uc -d
 
 Set `product_series` to the public
 [`patches/ubuntu-webkitgtk-native-hdr/series`](../../patches/ubuntu-webkitgtk-native-hdr/series)
-manifest, with all seventeen named patch files beside it. The helper compares its
+manifest, with all eighteen named patch files beside it. The helper compares its
 exact names and order with `product_patch_series` in [the pin](source-pin.json),
 then checks every regular patch file's SHA256 before changing the source.
 Reordering, omission, duplicate names, quilt options, traversal, symlink inputs
 and digest changes fail closed. It applies authenticated components in order
 with GNU patch, then verifies the complete final `Source` and `Tools` trees.
 `--product-patch` remains available for historical single-patch pins; it cannot
-substitute one patch or an unverified bundle for this seventeen-component series.
+substitute one patch or an unverified bundle for this eighteen-component series.
 
 Preparation refuses a different product patch digest, source tree, executable
 mode or Ubuntu `debian/` input. Its full top-level inventory permits only the
@@ -104,7 +104,7 @@ files, including private notes at the source root, fail before quilt records
 a delta. Original `debian/` identity is byte-closed: its Python caches are
 not ignored during pin verification. Explicit tar exclusions also prevent
 Python caches from entering the generated Debian source archive. The
-recorded patch must touch exactly the 82 pinned regular product
+recorded patch must touch exactly the 90 pinned regular product
 paths, with no binary patch, traversal, deletion or rename. Quilt metadata
 cannot contain symlinks or special files. Generated Python caches are excluded
 from source diffs explicitly; they never enter the public source package. It prints success only after generated control
@@ -161,7 +161,7 @@ An active compiler continues to own its source and headers. Add
 reviewed product tree. Preparation records the quilt delta using normal `dpkg-source --commit`.
 That tool normalizes patched source timestamps. The helper snapshots every
 public path, content identity, exact permission mode and timestamp. After the
-commit it proves the closed source inventory, pinned trees, exact 82 patch
+commit it proves the closed source inventory, pinned trees, exact 90 patch
 paths and all per-file identities still match, then restores only changed
 mtime metadata from its pre-commit snapshot. Final timestamps must equal the
 original snapshot, preserving completed objects. It does not alter the compiler cache. Before recording the delta it writes an

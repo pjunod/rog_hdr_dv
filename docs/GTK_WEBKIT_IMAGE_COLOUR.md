@@ -1,7 +1,6 @@
 # GTK and WebKit image colour — preserve values and describe the surface
 
-**Status:** Historical GTK6/WebKit7 correction qualified and installed November 15;
-restoration after the November 18 stock WebKit replacement is pending.
+**Status:** Current-source WebKit8 installed; ordinary-image import and recovery controls passed.
 **Updated:** November 20, 2026.
 **Deciders:** Project maintainer and coordinating agent. No upstream acceptance
 is claimed. Historical deployment is recorded below.
@@ -33,8 +32,11 @@ correction. These historical passes do not establish the current browser's
 colour or native-video behaviour. The current Ubuntu-source v8 normal
 build and package checks passed, followed by nineteen focused native cases
 with zero skips on the declared surfaceless software provider. Installed
-library binding and fresh ordinary-image/browser runtime acceptance remain
-pending. Verify GTK/sink/Showtime and WebKit package state
+WebKit8/GTK6 binding and both ordinary-image controls passed: normal F16 A/B
+import, then one failed import retaining A until authenticated SHM B recovery,
+without a blank. The actual WebProcess engine was i915; this does not grant
+NVIDIA natural-SHM coverage. Fresh browser video and normal-player acceptance
+remain in progress. Verify GTK/sink/Showtime and WebKit package state
 separately. Optical accuracy, full-film and every-frame fidelity remain open;
 encrypted browser DRM/CDM delivery is a separate scope.
 

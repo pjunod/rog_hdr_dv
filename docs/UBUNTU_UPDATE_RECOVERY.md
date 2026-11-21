@@ -1,6 +1,6 @@
 # Ubuntu update recovery — preserving the browser and video patches
 
-**State: exact recovery installed; publication and runtime acceptance pending · November 20, 2026.** This document answers
+**State: v8 recovery installed; v9 ordinary-colour correction in progress · November 20, 2026.** This document answers
 why WebKit lost the patches and how the browser/GStreamer update path is
 being corrected. [Current status](STATUS.md) separates current installation
 from earlier qualification; [APT operations](UBUNTU_APT_REPOSITORY.md) covers
@@ -37,6 +37,22 @@ of the project's native display-target/frame-mapping entry points. This
 confirms replacement of the implementation, rather than only a stale version
 label. November 15 browser/image comparisons still establish what the former
 patched build did; they do not qualify the stock replacement.
+
+## Ordinary-video colour correction after restoration
+
+The v8 recovery exposed two independent ordinary-YUV source defects. Matrix
+selection compared the complete colourimetry tuple, so known matrix metadata
+could be discarded when primaries or transfer were unspecified. The DMA path
+also omitted range, while its conversion always used limited-range coefficients.
+Applying that conversion to full-range samples shifts black and white levels.
+
+The reviewed v9 candidate retains independent matrix, range and transfer fields
+and uses the actual R8 or P010-in-R16 sample representation. Each video wrapper
+passes an immutable colour description to a cached layer for that draw, so
+recycled buffers do not leak one view's metadata into another. Unknown producer
+layouts retain their prior fallback; no global shader clamp hides the defect.
+Four CPU regressions and two shipping-renderer regressions are prepared.
+Compilation, execution and refreshed installed controls remain pending.
 
 ## Additional update drift found
 

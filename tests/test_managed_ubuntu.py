@@ -263,7 +263,7 @@ class RealAptPolicyTests(unittest.TestCase):
         self.assertNotIn('Inst ' + self.name, result)
 
     def test_newer_derivative_is_automatically_selected(self):
-        version = '2.52.6-1ubuntu1.1+rogdv8'
+        version = '2.52.6-1ubuntu1.1+rogdv9'
         result = self.solve(['2.52.6-1ubuntu1.1', version])
         self.assertIn('Inst ' + self.name, result)
         self.assertIn(version, result)

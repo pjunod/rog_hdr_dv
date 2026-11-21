@@ -1,6 +1,13 @@
 # Status — what is working and what remains
 
-**Updated November 20, 2026. Recovery installed; runtime acceptance pending.**
+**Updated November 20, 2026. Recovery installed; ordinary-video corrections in progress.**
+The installed v8 recovery is being followed by a reviewed v9 correction for
+lost YUV range and independently specified colour metadata. The original
+twenty-eight-case capture run is retained; its final analysis exposed these
+source defects and several test-harness assumptions. A normal paused-subtitle
+selection correction is also being prepared for GstPlay. No complete browser
+or normal-player runtime acceptance is claimed yet.
+
 The exact thirteen-package recovery transaction passed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv8`, eight GStreamer base packages
 `1.28.7-1+rogdv4.ubuntu0.2`, good `1.28.7-1ubuntu0.1+rogdv4`, GTK sink

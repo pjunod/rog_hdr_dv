@@ -20,15 +20,18 @@ repository owns the operating-system display work.
 
 ## Current recovery (2026-11-20)
 
-Ubuntu's November 18 update replaced the patched WebKit runtimes with stock
-packages. GTK/GStreamer remain installed; browser HDR/DV and image-colour
-acceptance must be re-established after the current-source WebKit rebase.
+The current-Ubuntu-source WebKit8 and coordinated GStreamer security recovery
+are installed: thirteen upgrades, no removals, with the desktop session kept
+open. Both ordinary-image import/recovery controls passed on the installed
+libraries. Browser video and normal-player runtime acceptance are in progress.
+Scoped APT preferences preserve the patched families, while source monitoring
+reports pending security rebuilds.
 [Update recovery](docs/UBUNTU_UPDATE_RECOVERY.md) records the confirmed cause,
 the package-management fix and the remaining deployment checks.
 
 ## Historical qualified baseline (2026-11-17)
 
-GTK `+rogdv6`, WebKit `+rogdv7` and Showtime `+rogdv5.13` are installed.
+That baseline installed GTK `+rogdv6`, WebKit `+rogdv7` and Showtime `+rogdv5.13`.
 On the measured P3 chart GNOME Web and Image Viewer agree within one PQ10
 code. The first item-7 range, chroma, scaling and cadence-source captures now
 have bounded digital diagnostics; the damage-driven stream cannot establish

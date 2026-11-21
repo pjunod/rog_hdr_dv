@@ -1,12 +1,13 @@
 # WebKitGTK clear video and native HDR
 
-**Status:** Current-source recovery in progress · **Updated:** November 20, 2026.
-The November 18 stock WebKit replacement superseded the installed native
-browser implementation. The runtime matrix below is historical qualification
-for its explicitly named package generations, including `+rogdv3` and
-`+rogdv6`; it does not qualify the current stock browser or the pending
-`2.52.6-1ubuntu1.1+rogdv8` replacement. See the
-[update recovery](UBUNTU_UPDATE_RECOVERY.md) and [current status](STATUS.md).
+**Status:** Current-source WebKit8 installed; video matrix in progress · **Updated:** November 20, 2026.
+The exact thirteen-package recovery restored WebKit/JavaScriptCore
+`2.52.6-1ubuntu1.1+rogdv8` after the November 18 stock replacement.
+Nineteen focused native cases and both installed ordinary-image controls
+passed. The video matrix below retains its historical package generations,
+including `+rogdv3` and `+rogdv6`; fresh current-source video acceptance is
+recorded separately in [update recovery](UBUNTU_UPDATE_RECOVERY.md) and
+[current status](STATUS.md).
 
 This browser change gives ordinary clear MP4/HEVC HTML video an explicit
 100-nit BT709/sRGB destination and adds an independent tagged HDR video plane

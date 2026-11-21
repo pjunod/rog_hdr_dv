@@ -1,9 +1,9 @@
 {
   "source_package": "webkit2gtk",
   "source_version": "2.52.6-1ubuntu1.1",
-  "package_version": "2.52.6-1ubuntu1.1+rogdv8",
+  "package_version": "2.52.6-1ubuntu1.1+rogdv9",
   "base_commit": "52e6d6acaeb608dcdc2b7950a4f72183dba960d7",
-  "candidate_commit": "38b355df19b3134e3b15e78fd4cfca199fde76c5",
+  "candidate_commit": "b90afb195d73ac6dfdae84b54acb4a545a76ef42",
   "common": {
     "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
     "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
@@ -15,8 +15,8 @@
     "debian": "da80b494e82d52c0c63f766d169e811f30a3c5f6"
   },
   "candidate": {
-    "Source": "a6838a015284195d76019a4c6bb006f5d64f6b90",
-    "Tools": "86175b1308679540ff5bef865acf0d32dc3ba4b9"
+    "Source": "4b96df92e35700d4a37cb88a5c44ac96e74fc6ec",
+    "Tools": "c876bdaedb9f12cc87020896ad4426472f1283cf"
   },
   "binary_packages": [
     "libjavascriptcoregtk-6.0-1",
@@ -53,12 +53,14 @@
     "Source/WebCore/platform/graphics/ImageFrame.cpp",
     "Source/WebCore/platform/graphics/ImageFrame.h",
     "Source/WebCore/platform/graphics/MediaPlayer.h",
+    "Source/WebCore/platform/graphics/gbm/DMABufBuffer.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDecoderPreference.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputHistory.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDoviInputSetup.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDoviOriginalSource.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerDoviSourcePolicy.h",
     "Source/WebCore/platform/graphics/gstreamer/GStreamerSDRVideoDestination.h",
+    "Source/WebCore/platform/graphics/gstreamer/GStreamerVideoColorDescription.h",
     "Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp",
     "Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h",
     "Source/WebCore/platform/graphics/skia/GraphicsContextSkia.cpp",
@@ -80,10 +82,15 @@
     "Source/WebCore/platform/graphics/texmap/TextureMapper.cpp",
     "Source/WebCore/platform/graphics/texmap/TextureMapper.h",
     "Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp",
+    "Source/WebCore/platform/graphics/texmap/TextureMapperYUVColorConversion.h",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedBackingStoreTile.cpp",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferDMABuf.cpp",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferDMABuf.h",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferNativeImage.cpp",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.cpp",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferVideo.h",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferYUV.cpp",
+    "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedPlatformLayerBufferYUV.h",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.cpp",
     "Source/WebCore/platform/graphics/texmap/coordinated/CoordinatedTileBuffer.h",
     "Source/WebCore/platform/graphics/texmap/coordinated/GTKNativeVideoSource.h",
@@ -120,6 +127,7 @@
     "Tools/TestWebKitAPI/ImageColour/CMakeLists.txt",
     "Tools/TestWebKitAPI/PlatformGTK.cmake",
     "Tools/TestWebKitAPI/Tests/WebCore/SkiaDecodedImageColour.cpp",
+    "Tools/TestWebKitAPI/Tests/WebCore/TextureMapperYUVColorConversion.cpp",
     "Tools/TestWebKitAPI/Tests/WebCore/glib/RendererBufferFrame.cpp",
     "Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp",
     "Tools/dovi-input-history-probe.cpp",
@@ -201,13 +209,17 @@
     {
       "name": "0017-tests-make-the-focused-image-colour-regressions-build.patch",
       "sha256": "33ce416be139b89e760c06b7b996ea2f5577ab54aa006d4bcbc940649f596fdb"
+    },
+    {
+      "name": "0018-webkit-preserve-YUV-range-and-independent-colorimetry.patch",
+      "sha256": "6a95e9a4a5f153d5738ff3594815402c90bb55676639356f3cfbfd70cc7768bf"
     }
   ],
   "ubuntu_descriptor_sha256": "c42d0b5b54b8f8b15eb5d573b3bedd5e8ec8bf3e3c842889b0bd835a6013e44d",
   "packaging_timestamp": "2026-11-20T00:00:00+00:00",
   "source_provenance": {
     "git_commits": "Local neutral-identity source imports; tree identities and authenticated Ubuntu archives are authoritative. No fetchable upstream commit is claimed.",
-    "ubuntu_update": "Preserves disable-nvidia-dmabuf.patch SharedMemory capability before the NVIDIA early return. All seventeen reviewed product patches replay unchanged; product paths and packaging input snapshots are unchanged.",
+    "ubuntu_update": "Preserves the authenticated Ubuntu NVIDIA SharedMemory fallback correction and the original seventeen product patches. Patch eighteen carries independent matrix/range/transfer metadata and physical R8/P010 normalization, with focused CPU and shipping-renderer regressions.",
     "previous_release": {
       "source_version": "2.52.6-1ubuntu1",
       "package_version": "2.52.6-1ubuntu1+rogdv7",
@@ -236,6 +248,14 @@
           "sha256": "6a6299568055c96438a801ba5f13300bb6dc3e4256f34f3a1f6be25452c4392e",
           "size": 96728
         }
+      }
+    },
+    "previous_recovery_release": {
+      "package_version": "2.52.6-1ubuntu1.1+rogdv8",
+      "candidate_commit": "38b355df19b3134e3b15e78fd4cfca199fde76c5",
+      "candidate": {
+        "Source": "a6838a015284195d76019a4c6bb006f5d64f6b90",
+        "Tools": "86175b1308679540ff5bef865acf0d32dc3ba4b9"
       }
     }
   }
