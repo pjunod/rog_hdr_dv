@@ -1,0 +1,123 @@
+From 721aa99fe6bed5a221a88488983c71c44173f18d Mon Sep 17 00:00:00 2001
+From: HDR Agent <agent@example.invalid>
+Date: Fri, 20 Nov 2026 20:28:26 -0500
+Subject: [PATCH] Keep YUV sampler and conversion precision where supported
+
+---
+ .../texmap/TextureMapperShaderProgram.cpp     | 44 +++++++++----------
+ .../Tests/WebCore/glib/SkiaWorkingTexture.cpp | 11 +++++
+ 2 files changed, 33 insertions(+), 22 deletions(-)
+
+diff --git a/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp b/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp
+index 50e23ed1..7c309689 100644
+--- a/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp
++++ b/Source/WebCore/platform/graphics/texmap/TextureMapperShaderProgram.cpp
+@@ -257,15 +257,15 @@ static const char* fragmentTemplateToneMapPq =
+ static const char* fragmentTemplateCommon =
+     STRINGIFY(
+         uniform sampler2D s_sampler;
+-        uniform sampler2D s_samplerY;
+-        uniform sampler2D s_samplerU;
+-        uniform sampler2D s_samplerV;
++        uniform TextureSpaceMatrixPrecision sampler2D s_samplerY;
++        uniform TextureSpaceMatrixPrecision sampler2D s_samplerU;
++        uniform TextureSpaceMatrixPrecision sampler2D s_samplerV;
+         uniform sampler2D s_samplerA;
+         uniform sampler2D s_contentTexture;
+         uniform SamplerExternalOESType s_externalOESTexture;
+         uniform float u_opacity;
+         uniform float u_filterAmount;
+-        uniform mat4 u_yuvToRgb;
++        uniform TextureSpaceMatrixPrecision mat4 u_yuvToRgb;
+         uniform vec4 u_color;
+         uniform vec2 u_texelSize;
+         uniform vec2 u_uvMax;
+@@ -310,45 +310,45 @@ static const char* fragmentTemplateCommon =
+ 
+         void applyToneMapPQ(inout vec4 color);
+ 
+-        vec3 yuvToRgb(float y, float u, float v)
++        TextureSpaceMatrixPrecision vec3 yuvToRgb(TextureSpaceMatrixPrecision float y, TextureSpaceMatrixPrecision float u, TextureSpaceMatrixPrecision float v)
+         {
+-            vec4 rgb = vec4(y, u, v, 1.0) * u_yuvToRgb;
++            TextureSpaceMatrixPrecision vec4 rgb = vec4(y, u, v, 1.0) * u_yuvToRgb;
+             return rgb.xyz;
+         }
+         void applyTextureYUV(inout vec4 color, vec2 texCoord)
+         {
+-            float y = texture2D(s_samplerY, texCoord).r;
+-            float u = texture2D(s_samplerU, texCoord).r;
+-            float v = texture2D(s_samplerV, texCoord).r;
+-            vec4 data = vec4(yuvToRgb(y, u, v), 1.0);
++            TextureSpaceMatrixPrecision float y = texture2D(s_samplerY, texCoord).r;
++            TextureSpaceMatrixPrecision float u = texture2D(s_samplerU, texCoord).r;
++            TextureSpaceMatrixPrecision float v = texture2D(s_samplerV, texCoord).r;
++            TextureSpaceMatrixPrecision vec4 data = vec4(yuvToRgb(y, u, v), 1.0);
+             color = u_textureColorSpaceMatrix * data;
+         }
+         void applyTextureYUVA(inout vec4 color, vec2 texCoord)
+         {
+-            float y = texture2D(s_samplerY, texCoord).r;
+-            float u = texture2D(s_samplerU, texCoord).r;
+-            float v = texture2D(s_samplerV, texCoord).r;
+-            float a = texture2D(s_samplerA, texCoord).r;
+-            vec4 data = vec4(yuvToRgb(y, u, v), a);
++            TextureSpaceMatrixPrecision float y = texture2D(s_samplerY, texCoord).r;
++            TextureSpaceMatrixPrecision float u = texture2D(s_samplerU, texCoord).r;
++            TextureSpaceMatrixPrecision float v = texture2D(s_samplerV, texCoord).r;
++            TextureSpaceMatrixPrecision float a = texture2D(s_samplerA, texCoord).r;
++            TextureSpaceMatrixPrecision vec4 data = vec4(yuvToRgb(y, u, v), a);
+             color = u_textureColorSpaceMatrix * data;
+         }
+         void applyTextureNV12(inout vec4 color, vec2 texCoord)
+         {
+-            float y = texture2D(s_samplerY, texCoord).r;
+-            vec2 uv = texture2D(s_samplerU, texCoord).rg;
+-            vec4 data = vec4(yuvToRgb(y, uv.x, uv.y), 1.0);
++            TextureSpaceMatrixPrecision float y = texture2D(s_samplerY, texCoord).r;
++            TextureSpaceMatrixPrecision vec2 uv = texture2D(s_samplerU, texCoord).rg;
++            TextureSpaceMatrixPrecision vec4 data = vec4(yuvToRgb(y, uv.x, uv.y), 1.0);
+             color = u_textureColorSpaceMatrix * data;
+         }
+         void applyTextureNV21(inout vec4 color, vec2 texCoord)
+         {
+-            float y = texture2D(s_samplerY, texCoord).r;
+-            vec2 uv = texture2D(s_samplerU, texCoord).gr;
+-            vec4 data = vec4(yuvToRgb(y, uv.x, uv.y), 1.0);
++            TextureSpaceMatrixPrecision float y = texture2D(s_samplerY, texCoord).r;
++            TextureSpaceMatrixPrecision vec2 uv = texture2D(s_samplerU, texCoord).gr;
++            TextureSpaceMatrixPrecision vec4 data = vec4(yuvToRgb(y, uv.x, uv.y), 1.0);
+             color = u_textureColorSpaceMatrix * data;
+         }
+         void applyTexturePackedYUV(inout vec4 color, vec2 texCoord)
+         {
+-            vec4 data = texture2D(s_sampler, texCoord);
++            TextureSpaceMatrixPrecision vec4 data = texture2D(s_sampler, texCoord);
+             color = u_textureColorSpaceMatrix * vec4(yuvToRgb(data.b, data.g, data.r), data.a);
+         }
+         void applyOpacity(inout vec4 color) { color *= u_opacity; }
+diff --git a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+index d0569963..3bf9fe4f 100644
+--- a/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
++++ b/Tools/TestWebKitAPI/Tests/WebCore/glib/SkiaWorkingTexture.cpp
+@@ -216,6 +216,17 @@ TEST_F(SkiaTextureContextTest, LegacyU8AllocationUploadCopySampleHasNoGLError)
+ 
+ TEST_F(SkiaWorkingTextureTest, YUVP010FullRangeKeepsDarkPictureAndUsesCachedDescription)
+ {
++    // Record the actual fragment precision; do not force a driver/API version.
++    auto* version = reinterpret_cast<const char*>(glGetString(GL_VERSION));
++    RecordProperty("actualGLVersion", version ? version : "unavailable");
++    if (!epoxy_is_desktop_gl() || epoxy_gl_version() >= 41) {
++        GLint range[2] { }, precision = 0;
++        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_MEDIUM_FLOAT, range, &precision);
++        RecordProperty("fragmentMediumpPrecisionBits", precision);
++        glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, range, &precision);
++        RecordProperty("fragmentHighpPrecisionBits", precision);
++    } else
++        RecordProperty("fragmentPrecisionQuerySupported", false);
+     // These are physical R16/GR1616 P010 codes, not normalized helper inputs.
+     // Full-range code 8 is visible; treating it as limited crushes it below 0.
+     auto dark = renderYUV(YUVSampleFormat::P010, 8, 512, 512, YUVRange::Full, YUVRange::Full);
+-- 
+2.55.0
+

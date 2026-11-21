@@ -3,7 +3,7 @@
   "source_version": "2.52.6-1ubuntu1.1",
   "package_version": "2.52.6-1ubuntu1.1+rogdv9",
   "base_commit": "52e6d6acaeb608dcdc2b7950a4f72183dba960d7",
-  "candidate_commit": "1a900d2d8ffdb22c2f3183d88587fad2374b4a71",
+  "candidate_commit": "721aa99fe6bed5a221a88488983c71c44173f18d",
   "common": {
     "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
     "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
@@ -15,8 +15,8 @@
     "debian": "da80b494e82d52c0c63f766d169e811f30a3c5f6"
   },
   "candidate": {
-    "Source": "3124cec9f66f5efb8bcc1925a267867812bba870",
-    "Tools": "c876bdaedb9f12cc87020896ad4426472f1283cf"
+    "Source": "09dfa3541bc35dae9e579925e1fd3935daf9aa8e",
+    "Tools": "ac9531d8c93dbc292bf448a8e07ff302b542e076"
   },
   "binary_packages": [
     "libjavascriptcoregtk-6.0-1",
@@ -219,13 +219,17 @@
     {
       "name": "0019-cmake-register-YUV-private-headers.patch",
       "sha256": "3ab923795f3025e6333490a7443cc31142c2efe5910accc5ba1be3d13b95d4bd"
+    },
+    {
+      "name": "0020-texmap-preserve-YUV-shader-sampling-precision.patch",
+      "sha256": "f3c18bb5dcd9a49bbd2985399e18368662f3a0bb266696f4ff4473b387d78b09"
     }
   ],
   "ubuntu_descriptor_sha256": "c42d0b5b54b8f8b15eb5d573b3bedd5e8ec8bf3e3c842889b0bd835a6013e44d",
   "packaging_timestamp": "2026-11-20T00:00:00+00:00",
   "source_provenance": {
     "git_commits": "Local neutral-identity source imports; tree identities and authenticated Ubuntu archives are authoritative. No fetchable upstream commit is claimed.",
-    "ubuntu_update": "Preserves the authenticated Ubuntu NVIDIA SharedMemory fallback correction and the original seventeen product patches. Patch eighteen carries independent matrix/range/transfer metadata and physical R8/P010 normalization, with focused CPU and shipping-renderer regressions. Patch nineteen registers the two new private headers in the shipping WebCore inventories after the compiler identified the missing forwarding headers.",
+    "ubuntu_update": "Preserves the authenticated Ubuntu NVIDIA SharedMemory fallback correction and the original seventeen product patches. Patch eighteen carries independent matrix/range/transfer metadata and physical R8/P010 normalization, with focused CPU and shipping-renderer regressions. Patch nineteen registers the two new private headers in the shipping WebCore inventories after the compiler identified the missing forwarding headers. Patch twenty uses the existing supported high-precision macro for YUV sampling and conversion only; general RGB/default precision and the natural unsupported fallback are unchanged.",
     "previous_release": {
       "source_version": "2.52.6-1ubuntu1",
       "package_version": "2.52.6-1ubuntu1+rogdv7",

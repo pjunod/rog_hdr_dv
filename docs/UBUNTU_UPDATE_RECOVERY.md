@@ -51,8 +51,12 @@ and uses the actual R8 or P010-in-R16 sample representation. Each video wrapper
 passes an immutable colour description to a cached layer for that draw, so
 recycled buffers do not leak one view's metadata into another. Unknown producer
 layouts retain their prior fallback; no global shader clamp hides the defect.
-Four CPU regressions and two shipping-renderer regressions are prepared.
-Compilation, execution and refreshed installed controls remain pending.
+The focused compiler/test loop also found insufficient YUV sampler/matrix
+precision. The candidate uses the existing supported high-precision qualifier
+only for YUV conversion; RGB/default precision and natural fallback stay as
+before. Twenty-four of the initial twenty-five native cases passed; the
+precision correction requires only the failed P010 case and affected NV12 case
+to run again. Refreshed installed controls remain pending.
 
 ## Additional update drift found
 

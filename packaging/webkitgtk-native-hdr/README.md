@@ -10,7 +10,7 @@ that installed correction. Those receipts qualify the historical source and
 package set only; see [status](../../docs/STATUS.md) and
 [image-colour acceptance](../../docs/GTK_WEBKIT_IMAGE_COLOUR.md).
 
-The recipe below rebases the original seventeen product patches plus the reviewed YUV colour correction and private-header registration onto Ubuntu
+The recipe below rebases the original seventeen product patches plus the reviewed YUV colour correction with private-header registration and YUV-only shader precision onto Ubuntu
 `2.52.6-1ubuntu1.1`, preserving its NVIDIA shared-memory fallback correction.
 No product patch bytes changed. Current binary compilation, focused tests,
 package binding and runtime acceptance remain pending. Optical, full-film
@@ -88,14 +88,14 @@ dpkg-buildpackage -S -us -uc -d
 
 Set `product_series` to the public
 [`patches/ubuntu-webkitgtk-native-hdr/series`](../../patches/ubuntu-webkitgtk-native-hdr/series)
-manifest, with all nineteen named patch files beside it. The helper compares its
+manifest, with all twenty named patch files beside it. The helper compares its
 exact names and order with `product_patch_series` in [the pin](source-pin.json),
 then checks every regular patch file's SHA256 before changing the source.
 Reordering, omission, duplicate names, quilt options, traversal, symlink inputs
 and digest changes fail closed. It applies authenticated components in order
 with GNU patch, then verifies the complete final `Source` and `Tools` trees.
 `--product-patch` remains available for historical single-patch pins; it cannot
-substitute one patch or an unverified bundle for this nineteen-component series.
+substitute one patch or an unverified bundle for this twenty-component series.
 
 Preparation refuses a different product patch digest, source tree, executable
 mode or Ubuntu `debian/` input. Its full top-level inventory permits only the
