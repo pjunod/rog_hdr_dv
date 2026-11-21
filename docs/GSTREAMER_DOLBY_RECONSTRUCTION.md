@@ -11,6 +11,38 @@ transaction and bounded November 15 checks are recorded in
 not describe the latest installation state.
 [Native FEL scope and controls](../evidence/gstreamer-native-fel-20261109.json).
 
+## Paused subtitle selection refresh
+
+GstPlay previously retained the old paused picture after changing the enabled
+subtitle or its selected track. The bad-family `1.28.6-1ubuntu1+rogdv10`
+[shared API patch](../patches/ubuntu-gst-plugins-bad-rpu/0019-play-refresh-paused-subtitles-at-the-current-accurate-position.patch)
+coalesces accepted changes into an accurate re-preroll at the current stream
+position. Explicit user seeks take priority; URI changes, stop and disposal
+cancel the pending refresh. An unsupported automatic refresh preserves paused
+playback. The normal Showtime `50.0-2+rogdv5.15` recipe requires the matching
+bad/extra packages while retaining the qualified application source.
+
+The [public C API probe](../packaging/gstreamer-dovi/tests/play-paused-subtitles-probe.c)
+authors its own black video and two subtitle tracks, then checks fresh paused
+frames for disable, enable, track change and exact restoration at one second.
+It also checks that a subsequent explicit two-second seek wins. Build and run
+it in an owned build directory with GStreamer development packages, normal
+base/good plugins, textoverlay and a usable font:
+
+```sh
+cc -O2 -Wall -Wextra packaging/gstreamer-dovi/tests/play-paused-subtitles-probe.c \
+  -o "$BUILD_DIRECTORY/play-paused-subtitles-probe" \
+  $(pkg-config --cflags --libs gstreamer-play-1.0 gstreamer-app-1.0 gstreamer-video-1.0)
+"$BUILD_DIRECTORY/play-paused-subtitles-probe" "$BUILD_DIRECTORY/fresh-subtitles.mkv"
+```
+
+The unchanged older library fails the fresh disabled-frame assertion; the
+patched library passes. This probe configures accurate explicit seeks, so
+independence from an inaccurate-seek configuration is source-reviewed rather
+than demonstrated by that run. It does not qualify the GNOME HDR caption
+composition, full-film continuity or physical panel output; those retain
+separate acceptance boundaries.
+
 ## Browser destination interface and acceptance boundary
 
 The source adds an explicit logical100nit BT709/sRGB destination without

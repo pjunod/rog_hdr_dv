@@ -13,7 +13,7 @@ import tempfile
 
 CORE_VERSION = "0.1.0+rogdv10"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.8"
-SHOWTIME_VERSION = "50.0-2+rogdv5.14"
+SHOWTIME_VERSION = "50.0-2+rogdv5.15"
 FIXED_GTK = "4.24.1+ds-1+rogdv6"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
@@ -311,7 +311,7 @@ def prepare(workspace, showtime_only=False):
              "Start the shared producer with an explicit SDR destination.",
              "Preserve overlay composition features through the RGBA precision filter.",
              "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour.",
-             "Refresh exact sink and GStreamer dependencies after the Ubuntu security rebase."],
+             "Require the matching GstPlay paused-subtitle refresh through exact bad/extra dependencies."],
             inputs["showtime"]["changelog"], date="Fri, 20 Nov 2026 14:00:00 +0000"),
     }
     sources = [("showtime", showtime)] if showtime_only else [("gtk", gtk), ("showtime", showtime)]

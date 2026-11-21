@@ -772,9 +772,9 @@
       "component": "ubuntu-gst-plugins-bad-rpu",
       "base_commit": "a1f686414dd0d7490c2fbf3438a2f58bfba25521",
       "base_tree": "3048f0c6d8c0f0960b91eee748c3940200788656",
-      "candidate_commit": "ccba1eade837a4d8fbc88ec2c4449c06ba9fea06",
-      "candidate_tree": "bad747d8332f6d79e7a0be6b5b50053a3be777ce",
-      "patch_count": 18,
+      "candidate_commit": "83bf3e1d97304ad1019d6d3128327348fcc05d57",
+      "candidate_tree": "5d47223c5bbaed32ad43c3e409994d6615db1fe4",
+      "patch_count": 20,
       "patch_order": [
         "0001-h265parse-attach-original-RPU-from-completed-access-units.patch",
         "0002-bind-the-resolved-Dolby-picture-to-the-VA-surface.patch",
@@ -793,7 +793,9 @@
         "0015-nvcodec-choose-the-output-memory-from-the-consumers-answer-for-the-marked-stream.patch",
         "0016-debian-version-the-copy-checking-VA-surface-copy-and-marked-NVDEC-output.patch",
         "0017-nvcodec-keep-the-normal-output-delay-for-profile7-enhancement-streams.patch",
-        "0018-debian-version-the-normal-delay-profile7-NVDEC-decoder.patch"
+        "0018-debian-version-the-normal-delay-profile7-NVDEC-decoder.patch",
+        "0019-play-refresh-paused-subtitles-at-the-current-accurate-position.patch",
+        "0020-debian-version-the-paused-subtitle-refresh.patch"
       ],
       "source_origin": {
         "kind": "ubuntu-source-package",
@@ -822,10 +824,10 @@
           }
         ]
       },
-      "candidate_status": "Eighteen-patch source candidate. 0017 returns NVDEC to its normal two-picture output delay for Dolby Profile 7 enhancement streams: the enhancement layer repeats the base layer's picture order, and the 16-picture delay held 19 pictures, so a seek into the last 0.8 s of a file produced no picture until end of stream. 0015 makes NVDEC choose its output memory from the consumer's answer for the marked stream, so Showtime's mapper receives CUDA pictures instead of downloaded system memory. 0014 uses vaCopy only when VADisplayAttribCopy reports the default copy mode it requests: iHD on Meteor Lake reports none and crashed inside vaCopy when a decoded picture was deep-copied (WebKit does so at every flush). 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately. VA decoders state their DRM render node and the NVDEC H.265 decoder states Dolby enhancement-layer composition in element metadata, so a consumer can choose a decoder from the registry without loading plugins.",
-      "previous_candidate_commit": "783e5327a6b3192abe5e330cfbd1af780b91d7eb",
-      "previous_candidate_tree": "39ff77767c2fcad9b38f1973e95cdd255d430807",
-      "candidate_package_version": "1.28.6-1ubuntu1+rogdv9"
+      "candidate_status": "Twenty-patch source candidate. 0019 refreshes an accepted changed subtitle selection at the current accurately re-prerolled picture while paused, through the shared GstPlay API. Pending user seeks take precedence, superseded selections coalesce, and rejected optional refreshes preserve paused playback. 0020 records the normal bad10 package version. A public synthetic API regression qualifies caption removal/restoration, subtitle-ID switching and newer user seek priority; normal installed GNOME acceptance remains separate. 0017 returns NVDEC to its normal two-picture output delay for Dolby Profile 7 enhancement streams: the enhancement layer repeats the base layer's picture order, and the 16-picture delay held 19 pictures, so a seek into the last 0.8 s of a file produced no picture until end of stream. 0015 makes NVDEC choose its output memory from the consumer's answer for the marked stream, so Showtime's mapper receives CUDA pictures instead of downloaded system memory. 0014 uses vaCopy only when VADisplayAttribCopy reports the default copy mode it requests: iHD on Meteor Lake reports none and crashed inside vaCopy when a decoded picture was deep-copied (WebKit does so at every flush). 0008 removes the VA src_event handler that took the decoder stream lock on RECONFIGURE (a lock-order deadlock with a downstream queue answering the decoder's serialized allocation query in WebKit) and recomputes qualified marked output on every negotiation. 0010 proves a marked output against the whole linked consumer chain with a filtered CAPS query, because passthrough converters answer ACCEPT_CAPS from their templates. Previous seven-patch qualification is retained separately. VA decoders state their DRM render node and the NVDEC H.265 decoder states Dolby enhancement-layer composition in element metadata, so a consumer can choose a decoder from the registry without loading plugins.",
+      "previous_candidate_commit": "ccba1eade837a4d8fbc88ec2c4449c06ba9fea06",
+      "previous_candidate_tree": "bad747d8332f6d79e7a0be6b5b50053a3be777ce",
+      "candidate_package_version": "1.28.6-1ubuntu1+rogdv10"
     },
     {
       "component": "ubuntu-gtk4-display-target",
