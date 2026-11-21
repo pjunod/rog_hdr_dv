@@ -1,20 +1,23 @@
 # Status — what is working and what remains
 
-**Updated November 20, 2026. Recovery installed; ordinary-video corrections in progress.**
-The installed v8 recovery is being followed by a reviewed v9 correction for
-lost YUV range and independently specified colour metadata. The original
-twenty-eight-case capture run is retained; its final analysis exposed these
-source defects and several test-harness assumptions. The v9 shader correction now qualifies 25 focused native cases: 23 retained
-passes plus the corrected P010 and affected NV12 GPU passes, with unchanged
-assertions. The normal six-package WebKit build passed. The normal eleven-output
-GStreamer bad v10 build also passed; only GstPlay changes among 178 runtime
-ELFs compared with v9. Its real API regression reproduces the old paused
-subtitle failure and passes with the correction, including alternate selection
-and an overriding explicit seek. Showtime requires a matching metadata-only revision because its installed
-dependencies pin bad v9 exactly; the new coherent transaction is eight
-upgrades, including Showtime v5.15. Exact dependency constraints remain. The
-selected host upgrades and live acceptance are being prepared. No complete browser
-or normal-player runtime acceptance is claimed yet.
+**Updated November 20, 2026. Colour/subtitle correction installed; runtime acceptance in progress.**
+The exact eight-package follow-up is installed: WebKit/JavaScriptCore
+`2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
+`1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.
+Forward and inverse simulations passed with eight changes and no removals;
+root sealing, package audit, owner-session preservation and unchanged APT
+configuration passed. [Sanitized installation receipt](../evidence/ubuntu-colour-subtitle-install-20261120.json).
+
+The v9 shader correction qualifies 25 focused native cases: 23 retained
+passes plus corrected P010 and affected NV12 GPU passes with unchanged
+assertions. Six normal WebKit packages and eleven normal GStreamer bad outputs
+built. Only GstPlay changes among 178 compared runtime ELFs; its real public
+API regression reproduces the old paused-subtitle failure and passes against
+the correction. Showtime's exact dependency pins move coherently with bad v10;
+its application/resources are byte identical. Fresh WebKit source replay
+matches 34,395 paths and modes. The original twenty-eight-case v8 captures
+remain intact; new installed-player and browser checks are underway. Complete
+runtime and optical acceptance are not inferred from source/package checks.
 
 The exact thirteen-package recovery transaction passed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv8`, eight GStreamer base packages

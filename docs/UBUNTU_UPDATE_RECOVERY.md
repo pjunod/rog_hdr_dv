@@ -1,6 +1,6 @@
 # Ubuntu update recovery — preserving the browser and video patches
 
-**State: v8 recovery installed; v9 ordinary-colour correction in progress · November 20, 2026.** This document answers
+**State: v9 colour/subtitle correction installed; runtime acceptance in progress · November 20, 2026.** This document answers
 why WebKit lost the patches and how the browser/GStreamer update path is
 being corrected. [Current status](STATUS.md) separates current installation
 from earlier qualification; [APT operations](UBUNTU_APT_REPOSITORY.md) covers
@@ -58,8 +58,8 @@ before. Twenty-four of the initial twenty-five native cases passed. The precisio
 correction then passed the failed P010 case and affected NV12 case with
 unchanged assertions: 23 retained plus two current passes qualify all 25.
 The actual context is OpenGL ES 3.2 Mesa; a naturally ES2-only provider remains
-uncovered. The normal six-package build passed. Refreshed installed controls
-remain pending.
+uncovered. The normal six-package build passed and the two runtimes are installed.
+Refreshed installed controls remain pending.
 
 The ordinary paused-subtitle check also reproduced a separate GstPlay defect:
 changing selection while paused did not present a new frame. The correction
@@ -70,8 +70,12 @@ against the correction: disable, re-enable, alternate track, exact restoration
 and an overriding explicit seek. No compensating test seek follows a toggle.
 The normal bad-family v10 build passed; only GstPlay differs among 178 packaged
 runtime ELFs. The other 177 retain identical allocated code/data sections.
-This is API/package qualification; the normal Showtime capture still needs
-to pass after installation.
+This is API/package qualification; normal Showtime capture acceptance remains
+pending. Its matching v5.15 package retains exact bad v10 dependency pins.
+Application/resources are unchanged; the normal package additionally includes
+the source-bound upstream manual page. The reviewed eight-package follow-up
+is installed with no removals, unchanged APT configuration and owner session.
+[Sanitized follow-up install receipt](../evidence/ubuntu-colour-subtitle-install-20261120.json).
 
 ## Additional update drift found
 

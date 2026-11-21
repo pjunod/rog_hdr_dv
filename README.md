@@ -20,10 +20,12 @@ repository owns the operating-system display work.
 
 ## Current recovery (2026-11-20)
 
-The current-Ubuntu-source WebKit8 and coordinated GStreamer security recovery
-are installed: thirteen upgrades, no removals, with the desktop session kept
-open. Both ordinary-image import/recovery controls passed on the installed
-libraries. Browser video and normal-player runtime acceptance are in progress.
+The current-Ubuntu-source security recovery and eight-package colour/subtitle
+follow-up are installed: WebKit9, bad10 and matching Showtime5.15, with no
+removals and the desktop session kept open. Both earlier ordinary-image
+import/recovery controls passed. The new YUV GPU and paused-subtitle API
+regressions pass; refreshed browser and normal-player capture acceptance are
+in progress.
 Scoped APT preferences preserve the patched families, while source monitoring
 reports pending security rebuilds.
 [Update recovery](docs/UBUNTU_UPDATE_RECOVERY.md) records the confirmed cause,
