@@ -1,0 +1,37 @@
+From 1a900d2d8ffdb22c2f3183d88587fad2374b4a71 Mon Sep 17 00:00:00 2001
+From: HDR Agent <agent@example.invalid>
+Date: Fri, 20 Nov 2026 20:09:16 -0500
+Subject: [PATCH] Register YUV color headers in shipping private inventories
+
+---
+ Source/WebCore/platform/GStreamer.cmake     | 1 +
+ Source/WebCore/platform/TextureMapper.cmake | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/Source/WebCore/platform/GStreamer.cmake b/Source/WebCore/platform/GStreamer.cmake
+index 4f3a0cfd..0218b452 100644
+--- a/Source/WebCore/platform/GStreamer.cmake
++++ b/Source/WebCore/platform/GStreamer.cmake
+@@ -26,6 +26,7 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
+         platform/gstreamer/GStreamerElementHarness.h
+         platform/graphics/gstreamer/GRefPtrGStreamer.h
+         platform/graphics/gstreamer/GStreamerCommon.h
++        platform/graphics/gstreamer/GStreamerVideoColorDescription.h
+         platform/graphics/gstreamer/GUniquePtrGStreamer.h
+ 
+         platform/mediastream/gstreamer/GStreamerWebRTCProvider.h
+diff --git a/Source/WebCore/platform/TextureMapper.cmake b/Source/WebCore/platform/TextureMapper.cmake
+index 0cf26b81..f15cade8 100644
+--- a/Source/WebCore/platform/TextureMapper.cmake
++++ b/Source/WebCore/platform/TextureMapper.cmake
+@@ -46,6 +46,7 @@ list(APPEND WebCore_PRIVATE_FRAMEWORK_HEADERS
+     platform/graphics/texmap/TextureMapperSolidColorLayer.h
+     platform/graphics/texmap/TextureMapperTile.h
+     platform/graphics/texmap/TextureMapperTiledBackingStore.h
++    platform/graphics/texmap/TextureMapperYUVColorConversion.h
+ )
+ 
+ if (USE_COORDINATED_GRAPHICS)
+-- 
+2.55.0
+

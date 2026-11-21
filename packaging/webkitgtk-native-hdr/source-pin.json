@@ -3,7 +3,7 @@
   "source_version": "2.52.6-1ubuntu1.1",
   "package_version": "2.52.6-1ubuntu1.1+rogdv9",
   "base_commit": "52e6d6acaeb608dcdc2b7950a4f72183dba960d7",
-  "candidate_commit": "b90afb195d73ac6dfdae84b54acb4a545a76ef42",
+  "candidate_commit": "1a900d2d8ffdb22c2f3183d88587fad2374b4a71",
   "common": {
     "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
     "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
@@ -15,7 +15,7 @@
     "debian": "da80b494e82d52c0c63f766d169e811f30a3c5f6"
   },
   "candidate": {
-    "Source": "4b96df92e35700d4a37cb88a5c44ac96e74fc6ec",
+    "Source": "3124cec9f66f5efb8bcc1925a267867812bba870",
     "Tools": "c876bdaedb9f12cc87020896ad4426472f1283cf"
   },
   "binary_packages": [
@@ -47,6 +47,8 @@
     "Source/WebCore/PlatformGTK.cmake",
     "Source/WebCore/html/HTMLMediaElement.cpp",
     "Source/WebCore/html/HTMLMediaElement.h",
+    "Source/WebCore/platform/GStreamer.cmake",
+    "Source/WebCore/platform/TextureMapper.cmake",
     "Source/WebCore/platform/graphics/BitmapImageSource.cpp",
     "Source/WebCore/platform/graphics/ImageBackingStore.h",
     "Source/WebCore/platform/graphics/ImageBufferBackend.h",
@@ -213,13 +215,17 @@
     {
       "name": "0018-webkit-preserve-YUV-range-and-independent-colorimetry.patch",
       "sha256": "6a95e9a4a5f153d5738ff3594815402c90bb55676639356f3cfbfd70cc7768bf"
+    },
+    {
+      "name": "0019-cmake-register-YUV-private-headers.patch",
+      "sha256": "3ab923795f3025e6333490a7443cc31142c2efe5910accc5ba1be3d13b95d4bd"
     }
   ],
   "ubuntu_descriptor_sha256": "c42d0b5b54b8f8b15eb5d573b3bedd5e8ec8bf3e3c842889b0bd835a6013e44d",
   "packaging_timestamp": "2026-11-20T00:00:00+00:00",
   "source_provenance": {
     "git_commits": "Local neutral-identity source imports; tree identities and authenticated Ubuntu archives are authoritative. No fetchable upstream commit is claimed.",
-    "ubuntu_update": "Preserves the authenticated Ubuntu NVIDIA SharedMemory fallback correction and the original seventeen product patches. Patch eighteen carries independent matrix/range/transfer metadata and physical R8/P010 normalization, with focused CPU and shipping-renderer regressions.",
+    "ubuntu_update": "Preserves the authenticated Ubuntu NVIDIA SharedMemory fallback correction and the original seventeen product patches. Patch eighteen carries independent matrix/range/transfer metadata and physical R8/P010 normalization, with focused CPU and shipping-renderer regressions. Patch nineteen registers the two new private headers in the shipping WebCore inventories after the compiler identified the missing forwarding headers.",
     "previous_release": {
       "source_version": "2.52.6-1ubuntu1",
       "package_version": "2.52.6-1ubuntu1+rogdv7",
