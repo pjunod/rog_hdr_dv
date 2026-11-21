@@ -2,10 +2,12 @@
 """Generate owned synthetic Y4M image-quality source stimuli; stdlib only."""
 
 import argparse
+from fractions import Fraction
 import hashlib
 import json
 import math
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -16,6 +18,8 @@ MIN_WIDTH, MIN_HEIGHT = 192, 72
 MAX_WIDTH, MAX_HEIGHT = 3840, 2160
 DEFAULT_CADENCE_FPS = (24, 25, 30, 50, 60)
 MAX_CADENCE_FILES = 16
+MAX_RATE_DENOMINATOR = 1001
+MAX_REFRESH_PERIOD_FRAMES = 2400
 DEFAULT_MAX_TOTAL_BYTES = 64 * 1024 * 1024
 
 # 10-bit limited-range code values (BT.2020 NCL, PQ declared in the manifest).
@@ -69,6 +73,41 @@ def round_half_up(value):
 
 # ---------------------------------------------------------------- validation
 
+def cadence_rate(value):
+    """Parse bounded exact rates; decimal approximations and booleans are refused."""
+    if type(value) is int:
+        rate = Fraction(value)
+    elif isinstance(value, str) and len(value) <= 24 and re.fullmatch(r"[0-9]+(?:/[0-9]+)?", value):
+        try:
+            rate = Fraction(value)
+        except (ValueError, ZeroDivisionError):
+            raise StimulusError("cadence fps must have a positive denominator") from None
+    else:
+        raise StimulusError("cadence fps must be an integer or exact N/D string")
+    if not 1 <= rate <= 120 or rate.denominator > MAX_RATE_DENOMINATOR:
+        raise StimulusError("cadence fps must be in 1..120 with reduced denominator at most 1001")
+    # Bound manifest work as well as media bytes. The required broadcast rates
+    # have repeat periods at most 1250 source frames for these refresh models.
+    if any(rate.numerator // math.gcd(rate.numerator, r * rate.denominator)
+           > MAX_REFRESH_PERIOD_FRAMES for r in REFRESH_RATES):
+        raise StimulusError("cadence refresh model period exceeds 2400 source frames")
+    return rate
+
+
+def cadence_value(value):
+    rate = cadence_rate(value)
+    return rate.numerator if rate.denominator == 1 else str(rate)
+
+
+def cadence_slug(value):
+    return str(cadence_value(value)).replace("/", "_")
+
+
+def rational_fields(value):
+    value = Fraction(value)
+    return {"numerator": value.numerator, "denominator": value.denominator}
+
+
 def validate_parameters(width, height, fps_list, seconds, max_total_bytes):
     if any(type(v) is not int for v in (width, height, seconds, max_total_bytes)):
         raise StimulusError("width, height, cadence seconds and max total bytes must be integers")
@@ -77,10 +116,9 @@ def validate_parameters(width, height, fps_list, seconds, max_total_bytes):
         raise StimulusError("require even width %d..%d and even height %d..%d"
                             % (MIN_WIDTH, MAX_WIDTH, MIN_HEIGHT, MAX_HEIGHT))
     if not isinstance(fps_list, (list, tuple)) or not 1 <= len(fps_list) <= MAX_CADENCE_FILES:
-        raise StimulusError("cadence fps list must hold 1..%d integers" % MAX_CADENCE_FILES)
-    if any(type(f) is not int or not 1 <= f <= 120 for f in fps_list):
-        raise StimulusError("each cadence fps must be an integer in 1..120")
-    if len(set(fps_list)) != len(fps_list):
+        raise StimulusError("cadence fps list must hold 1..%d exact rates" % MAX_CADENCE_FILES)
+    rates = [cadence_rate(f) for f in fps_list]
+    if len(set(rates)) != len(rates):
         raise StimulusError("cadence fps values must be unique")
     if not 1 <= seconds <= 10:
         raise StimulusError("cadence seconds must be 1..10")
@@ -91,7 +129,9 @@ def validate_parameters(width, height, fps_list, seconds, max_total_bytes):
 # ------------------------------------------------------------------ Y4M I/O
 
 def y4m_header(width, height, fps, colourspace, extra=""):
-    text = "YUV4MPEG2 W%d H%d F%d:1 Ip A1:1 C%s" % (width, height, fps, colourspace)
+    rate = cadence_rate(fps)
+    text = "YUV4MPEG2 W%d H%d F%d:%d Ip A1:1 C%s" % (
+        width, height, rate.numerator, rate.denominator, colourspace)
     return (text + (" " + extra if extra else "") + "\n").encode("ascii")
 
 
@@ -355,8 +395,10 @@ def cadence_frame_rows(index, width, height):
 
 def refresh_runs(fps, refresh):
     """Refreshes each source frame is held over one repeat period (integer arithmetic)."""
-    period = fps // math.gcd(fps, refresh)
-    starts = [-(-n * refresh // fps) for n in range(period + 1)]
+    rate = cadence_rate(fps)
+    num, den = rate.numerator, rate.denominator
+    period = num // math.gcd(num, refresh * den)
+    starts = [-(-n * refresh * den // num) for n in range(period + 1)]
     runs = [starts[n + 1] - starts[n] for n in range(period)]
     unit = next(u for u in range(1, period + 1)
                 if period % u == 0 and runs == runs[:u] * (period // u))
@@ -364,8 +406,12 @@ def refresh_runs(fps, refresh):
 
 
 def cadence_entry(fps, frames, width):
+    rate = cadence_rate(fps)
     return {
-        "fps": fps, "frame_count": frames, "chroma_code": C_NEUTRAL,
+        "fps": cadence_value(fps), "frame_rate": rational_fields(rate),
+        "frame_period_seconds": rational_fields(1 / rate),
+        "duration_seconds": rational_fields(frames / rate),
+        "frame_count": frames, "chroma_code": C_NEUTRAL,
         "barcode": {"rect_xywh": list(BARCODE_RECT), "block_size_px": BLOCK,
                     "block_count": BARCODE_BLOCKS, "block_order": "left to right, one row",
                     "bit_order": "most significant bit first",
@@ -414,9 +460,11 @@ def plan(width, height, fps_list, seconds):
     add("dither/dither_ramps_p10.y4m", y4m_header(width, height, 1, "420p10", p10), 2, wide10,
         "dither", "420p10", dither_entry(width, height), ("dither",))
     for fps in fps_list:
-        add("cadence/cadence_%dfps_p10.y4m" % fps, y4m_header(width, height, fps, "420p10", p10),
-            fps * seconds, wide10, "cadence", "420p10",
-            cadence_entry(fps, fps * seconds, width), ("cadence", fps * seconds))
+        rate = cadence_rate(fps)
+        count = rate.numerator * seconds // rate.denominator
+        add("cadence/cadence_%sfps_p10.y4m" % cadence_slug(fps),
+            y4m_header(width, height, fps, "420p10", p10), count, wide10, "cadence", "420p10",
+            cadence_entry(fps, count, width), ("cadence", count))
     return records
 
 
@@ -455,8 +503,11 @@ def _inside_repository(parent):
 def generate_stimuli(output, width=192, height=108, cadence_fps=DEFAULT_CADENCE_FPS,
                      cadence_seconds=2, max_total_bytes=DEFAULT_MAX_TOTAL_BYTES):
     """Publish a complete new directory; existing paths are never reused."""
+    if isinstance(cadence_fps, (str, bytes)):
+        raise StimulusError("cadence fps must be a list of exact rates")
     cadence_fps = list(cadence_fps)
     validate_parameters(width, height, cadence_fps, cadence_seconds, max_total_bytes)
+    cadence_fps = [cadence_value(fps) for fps in cadence_fps]
     output = Path(output)
     if output.name in ("", ".", ".."):
         raise StimulusError("output must name a new directory")
@@ -487,7 +538,9 @@ def generate_stimuli(output, width=192, height=108, cadence_fps=DEFAULT_CADENCE_
     except OSError:
         raise StimulusError("cannot hash generator source") from None
     manifest = {
-        "schema": "image-quality-stimuli-v1", "generator": "generate_quality_stimuli.py",
+        "schema": ("image-quality-stimuli-v2" if any(isinstance(fps, str) for fps in cadence_fps)
+                   else "image-quality-stimuli-v1"),
+        "generator": "generate_quality_stimuli.py",
         "coordinate_convention": COORDINATE_CONVENTION,
         "dimensions_and_timing": dict(parameters, stimulus_bytes_total=total),
         "input_hashes": {"generator_sha256": generator_hash,
@@ -569,8 +622,8 @@ def main(argv=None):
     parser.add_argument("output_directory", help="new directory outside this repository; parent must exist")
     parser.add_argument("--width", type=int, default=192)
     parser.add_argument("--height", type=int, default=108)
-    parser.add_argument("--cadence-fps", type=int, nargs="+", default=list(DEFAULT_CADENCE_FPS),
-                        help="integer frame rates 1..120, default 24 25 30 50 60")
+    parser.add_argument("--cadence-fps", nargs="+", default=list(DEFAULT_CADENCE_FPS),
+                        help="exact integer or N/D frame rates 1..120, e.g. 24000/1001; default 24 25 30 50 60")
     parser.add_argument("--cadence-seconds", type=int, default=2, help="1..10, default 2")
     parser.add_argument("--max-total-bytes", type=int, default=DEFAULT_MAX_TOTAL_BYTES,
                         help="refuse before writing if stimuli exceed this, default 64 MiB")
