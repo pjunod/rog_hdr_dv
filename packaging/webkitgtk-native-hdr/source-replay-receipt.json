@@ -1,29 +1,28 @@
 {
-  "schema": "webkitgtk-ubuntu-source-qualification-v2",
-  "date": "2026-11-20",
-  "product_git_commit": "38b355df19b3134e3b15e78fd4cfca199fde76c5",
+  "schema": "webkitgtk-ubuntu-source-qualification-v3",
+  "date": "2026-11-21",
+  "product_git_commit": "721aa99fe6bed5a221a88488983c71c44173f18d",
   "ubuntu_source_version": "2.52.6-1ubuntu1.1",
-  "derivative_source_version": "2.52.6-1ubuntu1.1+rogdv8",
-  "source_acquisition": "Authenticated signed Ubuntu APT source acquisition; archive hashes match the downloaded .dsc. No independent maintainer .dsc-signature verification is claimed.",
+  "derivative_source_version": "2.52.6-1ubuntu1.1+rogdv9",
+  "source_acquisition": "Retained authenticated Ubuntu APT source input hashes verified; locally generated unsigned derivative descriptor. No independent maintainer signature verification is claimed.",
   "recipe_inputs_sha256": {
     "prepare-source.py": "162ace67c1a8532686c74c7b6ac36d8be9e2a49f2b884143e4c3df3907706629",
-    "source-pin.json": "97dbd0fbdc47646034546b6fc28fec4ebca0b507b518b54d32c12c50fd3fb9ac",
-    "ubuntu-packaging.diff": "33739ee4cd4de19c679a412fc28780e669cf7a8afc99345bfb1e974972902168",
+    "source-pin.json": "a2ae57187a4b5c75490cf834d05e79236baf7e48540803e1b84e59d22bdb287a",
     "verify-build.py": "4eb8ec23e181425cfac7a488fa913b1ca3295bf08e129ac54ccf80fe9323458d",
     "cmake-profile.json": "f403de979140fb47a5f1fed310e1c72609495fac339d1b76534aa8d01204cba3",
     "cmake-features.json": "d3e2b22bbe5200d557fc728aa61eb276687cb371b439219e5733991d0e209c45"
   },
   "source_replay": {
-    "commands": [
-      "prepare-source.py --source <owned-clean-source> --product-series <public-seventeen-patch-series>",
-      "dpkg-buildpackage -S -us -uc -d",
-      "dpkg-source -x <generated.dsc> <owned-replay-source>",
-      "verify-build.py source tree verifier against source-pin.json"
-    ],
     "passed": true,
-    "unchanged_product_patches": 17,
-    "product_paths": 82,
-    "public_source_files_and_modes_matched": 34392,
+    "commands": [
+      "dpkg-source -x <generated-v9.dsc> <owned-fresh-source>",
+      "verify-build.py source tree verifier against source-pin.json",
+      "exact public source path/content/permission inventory comparison",
+      "dh_listpackages"
+    ],
+    "product_patch_components": 20,
+    "product_paths": 92,
+    "public_source_files_and_modes_matched": 34395,
     "generated_binary_control_packages": [
       "libjavascriptcoregtk-6.0-1",
       "libjavascriptcoregtk-6.0-dev",
@@ -38,66 +37,59 @@
       "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
       "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
       "Documentation": "715ccd92d15a815e4e47f749d14a2d11a09fdddc",
-      "Source": "a6838a015284195d76019a4c6bb006f5d64f6b90",
-      "Tools": "86175b1308679540ff5bef865acf0d32dc3ba4b9"
+      "Source": "09dfa3541bc35dae9e579925e1fd3935daf9aa8e",
+      "Tools": "ac9531d8c93dbc292bf448a8e07ff302b542e076"
     },
     "generated_archives": {
-      "webkit2gtk_2.52.6-1ubuntu1.1+rogdv8.dsc": {
-        "sha256": "a4c4d5488109ede1b15e4391a922d86d02506a369d9878a6199f6299029b252f",
-        "size": 2923
+      "webkit2gtk_2.52.6.orig.tar.xz": {
+        "sha256": "179a2ea3f8f6edd4be7f31fdc55afc57bd0729f1fba648c61d4181539ac116fc",
+        "size": 65746000
       },
-      "webkit2gtk_2.52.6-1ubuntu1.1+rogdv8.debian.tar.xz": {
-        "sha256": "0966de00e869af3200a81a59afd7fc0f80f5db126a5d43b1ee604be549f12060",
-        "size": 174540
+      "webkit2gtk_2.52.6-1ubuntu1.1+rogdv9.debian.tar.xz": {
+        "sha256": "5dc75ea9a5e3b9193b975fea72b679f88a95293be4a0d0861436b199da3a92c1",
+        "size": 181364
+      },
+      "webkit2gtk_2.52.6-1ubuntu1.1+rogdv9.dsc": {
+        "sha256": "6e8092f69fe30b30fa97c557ff71b804163b563b19efe76482ff9b832b77f2a5",
+        "size": 2923
       }
-    },
-    "nvidia_shared_memory_before_early_return_preserved": true,
-    "full_case_sensitive_distribution_documentation_preserved": true
-  },
-  "source_timestamp_controls": {
-    "clean_prepare_normalized_and_restored_files": 82,
-    "all_public_source_identities_and_mtimes_preserved": true
-  },
-  "compiler_prerequisite": {
-    "compiler": "Ubuntu clang 22.1.8 (1ubuntu1)",
-    "simple_c_object_compiled": true,
-    "webkit_compilation_qualified": false
-  },
-  "focused_tests": {
-    "current_rebase": "Not run; final review and affected checks pending. Historical source/test acceptance is separate."
+    }
   },
   "boundary": {
     "source_prepared": true,
-    "existing_warm_compiler_cache_mutated": false,
-    "binary_packages_qualified": false,
+    "fresh_source_replay_passed": true,
+    "existing_warm_compiler_cache_mutated_by_replay": false,
     "browser_runtime_qualified": false,
     "packages_installed": false,
     "optical_acceptance": false
   },
+  "historical_v8_receipt_preserved_separately": true,
   "historical_qualification": {
-    "schema": "webkitgtk-ubuntu-source-qualification-v1",
-    "date": "2026-11-09",
-    "qualified_recipe_revision": "8cd850a6079ebc558335ea3a7d95985fea375719",
-    "product_git_commit": "ad531204790393e4fc39b4ef4f7a472012394a3b",
-    "ubuntu_source_version": "2.52.6-1ubuntu1",
-    "derivative_source_version": "2.52.6-1ubuntu1+rogdv1",
-    "cmake_profile_sha256": "c6604971e3ceb1575b0ed536ab5be396da4ede83559f7e2b728b49051e9bdc8b",
-    "cmake_feature_map_sha256": "65d40e4893ebf3245ab680c1723e3a869d4af580b56129afc74ddea34f42fccc",
-    "focused_tests": {
-      "covered_cases": 17,
-      "retained_unaffected_passes": 13,
-      "affected_rerun_passes": 4,
-      "initial_failure_receipts_retained_privately": true
+    "schema": "webkitgtk-ubuntu-source-qualification-v2",
+    "date": "2026-11-20",
+    "product_git_commit": "38b355df19b3134e3b15e78fd4cfca199fde76c5",
+    "ubuntu_source_version": "2.52.6-1ubuntu1.1",
+    "derivative_source_version": "2.52.6-1ubuntu1.1+rogdv8",
+    "source_acquisition": "Authenticated signed Ubuntu APT source acquisition; archive hashes match the downloaded .dsc. No independent maintainer .dsc-signature verification is claimed.",
+    "recipe_inputs_sha256": {
+      "prepare-source.py": "162ace67c1a8532686c74c7b6ac36d8be9e2a49f2b884143e4c3df3907706629",
+      "source-pin.json": "97dbd0fbdc47646034546b6fc28fec4ebca0b507b518b54d32c12c50fd3fb9ac",
+      "ubuntu-packaging.diff": "33739ee4cd4de19c679a412fc28780e669cf7a8afc99345bfb1e974972902168",
+      "verify-build.py": "4eb8ec23e181425cfac7a488fa913b1ca3295bf08e129ac54ccf80fe9323458d",
+      "cmake-profile.json": "f403de979140fb47a5f1fed310e1c72609495fac339d1b76534aa8d01204cba3",
+      "cmake-features.json": "d3e2b22bbe5200d557fc728aa61eb276687cb371b439219e5733991d0e209c45"
     },
     "source_replay": {
       "commands": [
-        "prepare-source.py --source <owned-clean-source> --product-patch <reviewed-public-patch>",
-        "dh_listpackages",
+        "prepare-source.py --source <owned-clean-source> --product-series <public-seventeen-patch-series>",
         "dpkg-buildpackage -S -us -uc -d",
-        "dpkg-source -x <generated.dsc> <owned-replay-source>"
+        "dpkg-source -x <generated.dsc> <owned-replay-source>",
+        "verify-build.py source tree verifier against source-pin.json"
       ],
       "passed": true,
-      "public_source_files_and_modes_matched": 34386,
+      "unchanged_product_patches": 17,
+      "product_paths": 82,
+      "public_source_files_and_modes_matched": 34392,
       "generated_binary_control_packages": [
         "libjavascriptcoregtk-6.0-1",
         "libjavascriptcoregtk-6.0-dev",
@@ -112,31 +104,107 @@
         "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
         "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
         "Documentation": "715ccd92d15a815e4e47f749d14a2d11a09fdddc",
-        "Source": "618cd1831ea52af537d8e0e34242960594741ca1",
-        "Tools": "a2b93a24e58662878c2bf7c4e3b2e18800d9cbea"
-      }
-    },
-    "real_source_negative_controls": {
-      "top_level_private_sentinel_rejected_before_recording": true,
-      "debian_python_cache_private_sentinel_rejected_before_recording": true
+        "Source": "a6838a015284195d76019a4c6bb006f5d64f6b90",
+        "Tools": "86175b1308679540ff5bef865acf0d32dc3ba4b9"
+      },
+      "generated_archives": {
+        "webkit2gtk_2.52.6-1ubuntu1.1+rogdv8.dsc": {
+          "sha256": "a4c4d5488109ede1b15e4391a922d86d02506a369d9878a6199f6299029b252f",
+          "size": 2923
+        },
+        "webkit2gtk_2.52.6-1ubuntu1.1+rogdv8.debian.tar.xz": {
+          "sha256": "0966de00e869af3200a81a59afd7fc0f80f5db126a5d43b1ee604be549f12060",
+          "size": 174540
+        }
+      },
+      "nvidia_shared_memory_before_early_return_preserved": true,
+      "full_case_sensitive_distribution_documentation_preserved": true
     },
     "source_timestamp_controls": {
-      "clean_prepare_normalized_and_restored_files": 39,
-      "already_patched_prepare_normalized_and_restored_files": 39,
-      "all_public_source_identities_and_mtimes_preserved": true,
-      "normal_source_package_preserved_mtimes": true,
-      "immutable_recovery_snapshot_mode": "0600",
-      "initial_snapshot_unchanged_after_packaging": true
+      "clean_prepare_normalized_and_restored_files": 82,
+      "all_public_source_identities_and_mtimes_preserved": true
+    },
+    "compiler_prerequisite": {
+      "compiler": "Ubuntu clang 22.1.8 (1ubuntu1)",
+      "simple_c_object_compiled": true,
+      "webkit_compilation_qualified": false
+    },
+    "focused_tests": {
+      "current_rebase": "Not run; final review and affected checks pending. Historical source/test acceptance is separate."
     },
     "boundary": {
-      "compiler_executed": false,
-      "active_webkit_source_headers_cache_mutated": false,
+      "source_prepared": true,
+      "existing_warm_compiler_cache_mutated": false,
       "binary_packages_qualified": false,
       "browser_runtime_qualified": false,
       "packages_installed": false,
       "optical_acceptance": false
     },
-    "evidence_scope": "Source archive hashes matched the official descriptor pins. This receipt does not attest a new signing-key verification; original source-acquisition records remain separate. The product Git import and complete distribution documentation identity remain distinct in source-pin.json. Detailed logs, member list, source mtime snapshots and original failures remain private."
+    "historical_qualification": {
+      "schema": "webkitgtk-ubuntu-source-qualification-v1",
+      "date": "2026-11-09",
+      "qualified_recipe_revision": "8cd850a6079ebc558335ea3a7d95985fea375719",
+      "product_git_commit": "ad531204790393e4fc39b4ef4f7a472012394a3b",
+      "ubuntu_source_version": "2.52.6-1ubuntu1",
+      "derivative_source_version": "2.52.6-1ubuntu1+rogdv1",
+      "cmake_profile_sha256": "c6604971e3ceb1575b0ed536ab5be396da4ede83559f7e2b728b49051e9bdc8b",
+      "cmake_feature_map_sha256": "65d40e4893ebf3245ab680c1723e3a869d4af580b56129afc74ddea34f42fccc",
+      "focused_tests": {
+        "covered_cases": 17,
+        "retained_unaffected_passes": 13,
+        "affected_rerun_passes": 4,
+        "initial_failure_receipts_retained_privately": true
+      },
+      "source_replay": {
+        "commands": [
+          "prepare-source.py --source <owned-clean-source> --product-patch <reviewed-public-patch>",
+          "dh_listpackages",
+          "dpkg-buildpackage -S -us -uc -d",
+          "dpkg-source -x <generated.dsc> <owned-replay-source>"
+        ],
+        "passed": true,
+        "public_source_files_and_modes_matched": 34386,
+        "generated_binary_control_packages": [
+          "libjavascriptcoregtk-6.0-1",
+          "libjavascriptcoregtk-6.0-dev",
+          "gir1.2-javascriptcoregtk-6.0",
+          "libwebkitgtk-6.0-4",
+          "libwebkitgtk-6.0-dev",
+          "gir1.2-webkit-6.0"
+        ],
+        "debian_archive_member_count": 55,
+        "debian_archive_cache_and_private_members": 0,
+        "roots": {
+          "CMakeLists.txt": "a2fb62f292bf01ac52a6edb2625f09a4aec6d6a5",
+          "NEWS": "102aea99cab1a5689e55926c23892b272a00270a",
+          "Documentation": "715ccd92d15a815e4e47f749d14a2d11a09fdddc",
+          "Source": "618cd1831ea52af537d8e0e34242960594741ca1",
+          "Tools": "a2b93a24e58662878c2bf7c4e3b2e18800d9cbea"
+        }
+      },
+      "real_source_negative_controls": {
+        "top_level_private_sentinel_rejected_before_recording": true,
+        "debian_python_cache_private_sentinel_rejected_before_recording": true
+      },
+      "source_timestamp_controls": {
+        "clean_prepare_normalized_and_restored_files": 39,
+        "already_patched_prepare_normalized_and_restored_files": 39,
+        "all_public_source_identities_and_mtimes_preserved": true,
+        "normal_source_package_preserved_mtimes": true,
+        "immutable_recovery_snapshot_mode": "0600",
+        "initial_snapshot_unchanged_after_packaging": true
+      },
+      "boundary": {
+        "compiler_executed": false,
+        "active_webkit_source_headers_cache_mutated": false,
+        "binary_packages_qualified": false,
+        "browser_runtime_qualified": false,
+        "packages_installed": false,
+        "optical_acceptance": false
+      },
+      "evidence_scope": "Source archive hashes matched the official descriptor pins. This receipt does not attest a new signing-key verification; original source-acquisition records remain separate. The product Git import and complete distribution documentation identity remain distinct in source-pin.json. Detailed logs, member list, source mtime snapshots and original failures remain private."
+    },
+    "evidence_scope": "This is a source-only Ubuntu-update replay. Local neutral-identity import commits identify tree provenance, not fetchable upstream revisions. Historical qualification below retains its original source, test and timestamp-control scope. Private logs, source mtime snapshots and operational identities remain outside Git."
   },
-  "evidence_scope": "This is a source-only Ubuntu-update replay. Local neutral-identity import commits identify tree provenance, not fetchable upstream revisions. Historical qualification below retains its original source, test and timestamp-control scope. Private logs, source mtime snapshots and operational identities remain outside Git."
+  "date_timezone": "UTC"
 }

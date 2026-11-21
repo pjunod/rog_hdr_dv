@@ -10,8 +10,10 @@ assertions. The normal six-package WebKit build passed. The normal eleven-output
 GStreamer bad v10 build also passed; only GstPlay changes among 178 runtime
 ELFs compared with v9. Its real API regression reproduces the old paused
 subtitle failure and passes with the correction, including alternate selection
-and an overriding explicit seek. The selected seven host upgrades and live
-acceptance are being prepared. No complete browser
+and an overriding explicit seek. Showtime requires a matching metadata-only revision because its installed
+dependencies pin bad v9 exactly; the new coherent transaction is eight
+upgrades, including Showtime v5.15. Exact dependency constraints remain. The
+selected host upgrades and live acceptance are being prepared. No complete browser
 or normal-player runtime acceptance is claimed yet.
 
 The exact thirteen-package recovery transaction passed: WebKit/JavaScriptCore
