@@ -59,7 +59,12 @@ correction then passed the failed P010 case and affected NV12 case with
 unchanged assertions: 23 retained plus two current passes qualify all 25.
 The actual context is OpenGL ES 3.2 Mesa; a naturally ES2-only provider remains
 uncovered. The normal six-package build passed and the two runtimes are installed.
-Refreshed installed controls remain pending.
+All ten refreshed installed-browser core cases now qualify: seven retained
+initial passes plus three corrected analyses, with no recapture. The corrections
+use the declared CSS reference shape and source-only exact-frame spatial
+references; the native/control discriminator keeps its original region and
+minimum difference. The broader transition cohort remains separate.
+[Bounded core qualification](../evidence/ubuntu-browser-core-20261120.json).
 
 The ordinary paused-subtitle check also reproduced a separate GstPlay defect:
 changing selection while paused did not present a new frame. The correction
@@ -70,8 +75,9 @@ against the correction: disable, re-enable, alternate track, exact restoration
 and an overriding explicit seek. No compensating test seek follows a toggle.
 The normal bad-family v10 build passed; only GstPlay differs among 178 packaged
 runtime ELFs. The other 177 retain identical allocated code/data sections.
-This is API/package qualification; normal Showtime capture acceptance remains
-pending. Its matching v5.15 package retains exact bad v10 dependency pins.
+This is API/package qualification; three normal Showtime active/disabled/restored captures now demonstrate
+caption removal and exact restoration at the same paused mapped-video frame.
+Detailed caption geometry/colour and target-change acceptance remain pending. Its matching v5.15 package retains exact bad v10 dependency pins.
 Application/resources are unchanged; the normal package additionally includes
 the source-bound upstream manual page. The reviewed eight-package follow-up
 is installed with no removals, unchanged APT configuration and owner session.

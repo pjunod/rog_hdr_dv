@@ -16,8 +16,13 @@ API regression reproduces the old paused-subtitle failure and passes against
 the correction. Showtime's exact dependency pins move coherently with bad v10;
 its application/resources are byte identical. Fresh WebKit source replay
 matches 34,395 paths and modes. The original twenty-eight-case v8 captures
-remain intact; new installed-player and browser checks are underway. Complete
-runtime and optical acceptance are not inferred from source/package checks.
+remain intact. All ten installed-browser core cases now qualify, retaining
+seven initial passes and correcting only three capture analyses without
+recapture. The source/seek transition cohort remains separate. Normal Showtime
+also removes and restores a paused subtitle with exact image restoration and
+unchanged mapped-video samples. Detailed caption geometry/colour and HDR-target
+acceptance are still in progress. [Bounded core qualification](../evidence/ubuntu-browser-core-20261120.json).
+Complete runtime and optical acceptance are not inferred from these results.
 
 The exact thirteen-package recovery transaction passed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv8`, eight GStreamer base packages
