@@ -1,0 +1,24 @@
+{
+  "date_utc": "2026-11-25",
+  "host": "lab ROG",
+  "package": "mpv 0.42.0-0ubuntu0+rogdv5.7 (amd64)",
+  "candidate_sha256": "193d637b3987af2c86e71c867c06c76fce98b798aeb534deefc965305eba5078",
+  "rollback": "mpv 0.42.0-0ubuntu0+rogdv5.6, sha256 e42111fd2c03c11b71cb24b9c8f3090f4f567f525b0ea04206ae3216d9da0b56",
+  "build": {
+    "source": "The +rogdv5.5 Debian source package with mpv-fel-system-dv patches 0010 and 0011 added as the two final quilt patches. The +rogdv5.6 changelog entry was written as for +rogdv5.6, and the +rogdv5.7 entry is packaging/system-dv/mpv-042-ubuntu-el-composition-level.diff, applied with fuzz 1 because +rogdv5.6's entry wraps differently from the 5.6 overlay.",
+    "source_trees": "The patched source, outside debian/, has git tree 51651e8dd3e328cb420faa34037f860c4d677529 for 5.5, c135087e9906135315268eda50b49ffc2f562f1b with 0010 (the installed tree before this install) and 7bc255d3f4372495765e706c16d8d6e96be16647 with 0011, equal to sources.json candidate_tree.",
+    "environment": "dpkg-buildpackage -b in a throwaway ubuntu:26.10 container on the host, with the +rogdv5.6 build script and the same 21 hash-pinned inputs, including the two build-environment deviations recorded in evidence/mpv-rogdv56-install-20261125.json (relaxed exact pins of two private libraries inside the container only; libcaca-dev and libcurl4-gnutls-dev added).",
+    "equivalence_to_rogdv5.6": "The 77 enabled features, Depends, Recommends, Suggests, Conflicts, Breaks, Replaces, Provides, Pre-Depends, Architecture, Section, Priority and the packaged file list all equal +rogdv5.6. The only build warnings are the two single-label email notices, which 5.6 also had. Of the files whose contents changed, the binary carries patch 0011, the changelog has the 5.7 entry, and the man page differs only by patch 0011's native-dovi-target-state paragraph. The 5.6 changelog entry inside 5.7 carries the build-day timestamp, as in 5.6 itself."
+  },
+  "install": {
+    "procedure": "The release tooling operate-local-files.py, unchanged except for its release folder. It ran plan, then preflight (an exact live APT simulation with both archive digests verified), then install. Install uses a root-owned staged copy with --no-remove, verifies versions, marks and dpkg --audit, and removes the staging directory. No mpv process was running.",
+    "result": "One package change (mpv 5.6 to 5.7) and zero removals. dpkg --audit and dpkg -V mpv clean, and the manual mark preserved. The installed /usr/bin/mpv is byte-identical to the candidate package's. mpv --version still reports the native-dovi-api-1 capability token. No player, session, compositor, display or boot selection was started, restarted or changed.",
+    "field_check": "Read-only, without starting playback: the installed /usr/bin/mpv contains the native-dovi-target-state property and its enhancement-layer-composed sub-property name, and the installed man page documents the field.",
+    "rollback": "operate-local-files.py rollback in the same release folder reinstalls +rogdv5.6."
+  },
+  "limits": [
+    "The field check reads the installed files; it does not observe the property at runtime.",
+    "The attended play and seek check of the EL pill is the owner's and is pending.",
+    "No optical measurement."
+  ]
+}
