@@ -10,28 +10,35 @@ established current defect or a repair claim.
 ## Owner-attended session re-creation — the EL pill, not the mapping
 
 [The November 25 UTC receipt](../evidence/dv-owner-recreation-el-pill-20261125.json)
-records an owner-attended play of a Profile 7 FEL title in plurx Player 0.5.3-1
-with the installed mpv `+rogdv5.5`. The owner reported the enhancement pills
-shown for several minutes. After a +30-second seek outside the live session,
-the player re-created the session. From then on the owner saw RPU and DYN but
-no longer the enhancement-layer pill. A read-only IPC recorder sampled
+records an owner-attended Dolby Vision play in plurx Player 0.5.3-1 with the
+installed mpv `+rogdv5.5`. The owner reported "all enhancements (FEL, RPU, DYN
+pills)" for a few minutes, then, after seeking forward 30 seconds, "FEL no longer
+shows as active, only RPU and DYN". The seek was outside the live session, and
+the player re-created it. A read-only IPC recorder sampled
 `native-dovi-target-state` as active generation 1 before and after the
 re-creation's `start-file`. Decoded colour stayed Dolby Vision/PQ, and every
 drop counter stayed zero. The provider logged its reset diagnostic 2.85 seconds
-after the re-creation and no later mapped-frame diagnostic.
+after the re-creation and no later mapped-frame diagnostic. Because the
+generation stayed 1 on every sample, that reset line most likely came from the
+reset branch at the stream change rather than a sustained absence of RPU.
 
-The disappearing pill is plurx Player's own EL pill. The server never marks FEL
-active on the native Profile 7 route. The EL pill needs the player's renderer
-facts, while RPU and DYN need only Dolby decoding. The player clears those facts
+The first-map diagnostic reported `EL composed=1`, so a dual-layer stream
+reached mpv: the server's native route, on which the server's route code never
+marks FEL active. On that route the overlay can draw only its local EL pill, so the
+owner's "FEL" is most likely that pill. The recorder did not capture the
+overlay's input, so FEL versus EL is inferred from the code path, not
+observed. The EL pill needs the player's renderer facts, while RPU and DYN need
+only Dolby decoding. The player clears those facts
 at `start-file` and restores them from the VO's physical-target success record
 whose generation matches the property. This follows the property's rule that a
 source change requires a fresh record. [Patch 0002](../patches/mpv-fel-system-dv/0002-target-the-physical-display-and-retain-cached-PQ-signals.patch)
 logged that record once per render generation, and a re-created session keeps
 generation 1, so no fresh record followed.
 
-Mapping itself is not shown to stop. The November 17 replacement trial below
-measured 187 enhancement-layer-composed mapped returns after an actual
-replacement on the same route. [Patch 0010](../patches/mpv-fel-system-dv/0010-log-a-fresh-Dolby-success-record-after-each-reset.patch)
+No mapper probe ran in this window, so mapping continuity here is not
+measured. The separately measured November 17 replacement trial below recorded
+187 enhancement-layer-composed mapped returns after an actual replacement on
+the same route. [Patch 0010](../patches/mpv-fel-system-dv/0010-log-a-fresh-Dolby-success-record-after-each-reset.patch)
 logs the record again after each frame-queue reset (seek, new file or refill), on the first successful
 private map. A reset after which mapping stays inactive still logs nothing.
 
@@ -42,7 +49,14 @@ owner's report covers the pills, not a measured picture. Patch 0010
 compiles and links warning-free on native x86_64 but is not packaged: the rebuilt package, its installation and the attended re-check
 remain owner-coordinated. The earlier unexplained loss reports below also
 followed outside-range re-creation. This mechanism may account for them, but
-that is not established.
+that is not established. The success record attests a successful private
+map, not enhancement-layer composition, and it is edge-triggered: an
+enhancement-layer-only loss with mapping still succeeding would not clear the
+EL pill. A level-triggered composition field on `native-dovi-target-state`
+would be sturdier and is a follow-up. The most direct check of this window's
+mechanism is one more attended outside-range seek on the installed `+rogdv5.5`
+with the PID-scoped mapper probe, also recording the overlay's input and the
+track's Dolby profile.
 
 ## Original timing recovered — persistent fallback remains unproved
 
