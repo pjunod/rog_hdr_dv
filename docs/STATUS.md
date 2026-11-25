@@ -3,7 +3,7 @@
 **November 25, 2026 — EL composition reported as a level; installed.**
 The success record that plurx Player's EL pill relied on attests a successful
 map, not enhancement-layer composition, and it is edge-triggered. Patch 0011
-of `mpv-fel-system-dv` (source candidate `+rogdv5.7`) adds
+of `mpv-fel-system-dv` (`+rogdv5.7`) adds
 `enhancement-layer-composed` to `native-dovi-target-state`: true while the
 frame covering the presented instant was privately mapped with its enhancement
 layer composed; false for a frame mapped without it, a failed or blank render,
