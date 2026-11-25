@@ -1,0 +1,174 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Wed, 25 Nov 2026 03:00:00 +0000
+Subject: [PATCH] fix(mpv): report enhancement-layer composition as a level
+
+The physical-target success record attests a successful private map,
+and is logged once after each reset. It says nothing about whether the
+enhancement layer was composed, so a client that showed an EL fact from
+it kept that fact through an EL-only loss while mapping still succeeded,
+and it depended on catching one log line.
+
+Add enhancement-layer-composed to native-dovi-target-state. The VO sets
+it from the enhancement_layer_composed flag the renderer passes to a
+successful private physical map, for the last frame the renderer read
+in each presented render. A frame mapped without the layer, a frame
+not privately mapped or a failed render makes it false, as do a
+frame-queue reset and a generation change. A mixer cache hit keeps the
+current value. Each change notifies the property.
+---
+ DOCS/man/input.rst      | 17 ++++++++++++++---
+ player/command.c        |  1 +
+ video/out/vo.h          |  1 +
+ video/out/vo_gpu_next.c | 29 +++++++++++++++++++++++++++++
+ 4 files changed, 45 insertions(+), 3 deletions(-)
+
+diff --git a/DOCS/man/input.rst b/DOCS/man/input.rst
+index 4c63554..fcbf227 100644
+--- a/DOCS/man/input.rst
++++ b/DOCS/man/input.rst
+@@ -3899,9 +3899,20 @@ Property list
+ ``native-dovi-target-state``
+     Read-only native Dolby physical-target eligibility for the active
+     ``gpu-next`` output. Other outputs report this property unavailable.
+-    The map contains ``active`` (boolean) and ``generation`` (integer).
+-    Generation changes when physical-target eligibility or its display revision
+-    changes. Notifications follow those transitions, including paused redraws.
++    The map contains ``active`` (boolean), ``generation`` (integer) and
++    ``enhancement-layer-composed`` (boolean). Generation changes when
++    physical-target eligibility or its display revision changes. Notifications
++    follow those transitions, including paused redraws.
++
++    ``enhancement-layer-composed`` is a level, not an event: it is true while
++    the last frame the renderer read for the presented picture was privately
++    mapped on the physical path with a decoded Dolby Vision enhancement layer
++    composed into its master. It becomes false when a presented frame is mapped
++    without one, is not privately mapped, or fails to render, on a frame-queue
++    reset (a seek, a new file or a queue refill) and on every generation
++    change, and it implies ``active``. A redraw that reuses the renderer's
++    cached frame keeps the current value. Each change sends a notification. It
++    does not tell a full enhancement layer from a minimal one.
+ 
+     Active eligibility alone does not prove that a picture was Dolby mapped.
+     A client reporting successful mapping must also match the generation in
+diff --git a/player/command.c b/player/command.c
+index 9c3bcab..d788b9f 100644
+--- a/player/command.c
++++ b/player/command.c
+@@ -3050,6 +3050,7 @@ static int mp_property_native_dovi_target_state(void *ctx, struct m_property *pr
+     struct m_sub_property props[] = {
+         {"active", SUB_PROP_BOOL(state.active)},
+         {"generation", SUB_PROP_INT64(state.generation)},
++        {"enhancement-layer-composed", SUB_PROP_BOOL(state.enhancement_layer_composed)},
+         {0}
+     };
+     return m_property_read_sub(props, action, arg);
+diff --git a/video/out/vo.h b/video/out/vo.h
+index ddfbc65..6f236d0 100644
+--- a/video/out/vo.h
++++ b/video/out/vo.h
+@@ -161,6 +161,7 @@ struct voctrl_playback_state {
+ struct voctrl_native_dovi_target_state {
+     bool active;
+     uint64_t generation;
++    bool enhancement_layer_composed;
+ };
+ 
+ // VOCTRL_PERFORMANCE_DATA
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 373f46c..92bb57f 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -156,6 +156,12 @@ struct priv {
+     float dovi_transport_gain, dovi_reference, dovi_encoding_min, dovi_encoding_max;
+     uint64_t dovi_physical_generation, dovi_render_generation, dovi_map_calls;
+     bool dovi_physical_active, dovi_display_signal_valid, dovi_physical_logged;
++    // Whether the last presented frame was privately mapped on the physical
++    // path with its enhancement layer composed (native-dovi-target-state).
++    bool dovi_el_composed;
++    // The last frame read by the renderer during one render: -1 when it read
++    // none (a mixer cache hit), else whether that frame composed its EL.
++    int dovi_frame_el;
+     pl_renderer rr;
+     pl_queue queue;
+     pl_swapchain sw;
+@@ -1258,6 +1264,7 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+         dv_provider387_reset(p->dovi_provider);
+         p->dovi_render_generation++;
+         p->dovi_display_signal_valid = p->dovi_physical_logged = false;
++        p->dovi_el_composed = false;
+     }
+     p->dovi_physical_active = active;
+     p->dovi_physical_generation = generation;
+@@ -1265,9 +1272,20 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+         vo_event(vo, VO_EVENT_WIN_STATE);
+ }
+ 
++// Publish the level of native-dovi-target-state's enhancement-layer-composed.
++static void set_dovi_el_composed(struct priv *p, struct vo *vo, bool composed)
++{
++    if (composed == p->dovi_el_composed)
++        return;
++    p->dovi_el_composed = composed;
++    vo_event(vo, VO_EVENT_WIN_STATE);
++}
++
+ static void dovi_reset(void *priv)
+ {
+     struct priv *p = priv;
++    // The renderer read a Dolby frame it does not map.
++    p->dovi_frame_el = 0;
+     dv_provider387_reset(p->dovi_provider);
+ }
+ 
+@@ -1278,6 +1296,8 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+ {
+     struct priv *p = priv;
+     p->dovi_map_calls++;
++    // Only a successful private physical map below attests composition.
++    p->dovi_frame_el = 0;
+     if (!p->dovi_physical_active || target->transfer != PL_COLOR_TRC_PQ ||
+         target->primaries != PL_COLOR_PRIM_BT_2020) {
+         return dv_provider387_map(p->dovi_provider, gpu, rpu, size, enhancement_layer_composed, target,
+@@ -1354,6 +1374,7 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+                 (unsigned long long)p->dovi_render_generation);
+         p->dovi_physical_logged = true;
+     }
++    p->dovi_frame_el = enhancement_layer_composed;
+     return 1;
+ }
+ 
+@@ -1628,6 +1649,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+             // physical-target generation need not change with it, so the
+             // next successful private map logs its record again.
+             p->dovi_physical_logged = false;
++            // Nothing from the new source has been mapped yet.
++            set_dovi_el_composed(p, vo, false);
+             p->last_pts = 0.0;
+             p->last_id = 0;
+             p->want_reset = false;
+@@ -1993,8 +2016,13 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     // Render frame
+     stats_time_start(p->stats, "render");
+     uint64_t map_calls_before = p->dovi_map_calls;
++    p->dovi_frame_el = -1;
+     bool render_ok = pl_render_image_mix(p->rr, &mix, &target, &params);
+     stats_time_end(p->stats, "render");
++    // A mixer cache hit presents the frame already described. Otherwise the
++    // last frame read decides, including one that failed to render.
++    if (p->dovi_frame_el >= 0)
++        set_dovi_el_composed(p, vo, render_ok && p->dovi_frame_el);
+     if (!render_ok) {
+         MP_ERR(vo, "Failed rendering frame!\n");
+         goto done;
+@@ -2488,6 +2516,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
+         *state = (struct voctrl_native_dovi_target_state) {
+             .active = p->dovi_physical_active,
+             .generation = p->dovi_render_generation,
++            .enhancement_layer_composed = p->dovi_el_composed,
+         };
+         return VO_TRUE;
+     }
+-- 
+2.54.0 (Apple Git-157)
+

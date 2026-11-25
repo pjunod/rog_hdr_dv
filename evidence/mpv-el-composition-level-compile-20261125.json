@@ -1,0 +1,24 @@
+{
+  "kind": "source compile receipt",
+  "date_utc": "2026-11-25",
+  "change": "mpv-fel-system-dv patch 0011: enhancement-layer-composed in native-dovi-target-state",
+  "source": {
+    "base": "upstream mpv b0841e8c4d156b8403dc1876c4cbd9011eb583f3 (tree 6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df)",
+    "baseline_tree": "c135087e9906135315268eda50b49ffc2f562f1b (patches 0001-0010, the installed +rogdv5.6 source tree)",
+    "candidate_tree": "ab22cf70d32cc12753812d6f4deba31a2d16e08c (patches 0001-0011)"
+  },
+  "compile": {
+    "platform": "native x86_64 Linux build host (lab builder), throwaway ubuntu:26.10 container, gcc 15.3.0, meson, ninja -j4; nothing installed on the host",
+    "inputs": "The 18 private development and runtime packages listed in the +rogdv5.6 build's input manifest (FFmpeg 8.1.2+rogdv3, libdovi 3.3.2-3+rogdv1, libdisplay-info 0.3.0-1+nativehdr13, libplacebo-rog387 1.0.0+private20261108-2, provider387 1.0.0+private20261108-5 with its api2 SDK), each sha256-matched to that manifest; build dependencies from the +rogdv5.5 debian/control. Exact-version pins on the two private libraries mpv does not link were relaxed to >= inside the container only, as for +rogdv5.6.",
+    "options": "meson -Dlibmpv=true -Dtests=false --buildtype=release; the tree's normal warning flags",
+    "baseline_result": "367 build steps through linking libmpv.so.2.6.0 and mpv, 0 compiler warnings",
+    "patch_0011_result": "patch applied cleanly; 114 steps recompiled (vo.h changed) and relinked libmpv.so.2.6.0 and mpv with 0 compiler warnings"
+  },
+  "tests": "tests/test_mpv_system_dv_series.py checks the patch's level semantics textually: the per-render frame read, the successful-map-only true value, clearing at the frame-queue reset and generation change, and notification on change.",
+  "limits": [
+    "Compilation and linking only. No package build, no runtime, IPC or display test of the patched player.",
+    "The level reports what libplacebo passes as enhancement_layer_composed for the last frame read in a presented render. With frame mixing, that is the newest frame of the mix.",
+    "It does not distinguish a full enhancement layer from a minimal one.",
+    "The +rogdv5.7 package build, its installation on the ROG and the attended check are owner-coordinated."
+  ]
+}

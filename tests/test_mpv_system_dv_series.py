@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SERIES = ROOT / "patches/mpv-fel-system-dv"
 WAYLAND_PATCH = "0009-stop-dispatching-Wayland-events-after-a-fatal-display-error.patch"
 RECORD_PATCH = "0010-log-a-fresh-Dolby-success-record-after-each-reset.patch"
+LEVEL_PATCH = "0011-report-enhancement-layer-composition-as-a-level.patch"
 
 
 def entry():
@@ -23,7 +24,7 @@ class MpvSystemSeriesTests(unittest.TestCase):
         names = (SERIES / "series").read_text().split()
         self.assertEqual(names, entry()["patch_order"])
         self.assertEqual(len(names), entry()["patch_count"])
-        self.assertEqual(names[-2:], [WAYLAND_PATCH, RECORD_PATCH])
+        self.assertEqual(names[-3:], [WAYLAND_PATCH, RECORD_PATCH, LEVEL_PATCH])
         self.assertEqual(sorted(names), sorted(p.name for p in SERIES.glob("*.patch")))
         sums = dict(line.split("  ", 1)[::-1] for line in (ROOT / "SHA256SUMS").read_text().splitlines() if line)
         for name in names:
@@ -31,10 +32,10 @@ class MpvSystemSeriesTests(unittest.TestCase):
             self.assertEqual(sums[f"patches/mpv-fel-system-dv/{name}"], digest, name)
 
     def test_package_version_is_the_newest_changelog_overlay(self):
-        overlay = (ROOT / "packaging/system-dv/mpv-042-ubuntu-fresh-success-record.diff").read_text()
+        overlay = (ROOT / "packaging/system-dv/mpv-042-ubuntu-el-composition-level.diff").read_text()
         version = re.search(r"^\+mpv \(([^)]+)\)", overlay, re.M).group(1)
         self.assertEqual(entry()["candidate_package_version"], version)
-        self.assertTrue(version.endswith("+rogdv5.6"))
+        self.assertTrue(version.endswith("+rogdv5.7"))
 
     def test_a_dead_wayland_display_stops_dispatching_and_keeps_sleeping(self):
         text = (SERIES / WAYLAND_PATCH).read_text()
@@ -62,6 +63,25 @@ class MpvSystemSeriesTests(unittest.TestCase):
         # ...and nowhere else, so only a later successful map logs the record.
         self.assertEqual(text.count("+            p->dovi_physical_logged = false;"), 1)
         self.assertNotIn("+    p->dovi_physical_logged = true;", text)
+        self.assertIn("+++ b/DOCS/man/input.rst", text)
+
+    def test_enhancement_layer_composition_is_a_level(self):
+        text = (SERIES / LEVEL_PATCH).read_text()
+        # The property reports the level next to active and generation.
+        self.assertIn('+        {"enhancement-layer-composed", SUB_PROP_BOOL(state.enhancement_layer_composed)},', text)
+        self.assertIn("+            .enhancement_layer_composed = p->dovi_el_composed,", text)
+        # Each frame read starts unattested; only a successful private physical
+        # map carries the renderer's composition flag, and an unmapped frame clears it.
+        self.assertEqual(text.count("+    p->dovi_frame_el = 0;"), 2)
+        self.assertRegex(text, r"\+    p->dovi_frame_el = enhancement_layer_composed;\n     return 1;\n")
+        # The presented render decides it; a mixer cache hit (no frame read) keeps it.
+        self.assertIn("+    p->dovi_frame_el = -1;\n     bool render_ok = pl_render_image_mix(", text)
+        self.assertIn("+    if (p->dovi_frame_el >= 0)\n+        set_dovi_el_composed(p, vo, render_ok && p->dovi_frame_el);", text)
+        # It clears on the frame-queue reset and on a generation change...
+        self.assertRegex(text, r" +p->dovi_physical_logged = false;\n(?:\+ +//.*\n)*\+ +set_dovi_el_composed\(p, vo, false\);\n")
+        self.assertIn("+        p->dovi_el_composed = false;", text)
+        # ...and every change notifies the property.
+        self.assertRegex(text, r"\+    if \(composed == p->dovi_el_composed\)\n\+        return;\n\+    p->dovi_el_composed = composed;\n\+    vo_event\(vo, VO_EVENT_WIN_STATE\);")
         self.assertIn("+++ b/DOCS/man/input.rst", text)
 
 
