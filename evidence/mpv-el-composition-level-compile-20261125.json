@@ -5,19 +5,19 @@
   "source": {
     "base": "upstream mpv b0841e8c4d156b8403dc1876c4cbd9011eb583f3 (tree 6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df)",
     "baseline_tree": "c135087e9906135315268eda50b49ffc2f562f1b (patches 0001-0010, the installed +rogdv5.6 source tree)",
-    "candidate_tree": "d7f7f545e68365477a34e7eea48cd211085c75eb (patches 0001-0011)"
+    "candidate_tree": "7bc255d3f4372495765e706c16d8d6e96be16647 (patches 0001-0011)"
   },
   "compile": {
     "platform": "native x86_64 Linux build host (lab builder), throwaway ubuntu:26.10 container, gcc 15.3.0, meson, ninja -j4; nothing installed on the host",
     "inputs": "The 18 private development and runtime packages listed in the +rogdv5.6 build's input manifest (FFmpeg 8.1.2+rogdv3, libdovi 3.3.2-3+rogdv1, libdisplay-info 0.3.0-1+nativehdr13, libplacebo-rog387 1.0.0+private20261108-2, provider387 1.0.0+private20261108-5 with its api2 SDK), each sha256-matched to that manifest; build dependencies from the +rogdv5.5 debian/control. Exact-version pins on the two private libraries mpv does not link were relaxed to >= inside the container only, as for +rogdv5.6.",
     "options": "meson -Dlibmpv=true -Dtests=false --buildtype=release; the tree's normal warning flags",
     "baseline_result": "367 build steps through linking libmpv.so.2.6.0 and mpv, 0 compiler warnings",
-    "patch_0011_result": "patch applied cleanly; 114 steps recompiled (vo.h changed) and relinked libmpv.so.2.6.0 and mpv with 0 compiler warnings. The review revision (per-frame records, nearest-frame level, clears on failed or blank renders) was rebuilt the same way in a fresh container: 114 steps, 0 warnings."
+    "patch_0011_result": "patch applied cleanly; 114 steps recompiled (vo.h changed) and relinked libmpv.so.2.6.0 and mpv with 0 compiler warnings. The review revisions (per-frame records, a covering-frame level, clears on failed or blank renders) were each rebuilt the same way in a fresh container; the final one recompiled 114 steps with 0 warnings."
   },
   "tests": "tests/test_mpv_system_dv_series.py checks the patch's level semantics textually: the per-render frame read, the successful-map-only true value, clearing at the frame-queue reset and generation change, and notification on change.",
   "limits": [
     "Compilation and linking only. No package build, no runtime, IPC or display test of the patched player.",
-    "The level reports what libplacebo passed as enhancement_layer_composed when it last read the frame nearest the presented instant. The renderer's reset callback does not name the frame it read without mapping, so every frame of that render not yet attested is cleared; next to such a frame the level can under-report.",
+    "The level reports what libplacebo passed as enhancement_layer_composed when it last read the frame covering the presented instant (the latest at or before it). The renderer's reset callback does not name the frame it read without mapping, so every frame of that render not yet attested is cleared; next to such a frame the level can under-report.",
     "It does not distinguish a full enhancement layer from a minimal one.",
     "The +rogdv5.7 package build, its installation on the ROG and the attended check are owner-coordinated."
   ]

@@ -12,22 +12,23 @@ and it depended on catching one log line.
 Add enhancement-layer-composed to native-dovi-target-state. Each queued
 frame records, when the presenting renderer reads it, whether it was
 privately mapped on the physical path with the enhancement_layer_composed
-flag the renderer passes; the level is the record of the frame nearest
-the presented instant, so a cached redraw (including a pause after
-interpolation) keeps its own frame's value. A failed or blank render, a
-queue error, a frame-queue reset and a generation change make it false.
-The renderer's reset callback does not name the frame it read unmapped,
-so it clears every frame of that render not yet attested. Each change
-notifies the property.
+flag the renderer passes. The level is the record of the frame covering
+the presented instant (the latest at or before it), which every mixer
+reads, so a cached redraw (including a pause after interpolation) keeps
+its own frame's value. A failed or blank render, a queue error, a
+frame-queue reset and a generation change make it false. The renderer's
+reset callback does not name the frame it read unmapped, so it clears
+every frame of that render not yet attested. Each change notifies the
+property.
 ---
- DOCS/man/input.rst      | 21 +++++++++++--
+ DOCS/man/input.rst      | 21 +++++++++--
  player/command.c        |  1 +
  video/out/vo.h          |  1 +
- video/out/vo_gpu_next.c | 65 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 85 insertions(+), 3 deletions(-)
+ video/out/vo_gpu_next.c | 78 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 98 insertions(+), 3 deletions(-)
 
 diff --git a/DOCS/man/input.rst b/DOCS/man/input.rst
-index 4c63554..97c7c7d 100644
+index 4c63554..767923c 100644
 --- a/DOCS/man/input.rst
 +++ b/DOCS/man/input.rst
 @@ -3899,9 +3899,24 @@ Property list
@@ -43,18 +44,18 @@ index 4c63554..97c7c7d 100644
 +    follow those transitions, including paused redraws.
 +
 +    ``enhancement-layer-composed`` is a level, not an event. It is true while
-+    the frame nearest the presented instant was, when the renderer last read it
-+    for presentation, privately mapped on the physical path with a decoded
-+    Dolby Vision enhancement layer composed into its master. It is false for a
-+    frame mapped without one or not privately mapped, after a failed or blank
-+    render, after a frame-queue reset (a seek, a new file or a queue refill)
-+    until a composed frame is presented, and on every generation change; it
-+    implies ``active``. A redraw that reuses the renderer's cached frame keeps
-+    that frame's value, including while paused after interpolation. When the
-+    renderer reads a frame without mapping it, every frame of that render not
-+    yet attested is treated as not composed, which can under-report next to
-+    such a frame. Each change sends a notification. It does not tell a full
-+    enhancement layer from a minimal one.
++    the frame covering the presented instant (the latest frame at or before it)
++    was, when the renderer last read it for presentation, privately mapped on
++    the physical path with a decoded Dolby Vision enhancement layer composed
++    into its master. It is false for a frame mapped without one or not
++    privately mapped, after a failed or blank render, after a frame-queue reset
++    (a seek, a new file or a queue refill) until a composed frame is presented,
++    and on every generation change; it implies ``active``. A redraw that reuses
++    the renderer's cached frame keeps that frame's value, including while
++    paused after interpolation. When the renderer reads a frame without mapping
++    it, every frame of that render not yet attested is treated as not composed,
++    which can under-report next to such a frame. Each change sends a
++    notification. It does not tell a full enhancement layer from a minimal one.
  
      Active eligibility alone does not prove that a picture was Dolby mapped.
      A client reporting successful mapping must also match the generation in
@@ -83,7 +84,7 @@ index ddfbc65..6f236d0 100644
  
  // VOCTRL_PERFORMANCE_DATA
 diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
-index 373f46c..39072d1 100644
+index 373f46c..62eee9e 100644
 --- a/video/out/vo_gpu_next.c
 +++ b/video/out/vo_gpu_next.c
 @@ -156,6 +156,14 @@ struct priv {
@@ -121,7 +122,7 @@ index 373f46c..39072d1 100644
      }
      p->dovi_physical_active = active;
      p->dovi_physical_generation = generation;
-@@ -1265,9 +1279,43 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+@@ -1265,9 +1279,56 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
          vo_event(vo, VO_EVENT_WIN_STATE);
  }
  
@@ -132,6 +133,19 @@ index 373f46c..39072d1 100644
 +        return;
 +    p->dovi_el_composed = composed;
 +    vo_event(vo, VO_EVENT_WIN_STATE);
++}
++
++// The frame covering the presented instant: the latest one at or before it.
++// The renderer reads it in every mixer (an oversampled frame after it may not
++// intersect the vsync and go unread), and it is the only frame when paused.
++static const struct pl_frame *dovi_covering_frame(const struct pl_frame_mix *mix)
++{
++    const struct pl_frame *frame = mix->num_frames ? mix->frames[0] : NULL;
++    for (int i = 1; i < mix->num_frames; i++) {
++        if (mix->timestamps[i] <= 0)
++            frame = mix->frames[i];
++    }
++    return frame;
 +}
 +
 +// Record the renderer's composition result on the presented frame it read.
@@ -165,7 +179,7 @@ index 373f46c..39072d1 100644
      dv_provider387_reset(p->dovi_provider);
  }
  
-@@ -1278,6 +1326,8 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+@@ -1278,6 +1339,8 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
  {
      struct priv *p = priv;
      p->dovi_map_calls++;
@@ -174,7 +188,7 @@ index 373f46c..39072d1 100644
      if (!p->dovi_physical_active || target->transfer != PL_COLOR_TRC_PQ ||
          target->primaries != PL_COLOR_PRIM_BT_2020) {
          return dv_provider387_map(p->dovi_provider, gpu, rpu, size, enhancement_layer_composed, target,
-@@ -1354,6 +1404,7 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+@@ -1354,6 +1417,7 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
                  (unsigned long long)p->dovi_render_generation);
          p->dovi_physical_logged = true;
      }
@@ -182,7 +196,7 @@ index 373f46c..39072d1 100644
      return 1;
  }
  
-@@ -1628,6 +1679,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1628,6 +1692,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
              // physical-target generation need not change with it, so the
              // next successful private map logs its record again.
              p->dovi_physical_logged = false;
@@ -191,7 +205,7 @@ index 373f46c..39072d1 100644
              p->last_pts = 0.0;
              p->last_id = 0;
              p->want_reset = false;
-@@ -1921,6 +1974,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1921,6 +1987,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
          switch (pl_queue_update(p->queue, &mix, &qparams)) {
          case PL_QUEUE_ERR:
              MP_ERR(vo, "Failed updating frames!\n");
@@ -199,7 +213,7 @@ index 373f46c..39072d1 100644
              goto done;
          case PL_QUEUE_EOF:
              abort(); // we never signal EOF
-@@ -1993,8 +2047,18 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1993,8 +2060,18 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
      // Render frame
      stats_time_start(p->stats, "render");
      uint64_t map_calls_before = p->dovi_map_calls;
@@ -208,17 +222,17 @@ index 373f46c..39072d1 100644
      bool render_ok = pl_render_image_mix(p->rr, &mix, &target, &params);
 +    p->dovi_mix = NULL;
      stats_time_end(p->stats, "render");
-+    // The level follows the frame nearest the presented instant. A failed or
++    // The level follows the frame covering the presented instant. A failed or
 +    // blank render presents no composed picture; a frame the renderer did not
 +    // read as Dolby Vision (dovi_reset, or no RPU) stays unattested.
-+    const struct pl_frame *nearest = render_ok ? pl_frame_mix_nearest(&mix) : NULL;
-+    const struct frame_priv *nearest_fp = nearest
-+        ? ((const struct mp_image *) nearest->user_data)->priv : NULL;
-+    set_dovi_el_composed(p, vo, nearest_fp && nearest_fp->dovi_el_composed);
++    const struct pl_frame *covering = render_ok ? dovi_covering_frame(&mix) : NULL;
++    const struct frame_priv *covering_fp = covering
++        ? ((const struct mp_image *) covering->user_data)->priv : NULL;
++    set_dovi_el_composed(p, vo, covering_fp && covering_fp->dovi_el_composed);
      if (!render_ok) {
          MP_ERR(vo, "Failed rendering frame!\n");
          goto done;
-@@ -2488,6 +2552,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
+@@ -2488,6 +2565,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
          *state = (struct voctrl_native_dovi_target_state) {
              .active = p->dovi_physical_active,
              .generation = p->dovi_render_generation,

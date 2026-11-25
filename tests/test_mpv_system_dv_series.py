@@ -80,10 +80,13 @@ class MpvSystemSeriesTests(unittest.TestCase):
         self.assertRegex(text, r"\+    set_dovi_frame_el\(p, rpu, enhancement_layer_composed\);\n     return 1;\n")
         # An unmapped read clears every frame of that render not attested in it.
         self.assertIn("if (fp->dovi_el_serial != p->dovi_render_serial)\n            fp->dovi_el_composed = false;", added)
-        # The presented level is the nearest frame's record, false on a failed or blank render.
+        # The presented level is that frame's record, false on a failed or blank render.
         self.assertIn("p->dovi_mix = &mix;\n    p->dovi_render_serial++;", added)
-        self.assertIn("render_ok ? pl_frame_mix_nearest(&mix) : NULL;", added)
-        self.assertIn("set_dovi_el_composed(p, vo, nearest_fp && nearest_fp->dovi_el_composed);", added)
+        # The presented frame is the latest at or before the instant, which every mixer reads.
+        self.assertIn("if (mix->timestamps[i] <= 0)\n            frame = mix->frames[i];", added)
+        self.assertIn("render_ok ? dovi_covering_frame(&mix) : NULL;", added)
+        self.assertIn("set_dovi_el_composed(p, vo, covering_fp && covering_fp->dovi_el_composed);", added)
+        self.assertNotIn("pl_frame_mix_nearest", added)
         # A queue error, the frame-queue reset and a generation change clear it...
         self.assertRegex(text, r'Failed updating frames!\\n"\);\n\+ +set_dovi_el_composed\(p, vo, false\);\n')
         self.assertRegex(text, r" +p->dovi_physical_logged = false;\n(?:\+ +//.*\n)*\+ +set_dovi_el_composed\(p, vo, false\);\n")
