@@ -14,8 +14,8 @@ of `mpv-fel-system-dv` logs the record again on the first successful map after
 each reset. mpv `+rogdv5.6` with it was built from the `+rogdv5.5` source package
 and installed on the ROG on November 25 with the release tooling; its features,
 relations and files match `+rogdv5.5`, and rollback is `+rogdv5.5`
-([install receipt](../evidence/mpv-rogdv56-install-20261125.json)). The attended
-re-check of a re-created session is pending. [Observation, cause and limits](DV_FALLBACK_REPRODUCTION.md#owner-attended-session-re-creation--the-el-pill-not-the-mapping).
+([install receipt](../evidence/mpv-rogdv56-install-20261125.json)). In the owner's
+attended re-check on `+rogdv5.6`, a session re-created by a seek kept the EL pill. [Observation, cause and limits](DV_FALLBACK_REPRODUCTION.md#owner-attended-session-re-creation--the-el-pill-not-the-mapping).
 
 **November 20, 2026 — fractional HDR source fixtures source-qualified.** The
 existing [IQ stimulus pipeline](IMAGE_QUALITY_STIMULI.md) carries exact
