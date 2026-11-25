@@ -1,0 +1,29 @@
+{
+  "kind": "owner-attended DV seek re-check with an owner-approved PID-scoped mapper probe",
+  "date_utc": "2026-11-25",
+  "host": "lab ROG",
+  "software": {
+    "player": "plurx Player 0.5.3-1 (Linux)",
+    "mpv": "0.42.0-0ubuntu0+rogdv5.5 (patch 0010 not installed)"
+  },
+  "title_facts": "source dv_profile 7 and dv_el_present true, from the overlay input user-data/cinema-video.source",
+  "owner_report": "did a 30 second seek, which took forever, and it did the same thing as last time; did not get the fel pill back",
+  "timeline_probe_seconds": {
+    "first_map": 14,
+    "owner_seek": 52.9,
+    "provider_reset": 66.238,
+    "new_session_playback_restart": 66.9,
+    "player_closed": 81
+  },
+  "mapper_returns": "Every return in seconds 14-52 and 66-81 was 1 (mapped) with enhancement_layer_composed=1 and RPU present, 24 per full second in both sessions, including every full second 67-80 after re-creation. No 0 (unsupported) or -1 (error) returns, and no calls with the enhancement layer not composed.",
+  "overlay_input": "user-data/cinema-video.renderer held the native renderer record (target 616 nits) from 14.7 s until the seek, and stayed null after re-creation until close. native-dovi-target-state stayed active generation 1 throughout.",
+  "conclusion": "After the outside-session re-creation the provider kept composing the enhancement layer and mapping every frame. Only the player's renderer record, and with it the EL pill, was not restored. This directly confirms the cause that patch 0010 addresses, on the installed build.",
+  "separate_observation": "About 14 s from the seek to the first new frame (52.9 to 66.9 s), which the owner described as taking forever. Not investigated here.",
+  "limits": [
+    "About 15 s of post-seek playback.",
+    "Unfixed +rogdv5.5 build; the fixed build is not yet installed or re-checked.",
+    "No optical measurement.",
+    "The host carried concurrent CI load (load average about 4.5).",
+    "Probe counts are unpaired callback observations, not displayed-frame counts."
+  ]
+}

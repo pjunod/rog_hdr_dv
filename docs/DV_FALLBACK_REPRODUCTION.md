@@ -53,10 +53,23 @@ that is not established. The success record attests a successful private
 map, not enhancement-layer composition, and it is edge-triggered: an
 enhancement-layer-only loss with mapping still succeeding would not clear the
 EL pill. A level-triggered composition field on `native-dovi-target-state`
-would be sturdier and is a follow-up. The most direct check of this window's
-mechanism is one more attended outside-range seek on the installed `+rogdv5.5`
-with the PID-scoped mapper probe, also recording the overlay's input and the
-track's Dolby profile.
+would be sturdier and is a follow-up.
+
+**Direct check, November 25 UTC.** [A second owner-attended run](../evidence/dv-owner-recreation-probe-20261125.json)
+repeated one outside-session seek on the installed `+rogdv5.5` with the
+PID-scoped mapper probe, and also recorded the overlay's input. Every mapper
+return before the seek and after re-creation was "mapped" with the enhancement
+layer composed and RPU present: 24 per full second, including every full second
+67–80 s of probe time after re-creation. Apart from the probe's own startup,
+there was one provider reset, after the seek, and no unsupported or error
+returns. The
+overlay's renderer record was present before the seek and stayed `null` after
+re-creation, and the generation stayed 1. The owner again saw no enhancement-layer
+pill. Mapping and composition therefore continued, and only the player's
+renderer record, and with it the EL pill, was lost. That is the mechanism patch
+0010 addresses. Limits: about 15 seconds after the seek, on the unfixed build,
+without an optical measurement. The owner also noted about 14 seconds from the
+seek to the first new frame; that latency is separate and not investigated here.
 
 ## Original timing recovered — persistent fallback remains unproved
 

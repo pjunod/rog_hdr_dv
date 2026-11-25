@@ -6,9 +6,10 @@ left RPU and DYN shown but no longer the enhancement-layer pill (the owner's
 "FEL"; most likely the player's local EL pill on this route). The cause is the
 VO's success record. mpv logged it once per render generation, and a
 re-created session keeps generation 1, so the player never received the fresh
-record its contract requires after a source change. No mapper probe ran in this
-window; a separately measured November 17 replacement kept mapping with the
-enhancement layer composed. Patch 0010
+record its contract requires after a source change. A second owner-attended
+run with the mapper probe confirmed it on the installed build: after
+re-creation every frame was mapped with the enhancement layer composed, while
+the overlay's renderer record stayed empty. Patch 0010
 of `mpv-fel-system-dv` (source candidate `+rogdv5.6`) logs the record again on
 the first successful map after each reset. It compiles warning-free in a native
 x86_64 container but is not packaged or installed; the
