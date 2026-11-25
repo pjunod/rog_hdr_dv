@@ -52,8 +52,10 @@ followed outside-range re-creation. This mechanism may account for them, but
 that is not established. The success record attests a successful private
 map, not enhancement-layer composition, and it is edge-triggered: an
 enhancement-layer-only loss with mapping still succeeding would not clear the
-EL pill. A level-triggered composition field on `native-dovi-target-state`
-would be sturdier and is a follow-up.
+EL pill. Patch 0011 adds a level-triggered composition field to
+`native-dovi-target-state`, installed in mpv `+rogdv5.7`
+([install receipt](../evidence/mpv-rogdv57-install-20261125.json)), and
+plurx Player's EL pill reads it.
 
 **Direct check, November 25 UTC.** [A second owner-attended run](../evidence/dv-owner-recreation-probe-20261125.json)
 repeated one outside-session seek on the installed `+rogdv5.5` with the
