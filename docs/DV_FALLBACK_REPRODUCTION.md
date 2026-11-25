@@ -45,9 +45,9 @@ private map. A reset after which mapping stays inactive still logs nothing.
 Limits: the recorder captured neither the overlay's input property, the
 selected track's Dolby profile nor the mpv log stream. No mapper probe ran
 during this window, and the host carried heavy concurrent build load. The
-owner's report covers the pills, not a measured picture. Patch 0010
-compiles and links warning-free on native x86_64 but is not packaged: the rebuilt package, its installation and the attended re-check
-remain owner-coordinated. The earlier unexplained loss reports below also
+owner's report covers the pills, not a measured picture. Patch 0010 is
+installed in mpv `+rogdv5.6` ([install receipt](../evidence/mpv-rogdv56-install-20261125.json));
+the attended re-check of a re-created session is pending. The earlier unexplained loss reports below also
 followed outside-range re-creation. This mechanism may account for them, but
 that is not established. The success record attests a successful private
 map, not enhancement-layer composition, and it is edge-triggered: an
