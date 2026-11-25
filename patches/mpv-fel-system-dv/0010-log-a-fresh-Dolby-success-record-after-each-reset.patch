@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Wed, 25 Nov 2026 01:30:00 +0000
+Subject: [PATCH] fix(mpv): log a fresh Dolby success record after each reset
+
+The physical-target success record ("automatic DV physical target ...
+generation N") was logged once per render generation. A frame-queue
+reset (a seek, a new file or a queue refill) resets the queue and the
+provider without changing that generation, so no record followed the
+reset. Clients discard their record when the source changes, as
+native-dovi-target-state documents, and a player that replaced its
+stream mid-title lost its renderer facts for the rest of the play.
+
+Clear the logged flag where the queue and provider are reset. The
+record still prints only from a successful private map on the physical
+path, so a reset after which mapping stays inactive logs nothing.
+---
+ DOCS/man/input.rst      | 4 +++-
+ video/out/vo_gpu_next.c | 5 +++++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/DOCS/man/input.rst b/DOCS/man/input.rst
+index 20d87a494..4c6355467 100644
+--- a/DOCS/man/input.rst
++++ b/DOCS/man/input.rst
+@@ -3906,7 +3906,9 @@ Property list
+     Active eligibility alone does not prove that a picture was Dolby mapped.
+     A client reporting successful mapping must also match the generation in
+     the renderer's successful mapping record. Source changes require a fresh
+-    success record. ``video-target-params`` continues to describe the encoded
++    success record: after any frame-queue reset (a seek, a new file or a
++    queue refill) the renderer logs its record again on its first successful
++    mapping, even when the generation is unchanged. ``video-target-params`` continues to describe the encoded
+     video signal and can differ from the physical display target.
+ 
+ ``vo-passes``
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 1a73d6c92..373f46c79 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -1623,6 +1623,11 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+         if (p->want_reset) {
+             pl_queue_reset(p->queue);
+             dv_provider387_reset(p->dovi_provider);
++            // A new source, seek position or refill starts mapping afresh. Clients
++            // discard their success record when the source changes, and the
++            // physical-target generation need not change with it, so the
++            // next successful private map logs its record again.
++            p->dovi_physical_logged = false;
+             p->last_pts = 0.0;
+             p->last_id = 0;
+             p->want_reset = false;

@@ -1,0 +1,46 @@
+{
+  "kind": "owner-attended DV playback observation and source diagnosis",
+  "date_utc": "2026-11-25",
+  "window_utc": ["2026-11-25T00:15:26Z", "2026-11-25T00:19:40Z"],
+  "host": "lab ROG",
+  "software": {
+    "player": "plurx Player 0.5.3-1 (Linux)",
+    "mpv": "0.42.0-0ubuntu0+rogdv5.5, vo gpu-next",
+    "source_candidate_after_fix": "mpv-fel-system-dv with patch 0010 (candidate tree 503c0d3d6750e4a777509f10514b61b27001d9a0); compiled, not packaged or installed"
+  },
+  "owner_report": "The owner watched a Profile 7 FEL title for several minutes with the Dolby Vision enhancement pills shown. After a +30-second seek, the owner reported that the enhancement-layer pill was no longer shown; RPU and DYN remained.",
+  "observation": {
+    "method": "Read-only mpv IPC get_property recorder at a requested 4 Hz (853 samples over 212.9 s) alongside the owner's session; player journal lines read afterwards. No property was set and no command was sent.",
+    "player_journal_order": [
+      "first successful private map reported enhancement-layer composition",
+      "seek outside the live session; the player re-created the session",
+      "provider reset diagnostic 2.85 s after the re-creation log",
+      "no further mapped-frame diagnostic to the end of the window"
+    ],
+    "native_dovi_target_state": "active, generation 1 on every sample with video, before and after the re-creation's start-file",
+    "decoded_colour": "colormatrix dolbyvision, transfer PQ on every sample with video",
+    "drop_counters": "renderer, decoder and VO-delayed counters 0 throughout"
+  },
+  "diagnosis": {
+    "pill": "The enhancement-layer pill that disappeared is the player's local EL pill. A delivered Profile 7 stream is the server's native Dolby Vision route, on which the server never marks FEL active. The EL pill requires the player's renderer facts; RPU and DYN do not.",
+    "player_contract": "The player clears its renderer facts at start-file and restores them only from the VO's physical-target success record whose generation matches native-dovi-target-state, as the property's documentation requires for a source change.",
+    "renderer_cause": "Patch 0002 logged the success record once per render generation. A seek or new file resets the frame queue and the provider without changing that generation, so after the re-creation no fresh record could be logged.",
+    "mapping_continuity": "The provider's mapping after an actual session replacement was already measured: evidence/dv-live-session-replacement-20261117.json records 187 positive-RPU, enhancement-layer-composed entries with 187 mapped returns after replacement and generation 1 throughout. The reset diagnostic alone does not show a mapping stop.",
+    "fix": "Patch 0010 clears the logged flag where the VO resets its frame queue and provider. The record still prints only from a successful private map on the physical path."
+  },
+  "compile": {
+    "platform": "native x86_64 Linux build host (lab builder), throwaway ubuntu:26.10 container, gcc 15.3, meson, ninja -j4; nothing installed on the host",
+    "inputs": "Upstream mpv base b0841e8c4d15 with the 9-patch series (baseline) and then patch 0010; private FFmpeg 8.1.2+rogdv4.2, libplacebo-rog387 1.0.0+private20261108-2 and provider387 1.0.0+private20261108-5 development packages unpacked into a container sysroot",
+    "options": "meson -Dlibmpv=true -Dtests=false --buildtype=release; the tree's normal warning flags (-Wall -Wextra and its -W list)",
+    "baseline_result": "all 337 steps through linking libmpv.so.2.6.0 and mpv succeeded with 0 compiler warnings; the following protocol-listing helper, which executes the built player, could not run because the compile-only container omits FFmpeg's runtime codec libraries",
+    "patch_0010_result": "patch applied cleanly; ninja recompiled only video/out/vo_gpu_next.c with 0 warnings and relinked libmpv.so.2.6.0 and mpv",
+    "limits": "Compilation and linking only. No package build, no runtime or display test of the patched player."
+  },
+  "limits": [
+    "The recorder did not capture the overlay's input property, the selected video track's Dolby Vision profile or the mpv log stream; the pill identity follows from the code path and the provider's enhancement-layer composition diagnostic.",
+    "No mapper-return probe ran during this window; mapping continuity after this re-creation is inferred from the November 17 measurement on the same route, not measured here.",
+    "The host had heavy concurrent build load during the window; no drops were reported.",
+    "The owner's report covers the on-screen pills, not a measured picture difference. No optical measurement was made.",
+    "Patch 0010 is compiled but not packaged. The rebuilt package, its installation and the attended re-check on the ROG remain owner-coordinated."
+  ]
+}

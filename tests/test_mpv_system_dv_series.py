@@ -10,6 +10,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SERIES = ROOT / "patches/mpv-fel-system-dv"
 WAYLAND_PATCH = "0009-stop-dispatching-Wayland-events-after-a-fatal-display-error.patch"
+RECORD_PATCH = "0010-log-a-fresh-Dolby-success-record-after-each-reset.patch"
 
 
 def entry():
@@ -22,7 +23,7 @@ class MpvSystemSeriesTests(unittest.TestCase):
         names = (SERIES / "series").read_text().split()
         self.assertEqual(names, entry()["patch_order"])
         self.assertEqual(len(names), entry()["patch_count"])
-        self.assertEqual(names[-1], WAYLAND_PATCH)
+        self.assertEqual(names[-2:], [WAYLAND_PATCH, RECORD_PATCH])
         self.assertEqual(sorted(names), sorted(p.name for p in SERIES.glob("*.patch")))
         sums = dict(line.split("  ", 1)[::-1] for line in (ROOT / "SHA256SUMS").read_text().splitlines() if line)
         for name in names:
@@ -30,10 +31,10 @@ class MpvSystemSeriesTests(unittest.TestCase):
             self.assertEqual(sums[f"patches/mpv-fel-system-dv/{name}"], digest, name)
 
     def test_package_version_is_the_newest_changelog_overlay(self):
-        overlay = (ROOT / "packaging/system-dv/mpv-042-ubuntu-wayland-display-error.diff").read_text()
+        overlay = (ROOT / "packaging/system-dv/mpv-042-ubuntu-fresh-success-record.diff").read_text()
         version = re.search(r"^\+mpv \(([^)]+)\)", overlay, re.M).group(1)
         self.assertEqual(entry()["candidate_package_version"], version)
-        self.assertTrue(version.endswith("+rogdv5.5"))
+        self.assertTrue(version.endswith("+rogdv5.6"))
 
     def test_a_dead_wayland_display_stops_dispatching_and_keeps_sleeping(self):
         text = (SERIES / WAYLAND_PATCH).read_text()
@@ -51,6 +52,17 @@ class MpvSystemSeriesTests(unittest.TestCase):
         self.assertIn("+        mp_poll(&wakeup, nfds > 1, timeout_ns);", text)
         # The loop that spun forever no longer ignores the dispatch result.
         self.assertNotIn("\n+        wl_display_dispatch_pending(wl->display);", text)
+
+
+    def test_a_frame_queue_reset_requires_a_fresh_success_record(self):
+        text = (SERIES / RECORD_PATCH).read_text()
+        self.assertIn("+++ b/video/out/vo_gpu_next.c", text)
+        # The flag clears where the queue and the provider are reset...
+        self.assertRegex(text, r" +dv_provider387_reset\(p->dovi_provider\);\n(?:\+ +//.*\n)*\+ +p->dovi_physical_logged = false;\n")
+        # ...and nowhere else, so only a later successful map logs the record.
+        self.assertEqual(text.count("+            p->dovi_physical_logged = false;"), 1)
+        self.assertNotIn("+    p->dovi_physical_logged = true;", text)
+        self.assertIn("+++ b/DOCS/man/input.rst", text)
 
 
 if __name__ == "__main__":

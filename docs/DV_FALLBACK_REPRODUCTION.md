@@ -7,6 +7,43 @@ map/reset log timing has now been recovered; no timestamped persistent
 fallback is established. The claim remains an investigation target, not an
 established current defect or a repair claim.
 
+## Owner-attended session re-creation — the EL pill, not the mapping
+
+[The November 25 UTC receipt](../evidence/dv-owner-recreation-el-pill-20261125.json)
+records an owner-attended play of a Profile 7 FEL title in plurx Player 0.5.3-1
+with the installed mpv `+rogdv5.5`. The owner reported the enhancement pills
+shown for several minutes. After a +30-second seek outside the live session,
+the player re-created the session. From then on the owner saw RPU and DYN but
+no longer the enhancement-layer pill. A read-only IPC recorder sampled
+`native-dovi-target-state` as active generation 1 before and after the
+re-creation's `start-file`. Decoded colour stayed Dolby Vision/PQ, and every
+drop counter stayed zero. The provider logged its reset diagnostic 2.85 seconds
+after the re-creation and no later mapped-frame diagnostic.
+
+The disappearing pill is plurx Player's own EL pill. The server never marks FEL
+active on the native Profile 7 route. The EL pill needs the player's renderer
+facts, while RPU and DYN need only Dolby decoding. The player clears those facts
+at `start-file` and restores them from the VO's physical-target success record
+whose generation matches the property. This follows the property's rule that a
+source change requires a fresh record. [Patch 0002](../patches/mpv-fel-system-dv/0002-target-the-physical-display-and-retain-cached-PQ-signals.patch)
+logged that record once per render generation, and a re-created session keeps
+generation 1, so no fresh record followed.
+
+Mapping itself is not shown to stop. The November 17 replacement trial below
+measured 187 enhancement-layer-composed mapped returns after an actual
+replacement on the same route. [Patch 0010](../patches/mpv-fel-system-dv/0010-log-a-fresh-Dolby-success-record-after-each-reset.patch)
+logs the record again after each frame-queue reset (seek, new file or refill), on the first successful
+private map. A reset after which mapping stays inactive still logs nothing.
+
+Limits: the recorder captured neither the overlay's input property, the
+selected track's Dolby profile nor the mpv log stream. No mapper probe ran
+during this window, and the host carried heavy concurrent build load. The
+owner's report covers the pills, not a measured picture. Patch 0010
+compiles and links warning-free on native x86_64 but is not packaged: the rebuilt package, its installation and the attended re-check
+remain owner-coordinated. The earlier unexplained loss reports below also
+followed outside-range re-creation. This mechanism may account for them, but
+that is not established.
+
 ## Original timing recovered — persistent fallback remains unproved
 
 [The historical journal timeline](../evidence/dv-historical-journal-timeline-20261117.json)
