@@ -67,23 +67,30 @@ class MpvSystemSeriesTests(unittest.TestCase):
 
     def test_enhancement_layer_composition_is_a_level(self):
         text = (SERIES / LEVEL_PATCH).read_text()
+        added = "\n".join(l[1:] for l in text.splitlines() if l.startswith("+") and not l.startswith("+++"))
         # The property reports the level next to active and generation.
-        self.assertIn('+        {"enhancement-layer-composed", SUB_PROP_BOOL(state.enhancement_layer_composed)},', text)
-        self.assertIn("+            .enhancement_layer_composed = p->dovi_el_composed,", text)
-        # Each frame read starts unattested; only a successful private physical
-        # map carries the renderer's composition flag, and an unmapped frame clears it.
-        self.assertEqual(text.count("+    p->dovi_frame_el = 0;"), 2)
-        self.assertRegex(text, r"\+    p->dovi_frame_el = enhancement_layer_composed;\n     return 1;\n")
-        # The presented render decides it; a mixer cache hit (no frame read) keeps it.
-        self.assertIn("+    p->dovi_frame_el = -1;\n     bool render_ok = pl_render_image_mix(", text)
-        self.assertIn("+    if (p->dovi_frame_el >= 0)\n+        set_dovi_el_composed(p, vo, render_ok && p->dovi_frame_el);", text)
-        # It clears on the frame-queue reset and on a generation change...
+        self.assertIn('{"enhancement-layer-composed", SUB_PROP_BOOL(state.enhancement_layer_composed)},', added)
+        self.assertIn(".enhancement_layer_composed = p->dovi_el_composed,", added)
+        # Each frame carries its own record, found by its RPU among the render's frames;
+        # captures render without a mix and record nothing.
+        self.assertIn("if (image->dovi_rpu == rpu) {", added)
+        self.assertIn("if (!p->dovi_mix)\n        return;", added)
+        # A map starts unattested; only the successful private physical map carries the flag.
+        self.assertRegex(text, r"\+    set_dovi_frame_el\(p, rpu, false\);\n     if \(!p->dovi_physical_active")
+        self.assertRegex(text, r"\+    set_dovi_frame_el\(p, rpu, enhancement_layer_composed\);\n     return 1;\n")
+        # An unmapped read clears every frame of that render not attested in it.
+        self.assertIn("if (fp->dovi_el_serial != p->dovi_render_serial)\n            fp->dovi_el_composed = false;", added)
+        # The presented level is the nearest frame's record, false on a failed or blank render.
+        self.assertIn("p->dovi_mix = &mix;\n    p->dovi_render_serial++;", added)
+        self.assertIn("render_ok ? pl_frame_mix_nearest(&mix) : NULL;", added)
+        self.assertIn("set_dovi_el_composed(p, vo, nearest_fp && nearest_fp->dovi_el_composed);", added)
+        # A queue error, the frame-queue reset and a generation change clear it...
+        self.assertRegex(text, r'Failed updating frames!\\n"\);\n\+ +set_dovi_el_composed\(p, vo, false\);\n')
         self.assertRegex(text, r" +p->dovi_physical_logged = false;\n(?:\+ +//.*\n)*\+ +set_dovi_el_composed\(p, vo, false\);\n")
-        self.assertIn("+        p->dovi_el_composed = false;", text)
+        self.assertIn("        p->dovi_el_composed = false;", added)
         # ...and every change notifies the property.
-        self.assertRegex(text, r"\+    if \(composed == p->dovi_el_composed\)\n\+        return;\n\+    p->dovi_el_composed = composed;\n\+    vo_event\(vo, VO_EVENT_WIN_STATE\);")
+        self.assertIn("if (composed == p->dovi_el_composed)\n        return;\n    p->dovi_el_composed = composed;\n    vo_event(vo, VO_EVENT_WIN_STATE);", added)
         self.assertIn("+++ b/DOCS/man/input.rst", text)
-
 
 if __name__ == "__main__":
     unittest.main()

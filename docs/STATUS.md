@@ -5,9 +5,9 @@ The success record that plurx Player's EL pill relied on attests a successful
 map, not enhancement-layer composition, and it is edge-triggered. Patch 0011
 of `mpv-fel-system-dv` (source candidate `+rogdv5.7`) adds
 `enhancement-layer-composed` to `native-dovi-target-state`: true while the
-presented picture was privately mapped with its enhancement layer composed,
-cleared by a frame mapped without it, a frame-queue reset or a generation
-change, and notified on every change. plurx Player's EL pill now reads it for
+frame nearest the presented instant was privately mapped with its enhancement
+layer composed; false for a frame mapped without it, a failed or blank render,
+a frame-queue reset or a generation change; notified on every change. plurx Player's EL pill now reads it for
 the native renderer. The patched tree compiles and links warning-free on native
 x86_64 but is not packaged or installed; the ROG stays on `+rogdv5.6`, and the
 package build, install and attended check are owner-coordinated.
