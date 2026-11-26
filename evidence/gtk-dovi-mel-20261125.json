@@ -1,0 +1,47 @@
+{
+ "kind": "gtk-dovi-mel-mapping",
+ "date_utc": "2026-11-26",
+ "host": "lab ROG",
+ "change": "GTK Dolby mapper 0.1.0+rogdv11: upload the enhancement layer only for an active NLQ and let libplacebo (patch 0003 of libplacebo-fel-system-dv) decide whether a Profile 7 master is reconstructed; the provider callback still maps Profile 7 only when it is, and names that decline.",
+ "build": {
+  "environment": "Throwaway container from the local GTK/WebKit SDK image, with libplacebo-rog387 1.0.0+private20261108-3, the provider SDK API 2 development package, libdovi-dev and FFmpeg headers added; -Wall -Wextra -Wpedantic -Werror.",
+  "result": "dpkg-buildpackage passed; the negotiation probe reported 169 checks, 0 failures.",
+  "shlibs_note": "libplacebo-rog387 -3 ships an empty shlibs file (-2 carries the exact pin), so dependents cannot compute their libplacebo dependency. The build used a container-only shlibs override with the same exact pin the installed +depfix1 packages carry: libplacebo-rog387 (= 1.0.0+private20261108-3).",
+  "sha256": {
+   "libgstgtk-dovi-core0_0.1.0+rogdv11_amd64.deb": "36898af912b3b7970e2e91cc4c477e5a16a0650fbb7ec29bfbd5f3198925fa4a",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv11_amd64.deb": "1cb2531b9ba5908ff6d1358dcf6a1ef7cd884e66a9f59bd81de23a5a2708e8f7",
+   "libgstgtk-dovi-core-dev_0.1.0+rogdv11_amd64.deb": "0a40e786cdf8e595eca621fef8598c3001ad8bfad82eab3e9db1a7d2aae22f4a"
+  }
+ },
+ "qualification": {
+  "method": "Installed Showtime 50.0-2+rogdv5.15+depfix1 in the owner's unlocked desktop session (display in BT.2100 mode), 25 s per arm, mapper debug log at level 6. 'new' selects the built core and plugin with LD_LIBRARY_PATH and GST_PLUGIN_PATH; 'stock' is the installed 0.1.0+rogdv10+depfix1. Inputs are 60 s video-only stream copies (DOVI configuration record preserved) made because the full MEL files do not start in Showtime (see limits). No package installed.",
+  "arms": [
+   {"input": "MEL title A (the owner's)", "stock": "declined: matched enhancement planes or NLQ unavailable; 0 frames mapped", "new": "658 frames mapped with the master reconstructed; no decline"},
+   {"input": "MEL title B (independent)", "stock": "declined: matched enhancement planes or NLQ unavailable; 0 frames mapped", "new": "646 frames mapped with the master reconstructed"},
+   {"input": "FEL title", "stock": "655 frames mapped", "new": "659 frames mapped; same target strategy and the same one-time startup decline as stock"},
+   {"input": "HDR10 title", "stock": "no provider call, no native render", "new": "no provider call, no native render; identical mapper log signature"}
+  ],
+  "harness_control": "The full FEL title mapped 1019 frames in Showtime on stock, so the session, display and logging were able to show mapping."
+ },
+ "release": {
+  "status": "staged on the ROG, not installed; plan and preflight passed (4 package changes, 0 removals, 8 archive digests)",
+  "packages": "libgstgtk-dovi-core0 and gstreamer1.0-gtk-dovi 0.1.0+rogdv11 from source. gstreamer1.0-gtk4 0.15.2-1ubuntu2+rogdv5.8+depfix2 and showtime 50.0-2+rogdv5.15+depfix2 are metadata-only repacks of the installed +depfix1 archives (file contents identical) that change only Version and the exact pins on the core/plugin (and Showtime's pin on the sink).",
+  "candidate_sha256": {
+   "libgstgtk-dovi-core0_0.1.0+rogdv11_amd64.deb": "36898af912b3b7970e2e91cc4c477e5a16a0650fbb7ec29bfbd5f3198925fa4a",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv11_amd64.deb": "1cb2531b9ba5908ff6d1358dcf6a1ef7cd884e66a9f59bd81de23a5a2708e8f7",
+   "gstreamer1.0-gtk4_0.15.2-1ubuntu2+rogdv5.8+depfix2_amd64.deb": "61d5cfd8d03f3317302e4c85efdd0aaf6107715ddeb7de3d39d91a8f6c8f2097",
+   "showtime_50.0-2+rogdv5.15+depfix2_all.deb": "eae9b4c27d7133853773dbb7b644ecda9c90c536887d8eec15414eebe8784ced"
+  },
+  "rollback_sha256": {
+   "libgstgtk-dovi-core0_0.1.0+rogdv10+depfix1_amd64.deb": "1f80f33e233d8d872a936e24efab40c0976a30a8e63045aee12959602a4a27ff",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv10+depfix1_amd64.deb": "5fd27897483fb48277560e44b3da6ec26ce8ba7ca52871f1b7d94c4b86b259ba",
+   "gstreamer1.0-gtk4_0.15.2-1ubuntu2+rogdv5.8+depfix1_amd64.deb": "9dab954322706c7699b041c58c7c68fe6b2d87e042b0af6ee4e9ed0af3a6dbdf",
+   "showtime_50.0-2+rogdv5.15+depfix1_all.deb": "4a7c08608a9402bc28083a0cd73adb0810078726ca63c383978ce7a0aeb731e8"
+  }
+ },
+ "limits": [
+  "Digital mapper decisions over 25 s windows, not pixels or light.",
+  "Both full MEL files fail to start in Showtime with stock and new mappers alike: each selects a PGS subtitle track by default, and playsink's subtitle overlay refuses the NVDEC CUDA-memory Dolby caps (not-negotiated) before the mapper sees a picture. The FEL title does not select its PGS track by default. That is a separate, pre-existing defect.",
+  "The browser was not exercised."
+ ]
+}

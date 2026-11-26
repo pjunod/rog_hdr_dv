@@ -73,9 +73,24 @@ renderer reports whether the master is reconstructed (patch 0003), and the
 mapper's provider callback still maps a Profile 7 picture only when it does,
 now naming that decline ("renderer did not reconstruct the Profile 7
 master"). FEL pictures (active NLQ) and single-layer Profile 5 and 8
-pictures take the unchanged path. Source state only: the build, the
-Showtime check on an MEL title and the FEL and HDR10 controls are not yet
-recorded.
+pictures take the unchanged path.
+
+[The GTK receipt](../evidence/gtk-dovi-mel-20261125.json) records the
+build (warnings as errors; negotiation probe 169 checks, 0 failures) and
+Showtime runs selecting the built library without installing it. Two MEL
+titles changed from declined to mapped with the master reconstructed. A FEL
+title mapped as before, and an HDR10 title never reached the provider in
+either build. Because the core, plugin, GTK sink and Showtime pin each
+other exactly, the staged release carries the rebuilt core and plugin plus
+metadata-only `+depfix2` repacks of the sink and Showtime.
+
+Limits: mapper decisions, not pixels or light; the browser was not run.
+Both full MEL files fail to start in Showtime with either build, for a
+separate reason. Each selects a PGS subtitle track by default, and
+playsink's subtitle overlay refuses the NVDEC CUDA-memory caps before the
+mapper sees a picture. The runs therefore used video-only copies. The
+libplacebo-rog387 `-3` package ships an empty `shlibs` file, so the build
+supplied the same exact pin through a container-only override.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
 
