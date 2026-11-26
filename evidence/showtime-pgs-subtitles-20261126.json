@@ -1,0 +1,68 @@
+{
+ "kind": "showtime-pgs-subtitle-stall",
+ "date_utc": "2026-11-26",
+ "host": "lab ROG",
+ "change": "gst-plugins-bad1.0 1.28.6-1ubuntu1+rogdv11 (patch 0019 of ubuntu-gst-plugins-bad-rpu): dvdspu, assrender and dvbsuboverlay ask downstream about their overlay caps with those caps as the query filter and test the answer for emptiness, as basetextoverlay already does, instead of intersecting an unfiltered answer. For a peer that follows the caps-query rules the decision is unchanged.",
+ "cause": {
+  "symptom": "Full Dolby titles whose default subtitle track is PGS never start in Showtime; no error is shown.",
+  "mechanism": "The patched NVDEC decoder chooses CUDA memory from the GTK Dolby mapper's answer to a Dolby-marked filtered query (bad series patch 0015). playsink's subtitleoverlay then inserts dvdspu, which decided whether downstream takes its overlay metadata from an UNFILTERED peer caps query intersected with its own caps. The mapper's accepted input depends on stream fields that only a filter carries, so its unfiltered answer held identity memory only. dvdspu logged 'caps have dvdspu meta 0', refused the CUDA caps ('unsupported caps') and requested renegotiation indefinitely.",
+  "correction": "The earlier receipt (gtk-dovi-mel-20261125.json) attributed the stall to subtitleoverlay refusing the CUDA caps (not-negotiated). Those caps were accepted; the loop came from dvdspu's unfiltered downstream query.",
+  "rejected_alternative": "Making the mapper's unfiltered answer offer native memory was tried and dropped. Offering it unmarked breaks the filtered-equals-unfiltered-intersection rule for unmarked producers; offering it marked needs the stream's configuration, which Showtime's decodebin2 playback does not carry on STREAM_START (matroskademux attaches no GstStream there)."
+ },
+ "build": {
+  "source": "The exact source of the installed 1.28.6-1ubuntu1+rogdv10 package (the archived candidate tree of the session that built it), plus patch 0019 and a +rogdv11 changelog entry.",
+  "environment": "Throwaway container from a snapshot of that session's builder (2 CPUs, 4 GB), DEB_BUILD_OPTIONS=nocheck parallel=2.",
+  "result": "dpkg-buildpackage -b passed; no compiler warning in the three changed files."
+ },
+ "qualification": {
+  "method": "Installed Showtime 50.0-2+rogdv5.15+depfix2 and the installed GTK Dolby mapper 0.1.0+rogdv11 in the owner's unlocked desktop session. 'patched' adds the dvdspu, assrender and dvbsuboverlay plugins from the rogdv11 gstreamer1.0-plugins-bad package through GST_PLUGIN_PATH (the log confirms dvdspu loaded from there); 'stock' is the installed rogdv10. Full files with their default tracks, 25 s per arm, mapper debug level 6. Pre-install arms: no package was installed at the time.",
+  "arms": [
+   {
+    "input": "MEL title A, full file (default forced-only PGS track)",
+    "stock": "never starts: 'caps have dvdspu meta 0' and 'unsupported caps' 9 times, 0 frames mapped",
+    "patched": "511 frames mapped; 'caps have dvdspu meta 1', no unsupported caps"
+   },
+   {
+    "input": "MEL title B, full file (default PGS track)",
+    "stock": "never starts: 'caps have dvdspu meta 0' 9 times, 0 frames mapped",
+    "patched": "619 and 620 frames mapped in two runs; 'caps have dvdspu meta 1'"
+   },
+   {
+    "input": "FEL title, full file (no default subtitle track)",
+    "stock": "549-591 frames mapped",
+    "patched": "597 frames mapped; dvdspu not loaded"
+   },
+   {
+    "input": "HDR10 title, full file (default PGS track)",
+    "stock": "plays, no provider call, 'caps have dvdspu meta 1'",
+    "patched": "plays, no provider call, 'caps have dvdspu meta 1'"
+   }
+  ]
+ },
+ "release": {
+  "status": "staged on the ROG as bad-spu-release-001, not installed; plan and preflight passed (6 package changes, 0 removals, 12 archive digests); each rollback archive's md5sums equal the installed package's",
+  "packages": "Rebuilt: the five installed binaries of gst-plugins-bad1.0 at 1.28.6-1ubuntu1+rogdv11. Metadata-only repack with file contents identical to the installed package: showtime 50.0-2+rogdv5.15+depfix3 (exact pins on plugins-bad and plugins-extra rogdv11).",
+  "candidate_sha256": {
+   "gir1.2-gst-plugins-extra-1.0_1.28.6-1ubuntu1+rogdv11_amd64.deb": "c5a3ddf43c82c7c648ed4960492319b2fca6fb4d10af288bb49790a409db6acf",
+   "gstreamer1.0-plugins-bad_1.28.6-1ubuntu1+rogdv11_amd64.deb": "a4441af4981a950672418a809ae850d57f08cc285378ba625cba7451fa2d5d7c",
+   "gstreamer1.0-plugins-extra_1.28.6-1ubuntu1+rogdv11_amd64.deb": "9a6d3a280516da7d09241053f19e7f1cc8774e0f2b0d09e8340b49cae6b4b324",
+   "libgstreamer-plugins-bad1.0-0_1.28.6-1ubuntu1+rogdv11_amd64.deb": "23f7105a9524b14f8c383c4d4db872a645192e170fff45f406a8080ed1aa71d3",
+   "libgstreamer-plugins-extra1.0-0_1.28.6-1ubuntu1+rogdv11_amd64.deb": "0b0b8fea5d831b3909391285c746680d25d974cb4e5a3669f09863c0edcca10f",
+   "showtime_50.0-2+rogdv5.15+depfix3_all.deb": "be5cfd380c0f8a7c6f77da53ea79b72af79747e2449227ad53ac9789a07985f5"
+  },
+  "rollback_sha256": {
+   "gir1.2-gst-plugins-extra-1.0_1.28.6-1ubuntu1+rogdv10_amd64.deb": "93f0d9f878106bf8af1f83bcfff89ce10b1f7c863eb1c5460cd13a80a70fa394",
+   "gstreamer1.0-plugins-bad_1.28.6-1ubuntu1+rogdv10_amd64.deb": "795b75d2447b1ea7a0ee3db8d3c292d24c546ac17aef1254e843a3fb60619904",
+   "gstreamer1.0-plugins-extra_1.28.6-1ubuntu1+rogdv10_amd64.deb": "dd157c8e2cee22ea8a7579581078e7586b64aff107488a729f9935cae4382692",
+   "libgstreamer-plugins-bad1.0-0_1.28.6-1ubuntu1+rogdv10_amd64.deb": "8a2ca61fad60ade5355b9d6c2a0fcc4301fbcc440f4c47a51371036039165c54",
+   "libgstreamer-plugins-extra1.0-0_1.28.6-1ubuntu1+rogdv10_amd64.deb": "664a2092eb0b3a94678ce67e69bb133dbb8dde84c715e0adbb582060cc179323",
+   "showtime_50.0-2+rogdv5.15+depfix2_all.deb": "199eedc2b7e2f6711c96ee95c953907a8523c721a8a09f3d04be87c78291a343"
+  }
+ },
+ "limits": [
+  "Negotiation and mapper decisions over 25 s windows, not pixels or light.",
+  "No arm proves a subtitle was drawn: MEL title A's default track is forced-only, and the windows were not chosen for dialogue. Subtitle visibility is for the owner's visual check.",
+  "ASS (assrender) and DVB (dvbsuboverlay) subtitles carry the same change but were not run; the browser and plurx Player were not exercised.",
+  "Provenance gap: the installed plugins-bad rogdv10 carries a paused-subtitle-selection change (its changelog: 'Refresh paused subtitle selections at the current accurate stream position') that this repository's ubuntu-gst-plugins-bad-rpu series does not hold (the series ends at the rogdv9 patches before 0019). The rogdv11 build starts from the installed rogdv10 source to keep that change; replaying the series alone does not reproduce rogdv10 or rogdv11."
+ ]
+}
