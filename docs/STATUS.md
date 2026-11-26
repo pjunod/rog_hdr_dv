@@ -1,5 +1,24 @@
 # Status — what is working and what remains
 
+**November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; staged, not installed.**
+Full Dolby titles whose default subtitle track is PGS never started in
+Showtime, with no error. NVDEC chose CUDA memory from the GTK Dolby mapper's
+answer to a Dolby-marked query. The PGS renderer (`dvdspu`) then asked
+downstream without a filter, got only identity memory, refused the caps and
+renegotiated forever. The earlier entry's "subtitle overlay refuses the
+caps" was wrong. Plugins-bad `+rogdv11` (series patch 0019) makes `dvdspu`,
+`assrender` and `dvbsuboverlay` pass their overlay caps as the query filter,
+as `textoverlay` already does; the mapper is unchanged. With those plugins,
+Gran Turismo and a second MEL title started and mapped (stock: never
+started); a FEL title and an HDR10 title with a PGS track were unchanged. A
+six-package release (five plugins-bad binaries and a Showtime pin repack)
+is staged and awaits an attended install. Not run: ASS or DVB subtitles,
+the browser, and a visual check that subtitles are drawn. The installed
+plugins-bad `rogdv10` holds a paused-subtitle change this repository's series
+lacks; `rogdv11` was built from that installed source.
+[Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#subtitles-with-nvdec-decoded-dolby-video-in-showtime)
+· [Receipt](../evidence/showtime-pgs-subtitles-20261126.json).
+
 **November 26, 2026 — GTK Dolby plugin maps Profile 7 MEL; installed on the ROG.**
 The GTK Dolby mapper (Showtime, browser) declined every Profile 7 picture
 without active NLQ before libplacebo saw it, so MEL titles kept losing their
@@ -17,9 +36,8 @@ but could not tell by eye whether the Dolby mapping was active; the mapper
 log for that play shows it applied with no decline (not a measurement). The release holds the rebuilt core and plugin plus metadata-only repacks
 that carry the exact pins. The repacks also restore the `shlibs` files that
 libplacebo `-3` and the provider and GTK Dolby core `+depfix1` repacks left empty. The
-browser was not run. Open: full MEL files whose PGS subtitle track is
-selected by default do not start in Showtime with either build, because
-playsink's subtitle overlay refuses the NVDEC CUDA-memory caps.
+browser was not run. Full MEL files whose PGS subtitle track is selected
+by default did not start in Showtime; see the entry above.
 [Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#the-gtk-dolby-plugin-showtime-browser)
 · [Receipt](../evidence/gtk-dovi-mel-20261125.json).
 
