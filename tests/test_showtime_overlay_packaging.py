@@ -66,7 +66,7 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             before = play.read_bytes()
             packages.prepare(root)
             self.assertEqual(play.read_bytes(), before, 'prepared source rerun is idempotent')
-            self.assertEqual(packages.CORE_VERSION, '0.1.0+rogdv10')
+            self.assertEqual(packages.CORE_VERSION, '0.1.0+rogdv11')
             self.assertEqual(packages.GTK_VERSION, '0.15.2-1ubuntu2+rogdv5.8')
 
     def test_showtime_only_preparation_preserves_unrelated_gtk_workspace(self):

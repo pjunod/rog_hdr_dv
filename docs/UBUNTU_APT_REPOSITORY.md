@@ -47,6 +47,19 @@ refresh is prepared; they do not prove current security fixes are installed.
 The following original-builder details remain useful for that narrower build
 path; source pins, family inventory and current status determine each release.
 
+### Consumer pin re-releases
+
+The GTK sink and Showtime depend on exact versions of the GStreamer families,
+the GTK Dolby mapper and GTK, so a re-release of any of those forces new sink
+and Showtime versions. These are recorded repacks of the qualified payload:
+[`repack-consumers.py`](../packaging/gstreamer-gtk-dovi/repack-consumers.py)
+changes only `Version` and the exact pins, and
+[`consumer-releases.json`](../packaging/gstreamer-gtk-dovi/package-inputs/consumer-releases.json)
+records each base and release hash with its receipt. `verify` proves the payload
+is identical and the control is the generated one. The publisher takes these
+versions from that file. A payload change needs a new recipe version above
+every recorded release.
+
 ## Original automatic builder
 
 Ubuntu's own Mutter and libdisplay-info, rebuilt with this repository's

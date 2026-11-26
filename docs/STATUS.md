@@ -100,11 +100,14 @@ relations and files match `+rogdv5.5`, and rollback is `+rogdv5.5`
 attended re-check on `+rogdv5.6`, a session re-created by a seek kept the EL pill. [Observation, cause and limits](DV_FALLBACK_REPRODUCTION.md#owner-attended-session-re-creation--the-el-pill-not-the-mapping).
 
 **November 20, 2026 — Ubuntu update recovery: colour/subtitle correction installed; runtime acceptance in progress.**
-Since November 25–26 the installed sink and Showtime are the content-identical
-`+depfix2` metadata repacks from the MEL releases above, and the GTK Dolby
-plugin is `0.1.0+rogdv11`; WebKit, JavaScriptCore and the GStreamer base,
-good and bad families are unchanged. Publication must carry those installed
-versions rather than the superseded `+rogdv5.8` sink and `+rogdv5.15` Showtime.
+Since November 25–26 the MEL and PGS releases above installed bad `+rogdv11`,
+the GTK Dolby plugin `0.1.0+rogdv11` and payload-identical repacks of the sink
+(`+depfix2`) and Showtime (`+depfix3`) that carry their exact pins; WebKit,
+JavaScriptCore and the base and good families are unchanged. Those repacks
+are now a recorded recipe step ([consumer pin re-releases](UBUNTU_APT_REPOSITORY.md#consumer-pin-re-releases)):
+both installed files verify as the qualified payload with the generated
+control. The re-scoped 33-package bundle passes the publisher's family and
+version validation; publication still waits for runtime acceptance.
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.

@@ -78,6 +78,10 @@ def expected_version(source, spec):
         entries = json.loads((ROOT / 'sources.json').read_text())['series']
         return next(e['candidate_package_version'] for e in entries if e['component'] == spec['component'])
     if source in ('rust-gst-plugin-gtk4', 'showtime'):
+        releases = ROOT / 'packaging/gstreamer-gtk-dovi/package-inputs/consumer-releases.json'
+        recorded = json.loads(releases.read_text())['releases'].get(source) if releases.exists() else None
+        if recorded:
+            return recorded['release']['version']
         constant = 'GTK_VERSION' if source == 'rust-gst-plugin-gtk4' else 'SHOWTIME_VERSION'
         recipe = ast.parse((ROOT / 'packaging/gstreamer-gtk-dovi/prepare-ubuntu-packages.py').read_text())
         for node in recipe.body:

@@ -11,7 +11,10 @@ import shutil
 import subprocess
 import tempfile
 
-CORE_VERSION = "0.1.0+rogdv10"
+# Payload builds use these versions. Pin-only re-releases of the sink and
+# Showtime go through repack-consumers.py and package-inputs/consumer-releases.json;
+# a new payload build must use a version above every recorded release.
+CORE_VERSION = "0.1.0+rogdv11"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.8"
 SHOWTIME_VERSION = "50.0-2+rogdv5.15"
 FIXED_GTK = "4.24.1+ds-1+rogdv6"
