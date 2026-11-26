@@ -1,3 +1,17 @@
+gst-gtk-dovi-map (0.1.0+rogdv11) UNRELEASED; urgency=medium
+
+  * Let the renderer decide whether a Profile 7 master is reconstructed.
+    Upload the enhancement layer only for an active NLQ, the only case the
+    renderer samples it, instead of declining every Profile 7 picture
+    without one. A Profile 7 MEL (identity NLQ, zero residual) now reaches
+    the provider as a complete master; FEL and single-layer pictures are
+    unchanged. MEL mapping needs libplacebo-rog387 1.0.0+private20261108-3
+    or later, which decides a zero residual from the raw RPU; with an older
+    renderer an MEL picture still declines to the baseline conversion.
+  * Name the decline when the renderer reports the master not reconstructed.
+
+ -- ROG HDR contributors <rog-hdr@invalid>  Wed, 25 Nov 2026 23:30:00 +0000
+
 gst-gtk-dovi-map (0.1.0+rogdv10) UNRELEASED; urgency=medium
 
   * Accept each native input domain with the overlay composition meta too,

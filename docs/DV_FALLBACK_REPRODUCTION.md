@@ -59,9 +59,23 @@ the mapper active and the FEL pill on, with a mapped, enhancement-layer-
 composed frame in the player log.
 
 Limits: digital decisions and paused single-frame pixels, not continuous
-playback or light. The GTK Dolby plugin used by Showtime and the browser
-declines Profile 7 frames without active NLQ before rendering, so MEL titles
-there still lose the mapping until that plugin is changed. The server still labels an MEL title FEL.
+playback or light. The server still labels an MEL title FEL.
+
+### The GTK Dolby plugin (Showtime, browser)
+
+Up to `0.1.0+rogdv10` the GTK Dolby mapper declined every Profile 7 picture
+whose NLQ was inactive before libplacebo saw it ("matched enhancement planes
+or NLQ unavailable"), so an MEL title lost the mapping in Showtime and the
+browser even with libplacebo `-3`. `0.1.0+rogdv11` stops deciding this
+itself: it uploads the enhancement layer only for an active NLQ, the only
+case the renderer samples one, and passes the picture and raw RPU on. The
+renderer reports whether the master is reconstructed (patch 0003), and the
+mapper's provider callback still maps a Profile 7 picture only when it does,
+now naming that decline ("renderer did not reconstruct the Profile 7
+master"). FEL pictures (active NLQ) and single-layer Profile 5 and 8
+pictures take the unchanged path. Source state only: the build, the
+Showtime check on an MEL title and the FEL and HDR10 controls are not yet
+recorded.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
 

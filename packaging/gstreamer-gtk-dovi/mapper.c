@@ -63,7 +63,10 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
     pl_tex *mapped, struct pl_color_space *color)
 {
   GstGtkDoviMapper *s = priv;
-  if (s->requires_fel && !composed) return s->mapped = 0;
+  if (s->requires_fel && !composed) {
+    decline (s, 512, "renderer did not reconstruct the Profile 7 master");
+    return s->mapped = 0;
+  }
   guint strategy = 4; /* v1 runtime: complete named mapping */
   if (dv_provider387_map_v2) {
     s->mapped = dv_provider387_map_v2 (s->provider, gpu, rpu, size, composed,
@@ -521,15 +524,19 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   struct pl_dovi_metadata dovi;
   if (apply_dovi) {
     pl_map_avdovi_metadata (&source.color, &source.repr, &dovi, resolved);
-    if (fel) {
-      if (dovi.nlq_active && pl_map_avframe_ex (s->vk->gpu, &enhancement,
+    /* The renderer samples an enhancement layer only for an active NLQ and
+     * itself decides whether the master is reconstructed: a provably zero
+     * residual (Profile 7 MEL) is complete without one. requires_fel below
+     * still lets the provider map only a master the renderer calls composed. */
+    if (fel && dovi.nlq_active) {
+      if (pl_map_avframe_ex (s->vk->gpu, &enhancement,
           pl_avframe_params (.frame = fel, .tex = s->enhancement, .map_dovi = false))) {
         el_uploaded = TRUE;
         source.enhancement_layer = &enhancement;
       } else {
         apply_dovi = FALSE;
         source = baseline;
-        decline (s, 256, "matched enhancement planes or NLQ unavailable");
+        decline (s, 256, "matched enhancement planes unavailable");
       }
     }
   }
