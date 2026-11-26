@@ -7,13 +7,14 @@ grade there after the mpv fix. `0.1.0+rogdv11` uploads the enhancement layer
 only for an active NLQ and lets the renderer decide whether the master is
 reconstructed. Run from its build tree in Showtime, two MEL titles changed
 from declined to mapped. A FEL title mapped as before, and an HDR10 title
-never reached the provider. The rebuilt core and plugin, with
-metadata-only `+depfix2` repacks of the GTK sink and Showtime for their
-exact pins, are staged on the ROG (plan and preflight: four changes, no
-removals) and await an attended install. The browser was not run. Open: full MEL files whose PGS
-subtitle track is selected by default do not start in Showtime with either
-build (playsink's subtitle overlay refuses the NVDEC CUDA-memory caps), and
-libplacebo-rog387 `-3` ships an empty `shlibs` file.
+never reached the provider. One seven-package release is staged on the
+ROG (plan and preflight: seven changes, no removals) and awaits an attended
+install. It holds the rebuilt core and plugin plus metadata-only repacks
+that carry the exact pins. The repacks also restore the `shlibs` files that
+the libplacebo `-3`, provider and mpv `+depfix1` repacks left empty. The
+browser was not run. Open: full MEL files whose PGS subtitle track is
+selected by default do not start in Showtime with either build, because
+playsink's subtitle overlay refuses the NVDEC CUDA-memory caps.
 [Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#the-gtk-dolby-plugin-showtime-browser)
 · [Receipt](../evidence/gtk-dovi-mel-20261125.json).
 
