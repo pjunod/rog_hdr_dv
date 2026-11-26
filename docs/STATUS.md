@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; staged, not installed.**
+**November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in
 Showtime, with no error. NVDEC chose CUDA memory from the GTK Dolby mapper's
 answer to a Dolby-marked query. The PGS renderer (`dvdspu`) then asked
@@ -12,8 +12,12 @@ as `textoverlay` already does; the mapper is unchanged. With those plugins,
 Gran Turismo and a second MEL title started and mapped (stock: never
 started); a FEL title and an HDR10 title with a PGS track were unchanged. A
 six-package release (five plugins-bad binaries and a Showtime pin repack)
-is staged and awaits an attended install. Not run: ASS or DVB subtitles,
-the browser, and a visual check that subtitles are drawn. The installed
+was installed in an owner-attended window (audit and `dpkg -V` clean,
+nothing restarted). On the installed packages both MEL titles mapped and the
+FEL and HDR10 titles were unchanged; the owner then saw subtitles over the
+second MEL title (a visual report). Not run: ASS or DVB subtitles and the
+browser. Showtime played without sound during that check; this release
+changes no audio element, and the cause has not been established. The installed
 plugins-bad `rogdv10` holds a paused-subtitle change this repository's series
 lacks; `rogdv11` was built from that installed source.
 [Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#subtitles-with-nvdec-decoded-dolby-video-in-showtime)
