@@ -70,7 +70,7 @@
   ]
  },
  "release": {
-  "status": "staged, preflight passed, not installed",
+  "status": "installed on the ROG on 2026-11-26 UTC with the release tooling; owner-attended check passed",
   "packages": "libplacebo-rog387 1.0.0+private20261108-3 carries the patched library. Six packages pin it or a dependent exactly and are metadata-only +depfix1 repacks with byte-identical contents: librog-dv-provider387-1 1.0.0+private20261108-5+depfix1, mpv 0.42.0-0ubuntu0+rogdv5.7+depfix1, libgstgtk-dovi-core0 0.1.0+rogdv10+depfix1, gstreamer1.0-gtk-dovi 0.1.0+rogdv10+depfix1, gstreamer1.0-gtk4 0.15.2-1ubuntu2+rogdv5.8+depfix1, showtime 50.0-2+rogdv5.15+depfix1.",
   "plan": "Release tooling plan: 7 package changes, 0 removals; preflight re-verified the exact live simulation and all 14 archive digests.",
   "candidate_sha256": {
@@ -97,5 +97,11 @@
   "Paused single-frame screenshots at one timestamp per title, not continuous playback.",
   "The GTK Dolby plugin (Showtime, browser) declines Profile 7 frames without active NLQ before rendering, so MEL titles there still lose the mapping; that needs a separate plugin change.",
   "The server's FEL label for an MEL title is unchanged and is a separate follow-up."
- ]
+ ],
+ "install": {
+  "procedure": "operate-local-files.py install (the 5.7 release tool with only its release folder changed): digests re-verified on a root-owned copy, 7 package changes, no removals; nothing restarted; plurx Player was not running.",
+  "verification": "dpkg --audit clean and dpkg -V clean for all seven packages; the installed libplacebo.so.387rog1 is byte-identical to the qualified build.",
+  "rollback": "python3 operate-local-files.py rollback in the release folder reinstalls the seven previous packages.",
+  "owner_check": "The owner played the MEL title in plurx Player: info showed the mapper active and the FEL pill on. The player log recorded 'mapped raw-RPU frame ... target peak=616.000 ... EL composed=1' and no decline."
+ }
 }
