@@ -1,0 +1,54 @@
+diff --git a/src/include/libplacebo/renderer.h b/src/include/libplacebo/renderer.h
+index 52579f3..1ed28b6 100644
+--- a/src/include/libplacebo/renderer.h
++++ b/src/include/libplacebo/renderer.h
+@@ -368,7 +368,10 @@ struct pl_render_params {
+     // the next call; output color describes the actual mapped signal. A failure
+     // fails the render rather than silently presenting unprocessed Dolby Vision.
+     // enhancement_layer_composed is true only after the native master was
+-    // successfully materialized with a decoded and merged enhancement layer.
++    // successfully materialized with a decoded and merged enhancement layer,
++    // or when an enhancement layer was supplied whose RPU applies no residual
++    // (an identity NLQ, as in Profile 7 MEL), so the base-layer reshape is
++    // already the complete reconstruction.
+     // Return 1 when mapped, 0 for inapplicable targets (ordinary rendering),
+     // or -1 on eligible-input processing failure.
+     int (*dovi_map)(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t rpu_size,
+diff --git a/src/renderer.c b/src/renderer.c
+index a54a802..b1100a7 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -408,6 +408,10 @@ struct pass_state {
+     bool dovi_mapped; // already target-referred; encoding conversion only
+     bool dovi_fatal; // provider failures must never become mixer fallback
+     bool dovi_full_read; // restored crop requires explicit texture sampling
++    // A Dolby Vision enhancement layer was bound, but the RPU applies no
++    // residual (e.g. a Profile 7 MEL with identity NLQ). The base-layer
++    // reshape is then the complete reconstruction, so the layer is not sampled.
++    bool dovi_el_identity;
+ 
+     // Map of acquired frames
+     struct {
+@@ -2198,6 +2202,10 @@ static bool pass_read_image(struct pass_state *pass)
+                 rr->errors |= PL_RENDER_ERR_SAMPLING;
+             }
+         }
++        // An identity residual contributes exactly zero for every EL code, so
++        // the master is already the full base/enhancement reconstruction.
++        if (pass->dovi_el_identity)
++            enhancement_layer_composed = true;
+ #endif
+         pl_shader_decode_color_ex(sh, pl_color_decode_args(
+             .repr              = &pass->img.repr,
+@@ -3797,6 +3805,11 @@ static bool pass_init(struct pass_state *pass, bool acquire_image)
+                     goto error;
+                 }
+             } else {
++#ifdef PL_HAVE_DOVI
++                pass->dovi_el_identity =
++                    image->repr.sys == PL_COLOR_SYSTEM_DOLBYVISION &&
++                    image->repr.dovi;
++#endif
+                 // EL was attached but won't be composed, drop it.
+                 image->enhancement_layer = NULL;
+             }

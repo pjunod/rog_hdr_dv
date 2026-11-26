@@ -1,5 +1,18 @@
 # Status — what is working and what remains
 
+**November 25, 2026 — Profile 7 MEL titles declined by the mapper; source fix staged.**
+A newly downloaded Profile 7 title played without its Dolby Vision grade
+("display mapper unavailable", no FEL pill). It is MEL: an enhancement layer
+with an identity residual. libplacebo skipped that layer and reported it not
+composed, and the provider, which requires a reconstructed master whenever
+the RPU does not disable the residual, declined every frame. Patch 0003 of
+`libplacebo-fel-system-dv` reports the master as reconstructed when the bound
+layer's residual is identity. Two MEL titles now map with the layer composed;
+FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the stock
+rebuild. libplacebo-rog387 `-3`, with six metadata-only repacks for exact
+version pins, is staged with a passing preflight and not installed.
+[Diagnosis, controls and limits](DV_FALLBACK_REPRODUCTION.md#profile-7-mel--an-identity-enhancement-layer-declined-by-the-mapper).
+
 **November 25, 2026 — EL composition reported as a level; installed.**
 The success record that plurx Player's EL pill relied on attests a successful
 map, not enhancement-layer composition, and it is edge-triggered. Patch 0011

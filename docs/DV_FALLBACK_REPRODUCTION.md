@@ -7,6 +7,51 @@ map/reset log timing has now been recovered; no timestamped persistent
 fallback is established. The claim remains an investigation target, not an
 established current defect or a repair claim.
 
+## Profile 7 MEL — an identity enhancement layer declined by the mapper
+
+[The November 26 UTC receipt](../evidence/mel-identity-el-20261125.json) records
+an owner report on a newly downloaded Profile 7 title: no FEL pill and
+"display mapper unavailable" in plurx Player 0.5.5 with mpv `+rogdv5.7`. An
+attended probe found every mapper call made with the enhancement layer not
+composed, and every call declined with "unsupported residual".
+
+The file, the server route and mpv were each ruled out. The title has the same
+dual-layer single-track layout as a working FEL title. A working FEL title was
+served through the identical temporary live-HLS copy remux, and the remux and
+the live segments kept every enhancement-layer and RPU unit. mpv's Profile 7
+splitter paired every picture. The same decline occurred in an ordinary mpv
+window from the original file and from the captured live bytes.
+
+The title is **MEL**: its RPUs keep `disable_residual_flag=0` but carry an
+identity linear dead-zone NLQ (zero offset, slope and threshold, `vdr_in_max`
+of 1.0). libplacebo marks such a frame `nlq_active=false`, drops the bound
+enhancement layer and reports it as not composed. The provider reads the raw
+RPU, sees a residual that is not disabled, and requires a reconstructed
+master. The identity residual is exactly zero for every enhancement-layer
+code, so the base reshape already is that reconstruction; MEL carries its
+Dolby Vision grade entirely in the RPU.
+
+[Patch 0003](../patches/libplacebo-fel-system-dv/0003-report-an-identity-enhancement-layer-as-reconstructed.patch)
+of `libplacebo-fel-system-dv` records that an enhancement layer was bound
+without a residual and reports the master as reconstructed, without sampling
+the layer. FFmpeg rejects every NLQ method other than linear dead zone, so
+with a parsed RPU `nlq_active=false` means the residual is disabled, absent
+or identity. With the installed mpv selecting each library, two independent
+MEL titles changed from declined to mapped with the enhancement layer
+composed. A FEL title, the same FEL title with its enhancement layer
+suppressed, an HDR10 title and a Profile 8 title gave pixel-identical window
+screenshots to the stock rebuild, which itself matched the installed library.
+
+Because mpv, the provider, the GTK Dolby plugin, its GStreamer sinks and
+Showtime pin exact versions, the release carries libplacebo-rog387 `-3` and
+six metadata-only `+depfix1` repacks with byte-identical contents. It is
+staged with a passing preflight (seven changes, no removals) and is not
+installed.
+
+Limits: digital decisions and paused single-frame pixels, not continuous
+playback or light. The browser and Showtime route share the library but were
+not exercised. The server still labels an MEL title FEL.
+
 ## Owner-attended session re-creation — the EL pill, not the mapping
 
 [The November 25 UTC receipt](../evidence/dv-owner-recreation-el-pill-20261125.json)
