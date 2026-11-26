@@ -1,0 +1,121 @@
+{
+ "kind": "Profile 7 MEL diagnosis, libplacebo source fix and pre-install qualification",
+ "date_utc": "2026-11-26",
+ "host": "lab ROG",
+ "owner_report": "A newly downloaded Profile 7 title showed no FEL pill and 'display mapper unavailable' in plurx Player 0.5.5 with mpv +rogdv5.7.",
+ "diagnosis": {
+  "provider_decline": "Every mapper call in an attended play (about 1,300) had the enhancement layer not composed and RPU present; the provider returned 0 with 'unsupported residual: shared frontend has no verified enhancement-layer reconstruction'.",
+  "ruled_out": [
+   "Source file: Profile 7 dual-layer single track, 1920x1080 Main 10 enhancement layer under a 3840x2160 base, one RPU per access unit, the same layout as a working FEL title.",
+   "Server route: the title had no prepared VOD index and was served by the temporary live-HLS copy remux; a working FEL title used the identical ffmpeg command, and re-running it preserved every enhancement-layer and RPU NAL unit.",
+   "Live HLS bytes: the session's init.mp4 declared Profile 7 with el_present_flag=1; its segments carried 6,404 enhancement-layer and 565 RPU NAL units.",
+   "mpv splitting and pairing: the Profile 7 splitter started and every base picture was paired with its enhancement picture."
+  ],
+  "cause": "The title is MEL. Every sampled RPU had disable_residual_flag=0 with an identity linear dead-zone NLQ: nlq_offset=0, linear_deadzone_slope=0, linear_deadzone_threshold=0 and vdr_in_max=2^23 at coef_log2_denom=23. libplacebo's NLQ mapping marks that frame nlq_active=false, so the renderer dropped the bound enhancement layer and reported enhancement_layer_composed=false. The provider, reading disable_residual_flag=0 from the raw RPU, requires a reconstructed master and declined. The working FEL title had nlq_offset=512 and linear_deadzone_slope=2048.",
+  "same_failure_outside_the_player": "With the player's mpv options in an ordinary window, the original file (two timestamps), the captured live bytes and a software-decode run all declined."
+ },
+ "fix": {
+  "patch": "patches/libplacebo-fel-system-dv/0003-report-an-identity-enhancement-layer-as-reconstructed.patch",
+  "change": "Before calling the provider, when no enhancement layer was composed, the renderer parses the frame's raw RPU (the bytes the provider reads) with libdovi and reports the master as reconstructed only when the residual is enabled but exactly zero: disable_residual_flag=0, use_prev_vdr_rpu_flag=0, an NLQ block with linear dead-zone method, and zero slope and threshold in all three components. The residual formula then gives 0 for every enhancement-layer code. Disabled residuals, single-layer profiles, referenced previous RPUs and parse failures keep the previous behaviour. The decision does not depend on whether a caller attached the enhancement layer. A library built without libdovi logs a warning once and keeps the previous behaviour.",
+  "candidate_tree": "73b23f3fb7db47e55c659519291a6fa8d8da791b",
+  "build": "Stock candidate and patched trees built in a throwaway ubuntu:26.10 container on the ROG with the original options (debugoptimized, vulkan and dovi enabled), gcc 15.3.0, the private libdovi 3.3.2-3+rogdv1; zero warnings; identical exported symbols (537) and needed libraries. A -Dlibdovi=disabled build of the same tree also compiles with zero warnings.",
+  "review": "Two independent adversarial review rounds. Round 1: inferring a zero residual from nlq_active=false is unsafe for callers that fill pl_dovi_metadata themselves, and the result depended on whether an enhancement layer was attached; the patch was rewritten to decide from the raw RPU. Round 2: the zero condition, libdovi use and RPU buffer format hold; a silent fallback without libdovi now warns once; a misplaced comment was fixed; the claim that the GTK Dolby plugin is covered was withdrawn, because that plugin declines Profile 7 frames without active NLQ before rendering."
+ },
+ "qualification": {
+  "method": "Installed mpv +rogdv5.7 with the player's options, paused window screenshot after playback restart, LD_LIBRARY_PATH selecting each library; no package installed.",
+  "build_control": "The stock rebuild and the installed library produced identical screenshots for the MEL title and a FEL title.",
+  "arms": [
+   {
+    "input": "MEL title A (the owner's)",
+    "stock": "declined",
+    "patched": "mapped, EL composed=1",
+    "pixels": "differ"
+   },
+   {
+    "input": "MEL title B (independent)",
+    "stock": "declined",
+    "patched": "mapped, EL composed=1",
+    "pixels": "differ"
+   },
+   {
+    "input": "FEL title",
+    "stock": "mapped",
+    "patched": "mapped, EL composed=1",
+    "pixels": "identical"
+   },
+   {
+    "input": "FEL title, format:enhancement-layer=no",
+    "stock": "declined",
+    "patched": "declined",
+    "pixels": "identical"
+   },
+   {
+    "input": "HDR10 title",
+    "stock": "no provider call",
+    "patched": "no provider call",
+    "pixels": "identical"
+   },
+   {
+    "input": "Profile 8 title",
+    "stock": "mapped",
+    "patched": "mapped, EL composed=0",
+    "pixels": "identical"
+   },
+   {
+    "input": "MEL title A, format:enhancement-layer=no",
+    "stock": "declined",
+    "patched": "mapped, EL composed=1",
+    "pixels": "identical to MEL title A with the layer"
+   }
+  ]
+ },
+ "release": {
+  "status": "installed on the ROG on 2026-11-26 UTC with the release tooling; owner-attended check passed",
+  "packages": "libplacebo-rog387 1.0.0+private20261108-3 carries the patched library. Six packages pin it or a dependent exactly and are metadata-only +depfix1 repacks with byte-identical contents: librog-dv-provider387-1 1.0.0+private20261108-5+depfix1, mpv 0.42.0-0ubuntu0+rogdv5.7+depfix1, libgstgtk-dovi-core0 0.1.0+rogdv10+depfix1, gstreamer1.0-gtk-dovi 0.1.0+rogdv10+depfix1, gstreamer1.0-gtk4 0.15.2-1ubuntu2+rogdv5.8+depfix1, showtime 50.0-2+rogdv5.15+depfix1.",
+  "plan": "Release tooling plan: 7 package changes, 0 removals; preflight re-verified the exact live simulation and all 14 archive digests.",
+  "candidate_sha256": {
+   "libplacebo-rog387_1.0.0+private20261108-3_amd64.deb": "ac15fd5497e676fc7829148fe4c3d14a323d5df1f33990d770172e4ba84fd0c5",
+   "librog-dv-provider387-1_1.0.0+private20261108-5+depfix1_amd64.deb": "055d1b88565a6f29b4370ffa3764b32ba491003b4ec04f83c1afffcf80741abe",
+   "mpv_0.42.0-0ubuntu0+rogdv5.7+depfix1_amd64.deb": "15de7cf137ab15e37fba3822957a73e49497a8cc500da0653daf792f009f4bb3",
+   "libgstgtk-dovi-core0_0.1.0+rogdv10+depfix1_amd64.deb": "1f80f33e233d8d872a936e24efab40c0976a30a8e63045aee12959602a4a27ff",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv10+depfix1_amd64.deb": "5fd27897483fb48277560e44b3da6ec26ce8ba7ca52871f1b7d94c4b86b259ba",
+   "gstreamer1.0-gtk4_0.15.2-1ubuntu2+rogdv5.8+depfix1_amd64.deb": "9dab954322706c7699b041c58c7c68fe6b2d87e042b0af6ee4e9ed0af3a6dbdf",
+   "showtime_50.0-2+rogdv5.15+depfix1_all.deb": "4a7c08608a9402bc28083a0cd73adb0810078726ca63c383978ce7a0aeb731e8"
+  },
+  "rollback_sha256": {
+   "libplacebo-rog387_1.0.0+private20261108-2_amd64.deb": "db1a951037b30474b0c5477d5b7a547791878b2bf2daf90a61356928eca6b00f",
+   "librog-dv-provider387-1_1.0.0+private20261108-5_amd64.deb": "b7b067d1e1eae5d0aa8b5f749fb72ebc5f5ed19584837443037f908059c6d06e",
+   "mpv_0.42.0-0ubuntu0+rogdv5.7_amd64.deb": "193d637b3987af2c86e71c867c06c76fce98b798aeb534deefc965305eba5078",
+   "libgstgtk-dovi-core0_0.1.0+rogdv10_amd64.deb": "607fd5f51b4c3abab9300086fc17c3775154854d50c882f3328905a34afa1ab6",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv10_amd64.deb": "993e413f0215c1191186c802b1483a930f39ac4a5127d0dc4ef22d8ca82fc295",
+   "gstreamer1.0-gtk4_0.15.2-1ubuntu2+rogdv5.8_amd64.deb": "4c168c9ff8b5011fca9e818401eb5b3d7c888102481ee2887c780423239f67f4",
+   "showtime_50.0-2+rogdv5.15_all.deb": "42959e402aeee52a0bccc2e62dfb4f77ab0ac211e93cf0232cf9a6e69292e928"
+  }
+ },
+ "limits": [
+  "Digital checks of the mapper's decision and window pixels; no optical measurement.",
+  "Paused single-frame screenshots at one timestamp per title, not continuous playback.",
+  "The GTK Dolby plugin (Showtime, browser) declines Profile 7 frames without active NLQ before rendering, so MEL titles there still lose the mapping; that needs a separate plugin change.",
+  "The server's FEL label for an MEL title is unchanged and is a separate follow-up."
+ ],
+ "install": {
+  "procedure": "operate-local-files.py install (the 5.7 release tool with only its release folder changed): digests re-verified on a root-owned copy, 7 package changes, no removals; nothing restarted; plurx Player was not running.",
+  "verification": "dpkg --audit clean and dpkg -V clean for all seven packages; the installed libplacebo.so.387rog1 is byte-identical to the qualified build.",
+  "rollback": "python3 operate-local-files.py rollback in the release folder reinstalls the seven previous packages.",
+  "owner_check": "The owner played the MEL title in plurx Player: info showed the mapper active and the FEL pill on. The player log recorded 'mapped raw-RPU frame ... target peak=616.000 ... EL composed=1' and no decline."
+ },
+ "shlibs_correction": {
+  "defect": "The metadata repack that produced libplacebo-rog387 1.0.0+private20261108-3, librog-dv-provider387-1 1.0.0+private20261108-5+depfix1 and libgstgtk-dovi-core0 0.1.0+rogdv10+depfix1 opened each DEBIAN/shlibs file for writing before reading it, so those packages shipped empty shlibs. Runtime was unaffected; building against these libraries lost the automatic dependency line. Inspection of the staged debs found 0-byte shlibs in exactly those three; mpv, gstreamer1.0-gtk-dovi, gstreamer1.0-gtk4 and showtime ship no shlibs file in either their original or +depfix1 packages, so they were unaffected.",
+  "found_by": "The GTK Dolby plugin MEL work, whose package build needed a container-only override (evidence/gtk-dovi-mel-20261125.json).",
+  "correction": "Content-identical repacks with correct shlibs: libplacebo-rog387 1.0.0+private20261108-4 (shlibs 'libplacebo 387rog1 libplacebo-rog387 (= 1.0.0+private20261108-4)'), librog-dv-provider387-1 1.0.0+private20261108-5+depfix2 (shlibs 'libdv-provider387 1 librog-dv-provider387-1 (= 1.0.0+private20261108-5+depfix2)') and mpv 0.42.0-0ubuntu0+rogdv5.7+depfix2, the exact-pin dependent. The libplacebo shared object is byte-identical to -3 (sha256 555a171eb41a7d6029590c57bfcbd82c9699de0f47a22abee5afd977d142215b). The core's own shlibs was fixed by its rogdv11 rebuild.",
+  "candidate_sha256": {
+   "libplacebo-rog387_1.0.0+private20261108-4_amd64.deb": "68b20f7c4db4e8cba0c212d39b967661050f6833ab8a187418d7ea0228b3d9f5",
+   "librog-dv-provider387-1_1.0.0+private20261108-5+depfix2_amd64.deb": "362b2445a067fc714080a1aadba26075c36cfda8183d7149be8f26f62cb1400c",
+   "mpv_0.42.0-0ubuntu0+rogdv5.7+depfix2_amd64.deb": "d0edecc609c27edaa3c5b1c891785f182227aa64e7a881bb0e828cd53d1c0a43"
+  },
+  "install": "Shipped in the single owner-attended GTK MEL release (seven packages, evidence/gtk-dovi-mel-20261125.json); nothing restarted.",
+  "verification": "Checked independently on the ROG on 2026-11-26: the three packages are installed at the corrected versions, /var/lib/dpkg/info shows the two shlibs lines above, dpkg --audit and dpkg -V are clean, and the installed libplacebo.so.387rog1 has the sha256 above.",
+  "rollback": "The GTK MEL release's rollback (operate-local-files.py rollback in its release folder on the ROG) restores the -3 and +depfix1 set; the earlier MEL release's rollback still restores the pre-MEL -2 set.",
+  "verification_scope": "The provider shlibs line and the shared-object hash come from this check on the ROG; the deb hashes and the libplacebo shlibs line are corroborated by evidence/gtk-dovi-mel-20261125.json."
+ }
+}

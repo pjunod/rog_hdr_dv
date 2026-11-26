@@ -1,0 +1,33 @@
+{
+  "kind": "system mpv package build and install",
+  "date_utc": "2026-11-25",
+  "host": "lab ROG",
+  "package": "mpv 0.42.0-0ubuntu0+rogdv5.6 (amd64)",
+  "candidate_sha256": "e42111fd2c03c11b71cb24b9c8f3090f4f567f525b0ea04206ae3216d9da0b56",
+  "rollback": "mpv 0.42.0-0ubuntu0+rogdv5.5, sha256 7ee56c748c154b717c9a5b5327359b9630857d07de814f87e103bbda88373557",
+  "build": {
+    "source": "The +rogdv5.5 Debian source package with mpv-fel-system-dv patch 0010 added as a final quilt patch and a +rogdv5.6 changelog entry (packaging/system-dv/mpv-042-ubuntu-fresh-success-record.diff).",
+    "source_trees": "The patched 5.5 source, outside debian/, has git tree 51651e8dd3e328cb420faa34037f860c4d677529 (the installed_candidate_tree before this install). With 0010 the tree is c135087e9906135315268eda50b49ffc2f562f1b, equal to sources.json candidate_tree.",
+    "environment": "dpkg-buildpackage -b in a throwaway ubuntu:26.10 container on the host. It used the same 21 hash-pinned inputs as +rogdv5.5 (private FFmpeg, libdovi, libdisplay-info, libplacebo and provider packages, plus the 5.2 source package and orig tarball).",
+    "environment_deviations": [
+      "Two private libraries that mpv does not link directly (librog-dv-provider1, libplacebo-rog1-360) pin exact versions of seven system libraries from their own build day. Ubuntu now ships libc6 2.44-1ubuntu2.1, also at the 5.5 build-date snapshot. Inside the container only, those pins were relaxed to >=, matching the +depfix1 rebuilds installed on this host. The relaxed copies were never shipped.",
+      "libcaca-dev and libcurl4-gnutls-dev were added. debian/control does not list them, but the 5.5 build environment had them; without them the caca and libcurl features were missing."
+    ],
+    "equivalence_to_rogdv5.5": "Enabled feature list, Depends, Recommends, Suggests, Conflicts, Breaks, Replaces, Provides, Pre-Depends, Architecture, Section, Priority and the packaged file list all equal +rogdv5.5. The only build warnings are the two single-label email notices, which 5.5 also had. File names are identical. Of the files whose contents changed, the changelog has the 5.6 entry, and the man page differs only by patch 0010's native-dovi-target-state paragraph from DOCS/man/input.rst."
+  },
+  "install": {
+    "procedure": "The release tooling operate-local-files.py, unchanged except for its release folder. It ran plan, then preflight (an exact live APT simulation with both archive digests verified), then install. Install uses a root-owned staged copy with --no-remove, verifies versions, marks and dpkg --audit, and removes the staging directory.",
+    "result": "One package change (mpv 5.5 to 5.6) and zero removals. dpkg --audit clean and the manual mark preserved. The installed /usr/bin/mpv is byte-identical to the candidate package's. mpv --version still reports the native-dovi-api-1 capability token. No player, session or display was restarted or changed.",
+    "rollback": "operate-local-files.py rollback in the same release folder reinstalls +rogdv5.5."
+  },
+  "limits": [
+    "The attended re-check is the owner's visual report of the pill; no mapper probe ran during it.",
+    "No optical measurement."
+  ],
+  "attended_recheck": {
+    "date_utc": "2026-11-25",
+    "by": "owner",
+    "owner_report": "I re-checked it, the EL pill stays now",
+    "scope": "On the installed +rogdv5.6, the owner seeked outside the live session in plurx Player, which re-created it, and the EL pill stayed. Owner visual report of the on-screen pill; no probe or optical measurement in this check."
+  }
+}

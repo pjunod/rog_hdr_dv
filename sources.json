@@ -908,22 +908,31 @@
       "upstream": "https://github.com/haasn/libplacebo.git",
       "base_commit": "275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
       "base_tree": "9e95f4eff8376fa4bc5c9b932953946ee27dc443",
-      "candidate_commit": "8d7b8055b55df5b7b66c3373d91df832ee1dec55",
-      "candidate_tree": "55196f55f7e57cc8e81ce1fd67408159811eb4f0",
-      "patch_count": 2,
+      "candidate_commit": "7ae861cbdafb5cbdccc0e1cb478292b3a5097e84",
+      "candidate_tree": "73b23f3fb7db47e55c659519291a6fa8d8da791b",
+      "patch_count": 3,
       "patch_order": [
         "0001-map-the-native-reconstructed-dolby-master.patch",
-        "0002-propagate-flipped-planes-and-contributing-frame-errors.patch"
-      ]
+        "0002-propagate-flipped-planes-and-contributing-frame-errors.patch",
+        "0003-report-an-identity-enhancement-layer-as-reconstructed.patch"
+      ],
+      "candidate_package_version": "1.0.0+private20261108-3",
+      "installed_package_version": "1.0.0+private20261108-4",
+      "installed_candidate_tree": "73b23f3fb7db47e55c659519291a6fa8d8da791b",
+      "installed_patch_count": 3,
+      "rollback_package_version": "1.0.0+private20261108-3",
+      "rollback_candidate_tree": "73b23f3fb7db47e55c659519291a6fa8d8da791b",
+      "rollback_patch_count": 3,
+      "candidate_status": "candidate_package_version -3 is the patched-source build. libplacebo-rog387 -4 is installed: a content-identical metadata repack of -3 that restores the shlibs file -3 shipped empty (evidence/mel-identity-el-20261125.json, shlibs_correction); its immediate rollback is -3, and the pre-MEL -2 set stays staged. -3 was installed on the ROG with six exact-pin +depfix1 repacks; the owner-attended check passed (evidence/mel-identity-el-20261125.json): patch 0003 reports the master as reconstructed when the frame's raw RPU enables a residual that is exactly zero (linear dead-zone NLQ with zero slope and threshold, as in Profile 7 MEL), decided with libdovi from the bytes the provider reads, so the provider maps MEL titles in mpv instead of declining every frame; a build without libdovi warns once and keeps the previous behaviour. The GTK Dolby plugin gates Profile 7 on active NLQ itself, so MEL there needs a separate plugin change. FEL, base-only and HDR10 renders were pixel-identical to the stock rebuild. The pre-MEL -2 library's source equals the two-patch tree 55196f55."
     },
     {
       "component": "mpv-fel-system-dv",
       "upstream": "https://github.com/mpv-player/mpv.git",
       "base_commit": "b0841e8c4d156b8403dc1876c4cbd9011eb583f3",
       "base_tree": "6ac447c92aaaab6bb72b1cf91f1e401a14c9e1df",
-      "candidate_commit": "b97aa047c9fa6d716d0b248f0954226273e5bee8",
-      "candidate_tree": "51651e8dd3e328cb420faa34037f860c4d677529",
-      "patch_count": 9,
+      "candidate_commit": "5395ceab0f09afbb0bdf1bf868a8a8fee4d5a696",
+      "candidate_tree": "7bc255d3f4372495765e706c16d8d6e96be16647",
+      "patch_count": 11,
       "patch_order": [
         "0001-match-enhancement-pictures-and-validate-Wayland-signals.patch",
         "0002-target-the-physical-display-and-retain-cached-PQ-signals.patch",
@@ -933,10 +942,20 @@
         "0006-report-native-dolby-backend-capabilities.patch",
         "0007-expose-authoritative-native-dolby-target-state.patch",
         "0008-keep-describing-a-Wayland-Vulkan-window-colour-without-a-hint.patch",
-        "0009-stop-dispatching-Wayland-events-after-a-fatal-display-error.patch"
+        "0009-stop-dispatching-Wayland-events-after-a-fatal-display-error.patch",
+        "0010-log-a-fresh-Dolby-success-record-after-each-reset.patch",
+        "0011-report-enhancement-layer-composition-as-a-level.patch"
       ],
-      "candidate_package_version": "0.42.0-0ubuntu0+rogdv5.5",
-      "candidate_status": "The rogdv5.5 source adds patch 0009, an upstreamable fix: once the Wayland display is in a fatal error state (the compositor ended the connection over a protocol error, or it was lost), mpv's VO thread no longer spins at 100% CPU in wayland_dispatch_events(); it logs the error, asks the player to close and keeps sleeping on its wakeup pipe. A lab compositor protocol error left the rogdv5.4-equivalent tree at 102% CPU with SIGTERM ignored, and the patched tree exited. The rogdv5.5 binary build (mpv_0.42.0-0ubuntu0+rogdv5.5_amd64.deb, sha256 7ee56c748c15) was assembled from the rogdv5.2 source package plus two quilt patches (repo 0008 and 0009) and the changelog overlays; its patched source tree equals this entry's candidate_tree, its Depends match rogdv5.4 exactly and only the binary and changelog differ. It was installed on the ROG on November 12 with the release tooling (rollback: rogdv5.4). The rogdv5.4 binary build adds patch 0008 to the rogdv5.2 source package as a quilt patch (rogdv5.3 carried a narrower first version). An idle window followed by loadfile, as plurx-player opens titles, now plays on the NVIDIA Vulkan WSI instead of failing with a duplicate colour-surface protocol error. For rogdv5.2, the normal binary build and fresh normal source-package replay matched all 902 public Git-archive files and executable modes. Six focused private-compositor IPC checks pass, including paused active/inactive generation changes, read-only setter and video-output teardown notification. System-launcher package transaction and deployment remain separate."
+      "candidate_package_version": "0.42.0-0ubuntu0+rogdv5.7",
+      "installed_package_version": "0.42.0-0ubuntu0+rogdv5.7",
+      "installed_candidate_commit": "5395ceab0f09afbb0bdf1bf868a8a8fee4d5a696",
+      "installed_candidate_tree": "7bc255d3f4372495765e706c16d8d6e96be16647",
+      "installed_patch_count": 11,
+      "rollback_package_version": "0.42.0-0ubuntu0+rogdv5.6",
+      "rollback_candidate_commit": "55b14e709f8f1f0ee2373b7aef1fc7ef8a93dcff",
+      "rollback_candidate_tree": "c135087e9906135315268eda50b49ffc2f562f1b",
+      "rollback_patch_count": 10,
+      "candidate_status": "rogdv5.7 built from the rogdv5.5 source package plus patches 0010 and 0011 and installed on the ROG on November 25 with the release tooling; rollback is rogdv5.6 (evidence/mpv-rogdv57-install-20261125.json). It compiled warning-free in a native x86_64 container (evidence/mpv-el-composition-level-compile-20261125.json). Patch 0011 adds enhancement-layer-composed to native-dovi-target-state, a level that follows the frame covering the presented instant (the latest at or before it): true when the presenting renderer last read that frame and privately mapped it on the physical path with its enhancement layer composed; false after a failed or blank render, a queue error, a frame-queue reset or a generation change; each change notifies. It replaces the edge-triggered success record as the source of plurx Player's EL pill, which the record could not clear on an enhancement-layer-only loss. The attended check of the EL pill on a Profile 7 FEL title is pending. Previous candidate: rogdv5.6 built from the rogdv5.5 source package plus patch 0010 and installed on the ROG on November 25 with the release tooling; rollback is rogdv5.5 (evidence/mpv-rogdv56-install-20261125.json). Patch 0010 logs the physical-target success record again after each frame-queue reset (seek, new file or queue refill), on the first successful private map. Before it, the record was logged once per render generation, so a plurx Player session re-created mid-title kept generation 1, never received a fresh record, which by the code path explains the lost local EL pill in the owner observation of 2026-11-25 (docs/DV_FALLBACK_REPRODUCTION.md). In the owner's attended re-check, a session re-created by a seek kept the EL pill. Previous candidate: The rogdv5.5 source adds patch 0009, an upstreamable fix: once the Wayland display is in a fatal error state (the compositor ended the connection over a protocol error, or it was lost), mpv's VO thread no longer spins at 100% CPU in wayland_dispatch_events(); it logs the error, asks the player to close and keeps sleeping on its wakeup pipe. A lab compositor protocol error left the rogdv5.4-equivalent tree at 102% CPU with SIGTERM ignored, and the patched tree exited. The rogdv5.5 binary build (mpv_0.42.0-0ubuntu0+rogdv5.5_amd64.deb, sha256 7ee56c748c15) was assembled from the rogdv5.2 source package plus two quilt patches (repo 0008 and 0009) and the changelog overlays; its patched source tree equals this entry's rollback_candidate_tree (the nine-patch series), its Depends match rogdv5.4 exactly and only the binary and changelog differ. It was installed on the ROG on November 12 with the release tooling (rollback: rogdv5.4). The rogdv5.4 binary build adds patch 0008 to the rogdv5.2 source package as a quilt patch (rogdv5.3 carried a narrower first version). An idle window followed by loadfile, as plurx-player opens titles, now plays on the NVIDIA Vulkan WSI instead of failing with a duplicate colour-surface protocol error. For rogdv5.2, the normal binary build and fresh normal source-package replay matched all 902 public Git-archive files and executable modes. Six focused private-compositor IPC checks pass, including paused active/inactive generation changes, read-only setter and video-output teardown notification. System-launcher package transaction and deployment remain separate."
     },
     {
       "component": "ubuntu-gst-plugins-good-dovi",

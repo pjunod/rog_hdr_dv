@@ -1,6 +1,92 @@
 # Status — what is working and what remains
 
-**Updated November 20, 2026. Colour/subtitle correction installed; runtime acceptance in progress.**
+**November 26, 2026 — GTK Dolby plugin maps Profile 7 MEL; installed on the ROG.**
+The GTK Dolby mapper (Showtime, browser) declined every Profile 7 picture
+without active NLQ before libplacebo saw it, so MEL titles kept losing their
+grade there after the mpv fix. `0.1.0+rogdv11` uploads the enhancement layer
+only for an active NLQ and lets the renderer decide whether the master is
+reconstructed. Run from its build tree in Showtime, two MEL titles changed
+from declined to mapped. A FEL title mapped as before, and an HDR10 title
+never reached the provider. The seven-package release was installed on the
+ROG in an owner-attended window (audit and `dpkg -V` clean, nothing
+restarted). With the installed packages, both MEL titles mapped (652 and 654
+frames), the FEL title mapped as before and HDR10 never reached the
+provider. The owner then watched a
+video-only copy of MEL title A in Showtime and saw no visible problems,
+but could not tell by eye whether the Dolby mapping was active; the mapper
+log for that play shows it applied with no decline (not a measurement). The release holds the rebuilt core and plugin plus metadata-only repacks
+that carry the exact pins. The repacks also restore the `shlibs` files that
+libplacebo `-3` and the provider and GTK Dolby core `+depfix1` repacks left empty. The
+browser was not run. Open: full MEL files whose PGS subtitle track is
+selected by default do not start in Showtime with either build, because
+playsink's subtitle overlay refuses the NVDEC CUDA-memory caps.
+[Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#the-gtk-dolby-plugin-showtime-browser)
+· [Receipt](../evidence/gtk-dovi-mel-20261125.json).
+
+**November 25, 2026 — Profile 7 MEL titles declined by the mapper; fixed and installed.**
+A newly downloaded Profile 7 title played without its Dolby Vision grade
+("display mapper unavailable", no FEL pill). It is MEL: an enhancement layer
+with an identity residual. libplacebo skipped that layer and reported it not
+composed, and the provider, which requires a reconstructed master whenever
+the RPU does not disable the residual, declined every frame. Patch 0003 of
+`libplacebo-fel-system-dv` reports the master as reconstructed when the frame's
+raw RPU enables a residual that is exactly zero, decided with libdovi from the
+bytes the provider reads. Two MEL titles now map with the layer composed in
+mpv; FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the
+stock rebuild. The GTK Dolby plugin (Showtime, browser) declined MEL until
+`0.1.0+rogdv11` (above). libplacebo-rog387 `-3`, with six metadata-only repacks for exact
+version pins, was installed on the ROG (audit and verify clean; its release's rollback
+restores the previous seven packages). In the owner's attended check the MEL title showed
+the mapper active and the FEL pill on, and the player logged a mapped frame with
+the enhancement layer composed.
+libplacebo `-3` and the provider `+depfix1` repack shipped empty `shlibs` files
+(the other repacks ship none). Content-identical libplacebo-rog387 `-4`, provider
+`-5+depfix2` and mpv `+rogdv5.7+depfix2` restore them and are now installed with
+the GTK MEL release (the shared object is unchanged); that release's rollback
+returns to `-3`.
+[Diagnosis, controls and limits](DV_FALLBACK_REPRODUCTION.md#profile-7-mel--an-identity-enhancement-layer-declined-by-the-mapper).
+
+**November 25, 2026 — EL composition reported as a level; installed.**
+The success record that plurx Player's EL pill relied on attests a successful
+map, not enhancement-layer composition, and it is edge-triggered. Patch 0011
+of `mpv-fel-system-dv` (`+rogdv5.7`) adds
+`enhancement-layer-composed` to `native-dovi-target-state`: true while the
+frame covering the presented instant was privately mapped with its enhancement
+layer composed; false for a frame mapped without it, a failed or blank render,
+a frame-queue reset or a generation change; notified on every change. plurx Player's EL pill now reads it for
+the native renderer. The patched tree compiles and links warning-free on native
+x86_64. mpv `+rogdv5.7` with it was built from the `+rogdv5.5` source package
+plus patches 0010 and 0011 and installed on the ROG on November 25 with the
+release tooling; its features, relations and files match `+rogdv5.6`, and
+rollback is `+rogdv5.6`. The installed binary carries the field; the attended
+play and seek check of the EL pill is pending.
+[Design and limits](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers) ·
+[compile receipt](../evidence/mpv-el-composition-level-compile-20261125.json) ·
+[install receipt](../evidence/mpv-rogdv57-install-20261125.json).
+
+**November 25, 2026 — EL pill lost after session re-creation; source fix.**
+In an owner-attended play, a seek that re-created the live plurx Player session
+left RPU and DYN shown but no longer the enhancement-layer pill (the owner's
+"FEL"; most likely the player's local EL pill on this route). The cause is the
+VO's success record. mpv logged it once per render generation, and a
+re-created session keeps generation 1, so the player never received the fresh
+record its contract requires after a source change. A second owner-attended
+run with the mapper probe confirmed it on the installed build: after
+re-creation every frame was mapped with the enhancement layer composed, while
+the overlay's renderer record stayed empty. Patch 0010
+of `mpv-fel-system-dv` logs the record again on the first successful map after
+each reset. mpv `+rogdv5.6` with it was built from the `+rogdv5.5` source package
+and installed on the ROG on November 25 with the release tooling; its features,
+relations and files match `+rogdv5.5`, and rollback is `+rogdv5.5`
+([install receipt](../evidence/mpv-rogdv56-install-20261125.json)). In the owner's
+attended re-check on `+rogdv5.6`, a session re-created by a seek kept the EL pill. [Observation, cause and limits](DV_FALLBACK_REPRODUCTION.md#owner-attended-session-re-creation--the-el-pill-not-the-mapping).
+
+**November 20, 2026 — Ubuntu update recovery: colour/subtitle correction installed; runtime acceptance in progress.**
+Since November 25–26 the installed sink and Showtime are the content-identical
+`+depfix2` metadata repacks from the MEL releases above, and the GTK Dolby
+plugin is `0.1.0+rogdv11`; WebKit, JavaScriptCore and the GStreamer base,
+good and bad families are unchanged. Publication must carry those installed
+versions rather than the superseded `+rogdv5.8` sink and `+rogdv5.15` Showtime.
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.

@@ -1,0 +1,245 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Wed, 25 Nov 2026 03:00:00 +0000
+Subject: [PATCH] fix(mpv): report enhancement-layer composition as a level
+
+The physical-target success record attests a successful private map,
+and is logged once after each reset. It says nothing about whether the
+enhancement layer was composed, so a client that showed an EL fact from
+it kept that fact through an EL-only loss while mapping still succeeded,
+and it depended on catching one log line.
+
+Add enhancement-layer-composed to native-dovi-target-state. Each queued
+frame records, when the presenting renderer reads it, whether it was
+privately mapped on the physical path with the enhancement_layer_composed
+flag the renderer passes. The level is the record of the frame covering
+the presented instant (the latest at or before it), which every mixer
+reads, so a cached redraw (including a pause after interpolation) keeps
+its own frame's value. A failed or blank render, a queue error, a
+frame-queue reset and a generation change make it false. The renderer's
+reset callback does not name the frame it read unmapped, so it clears
+every frame of that render not yet attested. Each change notifies the
+property.
+---
+ DOCS/man/input.rst      | 21 +++++++++--
+ player/command.c        |  1 +
+ video/out/vo.h          |  1 +
+ video/out/vo_gpu_next.c | 78 +++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 98 insertions(+), 3 deletions(-)
+
+diff --git a/DOCS/man/input.rst b/DOCS/man/input.rst
+index 4c63554..767923c 100644
+--- a/DOCS/man/input.rst
++++ b/DOCS/man/input.rst
+@@ -3899,9 +3899,24 @@ Property list
+ ``native-dovi-target-state``
+     Read-only native Dolby physical-target eligibility for the active
+     ``gpu-next`` output. Other outputs report this property unavailable.
+-    The map contains ``active`` (boolean) and ``generation`` (integer).
+-    Generation changes when physical-target eligibility or its display revision
+-    changes. Notifications follow those transitions, including paused redraws.
++    The map contains ``active`` (boolean), ``generation`` (integer) and
++    ``enhancement-layer-composed`` (boolean). Generation changes when
++    physical-target eligibility or its display revision changes. Notifications
++    follow those transitions, including paused redraws.
++
++    ``enhancement-layer-composed`` is a level, not an event. It is true while
++    the frame covering the presented instant (the latest frame at or before it)
++    was, when the renderer last read it for presentation, privately mapped on
++    the physical path with a decoded Dolby Vision enhancement layer composed
++    into its master. It is false for a frame mapped without one or not
++    privately mapped, after a failed or blank render, after a frame-queue reset
++    (a seek, a new file or a queue refill) until a composed frame is presented,
++    and on every generation change; it implies ``active``. A redraw that reuses
++    the renderer's cached frame keeps that frame's value, including while
++    paused after interpolation. When the renderer reads a frame without mapping
++    it, every frame of that render not yet attested is treated as not composed,
++    which can under-report next to such a frame. Each change sends a
++    notification. It does not tell a full enhancement layer from a minimal one.
+ 
+     Active eligibility alone does not prove that a picture was Dolby mapped.
+     A client reporting successful mapping must also match the generation in
+diff --git a/player/command.c b/player/command.c
+index 9c3bcab..d788b9f 100644
+--- a/player/command.c
++++ b/player/command.c
+@@ -3050,6 +3050,7 @@ static int mp_property_native_dovi_target_state(void *ctx, struct m_property *pr
+     struct m_sub_property props[] = {
+         {"active", SUB_PROP_BOOL(state.active)},
+         {"generation", SUB_PROP_INT64(state.generation)},
++        {"enhancement-layer-composed", SUB_PROP_BOOL(state.enhancement_layer_composed)},
+         {0}
+     };
+     return m_property_read_sub(props, action, arg);
+diff --git a/video/out/vo.h b/video/out/vo.h
+index ddfbc65..6f236d0 100644
+--- a/video/out/vo.h
++++ b/video/out/vo.h
+@@ -161,6 +161,7 @@ struct voctrl_playback_state {
+ struct voctrl_native_dovi_target_state {
+     bool active;
+     uint64_t generation;
++    bool enhancement_layer_composed;
+ };
+ 
+ // VOCTRL_PERFORMANCE_DATA
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 373f46c..62eee9e 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -156,6 +156,14 @@ struct priv {
+     float dovi_transport_gain, dovi_reference, dovi_encoding_min, dovi_encoding_max;
+     uint64_t dovi_physical_generation, dovi_render_generation, dovi_map_calls;
+     bool dovi_physical_active, dovi_display_signal_valid, dovi_physical_logged;
++    // Whether the presented picture's reference frame was privately mapped on
++    // the physical path with its enhancement layer composed
++    // (native-dovi-target-state's enhancement-layer-composed).
++    bool dovi_el_composed;
++    // The frames of the render in progress, so dovi_map can find its frame,
++    // and that render's serial.
++    const struct pl_frame_mix *dovi_mix;
++    uint64_t dovi_render_serial;
+     pl_renderer rr;
+     pl_queue queue;
+     pl_swapchain sw;
+@@ -612,6 +620,11 @@ struct frame_priv {
+     struct osd_state subs;
+     uint64_t osd_sync;
+     struct ra_hwdec *hwdec;
++    // Set when this frame was last read by the presenting renderer and was
++    // privately mapped with its enhancement layer composed. A mixer cache hit
++    // keeps the value from the render that read the frame.
++    bool dovi_el_composed;
++    uint64_t dovi_el_serial; // the render that last recorded it
+     // Optional Dolby Vision FEL.
+     struct ra_hwdec *el_hwdec;
+     pl_tex el_tex[4];
+@@ -1258,6 +1271,7 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+         dv_provider387_reset(p->dovi_provider);
+         p->dovi_render_generation++;
+         p->dovi_display_signal_valid = p->dovi_physical_logged = false;
++        p->dovi_el_composed = false;
+     }
+     p->dovi_physical_active = active;
+     p->dovi_physical_generation = generation;
+@@ -1265,9 +1279,56 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+         vo_event(vo, VO_EVENT_WIN_STATE);
+ }
+ 
++// Publish the level of native-dovi-target-state's enhancement-layer-composed.
++static void set_dovi_el_composed(struct priv *p, struct vo *vo, bool composed)
++{
++    if (composed == p->dovi_el_composed)
++        return;
++    p->dovi_el_composed = composed;
++    vo_event(vo, VO_EVENT_WIN_STATE);
++}
++
++// The frame covering the presented instant: the latest one at or before it.
++// The renderer reads it in every mixer (an oversampled frame after it may not
++// intersect the vsync and go unread), and it is the only frame when paused.
++static const struct pl_frame *dovi_covering_frame(const struct pl_frame_mix *mix)
++{
++    const struct pl_frame *frame = mix->num_frames ? mix->frames[0] : NULL;
++    for (int i = 1; i < mix->num_frames; i++) {
++        if (mix->timestamps[i] <= 0)
++            frame = mix->frames[i];
++    }
++    return frame;
++}
++
++// Record the renderer's composition result on the presented frame it read.
++// Captures render outside draw_frame and record nothing.
++static void set_dovi_frame_el(struct priv *p, const uint8_t *rpu, bool composed)
++{
++    if (!p->dovi_mix)
++        return;
++    for (int i = 0; i < p->dovi_mix->num_frames; i++) {
++        const struct pl_frame *image = p->dovi_mix->frames[i];
++        if (image->dovi_rpu == rpu) {
++            struct mp_image *mpi = image->user_data;
++            struct frame_priv *fp = mpi->priv;
++            fp->dovi_el_composed = composed;
++            fp->dovi_el_serial = p->dovi_render_serial;
++        }
++    }
++}
++
+ static void dovi_reset(void *priv)
+ {
+     struct priv *p = priv;
++    // The renderer read a frame it does not Dolby map, and does not say which.
++    // No frame this render has not attested keeps an earlier composition.
++    for (int i = 0; p->dovi_mix && i < p->dovi_mix->num_frames; i++) {
++        struct mp_image *mpi = p->dovi_mix->frames[i]->user_data;
++        struct frame_priv *fp = mpi->priv;
++        if (fp->dovi_el_serial != p->dovi_render_serial)
++            fp->dovi_el_composed = false;
++    }
+     dv_provider387_reset(p->dovi_provider);
+ }
+ 
+@@ -1278,6 +1339,8 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+ {
+     struct priv *p = priv;
+     p->dovi_map_calls++;
++    // Only a successful private physical map below attests composition.
++    set_dovi_frame_el(p, rpu, false);
+     if (!p->dovi_physical_active || target->transfer != PL_COLOR_TRC_PQ ||
+         target->primaries != PL_COLOR_PRIM_BT_2020) {
+         return dv_provider387_map(p->dovi_provider, gpu, rpu, size, enhancement_layer_composed, target,
+@@ -1354,6 +1417,7 @@ static int dovi_map(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
+                 (unsigned long long)p->dovi_render_generation);
+         p->dovi_physical_logged = true;
+     }
++    set_dovi_frame_el(p, rpu, enhancement_layer_composed);
+     return 1;
+ }
+ 
+@@ -1628,6 +1692,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+             // physical-target generation need not change with it, so the
+             // next successful private map logs its record again.
+             p->dovi_physical_logged = false;
++            // Nothing from the new source has been mapped yet.
++            set_dovi_el_composed(p, vo, false);
+             p->last_pts = 0.0;
+             p->last_id = 0;
+             p->want_reset = false;
+@@ -1921,6 +1987,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+         switch (pl_queue_update(p->queue, &mix, &qparams)) {
+         case PL_QUEUE_ERR:
+             MP_ERR(vo, "Failed updating frames!\n");
++            set_dovi_el_composed(p, vo, false);
+             goto done;
+         case PL_QUEUE_EOF:
+             abort(); // we never signal EOF
+@@ -1993,8 +2060,18 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     // Render frame
+     stats_time_start(p->stats, "render");
+     uint64_t map_calls_before = p->dovi_map_calls;
++    p->dovi_mix = &mix;
++    p->dovi_render_serial++;
+     bool render_ok = pl_render_image_mix(p->rr, &mix, &target, &params);
++    p->dovi_mix = NULL;
+     stats_time_end(p->stats, "render");
++    // The level follows the frame covering the presented instant. A failed or
++    // blank render presents no composed picture; a frame the renderer did not
++    // read as Dolby Vision (dovi_reset, or no RPU) stays unattested.
++    const struct pl_frame *covering = render_ok ? dovi_covering_frame(&mix) : NULL;
++    const struct frame_priv *covering_fp = covering
++        ? ((const struct mp_image *) covering->user_data)->priv : NULL;
++    set_dovi_el_composed(p, vo, covering_fp && covering_fp->dovi_el_composed);
+     if (!render_ok) {
+         MP_ERR(vo, "Failed rendering frame!\n");
+         goto done;
+@@ -2488,6 +2565,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
+         *state = (struct voctrl_native_dovi_target_state) {
+             .active = p->dovi_physical_active,
+             .generation = p->dovi_render_generation,
++            .enhancement_layer_composed = p->dovi_el_composed,
+         };
+         return VO_TRUE;
+     }
+-- 
+2.54.0 (Apple Git-157)
+
