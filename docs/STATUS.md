@@ -11,7 +11,8 @@ never reached the provider. The seven-package release was installed on the
 ROG in an owner-attended window (audit and `dpkg -V` clean, nothing
 restarted). With the installed packages, both MEL titles mapped (652 and 654
 frames), the FEL title mapped as before and HDR10 never reached the
-provider. The release holds the rebuilt core and plugin plus metadata-only repacks
+provider. The owner then played the first MEL title in Showtime and
+reported that the picture looks right (a visual check, not a measurement). The release holds the rebuilt core and plugin plus metadata-only repacks
 that carry the exact pins. The repacks also restore the `shlibs` files that
 libplacebo `-3` and the provider and GTK Dolby core `+depfix1` repacks left empty. The
 browser was not run. Open: full MEL files whose PGS subtitle track is
