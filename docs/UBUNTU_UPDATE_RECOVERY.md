@@ -77,7 +77,19 @@ The normal bad-family v10 build passed; only GstPlay differs among 178 packaged
 runtime ELFs. The other 177 retain identical allocated code/data sections.
 This is API/package qualification; three normal Showtime active/disabled/restored captures now demonstrate
 caption removal and exact restoration at the same paused mapped-video frame.
-Detailed caption geometry/colour and target-change acceptance remain pending. Its matching v5.15 package retains exact bad v10 dependency pins.
+The first combined caption/target acceptance attempt (November 20, after the
+last recorded checkpoint) failed, and was reconciled on November 26 from its
+retained captures without a rerun. Two causes are distinct. First, 223 of 2,701
+glyph-core pixels fall up to 27 RGB10 codes below the derived white bound in
+every active state. All 223 lie on the core's outer edge and none is too bright, so the
+mask's four-texel bilinear footprint does not model the renderer's 1.5x caption
+downscale; the caption is present over the whole core. Second, only the first
+active picture differs, by one code in about 0.9% of viewport pixels, from every
+later presentation of the same frame. The target, mapped-video samples and
+compositor image descriptions are identical, so the difference arises after the
+mapper, in GTK composition or Mutter; it is not yet attributed. Later target
+round trips and caption toggles restored exactly. Caption geometry/colour and
+target-change acceptance therefore remain open. Its matching v5.15 package retains exact bad v10 dependency pins.
 Application/resources are unchanged; the normal package additionally includes
 the source-bound upstream manual page. The reviewed eight-package follow-up
 is installed with no removals, unchanged APT configuration and owner session.

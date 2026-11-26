@@ -108,6 +108,10 @@ are now a recorded recipe step ([consumer pin re-releases](UBUNTU_APT_REPOSITORY
 both installed files verify as the qualified payload with the generated
 control. The re-scoped 33-package bundle passes the publisher's family and
 version validation; publication still waits for runtime acceptance.
+The first combined caption/target acceptance attempt failed on two distinct
+causes: a caption-mask sampling model that is too strict at glyph edges, and a
+one-code first-presentation difference after the mapper that is not yet
+attributed ([details](UBUNTU_UPDATE_RECOVERY.md#ordinary-video-colour-correction-after-restoration)).
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.
