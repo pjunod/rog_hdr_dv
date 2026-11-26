@@ -2,7 +2,7 @@
  "kind": "showtime-pgs-subtitle-stall",
  "date_utc": "2026-11-26",
  "host": "lab ROG",
- "change": "gst-plugins-bad1.0 1.28.6-1ubuntu1+rogdv11 (patch 0019 of ubuntu-gst-plugins-bad-rpu): dvdspu, assrender and dvbsuboverlay ask downstream about their overlay caps with those caps as the query filter and test the answer for emptiness, as basetextoverlay already does, instead of intersecting an unfiltered answer. For a peer that follows the caps-query rules the decision is unchanged.",
+ "change": "gst-plugins-bad1.0 1.28.6-1ubuntu1+rogdv11 (patch 0019 of ubuntu-gst-plugins-bad-rpu): dvdspu, assrender and dvbsuboverlay ask downstream about their overlay caps with those caps as the query filter and test the answer for emptiness, as basetextoverlay already does, instead of intersecting an unfiltered answer. For a peer that follows the caps-query rules the decision is unchanged by construction (reasoned, not measured; only the PGS path was run).",
  "cause": {
   "symptom": "Full Dolby titles whose default subtitle track is PGS never start in Showtime; no error is shown.",
   "mechanism": "The patched NVDEC decoder chooses CUDA memory from the GTK Dolby mapper's answer to a Dolby-marked filtered query (bad series patch 0015). playsink's subtitleoverlay then inserts dvdspu, which decided whether downstream takes its overlay metadata from an UNFILTERED peer caps query intersected with its own caps. The mapper's accepted input depends on stream fields that only a filter carries, so its unfiltered answer held identity memory only. dvdspu logged 'caps have dvdspu meta 0', refused the CUDA caps ('unsupported caps') and requested renegotiation indefinitely.",

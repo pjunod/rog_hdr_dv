@@ -118,7 +118,7 @@ posted.
 makes `dvdspu`, `assrender` and `dvbsuboverlay` pass their overlay caps as the
 filter and test the answer for emptiness, as `textoverlay` (plugins-base)
 already does. For a peer that follows the caps-query rules the decision is
-the same. The mapper then answers through its marked-filter path and offers
+the same by construction; only the PGS path was run. The mapper then answers through its marked-filter path and offers
 CUDA memory with the overlay meta. Changing the mapper's unfiltered answer
 instead was tried and dropped. Unmarked native memory there would mislead
 unmarked producers. Marked memory needs the stream configuration, which
