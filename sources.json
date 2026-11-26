@@ -863,13 +863,19 @@
       "upstream": "https://github.com/haasn/libplacebo.git",
       "base_commit": "275f7dea27924cdd34ab2e6c20e448b6bc4fab65",
       "base_tree": "9e95f4eff8376fa4bc5c9b932953946ee27dc443",
-      "candidate_commit": "8d7b8055b55df5b7b66c3373d91df832ee1dec55",
-      "candidate_tree": "55196f55f7e57cc8e81ce1fd67408159811eb4f0",
-      "patch_count": 2,
+      "candidate_commit": "7ae861cbdafb5cbdccc0e1cb478292b3a5097e84",
+      "candidate_tree": "73b23f3fb7db47e55c659519291a6fa8d8da791b",
+      "patch_count": 3,
       "patch_order": [
         "0001-map-the-native-reconstructed-dolby-master.patch",
-        "0002-propagate-flipped-planes-and-contributing-frame-errors.patch"
-      ]
+        "0002-propagate-flipped-planes-and-contributing-frame-errors.patch",
+        "0003-report-an-identity-enhancement-layer-as-reconstructed.patch"
+      ],
+      "candidate_package_version": "1.0.0+private20261108-3",
+      "installed_package_version": "1.0.0+private20261108-2",
+      "installed_candidate_tree": "55196f55f7e57cc8e81ce1fd67408159811eb4f0",
+      "installed_patch_count": 2,
+      "candidate_status": "Source candidate for libplacebo-rog387 -3, staged on the ROG but not installed (evidence/mel-identity-el-20261125.json): patch 0003 reports the master as reconstructed when the frame's raw RPU enables a residual that is exactly zero (linear dead-zone NLQ with zero slope and threshold, as in Profile 7 MEL), decided with libdovi from the bytes the provider reads, so the provider maps MEL titles in mpv instead of declining every frame; a build without libdovi warns once and keeps the previous behaviour. The GTK Dolby plugin gates Profile 7 on active NLQ itself, so MEL there needs a separate plugin change. FEL, base-only and HDR10 renders were pixel-identical to the stock rebuild. The installed -2 library's source equals the two-patch tree 55196f55."
     },
     {
       "component": "mpv-fel-system-dv",

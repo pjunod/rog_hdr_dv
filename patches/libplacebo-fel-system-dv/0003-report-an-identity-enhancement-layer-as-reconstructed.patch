@@ -1,0 +1,102 @@
+diff --git a/src/include/libplacebo/renderer.h b/src/include/libplacebo/renderer.h
+index 52579f3c..7e5b2619 100644
+--- a/src/include/libplacebo/renderer.h
++++ b/src/include/libplacebo/renderer.h
+@@ -368,7 +368,10 @@ struct pl_render_params {
+     // the next call; output color describes the actual mapped signal. A failure
+     // fails the render rather than silently presenting unprocessed Dolby Vision.
+     // enhancement_layer_composed is true only after the native master was
+-    // successfully materialized with a decoded and merged enhancement layer.
++    // successfully materialized with a decoded and merged enhancement layer,
++    // or when the RPU enables a residual that is exactly zero (linear dead-zone
++    // NLQ with zero slope and threshold, as in Profile 7 MEL), so the base-layer
++    // reshape already is the complete reconstruction.
+     // Return 1 when mapped, 0 for inapplicable targets (ordinary rendering),
+     // or -1 on eligible-input processing failure.
+     int (*dovi_map)(void *priv, pl_gpu gpu, const uint8_t *rpu, size_t rpu_size,
+diff --git a/src/renderer.c b/src/renderer.c
+index a54a8020..73d57767 100644
+--- a/src/renderer.c
++++ b/src/renderer.c
+@@ -26,6 +26,10 @@
+ 
+ #include <libplacebo/renderer.h>
+ 
++#ifdef PL_HAVE_LIBDOVI
++#include <libdovi/rpu_parser.h>
++#endif
++
+ struct cached_frame {
+     uint64_t signature;
+     uint64_t params_hash; // for detecting `pl_render_params` changes
+@@ -90,6 +94,7 @@ struct pl_renderer_t {
+     // For debugging / logging purposes
+     int prev_dither;
+     bool dovi_override_warned;
++    bool dovi_residual_warned;
+ 
+     // For backwards compatibility
+     struct icc_state icc_fallback[2];
+@@ -1619,6 +1624,40 @@ static bool want_merge(struct pass_state *pass,
+ 
+ static int frame_ref(const struct pl_frame *frame);
+ 
++#ifdef PL_HAVE_LIBDOVI
++// True when the raw RPU enables a residual that is exactly zero for every
++// enhancement-layer code: linear dead-zone NLQ with zero slope and threshold in
++// all components, as in a Profile 7 MEL. The base-layer reshape is then the
++// complete base/enhancement reconstruction. Decided from the same RPU bytes the
++// display-management provider reads; any other or undecidable RPU is false.
++static bool dovi_rpu_residual_is_zero(const uint8_t *buf, size_t size)
++{
++    if (!buf || !size)
++        return false;
++
++    bool zero = false;
++    DoviRpuOpaque *rpu = dovi_parse_unspec62_nalu(buf, size);
++    const DoviRpuDataHeader *header = dovi_rpu_get_header(rpu);
++    if (header && !header->disable_residual_flag && !header->use_prev_vdr_rpu_flag) {
++        const DoviRpuDataMapping *mapping = dovi_rpu_get_data_mapping(rpu);
++        if (mapping && mapping->nlq && mapping->nlq_method_idc == 0) {
++            zero = true;
++            for (int c = 0; c < DoviNUM_COMPONENTS; c++) {
++                const DoviRpuDataNlq *nlq = mapping->nlq;
++                zero &= !nlq->linear_deadzone_slope_int[c] &&
++                        !nlq->linear_deadzone_slope[c] &&
++                        !nlq->linear_deadzone_threshold_int[c] &&
++                        !nlq->linear_deadzone_threshold[c];
++            }
++        }
++        dovi_rpu_free_data_mapping(mapping);
++    }
++    dovi_rpu_free_header(header);
++    dovi_rpu_free(rpu);
++    return zero;
++}
++#endif
++
+ #ifdef PL_HAVE_DOVI
+ // Build a sub-shader that samples the enhancement layer planes and returns
+ // the (color-repr-normalized) EL signal.
+@@ -2216,6 +2255,21 @@ static bool pass_read_image(struct pass_state *pass)
+             pass->dovi_fatal = true;
+             return false;
+         }
++        // A provably zero residual needs no enhancement layer to reconstruct
++        // the master, whether or not one was supplied or sampled.
++        if (!enhancement_layer_composed) {
++#ifdef PL_HAVE_LIBDOVI
++            enhancement_layer_composed =
++                dovi_rpu_residual_is_zero(image->dovi_rpu, image->dovi_rpu_size);
++#else
++            if (!rr->dovi_residual_warned) {
++                PL_WARN(rr, "Built without libdovi: cannot recognize a zero Dolby "
++                            "residual, so MEL frames are mapped only with a composed "
++                            "enhancement layer");
++                rr->dovi_residual_warned = true;
++            }
++#endif
++        }
+         int mapped_status = params->dovi_map(params->dovi_priv, rr->gpu,
+                 image->dovi_rpu, image->dovi_rpu_size, enhancement_layer_composed,
+                 &pass->target.color,
