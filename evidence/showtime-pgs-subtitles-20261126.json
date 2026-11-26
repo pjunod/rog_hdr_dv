@@ -40,7 +40,7 @@
   ]
  },
  "release": {
-  "status": "staged on the ROG as bad-spu-release-001, not installed; plan and preflight passed (6 package changes, 0 removals, 12 archive digests); each rollback archive's md5sums equal the installed package's",
+  "status": "installed on the ROG 2026-11-26 in an owner-attended window with the release tool (6 package changes, 0 removals, marks restored); the rollback archives remain staged in bad-spu-release-001",
   "packages": "Rebuilt: the five installed binaries of gst-plugins-bad1.0 at 1.28.6-1ubuntu1+rogdv11. Metadata-only repack with file contents identical to the installed package: showtime 50.0-2+rogdv5.15+depfix3 (exact pins on plugins-bad and plugins-extra rogdv11).",
   "candidate_sha256": {
    "gir1.2-gst-plugins-extra-1.0_1.28.6-1ubuntu1+rogdv11_amd64.deb": "c5a3ddf43c82c7c648ed4960492319b2fca6fb4d10af288bb49790a409db6acf",
@@ -61,8 +61,24 @@
  },
  "limits": [
   "Negotiation and mapper decisions over 25 s windows, not pixels or light.",
-  "No arm proves a subtitle was drawn: MEL title A's default track is forced-only, and the windows were not chosen for dialogue. Subtitle visibility is for the owner's visual check.",
+  "Subtitle drawing rests on the owner's visual report for MEL title B only; no arm measured it.",
   "ASS (assrender) and DVB (dvbsuboverlay) subtitles carry the same change but were not run; the browser and plurx Player were not exercised.",
-  "Provenance gap: the installed plugins-bad rogdv10 carries a paused-subtitle-selection change (its changelog: 'Refresh paused subtitle selections at the current accurate stream position') that this repository's ubuntu-gst-plugins-bad-rpu series does not hold (the series ends at the rogdv9 patches before 0019). The rogdv11 build starts from the installed rogdv10 source to keep that change; replaying the series alone does not reproduce rogdv10 or rogdv11."
- ]
+  "Provenance gap: the installed plugins-bad rogdv10 carries a paused-subtitle-selection change (its changelog: 'Refresh paused subtitle selections at the current accurate stream position') that this repository's ubuntu-gst-plugins-bad-rpu series does not hold (the series ends at the rogdv9 patches before 0019). The rogdv11 build starts from the installed rogdv10 source to keep that change; replaying the series alone does not reproduce rogdv10 or rogdv11.",
+  "Showtime played without sound during the owner's check. The default audio sink is the raw analog output rather than the tuned speaker sink; this release changes no audio element, and audio belongs to the separate audio repository."
+ ],
+ "install": {
+  "date_utc": "2026-11-26",
+  "attended": "The owner approved the install in this window and was present.",
+  "preconditions": "No Showtime or mpv process running; dpkg --audit clean; preflight repeated just before install: exact 6-package simulation and all 12 archive digests verified.",
+  "result": "The release tool reported a verified install of the exact qualified release. dpkg --audit and dpkg -V on all six packages were clean; every package was in state ii at its candidate version. The user's GStreamer registry cache was removed so the new plugins are rescanned. No compositor, session or service was restarted.",
+  "post_install_arms": {
+   "method": "Same method as the qualification, with the installed packages and no plugin path override.",
+   "MEL title A, full file": "400 frames mapped; 'caps have dvdspu meta 1'; the usual one-time startup decline",
+   "MEL title B, full file": "526 frames mapped; 'caps have dvdspu meta 1'",
+   "FEL title, full file": "582 frames mapped",
+   "HDR10 title, full file": "plays; no provider call"
+  },
+  "owner_visual_check": "The owner opened MEL title B in Showtime on the installed release and reported that subtitles show. A visual report only; subtitle placement, timing and colour were not measured. The owner also noticed that Showtime plays without sound; that is outside this change (see limits).",
+  "rollback": "python3 operate-local-files.py rollback in the release folder restores the six packages listed under rollback_sha256."
+ }
 }
