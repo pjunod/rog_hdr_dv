@@ -16,8 +16,8 @@ was installed in an owner-attended window (audit and `dpkg -V` clean,
 nothing restarted). On the installed packages both MEL titles mapped and the
 FEL and HDR10 titles were unchanged; the owner then saw subtitles over the
 second MEL title (a visual report). Not run: ASS or DVB subtitles and the
-browser. Showtime played without sound during that check, which this
-release does not touch (the default sink is the raw analog output). The installed
+browser. Showtime played without sound during that check; this release
+changes no audio element, and the cause has not been established. The installed
 plugins-bad `rogdv10` holds a paused-subtitle change this repository's series
 lacks; `rogdv11` was built from that installed source.
 [Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#subtitles-with-nvdec-decoded-dolby-video-in-showtime)

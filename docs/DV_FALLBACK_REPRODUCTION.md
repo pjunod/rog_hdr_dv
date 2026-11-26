@@ -128,14 +128,15 @@ Showtime's playback does not carry on its stream-start event.
 records Showtime runs on full files with the patched plugins loaded from the
 built package and the installed mapper. Both MEL titles changed from never
 starting to mapped. A FEL title without a default subtitle track and an
-HDR10 title with one played as before. The staged release holds the five
-installed plugins-bad binaries at `+rogdv11` and a metadata-only Showtime
+HDR10 title with one played as before. The release, installed on the ROG
+in an owner-attended window, holds the five installed plugins-bad binaries at `+rogdv11` and a metadata-only Showtime
 repack (`+depfix3`) carrying their exact pins. The installed `rogdv10` holds a
 paused-subtitle change that this repository's series does not, so `rogdv11`
 was built from that installed source plus patch 0019.
 
-Limits: negotiation and mapper decisions, not pixels. No run proves a
-subtitle was drawn (Gran Turismo's default track is forced-only). ASS and DVB
+Limits: negotiation and mapper decisions, not pixels. No run measured a
+drawn subtitle; the owner reported seeing subtitles over the second MEL
+title after the install (a visual report). ASS and DVB
 subtitles, the browser and plurx Player were not run.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
