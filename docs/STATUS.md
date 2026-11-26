@@ -1,6 +1,6 @@
 # Status — what is working and what remains
 
-**November 25, 2026 — Profile 7 MEL titles declined by the mapper; source fix staged.**
+**November 25, 2026 — Profile 7 MEL titles declined by the mapper; fixed and installed.**
 A newly downloaded Profile 7 title played without its Dolby Vision grade
 ("display mapper unavailable", no FEL pill). It is MEL: an enhancement layer
 with an identity residual. libplacebo skipped that layer and reported it not
@@ -11,7 +11,10 @@ raw RPU enables a residual that is exactly zero, decided with libdovi from the
 bytes the provider reads. Two MEL titles now map with the layer composed in
 mpv; FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the
 stock rebuild. The GTK Dolby plugin (Showtime, browser) still declines MEL. libplacebo-rog387 `-3`, with six metadata-only repacks for exact
-version pins, is staged with a passing preflight and not installed.
+version pins, is installed on the ROG (audit and verify clean; rollback restores
+the previous seven packages). In the owner's attended check the MEL title showed
+the mapper active and the FEL pill on, and the player logged a mapped frame with
+the enhancement layer composed.
 [Diagnosis, controls and limits](DV_FALLBACK_REPRODUCTION.md#profile-7-mel--an-identity-enhancement-layer-declined-by-the-mapper).
 
 **November 25, 2026 — EL composition reported as a level; installed.**

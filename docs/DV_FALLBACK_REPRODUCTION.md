@@ -52,9 +52,11 @@ rebuild, which itself matched the installed library.
 
 Because mpv, the provider, the GTK Dolby plugin, its GStreamer sinks and
 Showtime pin exact versions, the release carries libplacebo-rog387 `-3` and
-six metadata-only `+depfix1` repacks with byte-identical contents. It is
-staged with a passing preflight (seven changes, no removals) and is not
-installed.
+six metadata-only `+depfix1` repacks with byte-identical contents. It was
+installed on the ROG with the release tooling (seven changes, no removals;
+audit and verify clean). In the owner's attended check the MEL title showed
+the mapper active and the FEL pill on, with a mapped, enhancement-layer-
+composed frame in the player log.
 
 Limits: digital decisions and paused single-frame pixels, not continuous
 playback or light. The GTK Dolby plugin used by Showtime and the browser
