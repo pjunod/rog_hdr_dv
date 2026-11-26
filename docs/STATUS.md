@@ -1,5 +1,23 @@
 # Status — what is working and what remains
 
+**November 26, 2026 — GTK Dolby plugin maps Profile 7 MEL; staged, not installed.**
+The GTK Dolby mapper (Showtime, browser) declined every Profile 7 picture
+without active NLQ before libplacebo saw it, so MEL titles kept losing their
+grade there after the mpv fix. `0.1.0+rogdv11` uploads the enhancement layer
+only for an active NLQ and lets the renderer decide whether the master is
+reconstructed. Run from its build tree in Showtime, two MEL titles changed
+from declined to mapped. A FEL title mapped as before, and an HDR10 title
+never reached the provider. One seven-package release is staged on the
+ROG (plan and preflight: seven changes, no removals) and awaits an attended
+install. It holds the rebuilt core and plugin plus metadata-only repacks
+that carry the exact pins. The repacks also restore the `shlibs` files that
+the libplacebo `-3`, provider and mpv `+depfix1` repacks left empty. The
+browser was not run. Open: full MEL files whose PGS subtitle track is
+selected by default do not start in Showtime with either build, because
+playsink's subtitle overlay refuses the NVDEC CUDA-memory caps.
+[Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#the-gtk-dolby-plugin-showtime-browser)
+· [Receipt](../evidence/gtk-dovi-mel-20261125.json).
+
 **November 25, 2026 — Profile 7 MEL titles declined by the mapper; fixed and installed.**
 A newly downloaded Profile 7 title played without its Dolby Vision grade
 ("display mapper unavailable", no FEL pill). It is MEL: an enhancement layer
@@ -10,7 +28,8 @@ the RPU does not disable the residual, declined every frame. Patch 0003 of
 raw RPU enables a residual that is exactly zero, decided with libdovi from the
 bytes the provider reads. Two MEL titles now map with the layer composed in
 mpv; FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the
-stock rebuild. The GTK Dolby plugin (Showtime, browser) still declines MEL. libplacebo-rog387 `-3`, with six metadata-only repacks for exact
+stock rebuild. The GTK Dolby plugin (Showtime, browser) declined MEL until
+`0.1.0+rogdv11` (above). libplacebo-rog387 `-3`, with six metadata-only repacks for exact
 version pins, is installed on the ROG (audit and verify clean; rollback restores
 the previous seven packages). In the owner's attended check the MEL title showed
 the mapper active and the FEL pill on, and the player logged a mapped frame with

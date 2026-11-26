@@ -59,9 +59,43 @@ the mapper active and the FEL pill on, with a mapped, enhancement-layer-
 composed frame in the player log.
 
 Limits: digital decisions and paused single-frame pixels, not continuous
-playback or light. The GTK Dolby plugin used by Showtime and the browser
-declines Profile 7 frames without active NLQ before rendering, so MEL titles
-there still lose the mapping until that plugin is changed. The server still labels an MEL title FEL.
+playback or light. The server still labels an MEL title FEL.
+
+### The GTK Dolby plugin (Showtime, browser)
+
+Up to `0.1.0+rogdv10` the GTK Dolby mapper declined every Profile 7 picture
+whose NLQ was inactive before libplacebo saw it ("matched enhancement planes
+or NLQ unavailable"), so an MEL title lost the mapping in Showtime and the
+browser even with libplacebo `-3`. `0.1.0+rogdv11` stops deciding this
+itself: it uploads the enhancement layer only for an active NLQ, the only
+case the renderer samples one, and passes the picture and raw RPU on. The
+renderer reports whether the master is reconstructed (patch 0003), and the
+mapper's provider callback still maps a Profile 7 picture only when it does,
+now naming that decline ("renderer did not reconstruct the Profile 7
+master"). FEL pictures (active NLQ) and single-layer Profile 5 and 8
+pictures take the unchanged path.
+
+[The GTK receipt](../evidence/gtk-dovi-mel-20261125.json) records the
+build (warnings as errors; negotiation probe 169 checks, 0 failures) and
+Showtime runs selecting the built library without installing it. Two MEL
+titles changed from declined to mapped with the master reconstructed. A FEL
+title mapped as before, and an HDR10 title never reached the provider in
+either build. The core, plugin, GTK sink, Showtime, libplacebo, the
+provider and mpv pin each other exactly, so the staged release is one
+seven-package transaction. It carries the rebuilt core and plugin, which now
+depend on libplacebo-rog387 `-3` or later, and metadata-only repacks with
+unchanged files. The sink and Showtime repacks (`+depfix2`) carry the new
+pins. libplacebo `-4`, provider `+depfix2` and mpv `+depfix2` restore the
+`shlibs` files that the `-3`/`+depfix1` repacks left empty.
+
+Limits: mapper decisions, not pixels or light; the browser was not run.
+Both full MEL files fail to start in Showtime with either build, for a
+separate reason. Each selects a PGS subtitle track by default, and
+playsink's subtitle overlay refuses the NVDEC CUDA-memory caps before the
+mapper sees a picture. The runs therefore used video-only copies, with a
+first build made against `-3` through a container-only `shlibs` override.
+The final build against `-4` differs only in packaging metadata. The
+attended check after installation exercises the final packages.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
 
