@@ -6,10 +6,11 @@ A newly downloaded Profile 7 title played without its Dolby Vision grade
 with an identity residual. libplacebo skipped that layer and reported it not
 composed, and the provider, which requires a reconstructed master whenever
 the RPU does not disable the residual, declined every frame. Patch 0003 of
-`libplacebo-fel-system-dv` reports the master as reconstructed when the bound
-layer's residual is identity. Two MEL titles now map with the layer composed;
-FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the stock
-rebuild. libplacebo-rog387 `-3`, with six metadata-only repacks for exact
+`libplacebo-fel-system-dv` reports the master as reconstructed when the frame's
+raw RPU enables a residual that is exactly zero, decided with libdovi from the
+bytes the provider reads. Two MEL titles now map with the layer composed in
+mpv; FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the
+stock rebuild. The GTK Dolby plugin (Showtime, browser) still declines MEL. libplacebo-rog387 `-3`, with six metadata-only repacks for exact
 version pins, is staged with a passing preflight and not installed.
 [Diagnosis, controls and limits](DV_FALLBACK_REPRODUCTION.md#profile-7-mel--an-identity-enhancement-layer-declined-by-the-mapper).
 

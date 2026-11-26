@@ -32,15 +32,23 @@ code, so the base reshape already is that reconstruction; MEL carries its
 Dolby Vision grade entirely in the RPU.
 
 [Patch 0003](../patches/libplacebo-fel-system-dv/0003-report-an-identity-enhancement-layer-as-reconstructed.patch)
-of `libplacebo-fel-system-dv` records that an enhancement layer was bound
-without a residual and reports the master as reconstructed, without sampling
-the layer. FFmpeg rejects every NLQ method other than linear dead zone, so
-with a parsed RPU `nlq_active=false` means the residual is disabled, absent
-or identity. With the installed mpv selecting each library, two independent
+of `libplacebo-fel-system-dv` decides this from the frame's raw RPU, the bytes
+the provider reads. When no enhancement layer was composed, it parses the RPU
+with libdovi and reports the master as reconstructed only for an enabled
+residual that is exactly zero: linear dead-zone NLQ with zero slope and
+threshold in every component, and no reference to a previous RPU. Disabled
+residuals, single-layer profiles and parse failures are unchanged, the
+decision does not depend on whether the caller attached the layer, and a
+build without libdovi warns once and keeps the previous behaviour. A first
+version inferred the zero residual from `nlq_active`; independent review
+showed that is unsafe for callers that fill the metadata themselves, so it
+was replaced. With the installed mpv selecting each library, two independent
 MEL titles changed from declined to mapped with the enhancement layer
-composed. A FEL title, the same FEL title with its enhancement layer
-suppressed, an HDR10 title and a Profile 8 title gave pixel-identical window
-screenshots to the stock rebuild, which itself matched the installed library.
+composed, and a MEL frame with mpv's enhancement layer suppressed was
+pixel-identical to the frame with it. A FEL title, the same FEL title with
+its layer suppressed (still declined), an HDR10 title and a Profile 8 title
+(still not composed) gave pixel-identical window screenshots to the stock
+rebuild, which itself matched the installed library.
 
 Because mpv, the provider, the GTK Dolby plugin, its GStreamer sinks and
 Showtime pin exact versions, the release carries libplacebo-rog387 `-3` and
@@ -49,8 +57,9 @@ staged with a passing preflight (seven changes, no removals) and is not
 installed.
 
 Limits: digital decisions and paused single-frame pixels, not continuous
-playback or light. The browser and Showtime route share the library but were
-not exercised. The server still labels an MEL title FEL.
+playback or light. The GTK Dolby plugin used by Showtime and the browser
+declines Profile 7 frames without active NLQ before rendering, so MEL titles
+there still lose the mapping until that plugin is changed. The server still labels an MEL title FEL.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
 
