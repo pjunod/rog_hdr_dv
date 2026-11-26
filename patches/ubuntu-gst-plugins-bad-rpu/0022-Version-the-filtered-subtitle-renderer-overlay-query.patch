@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Thu, 26 Nov 2026 15:00:00 -0500
+Subject: [PATCH] Version the filtered subtitle-renderer overlay query as
+ rogdv11
+
+---
+ debian/changelog | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/debian/changelog b/debian/changelog
+index 3ca5a3e..33731f7 100644
+--- a/debian/changelog
++++ b/debian/changelog
+@@ -1,3 +1,13 @@
++gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv11) UNRELEASED; urgency=medium
++
++  * dvdspu, assrender, dvbsuboverlay: ask downstream about the overlay caps
++    with them as the filter, as textoverlay does, instead of intersecting an
++    unfiltered answer. A consumer whose accepted memory depends on stream
++    fields (the GTK Dolby mapper) answered unfiltered with identity memory
++    only, so subtitles on NVDEC-decoded Dolby video renegotiated forever.
++
++ -- ROG HDR contributors <rog-hdr@invalid>  Thu, 26 Nov 2026 20:00:00 +0000
++
+ gst-plugins-bad1.0 (1.28.6-1ubuntu1+rogdv10) UNRELEASED; urgency=medium
+ 
+   * Refresh paused subtitle selections at the current accurate stream position.

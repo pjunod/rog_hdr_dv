@@ -1,0 +1,64 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ROG HDR contributors <rog-hdr@invalid>
+Date: Thu, 26 Nov 2026 12:43:51 -0500
+Subject: [PATCH] subtitle renderers: ask downstream with the overlay caps as
+ filter
+
+dvdspu, assrender and dvbsuboverlay decided whether downstream takes their
+overlay metadata by intersecting an unfiltered peer caps answer with their
+overlay caps. A consumer whose accepted memory depends on stream fields
+that only a filter carries (the GTK Dolby mapper) answered unfiltered with
+identity memory only, so subtitles on NVDEC-decoded Dolby video renegotiated
+forever. Pass the overlay caps as the query filter and test the answer for
+emptiness, as basetextoverlay already does.
+---
+ ext/assrender/gstassrender.c         | 4 ++--
+ gst/dvbsuboverlay/gstdvbsuboverlay.c | 4 ++--
+ gst/dvdspu/gstdvdspu.c               | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/ext/assrender/gstassrender.c b/ext/assrender/gstassrender.c
+index c12c988..1d91ef3 100644
+--- a/ext/assrender/gstassrender.c
++++ b/ext/assrender/gstassrender.c
+@@ -834,8 +834,8 @@ gst_ass_render_negotiate (GstAssRender * render, GstCaps * caps)
+      * the format ourselves and thus would have to drop the overlays.
+      * Otherwise we should prefer what downstream wants here.
+      */
+-    peercaps = gst_pad_peer_query_caps (render->srcpad, NULL);
+-    caps_has_meta = gst_caps_can_intersect (peercaps, overlay_caps);
++    peercaps = gst_pad_peer_query_caps (render->srcpad, overlay_caps);
++    caps_has_meta = !gst_caps_is_empty (peercaps);
+     gst_caps_unref (peercaps);
+ 
+     GST_DEBUG ("caps have overlay meta %d", caps_has_meta);
+diff --git a/gst/dvbsuboverlay/gstdvbsuboverlay.c b/gst/dvbsuboverlay/gstdvbsuboverlay.c
+index b545aa5..5a55958 100644
+--- a/gst/dvbsuboverlay/gstdvbsuboverlay.c
++++ b/gst/dvbsuboverlay/gstdvbsuboverlay.c
+@@ -678,8 +678,8 @@ gst_dvbsub_overlay_negotiate (GstDVBSubOverlay * overlay, GstCaps * caps)
+      * the format ourselves and thus would have to drop the overlays.
+      * Otherwise we should prefer what downstream wants here.
+      */
+-    peercaps = gst_pad_peer_query_caps (overlay->srcpad, NULL);
+-    caps_has_meta = gst_caps_can_intersect (peercaps, overlay_caps);
++    peercaps = gst_pad_peer_query_caps (overlay->srcpad, overlay_caps);
++    caps_has_meta = !gst_caps_is_empty (peercaps);
+     gst_caps_unref (peercaps);
+ 
+     GST_DEBUG_OBJECT (overlay, "Downstream accepts the overlay meta: %d",
+diff --git a/gst/dvdspu/gstdvdspu.c b/gst/dvdspu/gstdvdspu.c
+index 21694e7..7aeff8e 100644
+--- a/gst/dvdspu/gstdvdspu.c
++++ b/gst/dvdspu/gstdvdspu.c
+@@ -1357,8 +1357,8 @@ gst_dvd_spu_negotiate (GstDVDSpu * dvdspu, GstCaps * caps)
+      * the format ourselves and thus would have to drop the overlays.
+      * Otherwise we should prefer what downstream wants here.
+      */
+-    peercaps = gst_pad_peer_query_caps (dvdspu->srcpad, NULL);
+-    caps_has_meta = gst_caps_can_intersect (peercaps, overlay_caps);
++    peercaps = gst_pad_peer_query_caps (dvdspu->srcpad, overlay_caps);
++    caps_has_meta = !gst_caps_is_empty (peercaps);
+     gst_caps_unref (peercaps);
+ 
+     GST_DEBUG ("caps have dvdspu meta %d", caps_has_meta);

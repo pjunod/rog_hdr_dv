@@ -90,9 +90,8 @@ pins. libplacebo `-4`, provider `+depfix2` and mpv `+depfix2` restore the
 
 Limits: mapper decisions, not pixels or light; the browser was not run.
 Both full MEL files fail to start in Showtime with either build, for a
-separate reason. Each selects a PGS subtitle track by default, and
-playsink's subtitle overlay refuses the NVDEC CUDA-memory caps before the
-mapper sees a picture. The runs therefore used video-only copies, with a
+separate reason. Each selects a PGS subtitle track by default (cause and fix
+in the next section). The runs therefore used video-only copies, with a
 first build made against `-3` through a container-only `shlibs` override.
 The final build against `-4` differs only in packaging metadata. After
 the owner-attended install of the seven-package release, the same runs on
@@ -100,6 +99,46 @@ the installed packages, with no library path override, gave the same
 decisions: both MEL titles mapped (652 and 654 frames), the FEL title
 mapped (657) and the HDR10 title never reached the provider. MEL title B and the FEL title each
 showed the same one-time startup decline before mapping, in both runs.
+
+### Subtitles with NVDEC-decoded Dolby video in Showtime
+
+When a Dolby title's default subtitle track is PGS, playsink inserts its
+subtitle overlay with `dvdspu`. The NVDEC decoder has already chosen CUDA
+memory: bad series patch 0015 asks downstream with the stream's Dolby-marked
+caps, and the GTK Dolby mapper accepts marked native input. Up to plugins-bad
+`+rogdv10`, `dvdspu` then decided whether downstream takes its overlay
+metadata by intersecting an unfiltered peer caps answer with its own caps.
+The mapper's accepted input depends on stream fields that only a filter
+carries, so its unfiltered answer held identity memory only. `dvdspu` found no
+CUDA memory with the overlay meta ("caps have dvdspu meta 0"), refused the
+caps and renegotiated forever. Playback never started and no error was
+posted.
+
+[Patch 0021](../patches/ubuntu-gst-plugins-bad-rpu/0021-subtitle-renderers-ask-downstream-with-the-overlay-c.patch)
+makes `dvdspu`, `assrender` and `dvbsuboverlay` pass their overlay caps as the
+filter and test the answer for emptiness, as `textoverlay` (plugins-base)
+already does. For a peer that follows the caps-query rules the decision is
+the same by construction; only the PGS path was run. The mapper then answers through its marked-filter path and offers
+CUDA memory with the overlay meta. Changing the mapper's unfiltered answer
+instead was tried and dropped. Unmarked native memory there would mislead
+unmarked producers. Marked memory needs the stream configuration, which
+Showtime's playback does not carry on its stream-start event.
+
+[The subtitle receipt](../evidence/showtime-pgs-subtitles-20261126.json)
+records Showtime runs on full files with the patched plugins loaded from the
+built package and the installed mapper. Both MEL titles changed from never
+starting to mapped. A FEL title without a default subtitle track and an
+HDR10 title with one played as before. The staged release holds the five
+installed plugins-bad binaries at `+rogdv11` and a metadata-only Showtime
+repack (`+depfix3`) carrying their exact pins. The installed `rogdv10` holds a
+paused-subtitle change from the [Ubuntu update recovery](UBUNTU_UPDATE_RECOVERY.md)
+branch, so `rogdv11` was built from that installed source plus this change.
+In the series it follows that pair as patch 0021, with 0022 recording the
+`+rogdv11` version; the receipt's "patch 0019" is its number when first merged.
+
+Limits: negotiation and mapper decisions, not pixels. No run proves a
+subtitle was drawn (Gran Turismo's default track is forced-only). ASS and DVB
+subtitles, the browser and plurx Player were not run.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
 
