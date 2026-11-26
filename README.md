@@ -245,6 +245,7 @@ has the remote and branch rules.
 
 | Document | Answers |
 |---|---|
+| [Runtime acceptance corrections](docs/RUNTIME_ACCEPTANCE_CORRECTIONS.md) | Why the November 20 caption/target attempt failed, the corrected caption mask, the first-presentation attribution diagnostic and the new seek-reference times |
 | [APT repository](docs/UBUNTU_APT_REPOSITORY.md) | Installing the HDR desktop packages on a machine, and how they follow Ubuntu's updates |
 | [Software install/rollback handoff](docs/SOFTWARE_DELIVERY.md) | Current package/source hashes, recovery boundaries and retained versus remaining acceptance |
 | [Tiling animation ownership](docs/TILING_ANIMATION_OWNERSHIP.md) | Installed nativehdr2 target errors; additive nativehdr3 API correction built, target activation pending; historical offline evidence retained |

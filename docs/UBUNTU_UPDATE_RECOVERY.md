@@ -81,13 +81,17 @@ The first combined caption/target acceptance attempt (November 20, after the
 last recorded checkpoint) failed, and was reconciled on November 26 from its
 retained captures without a rerun. Two causes are distinct. First, 223 of 2,701
 glyph-core pixels fall up to 27 RGB10 codes below the derived white bound in
-every active state. All 223 lie on the core's outer edge and none is too bright, so the
-mask's four-texel bilinear footprint does not model the renderer's 1.5x caption
-downscale; the caption is present over the whole core. Second, only the first
+every active state. All 223 lie on the core's outer edge and none is too bright.
+The caption glyphs use subpixel antialiasing, and the mask chose core texels by
+alpha alone, which admits edge texels whose dimmest colour channel is below
+white. An earlier reading blamed the 1.5x downscale footprint; that reading is
+superseded ([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md#1-caption-mask-v2)).
+Second, only the first
 active picture differs, by one code in about 0.9% of viewport pixels, from every
 later presentation of the same frame. The target, mapped-video samples and
 compositor image descriptions are identical, so the difference arises after the
-mapper, in GTK composition or Mutter; it is not yet attributed. Later target
+mapper, in GTK composition, Mutter or the capture path; a staged diagnostic
+attributes it ([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md#2-first-presentation-attribution)). Later target
 round trips and caption toggles restored exactly. Caption geometry/colour and
 target-change acceptance therefore remain open. Its matching v5.15 package retains exact bad v10 dependency pins.
 Application/resources are unchanged; the normal package additionally includes
