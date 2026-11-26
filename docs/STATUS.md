@@ -10,7 +10,7 @@ from declined to mapped. A FEL title mapped as before, and an HDR10 title
 never reached the provider. The rebuilt core and plugin, with
 metadata-only `+depfix2` repacks of the GTK sink and Showtime for their
 exact pins, are staged on the ROG (plan and preflight: four changes, no
-removals) and await an attended install. Open: full MEL files whose PGS
+removals) and await an attended install. The browser was not run. Open: full MEL files whose PGS
 subtitle track is selected by default do not start in Showtime with either
 build (playsink's subtitle overlay refuses the NVDEC CUDA-memory caps), and
 libplacebo-rog387 `-3` ships an empty `shlibs` file.

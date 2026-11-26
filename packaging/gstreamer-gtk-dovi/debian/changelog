@@ -5,12 +5,14 @@ gst-gtk-dovi-map (0.1.0+rogdv11) UNRELEASED; urgency=medium
     renderer samples it, instead of declining every Profile 7 picture
     without one. A Profile 7 MEL (identity NLQ, zero residual) now reaches
     the provider as a complete master; FEL and single-layer pictures are
-    unchanged. MEL mapping needs libplacebo-rog387 1.0.0+private20261108-3
-    or later, which decides a zero residual from the raw RPU; with an older
-    renderer an MEL picture still declines to the baseline conversion.
+    unchanged.
+  * Depend on and build against libplacebo-rog387 1.0.0+private20261108-3
+    or later, which decides a zero residual from the raw RPU. An older
+    renderer would make every MEL picture render twice (a declined Dolby
+    pass, then the baseline) and never map it.
   * Name the decline when the renderer reports the master not reconstructed.
 
- -- ROG HDR contributors <rog-hdr@invalid>  Wed, 25 Nov 2026 23:30:00 +0000
+ -- ROG HDR contributors <rog-hdr@invalid>  Thu, 26 Nov 2026 03:45:00 +0000
 
 gst-gtk-dovi-map (0.1.0+rogdv10) UNRELEASED; urgency=medium
 
