@@ -36,6 +36,10 @@ version pins, is installed on the ROG (audit and verify clean; rollback restores
 the previous seven packages). In the owner's attended check the MEL title showed
 the mapper active and the FEL pill on, and the player logged a mapped frame with
 the enhancement layer composed.
+Those repacks shipped empty `shlibs` files for libplacebo-rog387 and the
+provider; content-identical libplacebo-rog387 `-4`, provider `-5+depfix2` and
+mpv `+rogdv5.7+depfix2` restore them and are installed with the GTK MEL release
+(the shared object is unchanged).
 [Diagnosis, controls and limits](DV_FALLBACK_REPRODUCTION.md#profile-7-mel--an-identity-enhancement-layer-declined-by-the-mapper).
 
 **November 25, 2026 — EL composition reported as a level; installed.**
