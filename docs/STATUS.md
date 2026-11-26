@@ -13,7 +13,7 @@ restarted). With the installed packages, both MEL titles mapped (652 and 654
 frames), the FEL title mapped as before and HDR10 never reached the
 provider. The release holds the rebuilt core and plugin plus metadata-only repacks
 that carry the exact pins. The repacks also restore the `shlibs` files that
-the libplacebo `-3`, provider and mpv `+depfix1` repacks left empty. The
+libplacebo `-3` and the provider and GTK Dolby core `+depfix1` repacks left empty. The
 browser was not run. Open: full MEL files whose PGS subtitle track is
 selected by default do not start in Showtime with either build, because
 playsink's subtitle overlay refuses the NVDEC CUDA-memory caps.
@@ -32,10 +32,15 @@ bytes the provider reads. Two MEL titles now map with the layer composed in
 mpv; FEL, base-only, HDR10 and Profile 8 controls are pixel-identical to the
 stock rebuild. The GTK Dolby plugin (Showtime, browser) declined MEL until
 `0.1.0+rogdv11` (above). libplacebo-rog387 `-3`, with six metadata-only repacks for exact
-version pins, is installed on the ROG (audit and verify clean; rollback restores
-the previous seven packages). In the owner's attended check the MEL title showed
+version pins, was installed on the ROG (audit and verify clean; its release's rollback
+restores the previous seven packages). In the owner's attended check the MEL title showed
 the mapper active and the FEL pill on, and the player logged a mapped frame with
 the enhancement layer composed.
+libplacebo `-3` and the provider `+depfix1` repack shipped empty `shlibs` files
+(the other repacks ship none). Content-identical libplacebo-rog387 `-4`, provider
+`-5+depfix2` and mpv `+rogdv5.7+depfix2` restore them and are now installed with
+the GTK MEL release (the shared object is unchanged); that release's rollback
+returns to `-3`.
 [Diagnosis, controls and limits](DV_FALLBACK_REPRODUCTION.md#profile-7-mel--an-identity-enhancement-layer-declined-by-the-mapper).
 
 **November 25, 2026 — EL composition reported as a level; installed.**

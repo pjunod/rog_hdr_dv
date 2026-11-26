@@ -103,5 +103,19 @@
   "verification": "dpkg --audit clean and dpkg -V clean for all seven packages; the installed libplacebo.so.387rog1 is byte-identical to the qualified build.",
   "rollback": "python3 operate-local-files.py rollback in the release folder reinstalls the seven previous packages.",
   "owner_check": "The owner played the MEL title in plurx Player: info showed the mapper active and the FEL pill on. The player log recorded 'mapped raw-RPU frame ... target peak=616.000 ... EL composed=1' and no decline."
+ },
+ "shlibs_correction": {
+  "defect": "The metadata repack that produced libplacebo-rog387 1.0.0+private20261108-3, librog-dv-provider387-1 1.0.0+private20261108-5+depfix1 and libgstgtk-dovi-core0 0.1.0+rogdv10+depfix1 opened each DEBIAN/shlibs file for writing before reading it, so those packages shipped empty shlibs. Runtime was unaffected; building against these libraries lost the automatic dependency line. Inspection of the staged debs found 0-byte shlibs in exactly those three; mpv, gstreamer1.0-gtk-dovi, gstreamer1.0-gtk4 and showtime ship no shlibs file in either their original or +depfix1 packages, so they were unaffected.",
+  "found_by": "The GTK Dolby plugin MEL work, whose package build needed a container-only override (evidence/gtk-dovi-mel-20261125.json).",
+  "correction": "Content-identical repacks with correct shlibs: libplacebo-rog387 1.0.0+private20261108-4 (shlibs 'libplacebo 387rog1 libplacebo-rog387 (= 1.0.0+private20261108-4)'), librog-dv-provider387-1 1.0.0+private20261108-5+depfix2 (shlibs 'libdv-provider387 1 librog-dv-provider387-1 (= 1.0.0+private20261108-5+depfix2)') and mpv 0.42.0-0ubuntu0+rogdv5.7+depfix2, the exact-pin dependent. The libplacebo shared object is byte-identical to -3 (sha256 555a171eb41a7d6029590c57bfcbd82c9699de0f47a22abee5afd977d142215b). The core's own shlibs was fixed by its rogdv11 rebuild.",
+  "candidate_sha256": {
+   "libplacebo-rog387_1.0.0+private20261108-4_amd64.deb": "68b20f7c4db4e8cba0c212d39b967661050f6833ab8a187418d7ea0228b3d9f5",
+   "librog-dv-provider387-1_1.0.0+private20261108-5+depfix2_amd64.deb": "362b2445a067fc714080a1aadba26075c36cfda8183d7149be8f26f62cb1400c",
+   "mpv_0.42.0-0ubuntu0+rogdv5.7+depfix2_amd64.deb": "d0edecc609c27edaa3c5b1c891785f182227aa64e7a881bb0e828cd53d1c0a43"
+  },
+  "install": "Shipped in the single owner-attended GTK MEL release (seven packages, evidence/gtk-dovi-mel-20261125.json); nothing restarted.",
+  "verification": "Checked independently on the ROG on 2026-11-26: the three packages are installed at the corrected versions, /var/lib/dpkg/info shows the two shlibs lines above, dpkg --audit and dpkg -V are clean, and the installed libplacebo.so.387rog1 has the sha256 above.",
+  "rollback": "The GTK MEL release's rollback (operate-local-files.py rollback in its release folder on the ROG) restores the -3 and +depfix1 set; the earlier MEL release's rollback still restores the pre-MEL -2 set.",
+  "verification_scope": "The provider shlibs line and the shared-object hash come from this check on the ROG; the deb hashes and the libplacebo shlibs line are corroborated by evidence/gtk-dovi-mel-20261125.json."
  }
 }
