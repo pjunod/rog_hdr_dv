@@ -81,7 +81,7 @@ Showtime runs selecting the built library without installing it. Two MEL
 titles changed from declined to mapped with the master reconstructed. A FEL
 title mapped as before, and an HDR10 title never reached the provider in
 either build. The core, plugin, GTK sink, Showtime, libplacebo, the
-provider and mpv pin each other exactly, so the staged release is one
+provider and mpv pin each other exactly, so the release is one
 seven-package transaction. It carries the rebuilt core and plugin, which now
 depend on libplacebo-rog387 `-3` or later, and metadata-only repacks with
 unchanged files. The sink and Showtime repacks (`+depfix2`) carry the new
@@ -94,8 +94,12 @@ separate reason. Each selects a PGS subtitle track by default, and
 playsink's subtitle overlay refuses the NVDEC CUDA-memory caps before the
 mapper sees a picture. The runs therefore used video-only copies, with a
 first build made against `-3` through a container-only `shlibs` override.
-The final build against `-4` differs only in packaging metadata. The
-attended check after installation exercises the final packages.
+The final build against `-4` differs only in packaging metadata. After
+the owner-attended install of the seven-package release, the same runs on
+the installed packages, with no library path override, gave the same
+decisions: both MEL titles mapped (652 and 654 frames), the FEL title
+mapped (657) and the HDR10 title never reached the provider. MEL title B and the FEL title each
+showed the same one-time startup decline before mapping, in both runs.
 
 ## Owner-attended session re-creation — the EL pill, not the mapping
 

@@ -1,15 +1,17 @@
 # Status — what is working and what remains
 
-**November 26, 2026 — GTK Dolby plugin maps Profile 7 MEL; staged, not installed.**
+**November 26, 2026 — GTK Dolby plugin maps Profile 7 MEL; installed on the ROG.**
 The GTK Dolby mapper (Showtime, browser) declined every Profile 7 picture
 without active NLQ before libplacebo saw it, so MEL titles kept losing their
 grade there after the mpv fix. `0.1.0+rogdv11` uploads the enhancement layer
 only for an active NLQ and lets the renderer decide whether the master is
 reconstructed. Run from its build tree in Showtime, two MEL titles changed
 from declined to mapped. A FEL title mapped as before, and an HDR10 title
-never reached the provider. One seven-package release is staged on the
-ROG (plan and preflight: seven changes, no removals) and awaits an attended
-install. It holds the rebuilt core and plugin plus metadata-only repacks
+never reached the provider. The seven-package release was installed on the
+ROG in an owner-attended window (audit and `dpkg -V` clean, nothing
+restarted). With the installed packages, both MEL titles mapped (652 and 654
+frames), the FEL title mapped as before and HDR10 never reached the
+provider. The release holds the rebuilt core and plugin plus metadata-only repacks
 that carry the exact pins. The repacks also restore the `shlibs` files that
 the libplacebo `-3`, provider and mpv `+depfix1` repacks left empty. The
 browser was not run. Open: full MEL files whose PGS subtitle track is
