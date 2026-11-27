@@ -5,8 +5,8 @@ plurx Player's EL pill could say FEL or MEL only after the server's whole-title
 scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`
 (`+rogdv5.8`) adds `enhancement-layer-nlq-active` to `native-dovi-target-state`:
 libplacebo's own NLQ decision for the presented, composed frame (true: FEL;
-false: MEL). In whole-title runs on a private compositor, one FEL and two MEL
-titles each reported only their own kind, so plurx Player 0.5.7's pill follows
+false: MEL). In private-compositor runs covering 53–93% of one FEL and two MEL
+titles at merge time, each reported only its own kind, so plurx Player 0.5.7's pill follows
 the level and keeps the server's scan as a cross-check. `+rogdv5.8` was built on
 the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It is
 handed to the project APT channel for delivery, not installed with dpkg; the
