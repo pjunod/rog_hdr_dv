@@ -24,7 +24,7 @@ import sys
 import threading
 import time
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TRACEFS = Path("/sys/kernel/tracing")
 DRI_DEBUGFS = Path("/sys/kernel/debug/dri")
 EVENTS = (
@@ -175,17 +175,59 @@ def summarise(starts, refreshes, rate, tolerance_ms, repeats_returning=0,
     return report
 
 
+PATTERNS = 16
+
+
+def decode_patterns(segments, calibration):
+    """Map CRC segments to fixture pattern indices and count sequence faults.
+
+    The fixtures show pattern n mod PATTERNS for source frame n, with an
+    optional all-white sync flash replacing one frame per second. Successive
+    segments must advance by exactly one pattern; a larger step is skipped
+    source frames, a backward step is an earlier frame shown again, and a CRC
+    outside the calibration is a picture the fixture does not contain.
+    """
+    lookup = {crc: index for index, crc in enumerate(calibration["patterns"])}
+    flash = calibration.get("flash")
+    skipped = backward = foreign = flashes = 0
+    previous = None   # pattern index of the last known segment
+    pending = 0       # segments since then that were flashes
+    for _, _, crc in segments:
+        if crc == flash:
+            flashes += 1
+            pending += 1
+            continue
+        index = lookup.get(crc)
+        if index is None:
+            foreign += 1
+            continue
+        if previous is not None:
+            # A flash stands in for one source frame, so it consumes one step.
+            step = (index - previous - pending) % PATTERNS
+            if 0 < step < PATTERNS // 2:
+                skipped += step - 1
+            else:
+                backward += 1   # same or earlier pattern after an interruption
+        previous, pending = index, 0
+    return {"skipped_frames": skipped, "shown_again": backward,
+            "foreign_pictures": foreign, "sync_flashes": flashes}
+
+
 def analyze(lines, rate, pipe="A", skip_s=5.0, window_s=None,
-            tolerance_ms=DEFAULT_TOLERANCE_MS):
+            tolerance_ms=DEFAULT_TOLERANCE_MS, calibration=None):
     flips, planes, crcs = parse_trace(lines, pipe)
     flips, cursor_only = content_flips(flips, planes)
+    decoded = None
     if crcs:
         segments, lost = crc_presentations(crcs)
-        seen, returning = set(), 0
-        for _, _, crc in segments:
-            if crc in seen:
-                returning += 1
-            seen.add(crc)
+        if segments:
+            begin = segments[0][0] + skip_s
+            end = begin + window_s if window_s else math.inf
+            segments = [seg for seg in segments if begin <= seg[0] <= end]
+        returning = 0
+        if calibration:
+            decoded = decode_patterns(segments, calibration)
+            returning = decoded["shown_again"]
         rows = [(start, count) for start, count, _ in segments]
         source = "crc"
     else:
@@ -193,18 +235,55 @@ def analyze(lines, rate, pipe="A", skip_s=5.0, window_s=None,
         frames = [frame for _, frame in flips]
         rows = [(when, ((b - a) & 0xFFFFFFFF) if a is not None and b is not None else None)
                 for (when, a), b in zip(flips, frames[1:] + [None])]
+        if rows:
+            begin = rows[0][0] + skip_s
+            end = begin + window_s if window_s else math.inf
+            rows = [row for row in rows if begin <= row[0] <= end]
         source = "flips"
-    if rows:
-        begin = rows[0][0] + skip_s
-        end = begin + window_s if window_s else math.inf
-        rows = [row for row in rows if begin <= row[0] <= end]
     starts = [row[0] for row in rows]
     refreshes = [row[1] for row in rows[:-1] if row[1] is not None]
     report = summarise(starts, refreshes, rate, tolerance_ms, returning, lost, source)
     report["pipe"] = pipe
     report["cursor_only_flips"] = cursor_only
     report["crc_refreshes"] = len(crcs)
+    if crcs:
+        report["distinct_crcs"] = len({crc for _, _, crc in crcs})
+        report["content_identity"] = "decoded" if calibration else "change-only"
+    if decoded:
+        report.update(decoded)
+        if report["verdict"] == "even" and (decoded["skipped_frames"] or decoded["foreign_pictures"]):
+            report["verdict"] = "uneven"
+            report["reason"] = (f"{decoded['skipped_frames']} skipped source frames, "
+                                f"{decoded['foreign_pictures']} pictures outside the fixture")
     return report
+
+
+def calibrate(lines, first_pattern=0, pipe="A", flash_position=None):
+    """Calibration from a frame-stepped capture: distinct CRCs in step order."""
+    _, _, crcs = parse_trace(lines, pipe)
+    segments, _ = crc_presentations(crcs)
+    order = []
+    for _, _, crc in segments:
+        if not order or order[-1] != crc:
+            order.append(crc)
+    flash = None
+    if flash_position is not None:
+        flash = order[flash_position]   # the flash stands in for that step's frame
+    patterns = [None] * PATTERNS
+    for k, crc in enumerate(order):
+        if k == flash_position:
+            continue
+        index = (first_pattern + k) % PATTERNS
+        if patterns[index] is None:
+            patterns[index] = crc
+        elif patterns[index] != crc:
+            raise SystemExit(f"step {k} does not repeat the cycle; was a frame skipped while stepping?")
+    if None in patterns:
+        raise SystemExit(f"only {PATTERNS - patterns.count(None)} patterns seen; step through all {PATTERNS}")
+    if len(set(patterns)) != PATTERNS or flash in patterns:
+        raise SystemExit("two pictures share a CRC; the pipe CRC cannot tell them apart")
+    return {"schema": "cadence-crc-calibration-v1", "pipe": pipe,
+            "patterns": patterns, "flash": flash}
 
 
 def model(rate, seconds, refresh_hz=None, vrr_min_hz=None, vrr_max_hz=None,
@@ -362,6 +441,14 @@ def main(argv=None):
     ana.add_argument("--skip", type=float, default=5.0)
     ana.add_argument("--window", type=float)
     ana.add_argument("--tolerance-ms", type=float, default=DEFAULT_TOLERANCE_MS)
+    ana.add_argument("--calibration", help="JSON from the calibrate command")
+    cal = sub.add_parser("calibrate", help="pattern CRCs from a frame-stepped capture")
+    cal.add_argument("trace")
+    cal.add_argument("--first-pattern", type=int, default=0,
+                     help="pattern index (frame number mod 16) of the first stepped frame")
+    cal.add_argument("--flash-position", type=int,
+                     help="step position of the sync flash, if one was stepped over")
+    cal.add_argument("--pipe", default="A")
     mod = sub.add_parser("model", help="predicted cadence under a timing model")
     mod.add_argument("--rate", type=parse_rate, action="append", required=True)
     mod.add_argument("--seconds", type=float, default=600)
@@ -376,11 +463,20 @@ def main(argv=None):
         print(capture(args.output, args.seconds, args.card, args.crc_crtc))
         return 0
     if args.command == "analyze":
+        calibration = None
+        if args.calibration:
+            with open(args.calibration) as handle:
+                calibration = json.load(handle)
         with open(args.trace, errors="replace") as handle:
             report = analyze(handle, args.rate, args.pipe, args.skip, args.window,
-                             args.tolerance_ms)
+                             args.tolerance_ms, calibration)
         print(json.dumps(report, indent=1))
         return 0 if report["verdict"] == "even" else 1
+    if args.command == "calibrate":
+        with open(args.trace, errors="replace") as handle:
+            print(json.dumps(calibrate(handle, args.first_pattern, args.pipe,
+                                       args.flash_position), indent=1))
+        return 0
     if bool(args.refresh_hz) == bool(args.vrr):
         parser.error("model needs exactly one of --refresh-hz or --vrr")
     reports = []

@@ -6,7 +6,7 @@ import importlib.util
 from pathlib import Path
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "tools/presentation_cadence.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "tools/cadence/presentation_cadence.py"
 SPEC = importlib.util.spec_from_file_location("presentation_cadence", SCRIPT)
 cadence = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(cadence)
@@ -16,6 +16,7 @@ FLIP = ("  gnome-shell-2011    [003] d.h1. {t:.6f}: intel_crtc_flip_done: "
 ARM = ("  gnome-shell-2011    [003] ..... {t:.6f}: intel_plane_update_arm: "
        "dev 0000:00:02.0, pipe {p}, {plane}, frame={f}, scanline=1500, "
        "format=XR30 little-endian (0x30335258), 2560.000000x1600.000000+0.000000+0.000000 -> 2560x1600+0+0")
+ZEROS = " 00000000" * 4
 CRC = ("  <idle>-0    [000] d.h1. {t:.6f}: intel_pipe_crc: dev 0000:00:02.0, "
        "pipe A, frame={f}, scanline=1601 crc={c:08x} 00000000 00000000 00000000 00000000")
 
@@ -78,29 +79,99 @@ class AnalyzeFlips(unittest.TestCase):
 
 
 class AnalyzeCrc(unittest.TestCase):
+    """Pipe CRC per refresh at 240 Hz of a 24 fps, 16-pattern fixture."""
+
+    CAL = {"patterns": [f"{0x1000 + p:08x}" + ZEROS for p in range(16)],
+           "flash": f"{0xF1A5:08x}" + ZEROS}
+
     def crc_lines(self, pictures, start=500):
         return [CRC.format(t=1000 + i / 240, f=start + i, c=pic)
                 for i, pic in enumerate(pictures)]
 
-    def test_even_from_refresh_content(self):
-        pictures = [k // 10 + 1 for k in range(240 * 20)]
-        report = cadence.analyze(self.crc_lines(pictures), Fraction(24), skip_s=1)
-        self.assertEqual(report["source"], "crc")
-        self.assertEqual(report["verdict"], "even")
+    def frames(self, count=480):
+        return [0x1000 + (n % 16) for n in range(count)]
 
-    def test_returning_picture_is_uneven(self):
-        pictures = [k // 10 + 1 for k in range(240 * 20)]
-        pictures[2000:2010] = [pictures[1990]] * 10
-        report = cadence.analyze(self.crc_lines(pictures), Fraction(24), skip_s=0)
+    def refreshes(self, frames, hold=10):
+        return [pic for pic in frames for _ in range(hold)]
+
+    def analyze(self, pictures, **kwargs):
+        return cadence.analyze(self.crc_lines(pictures), Fraction(24), skip_s=0,
+                               calibration=self.CAL, **kwargs)
+
+    def test_even_and_decoded(self):
+        report = self.analyze(self.refreshes(self.frames()))
+        self.assertEqual(report["verdict"], "even")
+        self.assertEqual(report["content_identity"], "decoded")
+        self.assertEqual((report["skipped_frames"], report["shown_again"]), (0, 0))
+
+    def test_skipped_frame_found_even_when_timing_hides_it(self):
+        frames = self.frames()
+        del frames[200]          # one source frame never shown
+        pictures = self.refreshes(frames)
+        report = self.analyze(pictures)
+        self.assertEqual(report["skipped_frames"], 1)
         self.assertEqual(report["verdict"], "uneven")
 
+    def test_earlier_frame_shown_again(self):
+        frames = self.frames()
+        frames.insert(201, frames[199])
+        report = self.analyze(self.refreshes(frames))
+        self.assertEqual(report["shown_again"], 1)
+        self.assertEqual(report["verdict"], "uneven")
+
+    def test_sync_flash_consumes_one_frame(self):
+        frames = self.frames()
+        for n in range(0, len(frames), 24):
+            frames[n] = 0xF1A5
+        report = self.analyze(self.refreshes(frames))
+        self.assertEqual(report["sync_flashes"], 20)
+        self.assertEqual((report["skipped_frames"], report["shown_again"]), (0, 0))
+
+    def test_foreign_picture_counted(self):
+        pictures = self.refreshes(self.frames())
+        pictures[1000:1010] = [0xBEEF] * 10   # e.g. an OSD over one frame
+        report = self.analyze(pictures)
+        self.assertEqual(report["foreign_pictures"], 1)
+
+    def test_change_only_without_calibration(self):
+        report = cadence.analyze(self.crc_lines(self.refreshes(self.frames())),
+                                 Fraction(24), skip_s=0)
+        self.assertEqual(report["content_identity"], "change-only")
+        self.assertEqual(report["verdict"], "even")
+
     def test_lost_refreshes_are_incomplete(self):
-        pictures = [k // 10 + 1 for k in range(240 * 20)]
-        lines = self.crc_lines(pictures)
+        lines = self.crc_lines(self.refreshes(self.frames()))
         del lines[3000:3005]
         report = cadence.analyze(lines, Fraction(24), skip_s=0)
         self.assertEqual(report["verdict"], "incomplete")
         self.assertEqual(report["lost_refreshes"], 5)
+
+    def test_paused_frame_is_one_picture(self):
+        report = cadence.analyze(self.crc_lines([0x1003] * 2400), Fraction(24), skip_s=0)
+        self.assertEqual(report["distinct_crcs"], 1)
+
+
+class Calibrate(unittest.TestCase):
+    def stepped(self, first, count, flash_at=None):
+        pictures = []
+        for k in range(count):
+            pic = 0xF1A5 if k == flash_at else 0x2000 + (first + k) % 16
+            pictures += [pic] * 60   # each step held a quarter second
+        return [CRC.format(t=1000 + i / 240, f=i, c=p) for i, p in enumerate(pictures)]
+
+    def test_patterns_in_cycle_order(self):
+        result = cadence.calibrate(self.stepped(5, 18), first_pattern=5)
+        self.assertEqual(result["patterns"][5], f"{0x2005:08x}" + ZEROS)
+        self.assertEqual(result["patterns"][4], f"{0x2004:08x}" + ZEROS)
+
+    def test_flash_position(self):
+        result = cadence.calibrate(self.stepped(0, 20, flash_at=3), first_pattern=0,
+                                   flash_position=3)
+        self.assertEqual(result["flash"], f"{0xF1A5:08x}" + ZEROS)
+
+    def test_too_few_steps_refused(self):
+        with self.assertRaises(SystemExit):
+            cadence.calibrate(self.stepped(0, 10))
 
 
 class Models(unittest.TestCase):

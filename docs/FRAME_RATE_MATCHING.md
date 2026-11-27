@@ -22,7 +22,7 @@ This panel's fixed mode is already forgiving. At 240 Hz the refresh period is 4.
 | Source rate | Refreshes per frame at 240 Hz | Result at a fixed 240 Hz |
 |---|---|---|
 | 24, 30, 60 | 10, 8, 4 exactly | Even |
-| 23.976, 29.97, 59.94 | 10.01, 8.008, 4.004 | Even, with one frame held 4.17 ms longer about every 42 s, 33 s and 17 s |
+| 23.976, 29.97, 59.94 | 10.01, 8.008, 4.004 | Even, with one frame held 4.17 ms longer every 1001/240 s = 4.17 s (one extra refresh per 100, 125 and 250 frames); *corrected 2026-11-27* |
 | 25 | 9.6 | Uneven: durations alternate between 9 and 10 refreshes (37.5 and 41.7 ms) |
 | 50 | 4.8 | Uneven: 4 and 5 refreshes (16.7 and 20.8 ms) |
 
@@ -47,6 +47,17 @@ So the work is not "make 24p watchable". It is: remove the periodic long frame f
 
 Record each in the status page before designing a fix around it.
 
+**Read on the ROG, November 27 (read-only):**
+
+| Item | Result | How |
+|---|---|---|
+| 1. VRR range | **48–240 Hz**. The maximum frame time is 20.83 ms. The EDID's only native timings are 2560×1600 at 240.000 Hz and 60.000 Hz (same 1125.28 MHz clock, vtotal 1776 / 7104) | i915 debugfs `eDP-2/vrr_range`; EDID range descriptor; DisplayID type VII decode |
+| 2. Variable mode selected | Yes: `2560x1600@240.000+vrr` is current, refresh-rate-mode `variable` | `DisplayConfig.GetCurrentState`; `monitors.xml` `<ratemode>variable</ratemode>` |
+| 3. Mutter 51.0-1ubuntu3+nativehdr17 globals | `wp_presentation` 2, `wp_fifo_manager_v1` 1, `wp_commit_timing_manager_v1` 1, `wp_color_manager_v1` 2 | Raw Wayland registry query on the session socket |
+| 4. mpv 0.42.0 | Binds `wp_fifo_manager_v1` and `wp_presentation`, not `wp_commit_timing`. Display fps comes from `wl_output` (240 Hz), and a zero feedback interval falls back to 1/240 s. There is **no** presentation-v3 refresh-kind or "display follows" handling in 0.42; the `vo.c` behaviour in section 5 is mpv master | Binary interface strings; 0.42.0 `video/out/wayland_common.c`, `video/out/vo.c` |
+| GTK 4, WebKitGTK, waylandsink | GTK 4 binds `wp_presentation` only; the other two name none of the three protocols | Binary interface strings |
+| 5. Surface and feedback per player | Not yet checked; needs running players | — |
+
 1. The panel's VRR range: the EDID range-limits descriptor, and i915's view of it in debugfs for the connector. In particular whether the minimum is at or below 24 Hz, between 24 and 48 Hz, or 48 Hz.
 2. Whether the owner's session has the variable-refresh mode selected for the panel (`monitors.xml` and `DisplayConfig`), since **[source]** Mutter exposes VRR as a twin "variable" mode of each KMS mode and only enables VRR when that mode is current.
 3. The installed Mutter's protocol versions: `wp_presentation` (main advertises 2), `wp_fifo_v1` and `wp_commit_timing_v1` (both present on main). Read them with `wayland-info`.
@@ -64,8 +75,13 @@ Nothing is fixed before this exists. It must work for every player without modif
 | Layer | What it gives | How |
 |---|---|---|
 | Client protocol trace | For each video commit, the time the compositor says it reached the screen, and the feedback flags | Run the player with `WAYLAND_DEBUG=1`, parse `wl_surface.commit`, `wp_presentation.feedback` and `wp_presentation_feedback.presented`/`discarded` for the video surface. Works for mpv, GTK and WebKit's UI process. If a player does not request feedback on its video surface (section 3, item 5), say so and use the next two layers for it. |
-| Kernel flip trace | When the CRTC actually flipped | Tracepoints `i915:intel_crtc_flip_done`, `i915:intel_pipe_update_start/end` and `drm:drm_vblank_event_delivered`, filtered to the panel's pipe. Needs root, so it runs only in an owner-attended window. It validates that the compositor's reported times are real flips and shows compositor-initiated repeats. |
-| Content identity | Which source frame each presentation showed | Fixtures carry the frame index as a strip of large black/white blocks (binary code, plus a parity block) along the top edge. A PipeWire screencast of the monitor, read with the existing `tools/sample-screen-pixel.c` approach, recovers the index per captured frame. This catches a repeated or skipped source frame that timing alone cannot. It is not a timing source. |
+| Kernel flip trace | When the CRTC actually flipped | Tracepoints `i915:intel_crtc_flip_done`, `i915:intel_plane_update_arm` and `drm:drm_vblank_event`, filtered to the panel's pipe, recorded by a Python tracefs instance (`tools/cadence/presentation_cadence.py capture`) that never leaves a tracer enabled. Needs root, so it runs only in an owner-attended window. It validates that the compositor's reported times are real flips and shows compositor-initiated repeats. *Changed from bpftrace 2026-11-27.* |
+| Content identity | Which source frame each refresh showed | The i915 pipe CRC of every refresh, read by holding debugfs `crtc-N/crc/data` open with the default `auto` source. The file is read-only, so Secure Boot lockdown permits it. Fixtures cycle through 16 distinct full-frame patterns, and a calibration pass frame-steps once through the cycle recording each pattern's CRC. The per-refresh stream then decodes to a frame index modulo 16, which exposes skipped as well as repeated source frames. It is not a timing source. *Replaces the screencast strip, 2026-11-27.* |
+
+Conditions on the CRC, set by the coordinating session:
+
+- Before trusting it, show that a paused frame gives a constant CRC with the pointer hidden, and that HDR output does not make it vary (dithering or a compositor overlay would).
+- Enabling it while PSR is active forces one full modeset (`intel_crtc_crc_setup_workarounds`), and PSR stays off while it is open. It is opened once per attended window, and the CRC source is switched off again before the window ends.
 
 Player-internal counters are recorded alongside, never instead: mpv's `frame-drop-count`, `mistimed-frame-count`, `vo-delayed-frame-count`, `vsync-jitter` and `avsync` over IPC; GStreamer QoS messages for Showtime and GtkVideo.
 
@@ -73,19 +89,24 @@ Player-internal counters are recorded alongside, never instead: mpv's `frame-dro
 
 Generated with FFmpeg into an owned directory on the external drive, never committed:
 
-- 23.976, 24, 25, 29.97, 30, 50, 59.94 and 60 fps, 1080p, at least eleven minutes, with the frame-index strip and a moving vertical bar (so the owner can also see judder).
+- 23.976, 24, 25, 29.97, 30, 50, 59.94 and 60 fps, 1080p, at least eleven minutes. Source frame n shows pattern n mod 16 (a distinct flat level) with a vertical bar that moves with the same period, so the owner can also see judder. The pictures repeat exactly every 16 frames for CRC decoding.
+- MP4 with a track timescale that divides the frame period exactly, so source timestamps carry no rounding.
+- One Matroska fixture at 23.976 fps as a separate case. Real titles are often Matroska, whose 1 ms timestamps give ±0.5 ms rounding that players must cope with. It is judged against the threshold separately, and the result says so.
 - A silent variant and one with a 1 kHz tick each second for the sync check.
 - One HDR10 and one Dolby Vision Profile 8.1 variant at 23.976 fps, built from the project's existing chart, for the picture-unchanged check.
 - One file that changes from 23.976 to 59.94 fps mid-stream.
+- *Changed 2026-11-27:* no screencast frame-index strip.
 
 ### 4.3 Tooling and output
 
 `tools/cadence/` in `rog_hdr_dv`:
 
-- `make-fixtures.sh`: the FFmpeg recipes.
-- `parse-wayland-debug.py`: surface selection and per-commit presented times.
-- `flip-trace.bt` (bpftrace) with a wrapper that records start and end and never leaves a tracer running.
-- `analyse.py`: interval histogram, maximum deviation, repeats and drops, periodicity (autocorrelation of the interval error), and the pass/fail of section 1. Output is one JSON receipt per run under `evidence/`, with no raw captures.
+- `make_fixtures.py`: the FFmpeg recipes (Python, unit-tested).
+- `parse_wayland_debug.py`: surface selection and per-commit presented times.
+- `presentation_cadence.py`:
+  - `capture`: tracefs flip trace and optional CRC hold, never leaving a tracer enabled.
+  - `analyze`: interval histogram, maximum deviation, repeats and drops, periodicity, CRC calibration decoding, and the pass/fail of section 1. Output is one JSON receipt per run under `evidence/`, with no raw captures.
+  - `model`: the timing predictions of section 12.
 
 Unit tests for the parser and the analyser use synthetic traces, including the exact patterns in the section 1 table, and run in the Python fast lane.
 
@@ -103,15 +124,20 @@ Each is a hypothesis with the measurement that confirms or kills it and the plac
 - **[source]** mpv learns that a display is variable-rate from `wp_presentation` version 3 feedback flags. Mutter advertises version 2, so mpv's refresh kind stays unknown. **[source]** Mutter reports a refresh interval of 0 on a variable mode, and mpv then falls back to the output mode's nominal rate, 240 Hz. With `video-sync=audio` and presentation feedback, mpv aims each frame half a refresh before the nearest refresh of that nominal grid. A fallback in `vo.c` infers "the display follows" only when more than half of frames are shown at once.
 - **Prediction:** fullscreen with VRR on, intervals still show the fixed-240 pattern from section 1.
 - **Test:** 23.976 and 25 fps fixtures, VRR mode selected, mpv fullscreen; compare the interval histogram with the fixed-mode table.
-- **Fix location if confirmed:** Mutter, by advertising `wp_presentation` version 3 and setting the variable-rate flag on feedback while the view's frame clock is in variable mode. This is a small, upstreamable change in `src/wayland/meta-wayland-presentation-time.c`, and it tells every client, not just mpv. Do not fix it with an mpv option in plurx Player's launcher.
+- **Fix location if confirmed** (*updated 2026-11-27*): both halves are needed.
+  - Mutter advertises `wp_presentation` version 3 and sets the variable-rate flag on feedback while the view's frame clock is in variable mode. This is a small, upstreamable change in `src/wayland/meta-wayland-presentation-time.c`, and it tells every client.
+  - The project's mpv 0.42 series backports mpv master's variable-refresh handling. 0.42 has none, so without it the Mutter half changes nothing for mpv.
+  - Do not fix it with an mpv option in plurx Player's launcher.
 
-### H2. Mutter repeats frames unevenly below 30 fps
+### H2. The panel's own repeat collides with film frames in variable mode (*replaced 2026-11-27*)
 
-- **[source]** In variable mode Mutter's frame clock has a hard-coded minimum of 30 Hz (`MINIMUM_REFRESH_RATE` in `clutter-frame-clock.c`), so it re-presents the same content at most 33.3 ms after the last flip. It has no low-framerate compensation of its own, and none was found in i915.
-- **Prediction:** at 24 fps each source frame is shown as a 33.3 ms flip followed by an 8.4 ms flip. The source frame's total duration is right, but the panel's refresh interval alternates. On an OLED that can show as brightness flicker, because panel luminance depends slightly on the refresh interval.
-- **Test:** kernel flip trace at 23.976, 24 and 25 fps; look for the 33.3 / 8.4 alternation. Owner observation of a flat mid-grey fixture for flicker.
-- **Fix location if confirmed:** Mutter's frame clock. When the fullscreen surface updates more slowly than the maximum interval, schedule the repeats evenly: `n = ceil(content_interval / max_interval)` flips of `content_interval / n` each (two flips of 20.85 ms for 23.976 fps). The content interval comes from the client's `wp_commit_timing_v1` target times when present, otherwise from the measured period of the fullscreen surface's updates over the last several frames. The maximum interval should come from the panel's real VRR minimum (section 3, item 1) instead of the constant, if the kernel exposes it to userspace; if it does not, keep the constant and record that.
-- If the panel's VRR minimum is at or below 24 Hz and the kernel accepts a 41.7 ms interval, the simplest correct result is no repeat at all. Establish that before designing the even split.
+- **[repo, read]** With a 48–240 Hz range the panel's maximum frame time is 20.83 ms. When no flip arrives by then, the hardware scans the same picture out again. **[source]** Neither Mutter nor i915 adds repeats of its own. Mutter's 30 Hz constant only bounds flush updates the KMS thread raises, such as a cursor move. It does not re-present video.
+- **Prediction:** a 23.976 fps frame (41.71 ms) arrives just after the second forced refresh has started (2 × 20.83 = 41.67 ms) and must wait out that refresh's minimum frame time. Durations alternate near 37.6 and 45.8 ms. 24.000 fps sits on the edge and may race either way. 25 fps and faster are unaffected. Variable mode can therefore be *worse* than fixed 240 Hz for film until the compositor compensates.
+- **Test:** flip trace and CRC stream at 23.976, 24 and 25 fps, in both fixed and variable mode, compared directly.
+- **Fix location if confirmed:** Mutter's frame clock presents each content frame as n even flips. n is the smallest integer with `content_interval / n` at or below the panel's maximum frame time less a safety margin. The margin is derived from the measured spread of flip latency (commit to flip-done) in the baselines and stated with its derivation.
+  - That gives n = 3 for 23.976 and 24 (13.9 ms), n = 2 for 25, 29.97 and 30, and n = 1 for 50 and above, for any margin up to 0.8 ms.
+  - The content interval comes from `wp_commit_timing_v1` targets when a client supplies them. Otherwise it comes from the measured update period of the fullscreen surface, because mpv 0.42 and GTK do not use commit-timing.
+  - The maximum frame time comes from the EDID minimum Mutter already holds (`meta_output_info_get_min_refresh_rate`). The hard-coded constant is not used for this.
 
 ### H3. Extra flips from the cursor or on-screen display
 
@@ -165,6 +191,7 @@ Each is a hypothesis with the measurement that confirms or kills it and the plac
 
 This is where quantisation is severe: a 60 Hz television shows 24 fps as 3:2 pulldown.
 
+- **[repo, read 2026-11-27]** The internal panel offers only 240 Hz and 60 Hz timings, so it has no 120 Hz or 100 Hz mode. Mode switching is relevant only to external displays.
 - **First establish the hardware facts** (read-only): which connector each external port is wired to, which GPU drives it, and what modes and VRR capability a connected display reports. If no external display is available, record criterion 7 as waiting on named hardware and stop here.
 - **[decision]** Preference order for an external display:
   1. Variable refresh, if the display and the driving GPU support it. Sections 5 and 6 then apply unchanged.
@@ -194,46 +221,26 @@ This is where quantisation is severe: a 60 Hz television shows 24 fps as 3:2 pul
 - The baseline receipts and the attribution for each hypothesis, before any fix.
 - Anything that contradicts a **[source]** statement in the shipped packages.
 
-## 12. Results and contested points (dated)
+## 12. Results (dated)
 
-Sections 1–11 above are the design of record. They are kept as written by the
-coordinating session. Results are added here; a point marked *contested* has
-been sent to the coordinating session with its evidence and is not yet
-decided.
+Sections 1–11 above are the design of record, written by the coordinating
+session. Corrections it agreed are marked with their date. Results are added here.
 
-### November 27 — section 3 facts (read-only on the ROG)
+### Corrections adopted 2026-11-27
 
-| Item | Result | How |
-|---|---|---|
-| 1. VRR range | **48–240 Hz**. The EDID's only native timings are 2560×1600 at 240.000 Hz and 60.000 Hz (same 1125.28 MHz clock, vtotal 1776 / 7104); there is no 120/144 Hz mode | i915 debugfs `eDP-2/vrr_range`; EDID range descriptor; DisplayID type VII decode |
-| 2. Variable mode selected | Yes: `2560x1600@240.000+vrr` is current, refresh-rate-mode `variable` | `DisplayConfig.GetCurrentState`; `monitors.xml` `<ratemode>variable</ratemode>` |
-| 3. Mutter globals (51.0-1ubuntu3+nativehdr17) | `wp_presentation` 2, `wp_fifo_manager_v1` 1, `wp_commit_timing_manager_v1` 1, `wp_color_manager_v1` 2 | Raw Wayland registry query on the session socket |
-| 4. mpv 0.42.0 | Binds `wp_fifo_manager_v1` and `wp_presentation`, not `wp_commit_timing`. Display fps comes from `wl_output` (240 Hz), and a zero feedback interval falls back to 1/240 s. There is no presentation-v3 refresh-kind or "display follows" handling in 0.42 (that is mpv master) | Binary interface strings; 0.42.0 `video/out/wayland_common.c`, `video/out/vo.c` |
-| GTK 4, WebKitGTK, waylandsink | GTK 4 binds `wp_presentation` only; the other two name none of the three protocols | Binary interface strings |
-| 5. Surface and feedback per player | Not yet checked; needs running players | — |
+The frame-rate session sent five points back to the coordinating session, which agreed to all of them. They are now part of sections 1–9:
 
-### Contested points (sent November 27)
+- **A.** The section 1 beat period.
+- **B.** The new H2 mechanism.
+- **C.** The even-repeat count rule.
+- **D.** The VRR minimum comes from the EDID.
+- **E.** The two-part H1 fix and the absence of a 120 Hz mode.
 
-- **Section 1 beat period.** At 240 Hz, 23.976 fps needs 10.01 refreshes
-  per frame, so one frame in 100 is held 11 refreshes: every **4.17 s**.
-  The same holds for 29.97 (1 in 125) and 59.94 (1 in 250). The table's
-  42/33/17 s is the beat a 24 Hz display would have.
-- **H2 mechanism.** In the shipped Mutter source, `MINIMUM_REFRESH_RATE` sets
-  only the interval of `clutter_frame_clock_schedule_flush_update()`. That
-  runs when the KMS thread holds an update the frame clock did not submit,
-  such as a cursor move. Nothing re-presents video on a timer in variable
-  mode. The panel's own repeat comes first, at 1/48 Hz = 20.83 ms.
-- **H2 fix arithmetic.** For 23.976 fps, two flips of 20.85 ms exceed the
-  20.83 ms maximum frame time, so the hardware repeat still fires before
-  each. Three flips (13.9 ms, 71.9 Hz) clear it, with margin.
-- **Measurement deviations proposed.** Content identity from the
-  per-refresh i915 pipe CRC rather than a screencast. A Python tracefs flip
-  trace rather than bpftrace. MP4 fixtures with an exact track timescale,
-  because Matroska's 1 ms timestamps add ±0.5 ms of PTS jitter.
+The measurement changes (pipe CRC, Python tracefs, Python tooling, MP4 plus one Matroska case) are also adopted. The section 3 facts moved into section 3.
 
 ### Timing model (prediction, not measurement)
 
-`tools/presentation_cadence.py model` simulates presentation under fixed
+`tools/cadence/presentation_cadence.py model` simulates presentation under fixed
 refresh, or under VRR where the hardware repeats at the maximum frame time
 and a late flip waits out that repeat's minimum frame time. Its predictions,
 pending the baselines:
@@ -251,12 +258,18 @@ With ±1 ms of uniform commit jitter, every rate fails the 1.0 ms
 variable-refresh threshold. Even cadence under VRR therefore also needs
 clients to target presentation times.
 
-### Measurement tooling so far
+### Measurement tooling (November 27; unit-tested, no player run yet)
 
-- `tools/presentation_cadence.py`:
-  - `capture` (root, attended) records `intel_crtc_flip_done`, `intel_plane_update_arm`, `drm_vblank_event` and `intel_pipe_crc` into a private tracefs instance with the mono clock. It removes the instance on exit or `SIGTERM`. `--crc-crtc N` also holds the pipe CRC open.
-  - `analyze` gives per-frame durations, refresh counts and an even/uneven verdict.
-  - `model` is the table above.
-  - A 3 s run on the ROG with the display off (November 27) created and removed its instance. That shows only the capture lifecycle.
-- `scripts/generate_cadence_fixtures.py` writes 11-minute SDR or HDR10 MP4 fixtures at the eight exact rates, with a drawn frame number, a per-second bar and a click. 5 s probes read back exact durations and PQ/BT.2020 tags. The frame-index strip, moving bar, silent variant, DV P8.1 chart variant and rate-change file of section 4.2 are still to add.
-- Tests: `tests/test_presentation_cadence.py`, `tests/test_generate_cadence_fixtures.py`.
+- **`tools/cadence/presentation_cadence.py`**
+  - `capture` (root, attended) records `intel_crtc_flip_done`, `intel_plane_update_arm`, `drm_vblank_event` and `intel_pipe_crc` into a private tracefs instance with the mono clock. It removes the instance on exit or `SIGTERM`. `--crc-crtc N` holds the pipe CRC open for the run.
+  - `calibrate` turns a frame-stepped CRC capture into the 16 pattern CRCs (plus the sync flash). It refuses a cycle that does not repeat, or two patterns with one CRC.
+  - `analyze --calibration` decodes every refresh to a pattern index and reports skipped source frames, earlier frames shown again and pictures outside the fixture (for example an OSD), alongside the timing verdict. Without a calibration it reports change-only identity.
+  - `model` gives the predictions above.
+  - A 3 s run on the ROG with the display off created and removed its instance. That shows only the capture lifecycle.
+- **`tools/cadence/parse_wayland_debug.py`** pairs `wp_presentation.feedback` requests with their surface, even when object ids are reused. It records `presented` time, refresh and flags or `discarded`, picks the video surface, and reports the same metrics.
+- **`tools/cadence/make_fixtures.py`** builds fixtures:
+  - Variants: `standard` (MP4, click and sync flash), `silent`, `matroska` (23.976 only, default 1 ms timestamps) and `rate-change` (23.976 then 59.94, timescale 120000).
+  - Source frame n is pattern n mod 16: a flat level and a bar moving with the same period.
+  - Encoding is intra-only at constant QP with adaptive quantisation off, because inter prediction made frame n and n+16 decode differently.
+  - On the ROG on November 27, `framemd5` of 4 s encodes of each variant read 16 distinct pictures plus the flash, all repeating exactly. Durations read back as 1001/24000, 3600/90000 and 5005/2002 per 120000 for the rate change. Matroska read back 41 ms, as expected.
+- **Tests:** `tests/test_presentation_cadence.py`, `tests/test_parse_wayland_debug.py`, `tests/test_generate_cadence_fixtures.py` (43 checks).

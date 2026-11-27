@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-SCRIPT = Path(__file__).resolve().parents[1] / "scripts/generate_cadence_fixtures.py"
+SCRIPT = Path(__file__).resolve().parents[1] / "tools/cadence/make_fixtures.py"
 SPEC = importlib.util.spec_from_file_location("generate_cadence_fixtures", SCRIPT)
 gen = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(gen)
@@ -56,12 +56,69 @@ class CadenceFixtureTests(unittest.TestCase):
 
     def test_hdr10_argv(self):
         argv = gen.build_argv("ffmpeg", "hdr10", Fraction(24000, 1001), 660, 1920, 1080, "o.mkv")
-        self.assertIn(gen.X265_HDR10, argv)
+        params = argv[argv.index("-x265-params") + 1]
+        self.assertTrue(params.startswith(gen.X265_HDR10))
+        self.assertIn("keyint=1", params)
+        self.assertIn("qp=16", params)
         self.assertIn("hdr10=1", gen.X265_HDR10)
         self.assertEqual(argv[argv.index("-color_primaries") + 1], "bt2020")
-        self.assertEqual(argv[argv.index("-g") + 1], "48")
+        self.assertNotIn("-crf", argv)
         self.assertEqual(argv[argv.index("-r") + 1], "24000/1001")
         self.assertEqual(argv[argv.index("-video_track_timescale") + 1], "24000")
+
+    def video(self, argv):
+        return argv[argv.index("-i") + 1]
+
+    def test_geq_cycles_sixteen_patterns_without_noise(self):
+        v = self.video(gen.build_argv("ffmpeg", "sdr", Fraction(25), 10, 640, 360, "o.mp4"))
+        self.assertIn("mod(N,16)", v)
+        self.assertTrue(v.startswith("color="))
+        for bad in ("random", "testsrc", "drawtext"):
+            self.assertNotIn(bad, v)
+
+    def test_silent_has_no_audio_or_flash(self):
+        argv = gen.build_argv("ffmpeg", "sdr", Fraction(25), 10, 640, 360, "o.mp4",
+                              variant="silent")
+        self.assertEqual(argv.count("-i"), 1)
+        self.assertNotIn("-map", argv)
+        self.assertNotIn("-c:a", argv)
+        self.assertNotIn("mod(T", self.video(argv))
+
+    def test_matroska_rate_restriction_and_timestamps(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            gen.parse_args([str(self.out), "--variant", "matroska", "--rates", "25"])
+        args = self.parse("--variant", "matroska")
+        self.assertEqual(args.rates, [Fraction(24000, 1001)])
+        argv = gen.build_argv("ffmpeg", "sdr", args.rates[0], 10, 640, 360, "o.mkv",
+                              variant="matroska")
+        self.assertNotIn("-video_track_timescale", argv)
+        self.assertNotIn("-movflags", argv)
+        self.assertEqual(gen.fixture_name("sdr", args.rates[0], 1920, 1080, 660, "matroska"),
+                         "cadence-sdr-24000-1001-1920x1080-660s-mkv.mkv")
+
+    def test_rate_change_argv_and_segments(self):
+        argv = gen.build_rate_change_argv("ffmpeg", "sdr", 660, 1920, 1080, "o.mp4")
+        self.assertEqual(argv[argv.index("-video_track_timescale") + 1], "120000")
+        self.assertIn("concat=n=2:v=1:a=0", " ".join(argv))
+        self.assertEqual(argv[argv.index("-fps_mode") + 1], "passthrough")
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            gen.parse_args([str(self.out), "--variant", "rate-change", "--rates", "24"])
+        with mock.patch.object(gen.subprocess, "run", fake_ffmpeg(0)):
+            self.assertEqual(gen.main([str(self.out), "--variant", "rate-change"]), 0)
+        entry = json.loads((self.out / "manifest.json").read_text())["fixtures"][0]
+        self.assertEqual(entry["file"],
+                         "cadence-sdr-24000-1001-to-60000-1001-1920x1080-660s.mp4")
+        self.assertEqual([s["expected_frames"] for s in entry["segments"]],
+                         [7912, 19780])
+        self.assertEqual([s["start_seconds"] for s in entry["segments"]], [0, 330])
+
+    def test_manifest_v2_fields(self):
+        with mock.patch.object(gen.subprocess, "run", fake_ffmpeg(0)):
+            self.assertEqual(gen.main([str(self.out), "--rates", "25"]), 0)
+        m = json.loads((self.out / "manifest.json").read_text())
+        self.assertEqual((m["patterns"], m["variant"]), (16, "standard"))
+        self.assertEqual((m["fixtures"][0]["sync_flash"], m["fixtures"][0]["timestamps"]),
+                         (True, "exact"))
 
     def test_timescales_are_exact(self):
         for rate in gen.DEFAULT_RATES:
@@ -99,7 +156,7 @@ class CadenceFixtureTests(unittest.TestCase):
         with mock.patch.object(gen.subprocess, "run", fake_ffmpeg(0)):
             self.assertEqual(gen.main([str(self.out), "--rates", "25", "--kind", "hdr10"]), 0)
         manifest = json.loads((self.out / "manifest.json").read_text())
-        self.assertEqual(manifest["schema"], "cadence-fixtures-v1")
+        self.assertEqual(manifest["schema"], "cadence-fixtures-v2")
         entry = manifest["fixtures"][0]
         self.assertEqual(len(entry["sha256"]), 64)
         self.assertEqual(entry["size_bytes"], 7)
