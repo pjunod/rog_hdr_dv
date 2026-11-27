@@ -137,7 +137,12 @@ A read-only diagnosis ruled out the Profile 7 change in the GTK Dolby mapper
 and the PR #76 subtitle change, whose decoder code is byte-identical. The
 common failure is a fresh mapper's first render, which fails before the Dolby
 provider runs. The mapper discards libplacebo's diagnostics, so the failing
-step is not named. A diagnostics-only mapper build awaits owner approval.
+step is not named. The owner approved a diagnostics-only mapper build:
+`0.1.0+rogdv12` forwards libplacebo and provider messages to the `gtkdovimap`
+category and names every failing step in its error, with no change in
+rendering. It is built and staged as a four-package release with pin-only
+sink (`+depfix3`) and Showtime (`+depfix4`) repacks, not installed
+([receipt](../evidence/gtk-dovi-diagnostics-20261127.json)).
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.

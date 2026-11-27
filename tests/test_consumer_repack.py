@@ -85,10 +85,10 @@ class ReleaseControl(unittest.TestCase):
 class RecordedReleases(unittest.TestCase):
     def test_real_file_is_accepted(self):
         releases = repack.consumer_releases()
-        self.assertEqual(releases['showtime']['release']['version'], '50.0-2+rogdv5.15+depfix3')
+        self.assertEqual(releases['showtime']['release']['version'], '50.0-2+rogdv5.15+depfix4')
         pins = repack.current_pins()
         self.assertEqual(pins['libgstgtk-dovi-core0'], repack.recipe.CORE_VERSION)
-        self.assertEqual(pins['gstreamer1.0-gtk4'], '0.15.2-1ubuntu2+rogdv5.8+depfix2')
+        self.assertEqual(pins['gstreamer1.0-gtk4'], '0.15.2-1ubuntu2+rogdv5.8+depfix3')
 
     def mutated(self, change):
         data = json.loads((FOLDER / 'package-inputs/consumer-releases.json').read_text())
@@ -115,8 +115,8 @@ class RecordedReleases(unittest.TestCase):
 
     def test_publisher_uses_recorded_release_versions(self):
         self.assertEqual(managed.expected_version('rust-gst-plugin-gtk4', {}),
-                         '0.15.2-1ubuntu2+rogdv5.8+depfix2')
-        self.assertEqual(managed.expected_version('showtime', {}), '50.0-2+rogdv5.15+depfix3')
+                         '0.15.2-1ubuntu2+rogdv5.8+depfix3')
+        self.assertEqual(managed.expected_version('showtime', {}), '50.0-2+rogdv5.15+depfix4')
 
 
 @unittest.skipUnless(shutil.which('dpkg-deb'), 'dpkg-deb is required')
@@ -149,9 +149,9 @@ class RepackRoundTrip(unittest.TestCase):
 
     def test_repack_then_verify(self):
         output = repack.repack('showtime', self.base, self.root / 'out')
-        self.assertEqual(output.name, 'showtime_50.0-2+rogdv5.15+depfix3_all.deb')
+        self.assertEqual(output.name, 'showtime_50.0-2+rogdv5.15+depfix4_all.deb')
         fields = repack.parse_control(repack._dpkg_field_text(output))
-        self.assertEqual(fields['Version'], '50.0-2+rogdv5.15+depfix3')
+        self.assertEqual(fields['Version'], '50.0-2+rogdv5.15+depfix4')
         repack.verify('showtime', self.base, output)
         with self.assertRaises(repack.PreparationError):
             repack.verify('showtime', self.base, output, recorded=True)

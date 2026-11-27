@@ -1,0 +1,50 @@
+{
+ "kind": "gtk-dovi-diagnostics-build",
+ "date_utc": "2026-11-27",
+ "host": "lab ROG",
+ "change": "GTK Dolby mapper 0.1.0+rogdv12, diagnostics only. A process-wide pl_log forwards libplacebo and Dolby provider messages to the gtkdovimap GStreamer category and is given to the Vulkan device, shader cache, dispatch, renderer and provider, which all received NULL before. Every exit from render_destination that set no error now names its step in the error message, and provider_map records why its transport pass returned -1. Rendering, return values, retries and fallbacks are unchanged.",
+ "motive": "On rogdv11 a fresh mapper's first render fails after the process-shared Vulkan device is chosen and before the provider logs anything, in Showtime (first SDR frame, NVDEC CUDA input) and on the WebKit painter's first HDR redraw, with only the generic 'Eligible Dolby frame normalization/mapping failed'. This build names that step; it does not fix it.",
+ "build": {
+  "environment": "Throwaway rog-webkit-colour-sdk:nov20 container, the same normal dpkg-buildpackage build as rogdv11, against libplacebo-rog387 1.0.0+private20261108-4, librog-dv-provider387-1 1.0.0+private20261108-5+depfix2, the provider SDK API 2 development package, libdovi-dev and FFmpeg headers; gcc 15.3.0 with -Wall -Wextra -Wpedantic -Werror.",
+  "result": "dpkg-buildpackage passed. The only build warnings are the pre-existing single-label maintainer email notices from dpkg; the compiler emitted none.",
+  "depends_unchanged": "libgstgtk-dovi-core0 Depends are identical to rogdv11 (libplacebo-rog387 (= 1.0.0+private20261108-4) from libplacebo's shlibs); the core ships shlibs 'libgstgtkdovicore 0 libgstgtk-dovi-core0 (>= 0.1.0+rogdv12)'.",
+  "sha256": {
+   "libgstgtk-dovi-core0_0.1.0+rogdv12_amd64.deb": "c05d562d455d0c5486c1935896e395eec575370f17b0f24383eefcb732ee770d",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv12_amd64.deb": "540cf2177f6363b8c28bc7d9569006ab1537c51cd74186656578b95caa524422",
+   "libgstgtk-dovi-core-dev_0.1.0+rogdv12_amd64.deb": "d5d73580acbf3512aa422197690c4299b0a46a7f32dc6e6dc22e9313680a1f93"
+  }
+ },
+ "tests": {
+  "negotiation_probe": "169 checks, 0 failures against the built plugin.",
+  "placebo_log_probe": "probes/placebo-log.c, CPU only: 25 checks, 0 failures. Level mapping both ways, threshold following at creation and after refresh, a real libplacebo message (a malformed cache load, forwarded at ERROR as 'libplacebo: Failed loading cache: invalid magic bytes'), GStreamer threshold filtering and four concurrent callers.",
+  "not_run": "No render path was exercised: no GPU test exists offline, and no Showtime, browser or compositor was run. The new reason strings are therefore unobserved until the next attended run."
+ },
+ "consumer_repacks": {
+  "method": "repack-consumers.py from the qualified bases with CORE_VERSION 0.1.0+rogdv12; verify --recorded passed for both. Against the installed releases only Version and the gtk-dovi (and, for Showtime, sink) exact pins differ; file contents and every payload entry except the root directory's timestamp are identical.",
+  "gstreamer1.0-gtk4": {
+   "base": "0.15.2-1ubuntu2+rogdv5.8",
+   "release": "0.15.2-1ubuntu2+rogdv5.8+depfix3",
+   "deb_sha256": "85a54d5782593f9d2e3d9fcdc785df1f1c39345f5739a3d0470d8d4432214a4d"
+  },
+  "showtime": {
+   "base": "50.0-2+rogdv5.15",
+   "release": "50.0-2+rogdv5.15+depfix4",
+   "deb_sha256": "ff93ce7ab4579df5621319bfd551b5de606bb77a9229f6dc6aeadf4bc147c235"
+  }
+ },
+ "release": {
+  "status": "staged on the ROG, not installed",
+  "transaction": "Four package changes, no removals: libgstgtk-dovi-core0 and gstreamer1.0-gtk-dovi 0.1.0+rogdv11 -> 0.1.0+rogdv12, gstreamer1.0-gtk4 +depfix2 -> +depfix3, showtime +depfix3 -> +depfix4. The development package is staged but not installed on the ROG. The release tool's unprivileged plan and preflight passed: exact four-package live simulation and all eight archive digests.",
+  "rollback_sha256": {
+   "libgstgtk-dovi-core0_0.1.0+rogdv11_amd64.deb": "85ef83552d63ae55e656fe1435aae42efbf65208ab74ddb06f66a5cc2a5e8d52",
+   "gstreamer1.0-gtk-dovi_0.1.0+rogdv11_amd64.deb": "2a71aa54f6db17a571a30f025cf54b579c115c7f5366a21171105cccce95311f",
+   "gstreamer1.0-gtk4_0.15.2-1ubuntu2+rogdv5.8+depfix2_amd64.deb": "16c7a76da28d084f9703915645f3ec17703d2bed92b740f7228b6b9bafafe41b",
+   "showtime_50.0-2+rogdv5.15+depfix3_all.deb": "be5cfd380c0f8a7c6f77da53ea79b72af79747e2449227ad53ac9789a07985f5"
+  }
+ },
+ "limits": [
+  "Diagnostics only: this build does not fix the first-render failure and claims no change in mapping.",
+  "The libplacebo log level follows the gtkdovimap threshold; with GStreamer debug off nothing is forwarded, as before.",
+  "Verbose thresholds (gtkdovimap:6 and above) enable libplacebo's trace level, which its documentation says can cost CPU."
+ ]
+}
