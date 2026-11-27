@@ -118,8 +118,26 @@ On November 27 all three were implemented, independently reviewed and frozen.
 They have not been run. Review moved the attribution diagnostic's anomalous
 capture to the seek presentation, and moved the p7 still case from 0.5 s to
 2 s; the 0.5 s p7 still picture is now uncovered
-([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md)). The next step needs an
-owner test window.
+([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md)).
+
+**November 27 test window: nothing qualified.** The frozen runners were first
+re-bound to the installed packages (bad family and GTK Dolby at rogdv11, plus
+the sink and Showtime pin repacks). That re-freeze changed only paths, pins
+and versions.
+- **Both Showtime runs stopped on the first frame of the Profile 5 file.** The
+  mapper reported its generic "mapping failed" error, so the first-picture
+  test was invalid and was correctly not rerun.
+- **The browser cohort first exposed two harness defects, now fixed.** The
+  paired session holder had never matched its runner. The fix then made the
+  runtime path too long for WebKit's proxy sockets.
+- **The browser's first case then played no on-screen frames.** The painter's
+  first mapper render never completed.
+
+A read-only diagnosis ruled out the Profile 7 change in the GTK Dolby mapper
+and the PR #76 subtitle change, whose decoder code is byte-identical. The
+common failure is a fresh mapper's first render, which fails before the Dolby
+provider runs. The mapper discards libplacebo's diagnostics, so the failing
+step is not named. A diagnostics-only mapper build awaits owner approval.
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.

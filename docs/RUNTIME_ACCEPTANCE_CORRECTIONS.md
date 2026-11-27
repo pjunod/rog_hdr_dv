@@ -255,6 +255,48 @@ p7 still case moved to 2 s. The source-reference list is complete for the
 first time: the normal freeze step, run offline, accepts all eleven
 references, and they exactly match the set the twelve cases require.
 
+## November 27 runs
+
+No result qualified, and no frozen model was exercised.
+
+**Re-binding before the run.** The frozen runners pinned the November 20
+package versions, and reviewed work had since installed newer ones. They were
+re-bound in new copies:
+- **Paths and versions only:** the copies change only paths, pins and exact
+  versions, and a per-file freeze record proves that.
+- **Staged package list:** a release manifest and install plan were built
+  from the installed state and are staged, not published.
+
+**Showtime.** Attribution and caption/target acceptance both stopped before
+playback. The Dolby mapper failed on the first Profile 5 frame with its
+generic error. Attribution was invalid and correctly not eligible for the
+pre-declared rerun.
+
+**Browser cohort.** Three harness defects were found and fixed in turn:
+- **Session folder left behind:** the controller did not archive the GNOME
+  session folder before the browser phase.
+- **Holder and runner never matched:** the paired session holder created a
+  directory its runner never waited for. This dates from the first paired
+  copy, so no paired run had ever reached readiness.
+- **Proxy socket path too long:** the corrected directory name made WebKit's
+  proxy socket paths exceed the 107-byte Unix socket limit, so they were
+  silently truncated. The holder now checks the length before it creates
+  anything.
+
+The browser then loaded its first case. It played no on-screen frames,
+because the painter's first mapper render never completed.
+
+**Diagnosis (read-only).** Three suspects are ruled out:
+- the GTK Dolby rogdv11 change, which applies only to Profile 7;
+- the PR #76 subtitle change, whose decoder code is byte-identical;
+- the browser's VA decoder errors, which occur at teardown and also occurred
+  in the passing November 20 run.
+
+The common failure is a fresh mapper's first render, after GPU setup and
+before the Dolby provider runs. The mapper gives libplacebo no logger, so the
+failing step is unnamed. The next step is a diagnostics-only mapper build
+that routes those messages and per-step reasons to its debug log.
+
 ## Remaining order
 
 1. **Owner test window:** run the attribution phase, then caption/target
