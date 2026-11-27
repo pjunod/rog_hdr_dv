@@ -79,6 +79,8 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
     pl_tex *mapped, struct pl_color_space *color)
 {
   GstGtkDoviMapper *s = priv;
+  /* Only a -1 return below records a reason; every other return clears it. */
+  s->map_failure = NULL;
   if (s->requires_fel && !composed) {
     decline (s, 512, "renderer did not reconstruct the Profile 7 master");
     return s->mapped = 0;
@@ -437,8 +439,16 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   if (crop && (crop->x > storage_width || crop->y > storage_height ||
       crop->width != width || crop->height != height ||
       crop->width > storage_width - crop->x || crop->height > storage_height - crop->y))
-    FAIL ("crop %ux%u+%u+%u outside %ux%u input", crop->width, crop->height, crop->x, crop->y,
-        storage_width, storage_height);
+  {
+    /* Same tests as the condition above, evaluated only to name the failure. */
+    gboolean outside = crop->x > storage_width || crop->y > storage_height ||
+        crop->width > storage_width - crop->x || crop->height > storage_height - crop->y;
+    gboolean resized = crop->width != width || crop->height != height;
+    FAIL ("crop %ux%u+%u+%u %s (negotiated %ux%u, input %ux%u)", crop->width, crop->height,
+        crop->x, crop->y, outside && resized ? "differs from the negotiated size and lies outside the input" :
+        resized ? "differs from the negotiated size" : "lies outside the input",
+        width, height, storage_width, storage_height);
+  }
   gboolean native_yuv = format == AV_PIX_FMT_NV12 || format == AV_PIX_FMT_P010LE ||
       format == AV_PIX_FMT_YUV420P || format == AV_PIX_FMT_YUV420P10LE;
   gboolean apply_dovi = native_yuv && resolved && raw && t &&
