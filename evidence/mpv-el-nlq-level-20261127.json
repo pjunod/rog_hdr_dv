@@ -23,26 +23,33 @@
     "titles": [
       {
         "title": "FEL title (Avatar: Fire and Ash, 2025, remux)",
-        "status": "in progress at merge: frames 0-151517 of about 283900 (53%)",
+        "status": "paused at the owner's request (NAS bandwidth test for plurxd playback) after frames 0-200472 of about 283900 (71%)",
         "result": "composed=true, nlq-active=true from frame 0; no change notified in that span"
       },
       {
         "title": "MEL title A (Gran Turismo, 2023, remux)",
-        "status": "in progress at merge: frames 0-179855 of about 193150 (93%)",
-        "result": "composed=true, nlq-active=false from frame 1; no change notified in that span"
+        "status": "complete: end-of-file after 193049 frames (pts 8051.75 s of 8056.05 s), 0 dropped",
+        "result": "composed=true, nlq-active=false from frame 0; no change notified in the whole title"
       },
       {
         "title": "MEL title B (Can't Hardly Wait, 1998, remux)",
-        "status": "in progress at merge: frames 0-89266 of about 144560 (62%)",
+        "status": "paused at the owner's request after frames 0-120960 of about 144560 (84%)",
         "result": "composed=true, nlq-active=false from frame 0; no change notified in that span"
       }
     ],
-    "rule": "In the spans covered at merge time neither kind showed a frame of the other, so the pill follows the live level; no per-title latch or sustain rule is needed. The final whole-title counts are recorded in a follow-up; a change of kind would reopen the rule."
+    "rule": "One MEL title complete and the other two titles at 71% (FEL) and 84% (MEL) showed no frame of the other kind, so the pill follows the live level; no per-title latch or sustain rule is needed. A change of kind in the remaining spans would reopen the rule."
   },
   "limits": [
     "Notifications coalesce: a flip shorter than one property dispatch can be missed. The server's complete-title scan, which reads every RPU, is the independent cross-check the player keeps.",
     "libplacebo's identity test also requires vdr_in_max = 2^coef_log2_denom; the plurx server's does not, so they can disagree on that edge.",
     "Private compositor; no optical measurement; not an attended visual check."
   ],
-  "review": "One adversarial review (Fable). It found no serious defect in either change. It found an edge where a frame composed from a zero residual without an attached layer could report active NLQ; fixed by requiring the attached layer, which is libplacebo's own sampling condition. It also noted docs wording and plurx cross-check gaps around the server's own FEL claim; both were fixed."
+  "review": "One adversarial review (Fable). It found no serious defect in either change. It found an edge where a frame composed from a zero residual without an attached layer could report active NLQ; fixed by requiring the attached layer, which is libplacebo's own sampling condition. It also noted docs wording and plurx cross-check gaps around the server's own FEL claim; both were fixed.",
+  "install": {
+    "route": "The project APT channel (delivery effort E-96C3E3B252): libmpv2, libmpv-dev and mpv uploaded to the forge Debian registry (pjunod/debian, stonking/main); SHA256SUMS verified on the Mac and the ROG.",
+    "procedure": "apt-get -s showed 1 upgraded, 0 removed; after apt-get update, apt-cache policy mpv showed candidate +rogdv5.8 at priority 999 from the registry; installed with apt-get install --only-upgrade mpv.",
+    "result": "dpkg-query reports mpv 0.42.0-0ubuntu0+rogdv5.8 from stonking (no longer a local package); dpkg --audit and dpkg -V mpv clean. A running mpv kept the old binary until restart; nothing else was upgraded or restarted.",
+    "rollback": "~/work/claude-apt-mpv-rogdv58/rollback-mpv_0.42.0-0ubuntu0+rogdv5.7+depfix2_amd64.deb on the ROG, whose md5sums match the files that were installed.",
+    "attended_check": "pending (owner)"
+  }
 }

@@ -1,16 +1,17 @@
 # Status — what is working and what remains
 
-**November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; built.**
+**November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; installed.**
 plurx Player's EL pill could say FEL or MEL only after the server's whole-title
 scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`
 (`+rogdv5.8`) adds `enhancement-layer-nlq-active` to `native-dovi-target-state`:
 libplacebo's own NLQ decision for the presented, composed frame (true: FEL;
-false: MEL). In private-compositor runs covering 53–93% of one FEL and two MEL
-titles at merge time, each reported only its own kind, so plurx Player 0.5.7's pill follows
+false: MEL). In private-compositor runs, one MEL title to end of file and the FEL
+and other MEL title through 71% and 84% each reported only their own kind, so plurx Player 0.5.7's pill follows
 the level and keeps the server's scan as a cross-check. `+rogdv5.8` was built on
-the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It is
-handed to the project APT channel for delivery, not installed with dpkg; the
-attended visual check is the owner's.
+the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It was
+installed on the ROG through the project APT channel (forge Debian registry),
+not with dpkg; audit and verify are clean, rollback is `+rogdv5.7+depfix2`, and
+the attended visual check is the owner's.
 [Design and limits](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers)
 · [Receipt](../evidence/mpv-el-nlq-level-20261127.json).
 
