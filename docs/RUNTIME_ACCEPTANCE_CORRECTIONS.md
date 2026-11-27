@@ -1,6 +1,6 @@
 # Runtime acceptance corrections — caption mask, first-presentation attribution, seek references
 
-**State: designed, not implemented or run · November 26, 2026.** This page
+**State: implemented, reviewed and frozen; not run · November 27, 2026.** This page
 corrects the three harness defects behind the failed November 20 Showtime
 caption/target attempt and the incomplete browser source/seek cohort
 ([recovery record](UBUNTU_UPDATE_RECOVERY.md#ordinary-video-colour-correction-after-restoration),
@@ -108,8 +108,18 @@ These captures shaped the diagnosis, so this score does not grant acceptance.
     Only the preferred target changed (616 → 308 → 616 nits target
     luminance).
 - **What distinguishes A.** It is the only capture taken before the first
-  target round trip, and it is the first caption presentation. The difference
-  therefore arises after the mapper, in GSK, Mutter or the screencast path.
+  target round trip. The difference therefore arises after the mapper, in
+  GSK, Mutter or the screencast path.
+- **A is the seek presentation (source and retained, found in review on
+  November 27).** Showtime selects subtitle track 0 at load, so the caption is
+  already enabled when the seek frame appears. The early "invalid subtitle
+  stream index 0" error comes from that call, which fails before the streams
+  exist; the caption is enabled anyway. A carries the seek event's own sink
+  frame, context, generation and source epoch. Every later caption
+  presentation followed a stream reselection: active-A2 equals restored
+  active-A3 exactly, while A differs from both. The first design treated A as
+  the first caption toggle; that premise was wrong, and the sequence below
+  replaces it.
 
 ### Diagnostic sequence
 
@@ -120,15 +130,26 @@ throughout, and every compared presentation must carry the same mapper hash.
 
 | Step | Action | Isolates |
 |---|---|---|
-| D1 | Capture one unchanged presentation twice, with no `wl_surface.commit` between the two captures (checked in the protocol log) | Reader/screencast determinism |
-| D2 | Before any target change: caption off (D0) → on (A) → off → on (A′) | First presentation vs state before the round trip |
+| D1 | Capture the seek presentation (caption on, as loaded) twice, with no `wl_surface.commit` between the two captures (checked in the protocol log); the first is A | Reader/screencast determinism on the anomalous presentation |
+| D2 | Before any target change: caption off (D0) → on (A′) | Seek presentation vs a reselected presentation before the round trip |
 | D3 | Target round trip 616 → 308 → 616, then caption on (A2), as in run 007 | Reproduces the failing comparison |
-| D4 | Close and relaunch the player in the same private compositor, seek to the same frame, caption on (A-fresh), and repeat once (A-fresh′) | Client state vs compositor state |
-| D5 | At each phase, a separate passive client records the output's image-description information (`get_output`) | Compositor output-state identity, by protocol |
+| D4 | Close and relaunch the player in the same private compositor and seek to the same frame. Capture its own seek presentation (A-fresh), then caption off → on (A-fresh′) | Client state vs compositor state |
+| D5 | At each phase, a separate passive client records the output's image-description information (`get_output`) | Compositor output-state identity, by protocol; informational |
+
+The run is invalid, not attributed, when:
+- the caption is not on at either seek;
+- A or A-fresh is not its instance's seek event;
+- any compared presentation has a different mapper hash or allocation/UI binding;
+- the evaluation runs in a different boot from the capture.
+
+The relaunch reuses the private home and caches (warm, not cold). The
+player's normal Quit-to-exit path has not been observed before, because
+earlier cleanups ended with the supervisor's TERM. A failed Quit fails the
+run closed; no fallback signal is added.
 
 | Outcome | Attribution |
 |---|---|
-| D1 captures differ | Capture path (Mutter screencast), not the product |
+| D1 captures differ | Capture path or compositor repaint (Mutter), not the product |
 | A = A′ ≠ A2 and A-fresh = A2 | Compositor state that the round trip changed (Mutter) |
 | A = A′ ≠ A2 and A-fresh = A | Client state that the round trip changed (GTK) |
 | A ≠ A′, A′ = A2, and A-fresh ≠ A-fresh′ | First-frame transient in the client (GTK) |
@@ -167,16 +188,77 @@ The **offline** results come from the unchanged builder and fixture manifest
 time with an exact p7 frame. The frozen candidates are private files on the
 lab host; the contract change belongs to the reviewed case and contract pins.
 
-## Implementation and order
+p8loop repeats one static picture, so its seek case proves seek timing and
+presentation, not a change of picture content. That was already true at the
+old times.
 
-1. **Implementation agents** build, outside the product packages:
-   - caption mask v2: an offline `textoverlay` raster builder plus the
-     per-channel core;
-   - the D1–D5 controller steps;
-   - the case and contract time change.
-   Each change gets an independent review before it is frozen.
-2. **Owner test window:** run D1–D5 and the caption/target acceptance with
-   the frozen v2 mask, then the source/seek cohort and the loaded-library
-   check.
-3. Record the results in [status](STATUS.md) and the recovery record, then
+**Still case p7-clip05 → p7-clip20 (owner decision, November 27).** Review of
+the change found one more case on the rejected frame: the p7 still picture at
+0.5 s. It is moved by the same kind of fixed rule: the smallest half-second t
+≥ 1/2 whose p7 reference passes and that no sibling p7 still case uses.
+p7-clip15 already uses 3/2, so the rule gives t = 2.
+
+- **What was checked.** No earlier capture of p7 at 2 s exists, so no
+  capture informed the choice. The 3/2 and 2 source frames have different
+  decoded hashes, so the two still cases compare distinct pictures.
+- **Scope change.** The p7 still picture at 0.5 s, shortly after load, is no
+  longer covered by this reference method. Nothing records why 0.5 s was
+  originally chosen.
+- **Unchanged.** p8loop-clip05 still passes its reference and stays as it
+  was.
+
+## Implementation and review (November 27)
+
+Implementation agents built all three corrections in private harness copies
+outside the product packages; the November 20 harness is unchanged. Every
+piece had an independent adversarial review, and review findings were fixed
+before freezing. No piece has been launched against a display.
+
+**Caption mask v2 (fourth revision).** The mask is unchanged across
+revisions: 1,979 core and 16,660 support pixels. Review added:
+- **The sink's alpha round trip, modelled from source.** The sink requests
+  straight-alpha pixels, which GStreamer un-premultiplies; GTK keeps the
+  straight texture and premultiplies each texel in the shader before the
+  bilinear mix. The core test is c′·a ≥ 250·255 on all four footprint texels.
+  The sink's own pixel read must equal the model byte for byte. An exhaustive
+  8-bit check shows the round trip never changes the core decision.
+- **Both GPU renderers.** The test is a sufficient condition for the GL and
+  Vulkan GPU renderers, in either sRGB decode order: the decode curve is
+  convex and the primaries matrix is non-negative with unit rows. A
+  software or Cairo renderer is not covered, and the runner rejects one:
+  the window buffers must be dmabuf, with no shared-memory window buffer.
+- **The installed GTK.** Within the cited GTK source ranges, the later
+  project patches up to the installed revision leave the sampling and upload
+  path byte-identical. The installed library equals the packaged payload. A
+  byte-level rebuild of that package was not compared.
+- **An enforced binding.** The caption acceptance runner checks exact
+  package versions and library hashes, the system font configuration and
+  resolved font pattern, and the player's environment. It checks before
+  launch, and again after the captures against the player's own mapped
+  libraries.
+- **Evidence limit.** The requested Adwaita Sans is not installed; both the
+  offline renderer and the player resolve the same fallback face under the
+  same font configuration. The face is witnessed by font matching and file
+  hash, not inside the caption element.
+
+**Attribution phase.** It follows the corrected sequence above. It is
+invalid on a broken premise, a mapper-hash or UI-binding mismatch, a commit
+between the D1 captures, a cleanup failure, or evaluation in another boot.
+Parsers reproduce all seven step events of the November 20 run from its own
+logs. That check confirms that A was the seek presentation and that the
+caption was rendered into it. The D5 output reader is a small passive
+protocol client built from installed headers. It has not yet run against
+Mutter.
+
+**Browser cases.** The two seek cases start at 1.5 s and seek to 2.5 s. The
+p7 still case moved to 2 s. The source-reference list is complete for the
+first time: the normal freeze step, run offline, accepts all eleven
+references, and they exactly match the set the twelve cases require.
+
+## Remaining order
+
+1. **Owner test window:** run the attribution phase, then caption/target
+   acceptance with the frozen v2 mask, then the source/seek cohort and the
+   loaded-library check.
+2. Record the results in [status](STATUS.md) and the recovery record, then
    continue with merge review, the fast lane and publication.

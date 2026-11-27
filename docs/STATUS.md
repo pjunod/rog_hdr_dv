@@ -113,8 +113,13 @@ causes: a caption mask that chose its core by alpha alone, although the glyphs
 use subpixel antialiasing, and a one-code first-presentation difference after
 the mapper that is not yet attributed ([details](UBUNTU_UPDATE_RECOVERY.md#ordinary-video-colour-correction-after-restoration)).
 On November 26 a source-derived caption mask v2, a staged attribution
-diagnostic and new browser seek-reference times (start 3/2 s) were designed;
-they are not yet implemented or run ([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md)).
+diagnostic and new browser seek-reference times (start 3/2 s) were designed.
+On November 27 all three were implemented, independently reviewed and frozen.
+They have not been run. Review moved the attribution diagnostic's anomalous
+capture to the seek presentation, and moved the p7 still case from 0.5 s to
+2 s; the 0.5 s p7 still picture is now uncovered
+([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md)). The next step needs an
+owner test window.
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.
