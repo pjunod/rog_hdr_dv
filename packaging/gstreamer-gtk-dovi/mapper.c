@@ -3,6 +3,7 @@
 #include "mapper.h"
 #include "native-input-formats.h"
 #include "render-preconditions.h"
+#include "placebo-log.h"
 #include "gstdovipicture.h"
 #include <dv_provider387.h>
 #if !defined(DV_PROVIDER387_TARGET_V2_VERSION) || DV_PROVIDER387_TARGET_V2_VERSION != 2
@@ -51,6 +52,8 @@ struct GstGtkDoviMapper {
   int mapped;
   guint warned;
   guint target_strategy_witness;
+  /* Diagnostics only: why provider_map last returned -1, for the render error. */
+  const char *map_failure;
 };
 static int decline (GstGtkDoviMapper *s, guint bit, const char *reason)
 {
@@ -58,6 +61,19 @@ static int decline (GstGtkDoviMapper *s, guint bit, const char *reason)
   return 0;
 }
 static GQuark mapper_error (void) { return g_quark_from_static_string ("gtk-dovi-mapper"); }
+/* Name the failing step in the generic render error. Never replaces an error
+ * already set, and changes no return value or control flow. */
+G_GNUC_PRINTF (2, 3) static void name_failure (GError **error, const char *format, ...)
+{
+  if (!error || *error) return;
+  va_list args;
+  va_start (args, format);
+  gchar *reason = g_strdup_vprintf (format, args);
+  va_end (args);
+  g_set_error (error, mapper_error (), 1, "Eligible Dolby frame normalization/mapping failed: %s", reason);
+  g_free (reason);
+}
+#define FAIL(...) do { name_failure (error, __VA_ARGS__); goto done; } while (0)
 static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size,
     bool composed, const struct pl_color_space *target, pl_tex master,
     pl_tex *mapped, struct pl_color_space *color)
@@ -84,6 +100,7 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
         names[strategy] : "unknown");
     s->target_strategy_witness = strategy + 1;
   }
+  if (s->mapped < 0) s->map_failure = "provider map returned an error";
   if (s->mapped != 1) return s->mapped;
   if (s->requires_fel)
     GST_LOG ("Profile 7 provider accepted composed %dx%d master",
@@ -91,13 +108,22 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
   if (s->transport_gain != 1.0f) {
     pl_fmt fmt = pl_find_fmt (gpu, PL_FMT_FLOAT, 4, 32, 0,
         PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_SAMPLEABLE | PL_FMT_CAP_HOST_READABLE);
-    if (!fmt || !pl_tex_recreate (gpu, &s->transport, pl_tex_params (
+    if (!fmt) {
+      s->map_failure = "transport format unavailable";
+      return s->mapped = -1;
+    }
+    if (!pl_tex_recreate (gpu, &s->transport, pl_tex_params (
         .w = (*mapped)->params.w, .h = (*mapped)->params.h, .format = fmt,
         .sampleable = true, .renderable = true, .host_readable = true,
-        .storable = fmt->caps & PL_FMT_CAP_STORABLE))) return s->mapped = -1;
+        .storable = fmt->caps & PL_FMT_CAP_STORABLE))) {
+      s->map_failure = "transport texture create failed";
+      return s->mapped = -1;
+    }
     pl_shader sh = pl_dispatch_begin (s->dispatch);
     if (!pl_shader_sample_direct (sh, pl_sample_src (.tex = *mapped))) {
-      pl_dispatch_abort (s->dispatch, &sh); return s->mapped = -1;
+      pl_dispatch_abort (s->dispatch, &sh);
+      s->map_failure = "transport sample shader failed";
+      return s->mapped = -1;
     }
     const struct pl_color_space pq = {.primaries = PL_COLOR_PRIM_BT_2020, .transfer = PL_COLOR_TRC_PQ};
     pl_shader_linearize (sh, &pq);
@@ -108,11 +134,15 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
         .body = "color.rgb *= dv_physical_transport_gain;",
         .input = PL_SHADER_SIG_COLOR, .output = PL_SHADER_SIG_COLOR,
         .variables = &gain, .num_variables = 1})) {
-      pl_dispatch_abort (s->dispatch, &sh); return s->mapped = -1;
+      pl_dispatch_abort (s->dispatch, &sh);
+      s->map_failure = "transport gain shader failed";
+      return s->mapped = -1;
     }
     pl_shader_delinearize (sh, &pq);
-    if (!pl_dispatch_finish (s->dispatch, pl_dispatch_params (.shader = &sh, .target = s->transport)))
+    if (!pl_dispatch_finish (s->dispatch, pl_dispatch_params (.shader = &sh, .target = s->transport))) {
+      s->map_failure = "transport dispatch failed";
       return s->mapped = -1;
+    }
     *mapped = s->transport;
   }
   *color = *target;
@@ -127,6 +157,20 @@ GstGtkDoviMapper *gst_gtk_dovi_mapper_new (void) { gst_gtk_dovi_debug_init (); r
  * provider stay per mapper. The cache lets later mappers reuse compiled passes.
  * A GPU that is not thread-safe gets a device of the mapper's own instead. */
 static GMutex shared_gpu_lock;
+/* One libplacebo log per process, forwarding to the gtkdovimap category. It is
+ * created before the first device, renderer, dispatch, cache or provider and
+ * never destroyed: devices are destroyed on the release thread or by the exit
+ * drain, and every holder may log until then. */
+static pl_log placebo_log (void)
+{
+  static gsize initialized;
+  static pl_log placebo;
+  if (g_once_init_enter (&initialized)) {
+    placebo = gtk_dovi_placebo_log_create (gtk_dovi_map_debug);
+    g_once_init_leave (&initialized, 1);
+  }
+  return placebo;
+}
 static pl_vulkan shared_vk;
 static pl_cache shared_cache;
 static guint shared_gpu_users;
@@ -143,13 +187,15 @@ static void log_device (pl_vulkan vk)
 }
 static pl_vulkan acquire_vulkan (gboolean *shared)
 {
+  pl_log placebo = placebo_log ();
+  if (placebo) gtk_dovi_placebo_log_refresh (placebo, gtk_dovi_map_debug);
   g_mutex_lock (&shared_gpu_lock);
   if (!shared_vk) {
-    shared_vk = pl_vulkan_create (NULL, pl_vulkan_params (.allow_software = true));
+    shared_vk = pl_vulkan_create (placebo, pl_vulkan_params (.allow_software = true));
     if (shared_vk) {
       log_device (shared_vk);
       if (shared_vk->gpu->limits.thread_safe) {
-        shared_cache = pl_cache_create (pl_cache_params (.max_total_size = 64 << 20));
+        shared_cache = pl_cache_create (pl_cache_params (.log = placebo, .max_total_size = 64 << 20));
         pl_gpu_set_cache (shared_vk->gpu, shared_cache);
       }
     }
@@ -385,11 +431,14 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   gboolean el_uploaded = FALSE;
   gboolean uploaded = FALSE, success = FALSE, output_mapped = FALSE, direct_output = FALSE;
   GstBuffer *result = NULL;
-  if (!src || !dst || !gst_video_frame_map (&mapped, info, input, GST_MAP_READ)) goto done;
+  if (!src || !dst) FAIL ("AVFrame allocation failed");
+  if (!gst_video_frame_map (&mapped, info, input, GST_MAP_READ)) FAIL ("input frame map failed");
   guint storage_width = GST_VIDEO_FRAME_WIDTH (&mapped), storage_height = GST_VIDEO_FRAME_HEIGHT (&mapped);
   if (crop && (crop->x > storage_width || crop->y > storage_height ||
       crop->width != width || crop->height != height ||
-      crop->width > storage_width - crop->x || crop->height > storage_height - crop->y)) goto done;
+      crop->width > storage_width - crop->x || crop->height > storage_height - crop->y))
+    FAIL ("crop %ux%u+%u+%u outside %ux%u input", crop->width, crop->height, crop->x, crop->y,
+        storage_width, storage_height);
   gboolean native_yuv = format == AV_PIX_FMT_NV12 || format == AV_PIX_FMT_P010LE ||
       format == AV_PIX_FMT_YUV420P || format == AV_PIX_FMT_YUV420P10LE;
   gboolean apply_dovi = native_yuv && resolved && raw && t &&
@@ -481,7 +530,7 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     default: src->chroma_location = AVCHROMA_LOC_UNSPECIFIED; break;
   }
   src->sample_aspect_ratio = (AVRational) {GST_VIDEO_INFO_PAR_N (info), GST_VIDEO_INFO_PAR_D (info)};
-  if (av_frame_get_buffer (src, 32) < 0) goto done;
+  if (av_frame_get_buffer (src, 32) < 0) FAIL ("source frame allocation failed");
   const uint8_t *planes[4] = {0}; int strides[4] = {0};
   for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (info); i++) {
     planes[i] = GST_VIDEO_FRAME_PLANE_DATA (&mapped, i);
@@ -491,7 +540,8 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
       guint component = 0;
       while (component < GST_VIDEO_FORMAT_INFO_N_COMPONENTS (finfo) &&
           GST_VIDEO_FORMAT_INFO_PLANE (finfo, component) != i) component++;
-      if (component == GST_VIDEO_FORMAT_INFO_N_COMPONENTS (finfo)) goto done;
+      if (component == GST_VIDEO_FORMAT_INFO_N_COMPONENTS (finfo))
+        FAIL ("no component for cropped plane %u", i);
       planes[i] += (ptrdiff_t) (crop->y >> GST_VIDEO_FORMAT_INFO_H_SUB (finfo, component)) * strides[i] +
           (crop->x >> GST_VIDEO_FORMAT_INFO_W_SUB (finfo, component)) * GST_VIDEO_FORMAT_INFO_PSTRIDE (finfo, component);
     }
@@ -499,24 +549,26 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   av_image_copy (src->data, src->linesize, planes, strides, format, source_width, source_height);
   if (!s->vk) {
     s->vk = acquire_vulkan (&s->shared_vk);
-    if (!s->vk) goto done;
-    s->dispatch = pl_dispatch_create (NULL, s->vk->gpu);
-    s->renderer = pl_renderer_create (NULL, s->vk->gpu);
+    if (!s->vk) FAIL ("Vulkan device create failed");
+    s->dispatch = pl_dispatch_create (placebo_log (), s->vk->gpu);
+    s->renderer = pl_renderer_create (placebo_log (), s->vk->gpu);
     if (!s->dispatch || !s->renderer) {
+      const char *which = !s->dispatch && !s->renderer ? "dispatch and renderer" :
+          !s->dispatch ? "dispatch" : "renderer";
       /* Retry from scratch next time instead of holding a device unusable here. */
       pl_renderer_destroy (&s->renderer);
       pl_dispatch_destroy (&s->dispatch);
       release_vulkan (&s->vk, s->shared_vk);
-      goto done;
+      FAIL ("%s create failed", which);
     }
     GST_INFO ("native mapper %p uses %s Vulkan device", (void *) s,
         s->shared_vk ? "the process-shared" : "its own");
   }
-  if (!s->renderer || !s->dispatch) goto done;
-  if (apply_dovi && !s->provider) s->provider = dv_provider387_create (s->vk->gpu, NULL);
-  if (apply_dovi && !s->provider) goto done;
+  if (!s->renderer || !s->dispatch) FAIL ("renderer or dispatch unavailable");
+  if (apply_dovi && !s->provider) s->provider = dv_provider387_create (s->vk->gpu, placebo_log ());
+  if (apply_dovi && !s->provider) FAIL ("provider create failed");
   if (!pl_map_avframe_ex (s->vk->gpu, &source,
-      pl_avframe_params (.frame = src, .tex = s->source, .map_dovi = false))) goto done;
+      pl_avframe_params (.frame = src, .tex = s->source, .map_dovi = false))) FAIL ("plane upload failed");
   uploaded = TRUE;
   if (crop && !active_import)
     source.crop = (struct pl_rect2df) {crop->x, crop->y, crop->x + crop->width, crop->y + crop->height};
@@ -553,10 +605,11 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   if (sdr) {
     /* The intermediate remains PQ16. Its layout must never borrow the final
      * eight-bit SDR pool, whose authoritative output_info is different. */
-    if (av_frame_get_buffer (dst, 32) < 0) goto done;
+    if (av_frame_get_buffer (dst, 32) < 0) FAIL ("SDR intermediate frame allocation failed");
   } else {
     result = acquire_output_buffer (s, output_info);
-    if (!result || !gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) goto done;
+    if (!result) FAIL ("output buffer acquire failed");
+    if (!gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) FAIL ("output frame map failed");
     output_mapped = TRUE;
     /* Borrow the owned output memory; dst has no AVBufferRefs to free it. */
     for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (output_info); i++) {
@@ -564,15 +617,18 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
       dst->linesize[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
     }
   }
-  if (!pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
+  if (!pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst))
+    FAIL ("destination texture create failed");
   /* Render targets recreated for download are not sampleable, but the SDR
    * destination reads the graded PQ picture back in a second pass. Give that
    * intermediate its own stable textures with the same layout, sampleable. */
   for (int i = 0; sdr && i < destination.num_planes; i++) {
     struct pl_tex_params params = destination.planes[i].texture->params;
     params.sampleable = true;
-    if (!(params.format->caps & PL_FMT_CAP_SAMPLEABLE) ||
-        !pl_tex_recreate (s->vk->gpu, &s->sdr_intermediate[i], &params)) goto done;
+    if (!(params.format->caps & PL_FMT_CAP_SAMPLEABLE))
+      FAIL ("SDR intermediate format %s not sampleable", params.format->name);
+    if (!pl_tex_recreate (s->vk->gpu, &s->sdr_intermediate[i], &params))
+      FAIL ("SDR intermediate texture create failed");
     destination.planes[i].texture = s->sdr_intermediate[i];
   }
   direct_output = !sdr && direct_output_layout (&out, &destination);
@@ -581,12 +637,13 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
      * canonical download-and-copy path. Never pass a signed pitch as size_t. */
     memset (dst->data, 0, sizeof (dst->data));
     memset (dst->linesize, 0, sizeof (dst->linesize));
-    if (av_frame_get_buffer (dst, 32) < 0 ||
-        !pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst)) goto done;
+    if (av_frame_get_buffer (dst, 32) < 0) FAIL ("download frame allocation failed");
+    if (!pl_frame_recreate_from_avframe (s->vk->gpu, &destination, s->output, dst))
+      FAIL ("download destination texture create failed");
     for (guint i = 0; i < GST_VIDEO_FRAME_N_PLANES (&out); i++)
       if (!download_row_pitch_ok (dst->linesize[i],
               destination.planes[i].texture->params.format->texel_align, (gsize) dst->width *
-                  GST_VIDEO_INFO_COMP_PSTRIDE (output_info, 0))) goto done;
+                  GST_VIDEO_INFO_COMP_PSTRIDE (output_info, 0))) FAIL ("download row pitch unsupported");
   }
   for (int i = 0; i < destination.num_planes; i++) {
     const float zero[4] = {0}; pl_tex_clear (s->vk->gpu, destination.planes[i].texture, zero);
@@ -608,7 +665,10 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
   }
   s->requires_fel = apply_dovi && fel;
   s->mapped = 0;
-  if (!pl_render_image (s->renderer, &source, &destination, &params)) goto done;
+  s->map_failure = NULL;
+  if (!pl_render_image (s->renderer, &source, &destination, &params))
+    FAIL ("pl_render_image failed%s%s", s->map_failure ? ": " : "",
+        s->map_failure ? s->map_failure : "");
   if (apply_dovi && s->mapped == 0) {
     if (profile5) {
       g_set_error_literal (error, GST_STREAM_ERROR, GST_STREAM_ERROR_FORMAT,
@@ -621,12 +681,15 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     decline (s, 64, "provider declined; ordinary baseline re-encoding");
     params.dovi_map = NULL; params.dovi_priv = NULL;
     destination.color = baseline_destination;
-    if (!pl_render_image (s->renderer, &baseline, &destination, &params)) goto done;
+    if (!pl_render_image (s->renderer, &baseline, &destination, &params))
+      FAIL ("baseline pl_render_image failed after provider decline");
   }
-  if (s->mapped < 0) goto done;
+  if (s->mapped < 0)
+    FAIL ("provider mapped<0 (%d)%s%s", s->mapped, s->map_failure ? ": " : "",
+        s->map_failure ? s->map_failure : "");
   if (sdr) {
     converted = av_frame_alloc ();
-    if (!converted) goto done;
+    if (!converted) FAIL ("SDR output AVFrame allocation failed");
     converted->format = AV_PIX_FMT_RGBA;
     converted->width = dst->width; converted->height = dst->height;
     converted->color_range = AVCOL_RANGE_JPEG; converted->colorspace = AVCOL_SPC_RGB;
@@ -634,30 +697,32 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
     converted->color_trc = AVCOL_TRC_IEC61966_2_1;
     struct pl_frame sdr_destination = {0};
     result = acquire_output_buffer (s, output_info);
-    if (!result || !gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) goto done;
+    if (!result) FAIL ("SDR output buffer acquire failed");
+    if (!gst_video_frame_map (&out, output_info, result, GST_MAP_WRITE)) FAIL ("SDR output frame map failed");
     output_mapped = TRUE;
     for (guint i = 0; i < GST_VIDEO_INFO_N_PLANES (output_info); i++) {
       converted->data[i] = GST_VIDEO_FRAME_PLANE_DATA (&out, i);
       converted->linesize[i] = GST_VIDEO_FRAME_PLANE_STRIDE (&out, i);
     }
     if (!pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
-            s->sdr_output, converted)) goto done;
+            s->sdr_output, converted)) FAIL ("SDR destination texture create failed");
     direct_output = direct_output_layout (&out, &sdr_destination);
     if (!direct_output) {
       memset (converted->data, 0, sizeof (converted->data));
       memset (converted->linesize, 0, sizeof (converted->linesize));
-      if (av_frame_get_buffer (converted, 32) < 0 ||
-          !pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
-              s->sdr_output, converted)) goto done;
+      if (av_frame_get_buffer (converted, 32) < 0) FAIL ("SDR download frame allocation failed");
+      if (!pl_frame_recreate_from_avframe (s->vk->gpu, &sdr_destination,
+              s->sdr_output, converted)) FAIL ("SDR download destination texture create failed");
       for (guint i = 0; i < GST_VIDEO_FRAME_N_PLANES (&out); i++)
         if (!download_row_pitch_ok (converted->linesize[i],
                 sdr_destination.planes[i].texture->params.format->texel_align,
-                (gsize) converted->width * GST_VIDEO_INFO_COMP_PSTRIDE (output_info, 0))) goto done;
+                (gsize) converted->width * GST_VIDEO_INFO_COMP_PSTRIDE (output_info, 0)))
+          FAIL ("SDR download row pitch unsupported");
     }
     pl_shader sh = pl_dispatch_begin (s->dispatch);
     if (!pl_shader_sample_direct (sh,
         pl_sample_src (.tex = destination.planes[0].texture))) {
-      pl_dispatch_abort (s->dispatch, &sh); goto done;
+      pl_dispatch_abort (s->dispatch, &sh); FAIL ("SDR sample shader failed");
     }
     const struct pl_color_space pq = {
       .primaries = PL_COLOR_PRIM_BT_2020, .transfer = PL_COLOR_TRC_PQ};
@@ -673,13 +738,14 @@ static int render_destination (GstGtkDoviMapper *s, GstBuffer *input,
                 "-0.5876411388, 1.1328998971, -0.1005788980, "
                 "-0.0728498633, -0.0083494226, 1.1187296614) * color.rgb, 0.0, 1.0);",
         .input = PL_SHADER_SIG_COLOR, .output = PL_SHADER_SIG_COLOR})) {
-      pl_dispatch_abort (s->dispatch, &sh); goto done;
+      pl_dispatch_abort (s->dispatch, &sh); FAIL ("SDR gamut shader failed");
     }
     pl_shader_delinearize (sh, &srgb);
     if (!pl_dispatch_finish (s->dispatch, pl_dispatch_params (
-        .shader = &sh, .target = sdr_destination.planes[0].texture)) ||
-        !pl_download_avframe (s->vk->gpu, &sdr_destination, converted)) goto done;
-  } else if (!pl_download_avframe (s->vk->gpu, &destination, dst)) goto done;
+        .shader = &sh, .target = sdr_destination.planes[0].texture)))
+      FAIL ("SDR dispatch failed");
+    if (!pl_download_avframe (s->vk->gpu, &sdr_destination, converted)) FAIL ("SDR download failed");
+  } else if (!pl_download_avframe (s->vk->gpu, &destination, dst)) FAIL ("download failed");
   /* Download blocks until the borrowed output write is complete. */
   if (!direct_output) {
     AVFrame *final = sdr ? converted : dst;
@@ -711,6 +777,7 @@ done:
   }
   return s->mapped == 1 ? 1 : 2;
 }
+#undef FAIL
 
 int gst_gtk_dovi_mapper_render_destination (GstGtkDoviMapper *self,
     GstBuffer *input, const GstVideoInfo *info, GstGtkDoviDestinationKind kind,
