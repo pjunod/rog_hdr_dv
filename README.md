@@ -91,8 +91,8 @@ now agrees within one PQ10 code. Appearance alone is not optical acceptance.
 [Status](docs/STATUS.md) is the authoritative, dated version of this table.
 The [i915 VRR diagnosis](docs/I915_VRR_FASTSET.md) explains the retained
 page-flip fix and the outstanding hardware checks.
-[Frame-rate matching](docs/FRAME_RATE_MATCHING.md) holds the presentation-cadence
-model, the per-player measurement tool and fixtures, and what is still unmeasured.
+[Frame-rate matching](docs/FRAME_RATE_MATCHING.md) is the design of record for even
+video cadence, with the measurement tooling, model and dated results.
 
 ## How the pieces fit
 
