@@ -1,5 +1,17 @@
 # Status — what is working and what remains
 
+**November 27, 2026 — GTK Dolby mapper diagnostics build; staged, not installed.**
+A fresh mapper's first render fails after it picks the shared Vulkan device and
+before the Dolby provider runs, with only the generic "mapping failed" error:
+libplacebo got no log, and most failing exits named no step.
+`0.1.0+rogdv12` changes diagnostics only. libplacebo and provider messages
+reach the `gtkdovimap` debug category, and each failing step adds its own reason
+to the error. It built warning-free; the negotiation probe (169 checks) and a
+new CPU log-forwarding probe (25 checks) pass. With pin-only sink and Showtime
+repacks it is staged as a four-package release whose simulation passed. No
+render path has run yet, so the failing step is still unnamed.
+[Receipt](../evidence/gtk-dovi-diagnostics-20261127.json).
+
 **November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in
 Showtime, with no error. NVDEC chose CUDA memory from the GTK Dolby mapper's
