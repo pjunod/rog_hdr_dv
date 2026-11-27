@@ -141,6 +141,33 @@ stays the owner's.
    - `apt-cache policy` names this origin for each one;
    - one real new build reaches the machine through `apt upgrade`.
 
+## Server as built (phase 1, November 27)
+
+lab3 now serves an empty published repository; no machine uses it yet.
+
+| Part | As built |
+|---|---|
+| aptly | Ubuntu's `aptly` 1.6.2, run as the system account `aptly` (home `/srv/aptly`, mode 0750); config in `/srv/aptly/.aptly.conf`, data in `/srv/aptly/data`, signer `gpg2` |
+| Local repository | `rog-stonking`, distribution `stonking`, component `main`, architectures amd64 and i386 |
+| Published | Snapshot `rog-stonking-0000-empty`, `Origin: rog-hdr`, `Label: rog-hdr` |
+| Repository key | ed25519 signing key `2DA6B7DE09D5671941650C1A36DDB628371F0745` (`ROG HDR package repository <rog-hdr@invalid>`), no expiry; the private key and its revocation certificate stay in the `aptly` account's GnuPG home. The public key is served as `rog-hdr-archive-keyring.asc` |
+| Web server | Ubuntu's nginx on port 8095 only (the stock default site removed), serving `/srv/aptly/data/public` with basic authentication; `www-data` reads the tree through the `aptly` group |
+| Reader | One user, `rog-apt-reader`, in `/etc/nginx/rog-apt.htpasswd` (root:www-data 0640). The password is kept in the operator's secret store as `rog-apt-reader`, never in Git |
+
+Anonymous requests get 401. An authenticated fetch of `dists/stonking/InRelease`
+returns the signed release with `Origin: rog-hdr`.
+
+Publishing runs as the `aptly` account:
+
+```bash
+sudo runuser -u aptly -- env HOME=/srv/aptly GNUPGHOME=/srv/aptly/.gnupg \
+  aptly repo add rog-stonking <debs…>
+# then: aptly snapshot create <name> from repo rog-stonking
+#       aptly publish switch -gpg-key=<fingerprint> stonking <name>
+```
+
+The phase 2 publisher wraps these steps; until it exists, nothing is published.
+
 ## Decisions
 
 Recorded November 27, when the owner accepted all four recommendations after
