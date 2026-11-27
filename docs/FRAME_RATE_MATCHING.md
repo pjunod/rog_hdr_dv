@@ -65,9 +65,35 @@ Two conclusions follow, still subject to measurement:
    player to target presentation times through `wp_commit_timing_v1`, or an
    equivalent compositor-side target, rather than commit when a timer fires.
 
-Where the repeats belong (compositor frame clock, kernel driver, or neither)
-is decided only after the baselines show the real behaviour. A per-player
-repeat would be the kind of workaround the effort excludes.
+Which client stacks can target a time today (installed binaries, protocol
+interface strings, November 27): mpv 0.42 binds `wp_fifo_manager_v1` and
+`wp_presentation` but not `wp_commit_timing`. GTK 4 binds `wp_presentation`
+only. Neither WebKitGTK nor GStreamer's `waylandsink` names any of the three.
+These are source-level facts, not a cadence result.
+
+### Provisional design direction (decided while the owner was away; baselines decide)
+
+The fixed exact-multiple mode is unavailable on this panel: the EDID's only
+native timings are 2560×1600 at 240 Hz and at 60 Hz (the same pixel clock
+with vtotal ×4). A per-player repeat is the kind of workaround the effort
+excludes. The provisional direction, after a top-level-model consultation
+(registry ask `A-54F01CC9`), has three parts:
+
+- **Repeats below the floor in the Mutter frame clock**, as a recorded design
+  update to the project's Mutter series. Mutter alone knows the client's
+  target times (`wp_commit_timing`), the fullscreen/VRR state and the buffer,
+  so it can phase repeats exactly without prediction. It needs the
+  connector's real VRR minimum; today a hardcoded 30 Hz serves the cursor
+  flush. k is chosen well inside the range with hysteresis, for example 72 or
+  75 Hz for 24 and 25, rather than merely above 48 Hz. Each repeat must re-present
+  the identical HDR/DV plane state.
+- **Commit-timing in each client stack**: the mpv Wayland VO (which covers
+  mpv and Plurx Player through libmpv), the GTK 4 GDK path (Showtime,
+  GtkVideo) and the WebKitGTK compositor. A compositor heuristic that
+  re-times commits would be a symptom fix, so clients without the protocol
+  are measured and recorded as a limit.
+- **An i915 below-the-range predictor** is the recorded fallback if the
+  baselines show Mutter cannot phase the repeats.
 
 ## Measurement — `tools/presentation_cadence.py`
 
