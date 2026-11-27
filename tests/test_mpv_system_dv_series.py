@@ -104,7 +104,9 @@ class MpvSystemSeriesTests(unittest.TestCase):
         self.assertIn('{"enhancement-layer-nlq-active", SUB_PROP_BOOL(state.enhancement_layer_nlq_active)},', added)
         self.assertIn(".enhancement_layer_nlq_active = p->dovi_el_nlq_active,", added)
         # Each frame records libplacebo's own mapping of its RPU, only with a composition.
-        self.assertIn("fp->dovi_el_nlq_active = composed && image->repr.dovi &&\n"
+        # It is libplacebo's sampling condition: an attached layer and an active NLQ.
+        self.assertIn("fp->dovi_el_nlq_active = composed && image->enhancement_layer &&\n"
+                      "                                     image->repr.dovi &&\n"
                       "                                     image->repr.dovi->nlq_active;", added)
         # Nothing re-parses the RPU.
         self.assertNotIn("dovi_parse", added)

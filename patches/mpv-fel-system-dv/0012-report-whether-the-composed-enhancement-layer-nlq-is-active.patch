@@ -10,21 +10,21 @@ an external whole-title scan, although the renderer decides per frame.
 
 Add enhancement-layer-nlq-active to native-dovi-target-state. When the
 presenting renderer records a frame's composition, it also records
-libplacebo's own per-frame NLQ decision for that frame (repr.dovi's
-nlq_active, set by pl_map_avdovi_metadata from the frame's RPU), which
-is what makes the renderer sample the layer's residual. The level is the
+libplacebo's own condition for sampling the layer's residual: an
+attached layer and repr.dovi's nlq_active, which pl_map_avdovi_metadata
+sets from FFmpeg's Dolby Vision metadata for that frame. The level is the
 covering frame's record and implies enhancement-layer-composed, so it
 follows the same frame, clears in the same places and notifies on
 every change. Nothing re-parses the RPU.
 ---
- DOCS/man/input.rst      | 19 ++++++++++++++++---
+ DOCS/man/input.rst      | 21 ++++++++++++++++++---
  player/command.c        |  1 +
  video/out/vo.h          |  1 +
- video/out/vo_gpu_next.c | 32 ++++++++++++++++++++++++--------
- 4 files changed, 42 insertions(+), 11 deletions(-)
+ video/out/vo_gpu_next.c | 35 +++++++++++++++++++++++++++--------
+ 4 files changed, 47 insertions(+), 11 deletions(-)
 
 diff --git a/DOCS/man/input.rst b/DOCS/man/input.rst
-index 767923c..24a0272 100644
+index 767923c..a3328e4 100644
 --- a/DOCS/man/input.rst
 +++ b/DOCS/man/input.rst
 @@ -3899,8 +3899,9 @@ Property list
@@ -39,22 +39,24 @@ index 767923c..24a0272 100644
      physical-target eligibility or its display revision changes. Notifications
      follow those transitions, including paused redraws.
  
-@@ -3916,7 +3917,19 @@ Property list
+@@ -3916,7 +3917,21 @@ Property list
      paused after interpolation. When the renderer reads a frame without mapping
      it, every frame of that render not yet attested is treated as not composed,
      which can under-report next to such a frame. Each change sends a
 -    notification. It does not tell a full enhancement layer from a minimal one.
-+    notification. A frame whose RPU enables an exactly zero residual (a minimal
-+    enhancement layer) counts as composed, since the base-layer reshape then is
-+    the complete reconstruction.
++    notification. A frame whose RPU enables an exactly zero residual (zero
++    dead-zone slope and threshold, as in a minimal enhancement layer) counts as
++    composed, since the base-layer reshape then is the complete reconstruction.
 +
 +    ``enhancement-layer-nlq-active`` is a level with the same frame, timing,
 +    clearing and notification rules. It is true while
-+    ``enhancement-layer-composed`` is true and libplacebo's mapping of that
-+    frame's Dolby Vision metadata marked its non-linear quantization (NLQ)
-+    active, the decision by which the renderer samples the enhancement layer's
-+    residual (a full enhancement layer). It is false for a composed frame whose
-+    NLQ is the identity (a minimal enhancement layer) and whenever
++    ``enhancement-layer-composed`` is true, the frame has an enhancement layer
++    attached, and libplacebo's mapping of the frame's Dolby Vision metadata
++    marked its non-linear quantization (NLQ) active: the conditions under which
++    the renderer samples the layer's residual (a full enhancement layer). It is
++    false for a composed frame whose NLQ libplacebo treats as the identity
++    (zero offset, slope and threshold, and a unit maximum: a minimal
++    enhancement layer), for one composed without an attached layer, and whenever
 +    ``enhancement-layer-composed`` is false. It reports one frame at a time; a
 +    title can mix both kinds.
  
@@ -85,7 +87,7 @@ index 6f236d0..073de29 100644
  
  // VOCTRL_PERFORMANCE_DATA
 diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
-index 62eee9e..d3496d8 100644
+index 62eee9e..4f907e3 100644
 --- a/video/out/vo_gpu_next.c
 +++ b/video/out/vo_gpu_next.c
 @@ -160,6 +160,9 @@ struct priv {
@@ -137,18 +139,21 @@ index 62eee9e..d3496d8 100644
      vo_event(vo, VO_EVENT_WIN_STATE);
  }
  
-@@ -1313,6 +1323,10 @@ static void set_dovi_frame_el(struct priv *p, const uint8_t *rpu, bool composed)
+@@ -1313,6 +1323,13 @@ static void set_dovi_frame_el(struct priv *p, const uint8_t *rpu, bool composed)
              struct mp_image *mpi = image->user_data;
              struct frame_priv *fp = mpi->priv;
              fp->dovi_el_composed = composed;
-+            // libplacebo's own per-frame NLQ decision for this RPU, the one
-+            // that selected whether the renderer sampled the layer.
-+            fp->dovi_el_nlq_active = composed && image->repr.dovi &&
++            // libplacebo's own condition for sampling the layer's residual:
++            // an attached layer and an active NLQ in its mapping of the
++            // frame's Dolby Vision metadata. A composition from a provably
++            // zero residual alone does not meet it.
++            fp->dovi_el_nlq_active = composed && image->enhancement_layer &&
++                                     image->repr.dovi &&
 +                                     image->repr.dovi->nlq_active;
              fp->dovi_el_serial = p->dovi_render_serial;
          }
      }
-@@ -1327,7 +1341,7 @@ static void dovi_reset(void *priv)
+@@ -1327,7 +1344,7 @@ static void dovi_reset(void *priv)
          struct mp_image *mpi = p->dovi_mix->frames[i]->user_data;
          struct frame_priv *fp = mpi->priv;
          if (fp->dovi_el_serial != p->dovi_render_serial)
@@ -157,7 +162,7 @@ index 62eee9e..d3496d8 100644
      }
      dv_provider387_reset(p->dovi_provider);
  }
-@@ -1693,7 +1707,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1693,7 +1710,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
              // next successful private map logs its record again.
              p->dovi_physical_logged = false;
              // Nothing from the new source has been mapped yet.
@@ -166,7 +171,7 @@ index 62eee9e..d3496d8 100644
              p->last_pts = 0.0;
              p->last_id = 0;
              p->want_reset = false;
-@@ -1987,7 +2001,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -1987,7 +2004,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
          switch (pl_queue_update(p->queue, &mix, &qparams)) {
          case PL_QUEUE_ERR:
              MP_ERR(vo, "Failed updating frames!\n");
@@ -175,7 +180,7 @@ index 62eee9e..d3496d8 100644
              goto done;
          case PL_QUEUE_EOF:
              abort(); // we never signal EOF
-@@ -2071,7 +2085,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+@@ -2071,7 +2088,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
      const struct pl_frame *covering = render_ok ? dovi_covering_frame(&mix) : NULL;
      const struct frame_priv *covering_fp = covering
          ? ((const struct mp_image *) covering->user_data)->priv : NULL;
@@ -185,7 +190,7 @@ index 62eee9e..d3496d8 100644
      if (!render_ok) {
          MP_ERR(vo, "Failed rendering frame!\n");
          goto done;
-@@ -2566,6 +2581,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
+@@ -2566,6 +2584,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
              .active = p->dovi_physical_active,
              .generation = p->dovi_render_generation,
              .enhancement_layer_composed = p->dovi_el_composed,

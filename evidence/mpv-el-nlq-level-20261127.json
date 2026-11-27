@@ -4,25 +4,38 @@
   "host": "lab ROG",
   "change": "mpv-fel-system-dv patch 0012: enhancement-layer-nlq-active in native-dovi-target-state",
   "source": {
-    "candidate_tree": "716effdcc26328a6b7b295641ebc3ab49e48c4b3 (patches 0001-0012); its 0001-0011 replay equals the installed +rogdv5.7 tree 7bc255d3f4372495765e706c16d8d6e96be16647",
-    "method": "libplacebo's own per-frame repr.dovi->nlq_active, recorded with each frame's composition; no RPU re-parse"
+    "candidate_tree": "0c2bda4f2838fa88416475fe29a8d407b4fd9f52 (patches 0001-0012); its 0001-0011 replay equals the installed +rogdv5.7 tree 7bc255d3f4372495765e706c16d8d6e96be16647",
+    "method": "libplacebo's own condition for sampling the layer's residual, recorded with each frame's composition: an attached enhancement layer and repr.dovi->nlq_active (from pl_map_avdovi_metadata). No RPU re-parse."
   },
   "build": {
     "environment": "dpkg-buildpackage -b in a throwaway ubuntu:26.10 container on the ROG with the +rogdv5.7 build script plus patch 0012 and the 5.8 changelog overlay; the 5.7 inputs hash-matched, with libplacebo-rog387 1.0.0+private20261108-4 and librog-dv-provider387-1 1.0.0+private20261108-5+depfix2 (the installed builds) in place of -2 and -5. The provider SDK's exact -2/-5 pins were relaxed to >= inside the container only.",
-    "trees": "quilt-applied trees 5.5 51651e8, 5.6 c135087, 5.7 7bc255d, 5.8 716effd (equal to candidate_tree)",
+    "trees": "quilt-applied trees 5.5 51651e8, 5.6 c135087, 5.7 7bc255d, 5.8 0c2bda4 (equal to candidate_tree)",
     "result": "BUILD-OK; the only warnings are the two single-label email notices 5.7 also had. Depends, Recommends, Suggests, Conflicts, Breaks, Replaces, Provides, Pre-Depends, Architecture, Section, Priority and the file list equal the installed mpv 0.42.0-0ubuntu0+rogdv5.7+depfix2, including the libplacebo-rog387 (= 1.0.0+private20261108-4) pin.",
     "sha256": {
-      "mpv_0.42.0-0ubuntu0+rogdv5.8_amd64.deb": "c3f88a8692f89659ef39ee4bb70ad50c51805f1b0858ded6825fd0cb1afbd482",
-      "libmpv2_0.42.0-0ubuntu0+rogdv5.8_amd64.deb": "b53365273251def8d97a57c6401aea28a18d66a7da389e4e4a84bd55424a9995",
-      "libmpv-dev_0.42.0-0ubuntu0+rogdv5.8_amd64.deb": "74e11dbb7fa43cd7d3f3cd1935ac3bfdff7bdb88f143f9d484102f88adf445c5"
-    }
+      "mpv_0.42.0-0ubuntu0+rogdv5.8_amd64.deb": "19442a166ce49b5adf1d8c55b6377d4d4ad84bb5eb85bd464ca8bc25c4a1dfbe",
+      "libmpv2_0.42.0-0ubuntu0+rogdv5.8_amd64.deb": "f1e56b99ec5a3da2b8167d5614fc2b96f96bfc09e0e8ca9b870b61d4f6de40ef",
+      "libmpv-dev_0.42.0-0ubuntu0+rogdv5.8_amd64.deb": "2ef3d690eb62bd6ce62ef505df3431f72793d498429d76188be7f7f94e1768d6"
+    },
+    "revisions": "Rebuilt after review in a fresh container with the same script and inputs. The first build (tree 716effd) lacked the attached-layer condition; the measurement ran on it. That condition can only turn true into false for a frame composed from a zero residual without an attached layer. Every measured FEL frame reported true and had its layer attached and sampled (with an active NLQ and no layer, composition would have been false), and every MEL frame reported false either way, so the results carry over."
   },
   "measurement": {
     "method": "The uninstalled candidate binary (unpacked package) on a private headless Weston 16 with the physical-target fixture (616 cd/m2 target), with plurx Player's video options (--vo=gpu-next --gpu-api=vulkan --hwdec=auto-safe --target-colorspace-hint=yes) plus --no-audio --untimed --framedrop=no and a read-ahead cache. A Lua observer recorded every notified change of native-dovi-target-state with estimated-frame-number, and progress every 10 s. Nothing installed; the owner's session untouched.",
     "titles": [
-      {"title": "FEL title (Avatar: Fire and Ash, 2025, remux)", "status": "in progress", "result": "composed=true, nlq-active=true from frame 0; no change notified so far"},
-      {"title": "MEL title A (Gran Turismo, 2023, remux)", "status": "in progress", "result": "composed=true, nlq-active=false from frame 1; no change notified so far"},
-      {"title": "MEL title B (Can't Hardly Wait, 1998, remux)", "status": "in progress", "result": "composed=true, nlq-active=false from frame 0; no change notified so far"}
+      {
+        "title": "FEL title (Avatar: Fire and Ash, 2025, remux)",
+        "status": "in progress",
+        "result": "composed=true, nlq-active=true from frame 0; no change notified so far"
+      },
+      {
+        "title": "MEL title A (Gran Turismo, 2023, remux)",
+        "status": "in progress",
+        "result": "composed=true, nlq-active=false from frame 1; no change notified so far"
+      },
+      {
+        "title": "MEL title B (Can't Hardly Wait, 1998, remux)",
+        "status": "in progress",
+        "result": "composed=true, nlq-active=false from frame 0; no change notified so far"
+      }
     ],
     "rule": "Neither kind showed a frame of the other, so the pill follows the live level; no per-title latch or sustain rule is needed."
   },
@@ -30,5 +43,6 @@
     "Notifications coalesce: a flip shorter than one property dispatch can be missed. The server's complete-title scan, which reads every RPU, is the independent cross-check the player keeps.",
     "libplacebo's identity test also requires vdr_in_max = 2^coef_log2_denom; the plurx server's does not, so they can disagree on that edge.",
     "Private compositor; no optical measurement; not an attended visual check."
-  ]
+  ],
+  "review": "One adversarial review (Fable). It found no serious defect in either change. It found an edge where a frame composed from a zero residual without an attached layer could report active NLQ; fixed by requiring the attached layer, which is libplacebo's own sampling condition. It also noted docs wording and plurx cross-check gaps around the server's own FEL claim; both were fixed."
 }
