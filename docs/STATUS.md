@@ -1,5 +1,15 @@
 # Status — what is working and what remains
 
+**November 27, 2026 — One APT repository for every project package: design accepted, nothing deployed.**
+Only Mutter and libdisplay-info reach the ROG through APT; 54 of our packages there were
+installed from local `.deb` files, so `apt upgrade` never updates them. The owner asked for
+the repository to be the standard way every package is delivered. After an independent
+review, the owner accepted the design: aptly on lab3 publishing atomic snapshots under its own
+key and Origin, read by a machine account; one publisher that holds the only write credential;
+a pin generated from a manifest; no exact cross-source pins; kernels through APT with no meta
+package. Not started: the server, the manifest, the baseline import and the migration.
+[Design, phases and decisions](PACKAGE_DELIVERY.md).
+
 **November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in
 Showtime, with no error. NVDEC chose CUDA memory from the GTK Dolby mapper's
