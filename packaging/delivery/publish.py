@@ -243,7 +243,7 @@ def publish(manifest, project, debs, remote, now=None):
 
         remote.aptly("snapshot", "create", snapshot, "from", "repo", local_repo)
         remote.aptly("publish", "switch", f"-gpg-key={repo['signing_key']}", distribution, snapshot)
-        print(f"published {snapshot}")
+        print(f"{'would publish' if remote.dry_run else 'published'} {snapshot}")
 
         if not remote.dry_run:
             pattern = re.compile(re.escape(prefix) + r"-(\d{8}T\d{6}Z)-[a-z0-9_-]+\Z")
