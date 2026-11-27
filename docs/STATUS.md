@@ -10,8 +10,9 @@ and other MEL title through 71% and 84% each reported only their own kind, so pl
 the level and keeps the server's scan as a cross-check. `+rogdv5.8` was built on
 the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It was
 installed on the ROG through the project APT channel (forge Debian registry),
-not with dpkg; audit and verify are clean, rollback is `+rogdv5.7+depfix2`, and
-the attended visual check is the owner's.
+not with dpkg; audit and verify are clean, rollback is `+rogdv5.7+depfix2`.
+plurx Player 0.5.7-1 followed through the same channel (rollback 0.5.6-1). The
+attended visual check is the owner's.
 [Design and limits](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers)
 · [Receipt](../evidence/mpv-el-nlq-level-20261127.json).
 
