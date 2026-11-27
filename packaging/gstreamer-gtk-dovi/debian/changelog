@@ -1,3 +1,17 @@
+gst-gtk-dovi-map (0.1.0+rogdv12) UNRELEASED; urgency=medium
+
+  * Diagnostics only; rendering, return values, retries and fallbacks are
+    unchanged.
+  * Forward libplacebo and Dolby provider messages to the gtkdovimap debug
+    category: one process-wide pl_log, created before the first device and
+    never destroyed, is given to the Vulkan device, shader cache, dispatch,
+    renderer and provider. Its level follows the category threshold.
+  * Name the failing step in the frame render error instead of the bare
+    "Eligible Dolby frame normalization/mapping failed", for every exit
+    that set no reason, including the provider transport pass.
+
+ -- ROG HDR contributors <rog-hdr@invalid>  Fri, 27 Nov 2026 15:00:00 +0000
+
 gst-gtk-dovi-map (0.1.0+rogdv11) UNRELEASED; urgency=medium
 
   * Let the renderer decide whether a Profile 7 master is reconstructed.
