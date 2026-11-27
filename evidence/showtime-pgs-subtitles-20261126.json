@@ -64,7 +64,7 @@
   "Subtitle drawing rests on the owner's visual report for MEL title B only; no arm measured it.",
   "ASS (assrender) and DVB (dvbsuboverlay) subtitles carry the same change but were not run; the browser and plurx Player were not exercised.",
   "Provenance gap: the installed plugins-bad rogdv10 carries a paused-subtitle-selection change (its changelog: 'Refresh paused subtitle selections at the current accurate stream position') that this repository's ubuntu-gst-plugins-bad-rpu series does not hold (the series ends at the rogdv9 patches before 0019). The rogdv11 build starts from the installed rogdv10 source to keep that change; replaying the series alone does not reproduce rogdv10 or rogdv11.",
-  "Showtime played without sound during the owner's check. This release changes no audio element; the cause has not been established (the default audio sink at the time was the raw analog output rather than the tuned speaker sink, an observation only). Audio belongs to the separate audio repository."
+  "Showtime first played without sound during the owner's check. This release changes no audio element. A separate audio session found that WirePlumber had saved Showtime's playback stream (\"Video Player\") as muted and cleared it; the owner then reported sound (an audible report; the cause is inferred, not isolated). Per that audio session, the default sink being the raw analog output is the audio stack's normal routing (not re-measured here). Audio belongs to the separate audio repository."
  ],
  "install": {
   "date_utc": "2026-11-26",
@@ -78,7 +78,8 @@
    "FEL title, full file": "582 frames mapped",
    "HDR10 title, full file": "plays; no provider call"
   },
-  "owner_visual_check": "The owner opened MEL title B in Showtime on the installed release and reported that subtitles show. A visual report only; subtitle placement, timing and colour were not measured. The owner also noticed that Showtime plays without sound; that is outside this change (see limits).",
+  "owner_visual_check": "The owner opened MEL title B in Showtime on the installed release and reported that subtitles show. A visual report only; subtitle placement, timing and colour were not measured.",
+  "owner_audible_check": "2026-11-27: after a separate audio session cleared a saved per-application mute, the owner reported, in their words, \"there's sound in showtime, and I already verified the subtitles are there\". An audible report only; no audio level, channel layout or synchronisation was measured.",
   "rollback": "python3 operate-local-files.py rollback in the release folder restores the six packages listed under rollback_sha256."
  }
 }
