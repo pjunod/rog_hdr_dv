@@ -88,17 +88,17 @@ Chromium's public media configuration controls Dolby demuxing and leaves decodin
 
 #### Chromium renderer — to do, not started
 
-Scoped on 2026-11-27 from the WebKit series, public Chromium sources and the browser observations above. Nothing was built or measured, and the sizes are estimates. The Firefox renderer is separate work (effort E-8084F0D3B5).
+Scoped on 2026-11-27 from the WebKit series and from reading public Chromium and Firefox sources and release reports. Nothing was built, tested or measured: every statement below about Chromium or Firefox internals is from that reading, and the sizes are estimates. The statements about Plurx come from reading its separate repository. The Firefox renderer is separate work (effort E-8084F0D3B5).
 
 - **It is a Chromium derivative.** Google's Chrome build cannot be patched. A Chromium build has no Widevine or Google account sync unless they are added separately.
 - **Accept the track.** Enable Dolby demuxing in the media build configuration and add a platform decoder that claims only the profiles it renders. The capability answers then follow from the decoder, and Plurx needs no change for Profiles 5 and 8 because its web client already probes those codec strings.
 - **Keep the RPU.** Chromium decodes HEVC with its own VA-API decoder, which discards the RPU units. Each frame's RPU must travel with the decoded picture to the renderer. Firefox uses the system FFmpeg decoder, which already exposes it as frame side data.
-- **Decode on NVIDIA.** Stock Chromium does not decode HEVC on NVIDIA GPUs, which matches the declined Main and Main 10 queries above. It needs the third-party NVIDIA VA-API driver with an experimental feature flag, or a new decode path.
+- **Decode on NVIDIA.** Chromium does not support VA-API decoding on NVIDIA GPUs by default, and Chrome 156 declined the Main and Main 10 HEVC queries in the NVIDIA-backed configuration above. HEVC decode there needs the third-party NVIDIA VA-API driver with an experimental feature flag, or a new decode path.
 - **Map in the GPU process.** Load the shared renderer and provider inside the GPU process sandbox and give them the display target of the presenting surface.
-- **One owner for the transform.** Present the mapped picture as a described HDR Wayland surface so that Chromium's own HDR tone mapping does not run a second time. Chromium has enabled Wayland colour management by default since 2025.
+- **One owner for the transform.** Present the mapped picture as a described HDR Wayland surface so that Chromium's own HDR tone mapping does not run a second time. Chromium merged Wayland colour management, enabled by default, in 2025 ([report](https://linuxiac.com/hdr-video-playback-lands-in-chromium-on-wayland/)).
 - **Build.** A Chromium build is far beyond the WebKit builder limits (two CPUs and 6 GiB) and needs a larger builder.
 - **Maintenance.** Chromium releases every four weeks with security updates in between. Each one needs a rebase, a rebuild and requalification, or the installed browser falls behind on security fixes.
-- **Size.** Roughly two to three times the Firefox work for Profiles 5 and 8. Profile 7 composition needs a second decoder for the enhancement layer and is a separate project; the Plurx server converts Profile 7 to 8.1 for browsers meanwhile.
+- **Size.** Expected to be larger than the Firefox work for Profiles 5 and 8, because of the decoder, the sandbox and the build; there is no measured basis yet. Profile 7 composition needs a second decoder for the enhancement layer and is a separate project; the Plurx server converts Profile 7 to 8.1 for browsers meanwhile.
 
 Check first whether an in-page renderer serves instead: WebCodecs decoding and a WebGPU mapping shader drawing to an HDR canvas, in stock browsers. It cannot use the private provider, so it depends on [the open display-management work](OPEN_DV_DISPLAY_MANAGEMENT.md), and it still needs the browser to decode HEVC. This is untested. On Linux the Plurx web client already offers its native player for Dolby Vision titles, which covers Chromium users today. [Chromium VA-API notes](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/gpu/vaapi.md)
 
