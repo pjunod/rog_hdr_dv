@@ -1,0 +1,546 @@
+{
+  "schema": 1,
+  "origin": "rog-hdr",
+  "inventory": "Read-only ROG inventory of 2026-11-27 (apt list --installed for ,local packages and dpkg-query), plus Mutter and libdisplay-info from the Forgejo registry.",
+  "repository": {
+    "local_repo": "rog-stonking",
+    "distribution": "stonking",
+    "component": "main",
+    "architectures": [
+      "amd64",
+      "i386"
+    ],
+    "signing_key": "2DA6B7DE09D5671941650C1A36DDB628371F0745",
+    "snapshot_prefix": "rog-stonking",
+    "keep_snapshots": 20
+  },
+  "projects": [
+    "plurx",
+    "rog_audio",
+    "rog_hdr_dv"
+  ],
+  "packages": [
+    {
+      "source": "mutter",
+      "project": "rog_hdr_dv",
+      "class": "built",
+      "binaries": [
+        "gir1.2-mutter-51",
+        "libmutter-51-0",
+        "libmutter-51-dev",
+        "libmutter-test-51",
+        "mutter",
+        "mutter-51-tests",
+        "mutter-common",
+        "mutter-common-bin",
+        "mutter-dev-bin"
+      ],
+      "architectures": [
+        "amd64",
+        "all"
+      ],
+      "shadows_ubuntu": true,
+      "version": "51.0-1ubuntu3+nativehdr17",
+      "series": "patches/ubuntu-mutter",
+      "note": "Built by packaging/ubuntu/build.sh and installed from the Forgejo registry, not as a local package. The ROG has gir1.2-mutter-51, libmutter-51-0, mutter, mutter-common and mutter-common-bin installed."
+    },
+    {
+      "source": "libdisplay-info",
+      "project": "rog_hdr_dv",
+      "class": "built",
+      "binaries": [
+        "libdisplay-info-bin",
+        "libdisplay-info-dev",
+        "libdisplay-info3"
+      ],
+      "architectures": [
+        "amd64",
+        "i386"
+      ],
+      "shadows_ubuntu": true,
+      "version": "0.3.0-1+nativehdr17",
+      "series": "patches/ubuntu-libdisplay-info",
+      "multiarch_same": [
+        "libdisplay-info3"
+      ],
+      "note": "Built by packaging/ubuntu/build.sh and installed from the Forgejo registry. The ROG has libdisplay-info3 on amd64 and i386."
+    },
+    {
+      "source": "rog-apt-config",
+      "project": "rog_hdr_dv",
+      "class": "built",
+      "binaries": [
+        "rog-apt-config"
+      ],
+      "architectures": [
+        "all"
+      ],
+      "shadows_ubuntu": false,
+      "version": null,
+      "series": "packaging/delivery/rog-apt-config",
+      "note": "This repository's machine configuration package; not installed anywhere yet."
+    },
+    {
+      "source": "ffmpeg",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "libavcodec62",
+        "libavdevice62",
+        "libavfilter11",
+        "libavformat62"
+      ],
+      "architectures": [
+        "amd64",
+        "i386"
+      ],
+      "shadows_ubuntu": true,
+      "version": "7:8.1.2-2ubuntu2+rogdv4.2",
+      "binary_versions": {
+        "libavfilter11": "7:8.1.2-2ubuntu2+rogdv4.2+depfix1"
+      },
+      "multiarch_same": [
+        "libavcodec62"
+      ],
+      "reconcile_with": "patches/ubuntu-ffmpeg-system-dv",
+      "note": "Partial source: libavutil60, libswresample6, libswscale9 and ffmpeg stay Ubuntu's 7:8.1.2-2ubuntu2, and libavfilter11 pins libavutil60 (= 7:8.1.2-2ubuntu2) exactly. Only libavcodec62 has an i386 build."
+    },
+    {
+      "source": "gst-libav1.0",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gstreamer1.0-libav"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "1.28.7-1+rogdv1",
+      "reconcile_with": "patches/ubuntu-gst-libav-dovi-picture"
+    },
+    {
+      "source": "gst-plugins-bad1.0",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gir1.2-gst-plugins-extra-1.0",
+        "gstreamer1.0-plugins-bad",
+        "gstreamer1.0-plugins-extra",
+        "libgstreamer-plugins-bad1.0-0",
+        "libgstreamer-plugins-extra1.0-0"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "1.28.6-1ubuntu1+rogdv11",
+      "reconcile_with": "patches/ubuntu-gst-plugins-bad-rpu",
+      "note": "The installed rogdv10 and rogdv11 carry the paused-subtitle change, which the series does not yet have."
+    },
+    {
+      "source": "gst-plugins-base1.0",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gir1.2-gst-plugins-base-1.0",
+        "gstreamer1.0-alsa",
+        "gstreamer1.0-gl",
+        "gstreamer1.0-plugins-base",
+        "gstreamer1.0-plugins-base-apps",
+        "gstreamer1.0-x",
+        "libgstreamer-gl1.0-0",
+        "libgstreamer-plugins-base1.0-0"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "1.28.7-1+rogdv4.ubuntu0.2",
+      "reconcile_with": "patches/ubuntu-gst-plugins-base-rpu"
+    },
+    {
+      "source": "gst-plugins-good1.0",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gstreamer1.0-plugins-good"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "1.28.7-1ubuntu0.1+rogdv4",
+      "reconcile_with": "patches/ubuntu-gst-plugins-good-dovi"
+    },
+    {
+      "source": "gtk4",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gir1.2-gtk-4.0",
+        "gtk-update-icon-cache",
+        "libgtk-4-1",
+        "libgtk-4-bin",
+        "libgtk-4-common",
+        "libgtk-4-dev"
+      ],
+      "architectures": [
+        "amd64",
+        "all"
+      ],
+      "shadows_ubuntu": true,
+      "version": "4.24.1+ds-1+rogdv6",
+      "reconcile_with": "patches/ubuntu-gtk4-display-target"
+    },
+    {
+      "source": "glycin",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "glycin-loaders"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "2.2.1+ds-1ubuntu2+rogcolor1",
+      "reconcile_with": "patches/ubuntu-glycin-image-colour",
+      "note": "Partial source: the other glycin binaries stay Ubuntu's."
+    },
+    {
+      "source": "loupe",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "loupe"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "50.0-0ubuntu2+rogcolor2",
+      "reconcile_with": "patches/ubuntu-loupe-image-colour"
+    },
+    {
+      "source": "mesa",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "mesa-vulkan-drivers"
+      ],
+      "architectures": [
+        "amd64",
+        "i386"
+      ],
+      "shadows_ubuntu": true,
+      "version": "26.2.4-1ubuntu1+rogwsi2",
+      "multiarch_same": [
+        "mesa-vulkan-drivers"
+      ],
+      "reconcile_with": "patches/ubuntu-mesa-wayland-hdr",
+      "note": "Partial source: the other Mesa binaries stay Ubuntu's."
+    },
+    {
+      "source": "webkit2gtk",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "libjavascriptcoregtk-6.0-1",
+        "libwebkitgtk-6.0-4"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "2.52.6-1ubuntu1.1+rogdv9",
+      "reconcile_with": "patches/ubuntu-webkitgtk-native-hdr",
+      "note": "Partial source: the 4.1 API binaries stay Ubuntu's."
+    },
+    {
+      "source": "gnome-shell-ubuntu-extensions",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gnome-shell-ubuntu-extensions"
+      ],
+      "architectures": [
+        "all"
+      ],
+      "shadows_ubuntu": true,
+      "version": "51.26.10.6ubuntu+nativehdr3",
+      "reconcile_with": "patches/ubuntu-tiling-assistant"
+    },
+    {
+      "source": "rust-dolby-vision",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "libdovi3"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "3.3.2-3+rogdv1",
+      "reconcile_with": "patches/ubuntu-libdovi-ffi"
+    },
+    {
+      "source": "mpv",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "mpv"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "0.42.0-0ubuntu0+rogdv5.7+depfix2",
+      "reconcile_with": "patches/mpv-fel-system-dv"
+    },
+    {
+      "source": "rust-gst-plugin-gtk4",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gstreamer1.0-gtk4"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": true,
+      "version": "0.15.2-1ubuntu2+rogdv5.8+depfix2",
+      "reconcile_with": "packaging/gstreamer-gtk-dovi"
+    },
+    {
+      "source": "showtime",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "showtime"
+      ],
+      "architectures": [
+        "all"
+      ],
+      "shadows_ubuntu": true,
+      "version": "50.0-2+rogdv5.15+depfix3",
+      "reconcile_with": "packaging/gstreamer-gtk-dovi"
+    },
+    {
+      "source": "gst-gtk-dovi-map",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "gstreamer1.0-gtk-dovi",
+        "libgstgtk-dovi-core0"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "0.1.0+rogdv11",
+      "reconcile_with": "packaging/gstreamer-gtk-dovi",
+      "note": "Its debian/control also declares libgstgtk-dovi-core-dev, which the ROG does not have installed."
+    },
+    {
+      "source": "gstreamer-dovi-picture",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "libgstdovipicture-1.0-0"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "0.2.0+rogdv2",
+      "reconcile_with": "packaging/gstreamer-dovi"
+    },
+    {
+      "source": "libplacebo-rog1-360",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "libplacebo-rog1-360"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "1.0.0+private20261107-4+depfix1",
+      "reconcile_with": "patches/ubuntu-libplacebo-system-dv",
+      "note": "ABI-named: the source name is the binary name."
+    },
+    {
+      "source": "libplacebo-rog387",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "libplacebo-rog387"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "1.0.0+private20261108-4",
+      "reconcile_with": "patches/libplacebo-fel-system-dv",
+      "note": "ABI-named: the source name is the binary name."
+    },
+    {
+      "source": "librog-dv-provider1",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "librog-dv-provider1"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "1.0.0+private20261108-5+depfix1",
+      "note": "ABI-named. Its source series is not yet located in this repository."
+    },
+    {
+      "source": "librog-dv-provider387-1",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "librog-dv-provider387-1"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "1.0.0+private20261108-5+depfix2",
+      "note": "ABI-named. Its source series is not yet located in this repository."
+    },
+    {
+      "source": "linux-upstream",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "linux-headers-7.3.0-nativehdr3",
+        "linux-image-7.3.0-nativehdr3"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "7.3.0-10.10+nativehdr3",
+      "kernel": true,
+      "reconcile_with": "patches/linux",
+      "note": "Signed by the owner and published from the signed artifacts. No meta package."
+    },
+    {
+      "source": "linux-native-hdr-test",
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "binaries": [
+        "linux-headers-7.3.0-rc5-nativehdr1",
+        "linux-image-7.3.0-rc5-nativehdr1"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "7.3.0-8.8+nativehdr1",
+      "kernel": true,
+      "note": "The earlier release-candidate test kernel still installed on the ROG. No meta package."
+    },
+    {
+      "source": "plurx-player",
+      "project": "plurx",
+      "class": "imported",
+      "binaries": [
+        "plurx-player"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "0.5.6-1",
+      "note": "Built and released by the plurx repository."
+    },
+    {
+      "source": "rog-audio-easyeffects",
+      "project": "rog_audio",
+      "class": "imported",
+      "binaries": [
+        "rog-audio-easyeffects"
+      ],
+      "architectures": [
+        "amd64"
+      ],
+      "shadows_ubuntu": false,
+      "version": "8.2.8+rog3",
+      "note": "Built and released by the rog_audio repository."
+    }
+  ],
+  "unconfirmed": [
+    {
+      "source": "asus-rog",
+      "binaries": [
+        "asus-rog-battery",
+        "asus-rog-fwupd-refresh",
+        "asus-rog-tools"
+      ],
+      "version": "0.2.0",
+      "reason": "Installed as local packages on the ROG; the owning project is not yet confirmed."
+    },
+    {
+      "source": "network-manager",
+      "binaries": [
+        "libnm0",
+        "network-manager",
+        "network-manager-tui"
+      ],
+      "version": "1.58.1-1ubuntu3+rogsleep1",
+      "reason": "The owner is not yet confirmed, although patches/ubuntu-network-manager-suspend exists here. On the ROG, Ubuntu's 1.58.1-1ubuntu3.1 is already the apt candidate for libnm0 and network-manager-tui."
+    }
+  ],
+  "excluded": [
+    {
+      "binaries": [
+        "google-chrome-stable"
+      ],
+      "reason": "vendor package"
+    },
+    {
+      "binaries": [
+        "steam-launcher",
+        "steam-libs-amd64"
+      ],
+      "reason": "vendor package"
+    },
+    {
+      "binaries": [
+        "mullvad-vpn"
+      ],
+      "reason": "vendor package"
+    },
+    {
+      "binaries": [
+        "libnvidia-container-tools",
+        "libnvidia-container1",
+        "nvidia-container-toolkit",
+        "nvidia-container-toolkit-base"
+      ],
+      "reason": "vendor package"
+    },
+    {
+      "binaries": [
+        "mainline"
+      ],
+      "reason": "vendor kernel installer"
+    },
+    {
+      "binaries": [
+        "bzip2",
+        "libbz2-1.0",
+        "libbz2-dev"
+      ],
+      "reason": "a stock Ubuntu build (1.0.8-6ubuntu0.1), not ours"
+    }
+  ]
+}

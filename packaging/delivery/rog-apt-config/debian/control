@@ -1,0 +1,21 @@
+Source: rog-apt-config
+Section: admin
+Priority: optional
+Maintainer: HDR Engineering <hdr-engineering@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13), gpg
+Standards-Version: 4.7.2
+Rules-Requires-Root: no
+Homepage: https://github.com/pjunod/rog_hdr_dv
+
+Package: rog-apt-config
+Architecture: all
+Multi-Arch: foreign
+Depends: ${misc:Depends}
+Description: APT source, signing key and pins for the rog-hdr repository
+ Installs the deb822 source for the rog-hdr package repository, its public
+ signing key, and the apt preferences that decide which of its packages a
+ machine takes: listed packages that replace Ubuntu packages at 1001, other
+ listed packages at 500, and nothing else from the repository.
+ .
+ The repository needs a read credential, which this package does not
+ install: it belongs in /etc/apt/auth.conf.d/rog-hdr.conf, mode 0600.
