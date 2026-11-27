@@ -30,6 +30,38 @@ def flips(times, pipe="A", plane="plane 1A", start_frame=100, refresh=1 / 240):
     return lines
 
 
+VBL = ("  <idle>-0       [019] d.h2. {t:.6f}: drm_vblank_event: crtc={c}, seq={s}, "
+       "time={ns}, high-prec=true")
+
+
+class VblankFlips(unittest.TestCase):
+    """Display version 14: flips are vblank events that follow a plane arm."""
+
+    def lines(self, arms, vblank_times, plane="plane 1A"):
+        out = [ARM.format(t=a, p="A", plane=plane, f=0) for a in arms]
+        out += [VBL.format(t=v + 0.0001, c=0, s=1000 + k, ns=round(v * 1e9))
+                for k, v in enumerate(vblank_times)]
+        out += [VBL.format(t=v, c=1, s=5, ns=round(v * 1e9)) for v in vblank_times]
+        return sorted(out, key=lambda line: float(line.split(": ")[0].split()[-1]))
+
+    def test_vblank_without_arm_is_not_a_flip(self):
+        frames = [1000 + k / 24 for k in range(24 * 10)]
+        repeats = [t + 0.0208 for t in frames]          # panel repeats, no commit
+        arms = [t - 0.002 for t in frames]
+        flips, _, _ = cadence.parse_trace(self.lines(arms, frames + repeats))
+        self.assertEqual(len(flips), len(frames))
+        report = cadence.analyze(self.lines(arms, frames + repeats), Fraction(24), skip_s=0)
+        self.assertEqual(report["verdict"], "even")
+
+    def test_cursor_arm_does_not_make_a_flip(self):
+        frames = [1000 + k / 24 for k in range(48)]
+        cursor = self.lines([1000.03], [1000.031], plane="cursor A")
+        lines = self.lines([t - 0.002 for t in frames], frames) + cursor
+        lines.sort(key=lambda line: float(line.split(": ")[0].split()[-1]))
+        flips, _, _ = cadence.parse_trace(lines)
+        self.assertEqual(len(flips), len(frames))
+
+
 class ParseRate(unittest.TestCase):
     def test_exact_fraction(self):
         self.assertEqual(cadence.parse_rate("24000/1001"), Fraction(24000, 1001))

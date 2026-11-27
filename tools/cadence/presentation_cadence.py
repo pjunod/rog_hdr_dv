@@ -39,6 +39,7 @@ LINE = re.compile(
     r"(?P<ts>\d+\.\d+):\s+(?P<event>\w+):\s+(?P<body>.*)$")
 PIPE = re.compile(r"\bpipe (?P<pipe>[A-Z])\b")
 FRAME = re.compile(r"\bframe=(?P<frame>\d+)")
+VBLANK = re.compile(r"crtc=(?P<crtc>\d+), seq=(?P<seq>\d+), time=(?P<time>-?\d+)")
 CRC = re.compile(r"\bcrc=(?P<crc>[0-9a-f]{8}(?: [0-9a-f]{8})*)")
 PLANE = re.compile(r"pipe [A-Z], (?P<plane>[^,]+), frame=")
 
@@ -55,13 +56,26 @@ def parse_rate(text):
 
 
 def parse_trace(lines, pipe="A"):
-    """Return flips, plane updates and CRC refreshes for one pipe, in time order."""
-    flips, planes, crcs = [], [], []
+    """Return flips, plane updates and CRC refreshes for one pipe, in time order.
+
+    A flip is an `intel_crtc_flip_done` where the kernel emits it. On display
+    version 14 it does not, and the page-flip completion is the
+    `drm_vblank_event` delivered for the commit: its `time` is the hardware
+    vblank timestamp (CLOCK_MONOTONIC ns) the compositor also receives, and
+    `seq` the vblank count, so it is used instead (crtc index = pipe letter).
+    """
+    flips, vblanks, planes, crcs = [], [], [], []
+    crtc_index = ord(pipe) - ord("A")
     for line in lines:
         match = LINE.match(line)
         if not match:
             continue
         event, body = match["event"], match["body"]
+        if event == "drm_vblank_event":
+            found = VBLANK.search(body)
+            if found and int(found["crtc"]) == crtc_index:
+                vblanks.append((int(found["time"]) / 1e9, int(found["seq"])))
+            continue
         found = PIPE.search(body)
         if not found or found["pipe"] != pipe:
             continue
@@ -77,7 +91,29 @@ def parse_trace(lines, pipe="A"):
             value = CRC.search(body)
             if value:
                 crcs.append((when, frame, value["crc"]))
+    if not flips and vblanks:
+        flips = latched_flips(sorted(vblanks), planes)
+        planes = []   # already applied: cursor-only arms were never flips
     return flips, planes, crcs
+
+
+def latched_flips(vblanks, planes):
+    """Presentations from plane arms: each arm is shown at the next vblank.
+
+    Mutter also receives vblank events that carry no new picture (a refresh
+    the panel repeated on its own, or a wait with no commit), so a vblank is
+    a flip only when a non-cursor plane was armed since the previous one.
+    """
+    arms = [when for when, name in planes if "cursor" not in name]
+    flips, index = [], 0
+    for when, seq in vblanks:
+        armed = False
+        while index < len(arms) and arms[index] <= when:
+            armed = True
+            index += 1
+        if armed:
+            flips.append((when, seq))
+    return flips
 
 
 def content_flips(flips, planes):
@@ -332,6 +368,65 @@ def lfc_multiplier(rate, vrr_min_hz, vrr_max_hz, margin=0.1):
     return None
 
 
+def crtc_properties(card=0, crtc_id=None):
+    """Read-only libdrm query of CRTC properties: {crtc_id: {name: value}}.
+
+    Uses the unprivileged property ioctls on /dev/dri/cardN; it does not take
+    DRM master and changes nothing. Returns {} when libdrm is unavailable.
+    """
+    import ctypes
+    import ctypes.util
+
+    class Res(ctypes.Structure):
+        _fields_ = [("count_fbs", ctypes.c_int), ("fbs", ctypes.POINTER(ctypes.c_uint32)),
+                    ("count_crtcs", ctypes.c_int), ("crtcs", ctypes.POINTER(ctypes.c_uint32)),
+                    ("count_connectors", ctypes.c_int), ("connectors", ctypes.POINTER(ctypes.c_uint32)),
+                    ("count_encoders", ctypes.c_int), ("encoders", ctypes.POINTER(ctypes.c_uint32)),
+                    ("min_width", ctypes.c_uint32), ("max_width", ctypes.c_uint32),
+                    ("min_height", ctypes.c_uint32), ("max_height", ctypes.c_uint32)]
+
+    class Props(ctypes.Structure):
+        _fields_ = [("count_props", ctypes.c_uint32), ("props", ctypes.POINTER(ctypes.c_uint32)),
+                    ("prop_values", ctypes.POINTER(ctypes.c_uint64))]
+
+    class Prop(ctypes.Structure):
+        _fields_ = [("prop_id", ctypes.c_uint32), ("flags", ctypes.c_uint32),
+                    ("name", ctypes.c_char * 32)]
+
+    name = ctypes.util.find_library("drm")
+    if not name:
+        return {}
+    drm = ctypes.CDLL(name)
+    drm.drmModeGetResources.restype = ctypes.POINTER(Res)
+    drm.drmModeObjectGetProperties.restype = ctypes.POINTER(Props)
+    drm.drmModeGetProperty.restype = ctypes.POINTER(Prop)
+    fd = os.open(f"/dev/dri/card{card}", os.O_RDONLY | os.O_CLOEXEC)
+    result = {}
+    try:
+        res = drm.drmModeGetResources(fd)
+        if not res:
+            return {}
+        ids = [res.contents.crtcs[i] for i in range(res.contents.count_crtcs)]
+        drm.drmModeFreeResources(res)
+        for cid in ids:
+            if crtc_id is not None and cid != crtc_id:
+                continue
+            props = drm.drmModeObjectGetProperties(fd, cid, 0xcccccccc)
+            if not props:
+                continue
+            values = {}
+            for i in range(props.contents.count_props):
+                prop = drm.drmModeGetProperty(fd, props.contents.props[i])
+                if prop:
+                    values[prop.contents.name.decode()] = props.contents.prop_values[i]
+                    drm.drmModeFreeProperty(prop)
+            drm.drmModeFreeObjectProperties(props)
+            result[cid] = values
+    finally:
+        os.close(fd)
+    return result
+
+
 def tracefs_write(path, value):
     with open(path, "w") as handle:
         handle.write(value)
@@ -340,6 +435,10 @@ def tracefs_write(path, value):
 def display_snapshot(card):
     root = DRI_DEBUGFS / str(card)
     snapshot = {"time_mono": time.monotonic()}
+    try:
+        snapshot["crtc_properties"] = {str(k): v for k, v in crtc_properties(card).items()}
+    except OSError as exc:
+        snapshot["crtc_properties"] = f"unreadable: {exc}"
     for name in ("i915_display_info", "i915_edp_psr_status"):
         try:
             snapshot[name] = (root / name).read_text(errors="replace")
@@ -385,6 +484,18 @@ def capture(output, seconds, card=0, crc_crtc=None, buffer_kb=16384):
                             crc_lines.append(chunk)
             crc_thread = threading.Thread(target=drain, daemon=True)
             crc_thread.start()
+        vrr_samples = header.setdefault("vrr_samples", [])
+
+        def sample_vrr():
+            while not stop.is_set():
+                try:
+                    props = crtc_properties(card)
+                except OSError:
+                    props = {}
+                vrr_samples.append([round(time.monotonic(), 3)] + [
+                    [cid, values.get("VRR_ENABLED")] for cid, values in props.items()])
+                stop.wait(0.5)
+        threading.Thread(target=sample_vrr, daemon=True).start()
         deadline = time.monotonic() + seconds
         with open(instance / "trace_pipe", "rb", buffering=0) as pipe, \
                 open(output / "trace.txt", "wb") as out:

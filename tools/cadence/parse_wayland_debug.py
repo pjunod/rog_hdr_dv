@@ -23,7 +23,7 @@ cadence = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(cadence)
 
 MESSAGE = re.compile(
-    r"^\[\s*(?P<ts>[\d.]+)\]\s+(?:\{[^}]*\}\s+)?(?P<request>-> )?"
+    r"^\[\s*(?P<ts>[\d:.]+)\]\s+(?:\{[^}]*\}\s+)?(?P<request>-> )?"
     r"(?P<iface>[A-Za-z_0-9]+)[#@](?P<id>\d+)\.(?P<msg>\w+)\((?P<args>.*)\)\s*$")
 OBJECT = re.compile(r"(?:new id )?(?P<iface>[A-Za-z_0-9]+)[#@](?P<id>\d+)")
 FLAGS = {1: "vsync", 2: "hw_clock", 4: "hw_completion", 8: "zero_copy"}

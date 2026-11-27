@@ -57,6 +57,10 @@ class Parse(unittest.TestCase):
         result = wl.report(wl.parse(log(times, discard_every=50)), Fraction(30), skip_s=0)
         self.assertEqual(result["discarded"], 6)
 
+    def test_clock_time_prefix(self):
+        lines = [l.replace("[1234567.", "[23:53:13.") for l in log([5000 + k / 24 for k in range(100)])]
+        self.assertEqual(len(wl.parse(lines)[7]["presented"]), 100)
+
     def test_no_feedback_is_incomplete(self):
         lines = ["[1.000] {Default Queue}  -> wl_surface#7.commit()"]
         result = wl.report(wl.parse(lines), Fraction(24))
