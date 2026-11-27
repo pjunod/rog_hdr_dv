@@ -95,6 +95,12 @@ the display engine rather than the player:
   `testsrc2` plus a drawn frame number). A white bar on the first frame of each
   second and a 20 ms click give a later A/V sync check. Output goes
   outside the repository; nothing private is involved.
+  Fixtures are MP4 with a track timescale that divides the frame period
+  (24000 for 24000/1001, 90000 for integer rates). Matroska's default 1 ms
+  timestamps would build ±0.5 ms of PTS jitter into the source. The 5 s
+  probes on November 27 read back exact durations (1001/24000, 3600/90000)
+  and PQ/BT.2020 tags. Fixture colour is not a colour reference; the
+  [HDR reference corpus](HDR_REFERENCE_CORPUS.md) remains that.
 - **Verdict.** `analyze --rate N/D` skips start-up and reports frames,
   median/min/max/stdev durations, refresh and duration histograms,
   frames off the median by more than 0.75 ms, holds over 1.5 periods, the

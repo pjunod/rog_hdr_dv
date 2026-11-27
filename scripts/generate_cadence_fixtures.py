@@ -16,6 +16,7 @@ import subprocess
 import sys
 
 REPO = Path(__file__).resolve().parents[1]
+PRESETS = ("ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow")
 DEFAULT_RATES = "24000/1001 24 25 30000/1001 30 50 60000/1001 60".split()
 MASTER_DISPLAY = "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1)"
 X265_HDR10 = ("hdr10=1:repeat-headers=1:colorprim=bt2020:transfer=smpte2084:"
@@ -45,10 +46,18 @@ def rate_label(rate):
 
 
 def fixture_name(kind, rate, width, height, seconds):
-    return f"cadence-{kind}-{rate_label(rate)}-{width}x{height}-{seconds}s.mkv"
+    return f"cadence-{kind}-{rate_label(rate)}-{width}x{height}-{seconds}s.mp4"
 
 
-def build_argv(ffmpeg, kind, rate, seconds, width, height, out):
+def track_timescale(rate):
+    """Smallest multiple of 90000 (or the numerator) giving integer frame durations."""
+    for scale in (90000, rate.numerator, rate.numerator * 1000):
+        if (scale / rate).denominator == 1:
+            return scale
+    raise ValueError(f"no exact timescale for {rate}")
+
+
+def build_argv(ffmpeg, kind, rate, seconds, width, height, out, preset="medium"):
     """Return the FFmpeg argv (no shell) for one fixture."""
     r = rate_text(rate)
     video = (
@@ -64,17 +73,21 @@ def build_argv(ffmpeg, kind, rate, seconds, width, height, out):
             "-f", "lavfi", "-i", audio, "-map", "0:v", "-map", "1:a"]
     gop = ["-g", str(2 * round(rate))]
     if kind == "sdr":
-        argv += ["-vf", "format=yuv420p", "-c:v", "libx264", "-preset", "medium",
+        argv += ["-vf", "format=yuv420p", "-c:v", "libx264", "-preset", preset,
                  "-crf", "18", "-pix_fmt", "yuv420p", *gop,
                  "-color_primaries", "bt709", "-color_trc", "bt709",
                  "-colorspace", "bt709"]
     else:
-        argv += ["-vf", "format=yuv420p10le", "-c:v", "libx265", "-preset", "medium",
+        argv += ["-vf", "format=yuv420p10le", "-c:v", "libx265", "-preset", preset,
                  "-crf", "18", "-pix_fmt", "yuv420p10le", *gop,
                  "-x265-params", X265_HDR10,
                  "-color_primaries", "bt2020", "-color_trc", "smpte2084",
                  "-colorspace", "bt2020nc"]
-    argv += ["-r", r, "-fps_mode", "cfr", "-c:a", "aac", "-ar", "48000",
+    # MP4 with a timescale that divides the frame period exactly; Matroska's
+    # default 1 ms timestamps would build +-0.5 ms jitter into the fixture.
+    argv += ["-r", r, "-fps_mode", "cfr", "-video_track_timescale",
+             str(track_timescale(rate)), "-movflags", "+faststart",
+             "-c:a", "aac", "-ar", "48000",
              "-ac", "2", "-shortest", str(out)]
     return argv
 
@@ -105,17 +118,21 @@ def parse_args(argv=None):
     p.add_argument("--width", type=bounded(320, 3840, 2), default=1920)
     p.add_argument("--height", type=bounded(180, 2160, 2), default=1080)
     p.add_argument("--kind", choices=("sdr", "hdr10"), default="sdr")
+    p.add_argument("--preset", default="medium",
+                   help="x264/x265 preset; picture quality does not affect cadence")
     p.add_argument("--ffmpeg", default="ffmpeg")
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args(argv)
     if len(set(args.rates)) != len(args.rates):
         p.error("duplicate rates after reduction")
+    if args.preset not in PRESETS:
+        p.error(f"--preset must be one of {', '.join(PRESETS)}")
     out = args.output_dir.resolve()
     if out.exists():
         p.error(f"{out} already exists")
     if not out.parent.is_dir():
         p.error(f"parent of {out} does not exist")
-    if out == REPO or REPO in out.parents:
+    if (REPO / ".git").exists() and (out == REPO or REPO in out.parents):
         p.error("OUTPUT_DIR must be outside the repository")
     args.output_dir = out
     return args
@@ -127,7 +144,7 @@ def main(argv=None):
     for rate in args.rates:
         name = fixture_name(args.kind, rate, args.width, args.height, args.seconds)
         cmd = build_argv(args.ffmpeg, args.kind, rate, args.seconds, args.width,
-                         args.height, args.output_dir / name)
+                         args.height, args.output_dir / name, args.preset)
         entries.append({"file": name, "rate": rate_text(rate), "rate_float": float(rate),
                         "expected_frames": math.floor(args.seconds * rate),
                         "argv": cmd})

@@ -50,9 +50,9 @@ class CadenceFixtureTests(unittest.TestCase):
 
     def test_filenames(self):
         self.assertEqual(gen.fixture_name("sdr", Fraction(24000, 1001), 1920, 1080, 660),
-                         "cadence-sdr-24000-1001-1920x1080-660s.mkv")
+                         "cadence-sdr-24000-1001-1920x1080-660s.mp4")
         self.assertEqual(gen.fixture_name("hdr10", Fraction(60), 1920, 1080, 660),
-                         "cadence-hdr10-60-1920x1080-660s.mkv")
+                         "cadence-hdr10-60-1920x1080-660s.mp4")
 
     def test_hdr10_argv(self):
         argv = gen.build_argv("ffmpeg", "hdr10", Fraction(24000, 1001), 660, 1920, 1080, "o.mkv")
@@ -61,6 +61,13 @@ class CadenceFixtureTests(unittest.TestCase):
         self.assertEqual(argv[argv.index("-color_primaries") + 1], "bt2020")
         self.assertEqual(argv[argv.index("-g") + 1], "48")
         self.assertEqual(argv[argv.index("-r") + 1], "24000/1001")
+        self.assertEqual(argv[argv.index("-video_track_timescale") + 1], "24000")
+
+    def test_timescales_are_exact(self):
+        for rate in gen.DEFAULT_RATES:
+            value = Fraction(rate)
+            scale = gen.track_timescale(value)
+            self.assertEqual((scale / value).denominator, 1, rate)
 
     def test_expected_frames_in_manifest(self):
         with mock.patch.object(gen.subprocess, "run", fake_ffmpeg(0)):
