@@ -1186,6 +1186,7 @@ Mutter and matching amd64/i386 library packaging.
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; optical verification (the owner's visual check passed) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
+| Browser Dolby Vision | WebKitGTK has a native renderer ([browser change](WEBKIT_NATIVE_HDR.md)). Firefox: effort recorded on 2026-11-27, not started. Chromium: scoped only | **To do, not started:** a Chromium renderer. Scope, costs and the check to make first are in [Chromium renderer](SYSTEM_DOLBY_VISION.md#chromium-renderer--to-do-not-started) |
 
 The owner has no colourimeter or spectrophotometer yet and is open to obtaining
 one. Software work continues independently. Define the measurement procedure
