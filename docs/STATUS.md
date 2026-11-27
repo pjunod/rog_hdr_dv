@@ -7,8 +7,9 @@ the repository to be the standard way every package is delivered. After an indep
 review, the owner accepted the design: aptly on lab3 publishing atomic snapshots under its own
 key and Origin, read by a machine account; one publisher that holds the only write credential;
 a pin generated from a manifest; no exact cross-source pins; kernels through APT with no meta
-package. Not started: the server, the manifest, the baseline import and the migration.
+package. Not started: the baseline import and the migration.
 [Design, phases and decisions](PACKAGE_DELIVERY.md).
+Phase 2 built: the manifest (28 sources from the ROG's inventory), the publisher, the pin generator and `rog-apt-config`; tested against a fake aptly only, and nothing published ([phase 2](PACKAGE_DELIVERY.md#manifest-and-publisher-phase-2-november-27)).
 
 **November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in

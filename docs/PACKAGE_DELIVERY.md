@@ -3,9 +3,10 @@
 Companion to the [APT repository](UBUNTU_APT_REPOSITORY.md), which describes
 the current Forgejo registry for Mutter and libdisplay-info, and to the
 [software handoff](SOFTWARE_DELIVERY.md), which records what is installed now.
-This document is the **design** that replaces both delivery paths. Nothing
-here is deployed yet; the [status page](STATUS.md) records each phase as it
-lands.
+This document is the **design** that replaces both delivery paths. The
+server (phase 1) and the manifest and publisher (phase 2) exist; no machine
+uses the repository yet, and nothing has been published to it. The
+[status page](STATUS.md) records each phase as it lands.
 
 ## Goal
 
@@ -53,7 +54,7 @@ Within the local repository, each **binary package name** keeps one version. A n
 
 ### The manifest
 
-`packaging/delivery/manifest.json` (phase 2) will be the
+[`packaging/delivery/manifest.json`](../packaging/delivery/manifest.json) is the
 one list of what is delivered. Each entry is a source package with these fields:
 
 - `project`: which repository owns it (`rog_hdr_dv`, `plurx`, `rog_audio`, …).
@@ -166,7 +167,141 @@ sudo runuser -u aptly -- env HOME=/srv/aptly GNUPGHOME=/srv/aptly/.gnupg \
 #       aptly publish switch -gpg-key=<fingerprint> stonking <name>
 ```
 
-The phase 2 publisher wraps these steps; until it exists, nothing is published.
+The phase 2 publisher (below) wraps these steps.
+
+## Manifest and publisher (phase 2, November 27)
+
+Everything is under [`packaging/delivery/`](../packaging/delivery/), in
+Python with only the standard library. It reads `.deb` files itself, so no
+dpkg is needed; zstd members need Python 3.14 or newer.
+
+| File | What it does |
+|---|---|
+| `manifest.json` | One entry per delivered source package (fields below), plus `unconfirmed` (ours, owner not known) and `excluded` (vendor or stock), each with a reason |
+| `publish.py` | The single publisher: checks a directory of `.deb` files, then adds, replaces, snapshots, switches and prunes over ssh |
+| `pins.py` | Generates `rog-apt-config/preferences.d/rog-hdr` from the manifest |
+| `fetch-key.py` | Fetches the served public key into `rog-apt-config/keyrings/`, refusing any other fingerprint |
+| `rog-apt-config/` | The debhelper source package for machines |
+| `delivery.py` | The shared code: manifest schema, `.deb` reader, pin generator, OpenPGP fingerprint |
+
+### The manifest
+
+Each entry has `source`, `project`, `class`, `binaries`, `architectures`,
+`shadows_ubuntu` and `version`, which is the version installed on the ROG,
+or null when the package is not installed. Optional fields:
+
+- `series`: for a `built` entry, where its series lives in this repository;
+- `reconcile_with`: for an `imported` entry, the series that phase 4
+  reconciles it with. This is a pointer, not a claim that the installed bytes
+  were built from it;
+- `multiarch_same`: names that must arrive on every listed architecture
+  together;
+- `binary_versions`: binaries whose installed version differs from the
+  source's, which today means the `+depfix` repacks;
+- `kernel`: the publisher never removes a kernel's older versions;
+- `note`.
+
+The manifest was populated on November 27 from a read-only inventory of the ROG:
+`apt list --installed` for local packages, and `dpkg-query` for their source names.
+It has 28 sources and 61 binaries:
+
+| Project | Built | Imported |
+|---|---|---|
+| `rog_hdr_dv` | 3: Mutter, libdisplay-info, `rog-apt-config` | 23, including two kernels |
+| `plurx` | 0 | 1: `plurx-player` |
+| `rog_audio` | 0 | 1: `rog-audio-easyeffects` |
+
+Mutter and libdisplay-info are the only sources CI builds today. Everything else installed on the ROG was built by hand, so it stays `imported` until phase 4.
+
+The asus-rog tools and NetworkManager are `unconfirmed`, so the publisher
+refuses them until their owner is known. The vendor packages, and bzip2 (a
+stock Ubuntu build), are `excluded`.
+
+### Publishing
+
+```bash
+# Every check, and the plan; contacts nothing.
+packaging/delivery/publish.py --project rog_hdr_dv DIR --dry-run
+
+# On the publishing runner, as the aptly account on the repository host.
+ROG_APT_HOST=aptly@<repository host> packaging/delivery/publish.py --project rog_hdr_dv DIR
+```
+
+The host comes only from the environment; the repository never names it.
+
+**Checks on each `.deb`.** The publisher refuses the whole directory, before
+it contacts the host, when any of these fails:
+
+- the binary name is not listed, or its entry belongs to another project;
+- its `Source` is not the entry's source, or its architecture is not listed;
+- a name or architecture appears twice;
+- a `multiarch_same` pair is incomplete;
+- a `Multi-Arch: same` package present on two architectures differs in version or in any shared file;
+- it has an exact `(= …)` dependency on a binary of another manifest entry.
+
+`--allow-baseline-exact-deps` accepts that last case for `imported` entries,
+for the baseline import of the installed bytes only. It never applies to a
+`built` entry. Exact pins on names the manifest doesn't list are printed as
+notes. Those names are Ubuntu binaries or virtual ABI names such as
+`rog-dv-hevc-runtime`.
+
+**Remote steps.** Every remote step runs over ssh, under a lock directory in the account's home:
+
+1. Upload into a fresh staging directory and compare SHA-256 sums.
+2. `aptly repo add`.
+3. Remove every other version of each published name and architecture. Kernels are never removed, and no other name is touched.
+4. Create the snapshot `rog-stonking-<UTC timestamp>-<project>`.
+5. `aptly publish switch -gpg-key=2DA6B7DE…0745 stonking <snapshot>`.
+6. Drop all but the newest 20 publisher snapshots. The published snapshot is never dropped; neither is the original `rog-stonking-0000-empty`.
+7. `aptly db cleanup`.
+
+A failure before step 5 changes nothing that machines see.
+
+A crashed run leaves the lock `~/.rog-apt-publish.lock` behind. The next run then refuses to start until someone removes the lock by hand.
+
+`ROG_APT_SSH` and `ROG_APT_APTLY` override the transport and the aptly
+command. That is how the tests run the publisher against a scratch state. A
+throwaway aptly also works: `ROG_APT_APTLY='aptly -config=<scratch>/aptly.conf'`.
+
+### Pins and the config package
+
+```bash
+packaging/delivery/pins.py --write   # after any manifest change
+packaging/delivery/pins.py --check   # what scripts/check_repository.py enforces
+```
+
+`rog-apt-config` installs three files:
+- `/etc/apt/sources.list.d/rog-hdr.sources`, whose URL `http://forge.lan:8095/` appears only in `debian/rog-hdr.sources`;
+- `/usr/share/keyrings/rog-hdr-archive-keyring.asc`;
+- `/etc/apt/preferences.d/rog-hdr`.
+
+It has no maintainer scripts, so it runs no apt, and it installs no credential.
+
+The key file is not checked in yet. `fetch-key.py` fetches it with the
+reader account and checks the fingerprint; then it is committed.
+`debian/rules` refuses to build without it, or with any other fingerprint.
+
+### Repository checks
+
+`scripts/check_repository.py` now also checks:
+- the manifest schema, and that the `series` and `reconcile_with` paths exist;
+- that each binary is listed by one source only, and is not also unconfirmed or excluded;
+- that the checked-in pin equals the generated one;
+- that the package's recorded fingerprint, and the key file once present, match the manifest;
+- that no maintainer script runs apt.
+
+The cross-source rule for `built` entries needs the built `.deb` files, so the
+publisher enforces it, not the offline check.
+`tests/test_package_delivery.py` covers the publisher against
+`tests/delivery_fakes.py`, an ssh and aptly double.
+
+### Limits found in phase 2
+
+- **Partial sources.** For FFmpeg, Mesa, glycin and WebKitGTK we deliver only some binaries; Ubuntu supplies the rest. `libavfilter11` pins Ubuntu's `libavutil60 (= 7:8.1.2-2ubuntu2)` exactly, so an Ubuntu FFmpeg update is held back until we rebuild. Following Ubuntu has to cover these sources too.
+- **ABI-named sources.** `libplacebo-rog1-360`, `libplacebo-rog387` and the two `librog-dv-provider` libraries are each their own source, named after the binary. Each ABI is therefore a separate entry, and a new ABI needs a manifest entry before it can be published. Old ABI names are never removed automatically; retiring one is a manifest change plus an explicit `aptly repo remove`.
+- **Versioned names accumulate.** The same applies to `libmutter-51-0` when Mutter moves to 52, and to kernels.
+- **`+depfix` repacks** give binaries versions that differ from their source's (`binary_versions`). They retire as phase 4 rebuilds each source.
+- **NetworkManager.** On the ROG, Ubuntu's `1.58.1-1ubuntu3.1` is already the apt candidate over our `+rogsleep1` for `libnm0` and `network-manager-tui`.
 
 ## Decisions
 
