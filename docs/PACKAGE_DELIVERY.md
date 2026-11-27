@@ -117,6 +117,23 @@ no meta package. `apt upgrade` never installs a new kernel; the owner runs
 `apt install linux-image-<version>` when releasing one. The saved GRUB default
 stays the owner's.
 
+## Interim channel until the migration (decided November 27)
+
+The WebKit recovery effort is already extending the Forgejo registry, with
+WebKit, GStreamer and their families, and the ROG already reads it. The owner
+decided that the Forgejo registry is the **interim** delivery channel and that
+aptly takes over at phase 6. Until then:
+
+- **New builds publish to the Forgejo registry**, through one publisher (this effort), using `packaging/ubuntu/publish.sh` and `registry.sh`. Sessions that build packages hand over a folder of `.deb` files with their SHA-256s; they don't upload or `dpkg -i`.
+- **Upload order:** dependencies first and consumers last, so the index never offers a package whose dependencies are missing. Each release is rehearsed on the ROG with `apt-get -s` before and after it is published.
+- **Pins on the ROG come from the WebKit effort's `managed-families.json`:** 999 by origin and by a derivative version pattern such as `+rogdv` or `+nativehdr`. That protects an installed derivative even when the registry has no candidate for it.
+- **Interim limits:** a release of several packages isn't atomic, and the registry keeps no rollback archive. Rollback stays the retained `.deb` files.
+
+Before phase 6, the two package lists (`manifest.json` here and
+`managed-families.json`) become one list, and one pin policy replaces both,
+put to the owner as its own decision. Running aptly and Forgejo side by side
+as live sources is not part of the design.
+
 ## Phases
 
 1. **Server.** Set up aptly, the key, the authenticated web server and the machine account on lab3, then publish an empty snapshot.
@@ -311,4 +328,4 @@ an independent review.
 1. **One private repository for everything,** read by a read-only machine account. Splitting the public and private builds across two repositories would break the dependency chains that cross them.
 2. **A single publisher holds the only write credential.** The pin is generated from the manifest, so no unlisted name can win.
 3. **Kernels go through apt with no meta package and no hold.** The owner installs each kernel and keeps the GRUB default.
-4. **aptly replaces the Forgejo registry** for delivery, and is set up before any package moves, so each machine's source changes once.
+4. **aptly replaces the Forgejo registry** for delivery, at phase 6. Until then the Forgejo registry is the interim channel (see above), as the owner decided later the same day after the WebKit effort's work came to light.
