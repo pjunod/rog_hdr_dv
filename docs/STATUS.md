@@ -1,5 +1,19 @@
 # Status — what is working and what remains
 
+**November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; built.**
+plurx Player's EL pill could say FEL or MEL only after the server's whole-title
+scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`
+(`+rogdv5.8`) adds `enhancement-layer-nlq-active` to `native-dovi-target-state`:
+libplacebo's own NLQ decision for the presented, composed frame (true: FEL;
+false: MEL). In private-compositor runs covering 53–93% of one FEL and two MEL
+titles at merge time, each reported only its own kind, so plurx Player 0.5.7's pill follows
+the level and keeps the server's scan as a cross-check. `+rogdv5.8` was built on
+the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It is
+handed to the project APT channel for delivery, not installed with dpkg; the
+attended visual check is the owner's.
+[Design and limits](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers)
+· [Receipt](../evidence/mpv-el-nlq-level-20261127.json).
+
 **November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in
 Showtime, with no error. NVDEC chose CUDA memory from the GTK Dolby mapper's
