@@ -97,15 +97,23 @@ class CadenceFixtureTests(unittest.TestCase):
                          "cadence-sdr-24000-1001-1920x1080-660s-mkv.mkv")
 
     def test_rate_change_argv_and_segments(self):
-        argv = gen.build_rate_change_argv("ffmpeg", "sdr", 660, 1920, 1080, "o.mp4")
-        self.assertEqual(argv[argv.index("-video_track_timescale") + 1], "120000")
-        self.assertIn("concat=n=2:v=1:a=0", " ".join(argv))
-        self.assertEqual(argv[argv.index("-fps_mode") + 1], "passthrough")
+        steps, listing, parts = gen.build_rate_change_steps("ffmpeg", "sdr", 660, 1920, 1080,
+                                                            "o.mp4")
+        self.assertEqual(len(steps), 3)
+        for step in steps:
+            self.assertEqual(step[step.index("-video_track_timescale") + 1], "120000")
+        self.assertIn("r=24000/1001", " ".join(steps[0]))
+        self.assertIn("r=60000/1001", " ".join(steps[1]))
+        self.assertEqual(steps[2][steps[2].index("-f") + 1], "concat")
+        self.assertEqual(steps[2][-1], "o.mp4")
         with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
             gen.parse_args([str(self.out), "--variant", "rate-change", "--rates", "24"])
         with mock.patch.object(gen.subprocess, "run", fake_ffmpeg(0)):
             self.assertEqual(gen.main([str(self.out), "--variant", "rate-change"]), 0)
         entry = json.loads((self.out / "manifest.json").read_text())["fixtures"][0]
+        self.assertEqual(sorted(p.name for p in self.out.iterdir()),
+                         ["cadence-sdr-24000-1001-to-60000-1001-1920x1080-660s.mp4",
+                          "manifest.json"])   # parts and listing removed
         self.assertEqual(entry["file"],
                          "cadence-sdr-24000-1001-to-60000-1001-1920x1080-660s.mp4")
         self.assertEqual([s["expected_frames"] for s in entry["segments"]],

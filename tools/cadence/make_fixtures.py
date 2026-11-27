@@ -83,13 +83,24 @@ def track_timescale(rate):
 
 
 def video_source(rate, seconds, width, height, sync):
-    """One lavfi input: color + geq cycling PATTERNS pictures by frame number."""
+    """One lavfi input: the PATTERNS pictures rendered once by geq, then looped.
+
+    geq per pixel is slow, so only the first PATTERNS frames are computed;
+    `loop` repeats them and `setpts` restores an exact constant-rate
+    timeline. The optional sync flash is a full-frame drawbox on the first
+    frame of each second (half-frame offset keeps it robust to rounding).
+    """
+    r = rate_text(rate)
     p = f"mod(N,{PATTERNS})"
     lum = f"if(eq(floor(X/(W/{PATTERNS})),{p}),235,16+{p}*14)"
-    if sync:  # half-frame offset keeps whole-second frames robust to rounding
-        lum = (f"if(lt(mod(T+{1 / (2 * rate)},1),{1 / rate}),235,{lum})")
-    return (f"color=c=black:s={width}x{height}:r={rate_text(rate)}:d={seconds},"
-            f"format=yuv420p,geq=lum='{lum}':cb=128:cr=128")
+    chain = (f"color=c=black:s={width}x{height}:r={r},format=yuv420p,"
+             f"trim=end_frame={PATTERNS},geq=lum='{lum}':cb=128:cr=128,"
+             f"loop=loop=-1:size={PATTERNS}:start=0,setpts=N/({r})/TB,"
+             f"trim=duration={seconds}")
+    if sync:
+        chain += (f",drawbox=x=0:y=0:w=iw:h=ih:color=white:t=fill:"
+                  f"enable='lt(mod(t+{1 / (2 * rate)},1),{1 / rate})'")
+    return chain
 
 
 def codec_args(kind, preset, rate_hint):
@@ -141,17 +152,29 @@ def build_argv(ffmpeg, kind, rate, seconds, width, height, out, preset="medium",
     return argv + [str(out)]
 
 
-def build_rate_change_argv(ffmpeg, kind, seconds, width, height, out, preset="medium"):
-    """One silent MP4: seconds/2 at 24000/1001 then seconds/2 at 60000/1001."""
+def build_rate_change_steps(ffmpeg, kind, seconds, width, height, out, preset="medium"):
+    """Steps for one silent MP4: seconds/2 at 24000/1001, then seconds/2 at 60000/1001.
+
+    Each segment is encoded on its own with a time base that holds both frame
+    periods exactly, then the concat demuxer joins them by stream copy.
+    Joining in a filter graph rounded the second segment onto the first
+    segment's grid (checked on the laptop, November 27).
+    Returns (steps, concat_list_path, temporary_paths).
+    """
+    out = Path(out)
     half = seconds // 2
-    argv = [ffmpeg, "-hide_banner", "-y"]
-    for rate in CHANGE_RATES:
-        argv += ["-f", "lavfi", "-i", video_source(rate, half, width, height, False)]
-    graph = f"[0:v][1:v]concat=n=2:v=1:a=0,format={pix_fmt(kind)}[v]"
-    return argv + ["-filter_complex", graph, "-map", "[v]",
-                   *codec_args(kind, preset, CHANGE_RATES[1]),
-                   "-fps_mode", "passthrough", "-video_track_timescale",
-                   str(CHANGE_TIMESCALE), "-movflags", "+faststart", str(out)]
+    parts = [out.with_name(f"{out.stem}.part{k}.mp4") for k in range(len(CHANGE_RATES))]
+    steps = []
+    for rate, part in zip(CHANGE_RATES, parts):
+        steps.append([ffmpeg, "-hide_banner", "-y", "-f", "lavfi",
+                      "-i", video_source(rate, half, width, height, False),
+                      "-vf", f"format={pix_fmt(kind)}", *codec_args(kind, preset, rate),
+                      "-video_track_timescale", str(CHANGE_TIMESCALE), str(part)])
+    listing = out.with_name(f"{out.stem}.parts.txt")
+    steps.append([ffmpeg, "-hide_banner", "-y", "-f", "concat", "-safe", "0",
+                  "-i", str(listing), "-c", "copy", "-video_track_timescale",
+                  str(CHANGE_TIMESCALE), "-movflags", "+faststart", str(out)])
+    return steps, listing, parts
 
 
 def sha256(path):
@@ -226,11 +249,13 @@ def plan(args):
         segments = [{"rate": rate_text(r), "start_seconds": i * half,
                      "expected_frames": math.floor(half * r)}
                     for i, r in enumerate(CHANGE_RATES)]
-        cmd = build_rate_change_argv(args.ffmpeg, args.kind, args.seconds, args.width,
-                                     args.height, d / name, args.preset)
+        steps, listing, parts = build_rate_change_steps(
+            args.ffmpeg, args.kind, args.seconds, args.width, args.height, d / name,
+            args.preset)
         return [{"file": name, "segments": segments, "timescale": CHANGE_TIMESCALE,
                  "expected_frames": sum(s["expected_frames"] for s in segments),
-                 **common, "argv": cmd}]
+                 **common, "steps": steps,
+                 "concat_list": {"path": str(listing), "parts": [str(p) for p in parts]}}]
     entries = []
     for rate in args.rates:
         name = fixture_name(args.kind, rate, args.width, args.height, args.seconds,
@@ -239,7 +264,7 @@ def plan(args):
                          args.height, d / name, args.preset, args.variant, args.sync)
         entries.append({"file": name, "rate": rate_text(rate), "rate_float": float(rate),
                         "expected_frames": math.floor(args.seconds * rate),
-                        **common, "argv": cmd})
+                        **common, "steps": [cmd]})
     return entries
 
 
@@ -247,17 +272,28 @@ def main(argv=None):
     args = parse_args(argv)
     entries = plan(args)
     if args.dry_run:
-        print(json.dumps([e["argv"] for e in entries], indent=2))
+        print(json.dumps([e["steps"] for e in entries], indent=2))
         return 0
     args.output_dir.mkdir()
     for entry in entries:
         path = args.output_dir / entry["file"]
-        try:
-            result = subprocess.run(entry["argv"], check=False)
-            ok = result.returncode == 0
-        except OSError as exc:
-            print(f"cannot run ffmpeg: {exc}", file=sys.stderr)
-            ok = False
+        concat = entry.pop("concat_list", None)
+        temporary = []
+        if concat:
+            temporary = [Path(concat["path"])] + [Path(p) for p in concat["parts"]]
+            Path(concat["path"]).write_text(
+                "".join(f"file '{Path(p).name}'\n" for p in concat["parts"]))
+        ok = True
+        for step in entry["steps"]:
+            try:
+                ok = subprocess.run(step, check=False).returncode == 0
+            except OSError as exc:
+                print(f"cannot run ffmpeg: {exc}", file=sys.stderr)
+                ok = False
+            if not ok:
+                break
+        for leftover in temporary:
+            leftover.unlink(missing_ok=True)
         if not ok:
             path.unlink(missing_ok=True)
             print(f"ffmpeg failed for {entry['file']}", file=sys.stderr)

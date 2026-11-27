@@ -271,5 +271,7 @@ clients to target presentation times.
   - Variants: `standard` (MP4, click and sync flash), `silent`, `matroska` (23.976 only, default 1 ms timestamps) and `rate-change` (23.976 then 59.94, timescale 120000).
   - Source frame n is pattern n mod 16: a flat level and a bar moving with the same period.
   - Encoding is intra-only at constant QP with adaptive quantisation off, because inter prediction made frame n and n+16 decode differently.
-  - On the ROG on November 27, `framemd5` of 4 s encodes of each variant read 16 distinct pictures plus the flash, all repeating exactly. Durations read back as 1001/24000, 3600/90000 and 5005/2002 per 120000 for the rate change. Matroska read back 41 ms, as expected.
+  - The 16 pictures are rendered once and looped, because `geq` per pixel is slow.
+  - The rate-change file is two segment encodes joined by the concat demuxer, because joining in a filter graph rounded the 59.94 segment onto the 23.976 grid.
+  - On the ROG on November 27, `framemd5` of 4 s encodes of each variant read 16 distinct pictures plus the flash, all repeating exactly. Durations read back as 1001/24000 and 3600/90000. The 20 s rate-change file read 240 frames at 5005 then 599 at 2002 (per 120000). Matroska read back 41 ms, as expected.
 - **Tests:** `tests/test_presentation_cadence.py`, `tests/test_parse_wayland_debug.py`, `tests/test_generate_cadence_fixtures.py` (43 checks).
