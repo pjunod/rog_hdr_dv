@@ -28,7 +28,7 @@ ROG_APT_HOST as the aptly account:
 6. drop all but the newest keep_snapshots publisher snapshots (never the
    published one) and clean the package pool.
 
-A remote lock directory serializes publishers. With --require-release-receipt,
+A remote lock directory serializes publishers. With a verified release.json,
 versions must advance according to dpkg or match the published SHA-256. An exact
 replay leaves the published snapshot in place. --dry-run checks the local
 inputs and prints the plan without contacting the host. ROG_APT_SSH (default
@@ -424,7 +424,7 @@ def main():
     remote = Remote(host or "<ROG_APT_HOST>", dry_run=args.dry_run)
     try:
         publish(manifest, args.project, debs, remote,
-                release_hashes=release_hashes if args.require_release_receipt else None)
+                release_hashes=release_hashes)
     except RuntimeError as exc:
         print(f"publish.py: {exc}", file=sys.stderr)
         return 1
