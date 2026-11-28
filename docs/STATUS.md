@@ -1,5 +1,23 @@
 # Status — what is working and what remains
 
+**November 27, 2026 — the Dolby mapping rules have one owner, `librog-dovi-map`; built, not installed.**
+The GTK element's qualification, target, provider and transport rules, the
+SDR destination and the process-shared Vulkan device moved unchanged into a
+GStreamer-free core (`packaging/dovi-map-core`, `0.1.0+rogdv1`) that Firefox
+will also call. `libgstgtk-dovi-core0` `0.1.0+rogdv13` is an adapter over it
+with an exact pin and an unchanged `mapper.h`. Staged on the ROG beside the
+installed `rogdv12`, both on libplacebo's default device, the adapter's
+output was byte-identical for the Profile 8.1 chart (two pictures) and a
+Profile 5 picture, at 616 cd/m² and at the SDR destination; the negotiation
+probe stayed at 169/0. The core's DMABuf route (VA-API P010 on Intel, core
+allocated output) was byte-identical to the GTK mapper pinned to Intel.
+Open: 8-bit NV12 (no clear fixture), Showtime and WebKitGTK requalification
+(mapped-frame counts for Profile 5, 8.1, MEL and FEL titles), a tiled
+output read-back, and an existing exit crash after a second device cycle
+on the default device, reported rather than changed.
+[Core](../packaging/dovi-map-core/README.md)
+· [Receipt](../evidence/dovi-map-core-extraction-20261127.json).
+
 **November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; installed.**
 plurx Player's EL pill could say FEL or MEL only after the server's whole-title
 scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`

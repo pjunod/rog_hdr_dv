@@ -191,6 +191,7 @@ has the remote and branch rules.
 | [GTK colour-owner fixture](docs/GTK_COLOUR_OWNER_FIXTURE.md) | Testing default Vulkan rejection and renderer fallback without invented capabilities |
 | [GStreamer per-picture RPU transport](docs/GSTREAMER_DOLBY_TRANSPORT.md) | Picture-owned RPU contract, Software/VA/NVIDIA transport and phase boundaries |
 | [GStreamer resolved Dolby pictures](docs/GSTREAMER_DOLBY_RECONSTRUCTION.md) | Decoder-owned frame state, native software and Intel controls, and the ABI for renderers |
+| [Dolby Vision mapping core](packaging/dovi-map-core/README.md) | The GStreamer-free `librog-dovi-map` that owns the mapping rules for the GTK element and Firefox; its ABI and extraction acceptance |
 | [Status](docs/STATUS.md) · [status page](docs/STATUS.html) | What is proven, what is installed, what remains |
 | [Hardware](docs/HARDWARE.md) | Exactly which panel this is and what its firmware declares |
 | [ThinkPad X1 Carbon Gen 6](docs/THINKPAD_X1_CARBON_GEN6.md) | Closed read-only inspection and the pending native-gamma HDR qualification plan |

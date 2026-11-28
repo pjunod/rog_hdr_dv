@@ -1,8 +1,8 @@
 # Dolby Vision mapping core (`librog-dovi-map`)
 
 The one owner of the project's per-picture Dolby Vision mapping rules, with a
-plain C ABI and no GLib or GStreamer dependency
-([design](../../docs/FIREFOX_DOLBY_VISION.md#4-the-shared-mapping-core-librog-dovi-map)).
+plain C ABI and no GLib or GStreamer dependency (design: section 4 of
+`docs/FIREFOX_DOLBY_VISION.md`, the Firefox Dolby Vision design of record).
 The GTK element ([`gstreamer-gtk-dovi`](../gstreamer-gtk-dovi)) is an adapter
 over it, and Firefox will call it from its decoder process.
 
