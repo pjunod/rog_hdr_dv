@@ -32,6 +32,9 @@ ENTRY_FIELDS = {"source", "project", "class", "binaries", "architectures",
 REQUIRED_ENTRY_FIELDS = {"source", "project", "class", "binaries",
                          "architectures", "shadows_ubuntu", "version"}
 
+FORGEJO_FIELDS = {"component", "automatic", "derivative", "pin", "provenance", "project", "policy_only",
+                  "monitor_scope", "optional", "omit", "expected_package_version"}
+
 
 def unique_object(pairs):
     result = {}
@@ -195,8 +198,18 @@ def validate(manifest, root=None):
                 or not re.fullmatch(r"\+[a-z0-9]+", spec["derivative"])):
             errors.append(f"{source}: Forgejo policy needs a derivative suffix")
             continue
-        if entry in unconfirmed and spec.get("policy_only") is not True:
-            errors.append(f"{source}: unconfirmed sources may only carry an interim version pin")
+        if unknown := sorted(set(spec) - FORGEJO_FIELDS):
+            errors.append(f"{source}: unknown Forgejo fields {unknown}")
+        for field in ("automatic", "policy_only", "project"):
+            if field in spec and type(spec[field]) is not bool:
+                errors.append(f"{source}: Forgejo {field} must be a boolean")
+        for field in ("component", "pin", "provenance", "monitor_scope", "expected_package_version"):
+            if field in spec and (not isinstance(spec[field], str) or not spec[field]):
+                errors.append(f"{source}: Forgejo {field} must be a nonempty string")
+        if entry in unconfirmed:
+            if spec.get("policy_only") is not True:
+                errors.append(f"{source}: unconfirmed sources may only carry an interim version pin")
+            validate_forgejo_architectures(entry, source, errors)
         binaries = entry.get("binaries")
         optional, omit = spec.get("optional", []), spec.get("omit", [])
         if (not _string_list(binaries) or not isinstance(optional, list) or not isinstance(omit, list)
@@ -205,6 +218,18 @@ def validate(manifest, root=None):
                 or not set(binaries) - set(optional + omit)):
             errors.append(f"{source}: invalid optional/omitted Forgejo binaries")
     return errors
+
+
+def validate_forgejo_architectures(entry, source, errors):
+    arches = entry.get("architectures")
+    binaries = entry.get("binaries")
+    by_binary = entry.get("binary_architectures", {})
+    if (not _string_list(arches) or not set(arches) <= set(ARCHITECTURES)
+            or not _string_list(binaries) or not isinstance(by_binary, dict)
+            or not set(by_binary) <= set(binaries)
+            or not all(_string_list(values) and set(values) <= set(arches)
+                       for values in by_binary.values())):
+        errors.append(f"{source}: invalid Forgejo binary architectures")
 
 
 def binary_index(manifest):

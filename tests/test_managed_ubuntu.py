@@ -354,6 +354,7 @@ class SetupShellRegressionTests(unittest.TestCase):
         manifest = self.recipe.parent / 'delivery/manifest.json'
         manifest.parent.mkdir()
         shutil.copy2(managed.MANIFEST, manifest)
+        shutil.copy2(managed.DELIVERY / 'delivery.py', manifest.parent)
         self.etc = self.root / 'etc'
         for path in ('apt/keyrings', 'apt/sources.list.d', 'apt/preferences.d'):
             (self.etc / path).mkdir(parents=True)
@@ -445,12 +446,16 @@ class PublisherShellRegressionTests(unittest.TestCase):
             shutil.copy2(ROOT / 'packaging/ubuntu' / name, self.recipe / name)
         manifest = self.recipe.parent / 'delivery/manifest.json'
         manifest.parent.mkdir()
-        manifest.write_text(json.dumps({'packages': [{
-            'source': 'fixture-source',
-            'binaries': ['fixture-first', 'fixture-second'],
-            'architectures': ['amd64'],
+        data = json.loads(managed.MANIFEST.read_text())
+        data['packages'] = [{
+            'source': 'fixture-source', 'project': 'rog_hdr_dv', 'class': 'imported',
+            'shadows_ubuntu': True, 'version': None,
+            'binaries': ['fixture-first', 'fixture-second'], 'architectures': ['amd64'],
             'forgejo': {'derivative': '+rogdv', 'expected_package_version': '1-1+rogdv2'},
-        }]}))
+        }]
+        data['unconfirmed'] = []
+        manifest.write_text(json.dumps(data))
+        shutil.copy2(managed.DELIVERY / 'delivery.py', manifest.parent)
         self.outputs = self.root / 'outputs'
         self.outputs.mkdir()
         self.rows = []

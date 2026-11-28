@@ -15,11 +15,18 @@ import sys
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-MANIFEST = ROOT / 'packaging/delivery/manifest.json'
+DELIVERY = ROOT / 'packaging/delivery'
+sys.path.insert(0, str(DELIVERY))
+import delivery  # noqa: E402
+
+
+MANIFEST = DELIVERY / 'manifest.json'
 
 
 def families():
-    manifest = json.loads(MANIFEST.read_text())
+    manifest = delivery.load_manifest(MANIFEST)
+    if errors := delivery.validate(manifest):
+        raise ValueError('invalid delivery manifest: ' + '; '.join(errors))
     result = {}
     for entry in manifest['packages'] + manifest.get('unconfirmed', []):
         if 'forgejo' not in entry:
@@ -32,7 +39,7 @@ def families():
             if name in omitted:
                 continue
             packages = optional_packages if name in optional else required_packages
-            for arch in entry.get('binary_architectures', {}).get(name, entry['architectures']):
+            for arch in delivery.binary_architectures(entry, name):
                 packages.setdefault(arch, []).append(name)
         spec['packages'] = required_packages
         if optional_packages:

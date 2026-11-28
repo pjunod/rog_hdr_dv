@@ -38,7 +38,8 @@ class UbuntuOutputRetentionTests(unittest.TestCase):
             shutil.copy2(PACKAGING / name, self.here / name)
         delivery = self.here.parent / "delivery"
         delivery.mkdir()
-        shutil.copy2(ROOT / "packaging/delivery/manifest.json", delivery / "manifest.json")
+        for name in ("manifest.json", "delivery.py"):
+            shutil.copy2(ROOT / "packaging/delivery" / name, delivery)
         shutil.copy2(ROOT / "sources.json", self.root / "repo/sources.json")
         origins = {entry["component"]: entry.get("source_origin", {})
                    for entry in json.loads((ROOT / "sources.json").read_text())["series"]}
@@ -91,7 +92,8 @@ if os.environ.get("FAIL_BUILD") == "yes":
 (out / "partial").unlink()
 for suffix in ("changes", "buildinfo"):
     (out / f"{src}_{version}_{arch}.{suffix}").write_bytes(b"fake " + suffix.encode())
-spec = json.loads(Path(os.environ["MANAGED_MANIFEST"]).read_text())["families"][src]
+import runpy
+spec = runpy.run_path(os.environ["MANAGED_SCRIPT"])["families"]()[src]
 for package_arch, names in spec["packages"].items():
     if package_arch != arch and not (arch == "amd64" and package_arch == "all"):
         continue
