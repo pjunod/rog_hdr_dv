@@ -658,18 +658,6 @@
       "shadows_ubuntu": false,
       "version": "8.2.8+rog3",
       "note": "Built and released by the rog_audio repository."
-    }
-  ],
-  "unconfirmed": [
-    {
-      "source": "asus-rog",
-      "binaries": [
-        "asus-rog-battery",
-        "asus-rog-fwupd-refresh",
-        "asus-rog-tools"
-      ],
-      "version": "0.2.0",
-      "reason": "Installed as local packages on the ROG; the owning project is not yet confirmed."
     },
     {
       "source": "network-manager",
@@ -679,7 +667,6 @@
         "network-manager-tui"
       ],
       "version": "1.58.1-1ubuntu3+rogsleep1",
-      "reason": "The owner is not yet confirmed, although patches/ubuntu-network-manager-suspend exists here. On the ROG, Ubuntu's 1.58.1-1ubuntu3.1 is already the apt candidate for libnm0 and network-manager-tui.",
       "architectures": [
         "amd64",
         "i386"
@@ -700,7 +687,27 @@
           "libnm0",
           "network-manager-tui"
         ]
-      }
+      },
+      "project": "rog_hdr_dv",
+      "class": "imported",
+      "shadows_ubuntu": true,
+      "reconcile_with": "patches/ubuntu-network-manager-suspend",
+      "multiarch_same": [
+        "libnm0"
+      ],
+      "note": "The ROG has patched network-manager, network-manager-tui and libnm0 on both architectures. Ubuntu has a newer security base awaiting a source rebase."
+    }
+  ],
+  "unconfirmed": [
+    {
+      "source": "asus-rog",
+      "binaries": [
+        "asus-rog-battery",
+        "asus-rog-fwupd-refresh",
+        "asus-rog-tools"
+      ],
+      "version": "0.2.0",
+      "reason": "Installed as local packages on the ROG; the owning project is not yet confirmed."
     }
   ],
   "excluded": [

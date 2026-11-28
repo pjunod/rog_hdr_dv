@@ -75,7 +75,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_unconfirmed_name_cannot_also_be_published(self):
         manifest = copy.deepcopy(self.manifest)
-        manifest["packages"][0]["binaries"].append("network-manager")
+        manifest["packages"][0]["binaries"].append("asus-rog-tools")
         self.assertTrue(any("both published and unconfirmed" in e for e in delivery.validate(manifest)))
 
     def test_schema_rejects_unknown_class_and_missing_series(self):
@@ -97,7 +97,7 @@ class ManifestTests(unittest.TestCase):
     def test_vendor_and_unowned_packages_are_not_published(self):
         index = delivery.binary_index(self.manifest)
         for name in ("google-chrome-stable", "steam-launcher", "mullvad-vpn", "mainline", "libbz2-1.0",
-                     "nvidia-container-toolkit", "asus-rog-tools", "network-manager", "libnm0"):
+                     "nvidia-container-toolkit", "asus-rog-tools"):
             self.assertNotIn(name, index)
 
     def test_pins_are_deterministic_and_match_checked_in(self):
@@ -194,14 +194,14 @@ class VerifyTests(unittest.TestCase):
 
     def test_unlisted_unconfirmed_wrong_project_arch_and_source(self):
         paths = [make_deb(self.dir, "unknown-tool", "1", "amd64"),
-                 make_deb(self.dir, "network-manager", "1.58.1-1ubuntu3+rogsleep2", "amd64"),
+                 make_deb(self.dir, "asus-rog-tools", "0.2.0", "all"),
                  make_deb(self.dir, "plurx-player", "0.5.7-1", "amd64"),
                  make_deb(self.dir, "mutter", "51.0-1ubuntu3+nativehdr18", "i386"),
                  make_deb(self.dir, "libdovi3", "3.3.2-3+rogdv2", "amd64", source="other-source")]
         errors, _ = self.check(paths)
         text = "\n".join(errors)
         self.assertIn("unknown-tool is not published (not in the manifest)", text)
-        self.assertIn("network-manager is not published (unconfirmed:", text)
+        self.assertIn("asus-rog-tools is not published (unconfirmed:", text)
         self.assertIn("plurx-player belongs to project plurx, not rog_hdr_dv", text)
         self.assertIn("architecture i386 is not listed for mutter", text)
         self.assertIn("Source other-source is not the manifest's rust-dolby-vision", text)

@@ -234,19 +234,19 @@ or null when the package is not installed. Optional fields:
 
 The manifest was populated on November 27 from a read-only inventory of the ROG:
 `apt list --installed` for local packages, and `dpkg-query` for their source names.
-The baseline inventory covers 28 sources, with additional companion
+The baseline inventory covers 29 sources, with additional companion
 binaries from their release definitions:
 
 | Project | Built | Imported |
 |---|---|---|
-| `rog_hdr_dv` | 3: Mutter, libdisplay-info, `rog-apt-config` | 23, including two kernels |
+| `rog_hdr_dv` | 3: Mutter, libdisplay-info, `rog-apt-config` | 24, including two kernels |
 | `plurx` | 0 | 1: `plurx-player` |
 | `rog_audio` | 0 | 1: `rog-audio-easyeffects` |
 
 Mutter and libdisplay-info are the only sources CI builds today. Everything else installed on the ROG was built by hand, so it stays `imported` until phase 4.
 
-The asus-rog tools and NetworkManager are `unconfirmed`, so the publisher
-refuses them until their owner is known. The vendor packages, and bzip2 (a
+The asus-rog tools are `unconfirmed`. Their source and owning project
+are still open. The vendor packages, and bzip2 (a
 stock Ubuntu build), are `excluded`.
 
 ### Publishing
