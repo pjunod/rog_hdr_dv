@@ -28,8 +28,10 @@ ROG_APT_HOST as the aptly account:
 6. drop all but the newest keep_snapshots publisher snapshots (never the
    published one) and clean the package pool.
 
-A remote lock directory serializes publishers. --dry-run runs every check
-and prints the plan without contacting the host. ROG_APT_SSH (default
+A remote lock directory serializes publishers. With --require-release-receipt,
+versions must advance according to dpkg or match the published SHA-256. An exact
+replay leaves the published snapshot in place. --dry-run checks the local
+inputs and prints the plan without contacting the host. ROG_APT_SSH (default
 `ssh -o BatchMode=yes`) and ROG_APT_APTLY (default `aptly`) override the
 transport and the aptly command, for testing against a scratch rootDir.
 """
@@ -223,7 +225,39 @@ def published_snapshot(remote, distribution, component):
     raise RuntimeError(f"{distribution}/{component} is not published from a snapshot")
 
 
-def publish(manifest, project, debs, remote, now=None):
+def release_already_published(remote, local_repo, base, debs):
+    """Check the entire receipt against the current snapshot under the writer lock."""
+    present = repository_packages(remote, local_repo)
+    unchanged = True
+    for deb in debs:
+        versions = present.get((deb.name, deb.architecture), ())
+        if deb.version not in versions:
+            unchanged = False
+        for version in sorted(versions):
+            if deb.version != version:
+                result = remote.run([
+                    "sh", "-c",
+                    'dpkg --compare-versions "$1" gt "$2"; rc=$?; '
+                    'case "$rc" in 0|1) echo "$rc";; *) exit "$rc";; esac',
+                    "compare-versions", deb.version, version,
+                ]).strip()
+                if result not in {"0", "1"}:
+                    raise RuntimeError("unexpected response from dpkg version comparison")
+                if result == "1":
+                    raise RuntimeError(f"{deb.name}:{deb.architecture} {deb.version} is not newer "
+                                       f"than published version {version}")
+                continue
+            query = (f"Name (= {deb.name}), Architecture (= {deb.architecture}), "
+                     f"Version (= {version})")
+            hashes = remote.aptly("snapshot", "search", "-format={{.SHA256}}", base, query).split()
+            if len(hashes) != 1 or not re.fullmatch(r"[a-f0-9]{64}", hashes[0]):
+                raise RuntimeError(f"cannot verify the published hash of {deb.name}:{deb.architecture}")
+            if hashes[0] != sha256(deb.path):
+                raise RuntimeError(f"{deb.name}:{deb.architecture} {version} differs from the published bytes")
+    return unchanged
+
+
+def publish(manifest, project, debs, remote, now=None, require_release_receipt=False):
     repo = manifest["repository"]
     distribution, component = repo["distribution"], repo["component"]
     prefix, keep = repo["snapshot_prefix"], repo["keep_snapshots"]
@@ -237,6 +271,12 @@ def publish(manifest, project, debs, remote, now=None):
         base = published_snapshot(remote, distribution, component)
         remote.aptly("repo", "create", local_repo, "from", "snapshot", base)
         try:
+            if require_release_receipt:
+                if remote.dry_run:
+                    print("would verify the release is newer than the active snapshot or an exact replay")
+                elif release_already_published(remote, local_repo, base, debs):
+                    print(f"release already matches {base}")
+                    return base
             prepare_snapshot(remote, local_repo, snapshot, debs, index)
         finally:
             remote.aptly("repo", "drop", "-force", local_repo)
@@ -379,7 +419,7 @@ def main():
         return 2
     remote = Remote(host or "<ROG_APT_HOST>", dry_run=args.dry_run)
     try:
-        publish(manifest, args.project, debs, remote)
+        publish(manifest, args.project, debs, remote, require_release_receipt=args.require_release_receipt)
     except RuntimeError as exc:
         print(f"publish.py: {exc}", file=sys.stderr)
         return 1

@@ -19,7 +19,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 
 REPOSITORY = Path(__file__).resolve().parents[1]
@@ -375,6 +375,69 @@ class VerifyTests(unittest.TestCase):
         self.assertTrue(any("libgtk-4-1" in n and "accepted for the baseline" in n for n in notes))
         self.assertTrue(any("rog-dv-hevc-runtime" in n and "unlisted" in n for n in notes))
         self.assertFalse(any("Depends libmutter-51-0" in error for error in errors))
+
+
+class ReleaseReplayTests(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.directory = Path(tmp.name)
+        self.manifest = delivery.load_manifest()
+        self.deb = delivery.Deb(make_deb(self.directory, "plurx-player", "1:0.5.7-1", "amd64"))
+        self.remote = Mock(dry_run=False)
+        self.state = (f"Packages:\n plurx-player_{self.deb.version}_amd64\n")
+        self.checksum = publish.sha256(self.deb.path)
+
+        def aptly(*args):
+            if args[:2] == ("publish", "show"):
+                return "Sources:\n  main: active [snapshot]\n"
+            if args[:2] == ("repo", "show"):
+                return self.state
+            if args[:2] == ("snapshot", "search"):
+                return self.checksum
+            return ""
+
+        self.remote.aptly.side_effect = aptly
+
+    def publish(self):
+        return publish.publish(self.manifest, "plurx", [self.deb], self.remote,
+                               require_release_receipt=True)
+
+    def assert_no_switch(self):
+        self.assertFalse(any(call.args[:2] == ("publish", "switch")
+                             for call in self.remote.aptly.call_args_list))
+        self.remote.run.assert_called_with(["rmdir", publish.LOCK])
+
+    def test_exact_replay_does_not_create_another_snapshot(self):
+        self.assertEqual(self.publish(), "active")
+        self.assert_no_switch()
+        self.remote.upload.assert_not_called()
+
+    def test_same_version_changed_bytes_or_unavailable_digest_are_rejected(self):
+        for checksum in ("0" * 64, "", "a" * 64 + " " + "b" * 64):
+            with self.subTest(checksum=checksum):
+                self.checksum = checksum
+                with self.assertRaisesRegex(RuntimeError, "published bytes|published hash"):
+                    self.publish()
+        self.assert_no_switch()
+        self.remote.upload.assert_not_called()
+
+    def test_stale_version_cannot_reach_upload_or_switch(self):
+        self.state = "Packages:\n plurx-player_2:0.5.1-1_amd64\n"
+        self.remote.run.return_value = "1\n"
+        with self.assertRaisesRegex(RuntimeError, "is not newer"):
+            self.publish()
+        comparison = self.remote.run.call_args_list[1].args[0]
+        self.assertEqual(comparison[-2:], ["1:0.5.7-1", "2:0.5.1-1"])
+        self.assert_no_switch()
+        self.remote.upload.assert_not_called()
+
+    def test_newer_release_reaches_snapshot_preparation(self):
+        self.state = "Packages:\n plurx-player_0.5.8-1_amd64\n"
+        self.remote.run.return_value = "0\n"
+        with patch.object(publish, "prepare_snapshot") as prepare:
+            self.assertNotEqual(self.publish(), "active")
+        prepare.assert_called_once()
 
 
 class PublisherTests(unittest.TestCase):
