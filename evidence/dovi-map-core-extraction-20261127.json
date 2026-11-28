@@ -5,15 +5,17 @@
   "change": {
     "core": "packaging/dovi-map-core, librog-dovi-map.so.1 0.1.0+rogdv1",
     "adapter": "packaging/gstreamer-gtk-dovi 0.1.0+rogdv13 over the core",
-    "reference": "installed libgstgtkdovicore0 0.1.0+rogdv12 (main's rogdv11 rules plus an uninstalled-branch diagnostics change that does not alter rendering)",
+    "reference": "two references: the installed libgstgtk-dovi-core0 0.1.0+rogdv12 (main's rogdv11 rules plus an uninstalled-branch diagnostics change) and a 0.1.0+rogdv11 build of main's packaging/gstreamer-gtk-dovi at e455f69, staged with LD_LIBRARY_PATH",
     "staged_sha256": {
+      "note": "hashes of the first acceptance build; the final build (with the kept device, DMABuf bounds and cross-device decline) was compared again below, results unchanged",
       "libgstgtkdovicore.so.0.0.0": "d4a5a59c066cb1d3f88a45609655b2cb799d2272bc45386b9bd74fe9648d512c",
       "librog-dovi-map.so.1.0.0": "fc89857408e2dff064c2e067f1054296ac7927f101eb2d73e07efd73c934bacb",
       "libgstgtkdovimap.so": "272744c2b19facba3d14c478acd83eb1aa8f90f7110e0c418a891adf76f5c034"
     },
     "reference_sha256": {
       "libgstgtkdovicore.so.0.0.0": "56dc9ad5653062a5d06b062ef0a855b63c5fc20012036a0d831cca58b938b2bb",
-      "libgstgtkdovimap.so": "77a6db8b6401da7ef44a5c9bdb2dccac6e86ab8c46e22a3f522d77417b45a260"
+      "libgstgtkdovimap.so": "77a6db8b6401da7ef44a5c9bdb2dccac6e86ab8c46e22a3f522d77417b45a260",
+      "rogdv11 build libgstgtkdovicore.so.0.0.0": "a5e95214e77e85361d70127ed204ea658d0413e52a30e68f803d85819d397ba8"
     }
   },
   "build": "Ubuntu 26.10 builder container, meson debugoptimized, one job, against the project's private libplacebo-rog387 1.0.0+private20261108-4, provider 1.0.0+private20261108-5, picture bridge 0.2.0+rogdv2 and plugins-base 1.28.7-1+rogdv4.ubuntu0.2 headers (hash-matched to the ROG's installed runtime). Staged on the ROG and selected with LD_LIBRARY_PATH.",
@@ -21,37 +23,106 @@
     "profile_8_1": "self-owned clear Profile 8.1 chart, 2560x1280, pictures 0 and 24",
     "profile_5": "clear Profile 5 reference title, 1920x1080, picture 48"
   },
-  "target": {"peak_nits": 616, "min_nits": 0.005, "reference_nits": 203, "primaries": "BT.2020 D65 stand-in", "sdr": "the core's logical 100 cd/m2 BT.709 destination"},
+  "target": {
+    "peak_nits": 616,
+    "min_nits": 0.005,
+    "reference_nits": 203,
+    "primaries": "BT.2020 D65 stand-in",
+    "sdr": "the core's logical 100 cd/m2 BT.709 destination"
+  },
   "gtk_adapter_vs_shipped": {
     "device": "no pinning: libplacebo's default device for both (NVIDIA on this host, logged by both)",
     "decoder": "avdec_h265, I420_10LE with the picture meta",
     "results": [
-      {"picture": "P8.1 chart 0", "destination": "DISPLAY_PQ", "result_both": 1, "byte_identical": true, "pixels": 3276800},
-      {"picture": "P8.1 chart 0", "destination": "STANDARD_SDR_SRGB", "result_both": 1, "byte_identical": true, "pixels": 3276800},
-      {"picture": "P8.1 chart 24", "destination": "DISPLAY_PQ", "result_both": 1, "byte_identical": true, "pixels": 3276800},
-      {"picture": "P8.1 chart 24", "destination": "STANDARD_SDR_SRGB", "result_both": 1, "byte_identical": true, "pixels": 3276800},
-      {"picture": "P5 picture 48", "destination": "DISPLAY_PQ", "result_both": 1, "byte_identical": true, "pixels": 2073600},
-      {"picture": "P5 picture 48", "destination": "STANDARD_SDR_SRGB", "result_both": 1, "byte_identical": true, "pixels": 2073600}
+      {
+        "picture": "P8.1 chart 0",
+        "destination": "DISPLAY_PQ",
+        "result_both": 1,
+        "byte_identical": true,
+        "pixels": 3276800
+      },
+      {
+        "picture": "P8.1 chart 0",
+        "destination": "STANDARD_SDR_SRGB",
+        "result_both": 1,
+        "byte_identical": true,
+        "pixels": 3276800
+      },
+      {
+        "picture": "P8.1 chart 24",
+        "destination": "DISPLAY_PQ",
+        "result_both": 1,
+        "byte_identical": true,
+        "pixels": 3276800
+      },
+      {
+        "picture": "P8.1 chart 24",
+        "destination": "STANDARD_SDR_SRGB",
+        "result_both": 1,
+        "byte_identical": true,
+        "pixels": 3276800
+      },
+      {
+        "picture": "P5 picture 48",
+        "destination": "DISPLAY_PQ",
+        "result_both": 1,
+        "byte_identical": true,
+        "pixels": 2073600
+      },
+      {
+        "picture": "P5 picture 48",
+        "destination": "STANDARD_SDR_SRGB",
+        "result_both": 1,
+        "byte_identical": true,
+        "pixels": 2073600
+      }
     ],
     "target_strategy": "raw-xy-neutral-cm4 (P8.1) and named-creative-fallback (P5), the same for both",
-    "exported_symbols": "the 26 dynamic symbols of libgstgtkdovicore.so.0 are identical"
+    "exported_symbols": "the 26 dynamic symbols of libgstgtkdovicore.so.0 are identical",
+    "final_build": "Rerun with the final adapter (device kept for the process): all six byte-identical against rogdv12 AND against the rogdv11 build; each result 1 for all three builds.",
+    "baseline": {
+      "case": "P8.1 chart 0, DISPLAY_PQ, peak 100 cd/m2 (a non-HDR target, so the picture is declined)",
+      "result": "2 (baseline re-encoded) for rogdv12, rogdv11 and the staged adapter",
+      "byte_identical": "staged vs rogdv12 and staged vs rogdv11"
+    }
   },
   "firefox_route_vs_gtk_on_intel": {
     "reference": "shipped GTK mapper pinned with VK_ICD_FILENAMES=intel_icd.json",
     "core": "explicit Intel render node for input and output",
     "results": [
-      {"route": "VA-API P010 DMABuf (Intel tiled modifier) -> core-allocated linear ABGR16161616", "picture": "P8.1 chart 0", "destination": "DISPLAY_PQ", "byte_identical": true},
-      {"route": "VA-API P010 DMABuf -> core-allocated linear ABGR8888", "picture": "P8.1 chart 0", "destination": "STANDARD_SDR_SRGB", "byte_identical": true},
-      {"route": "VA-API P010 copied to host planes -> host RGBA64", "picture": "P8.1 chart 0", "destination": "DISPLAY_PQ", "byte_identical": true},
-      {"route": "VA-API P010 DMABuf -> linear ABGR16161616", "picture": "P5 picture 48", "destination": "DISPLAY_PQ", "byte_identical": true}
+      {
+        "route": "VA-API P010 DMABuf (Intel tiled modifier) -> core-allocated linear ABGR16161616",
+        "picture": "P8.1 chart 0",
+        "destination": "DISPLAY_PQ",
+        "byte_identical": true
+      },
+      {
+        "route": "VA-API P010 DMABuf -> core-allocated linear ABGR8888",
+        "picture": "P8.1 chart 0",
+        "destination": "STANDARD_SDR_SRGB",
+        "byte_identical": true
+      },
+      {
+        "route": "VA-API P010 copied to host planes -> host RGBA64",
+        "picture": "P8.1 chart 0",
+        "destination": "DISPLAY_PQ",
+        "byte_identical": true
+      },
+      {
+        "route": "VA-API P010 DMABuf -> linear ABGR16161616",
+        "picture": "P5 picture 48",
+        "destination": "DISPLAY_PQ",
+        "byte_identical": true
+      }
     ],
     "default_device_core": "FFmpeg software decode, no nodes, host output: byte-identical to the unpinned shipped GTK mapper (NVIDIA), P8.1 chart 0 DISPLAY_PQ",
     "nv12_8bit": "open: no clear 8-bit Dolby Vision fixture exists"
   },
   "cross_gpu": {
-    "case": "render on NVIDIA (input node), output allocated on the Intel node",
-    "ABGR16161616": "declined with ROG_DOVI_DECLINE_OUTPUT_IMPORT: the NVIDIA device offers no linear modifier for that format",
-    "ABGR2101010": "mapped (result 1) into a linear Intel buffer; no pixel reference exists for a 10-bit output, so only completion is shown"
+    "case": "render on NVIDIA (input node), DMABuf output allocated on the Intel node",
+    "decision": "declined with ROG_DOVI_DECLINE_CROSS_DEVICE (2048) until a reference exists",
+    "why": "No same-device reference: NVIDIA GBM refuses a linear ABGR2101010 buffer (EINVAL). Against Intel's own 10-bit output on the same picture the cross output differed by at most 1 code for P8.1 PQ (99.291% identical) and P5 PQ (99.9913%), but by up to 5 codes at the SDR destination (93.4641% identical; 46,659 pixels at 3 codes), which is beyond the half-code device rounding known for PQ.",
+    "after": "result 0, last_decline 0x800 only; Profile 5 fails"
   },
   "other_checks": {
     "negotiation_probe": "169 checks, 0 failures for both the shipped and the staged plugin, identical output, each loaded alone from a private registry",
@@ -61,13 +132,21 @@
     "profiles_mask": "0x1a0 (Profiles 5, 7 and 8) on both devices"
   },
   "process_exit": {
-    "fixed_in_core": "The first node-selecting build destroyed its enumeration instance; that unloaded the NVIDIA ICD while rendering on Intel and the process crashed at exit (7 of 8 runs). The enumeration instance is now kept for the process lifetime: 8 of 8 clean exits.",
-    "pre_existing_not_changed": "With libplacebo's default device, a process that creates and destroys the device twice (two mappers in turn) crashed at exit with the shipped rogdv12 library in 2 of 3 runs (0 of 3 with the staged adapter, and 1 of 7 core-probe runs with a profile query first). The cause is the same ICD unload when the last device is destroyed; the element's device lifetime was moved unchanged and is reported for a decision, not altered."
+    "backtrace_installed_rogdv12": "gdb, two mappers in turn: thread 1 SIGSEGV at an unmapped address called from __run_exit_handlers+495 (stack: __libc_start_call_main -> exit -> __run_exit_handlers -> handler). LD_DEBUG=files: the last library mapped at that address was libEGL_nvidia.so.0 (handler at +0x9fbec), which had been unloaded ('calling fini') when the Vulkan loader released the NVIDIA ICD after the last device was destroyed. libEGL_nvidia imports __cxa_atexit.",
+    "counts_20_runs_two_mapper_cycles": {
+      "installed rogdv12": "10/20 crashed (139)",
+      "staged adapter, device lifetime unchanged": "4/20 crashed (139)",
+      "staged adapter, ROG_DOVI_MAPPER_KEEP_DEVICE": "0/20"
+    },
+    "staged_vs_installed_rate": "Same fault, same cause; the lower rate is not a behavioural difference that was found: device release is the same sequence (queued destroy on one worker thread, drained at exit), with a pthread worker in place of a GThreadPool. Treated as timing.",
+    "fix": "One mechanism: the GTK adapter creates its mapper with ROG_DOVI_MAPPER_KEEP_DEVICE, the same flag Firefox uses, so the device and the driver are never unloaded. The explicit-node path additionally keeps its enumeration instance (an instance, not a device) because a non-keep node mapper would otherwise unload the drivers the same way.",
+    "keep_check": "core probe: profile query then mapper on one node creates 2 devices without the flag and 1 with it"
   },
   "limits": [
     "Static pictures only; no playback through Showtime or WebKitGTK, no mapped-frame counts, no MEL or FEL title (requalification listed in docs/STATUS.md).",
     "Digital comparison of nominal values; not an optical measurement.",
     "The Profile 7 enhancement-layer path is moved but not exercised here.",
-    "No tiled output modifier was read back; tiled allocation from a compositor list is untested."
+    "No tiled output modifier was read back; tiled allocation from a compositor list is untested.",
+    "The GTK element now keeps its Vulkan device for the process lifetime: a behaviour change that WebKit and Showtime requalification must cover (source change, teardown, memory after the last video)."
   ]
 }
