@@ -16,7 +16,7 @@ import tempfile
 # a new payload build must use a version above every recorded release.
 CORE_VERSION = "0.1.0+rogdv11"
 GTK_VERSION = "0.15.2-1ubuntu2+rogdv5.8"
-SHOWTIME_VERSION = "50.0-2+rogdv5.15"
+SHOWTIME_VERSION = "50.0-2+rogdv5.16"
 FIXED_GTK = "4.24.1+ds-1+rogdv6"
 FEATURES = "gtk_v4_20,x11egl,x11glx,waylandegl,dmabuf,v1_28"
 INPUT_DIR = Path(__file__).with_name("package-inputs")
@@ -195,11 +195,13 @@ def gtk_control(original):
 
 def showtime_control(original):
     qualified = qualified_pipeline()
+    sink_release = json.loads((INPUT_DIR / "consumer-releases.json").read_text())[
+        "releases"]["rust-gst-plugin-gtk4"]["release"]["version"]
     source, binary = control_stanzas(original, "showtime", ("showtime",))
     depends = field_text(binary, "Depends")
     depends = replace_once(
         depends, " gstreamer1.0-gtk4,",
-        f" gstreamer1.0-gtk4 (= {GTK_VERSION}),\n"
+        f" gstreamer1.0-gtk4 (= {sink_release}),\n"
         f" gstreamer1.0-gtk-dovi (= {CORE_VERSION}),\n"
         f" libgtk-4-1 (= {FIXED_GTK}),",
         "showtime sink dependencies",
@@ -247,15 +249,14 @@ def pinned_inputs():
     return result
 
 
-def showtime_source_candidate(source):
-    """Replay only the authenticated Showtime play.py stages, without mutating source."""
-    series = json.loads((INPUT_DIR / "provenance.json").read_text())["showtime"]["source_series"]
+def replay_showtime_source(source, filename, series, input_key, result_key):
+    """Replay the pinned stages of a single Showtime source file in isolation."""
     patches = series["patches"]
-    stages = [series["upstream_play_sha256"]] + [item["result_play_sha256"] for item in patches]
-    current = (source / "showtime/play.py").read_bytes()
+    stages = [series[input_key]] + [item[result_key] for item in patches]
+    current = (source / "showtime" / filename).read_bytes()
     digest = hashlib.sha256(current).hexdigest()
     if digest not in stages:
-        raise PreparationError("unrecognized Showtime play.py; use the pinned clean source or exact recorded patch stage")
+        raise PreparationError(f"unrecognized Showtime {filename}; use the pinned source or exact recorded patch stage")
     start = stages.index(digest)
     for item in patches:
         patch = Path(__file__).parent / item["file"]
@@ -264,18 +265,40 @@ def showtime_source_candidate(source):
     with tempfile.TemporaryDirectory(prefix=".showtime-source-", dir=source) as directory:
         staging = Path(directory)
         (staging / "showtime").mkdir()
-        target = staging / "showtime/play.py"
+        target = staging / "showtime" / filename
         target.write_bytes(current)
         for item in patches[start:]:
             result = subprocess.run(["patch", "--batch", "--fuzz=0", "-p1", "-i",
                                      str((Path(__file__).parent / item["file"]).resolve())],
                                     cwd=staging, capture_output=True, text=True)
-            if result.returncode or hashlib.sha256(target.read_bytes()).hexdigest() != item["result_play_sha256"]:
+            if result.returncode or hashlib.sha256(target.read_bytes()).hexdigest() != item[result_key]:
                 raise PreparationError("Showtime exact source replay failed: " + item["file"])
         candidate = target.read_bytes()
-    return candidate, {"input_play_sha256": digest, "output_play_sha256": stages[-1],
-                       "source_version": SHOWTIME_VERSION, "patches": patches,
-                       "upstream_play_sha256": stages[0]}
+    return candidate, digest, stages[-1]
+
+
+def showtime_source_candidate(source):
+    provenance = json.loads((INPUT_DIR / "provenance.json").read_text())["showtime"]
+    play = provenance["source_series"]
+    mpris = provenance["mpris_series"]
+    play_bytes, play_input, play_output = replay_showtime_source(
+        source, "play.py", play, "upstream_play_sha256", "result_play_sha256")
+    mpris_bytes, mpris_input, mpris_output = replay_showtime_source(
+        source, "mpris.py", mpris, "upstream_mpris_sha256", "result_mpris_sha256")
+    receipt = {
+        "input_play_sha256": play_input,
+        "output_play_sha256": play_output,
+        "source_version": SHOWTIME_VERSION,
+        "patches": play["patches"],
+        "upstream_play_sha256": play["upstream_play_sha256"],
+        "mpris": {
+            "input_sha256": mpris_input,
+            "output_sha256": mpris_output,
+            "upstream_sha256": mpris["upstream_mpris_sha256"],
+            "patches": mpris["patches"],
+        },
+    }
+    return {"play.py": play_bytes, "mpris.py": mpris_bytes}, receipt
 
 
 def require_known_current(path, original, generated):
@@ -314,8 +337,9 @@ def prepare(workspace, showtime_only=False):
              "Start the shared producer with an explicit SDR destination.",
              "Preserve overlay composition features through the RGBA precision filter.",
              "Pair with GTK 4.24.1+ds-1+rogdv6 normal image colour.",
-             "Require the matching GstPlay paused-subtitle refresh through exact bad/extra dependencies."],
-            inputs["showtime"]["changelog"], date="Fri, 20 Nov 2026 14:00:00 +0000"),
+             "Require the matching GstPlay paused-subtitle refresh through exact bad/extra dependencies.",
+             "Expose the loaded MPRIS track and honor exact absolute seeks for that track."],
+            inputs["showtime"]["changelog"], date="Sat, 28 Nov 2026 10:30:00 +0000"),
     }
     sources = [("showtime", showtime)] if showtime_only else [("gtk", gtk), ("showtime", showtime)]
     if showtime_only:
@@ -345,7 +369,8 @@ def prepare(workspace, showtime_only=False):
         outputs[cargo_config] = CARGO_CONFIG
         outputs[shlibs] = shlibs_text
 
-    (showtime / "showtime/play.py").write_bytes(showtime_candidate)
+    for filename, data in showtime_candidate.items():
+        (showtime / "showtime" / filename).write_bytes(data)
     (workspace / "showtime-source-preparation.json").write_text(json.dumps(showtime_receipt, indent=2) + "\n")
     backups.mkdir(exist_ok=True)
     for label, source in sources:

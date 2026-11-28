@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Showtime source/packaging boundary controls; requires SHOWTIME_PINNED_PLAY.
+"""Showtime source/packaging boundary controls.
 
-The fixture is the authentic upstream showtime/play.py named by the recorded
-SHA256, not a reduced source snippet. Missing fixtures fail rather than skip.
+Set SHOWTIME_PINNED_PLAY and SHOWTIME_PINNED_MPRIS to the exact upstream files.
 """
 import hashlib
 import importlib.util
@@ -28,9 +27,17 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
         if not fixture:
             raise AssertionError('SHOWTIME_PINNED_PLAY must name authenticated upstream Showtime 50.0 play.py')
         cls.upstream = Path(fixture).read_bytes()
-        cls.series = json.loads((FOLDER / 'package-inputs/provenance.json').read_text())['showtime']['source_series']
+        mpris_fixture = os.environ.get('SHOWTIME_PINNED_MPRIS')
+        if not mpris_fixture:
+            raise AssertionError('SHOWTIME_PINNED_MPRIS must name authenticated upstream Showtime 50.0 mpris.py')
+        cls.upstream_mpris = Path(mpris_fixture).read_bytes()
+        provenance = json.loads((FOLDER / 'package-inputs/provenance.json').read_text())['showtime']
+        cls.series = provenance['source_series']
+        cls.mpris_series = provenance['mpris_series']
         if hashlib.sha256(cls.upstream).hexdigest() != cls.series['upstream_play_sha256']:
             raise AssertionError('upstream Showtime fixture does not match the pinned source')
+        if hashlib.sha256(cls.upstream_mpris).hexdigest() != cls.mpris_series['upstream_mpris_sha256']:
+            raise AssertionError('upstream Showtime MPRIS fixture does not match the pinned source')
 
     def workspace(self, root):
         for label, name in [('gtk', 'source'), ('showtime', 'showtime-50.0')]:
@@ -39,6 +46,7 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
                 shutil.copyfile(FOLDER / 'package-inputs' / label / field, debian / field)
         play = root / 'showtime-50.0/showtime/play.py'; play.parent.mkdir()
         play.write_bytes(self.upstream)
+        play.with_name('mpris.py').write_bytes(self.upstream_mpris)
         return play
 
     def test_real_pinned_source_replays_all_consumer_patches_and_records_version(self):
@@ -46,10 +54,12 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             root = Path(directory); play = self.workspace(root)
             packages.prepare(root)
             receipt = json.loads((root / 'showtime-source-preparation.json').read_text())
-            self.assertEqual(receipt['source_version'], '50.0-2+rogdv5.15')
+            self.assertEqual(receipt['source_version'], '50.0-2+rogdv5.16')
             self.assertEqual(receipt['patches'], self.series['patches'])
             self.assertEqual(hashlib.sha256(play.read_bytes()).hexdigest(), self.series['patches'][-1]['result_play_sha256'])
-            self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.15)'))
+            self.assertEqual(receipt['mpris']['output_sha256'], self.mpris_series['patches'][-1]['result_mpris_sha256'])
+            self.assertEqual(hashlib.sha256(play.with_name('mpris.py').read_bytes()).hexdigest(), receipt['mpris']['output_sha256'])
+            self.assertTrue((root / 'showtime-50.0/debian/changelog').read_text().startswith('showtime (50.0-2+rogdv5.16)'))
             qualified = packages.qualified_pipeline()
             showtime_control = (root / 'showtime-50.0/debian/control').read_text()
             gtk_control = (root / 'source/debian/control').read_text()
@@ -60,7 +70,7 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
             for name in ('gstreamer1.0-gl', 'libgstreamer-gl1.0-0',
                          'libgstreamer-plugins-base1.0-0'):
                 self.assertIn(f'{name} (= {qualified[name]})', gtk_control)
-            self.assertIn(f'gstreamer1.0-gtk4 (= {packages.GTK_VERSION})', showtime_control)
+            self.assertIn('gstreamer1.0-gtk4 (= 0.15.2-1ubuntu2+rogdv5.8+depfix2)', showtime_control)
             inventory = json.loads((root / 'package-output-inventory.json').read_text())
             self.assertEqual(inventory['showtime_source']['output_play_sha256'], receipt['output_play_sha256'])
             before = play.read_bytes()

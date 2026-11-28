@@ -1,0 +1,109 @@
+From: Codex Agent <codex-agent@invalid>
+Date: Sat, 28 Nov 2026 17:18:55 +0000
+Subject: [PATCH] showtime: identify the current MPRIS track
+
+Expose a D-Bus object path for loaded media so clients can use absolute
+SetPosition. Bind requests to the current URI and use an integer conversion
+from microseconds to GStreamer nanoseconds, leaving relative Seek intact.
+
+Use the MPRIS NoTrack path until metadata describes the selected URI.
+Ignore requests carrying a stale track ID or a position outside the known
+duration.
+
+--- a/showtime/mpris.py
++++ b/showtime/mpris.py
+@@ -7,11 +7,13 @@
+ 
+ import re
+ from functools import partial
++from hashlib import sha256
+ from typing import Any
+ 
+ from gi.repository import (
+     Gio,
+     GLib,
++    Gst,
+     GstAudio,  # pyright: ignore[reportAttributeAccessIssue]
+     GstPlay,  # pyright: ignore[reportAttributeAccessIssue]
+     Gtk,
+@@ -25,6 +27,8 @@
+ RATE_NORMAL = 1.125
+ RATE_FASTER = 1.375
+ RATE_FASTEST = 1.75
++
++NO_TRACK = "/org/mpris/MediaPlayer2/TrackList/NoTrack"
+ 
+ INTERFACE = """
+ <!DOCTYPE node PUBLIC
+@@ -275,19 +279,35 @@
+ 
+         return "Playing"
+ 
++    @staticmethod
++    def _current_media_info(play: GstPlay.Play | None) -> GstPlay.PlayMediaInfo | None:
++        if play and (media_info := play.get_media_info()):
++            uri = media_info.get_uri()
++            if uri and uri == play.get_uri():
++                return media_info
++        return None
++
++    @staticmethod
++    def _track_id(uri: str) -> str:
++        return f"{PREFIX}/Track/{sha256(uri.encode()).hexdigest()}"
++
+     def _get_metadata(self) -> dict:
+-        if (not self.play) or (not (media_info := self.play.get_media_info())):
+-            return {
+-                "mpris:trackid": GLib.Variant("o", f"{PREFIX}/TrackList/CurrentTrack")
+-            }
+-
+-        return {
+-            "xesam:url": GLib.Variant("s", media_info.get_uri()),
+-            "mpris:length": GLib.Variant("x", int(self.play.get_duration() / 1e3)),
++        play = self.play
++        if not play or not (media_info := self._current_media_info(play)):
++            return {"mpris:trackid": GLib.Variant("o", NO_TRACK)}
++
++        uri = media_info.get_uri()
++        metadata = {
++            "mpris:trackid": GLib.Variant("o", self._track_id(uri)),
++            "xesam:url": GLib.Variant("s", uri),
+             "xesam:title": GLib.Variant(
+                 "s", get_title(media_info) or _("Unknown Title")
+             ),
+         }
++        duration = play.get_duration()
++        if duration != Gst.CLOCK_TIME_NONE:
++            metadata["mpris:length"] = GLib.Variant("x", duration // Gst.USECOND)
++        return metadata
+ 
+     def _on_player_state_changed(self, *_args) -> None:
+         playback_status = self._get_playback_status()
+@@ -427,16 +447,22 @@
+ 
+         self.play.seek(max(0, self.play.get_position() + (offset_usecond * 1e3)))
+ 
+-    def _set_position(self, _track_id: str, position_usecond: int) -> None:
++    def _set_position(self, track_id: str, position_usecond: int) -> None:
+         """Set the current track position in microseconds (MPRIS Method).
+ 
+         :param str track_id: The currently playing track's identifier
+         :param int position_usecond: new position in microseconds
+         """
+-        if not self.play:
+-            return
+-
+-        self.play.seek(position_usecond * 1e3)
++        play = self.play
++        if not play or not (media_info := self._current_media_info(play)):
++            return
++        if track_id != self._track_id(media_info.get_uri()):
++            return
++
++        position = position_usecond * Gst.USECOND
++        duration = play.get_duration()
++        if duration != Gst.CLOCK_TIME_NONE and 0 <= position <= duration:
++            play.seek(position)
+ 
+     def _open_uri(self, _uri: str) -> None:
+         """Open the Uri given as an argument (MPRIS Method).
