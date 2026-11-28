@@ -1,5 +1,13 @@
 # Status — what is working and what remains
 
+**November 27, 2026 — package delivery through APT is expanding.**
+The interim Forgejo registry delivers Mutter, libdisplay-info, mpv
+`+rogdv5.8` and plurx Player `0.5.7-1`. The planned authenticated aptly
+repository serves an empty signed snapshot. The delivery manifest, publisher,
+pin generator and `rog-apt-config` are in development. Baseline import,
+project CI publishing and migration of the ROG remain open.
+[Design, phases and decisions](PACKAGE_DELIVERY.md).
+
 **November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; installed.**
 plurx Player's EL pill could say FEL or MEL only after the server's whole-title
 scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`
