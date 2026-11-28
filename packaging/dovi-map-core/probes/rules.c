@@ -194,6 +194,20 @@ static void baseline_rules (void)
   av_free (m);
 }
 
+static void lifetime_rules (void)
+{
+  struct rog_dovi_mapper_params p = {.struct_size = sizeof (p), .flags = ROG_DOVI_MAPPER_KEEP_DEVICE};
+  rog_dovi_mapper *keep = rog_dovi_mapper_new (&p);
+  require (keep && keep->keep_device, "keep-device mapper");
+  rog_dovi_mapper_free (keep);
+  rog_dovi_mapper *plain = rog_dovi_mapper_new (NULL);
+  require (plain && !plain->keep_device, "default mapper releases its device");
+  rog_dovi_mapper_free (plain);
+  p.flags = 2;
+  require (!rog_dovi_mapper_new (&p), "unknown mapper flag");
+  require (!rog_dovi_map_profiles (&p), "unknown flag has no profiles");
+}
+
 static void decline_names (void)
 {
   for (uint32_t bit = 1; bit <= ROG_DOVI_DECLINE_OUTPUT_IMPORT; bit <<= 1) {
@@ -211,6 +225,7 @@ int main (void)
   metadata_rules ();
   pitch_rules ();
   baseline_rules ();
+  lifetime_rules ();
   decline_names ();
   printf ("{\"checks\": %u, \"failures\": %u}\n", checks, failures);
   return failures != 0;

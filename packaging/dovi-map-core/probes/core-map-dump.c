@@ -11,7 +11,8 @@
  *               "none" (host output in the caller's memory)
  * Output rows: RGBA64LE-ordered ABGR16161616 for pq, ABGR8888 (RGBA bytes)
  * for sdr. PROBE_FOURCC=2101010 renders DRM_FORMAT_ABGR2101010 instead and
- * writes its 32-bit words. */
+ * writes its 32-bit words. PROBE_KEEP=1 creates the mappers with
+ * ROG_DOVI_MAPPER_KEEP_DEVICE; PROBE_NO_PROFILES=1 skips the profile query. */
 #define _GNU_SOURCE
 #include "rog-dovi-map.h"
 #include <libavformat/avformat.h>
@@ -105,6 +106,7 @@ int main (int argc, char **argv)
     .width = frame->width, .height = frame->height, .has_geometry = 1,
     .geometry = {frame->width, frame->height, 0, 0, frame->width, frame->height}};
   struct rog_dovi_mapper_params params = {.struct_size = sizeof (params),
+    .flags = getenv ("PROBE_KEEP") ? ROG_DOVI_MAPPER_KEEP_DEVICE : 0,
     .input_node = node_of (argv[2]), .output_node = node_of (argv[3])};
   if (!getenv ("PROBE_NO_PROFILES"))
     fprintf (stderr, "profiles mask 0x%x\n", rog_dovi_map_profiles (&params));

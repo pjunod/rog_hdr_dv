@@ -191,6 +191,7 @@ struct device {
   pl_vulkan vk;
   pl_cache cache;
   unsigned users;
+  bool keep;                /* a ROG_DOVI_MAPPER_KEEP_DEVICE mapper acquired it */
   struct device *next;
 };
 static pthread_mutex_t shared_gpu_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -272,7 +273,7 @@ static pl_vulkan create_vulkan (uint64_t node)
   return pl_vulkan_create (shared_log (), &params);
 }
 
-static pl_vulkan acquire_vulkan (uint64_t node, bool *shared)
+static pl_vulkan acquire_vulkan (uint64_t node, bool keep, bool *shared)
 {
   pthread_mutex_lock (&shared_gpu_lock);
   struct device **link = &shared_devices;
@@ -300,6 +301,7 @@ static pl_vulkan acquire_vulkan (uint64_t node, bool *shared)
   *shared = vk && vk->gpu->limits.thread_safe;
   if (*shared) {
     d->users++;
+    d->keep |= keep;
   } else if (d) {
     /* Never shared: the creating mapper keeps it as its own. */
     *link = d->next;
@@ -396,15 +398,20 @@ static void destroy_vulkan_off_thread (pl_vulkan vk, pl_cache cache)
 /* The last mapper out destroys the device: a web process without video should
  * not keep one. A new pipeline's own mapper creates the next device while it
  * prerolls, before the clock runs. */
-static void release_vulkan (pl_vulkan *vk, bool shared)
+static void release_vulkan (pl_vulkan *vk, bool shared, bool keep)
 {
   if (!*vk) return;
-  if (!shared) { destroy_vulkan_off_thread (*vk, NULL); *vk = NULL; return; }
+  if (!shared) {
+    /* A kept device of the mapper's own is deliberately never destroyed. */
+    if (!keep) destroy_vulkan_off_thread (*vk, NULL);
+    *vk = NULL;
+    return;
+  }
   pthread_mutex_lock (&shared_gpu_lock);
   struct device **link = &shared_devices;
   while (*link && (*link)->vk != *vk) link = &(*link)->next;
   struct device *d = *link;
-  if (d && d->users && !--d->users) {
+  if (d && d->users && !--d->users && !d->keep) {
     *link = d->next;
     destroy_vulkan_off_thread (d->vk, d->cache);
     free (d);
@@ -416,6 +423,7 @@ static void release_vulkan (pl_vulkan *vk, bool shared)
 /* ---- Mapper ----------------------------------------------------------- */
 struct rog_dovi_mapper {
   uint64_t input_node, output_node;
+  bool keep_device;
   pl_vulkan vk;
   bool shared_vk;
   pl_renderer renderer;
@@ -527,10 +535,14 @@ static int provider_map (void *priv, pl_gpu gpu, const uint8_t *rpu, size_t size
 
 rog_dovi_mapper *rog_dovi_mapper_new (const struct rog_dovi_mapper_params *params)
 {
-  if (params && params->struct_size < sizeof (*params)) return NULL;
+  if (params && (params->struct_size < sizeof (*params) ||
+      (params->flags & ~ROG_DOVI_MAPPER_KEEP_DEVICE))) return NULL;
   rog_dovi_mapper *s = calloc (1, sizeof (*s));
   if (!s) return NULL;
-  if (params) { s->input_node = params->input_node; s->output_node = params->output_node; }
+  if (params) {
+    s->input_node = params->input_node; s->output_node = params->output_node;
+    s->keep_device = params->flags & ROG_DOVI_MAPPER_KEEP_DEVICE;
+  }
   s->gbm_fd = -1;
   return s;
 }
@@ -550,7 +562,7 @@ void rog_dovi_mapper_free (rog_dovi_mapper *s)
       pl_tex_destroy (s->vk->gpu, &s->sdr_intermediate[i]);
       pl_tex_destroy (s->vk->gpu, &s->sdr_output[i]);
     }
-    release_vulkan (&s->vk, s->shared_vk);
+    release_vulkan (&s->vk, s->shared_vk, s->keep_device);
   }
   av_buffer_unref (&s->drm_frames);
   av_buffer_unref (&s->drm_device);
@@ -572,7 +584,7 @@ static uint64_t render_node (const rog_dovi_mapper *s)
 static bool ensure_device (rog_dovi_mapper *s)
 {
   if (s->vk) return s->renderer && s->dispatch;
-  s->vk = acquire_vulkan (render_node (s), &s->shared_vk);
+  s->vk = acquire_vulkan (render_node (s), s->keep_device, &s->shared_vk);
   if (!s->vk) return false;
   s->dispatch = pl_dispatch_create (shared_log (), s->vk->gpu);
   s->renderer = pl_renderer_create (shared_log (), s->vk->gpu);
@@ -580,7 +592,7 @@ static bool ensure_device (rog_dovi_mapper *s)
     /* Retry from scratch next time instead of holding a device unusable here. */
     pl_renderer_destroy (&s->renderer);
     pl_dispatch_destroy (&s->dispatch);
-    release_vulkan (&s->vk, s->shared_vk);
+    release_vulkan (&s->vk, s->shared_vk, s->keep_device);
     return false;
   }
   logf_ (ROG_DOVI_LOG_INFO, "native mapper %p uses %s Vulkan device", (void *) s,

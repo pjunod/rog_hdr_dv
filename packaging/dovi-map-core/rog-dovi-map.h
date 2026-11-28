@@ -55,9 +55,19 @@ enum rog_dovi_format {
  * the mapper renders on the input node's device if one is given, else on the
  * output node's. DMABuf output is allocated on the output node; when it
  * differs from the rendering device the output is linear and must be
- * importable by the output node, otherwise the picture is declined. */
+ * importable by the output node, otherwise the picture is declined.
+ *
+ * Device lifetime. By default the last mapper freed on a node destroys its
+ * Vulkan device (off the caller's thread): a process without video keeps no
+ * device. ROG_DOVI_MAPPER_KEEP_DEVICE keeps the device for the process
+ * lifetime instead (Firefox's decoder process). Keep and non-keep mappers on
+ * one node share one device; once any keep mapper has acquired it, it is
+ * kept, whatever other mappers do. A device a non-keep mapper created and
+ * already released is not affected. Unknown flag bits make
+ * rog_dovi_mapper_new return NULL and rog_dovi_map_profiles return 0. */
+#define ROG_DOVI_MAPPER_KEEP_DEVICE 1u
 struct rog_dovi_mapper_params {
-  uint32_t struct_size, reserved;
+  uint32_t struct_size, flags;
   uint64_t input_node, output_node;
 };
 
@@ -238,6 +248,8 @@ ROG_DOVI_MAP_API const char *rog_dovi_map_decline_reason(uint32_t bit);
 
 /* Bit (1u << profile) for each profile the core and the installed provider
  * can map on the device params selects, established by creating a provider.
+ * With ROG_DOVI_MAPPER_KEEP_DEVICE the device it creates stays for the
+ * mappers that follow.
  * Profile 7 needs a decoded enhancement picture. 0 if none. */
 ROG_DOVI_MAP_API uint32_t rog_dovi_map_profiles(const struct rog_dovi_mapper_params *params);
 
