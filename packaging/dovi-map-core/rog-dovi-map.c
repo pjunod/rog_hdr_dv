@@ -208,25 +208,35 @@ static void log_device (pl_vulkan vk)
   }
 }
 
-/* The Vulkan device whose DRM render node is node, by its UUID. The
- * enumeration instance is created once and never destroyed. Destroying it
- * dlcloses every ICD it loaded, including the NVIDIA one when the picture
- * is rendered on Intel; a process that later exits then crashed in the
- * unloaded NVIDIA libraries (measured on the lab host, 7 of 8 runs). Holding
- * the instance keeps the loaded ICDs for the process lifetime. */
-static pthread_mutex_t enumeration_lock = PTHREAD_MUTEX_INITIALIZER;
-static VkInstance enumeration_instance;
-static bool uuid_for_node (uint64_t node, uint8_t uuid[VK_UUID_SIZE])
+/* One Vulkan instance held for the process, created with the first device
+ * and never destroyed. The loader dlcloses every ICD an instance loaded when
+ * the last instance goes away; the NVIDIA ICD's EGL library leaves an exit
+ * handler registered, so a process that had created and destroyed a device
+ * crashed at exit inside the unloaded libEGL_nvidia.so.0 (lab host: 10 of 20
+ * runs with the installed element; 7 of 8 on the explicit-node path, whose
+ * enumeration instance was destroyed). Holding one instance keeps the ICDs
+ * resident; devices are still created and destroyed as before. The same
+ * instance enumerates devices for node selection. */
+static pthread_mutex_t held_instance_lock = PTHREAD_MUTEX_INITIALIZER;
+static VkInstance held_instance;
+static VkInstance hold_instance (void)
 {
-  pthread_mutex_lock (&enumeration_lock);
-  if (!enumeration_instance) {
+  pthread_mutex_lock (&held_instance_lock);
+  if (!held_instance) {
     VkApplicationInfo app = {.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO, .apiVersion = VK_API_VERSION_1_1};
     if (vkCreateInstance (&(VkInstanceCreateInfo) {.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pApplicationInfo = &app}, NULL, &enumeration_instance) != VK_SUCCESS)
-      enumeration_instance = VK_NULL_HANDLE;
+        .pApplicationInfo = &app}, NULL, &held_instance) != VK_SUCCESS)
+      held_instance = VK_NULL_HANDLE;
   }
-  VkInstance inst = enumeration_instance;
-  pthread_mutex_unlock (&enumeration_lock);
+  VkInstance inst = held_instance;
+  pthread_mutex_unlock (&held_instance_lock);
+  return inst;
+}
+
+/* The Vulkan device whose DRM render node is node, by its UUID. */
+static bool uuid_for_node (uint64_t node, uint8_t uuid[VK_UUID_SIZE])
+{
+  VkInstance inst = hold_instance ();
   if (!inst) return false;
   uint32_t n = 0;
   bool found = false;
@@ -260,6 +270,9 @@ static pl_vulkan create_vulkan (uint64_t node)
 {
   struct pl_vulkan_params params = pl_vulkan_default_params;
   params.allow_software = true;
+  /* Created before the device's own instance, so the ICDs are never unloaded. */
+  if (!hold_instance ())
+    logf_ (ROG_DOVI_LOG_WARN, "no process Vulkan instance; drivers may unload with the last device");
   if (node) {
     uint8_t uuid[VK_UUID_SIZE];
     if (!uuid_for_node (node, uuid)) {
@@ -329,6 +342,7 @@ static bool vulkan_release_started, vulkan_release_stopping, vulkan_release_drai
 static void destroy_vulkan (struct release_job *job)
 {
   pl_vulkan_destroy (&job->vk);
+  logf_ (ROG_DOVI_LOG_INFO, "native mapper Vulkan device destroyed");
   pl_cache_destroy (&job->cache);
   free (job);
 }
