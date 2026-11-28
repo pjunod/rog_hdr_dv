@@ -40,10 +40,12 @@ mapped, `0` declined, `-1` failed.
 With no render node the core uses libplacebo's default Vulkan device, which is
 what the GTK element does. Only callers that pass explicit nodes (Firefox)
 select a device by node; the core derives `/dev/dri/renderD<minor>` from the
-node and never lists `/dev/dri`. `ROG_DOVI_MAPPER_KEEP_DEVICE` keeps a device
-for the process lifetime. Both the GTK element and Firefox use it: destroying
-the last device unloaded the NVIDIA driver and the process crashed at exit in
-its EGL library's exit handler. A DMABuf output on another GPU than the
+node and never lists `/dev/dri`. The core holds one Vulkan instance for the process so the loader never
+unloads the drivers: destroying the last instance unloaded the NVIDIA driver
+and the process crashed at exit in its EGL library's exit handler. Devices
+are still destroyed with their last mapper; `ROG_DOVI_MAPPER_KEEP_DEVICE`
+keeps one for the process instead (Firefox's decoder process).
+A DMABuf output on another GPU than the
 renderer is declined until it has a pixel reference.
 
 ## Build and probes

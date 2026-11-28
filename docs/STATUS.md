@@ -12,13 +12,15 @@ Profile 5 picture, at 616 cd/m² and at the SDR destination; the negotiation
 probe stayed at 169/0. The core's DMABuf route (VA-API P010 on Intel, core
 allocated output) was byte-identical to the GTK mapper pinned to Intel.
 The same six comparisons against a `rogdv11` build of main were also
-byte-identical. The element now keeps its Vulkan device for the process:
-destroying the last device unloaded the NVIDIA driver, and two mappers in
-turn crashed at exit in 10 of 20 runs with `rogdv12` (0 of 20 kept). A DMABuf
+byte-identical. The core now holds one Vulkan instance for the process:
+destroying the last instance unloaded the NVIDIA driver, and two mappers in
+turn crashed at exit in its EGL library in 10 of 20 runs with `rogdv12` (0 of
+20 with the held instance; device lifetime unchanged). A DMABuf
 output on another GPU than the renderer is declined until it has a
 reference. Open: 8-bit NV12 (no clear fixture), Showtime and WebKitGTK
 requalification (mapped-frame counts for Profile 5, 8.1, MEL and FEL titles,
-and the kept device across source changes) and a tiled output read-back.
+and the held instance across source changes and exit) and a tiled output
+read-back.
 [Core](../packaging/dovi-map-core/README.md)
 · [Receipt](../evidence/dovi-map-core-extraction-20261127.json).
 

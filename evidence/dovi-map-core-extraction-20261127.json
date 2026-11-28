@@ -7,10 +7,10 @@
     "adapter": "packaging/gstreamer-gtk-dovi 0.1.0+rogdv13 over the core",
     "reference": "two references: the installed libgstgtk-dovi-core0 0.1.0+rogdv12 (main's rogdv11 rules plus an uninstalled-branch diagnostics change) and a 0.1.0+rogdv11 build of main's packaging/gstreamer-gtk-dovi at e455f69, staged with LD_LIBRARY_PATH",
     "staged_sha256": {
-      "note": "hashes of the first acceptance build; the final build (with the kept device, DMABuf bounds and cross-device decline) was compared again below, results unchanged",
-      "libgstgtkdovicore.so.0.0.0": "d4a5a59c066cb1d3f88a45609655b2cb799d2272bc45386b9bd74fe9648d512c",
-      "librog-dovi-map.so.1.0.0": "fc89857408e2dff064c2e067f1054296ac7927f101eb2d73e07efd73c934bacb",
-      "libgstgtkdovimap.so": "272744c2b19facba3d14c478acd83eb1aa8f90f7110e0c418a891adf76f5c034"
+      "note": "final head (variant I: process Vulkan instance, device lifetime unchanged)",
+      "libgstgtkdovicore.so.0.0.0": "b84901f3b67244aa338a9b7549c4bf291d1e7ad8cfc5b79bafe02a30ff7866f7",
+      "librog-dovi-map.so.1.0.0": "86f9f8684b4a7f4762400f7248bc75bfcad26748905785935940e787b63a9498",
+      "libgstgtkdovimap.so": "4dc76b139051760f980dd13f68395cc75a4b10522df2a7628b479e2a75a8d8cb"
     },
     "reference_sha256": {
       "libgstgtkdovicore.so.0.0.0": "56dc9ad5653062a5d06b062ef0a855b63c5fc20012036a0d831cca58b938b2bb",
@@ -79,7 +79,7 @@
     ],
     "target_strategy": "raw-xy-neutral-cm4 (P8.1) and named-creative-fallback (P5), the same for both",
     "exported_symbols": "the 26 dynamic symbols of libgstgtkdovicore.so.0 are identical",
-    "final_build": "Rerun with the final adapter (device kept for the process): all six byte-identical against rogdv12 AND against the rogdv11 build; each result 1 for all three builds.",
+    "final_build": "Final head: all six byte-identical against rogdv12 AND against the rogdv11 build, result 1 for all three builds; the baseline case byte-identical with result 2.",
     "baseline": {
       "case": "P8.1 chart 0, DISPLAY_PQ, peak 100 cd/m2 (a non-HDR target, so the picture is declined)",
       "result": "2 (baseline re-encoded) for rogdv12, rogdv11 and the staged adapter",
@@ -135,18 +135,20 @@
     "backtrace_installed_rogdv12": "gdb, two mappers in turn: thread 1 SIGSEGV at an unmapped address called from __run_exit_handlers+495 (stack: __libc_start_call_main -> exit -> __run_exit_handlers -> handler). LD_DEBUG=files: the last library mapped at that address was libEGL_nvidia.so.0 (handler at +0x9fbec), which had been unloaded ('calling fini') when the Vulkan loader released the NVIDIA ICD after the last device was destroyed. libEGL_nvidia imports __cxa_atexit.",
     "counts_20_runs_two_mapper_cycles": {
       "installed rogdv12": "10/20 crashed (139)",
-      "staged adapter, device lifetime unchanged": "4/20 crashed (139)",
-      "staged adapter, ROG_DOVI_MAPPER_KEEP_DEVICE": "0/20"
+      "staged adapter, before the held instance": "4/20 crashed (139)",
+      "staged adapter, whole device kept (superseded)": "0/20",
+      "staged adapter, process Vulkan instance held, device lifetime unchanged (final)": "0/20"
     },
     "staged_vs_installed_rate": "Same fault, same cause; the lower rate is not a behavioural difference that was found: device release is the same sequence (queued destroy on one worker thread, drained at exit), with a pthread worker in place of a GThreadPool. Treated as timing.",
-    "fix": "One mechanism: the GTK adapter creates its mapper with ROG_DOVI_MAPPER_KEEP_DEVICE, the same flag Firefox uses, so the device and the driver are never unloaded. The explicit-node path additionally keeps its enumeration instance (an instance, not a device) because a non-keep node mapper would otherwise unload the drivers the same way.",
-    "keep_check": "core probe: profile query then mapper on one node creates 2 devices without the flag and 1 with it"
+    "fix": "The core creates one Vulkan instance before the first device on either path and never destroys it, so the loader keeps the ICDs resident. The same instance enumerates devices for node selection. Device lifetime is unchanged: the last mapper destroys the device off-thread; the GTK element passes no flag. ROG_DOVI_MAPPER_KEEP_DEVICE remains for Firefox's process-lifetime device.",
+    "keep_check": "core probe: profile query then mapper on one node creates 2 devices without the flag and 1 with it",
+    "device_release_check": "Two mappers in turn with the final head: 2 devices created and 2 destroyed (the first at 1.25 s, before the second mapper rendered); libEGL_nvidia finalized only at process teardown."
   },
   "limits": [
     "Static pictures only; no playback through Showtime or WebKitGTK, no mapped-frame counts, no MEL or FEL title (requalification listed in docs/STATUS.md).",
     "Digital comparison of nominal values; not an optical measurement.",
     "The Profile 7 enhancement-layer path is moved but not exercised here.",
     "No tiled output modifier was read back; tiled allocation from a compositor list is untested.",
-    "The GTK element now keeps its Vulkan device for the process lifetime: a behaviour change that WebKit and Showtime requalification must cover (source change, teardown, memory after the last video)."
+    "Requalification: Vulkan instance held for the process; device lifetime unchanged (WebKit source change, teardown, exit across several videos)."
   ]
 }
