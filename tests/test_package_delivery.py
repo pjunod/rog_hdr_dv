@@ -117,6 +117,8 @@ class ManifestTests(unittest.TestCase):
         self.assertIn("mutter:amd64", by_priority["1001"])
         self.assertIn("mutter-common:any", by_priority["1001"])
         self.assertIn("libdisplay-info3:i386", by_priority["1001"])
+        self.assertLessEqual({"network-manager:amd64", "network-manager-tui:amd64",
+                              "libnm0:amd64", "libnm0:i386"}, set(by_priority["1001"]))
         self.assertNotIn("libavfilter11:i386", by_priority["1001"])
         self.assertIn("plurx-player:amd64", by_priority["500"])
         self.assertIn("linux-image-7.3.0-nativehdr3:amd64", by_priority["500"])
@@ -215,6 +217,18 @@ class VerifyTests(unittest.TestCase):
         self.assertGreaterEqual(len(errors), 2, errors)
         self.assertIn("binary mutter-common", errors[0])
         self.assertIn("binary libavformat62", errors[1])
+
+    def test_network_manager_requires_matching_daemon_tui_and_both_library_architectures(self):
+        version = "1.58.1-1ubuntu3+rogsleep1"
+        daemon = make_deb(self.dir, "network-manager", version, "amd64")
+        tui = make_deb(self.dir, "network-manager-tui", version, "amd64", "network-manager")
+        libraries = [make_deb(self.dir, "libnm0", version, arch, "network-manager", multiarch="same")
+                     for arch in ("amd64", "i386")]
+        self.assertIn("incomplete source release", "\n".join(self.check([daemon])[0]))
+        self.assertEqual(self.check([daemon, tui, *libraries])[0], [])
+        wrong_tui = make_deb(self.dir, "network-manager-tui", version + ".1", "amd64", "network-manager")
+        self.assertIn("source release has mixed versions", "\n".join(
+            self.check([daemon, wrong_tui, *libraries])[0]))
 
     def test_unknown_project_is_rejected(self):
         errors, _ = self.check([make_deb(self.dir, "plurx-player", "1", "amd64")], project="someone")

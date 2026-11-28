@@ -28,7 +28,7 @@ SNAPSHOT_STAMP = re.compile(r"\d{8}T\d{6}Z\Z")
 
 ENTRY_FIELDS = {"source", "project", "class", "binaries", "architectures",
                 "shadows_ubuntu", "version", "series", "reconcile_with",
-                "multiarch_same", "binary_architectures", "binary_versions", "kernel", "note", "forgejo"}
+                "multiarch_same", "binary_architectures", "binary_versions", "kernel", "note", "forgejo", "coherent_release"}
 REQUIRED_ENTRY_FIELDS = {"source", "project", "class", "binaries",
                          "architectures", "shadows_ubuntu", "version"}
 
@@ -151,6 +151,8 @@ def validate(manifest, root=None):
             if (not _string_list(pairs) or not set(pairs) <= set(entry["binaries"])
                     or len([a for a in arches if a != "all"]) < 2):
                 errors.append(f"{where}: multiarch_same must name listed binaries of an entry with two architectures")
+        if "coherent_release" in entry and entry["coherent_release"] is not True:
+            errors.append(f"{where}: coherent_release must be true when specified")
         if "binary_versions" in entry:
             versions = entry["binary_versions"]
             if (not isinstance(versions, dict) or not versions

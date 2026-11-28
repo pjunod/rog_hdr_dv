@@ -94,22 +94,22 @@ def verify(manifest, project, debs, allow_baseline_exact=False):
         seen[key] = deb
         accepted.append((deb, entry))
 
-    # A built source is published as one release because its binaries can
-    # depend on sibling binaries at exactly the same version.
-    built = {}
+    # These sources are published together because their binaries can
+    # depend on siblings at exactly the same version.
+    coherent = {}
     for deb, entry in accepted:
-        if entry["class"] == "built":
-            built.setdefault(entry["source"], []).append((deb, entry))
-    for source, items in sorted(built.items()):
+        if entry["class"] == "built" or entry.get("coherent_release"):
+            coherent.setdefault(entry["source"], []).append((deb, entry))
+    for source, items in sorted(coherent.items()):
         entry = items[0][1]
         expected = {(name, arch) for name in entry["binaries"]
                     for arch in delivery.binary_architectures(entry, name)}
         present = {(deb.name, deb.architecture) for deb, _ in items}
         if missing := sorted(expected - present):
-            errors.append(f"{source}: incomplete built release, missing "
+            errors.append(f"{source}: incomplete source release, missing "
                           + ", ".join(f"{name}:{arch}" for name, arch in missing))
         if len({deb.version for deb, _ in items}) != 1:
-            errors.append(f"{source}: built release has mixed versions")
+            errors.append(f"{source}: source release has mixed versions")
 
     # Multi-Arch: same completeness and shared-file identity.
     by_name = {}

@@ -227,6 +227,8 @@ or null when the package is not installed. Optional fields:
   together;
 - `binary_architectures`: per-binary architecture limits for sources that
   build different packages on different architectures;
+- `coherent_release`: publish an imported source's complete package set at
+  one version when its binaries have exact sibling dependencies;
 - `binary_versions`: binaries whose installed version differs from the
   source's, which today means the `+depfix` repacks;
 - `kernel`: the publisher never removes a kernel's older versions;
@@ -265,8 +267,8 @@ The host comes only from the environment; the repository never names it.
 it contacts the host, when any of these fails:
 
 - the binary name is not listed, or its entry belongs to another project;
-- a source built by this repository is missing a listed binary or combines
-  multiple versions in the same release;
+- a built source or a source marked `coherent_release` is missing a listed
+  binary or combines multiple versions in the same release;
 - its `Source` is not the entry's source, or its architecture is not listed;
 - a name or architecture appears twice;
 - a `multiarch_same` pair is incomplete;
