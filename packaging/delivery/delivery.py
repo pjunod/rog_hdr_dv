@@ -83,6 +83,17 @@ def validate(manifest, root=None):
     if not _string_list(projects, PROJECT) or len(set(projects)) != len(projects):
         errors.append("projects must be a nonempty list of unique project names")
         projects = []
+    channels = manifest.get("release_channels", {})
+    if not isinstance(channels, dict):
+        errors.append("release_channels must be an object")
+    else:
+        for project, channel in channels.items():
+            if (project not in projects or not isinstance(channel, dict)
+                    or not isinstance(channel.get("repository"), str)
+                    or not re.fullmatch(r"[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+", channel["repository"])
+                    or not isinstance(channel.get("tag_prefix"), str)
+                    or not re.fullmatch(r"[a-z0-9-]+-", channel["tag_prefix"])):
+                errors.append(f"invalid release channel for project {project!r}")
     packages = manifest.get("packages")
     if not isinstance(packages, list) or not packages:
         return errors + ["packages must be a nonempty list"]

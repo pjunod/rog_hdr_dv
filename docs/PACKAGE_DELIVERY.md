@@ -254,6 +254,21 @@ ROG_APT_HOST=aptly@<repository host> packaging/delivery/publish.py --project rog
 
 The host comes only from the environment; the repository never names it.
 
+For packages built by other projects, the publisher first retrieves the
+named release from its owning Forgejo repository. Keep the retrieved
+bundle and its source commit with the release receipt.
+
+```bash
+python3 packaging/delivery/fetch-release.py --project plurx \
+  plurx-player-deb-<version> <new-output-directory>
+```
+
+Set `ROG_APT_FORGEJO_URL` and provide a read-only
+`ROG_APT_FORGEJO_TOKEN` through the runner environment. The tool checks
+the actual Git tag, the package digests and the delivery manifest before
+making the output directory available for publication.
+
+
 **Checks on each `.deb`.** The publisher refuses the whole directory, before
 it contacts the host, when any of these fails:
 

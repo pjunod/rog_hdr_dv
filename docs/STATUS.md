@@ -1,11 +1,12 @@
 # Status — what is working and what remains
 
 **November 27, 2026 — package delivery through APT is expanding.**
-The interim Forgejo registry delivers Mutter, libdisplay-info, mpv
-`+rogdv5.8` and plurx Player `0.5.7-1`. The planned authenticated aptly
-repository serves an empty signed snapshot. The delivery manifest, publisher,
-pin generator and `rog-apt-config` are in development. Baseline import,
-project CI publishing and migration of the ROG remain open.
+Forgejo delivers Mutter, libdisplay-info, mpv `+rogdv5.8` and plurx Player
+`0.5.7-1` to the ROG. The delivery manifest, publisher, pin generator and
+config package landed after review and the fast lane. An isolated Aptly
+1.6.2 rehearsal published the 19 interim packages as two signed snapshots
+and verified the resulting index. The baseline import, project CI
+publishing and ROG migration remain open.
 [Design, phases and decisions](PACKAGE_DELIVERY.md).
 
 **November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; installed.**
