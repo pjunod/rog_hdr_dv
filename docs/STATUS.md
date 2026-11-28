@@ -216,6 +216,11 @@ Profile 8 source-switch captures each passed all seven phases on
 independent replay. The run stopped in the following Profile 7
 source-switch case before restored capture. Seven later cases
 remain unattempted.
+After correcting two embedded startup digests, a fresh run passed the
+four source-switch cases on independent replay. Eight of twelve cases
+have now passed, covering 50 phases. The current stop is Profile 7
+Clip 20, whose action did not produce the required full
+enhancement-layer proof. Three later clip cases went unattempted.
 [Focused follow-up](RUNTIME_ACCEPTANCE_CORRECTIONS.md#focused-follow-up).
 
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore

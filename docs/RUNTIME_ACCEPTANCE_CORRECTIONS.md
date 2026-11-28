@@ -409,4 +409,27 @@ run stopped in the subsequent Profile 7 source-switch case on a mapper
 record before the restored capture. Seven later cases were unattempted.
 The same-boot evaluator reported an unqualified cohort and clean teardown.
 
+The next controller stopped before playback because two helper digests
+embedded in the fixture did not match its freeze. A startup check using
+the real fixture entry point reproduced the rejection and passed after
+the pins were corrected. With that correction, four additional cases
+passed independent replay in the same boot.
+
+| Captured case | Frozen phases passed |
+|---|---:|
+| Profile 7 source change | 7 of 7 |
+| Profile 7 to Profile 5 source change | 9 of 9 |
+| Profile 5 clipped source change | 3 of 3 |
+| Profile 7 clipped source change | 3 of 3 |
+
+The controller stopped at Profile 7 Clip 20 because it could not establish
+the required decoder submission, output and full enhancement-layer proof
+for the current action. The saved log shows all three records. The parser
+cleared the submission when the decoder forwarded the pending seek
+segment downstream between finishing the frame and pushing it. Three
+later clip cases went unattempted. The aggregate analyzer also rejected
+regular fixture files as unexpected extraction directories. Independent
+replay has passed eight of twelve cases, covering 50 phases. The cohort
+remains unqualified.
+
 Publication awaits runtime qualification. [Current status](STATUS.md).
