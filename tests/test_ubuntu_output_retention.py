@@ -34,8 +34,11 @@ class UbuntuOutputRetentionTests(unittest.TestCase):
         self.bin = self.root / "bin"
         self.bin.mkdir()
         self.work = self.root / "retained outputs"
-        for name in ("rebuild.sh", "registry.sh", "outputs.py", "REVISION", "managed.py", "managed-families.json"):
+        for name in ("rebuild.sh", "registry.sh", "outputs.py", "REVISION", "managed.py"):
             shutil.copy2(PACKAGING / name, self.here / name)
+        delivery = self.here.parent / "delivery"
+        delivery.mkdir()
+        shutil.copy2(ROOT / "packaging/delivery/manifest.json", delivery / "manifest.json")
         shutil.copy2(ROOT / "sources.json", self.root / "repo/sources.json")
         origins = {entry["component"]: entry.get("source_origin", {})
                    for entry in json.loads((ROOT / "sources.json").read_text())["series"]}
@@ -55,8 +58,8 @@ if "-o" in args:
 else:
     if os.environ.get("PUBLISHED") in ("yes", "old"):
         version = os.environ["REVISION"] if os.environ.get("PUBLISHED") == "yes" else "0"
-        manifest = Path(os.environ["MANAGED_MANIFEST"])
-        data = json.loads(manifest.read_text())["families"]
+        import runpy
+        data = runpy.run_path(os.environ["MANAGED_SCRIPT"])["families"]()
         for source, base in (("libdisplay-info", os.environ["LDI_VERSION"]), ("mutter", os.environ["MUTTER_VERSION"])):
             for arch, names in data[source]["packages"].items():
                 for name in names:
@@ -123,7 +126,7 @@ if os.environ.get("FAIL_PUBLISH") == "yes":
         self.env = os.environ.copy()
         self.env.pop("FORGEJO_TOKEN", None)
         self.env.update(PATH=str(self.bin) + os.pathsep + self.env["PATH"],
-                        MANAGED_MANIFEST=str(self.here / "managed-families.json"),
+                        MANAGED_SCRIPT=str(self.here / "managed.py"),
                         LDI_VERSION=self.ldi_version, MUTTER_VERSION=self.mutter_version,
                         REVISION=self.revision, FORGEJO_URL="http://registry.invalid",
                         FORGEJO_OWNER="operator", PUBLISHED="no", FAIL_BUILD="no",

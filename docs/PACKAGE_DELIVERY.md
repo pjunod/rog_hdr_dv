@@ -126,13 +126,19 @@ aptly takes over at phase 6. Until then:
 
 - **New builds publish to the Forgejo registry**, through one publisher (this effort), using `packaging/ubuntu/publish.sh` and `registry.sh`. Sessions that build packages hand over a folder of `.deb` files with their SHA-256s; they don't upload or `dpkg -i`.
 - **Upload order:** dependencies first and consumers last, so the index never offers a package whose dependencies are missing. Each release is rehearsed on the ROG with `apt-get -s` before and after it is published.
-- **Pins on the ROG come from the WebKit effort's `managed-families.json`:** 999 by origin and by a derivative version pattern such as `+rogdv` or `+nativehdr`. That protects an installed derivative even when the registry has no candidate for it.
-- **Interim limits:** a release of several packages isn't atomic, and the registry keeps no rollback archive. Rollback stays the retained `.deb` files.
+- **Pins on the ROG come from the delivery manifest.** The interim policy
+  uses 999 by registry host and derivative version, such as `+rogdv` or
+  `+nativehdr`. The version rule protects an installed derivative when its
+  remote version is temporarily unavailable.
+- **Interim limits.** A Forgejo release updates its index one file at a time.
+  Keep the released `.deb` files for rollback.
 
-Before phase 6, the two package lists (`manifest.json` here and
-`managed-families.json`) become one list, and one pin policy replaces both,
-put to the owner as its own decision. Running aptly and Forgejo side by side
-as live sources is not part of the design.
+The publishing tools, the Ubuntu freshness monitor and the generated APT
+preferences all read the same delivery manifest. Its `forgejo` fields
+record interim publication and monitoring rules for each applicable source.
+An optional binary may accompany a complete release, while an omitted
+binary keeps its separate release path until cutover. At phase 6 the ROG
+switches to the final Origin-based pin.
 
 ## Phases
 
@@ -228,7 +234,8 @@ or null when the package is not installed. Optional fields:
 
 The manifest was populated on November 27 from a read-only inventory of the ROG:
 `apt list --installed` for local packages, and `dpkg-query` for their source names.
-It has 28 sources and 63 binaries:
+The baseline inventory covers 28 sources, with additional companion
+binaries from their release definitions:
 
 | Project | Built | Imported |
 |---|---|---|

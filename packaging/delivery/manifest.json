@@ -71,6 +71,11 @@
         "mutter-dev-bin": [
           "amd64"
         ]
+      },
+      "forgejo": {
+        "component": "ubuntu-mutter",
+        "automatic": true,
+        "derivative": "+nativehdr"
       }
     },
     {
@@ -92,7 +97,12 @@
       "multiarch_same": [
         "libdisplay-info3"
       ],
-      "note": "Built by packaging/ubuntu/build.sh and installed from the Forgejo registry. The ROG has libdisplay-info3 on amd64 and i386."
+      "note": "Built by packaging/ubuntu/build.sh and installed from the Forgejo registry. The ROG has libdisplay-info3 on amd64 and i386.",
+      "forgejo": {
+        "component": "ubuntu-libdisplay-info",
+        "automatic": true,
+        "derivative": "+nativehdr"
+      }
     },
     {
       "source": "rog-apt-config",
@@ -143,6 +153,11 @@
         "libavformat62": [
           "amd64"
         ]
+      },
+      "forgejo": {
+        "policy_only": true,
+        "component": "ubuntu-ffmpeg-system-dv",
+        "derivative": "+rogdv"
       }
     },
     {
@@ -157,18 +172,25 @@
       ],
       "shadows_ubuntu": true,
       "version": "1.28.7-1+rogdv1",
-      "reconcile_with": "patches/ubuntu-gst-libav-dovi-picture"
+      "reconcile_with": "patches/ubuntu-gst-libav-dovi-picture",
+      "forgejo": {
+        "component": "ubuntu-gst-libav-dovi-picture",
+        "derivative": "+rogdv"
+      }
     },
     {
       "source": "gst-plugins-bad1.0",
       "project": "rog_hdr_dv",
       "class": "imported",
       "binaries": [
+        "gir1.2-gst-plugins-bad-1.0",
         "gir1.2-gst-plugins-extra-1.0",
         "gstreamer1.0-plugins-bad",
         "gstreamer1.0-plugins-extra",
         "libgstreamer-plugins-bad1.0-0",
-        "libgstreamer-plugins-extra1.0-0"
+        "libgstreamer-plugins-bad1.0-dev",
+        "libgstreamer-plugins-extra1.0-0",
+        "libgstreamer-plugins-extra1.0-dev"
       ],
       "architectures": [
         "amd64"
@@ -176,7 +198,16 @@
       "shadows_ubuntu": true,
       "version": "1.28.6-1ubuntu1+rogdv11",
       "reconcile_with": "patches/ubuntu-gst-plugins-bad-rpu",
-      "note": "The installed rogdv10 and rogdv11 carry the paused-subtitle change, which the series does not yet have."
+      "note": "The installed rogdv10 and rogdv11 carry the paused-subtitle change, which the series does not yet have.",
+      "forgejo": {
+        "component": "ubuntu-gst-plugins-bad-rpu",
+        "derivative": "+rogdv",
+        "optional": [
+          "gir1.2-gst-plugins-bad-1.0",
+          "libgstreamer-plugins-bad1.0-dev",
+          "libgstreamer-plugins-extra1.0-dev"
+        ]
+      }
     },
     {
       "source": "gst-plugins-base1.0",
@@ -190,28 +221,50 @@
         "gstreamer1.0-plugins-base-apps",
         "gstreamer1.0-x",
         "libgstreamer-gl1.0-0",
-        "libgstreamer-plugins-base1.0-0"
+        "libgstreamer-plugins-base1.0-0",
+        "libgstreamer-plugins-base1.0-dev"
       ],
       "architectures": [
         "amd64"
       ],
       "shadows_ubuntu": true,
       "version": "1.28.7-1+rogdv4.ubuntu0.2",
-      "reconcile_with": "patches/ubuntu-gst-plugins-base-rpu"
+      "reconcile_with": "patches/ubuntu-gst-plugins-base-rpu",
+      "forgejo": {
+        "component": "ubuntu-gst-plugins-base-rpu",
+        "derivative": "+rogdv",
+        "optional": [
+          "libgstreamer-plugins-base1.0-dev"
+        ]
+      }
     },
     {
       "source": "gst-plugins-good1.0",
       "project": "rog_hdr_dv",
       "class": "imported",
       "binaries": [
-        "gstreamer1.0-plugins-good"
+        "gstreamer1.0-gtk3",
+        "gstreamer1.0-plugins-good",
+        "gstreamer1.0-pulseaudio",
+        "gstreamer1.0-qt5",
+        "gstreamer1.0-qt6"
       ],
       "architectures": [
         "amd64"
       ],
       "shadows_ubuntu": true,
       "version": "1.28.7-1ubuntu0.1+rogdv4",
-      "reconcile_with": "patches/ubuntu-gst-plugins-good-dovi"
+      "reconcile_with": "patches/ubuntu-gst-plugins-good-dovi",
+      "forgejo": {
+        "component": "ubuntu-gst-plugins-good-dovi",
+        "derivative": "+rogdv",
+        "optional": [
+          "gstreamer1.0-gtk3",
+          "gstreamer1.0-pulseaudio",
+          "gstreamer1.0-qt5",
+          "gstreamer1.0-qt6"
+        ]
+      }
     },
     {
       "source": "gtk4",
@@ -219,11 +272,15 @@
       "class": "imported",
       "binaries": [
         "gir1.2-gtk-4.0",
+        "gtk-4-examples",
+        "gtk-4-tests",
         "gtk-update-icon-cache",
         "libgtk-4-1",
         "libgtk-4-bin",
         "libgtk-4-common",
-        "libgtk-4-dev"
+        "libgtk-4-dev",
+        "libgtk-4-doc",
+        "libgtk-4-media-gstreamer"
       ],
       "architectures": [
         "amd64",
@@ -234,6 +291,12 @@
       "reconcile_with": "patches/ubuntu-gtk4-display-target",
       "binary_architectures": {
         "gir1.2-gtk-4.0": [
+          "amd64"
+        ],
+        "gtk-4-examples": [
+          "amd64"
+        ],
+        "gtk-4-tests": [
           "amd64"
         ],
         "gtk-update-icon-cache": [
@@ -250,6 +313,22 @@
         ],
         "libgtk-4-dev": [
           "amd64"
+        ],
+        "libgtk-4-doc": [
+          "all"
+        ],
+        "libgtk-4-media-gstreamer": [
+          "amd64"
+        ]
+      },
+      "forgejo": {
+        "component": "ubuntu-gtk4-display-target",
+        "derivative": "+rogdv",
+        "optional": [
+          "gtk-4-examples",
+          "gtk-4-tests",
+          "libgtk-4-doc",
+          "libgtk-4-media-gstreamer"
         ]
       }
     },
@@ -299,15 +378,24 @@
         "mesa-vulkan-drivers"
       ],
       "reconcile_with": "patches/ubuntu-mesa-wayland-hdr",
-      "note": "Partial source: the other Mesa binaries stay Ubuntu's."
+      "note": "Partial source: the other Mesa binaries stay Ubuntu's.",
+      "forgejo": {
+        "policy_only": true,
+        "component": "ubuntu-mesa-wayland-hdr",
+        "derivative": "+rogwsi"
+      }
     },
     {
       "source": "webkit2gtk",
       "project": "rog_hdr_dv",
       "class": "imported",
       "binaries": [
+        "gir1.2-javascriptcoregtk-6.0",
+        "gir1.2-webkit-6.0",
         "libjavascriptcoregtk-6.0-1",
-        "libwebkitgtk-6.0-4"
+        "libjavascriptcoregtk-6.0-dev",
+        "libwebkitgtk-6.0-4",
+        "libwebkitgtk-6.0-dev"
       ],
       "architectures": [
         "amd64"
@@ -315,7 +403,11 @@
       "shadows_ubuntu": true,
       "version": "2.52.6-1ubuntu1.1+rogdv9",
       "reconcile_with": "patches/ubuntu-webkitgtk-native-hdr",
-      "note": "Partial source: the 4.1 API binaries stay Ubuntu's."
+      "note": "Partial source: the 4.1 API binaries stay Ubuntu's.",
+      "forgejo": {
+        "pin": "packaging/webkitgtk-native-hdr/source-pin.json",
+        "derivative": "+rogdv"
+      }
     },
     {
       "source": "gnome-shell-ubuntu-extensions",
@@ -329,7 +421,12 @@
       ],
       "shadows_ubuntu": true,
       "version": "51.26.10.6ubuntu+nativehdr3",
-      "reconcile_with": "patches/ubuntu-tiling-assistant"
+      "reconcile_with": "patches/ubuntu-tiling-assistant",
+      "forgejo": {
+        "policy_only": true,
+        "component": "ubuntu-tiling-assistant",
+        "derivative": "+nativehdr"
+      }
     },
     {
       "source": "rust-dolby-vision",
@@ -360,7 +457,17 @@
       "shadows_ubuntu": true,
       "version": "0.42.0-0ubuntu0+rogdv5.8",
       "reconcile_with": "patches/mpv-fel-system-dv",
-      "note": "All three binaries are in the interim registry. Only mpv is installed on the ROG."
+      "note": "All three binaries are in the interim registry. Only mpv is installed on the ROG.",
+      "forgejo": {
+        "policy_only": true,
+        "component": "ubuntu-mpv-system-dv",
+        "derivative": "+rogdv",
+        "monitor_scope": "Ubuntu packaging base only; upstream 0.42 convergence is a separate reviewed release.",
+        "omit": [
+          "libmpv-dev",
+          "libmpv2"
+        ]
+      }
     },
     {
       "source": "rust-gst-plugin-gtk4",
@@ -374,7 +481,11 @@
       ],
       "shadows_ubuntu": true,
       "version": "0.15.2-1ubuntu2+rogdv5.8+depfix2",
-      "reconcile_with": "packaging/gstreamer-gtk-dovi"
+      "reconcile_with": "packaging/gstreamer-gtk-dovi",
+      "forgejo": {
+        "provenance": "gtk",
+        "derivative": "+rogdv"
+      }
     },
     {
       "source": "showtime",
@@ -388,7 +499,11 @@
       ],
       "shadows_ubuntu": true,
       "version": "50.0-2+rogdv5.15+depfix3",
-      "reconcile_with": "packaging/gstreamer-gtk-dovi"
+      "reconcile_with": "packaging/gstreamer-gtk-dovi",
+      "forgejo": {
+        "provenance": "showtime",
+        "derivative": "+rogdv"
+      }
     },
     {
       "source": "gst-gtk-dovi-map",
@@ -396,6 +511,7 @@
       "class": "imported",
       "binaries": [
         "gstreamer1.0-gtk-dovi",
+        "libgstgtk-dovi-core-dev",
         "libgstgtk-dovi-core0"
       ],
       "architectures": [
@@ -404,7 +520,11 @@
       "shadows_ubuntu": false,
       "version": "0.1.0+rogdv11",
       "reconcile_with": "packaging/gstreamer-gtk-dovi",
-      "note": "Its debian/control also declares libgstgtk-dovi-core-dev, which the ROG does not have installed."
+      "note": "Its debian/control also declares libgstgtk-dovi-core-dev, which the ROG does not have installed.",
+      "forgejo": {
+        "project": true,
+        "derivative": "+rogdv"
+      }
     },
     {
       "source": "gstreamer-dovi-picture",
@@ -559,7 +679,28 @@
         "network-manager-tui"
       ],
       "version": "1.58.1-1ubuntu3+rogsleep1",
-      "reason": "The owner is not yet confirmed, although patches/ubuntu-network-manager-suspend exists here. On the ROG, Ubuntu's 1.58.1-1ubuntu3.1 is already the apt candidate for libnm0 and network-manager-tui."
+      "reason": "The owner is not yet confirmed, although patches/ubuntu-network-manager-suspend exists here. On the ROG, Ubuntu's 1.58.1-1ubuntu3.1 is already the apt candidate for libnm0 and network-manager-tui.",
+      "architectures": [
+        "amd64",
+        "i386"
+      ],
+      "binary_architectures": {
+        "network-manager": [
+          "amd64"
+        ],
+        "network-manager-tui": [
+          "amd64"
+        ]
+      },
+      "forgejo": {
+        "policy_only": true,
+        "component": "ubuntu-network-manager-suspend",
+        "derivative": "+rogsleep",
+        "omit": [
+          "libnm0",
+          "network-manager-tui"
+        ]
+      }
     }
   ],
   "excluded": [

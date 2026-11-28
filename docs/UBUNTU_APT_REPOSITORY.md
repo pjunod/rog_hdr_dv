@@ -12,7 +12,7 @@ builder below covered only Mutter/libdisplay-info. Browser and video builds
 had been installed separately. [Recovery and evidence](UBUNTU_UPDATE_RECOVERY.md)
 records the incident; current deployment acceptance is in [status](STATUS.md).
 
-[`managed-families.json`](../packaging/ubuntu/managed-families.json) now defines
+[The delivery manifest](../packaging/delivery/manifest.json) defines
 public binary families for Mutter, libdisplay-info, WebKit/JavaScriptCore,
 GTK, GStreamer and its GTK consumers. The publisher checks required family
 members before mutation and verifies indexed hashes afterwards. A version's

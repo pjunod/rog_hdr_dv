@@ -28,7 +28,7 @@ SNAPSHOT_STAMP = re.compile(r"\d{8}T\d{6}Z\Z")
 
 ENTRY_FIELDS = {"source", "project", "class", "binaries", "architectures",
                 "shadows_ubuntu", "version", "series", "reconcile_with",
-                "multiarch_same", "binary_architectures", "binary_versions", "kernel", "note"}
+                "multiarch_same", "binary_architectures", "binary_versions", "kernel", "note", "forgejo"}
 REQUIRED_ENTRY_FIELDS = {"source", "project", "class", "binaries",
                          "architectures", "shadows_ubuntu", "version"}
 
@@ -180,6 +180,30 @@ def validate(manifest, root=None):
             for name in item["binaries"]:
                 if name in owners:
                     errors.append(f"binary {name} is both published and {list_name}")
+    managed = set()
+    unconfirmed = manifest.get("unconfirmed", [])
+    for entry in packages + (unconfirmed if isinstance(unconfirmed, list) else []):
+        if not isinstance(entry, dict) or "forgejo" not in entry:
+            continue
+        spec = entry["forgejo"]
+        source = entry.get("source")
+        if not isinstance(source, str) or source in managed:
+            errors.append(f"invalid or repeated Forgejo source: {source!r}")
+            continue
+        managed.add(source)
+        if (not isinstance(spec, dict) or not isinstance(spec.get("derivative"), str)
+                or not re.fullmatch(r"\+[a-z0-9]+", spec["derivative"])):
+            errors.append(f"{source}: Forgejo policy needs a derivative suffix")
+            continue
+        if entry in unconfirmed and spec.get("policy_only") is not True:
+            errors.append(f"{source}: unconfirmed sources may only carry an interim version pin")
+        binaries = entry.get("binaries")
+        optional, omit = spec.get("optional", []), spec.get("omit", [])
+        if (not _string_list(binaries) or not isinstance(optional, list) or not isinstance(omit, list)
+                or not all(isinstance(name, str) for name in optional + omit)
+                or set(optional) & set(omit) or not set(optional + omit) <= set(binaries)
+                or not set(binaries) - set(optional + omit)):
+            errors.append(f"{source}: invalid optional/omitted Forgejo binaries")
     return errors
 
 

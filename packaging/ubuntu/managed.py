@@ -15,10 +15,30 @@ import sys
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
+MANIFEST = ROOT / 'packaging/delivery/manifest.json'
 
 
 def families():
-    return json.loads((HERE / 'managed-families.json').read_text())['families']
+    manifest = json.loads(MANIFEST.read_text())
+    result = {}
+    for entry in manifest['packages'] + manifest.get('unconfirmed', []):
+        if 'forgejo' not in entry:
+            continue
+        spec = dict(entry['forgejo'])
+        optional = set(spec.pop('optional', ()))
+        omitted = set(spec.pop('omit', ()))
+        required_packages, optional_packages = {}, {}
+        for name in entry['binaries']:
+            if name in omitted:
+                continue
+            packages = optional_packages if name in optional else required_packages
+            for arch in entry.get('binary_architectures', {}).get(name, entry['architectures']):
+                packages.setdefault(arch, []).append(name)
+        spec['packages'] = required_packages
+        if optional_packages:
+            spec['optional_packages'] = optional_packages
+        result[entry['source']] = spec
+    return result
 
 
 def records(body):
@@ -177,7 +197,7 @@ def local_rows(directories):
 def preferences(data, host):
     if not re.fullmatch(r'[A-Za-z0-9.-]+', host):
         raise ValueError('invalid registry host')
-    sections = ['# Generated from managed-families.json. No permanent dpkg holds.']
+    sections = ['# Generated from packaging/delivery/manifest.json. No permanent dpkg holds.']
     for source, spec in data.items():
         names = ' '.join(sorted({f'{name}:{arch if arch != "all" else "any"}'
                                  for name, arch in expected(spec, optional=True)}))

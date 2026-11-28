@@ -350,8 +350,10 @@ class SetupShellRegressionTests(unittest.TestCase):
         self.bin.mkdir()
         self.recipe = self.root / 'packaging/ubuntu'
         self.recipe.mkdir(parents=True)
-        for name in ('managed.py', 'managed-families.json'):
-            shutil.copy2(ROOT / 'packaging/ubuntu' / name, self.recipe / name)
+        shutil.copy2(ROOT / 'packaging/ubuntu/managed.py', self.recipe / 'managed.py')
+        manifest = self.recipe.parent / 'delivery/manifest.json'
+        manifest.parent.mkdir()
+        shutil.copy2(managed.MANIFEST, manifest)
         self.etc = self.root / 'etc'
         for path in ('apt/keyrings', 'apt/sources.list.d', 'apt/preferences.d'):
             (self.etc / path).mkdir(parents=True)
@@ -441,9 +443,14 @@ class PublisherShellRegressionTests(unittest.TestCase):
         self.recipe.mkdir(parents=True)
         for name in ('managed.py', 'registry.sh', 'publish.sh'):
             shutil.copy2(ROOT / 'packaging/ubuntu' / name, self.recipe / name)
-        data = {'fixture-source': {'derivative': '+rogdv', 'expected_package_version': '1-1+rogdv2',
-                                  'packages': {'amd64': ['fixture-first', 'fixture-second']}}}
-        (self.recipe / 'managed-families.json').write_text(json.dumps({'families': data}))
+        manifest = self.recipe.parent / 'delivery/manifest.json'
+        manifest.parent.mkdir()
+        manifest.write_text(json.dumps({'packages': [{
+            'source': 'fixture-source',
+            'binaries': ['fixture-first', 'fixture-second'],
+            'architectures': ['amd64'],
+            'forgejo': {'derivative': '+rogdv', 'expected_package_version': '1-1+rogdv2'},
+        }]}))
         self.outputs = self.root / 'outputs'
         self.outputs.mkdir()
         self.rows = []
