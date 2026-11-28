@@ -10,6 +10,11 @@ gst-gtk-dovi-map (0.1.0+rogdv13) UNRELEASED; urgency=medium
     0.1.0+rogdv12 for the Profile 8.1 chart and a Profile 5 picture, at
     616 cd/m2 and at the SDR destination.
   * libplacebo messages now reach the gtkdovimap category through the core.
+  * Keep the Vulkan device for the process instead of destroying it with the
+    last mapper. Its destruction unloaded the NVIDIA driver, and a process
+    that had done so crashed at exit in an exit handler of the unloaded
+    NVIDIA EGL library (10 of 20 runs of two mappers in turn with
+    0.1.0+rogdv12).
   * Version 0.1.0+rogdv12 was an uninstalled-branch diagnostics build; this
     release does not include it.
 
