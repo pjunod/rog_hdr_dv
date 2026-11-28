@@ -53,9 +53,11 @@ enum rog_dovi_format {
  * means "no node". With no nodes at all the core uses libplacebo's default
  * Vulkan device selection (what the GTK element has always done). Otherwise
  * the mapper renders on the input node's device if one is given, else on the
- * output node's. DMABuf output is allocated on the output node; when it
- * differs from the rendering device the output is linear and must be
- * importable by the output node, otherwise the picture is declined.
+ * output node's. DMABuf output is allocated on the output node with one of
+ * the caller's modifiers the rendering device can render to. When the
+ * rendering device is not the output node's (an input node of another GPU)
+ * a DMABuf output is declined (ROG_DOVI_DECLINE_CROSS_DEVICE) until that
+ * combination has a pixel reference.
  *
  * Device lifetime. By default the last mapper freed on a node destroys its
  * Vulkan device (off the caller's thread): a process without video keeps no
@@ -204,6 +206,7 @@ struct rog_dovi_output {
 #define ROG_DOVI_DECLINE_ENHANCEMENT 256u   /* enhancement planes unavailable */
 #define ROG_DOVI_DECLINE_COMPOSITION 512u   /* Profile 7 master not reconstructed */
 #define ROG_DOVI_DECLINE_OUTPUT_IMPORT 1024u /* output node cannot import the output */
+#define ROG_DOVI_DECLINE_CROSS_DEVICE 2048u /* DMABuf output on another GPU than the renderer */
 
 enum rog_dovi_failure {
   ROG_DOVI_FAILURE_NONE = 0,

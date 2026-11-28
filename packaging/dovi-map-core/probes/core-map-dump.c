@@ -106,7 +106,7 @@ int main (int argc, char **argv)
     .width = frame->width, .height = frame->height, .has_geometry = 1,
     .geometry = {frame->width, frame->height, 0, 0, frame->width, frame->height}};
   struct rog_dovi_mapper_params params = {.struct_size = sizeof (params),
-    .flags = getenv ("PROBE_KEEP") ? ROG_DOVI_MAPPER_KEEP_DEVICE : 0,
+    .flags = getenv ("PROBE_KEEP") && !strcmp (getenv ("PROBE_KEEP"), "1") ? ROG_DOVI_MAPPER_KEEP_DEVICE : 0,
     .input_node = node_of (argv[2]), .output_node = node_of (argv[3])};
   if (!getenv ("PROBE_NO_PROFILES"))
     fprintf (stderr, "profiles mask 0x%x\n", rog_dovi_map_profiles (&params));
@@ -182,7 +182,7 @@ int main (int argc, char **argv)
   uint32_t declined = rog_dovi_map_last_decline (m);
   fprintf (stderr, "route %s map result %d declined 0x%x%s%s\n", route, r, declined,
       err ? ": " : "", err ? err : "");
-  for (uint32_t bit = 1; bit <= 1024; bit <<= 1)
+  for (uint32_t bit = 1; bit <= ROG_DOVI_DECLINE_CROSS_DEVICE; bit <<= 1)
     if (declined & bit) fprintf (stderr, "  decline: %s\n", rog_dovi_map_decline_reason (bit));
   if (r != 1) return 12;
   FILE *o = fopen (outpath, "wbx");

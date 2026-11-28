@@ -464,6 +464,7 @@ const char *rog_dovi_map_decline_reason (uint32_t bit)
     case ROG_DOVI_DECLINE_ENHANCEMENT: return "matched enhancement planes unavailable";
     case ROG_DOVI_DECLINE_COMPOSITION: return "renderer did not reconstruct the Profile 7 master";
     case ROG_DOVI_DECLINE_OUTPUT_IMPORT: return "output node cannot import the mapped picture";
+    case ROG_DOVI_DECLINE_CROSS_DEVICE: return "output on another GPU than the renderer is not qualified";
     default: return NULL;
   }
 }
@@ -781,12 +782,6 @@ static bool node_path (uint64_t node, char *path, size_t size)
   return !stat (path, &st) && S_ISCHR (st.st_mode) && (uint64_t) st.st_rdev == node;
 }
 
-static bool list_has (const uint64_t *list, uint32_t n, uint64_t value)
-{
-  for (uint32_t i = 0; i < n; i++) if (list[i] == value) return true;
-  return false;
-}
-
 /* Allocate the output on the output node and import it as a render target.
  * Returns the texture; *fd is the caller's fd for it. 0 with *declined when
  * no modifier both sides can use exists. */
@@ -795,6 +790,17 @@ static pl_tex allocate_output (rog_dovi_mapper *s, struct rog_dovi_output *out,
 {
   *fd = -1;
   *declined = false;
+  /* Rendering on one GPU into a buffer allocated on another is declined
+   * until it has a pixel reference. On the lab host NVIDIA rendering into a
+   * linear Intel ABGR2101010 buffer differed from Intel by up to 5 codes at
+   * the SDR destination, and no same-device reference could be made (NVIDIA
+   * GBM refuses a linear 10-bit buffer). */
+  if (render_node (s) != s->output_node) {
+    logf_ (ROG_DOVI_LOG_WARN, "output on another device than the renderer is not qualified");
+    *declined = true;
+    decline (s, ROG_DOVI_DECLINE_CROSS_DEVICE);
+    return NULL;
+  }
   pl_gpu gpu = s->vk->gpu;
   pl_fmt fmt = pl_find_fourcc (gpu, out->drm_fourcc);
   if (!fmt || !(fmt->caps & PL_FMT_CAP_RENDERABLE) || !(gpu->import_caps.tex & PL_HANDLE_DMA_BUF) ||
@@ -813,17 +819,13 @@ static pl_tex allocate_output (rog_dovi_mapper *s, struct rog_dovi_output *out,
   }
   uint64_t chosen[64];
   uint32_t n = 0;
-  if (render_node (s) == s->output_node) {
-    for (uint32_t i = 0; i < out->num_modifiers && n < 64; i++)
-      if (pl_fmt_has_modifier (fmt, out->modifiers[i])) chosen[n++] = out->modifiers[i];
-  } else if (list_has (out->modifiers, out->num_modifiers, DRM_FORMAT_MOD_LINEAR) &&
-      pl_fmt_has_modifier (fmt, DRM_FORMAT_MOD_LINEAR)) {
-    chosen[n++] = DRM_FORMAT_MOD_LINEAR;
-  }
+  for (uint32_t i = 0; i < out->num_modifiers && n < 64; i++)
+    if (pl_fmt_has_modifier (fmt, out->modifiers[i])) chosen[n++] = out->modifiers[i];
   if (!n) {
-    logf_ (ROG_DOVI_LOG_WARN, "output %.4s: no modifier both the rendering device and the caller accept%s",
-        (const char *) &out->drm_fourcc, render_node (s) == s->output_node ? "" : " (linear required across devices)");
+    logf_ (ROG_DOVI_LOG_WARN, "output %.4s: no modifier both the rendering device and the caller accept",
+        (const char *) &out->drm_fourcc);
     *declined = true;
+    decline (s, ROG_DOVI_DECLINE_OUTPUT_IMPORT);
     return NULL;
   }
   struct gbm_bo *bo = gbm_bo_create_with_modifiers2 (s->gbm, out->width, out->height,
@@ -831,7 +833,6 @@ static pl_tex allocate_output (rog_dovi_mapper *s, struct rog_dovi_output *out,
   if (!bo) {
     logf_ (ROG_DOVI_LOG_WARN, "output %.4s %ux%u: GBM allocation failed: %s",
         (const char *) &out->drm_fourcc, out->width, out->height, strerror (errno));
-    *declined = render_node (s) != s->output_node;
     return NULL;
   }
   out->modifier = gbm_bo_get_modifier (bo);
@@ -855,7 +856,6 @@ static pl_tex allocate_output (rog_dovi_mapper *s, struct rog_dovi_output *out,
     logf_ (ROG_DOVI_LOG_WARN, "output %.4s modifier 0x%llx: the rendering device cannot import it",
         (const char *) &out->drm_fourcc, (unsigned long long) out->modifier);
     close (*fd); *fd = -1;
-    *declined = render_node (s) != s->output_node;
   }
   return tex;
 }
@@ -1099,7 +1099,6 @@ static int render_destination (rog_dovi_mapper *s, const struct source *in,
     imported = allocate_output (s, output, &output_fd, &output_declined);
     if (!imported) {
       if (output_declined) {
-        decline (s, ROG_DOVI_DECLINE_OUTPUT_IMPORT);
         if (profile5) fail (s, error, ROG_DOVI_FAILURE_CONTENT,
             "Profile 5 output cannot be imported by the output node");
         else { apply_dovi = false; success = true; }
@@ -1199,8 +1198,7 @@ static int render_destination (rog_dovi_mapper *s, const struct source *in,
       imported = allocate_output (s, output, &output_fd, &output_declined);
       if (!imported) {
         if (output_declined) {
-          decline (s, ROG_DOVI_DECLINE_OUTPUT_IMPORT);
-          if (profile5) fail (s, error, ROG_DOVI_FAILURE_CONTENT,
+            if (profile5) fail (s, error, ROG_DOVI_FAILURE_CONTENT,
               "Profile 5 output cannot be imported by the output node");
           else { s->mapped = 0; success = true; }
         }

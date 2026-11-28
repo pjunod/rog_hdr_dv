@@ -249,9 +249,9 @@ static void dmabuf_bounds_rules (void)
 
 static void decline_names (void)
 {
-  for (uint32_t bit = 1; bit <= ROG_DOVI_DECLINE_OUTPUT_IMPORT; bit <<= 1) {
+  for (uint32_t bit = 1; bit <= ROG_DOVI_DECLINE_CROSS_DEVICE; bit <<= 1) {
     bool named = bit == 1 || bit == 2 || bit == 32 || bit == 64 || bit == 128 ||
-        bit == 256 || bit == 512 || bit == 1024;
+        bit == 256 || bit == 512 || bit == 1024 || bit == 2048;
     require (!!rog_dovi_map_decline_reason (bit) == named, "every decline bit is named");
   }
 }
