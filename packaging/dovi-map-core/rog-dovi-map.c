@@ -1317,6 +1317,27 @@ int rog_dovi_map_planes (rog_dovi_mapper *s, const struct rog_dovi_planes *pictu
   return map (s, &in, enhancement, record, destination, target, output, flags, error);
 }
 
+/* Every plane of a DMABuf picture lies inside its buffer before anything
+ * imports it: offset + pitch * rows within the fd's size, a pitch that holds
+ * a row, and a real fd. */
+static bool dmabuf_bounds_ok (const struct rog_dovi_dmabuf *in)
+{
+  bool p010 = in->drm_fourcc == DRM_FORMAT_P010;
+  if (!in->width || !in->height) return false;
+  for (unsigned i = 0; i < 2; i++) {
+    const struct rog_dovi_dmabuf_plane *p = &in->planes[i];
+    if (p->fd < 0) return false;
+    off_t end = lseek (p->fd, 0, SEEK_END);
+    if (end <= 0) return false;
+    uint64_t width = i ? (in->width + 1) / 2 : in->width;
+    uint64_t rows = i ? (in->height + 1) / 2 : in->height;
+    uint64_t row_bytes = width * (p010 ? 2 : 1) * (i ? 2 : 1);
+    if (p->pitch < row_bytes || (uint64_t) p->offset + (uint64_t) p->pitch * rows > (uint64_t) end)
+      return false;
+  }
+  return true;
+}
+
 int rog_dovi_map_dmabuf (rog_dovi_mapper *s, const struct rog_dovi_dmabuf *picture,
     const struct rog_dovi_planes *enhancement, const struct rog_dovi_picture *record,
     enum rog_dovi_destination destination, const struct rog_dovi_target *target,
@@ -1325,6 +1346,12 @@ int rog_dovi_map_dmabuf (rog_dovi_mapper *s, const struct rog_dovi_dmabuf *pictu
   if (!picture || picture->struct_size < sizeof (*picture)) {
     if (error) *error = NULL;
     return fail (s, error, ROG_DOVI_FAILURE_INTERNAL, "Invalid arguments");
+  }
+  if ((picture->drm_fourcc == DRM_FORMAT_P010 || picture->drm_fourcc == DRM_FORMAT_NV12) &&
+      picture->num_planes == 2 && !dmabuf_bounds_ok (picture)) {
+    if (error) *error = NULL;
+    if (s) { s->declined = 0; s->failure = ROG_DOVI_FAILURE_NONE; }
+    return fail (s, error, ROG_DOVI_FAILURE_INTERNAL, "DMABuf plane outside its buffer");
   }
   const struct source in = {.dmabuf = picture};
   return map (s, &in, enhancement, record, destination, target, output, flags, error);

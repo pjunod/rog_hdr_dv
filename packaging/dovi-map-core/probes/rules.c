@@ -3,6 +3,7 @@
  * media. The implementation is included so its static rules are reachable. */
 #include "../rog-dovi-map.c"
 #include <assert.h>
+#include <sys/mman.h>
 
 static unsigned checks, failures;
 static void require (bool ok, const char *name)
@@ -208,6 +209,40 @@ static void lifetime_rules (void)
   require (!rog_dovi_map_profiles (&p), "unknown flag has no profiles");
 }
 
+static void dmabuf_bounds_rules (void)
+{
+  /* A 4x4 P010 picture: luma 4 rows of 8 bytes, chroma 2 rows of 8 bytes. */
+  int fd = memfd_create ("rog-dovi-map-rules", MFD_CLOEXEC);
+  require (fd >= 0 && !ftruncate (fd, 48), "memfd");
+  struct rog_dovi_dmabuf in = {.struct_size = sizeof (in), .width = 4, .height = 4,
+      .drm_fourcc = DRM_FORMAT_P010, .num_planes = 2,
+      .planes = {{fd, 0, 8}, {fd, 32, 8}}};
+  require (dmabuf_bounds_ok (&in), "planes inside the buffer");
+  in.planes[1].offset = 33;
+  require (!dmabuf_bounds_ok (&in), "chroma past the end");
+  in.planes[1].offset = 32; in.planes[0].pitch = 7;
+  require (!dmabuf_bounds_ok (&in), "luma pitch shorter than a row");
+  in.planes[0].pitch = 8; in.planes[1].pitch = 4;
+  require (!dmabuf_bounds_ok (&in), "chroma pitch shorter than a row");
+  in.planes[1].pitch = 8; in.planes[0].fd = -1;
+  require (!dmabuf_bounds_ok (&in), "negative fd");
+  in.planes[0].fd = fd; in.planes[0].offset = UINT32_MAX;
+  require (!dmabuf_bounds_ok (&in), "offset overflow");
+  in.planes[0].offset = 0; in.drm_fourcc = DRM_FORMAT_NV12;
+  require (dmabuf_bounds_ok (&in), "NV12 needs half the bytes");
+  in.drm_fourcc = DRM_FORMAT_P010; in.planes[1].offset = 40;
+  rog_dovi_mapper *mapper = rog_dovi_mapper_new (NULL);
+  struct rog_dovi_output out = {.struct_size = sizeof (out), .kind = ROG_DOVI_OUTPUT_HOST,
+      .width = 4, .height = 4, .host_format = ROG_DOVI_FORMAT_RGBA, .acquire = count_acquire};
+  const char *error = NULL;
+  require (rog_dovi_map_dmabuf (mapper, &in, NULL, NULL, ROG_DOVI_DESTINATION_STANDARD_SDR_SRGB,
+      NULL, &out, ROG_DOVI_MAP_BASELINE_ON_DECLINE, &error) == -1 &&
+      rog_dovi_map_last_failure (mapper) == ROG_DOVI_FAILURE_INTERNAL && error &&
+      !mapper->vk, "out-of-bounds picture fails before any import");
+  rog_dovi_mapper_free (mapper);
+  close (fd);
+}
+
 static void decline_names (void)
 {
   for (uint32_t bit = 1; bit <= ROG_DOVI_DECLINE_OUTPUT_IMPORT; bit <<= 1) {
@@ -226,6 +261,7 @@ int main (void)
   pitch_rules ();
   baseline_rules ();
   lifetime_rules ();
+  dmabuf_bounds_rules ();
   decline_names ();
   printf ("{\"checks\": %u, \"failures\": %u}\n", checks, failures);
   return failures != 0;
