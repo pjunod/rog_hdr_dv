@@ -16,5 +16,8 @@ override_dh_auto_build:
 	  test "$$actual" = "$$expected" || { echo "$(KEY) is $$actual, expected $$expected" >&2; exit 1; }
 	rm -rf $(CHECK_HOME)
 
+	python3 debian/render-source.py
+
 override_dh_auto_clean:
 	rm -rf $(CHECK_HOME)
+	rm -f debian/rog-hdr.sources

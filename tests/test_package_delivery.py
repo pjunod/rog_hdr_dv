@@ -200,15 +200,31 @@ class ManifestTests(unittest.TestCase):
         debian = package / "debian"
         for script in ("preinst", "postinst", "prerm", "postrm"):
             self.assertFalse((debian / script).exists(), script)
-        sources = (debian / "rog-hdr.sources").read_text()
+        sources = (debian / "rog-hdr.sources.in").read_text()
         fingerprint = self.manifest["repository"]["signing_key"]
         self.assertIn(f"Signed-By: /usr/share/keyrings/rog-hdr-archive-keyring.asc {fingerprint}\n", sources)
-        self.assertIn("URIs: http://forge.lan:8095/", sources)
-        self.assertNotIn("@", sources)
-        hits = [p for p in package.rglob("*") if p.is_file() and "forge.lan:8095" in p.read_text(errors="ignore")]
-        self.assertEqual(hits, [debian / "rog-hdr.sources"])
+        self.assertIn("URIs: @REPOSITORY_URL@", sources)
+        self.assertNotIn("http:", sources)
+        self.assertNotIn("https:", sources)
         self.assertEqual((debian / "signing-key-fingerprint").read_text().strip(),
                          self.manifest["repository"]["signing_key"])
+
+
+    def test_config_source_uses_a_supplied_endpoint(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            debian = DELIVERY / "rog-apt-config" / "debian"
+            for name in ("render-source.py", "rog-hdr.sources.in"):
+                (root / name).write_bytes((debian / name).read_bytes())
+            script = [sys.executable, str(root / "render-source.py")]
+            env = dict(os.environ, ROG_APT_REPOSITORY_URL="https://apt.example.invalid/rog")
+            subprocess.run(script, env=env, check=True)
+            self.assertIn("URIs: https://apt.example.invalid/rog/\n", (root / "rog-hdr.sources").read_text())
+            for invalid in ("", "https://user:pw@apt.example.invalid", "https://apt.example.invalid\nEnabled: no"):
+                with self.subTest(uri=invalid):
+                    env["ROG_APT_REPOSITORY_URL"] = invalid
+                    result = subprocess.run(script, env=env, capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
 
 
 class OpenPGPTests(unittest.TestCase):

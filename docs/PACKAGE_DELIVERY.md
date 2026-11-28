@@ -320,11 +320,15 @@ packaging/delivery/pins.py --check   # what scripts/check_repository.py enforces
 ```
 
 `rog-apt-config` installs three files:
-- `/etc/apt/sources.list.d/rog-hdr.sources`, whose URL `http://forge.lan:8095/` appears only in `debian/rog-hdr.sources`;
+- `/etc/apt/sources.list.d/rog-hdr.sources`, rendered from the build
+  environment's `ROG_APT_REPOSITORY_URL`;
 - `/usr/share/keyrings/rog-hdr-archive-keyring.asc`;
 - `/etc/apt/preferences.d/rog-hdr`.
 
-It has no maintainer scripts, so it runs no apt, and it installs no credential.
+Build the config package with `ROG_APT_REPOSITORY_URL` set to the real
+endpoint reachable by clients. The build rejects an absent URL or one
+containing credentials. The packaged source contains the URL and the public
+signing fingerprint. APT authentication still comes from the local auth file.
 
 The key file is checked in, and the source stanza restricts APT to the
 approved fingerprint. `fetch-key.py` fetches the public key with the
