@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: LGPL-2.1-or-later */
 /* CPU-only storage regression; the included implementation is section-GC'd so
- * this executable links only GStreamer video and libavutil, not a GPU backend. */
+ * this executable links only GStreamer video, libavutil and the mapping core,
+ * not a GPU backend. The GPU row-pitch rule moved with the rendering into the
+ * mapping core; packaging/dovi-map-core/probes/rules.c checks it. */
 #include "../mapper.c"
 
 static GstVideoInfo layout (GstVideoFormat format, gint stride, gsize offset, gsize size)
@@ -45,17 +47,6 @@ static void single_row_stride (void)
   g_assert_true (valid_output_span (&info));
   info.stride[0] = -32;
   g_assert_true (valid_output_span (&info));
-}
-static void gpu_pitch_selection (void)
-{
-  g_assert_true (download_row_pitch_ok (32, 8, 32));
-  g_assert_true (download_row_pitch_ok (40, 8, 32));
-  g_assert_false (download_row_pitch_ok (36, 8, 32));
-  g_assert_false (download_row_pitch_ok (-32, 8, 32));
-  g_assert_false (download_row_pitch_ok (0, 8, 32));
-  g_assert_false (download_row_pitch_ok (16, 8, 32));
-  g_assert_false (download_row_pitch_ok (32, 0, 32));
-  g_assert_true (download_row_pitch_ok (16, 4, 16));
 }
 static void fallback_pixels (void)
 {
@@ -160,7 +151,6 @@ int main (int argc, char **argv)
   gst_init (&argc, &argv); g_test_init (&argc, &argv, NULL);
   g_test_add_func ("/output/checked-spans", checked_spans);
   g_test_add_func ("/output/single-row-stride", single_row_stride);
-  g_test_add_func ("/output/gpu-pitch-selection", gpu_pitch_selection);
   g_test_add_func ("/output/fallback-pixels", fallback_pixels);
   g_test_add_func ("/output/held-buffers-and-layout-switch", held_buffers_and_layout_switch);
   g_test_add_func ("/output/destination-memory-flag", destination_memory_flag);

@@ -1,3 +1,20 @@
+gst-gtk-dovi-map (0.1.0+rogdv13) UNRELEASED; urgency=medium
+
+  * Become an adapter over librog-dovi-map 0.1.0+rogdv1, exactly pinned. The
+    qualification, target, provider and transport rules, the SDR
+    destination and the process-shared Vulkan device moved to the core
+    unchanged; this library keeps the source lease, the retained native
+    frame, the output pool and the GStreamer translation. The public
+    mapper.h ABI is unchanged and the device is still libplacebo's
+    default. On the lab host the mapped output is byte-identical to
+    0.1.0+rogdv12 for the Profile 8.1 chart and a Profile 5 picture, at
+    616 cd/m2 and at the SDR destination.
+  * libplacebo messages now reach the gtkdovimap category through the core.
+  * Version 0.1.0+rogdv12 was an uninstalled-branch diagnostics build; this
+    release does not include it.
+
+ -- ROG HDR contributors <rog-hdr@invalid>  Fri, 27 Nov 2026 20:00:00 +0000
+
 gst-gtk-dovi-map (0.1.0+rogdv11) UNRELEASED; urgency=medium
 
   * Let the renderer decide whether a Profile 7 master is reconstructed.

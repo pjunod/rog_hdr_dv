@@ -2,35 +2,41 @@
 #ifndef GST_GTK_DOVI_RENDER_PRECONDITIONS_H
 #define GST_GTK_DOVI_RENDER_PRECONDITIONS_H
 #include "mapper.h"
+#include "stream.h"
 #include "gstdovipicture.h"
-/* Called with the decoder-owned complete configuration, never an RPU profile
- * guess. Profile 5 IPT base samples have no ordinary HDR10 interpretation. */
+/* GStreamer views of the mapping core's rules. Called with the decoder-owned
+ * complete configuration, never an RPU profile guess. Profile 5 IPT base
+ * samples have no ordinary HDR10 interpretation. */
 static inline gboolean gtk_dovi_profile5_has_no_base_fallback (
     const AVDOVIDecoderConfigurationRecord *config)
 {
-  return config && config->dv_version_major == 1 && config->dv_version_minor == 0 &&
-      config->dv_profile == 5 && config->dv_bl_signal_compatibility_id == 0 &&
-      config->rpu_present_flag && config->bl_present_flag && !config->el_present_flag &&
-      config->dv_md_compression == AV_DOVI_COMPRESSION_NONE;
+  if (!config) return FALSE;
+  struct rog_dovi_stream_config core = gtk_dovi_core_config (config);
+  return rog_dovi_map_profile5_has_no_base_fallback (&core);
 }
 static inline gboolean gtk_dovi_profile5_destination_supported (
     const AVDOVIDecoderConfigurationRecord *config, gboolean sdr,
     const GstGtkDoviTarget *physical)
 {
-  return !gtk_dovi_profile5_has_no_base_fallback (config) || sdr ||
-      (physical && physical->valid && physical->render_ready && physical->composed);
+  struct rog_dovi_stream_config core;
+  if (config) core = gtk_dovi_core_config (config);
+  struct rog_dovi_target target = {.struct_size = sizeof (target)};
+  if (physical)
+    target.flags = (physical->valid ? ROG_DOVI_TARGET_VALID : 0) |
+        (physical->render_ready ? ROG_DOVI_TARGET_RENDER_READY : 0) |
+        (physical->composed ? ROG_DOVI_TARGET_COMPOSED : 0);
+  return rog_dovi_map_profile5_destination_supported (config ? &core : NULL,
+      sdr ? ROG_DOVI_DESTINATION_STANDARD_SDR_SRGB : ROG_DOVI_DESTINATION_DISPLAY_PQ,
+      physical ? &target : NULL);
 }
 /* Compare every public parsed field; never compare struct padding or infer
  * compatibility from an RPU profile guess. */
 static inline gboolean gtk_dovi_same_configuration (
     const AVDOVIDecoderConfigurationRecord *a, const AVDOVIDecoderConfigurationRecord *b)
 {
-  return a && b && a->dv_version_major == b->dv_version_major &&
-      a->dv_version_minor == b->dv_version_minor && a->dv_profile == b->dv_profile &&
-      a->dv_level == b->dv_level && a->rpu_present_flag == b->rpu_present_flag &&
-      a->el_present_flag == b->el_present_flag && a->bl_present_flag == b->bl_present_flag &&
-      a->dv_bl_signal_compatibility_id == b->dv_bl_signal_compatibility_id &&
-      a->dv_md_compression == b->dv_md_compression;
+  if (!a || !b) return FALSE;
+  struct rog_dovi_stream_config ca = gtk_dovi_core_config (a), cb = gtk_dovi_core_config (b);
+  return rog_dovi_map_same_config (&ca, &cb);
 }
 static inline gboolean gtk_dovi_profile5_picture_proved (
     const AVDOVIDecoderConfigurationRecord *required, GstBuffer *input)
