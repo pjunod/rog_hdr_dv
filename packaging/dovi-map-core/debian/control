@@ -1,0 +1,25 @@
+Source: rog-dovi-map
+Section: video
+Priority: optional
+Maintainer: ROG HDR contributors <rog-hdr@invalid>
+Build-Depends: debhelper-compat (= 13), meson, pkgconf, rog-dv-provider387-sdk-api (>= 2), libplacebo-rog387 (>= 1.0.0+private20261108-3), libavutil-dev, libavcodec-dev, libavformat-dev, libgbm-dev, libdrm-dev, libvulkan-dev
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+
+Package: librog-dovi-map1
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}, ${misc:Depends}, libplacebo-rog387 (>= 1.0.0+private20261108-3), rog-dv-hevc-runtime (>= 2)
+Description: Per-picture Dolby Vision mapping core
+ The project's one owner of the Dolby Vision qualification and mapping
+ rules, with a plain C ABI and no GLib or GStreamer dependency. The GTK
+ video element and Firefox both call it. Requires the separately
+ distributed private mapping provider.
+
+Package: librog-dovi-map-dev
+Section: libdevel
+Architecture: any
+Multi-Arch: same
+Depends: librog-dovi-map1 (= ${binary:Version}), ${misc:Depends}
+Description: Development files for the Dolby Vision mapping core
+ Public header and pkg-config metadata, without private mapping code.
