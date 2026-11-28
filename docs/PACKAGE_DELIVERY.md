@@ -259,14 +259,16 @@ named release from its owning Forgejo repository. Keep the retrieved
 bundle and its source commit with the release receipt.
 
 ```bash
-python3 packaging/delivery/fetch-release.py --project plurx \
+python3 packaging/delivery/forgejo-release.py --project plurx \
   plurx-player-deb-<version> <new-output-directory>
 ```
 
-Set `ROG_APT_FORGEJO_URL` and provide a read-only
+Set `ROG_APT_FORGEJO_URL` to the HTTPS service or its authenticated loopback
+tunnel. Provide a read-only
 `ROG_APT_FORGEJO_TOKEN` through the runner environment. The tool checks
 the actual Git tag, the package digests and the delivery manifest before
-making the output directory available for publication.
+making the output directory available for publication. Invoke `publish.py`
+with `--require-release-receipt` when publishing CI bundles.
 
 
 **Checks on each `.deb`.** The publisher refuses the whole directory, before

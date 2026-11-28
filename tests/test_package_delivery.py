@@ -65,7 +65,7 @@ def make_deb(directory, name, version, arch, source=None, depends=None, multiarc
 
 class ReleaseIntakeTests(unittest.TestCase):
     def setUp(self):
-        spec = importlib.util.spec_from_file_location("fetch_release", DELIVERY / "fetch-release.py")
+        spec = importlib.util.spec_from_file_location("fetch_release", DELIVERY / "forgejo-release.py")
         self.fetch = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.fetch)
         directory = tempfile.TemporaryDirectory()
@@ -73,19 +73,20 @@ class ReleaseIntakeTests(unittest.TestCase):
         root = Path(directory.name)
         self.output = root / "received"
         self.package = make_deb(root, "plurx-player", "0.5.8-1", "amd64")
-        self.server = "http://forge.example.invalid"
+        self.server = "https://forge.example.invalid"
         self.tag = "plurx-player-deb-0.5.8-1"
         self.receipt = "0" * 40
         api = f"{self.server}/api/v1/repos/noirr/plurx"
-        self.asset = f"{self.server}/asset/{self.package.name}"
-        self.checksums = f"{self.server}/asset/SHA256SUMS"
+        download_path = f"{self.server}/noirr/plurx/releases/download/{self.tag}"
+        self.asset = f"{download_path}/{self.package.name}"
+        self.checksums = f"{download_path}/SHA256SUMS"
         self.release_url = f"{api}/releases/tags/{self.tag}"
         self.routes = {
             self.release_url: json.dumps({
-                "draft": False, "tag_name": self.tag,
+                "draft": False, "tag_name": self.tag, "body": f"Source commit `{self.receipt}`.",
                 "assets": [
-                    {"name": self.package.name, "browser_download_url": self.asset},
-                    {"name": "SHA256SUMS", "browser_download_url": self.checksums},
+                    {"name": self.package.name, "type": "attachment"},
+                    {"name": "SHA256SUMS", "type": "attachment"},
                 ],
             }).encode(),
             f"{api}/tags/{self.tag}": json.dumps({"commit": {"sha": self.receipt}}).encode(),
@@ -115,13 +116,21 @@ class ReleaseIntakeTests(unittest.TestCase):
             self.retrieve()
         self.assertFalse(self.output.exists())
 
-    def test_external_asset_is_rejected_before_request(self):
+    def test_link_asset_is_rejected_before_request(self):
         release = json.loads(self.routes[self.release_url])
-        release["assets"][0]["browser_download_url"] = "https://other.example.invalid/package.deb"
+        release["assets"][0]["type"] = "external"
         self.routes[self.release_url] = json.dumps(release).encode()
-        with self.assertRaisesRegex(ValueError, "left the configured Forgejo origin"):
+        with self.assertRaisesRegex(ValueError, "not an uploaded Forgejo asset"):
             self.retrieve()
         self.assertFalse(self.output.exists())
+
+
+    def test_publisher_refuses_modified_fetched_bytes(self):
+        self.retrieve()
+        package = self.output / self.package.name
+        package.write_bytes(b"changed after receipt")
+        with self.assertRaisesRegex(ValueError, "differ from the verified release receipt"):
+            publish.verify_release_receipt(self.output, [package], delivery.load_manifest(), "plurx", required=True)
 
 
 class ManifestTests(unittest.TestCase):

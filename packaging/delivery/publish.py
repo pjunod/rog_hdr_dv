@@ -37,6 +37,7 @@ transport and the aptly command, for testing against a scratch rootDir.
 import argparse
 import datetime
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -312,6 +313,25 @@ def prepare_snapshot(remote, local_repo, snapshot, debs, index):
     remote.aptly("snapshot", "create", snapshot, "from", "repo", local_repo)
 
 
+def verify_release_receipt(directory, paths, manifest, project, required=False):
+    receipt = directory / "release.json"
+    if not receipt.is_file():
+        if required:
+            raise ValueError("release.json is required for project CI publication")
+        return
+    meta = json.loads(receipt.read_text(encoding="utf-8"), object_pairs_hook=delivery.unique_object)
+    channel = manifest.get("release_channels", {}).get(project)
+    if channel is None or meta.get("forgejo_repository") != channel["repository"]:
+        raise ValueError("release receipt does not identify the selected project")
+    if (not isinstance(meta.get("tag"), str) or not meta["tag"].startswith(channel["tag_prefix"])
+            or not isinstance(meta.get("source_commit"), str)
+            or not re.fullmatch(r"[a-f0-9]{40}", meta["source_commit"])):
+        raise ValueError("release receipt must identify a matching tag and source commit")
+    current = {path.name: sha256(path) for path in paths}
+    if current != meta.get("package_sha256"):
+        raise ValueError("package files differ from the verified release receipt")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("directory")
@@ -319,6 +339,7 @@ def main():
     parser.add_argument("--manifest", default=str(delivery.MANIFEST))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--allow-baseline-exact-deps", action="store_true")
+    parser.add_argument("--require-release-receipt", action="store_true")
     args = parser.parse_args()
 
     manifest = delivery.load_manifest(args.manifest)
@@ -326,9 +347,15 @@ def main():
     if errors:
         print("manifest is invalid:\n" + "\n".join(errors), file=sys.stderr)
         return 1
-    paths = sorted(Path(args.directory).glob("*.deb"))
+    directory = Path(args.directory)
+    paths = sorted(directory.glob("*.deb"))
     if not paths:
         print(f"publish.py: no .deb in {args.directory}", file=sys.stderr)
+        return 1
+    try:
+        verify_release_receipt(directory, paths, manifest, args.project, args.require_release_receipt)
+    except (OSError, ValueError) as error:
+        print(f"publish.py: {error}", file=sys.stderr)
         return 1
     debs, errors = [], []
     for path in paths:
