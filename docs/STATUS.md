@@ -1,6 +1,30 @@
 # Status — what is working and what remains
 
-**November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; staged, not installed.**
+**November 27, 2026 — package delivery through APT is expanding.**
+The interim Forgejo registry delivers Mutter, libdisplay-info, mpv
+`+rogdv5.8` and plurx Player `0.5.7-1`. The planned authenticated aptly
+repository serves an empty signed snapshot. The delivery manifest, publisher,
+pin generator and `rog-apt-config` are in development. Baseline import,
+project CI publishing and migration of the ROG remain open.
+[Design, phases and decisions](PACKAGE_DELIVERY.md).
+
+**November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; installed.**
+plurx Player's EL pill could say FEL or MEL only after the server's whole-title
+scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`
+(`+rogdv5.8`) adds `enhancement-layer-nlq-active` to `native-dovi-target-state`:
+libplacebo's own NLQ decision for the presented, composed frame (true: FEL;
+false: MEL). In private-compositor runs, one MEL title to end of file and the FEL
+and other MEL title through 71% and 84% each reported only their own kind, so plurx Player 0.5.7's pill follows
+the level and keeps the server's scan as a cross-check. `+rogdv5.8` was built on
+the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It was
+installed on the ROG through the project APT channel (forge Debian registry),
+not with dpkg; audit and verify are clean, rollback is `+rogdv5.7+depfix2`.
+plurx Player 0.5.7-1 followed through the same channel (rollback 0.5.6-1). The
+attended visual check is the owner's.
+[Design and limits](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers)
+· [Receipt](../evidence/mpv-el-nlq-level-20261127.json).
+
+**November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in
 Showtime, with no error. NVDEC chose CUDA memory from the GTK Dolby mapper's
 answer to a Dolby-marked query. The PGS renderer (`dvdspu`) then asked
@@ -12,10 +36,16 @@ as `textoverlay` already does; the mapper is unchanged. With those plugins,
 Gran Turismo and a second MEL title started and mapped (stock: never
 started); a FEL title and an HDR10 title with a PGS track were unchanged. A
 six-package release (five plugins-bad binaries and a Showtime pin repack)
-is staged and awaits an attended install. Not run: ASS or DVB subtitles,
-the browser, and a visual check that subtitles are drawn. The installed
-plugins-bad `rogdv10` holds a paused-subtitle change this repository's series
-lacks; `rogdv11` was built from that installed source.
+was installed in an owner-attended window (audit and `dpkg -V` clean,
+nothing restarted). On the installed packages both MEL titles mapped and the
+FEL and HDR10 titles were unchanged; the owner then saw subtitles over the
+second MEL title (a visual report). Not run: ASS or DVB subtitles and the
+browser. Showtime first played without sound; the likely cause, outside
+this release, was a saved per-application mute in WirePlumber. Once a
+separate audio session cleared it, the owner reported sound in Showtime (an
+audible report, November 27). The installed plugins-bad `rogdv10` holds a
+paused-subtitle change this repository's series lacks; `rogdv11` was built
+from that installed source.
 [Change, controls and limits](DV_FALLBACK_REPRODUCTION.md#subtitles-with-nvdec-decoded-dolby-video-in-showtime)
 · [Receipt](../evidence/showtime-pgs-subtitles-20261126.json).
 
@@ -1254,6 +1284,7 @@ Mutter and matching amd64/i386 library packaging.
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; optical verification (the owner's visual check passed) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
+| Browser Dolby Vision | WebKitGTK is patched to put the shared Dolby mapper at the head of its page video sink ([browser change](WEBKIT_NATIVE_HDR.md)). Firefox: effort recorded on 2026-11-27, not started. Chromium: scoped only | **To do, not started:** a Chromium renderer. Scope, costs and the check to make first are in [Chromium renderer](SYSTEM_DOLBY_VISION.md#chromium-renderer--to-do-not-started) |
 
 The owner has no colourimeter or spectrophotometer yet and is open to obtaining
 one. Software work continues independently. Define the measurement procedure

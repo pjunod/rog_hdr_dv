@@ -12,6 +12,7 @@ SERIES = ROOT / "patches/mpv-fel-system-dv"
 WAYLAND_PATCH = "0009-stop-dispatching-Wayland-events-after-a-fatal-display-error.patch"
 RECORD_PATCH = "0010-log-a-fresh-Dolby-success-record-after-each-reset.patch"
 LEVEL_PATCH = "0011-report-enhancement-layer-composition-as-a-level.patch"
+NLQ_PATCH = "0012-report-whether-the-composed-enhancement-layer-nlq-is-active.patch"
 
 
 def entry():
@@ -24,7 +25,7 @@ class MpvSystemSeriesTests(unittest.TestCase):
         names = (SERIES / "series").read_text().split()
         self.assertEqual(names, entry()["patch_order"])
         self.assertEqual(len(names), entry()["patch_count"])
-        self.assertEqual(names[-3:], [WAYLAND_PATCH, RECORD_PATCH, LEVEL_PATCH])
+        self.assertEqual(names[-4:], [WAYLAND_PATCH, RECORD_PATCH, LEVEL_PATCH, NLQ_PATCH])
         self.assertEqual(sorted(names), sorted(p.name for p in SERIES.glob("*.patch")))
         sums = dict(line.split("  ", 1)[::-1] for line in (ROOT / "SHA256SUMS").read_text().splitlines() if line)
         for name in names:
@@ -32,10 +33,10 @@ class MpvSystemSeriesTests(unittest.TestCase):
             self.assertEqual(sums[f"patches/mpv-fel-system-dv/{name}"], digest, name)
 
     def test_package_version_is_the_newest_changelog_overlay(self):
-        overlay = (ROOT / "packaging/system-dv/mpv-042-ubuntu-el-composition-level.diff").read_text()
+        overlay = (ROOT / "packaging/system-dv/mpv-042-ubuntu-el-nlq-level.diff").read_text()
         version = re.search(r"^\+mpv \(([^)]+)\)", overlay, re.M).group(1)
         self.assertEqual(entry()["candidate_package_version"], version)
-        self.assertTrue(version.endswith("+rogdv5.7"))
+        self.assertTrue(version.endswith("+rogdv5.8"))
 
     def test_a_dead_wayland_display_stops_dispatching_and_keeps_sleeping(self):
         text = (SERIES / WAYLAND_PATCH).read_text()
@@ -93,6 +94,35 @@ class MpvSystemSeriesTests(unittest.TestCase):
         self.assertIn("        p->dovi_el_composed = false;", added)
         # ...and every change notifies the property.
         self.assertIn("if (composed == p->dovi_el_composed)\n        return;\n    p->dovi_el_composed = composed;\n    vo_event(vo, VO_EVENT_WIN_STATE);", added)
+        self.assertIn("+++ b/DOCS/man/input.rst", text)
+
+    def test_the_nlq_level_is_libplacebos_per_frame_decision(self):
+        text = (SERIES / NLQ_PATCH).read_text()
+        added = "\n".join(l[1:] for l in text.splitlines() if l.startswith("+") and not l.startswith("+++"))
+        removed = "\n".join(l[1:] for l in text.splitlines() if l.startswith("-") and not l.startswith("---"))
+        # The property reports the level next to the composition level.
+        self.assertIn('{"enhancement-layer-nlq-active", SUB_PROP_BOOL(state.enhancement_layer_nlq_active)},', added)
+        self.assertIn(".enhancement_layer_nlq_active = p->dovi_el_nlq_active,", added)
+        # Each frame records libplacebo's own mapping of its RPU, only with a composition.
+        # It is libplacebo's sampling condition: an attached layer and an active NLQ.
+        self.assertIn("fp->dovi_el_nlq_active = composed && image->enhancement_layer &&\n"
+                      "                                     image->repr.dovi &&\n"
+                      "                                     image->repr.dovi->nlq_active;", added)
+        # Nothing re-parses the RPU.
+        self.assertNotIn("dovi_parse", added)
+        self.assertNotIn("rpu_parser", added)
+        # The published level is the covering frame's, implies composed and notifies on change.
+        self.assertIn("covering_fp && covering_fp->dovi_el_nlq_active);", added)
+        self.assertIn("nlq_active = composed && nlq_active;", added)
+        self.assertRegex(text, r"\+    if \(composed == p->dovi_el_composed && nlq_active == p->dovi_el_nlq_active\)\n"
+                               r"         return;\n     p->dovi_el_composed = composed;\n"
+                               r"\+    p->dovi_el_nlq_active = nlq_active;\n     vo_event\(vo, VO_EVENT_WIN_STATE\);")
+        # It clears wherever the composition level clears.
+        self.assertIn("fp->dovi_el_composed = fp->dovi_el_nlq_active = false;", added)
+        self.assertIn("p->dovi_el_composed = p->dovi_el_nlq_active = false;", added)
+        self.assertEqual(added.count("set_dovi_el_composed(p, vo, false, false);"), 2)
+        self.assertNotIn("set_dovi_el_composed(p, vo, false);", added)
+        self.assertEqual(removed.count("set_dovi_el_composed(p, vo, false);"), 2)
         self.assertIn("+++ b/DOCS/man/input.rst", text)
 
 if __name__ == "__main__":
