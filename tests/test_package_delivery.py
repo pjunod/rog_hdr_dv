@@ -199,6 +199,16 @@ class VerifyTests(unittest.TestCase):
         self.assertIn("architecture i386 is not listed for mutter", text)
         self.assertIn("Source other-source is not the manifest's rust-dolby-vision", text)
 
+    def test_source_architectures_do_not_extend_sibling_binaries(self):
+        paths = [make_deb(self.dir, "mutter-common", "1", "amd64", "mutter"),
+                 make_deb(self.dir, "libavformat62", "1", "i386", "ffmpeg"),
+                 make_deb(self.dir, "mutter-common-bin", "1", "amd64", "mutter"),
+                 make_deb(self.dir, "libgtk-4-common", "1", "all", "gtk4")]
+        errors, _ = self.check(paths)
+        self.assertEqual(len(errors), 2, errors)
+        self.assertIn("binary mutter-common", errors[0])
+        self.assertIn("binary libavformat62", errors[1])
+
     def test_unknown_project_is_rejected(self):
         errors, _ = self.check([make_deb(self.dir, "plurx-player", "1", "amd64")], project="someone")
         self.assertIn("unknown project", errors[0])
@@ -247,6 +257,13 @@ class PublisherTests(unittest.TestCase):
             ROG_APT_APTLY=f"{shlex.quote(sys.executable)} {shlex.quote(str(FAKES))} aptly -config={self.config}")
 
     def run_publisher(self, directory, *extra, project="rog_hdr_dv", environment=None):
+        if "--dry-run" not in extra and not (self.root / "state.json").exists():
+            self.root.mkdir()
+            empty = "rog-stonking-0000-empty"
+            (self.root / "state.json").write_text(json.dumps({
+                "repos": {}, "pool": {}, "published": {"stonking": empty},
+                "snapshots": [{"name": empty, "refs": []}],
+            }))
         return subprocess.run([sys.executable, str(DELIVERY / "publish.py"), str(directory),
                                "--project", project, "--manifest", str(self.manifest_path), *extra],
                               capture_output=True, text=True, timeout=60, env=environment or self.environment)
@@ -269,7 +286,7 @@ class PublisherTests(unittest.TestCase):
         result = self.run_publisher(self.release("a", "nativehdr18"), "--dry-run", environment=environment)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("verified 3 package(s)", result.stdout)
-        self.assertIn("repo add rog-stonking rog-apt-incoming", result.stdout)
+        self.assertIn("repo add rog-stonking-incoming-", result.stdout)
         self.assertIn("publish switch -gpg-key=2DA6B7DE09D5671941650C1A36DDB628371F0745 stonking", result.stdout)
         self.assertFalse(self.root.exists())
         self.assertFalse((self.home / "ssh.log").exists())
@@ -311,7 +328,9 @@ class PublisherTests(unittest.TestCase):
         self.assertIn("removed libdisplay-info3 0.3.0-1+nativehdr18 i386", second.stdout)
 
         state = self.state()
-        refs = set(state["repos"]["rog-stonking"])
+        self.assertEqual(state["repos"], {})
+        published = state["published"]["stonking"]
+        refs = set(next(s["refs"] for s in state["snapshots"] if s["name"] == published))
         self.assertEqual(refs, {
             "mutter_51.0-1ubuntu3+nativehdr17_amd64",
             "linux-image-7.3.0-nativehdr3_7.3.0-10.10+nativehdr3_amd64",
@@ -320,16 +339,32 @@ class PublisherTests(unittest.TestCase):
             "libdisplay-info3_0.3.0-1+nativehdr19_i386",
             "libdisplay-info-bin_0.3.0-1+nativehdr19_amd64",
         })
-        names = [s["name"] for s in state["snapshots"]]
+        names = [s["name"] for s in state["snapshots"] if s["name"] != "rog-stonking-0000-empty"]
         self.assertEqual(len(names), 2, names)  # keep_snapshots is 2 here
         self.assertTrue(all(n.startswith("rog-stonking-") and n.endswith("-rog_hdr_dv") for n in names))
         self.assertEqual(state["published"]["stonking"], names[-1])
         self.assertEqual(state["signing_key"], "2DA6B7DE09D5671941650C1A36DDB628371F0745")
         # The previous release stays in the pool for rollback, through the kept snapshot.
-        self.assertIn("libdisplay-info3_0.3.0-1+nativehdr18_amd64", state["snapshots"][0]["refs"])
+        self.assertIn("libdisplay-info3_0.3.0-1+nativehdr18_amd64", next(s["refs"] for s in state["snapshots"] if s["name"] == names[0]))
         self.assertIn("libdisplay-info3_0.3.0-1+nativehdr18_amd64", state["pool"])
         leftovers = sorted(p.name for p in self.home.iterdir() if not p.name.startswith((".fake-bin", "ssh.log")))
         self.assertEqual(leftovers, [])  # staging removed, lock released
+
+    def test_failed_release_cannot_leak_into_a_later_snapshot(self):
+        failed = self.release("failed", "nativehdr18")
+        result = self.run_publisher(failed, environment=dict(self.environment, FAKE_SWITCH_FAIL="1"))
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.state()["published"]["stonking"], "rog-stonking-0000-empty")
+
+        other = self.debs / "other"
+        other.mkdir()
+        make_deb(other, "plurx-player", "0.5.8-1", "amd64")
+        result = self.run_publisher(other, project="plurx")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = self.state()
+        published = state["published"]["stonking"]
+        refs = next(s["refs"] for s in state["snapshots"] if s["name"] == published)
+        self.assertEqual(refs, ["plurx-player_0.5.8-1_amd64"])
 
     def test_conflicting_bytes_for_a_published_version_fail(self):
         self.assertEqual(self.run_publisher(self.release("a", "nativehdr18")).returncode, 0)
@@ -340,7 +375,7 @@ class PublisherTests(unittest.TestCase):
         result = self.run_publisher(directory)
         self.assertEqual(result.returncode, 1)
         self.assertIn("conflict", result.stderr)
-        self.assertEqual(len(self.state()["snapshots"]), 1)
+        self.assertEqual(len(self.state()["snapshots"]), 2)
         self.assertFalse((self.home / publish.LOCK).exists())
 
     def test_held_lock_stops_a_second_publisher(self):

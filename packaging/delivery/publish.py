@@ -20,7 +20,7 @@ Only when every check passes does it change the repository, over ssh to
 ROG_APT_HOST as the aptly account:
 
 1. upload the files into a fresh staging directory and verify their hashes;
-2. `aptly repo add`;
+2. initialize a temporary local repo from the published snapshot and add the files;
 3. remove every other version of each published (name, architecture),
    except kernel entries, and nothing of any other name;
 4. snapshot the repository as <prefix>-<UTC timestamp>-<project>;
@@ -83,9 +83,10 @@ def verify(manifest, project, debs, allow_baseline_exact=False):
             continue
         if deb.source != entry["source"]:
             errors.append(f"{label}: Source {deb.source} is not the manifest's {entry['source']}")
-        if deb.architecture not in entry["architectures"]:
+        architectures = delivery.binary_architectures(entry, deb.name)
+        if deb.architecture not in architectures:
             errors.append(f"{label}: architecture {deb.architecture} is not listed for {entry['source']} "
-                          f"({', '.join(entry['architectures'])})")
+                          f"({', '.join(architectures)}; binary {deb.name})")
         key = (deb.name, deb.architecture)
         if key in seen:
             errors.append(f"{label}: {deb.name} {deb.architecture} is also in {seen[key].path.name}")
@@ -101,7 +102,7 @@ def verify(manifest, project, debs, allow_baseline_exact=False):
         entry = items[0][1]
         arches = {deb.architecture for deb, _ in items}
         if name in entry.get("multiarch_same", []):
-            wanted = {a for a in entry["architectures"] if a != "all"}
+            wanted = set(delivery.binary_architectures(entry, name)) - {"all"}
             missing = sorted(wanted - arches)
             if missing:
                 errors.append(f"{name}: Multi-Arch: same pair is incomplete, missing {', '.join(missing)}")
@@ -193,65 +194,45 @@ def repository_packages(remote, local_repo):
     return packages
 
 
-def published_snapshot(remote, distribution):
+def published_snapshot(remote, distribution, component):
+    if remote.dry_run:
+        remote.aptly("publish", "show", distribution)
+        return "<published-snapshot>"
+    pattern = rf"\s+{re.escape(component)}: (\S+) \[snapshot\]"
     for line in remote.aptly("publish", "show", distribution).splitlines():
-        match = re.match(r"\s+\S+: (\S+) \[snapshot\]", line)
-        if match:
+        if match := re.fullmatch(pattern, line):
             return match.group(1)
-    return None
+    raise RuntimeError(f"{distribution}/{component} is not published from a snapshot")
 
 
 def publish(manifest, project, debs, remote, now=None):
     repo = manifest["repository"]
-    local_repo, distribution = repo["local_repo"], repo["distribution"]
+    distribution, component = repo["distribution"], repo["component"]
     prefix, keep = repo["snapshot_prefix"], repo["keep_snapshots"]
     index = delivery.binary_index(manifest)
-    stamp = (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y%m%dT%H%M%SZ")
+    stamp = (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y%m%dT%H%M%S%fZ")
     snapshot = f"{prefix}-{stamp}-{project}"
+    local_repo = f"{repo['local_repo']}-incoming-{stamp}"
 
     remote.run(["mkdir", LOCK])
     try:
-        staging = remote.run(["mktemp", "-d", "rog-apt-incoming.XXXXXXXX"]).strip() or "rog-apt-incoming.DRYRUN"
+        base = published_snapshot(remote, distribution, component)
+        remote.aptly("repo", "create", local_repo, "from", "snapshot", base)
         try:
-            remote_paths = []
-            for deb in debs:
-                destination = f"{staging}/{deb.path.name}"
-                remote.upload(deb.path, destination)
-                remote_paths.append(destination)
-            if not remote.dry_run:
-                sums = remote.run(["sha256sum", "--"] + remote_paths)
-                actual = {line.split()[1]: line.split()[0] for line in sums.splitlines() if line.strip()}
-                for deb, destination in zip(debs, remote_paths):
-                    if actual.get(destination) != sha256(deb.path):
-                        raise RuntimeError(f"uploaded {deb.path.name} does not match its local hash")
-            remote.aptly("repo", "add", local_repo, *remote_paths)
+            prepare_snapshot(remote, local_repo, snapshot, debs, index)
         finally:
-            remote.run(["rm", "-rf", "--", staging])
+            remote.aptly("repo", "drop", "-force", local_repo)
 
-        if not remote.dry_run:
-            present = repository_packages(remote, local_repo)
-            for deb in debs:
-                if index[deb.name].get("kernel"):
-                    continue
-                for version in sorted(present.get((deb.name, deb.architecture), set()) - {deb.version}):
-                    remote.aptly("repo", "remove", local_repo,
-                                 f"Name (= {deb.name}), $Version (= {version}), "
-                                 f"$Architecture (= {deb.architecture})")
-                    print(f"removed {deb.name} {version} {deb.architecture}")
-        else:
-            print("would remove: every other version of each published (name, architecture), kernels excepted")
-
-        remote.aptly("snapshot", "create", snapshot, "from", "repo", local_repo)
         remote.aptly("publish", "switch", f"-gpg-key={repo['signing_key']}", distribution, snapshot)
         print(f"{'would publish' if remote.dry_run else 'published'} {snapshot}")
 
         if not remote.dry_run:
-            pattern = re.compile(re.escape(prefix) + r"-(\d{8}T\d{6}Z)-[a-z0-9_-]+\Z")
-            ours = sorted((m.group(1), name) for name in remote.aptly("snapshot", "list", "-raw").split()
+            pattern = re.compile(re.escape(prefix) + r"-(\d{8}T\d{6}(?:\d{6})?)Z-[a-z0-9_-]+\Z")
+            ours = sorted((m.group(1).ljust(21, "0"), name)
+                          for name in remote.aptly("snapshot", "list", "-raw").split()
                           if (m := pattern.fullmatch(name)))
-            current = published_snapshot(remote, distribution)
-            for _, name in ours[:-keep] if len(ours) > keep else []:
-                if name != current:
+            for _, name in ours[:-keep]:
+                if name != snapshot:
                     remote.aptly("snapshot", "drop", name)
                     print(f"dropped snapshot {name}")
             remote.aptly("db", "cleanup")
@@ -260,6 +241,39 @@ def publish(manifest, project, debs, remote, now=None):
     finally:
         remote.run(["rmdir", LOCK])
     return snapshot
+
+
+def prepare_snapshot(remote, local_repo, snapshot, debs, index):
+    staging = remote.run(["mktemp", "-d", "rog-apt-incoming.XXXXXXXX"]).strip() or "rog-apt-incoming.DRYRUN"
+    try:
+        remote_paths = []
+        for deb in debs:
+            destination = f"{staging}/{deb.path.name}"
+            remote.upload(deb.path, destination)
+            remote_paths.append(destination)
+        if not remote.dry_run:
+            sums = remote.run(["sha256sum", "--"] + remote_paths)
+            actual = {line.split()[1]: line.split()[0] for line in sums.splitlines() if line.strip()}
+            for deb, destination in zip(debs, remote_paths):
+                if actual.get(destination) != sha256(deb.path):
+                    raise RuntimeError(f"uploaded {deb.path.name} does not match its local hash")
+        remote.aptly("repo", "add", local_repo, *remote_paths)
+    finally:
+        remote.run(["rm", "-rf", "--", staging])
+
+    if not remote.dry_run:
+        present = repository_packages(remote, local_repo)
+        for deb in debs:
+            if index[deb.name].get("kernel"):
+                continue
+            for version in sorted(present.get((deb.name, deb.architecture), set()) - {deb.version}):
+                remote.aptly("repo", "remove", local_repo,
+                             f"{deb.name}_{version}_{deb.architecture}")
+                print(f"removed {deb.name} {version} {deb.architecture}")
+    else:
+        print("would remove: every other version of each published (name, architecture), kernels excepted")
+
+    remote.aptly("snapshot", "create", snapshot, "from", "repo", local_repo)
 
 
 def main():

@@ -35,16 +35,16 @@ container tooling, kernel installers) keep their vendors' channels.
   - The private key stays on lab3, under that account.
   - The public key is published and shipped in the config package (below).
 - Releases carry `Origin: rog-hdr` and `Label: rog-hdr`. Pins can therefore name this repository rather than a host.
-- A static web server, which is a small container on lab3, serves the published tree over HTTP with basic authentication.
+- A dedicated nginx site on lab3 serves the published tree over HTTP with basic authentication.
   - There is no anonymous read: some builds are not cleared for publication.
   - Machines read as one read-only machine account. The credential lives in `/etc/apt/auth.conf.d/rog-hdr.conf` (mode 0600) and never in Git or in a package.
 
 ### Releases are snapshots
 
-1. The publisher adds each release's packages to the local repository.
-2. It takes a snapshot.
-3. It runs `aptly publish switch` to that snapshot.
-4. It keeps the last 20 snapshots.
+1. The publisher initializes a temporary local repository from the live snapshot.
+2. It adds the release, takes a new snapshot and drops the temporary repository.
+3. It runs `aptly publish switch` to the new snapshot.
+4. It keeps the last 20 release snapshots.
 
 Every release is therefore atomic: a machine sees either the whole previous set or the whole new set. Rolling back means switching the published snapshot back. Pinned at 1001, apt follows a rollback as an ordinary downgrade. That closes the "not a rollback archive" gap in the APT guide.
 
@@ -213,6 +213,8 @@ or null when the package is not installed. Optional fields:
   were built from it;
 - `multiarch_same`: names that must arrive on every listed architecture
   together;
+- `binary_architectures`: per-binary architecture limits for sources that
+  build different packages on different architectures;
 - `binary_versions`: binaries whose installed version differs from the
   source's, which today means the `+depfix` repacks;
 - `kernel`: the publisher never removes a kernel's older versions;
@@ -220,7 +222,7 @@ or null when the package is not installed. Optional fields:
 
 The manifest was populated on November 27 from a read-only inventory of the ROG:
 `apt list --installed` for local packages, and `dpkg-query` for their source names.
-It has 28 sources and 61 binaries:
+It has 28 sources and 63 binaries:
 
 | Project | Built | Imported |
 |---|---|---|
@@ -265,14 +267,18 @@ notes. Those names are Ubuntu binaries or virtual ABI names such as
 **Remote steps.** Every remote step runs over ssh, under a lock directory in the account's home:
 
 1. Upload into a fresh staging directory and compare SHA-256 sums.
-2. `aptly repo add`.
+2. Initialize a temporary repo from the currently published snapshot and add
+   the staged files.
 3. Remove every other version of each published name and architecture. Kernels are never removed, and no other name is touched.
-4. Create the snapshot `rog-stonking-<UTC timestamp>-<project>`.
+4. Create the snapshot `rog-stonking-<UTC timestamp>-<project>` and drop
+   the temporary repository.
 5. `aptly publish switch -gpg-key=2DA6B7DE…0745 stonking <snapshot>`.
 6. Drop all but the newest 20 publisher snapshots. The published snapshot is never dropped; neither is the original `rog-stonking-0000-empty`.
 7. `aptly db cleanup`.
 
-A failure before step 5 changes nothing that machines see.
+A failure before step 5 leaves the live snapshot in place. The next
+release starts from that live snapshot, so a failed candidate cannot ride
+along with a later release.
 
 A crashed run leaves the lock `~/.rog-apt-publish.lock` behind. The next run then refuses to start until someone removes the lock by hand.
 
@@ -294,8 +300,8 @@ packaging/delivery/pins.py --check   # what scripts/check_repository.py enforces
 
 It has no maintainer scripts, so it runs no apt, and it installs no credential.
 
-The key file is not checked in yet. `fetch-key.py` fetches it with the
-reader account and checks the fingerprint; then it is committed.
+The key file is checked in. `fetch-key.py` fetches the public key with the
+reader account and checks the fingerprint before writing the file.
 `debian/rules` refuses to build without it, or with any other fingerprint.
 
 ### Repository checks

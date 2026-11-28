@@ -58,7 +58,7 @@ def sha256sum(args):
     return 0
 
 
-QUERY = re.compile(r"Name \(= ([^)]+)\), \$Version \(= ([^)]+)\), \$Architecture \(= ([^)]+)\)\Z")
+PACKAGE_REF = re.compile(r"[^_]+_[^_]+_[^_]+\Z")
 
 
 def aptly(args):
@@ -80,7 +80,17 @@ def aptly(args):
         return state["repos"].setdefault(name, [])
 
     command = args[:2]
-    if command == ["repo", "add"]:
+    if command == ["repo", "create"]:
+        name, base = args[2], args[5]
+        refs = next(s["refs"] for s in state["snapshots"] if s["name"] == base)
+        state["repos"][name] = list(refs)
+        save()
+    elif command == ["repo", "drop"]:
+        if args[2] != "-force":
+            fail("fake aptly: dropping a snapshot's source repo requires -force")
+        del state["repos"][args[3]]
+        save()
+    elif command == ["repo", "add"]:
         refs = repo(args[2])
         for path in args[3:]:
             deb = delivery.Deb(path)
@@ -101,10 +111,9 @@ def aptly(args):
         for key in sorted(refs):
             print(f"  {key}")
     elif command == ["repo", "remove"]:
-        match = QUERY.fullmatch(args[3])
-        if not match:
-            fail(f"fake aptly: unsupported query {args[3]!r}")
-        key = "_".join(match.groups())
+        key = args[3]
+        if not PACKAGE_REF.fullmatch(key):
+            fail(f"fake aptly: unsupported package reference {key!r}")
         refs = repo(args[2])
         if key in refs:
             refs.remove(key)
@@ -132,6 +141,8 @@ def aptly(args):
         if not args[2].startswith("-gpg-key="):
             fail("fake aptly: publish switch must name the signing key")
         distribution, name = args[3], args[4]
+        if os.environ.get("FAKE_SWITCH_FAIL"):
+            fail("fake aptly: switch failed")
         if not any(s["name"] == name for s in state["snapshots"]):
             fail(f"ERROR: snapshot {name} not found")
         state["published"][distribution] = name

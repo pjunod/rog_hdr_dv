@@ -28,7 +28,7 @@ SNAPSHOT_STAMP = re.compile(r"\d{8}T\d{6}Z\Z")
 
 ENTRY_FIELDS = {"source", "project", "class", "binaries", "architectures",
                 "shadows_ubuntu", "version", "series", "reconcile_with",
-                "multiarch_same", "binary_versions", "kernel", "note"}
+                "multiarch_same", "binary_architectures", "binary_versions", "kernel", "note"}
 REQUIRED_ENTRY_FIELDS = {"source", "project", "class", "binaries",
                          "architectures", "shadows_ubuntu", "version"}
 
@@ -136,6 +136,13 @@ def validate(manifest, root=None):
                 errors.append(f"{where}: reconcile_with must be a path under patches/ or packaging/")
             elif root is not None and not (Path(root) / value).exists():
                 errors.append(f"{where}: reconcile_with {value} does not exist")
+        if "binary_architectures" in entry:
+            by_binary = entry["binary_architectures"]
+            if (not isinstance(by_binary, dict) or not by_binary
+                    or not set(by_binary) <= set(entry["binaries"])
+                    or not all(_string_list(values) and len(set(values)) == len(values)
+                               and set(values) <= set(arches) for values in by_binary.values())):
+                errors.append(f"{where}: binary_architectures must map listed binaries to listed architectures")
         if "multiarch_same" in entry:
             pairs = entry["multiarch_same"]
             if (not _string_list(pairs) or not set(pairs) <= set(entry["binaries"])
@@ -178,6 +185,10 @@ def validate(manifest, root=None):
 
 def binary_index(manifest):
     return {name: entry for entry in manifest["packages"] for name in entry["binaries"]}
+
+
+def binary_architectures(entry, name):
+    return entry.get("binary_architectures", {}).get(name, entry["architectures"])
 
 
 def unpublished_reasons(manifest):

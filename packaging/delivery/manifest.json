@@ -42,7 +42,36 @@
       "shadows_ubuntu": true,
       "version": "51.0-1ubuntu3+nativehdr17",
       "series": "patches/ubuntu-mutter",
-      "note": "Built by packaging/ubuntu/build.sh and installed from the Forgejo registry, not as a local package. The ROG has gir1.2-mutter-51, libmutter-51-0, mutter, mutter-common and mutter-common-bin installed."
+      "note": "Built by packaging/ubuntu/build.sh and installed from the Forgejo registry, not as a local package. The ROG has gir1.2-mutter-51, libmutter-51-0, mutter, mutter-common and mutter-common-bin installed.",
+      "binary_architectures": {
+        "gir1.2-mutter-51": [
+          "amd64"
+        ],
+        "libmutter-51-0": [
+          "amd64"
+        ],
+        "libmutter-51-dev": [
+          "amd64"
+        ],
+        "libmutter-test-51": [
+          "amd64"
+        ],
+        "mutter": [
+          "amd64"
+        ],
+        "mutter-51-tests": [
+          "amd64"
+        ],
+        "mutter-common": [
+          "all"
+        ],
+        "mutter-common-bin": [
+          "amd64"
+        ],
+        "mutter-dev-bin": [
+          "amd64"
+        ]
+      }
     },
     {
       "source": "libdisplay-info",
@@ -103,7 +132,18 @@
         "libavcodec62"
       ],
       "reconcile_with": "patches/ubuntu-ffmpeg-system-dv",
-      "note": "Partial source: libavutil60, libswresample6, libswscale9 and ffmpeg stay Ubuntu's 7:8.1.2-2ubuntu2, and libavfilter11 pins libavutil60 (= 7:8.1.2-2ubuntu2) exactly. Only libavcodec62 has an i386 build."
+      "note": "Partial source: libavutil60, libswresample6, libswscale9 and ffmpeg stay Ubuntu's 7:8.1.2-2ubuntu2, and libavfilter11 pins libavutil60 (= 7:8.1.2-2ubuntu2) exactly. Only libavcodec62 has an i386 build.",
+      "binary_architectures": {
+        "libavdevice62": [
+          "amd64"
+        ],
+        "libavfilter11": [
+          "amd64"
+        ],
+        "libavformat62": [
+          "amd64"
+        ]
+      }
     },
     {
       "source": "gst-libav1.0",
@@ -191,7 +231,27 @@
       ],
       "shadows_ubuntu": true,
       "version": "4.24.1+ds-1+rogdv6",
-      "reconcile_with": "patches/ubuntu-gtk4-display-target"
+      "reconcile_with": "patches/ubuntu-gtk4-display-target",
+      "binary_architectures": {
+        "gir1.2-gtk-4.0": [
+          "amd64"
+        ],
+        "gtk-update-icon-cache": [
+          "amd64"
+        ],
+        "libgtk-4-1": [
+          "amd64"
+        ],
+        "libgtk-4-bin": [
+          "amd64"
+        ],
+        "libgtk-4-common": [
+          "all"
+        ],
+        "libgtk-4-dev": [
+          "amd64"
+        ]
+      }
     },
     {
       "source": "glycin",
@@ -290,14 +350,17 @@
       "project": "rog_hdr_dv",
       "class": "imported",
       "binaries": [
+        "libmpv-dev",
+        "libmpv2",
         "mpv"
       ],
       "architectures": [
         "amd64"
       ],
       "shadows_ubuntu": true,
-      "version": "0.42.0-0ubuntu0+rogdv5.7+depfix2",
-      "reconcile_with": "patches/mpv-fel-system-dv"
+      "version": "0.42.0-0ubuntu0+rogdv5.8",
+      "reconcile_with": "patches/mpv-fel-system-dv",
+      "note": "All three binaries are in the interim registry. Only mpv is installed on the ROG."
     },
     {
       "source": "rust-gst-plugin-gtk4",
@@ -459,7 +522,7 @@
         "amd64"
       ],
       "shadows_ubuntu": false,
-      "version": "0.5.6-1",
+      "version": "0.5.7-1",
       "note": "Built and released by the plurx repository."
     },
     {
