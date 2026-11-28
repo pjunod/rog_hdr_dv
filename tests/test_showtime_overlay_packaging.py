@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: MIT
 """Showtime source/packaging boundary controls.
 
-Set SHOWTIME_PINNED_PLAY and SHOWTIME_PINNED_MPRIS to the exact upstream files.
+Set SHOWTIME_PINNED_PLAY to the exact upstream play.py. The test reads its
+sibling mpris.py unless SHOWTIME_PINNED_MPRIS names a separate fixture.
 """
 import hashlib
 import importlib.util
@@ -26,18 +27,27 @@ class ShowtimeOverlayPackaging(unittest.TestCase):
         fixture = os.environ.get('SHOWTIME_PINNED_PLAY')
         if not fixture:
             raise AssertionError('SHOWTIME_PINNED_PLAY must name authenticated upstream Showtime 50.0 play.py')
-        cls.upstream = Path(fixture).read_bytes()
-        mpris_fixture = os.environ.get('SHOWTIME_PINNED_MPRIS')
-        if not mpris_fixture:
-            raise AssertionError('SHOWTIME_PINNED_MPRIS must name authenticated upstream Showtime 50.0 mpris.py')
-        cls.upstream_mpris = Path(mpris_fixture).read_bytes()
+        play = Path(fixture)
+        try:
+            cls.upstream = play.read_bytes()
+        except OSError as error:
+            raise AssertionError(f'Cannot read Showtime play.py from SHOWTIME_PINNED_PLAY at {play}') from error
         provenance = json.loads((FOLDER / 'package-inputs/provenance.json').read_text())['showtime']
         cls.series = provenance['source_series']
         cls.mpris_series = provenance['mpris_series']
         if hashlib.sha256(cls.upstream).hexdigest() != cls.series['upstream_play_sha256']:
-            raise AssertionError('upstream Showtime fixture does not match the pinned source')
+            raise AssertionError(f'Showtime play.py at {play} does not match the pinned upstream source')
+        override = os.environ.get('SHOWTIME_PINNED_MPRIS')
+        mpris = Path(override) if override else play.resolve().with_name('mpris.py')
+        try:
+            cls.upstream_mpris = mpris.read_bytes()
+        except OSError as error:
+            raise AssertionError(
+                f'Cannot read Showtime mpris.py at {mpris}. '
+                'Set SHOWTIME_PINNED_MPRIS if the authenticated fixture is stored separately.'
+            ) from error
         if hashlib.sha256(cls.upstream_mpris).hexdigest() != cls.mpris_series['upstream_mpris_sha256']:
-            raise AssertionError('upstream Showtime MPRIS fixture does not match the pinned source')
+            raise AssertionError(f'Showtime mpris.py at {mpris} does not match the pinned upstream source')
 
     def workspace(self, root):
         for label, name in [('gtk', 'source'), ('showtime', 'showtime-50.0')]:

@@ -251,8 +251,10 @@ The [behavior control](../packaging/gstreamer-gtk-dovi/probes/showtime-precision
 executes the prepared consumer caps branch through a real filter and linked
 mapper queries, including overlay/plain domains, format/memory refusals and
 the ordinary non-Dolby path. These focused checks cover package regressions
-and caps negotiation; they are separate from playback. Source/package replay
-controls require the authenticated upstream file in `SHOWTIME_PINNED_PLAY`.
+and caps negotiation; they are separate from playback. For source/package
+replay controls, set `SHOWTIME_PINNED_PLAY` to the authenticated upstream
+`play.py`. The controls also verify its sibling `mpris.py` against the pinned
+source hash. Set `SHOWTIME_PINNED_MPRIS` if the fixtures are stored separately.
 Patch and support-file hashes are recorded in the scoped
 [SHA256SUMS](../packaging/gstreamer-gtk-dovi/SHA256SUMS); imported patch bytes
 remain unchanged.
