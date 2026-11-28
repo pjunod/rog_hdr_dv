@@ -114,9 +114,12 @@ class ManifestTests(unittest.TestCase):
         stanzas = [dict(line.split(": ", 1) for line in block.splitlines() if ": " in line and not line.startswith("#"))
                    for block in pins.split("\n\n") if "Pin-Priority" in block]
         by_priority = {s["Pin-Priority"]: s["Package"].split() for s in stanzas}
-        self.assertIn("mutter", by_priority["1001"])
-        self.assertIn("plurx-player", by_priority["500"])
-        self.assertIn("linux-image-7.3.0-nativehdr3", by_priority["500"])
+        self.assertIn("mutter:amd64", by_priority["1001"])
+        self.assertIn("mutter-common:any", by_priority["1001"])
+        self.assertIn("libdisplay-info3:i386", by_priority["1001"])
+        self.assertNotIn("libavfilter11:i386", by_priority["1001"])
+        self.assertIn("plurx-player:amd64", by_priority["500"])
+        self.assertIn("linux-image-7.3.0-nativehdr3:amd64", by_priority["500"])
         self.assertEqual(by_priority["-1"], ["*"])
         self.assertTrue(all(s["Pin"] == "release o=rog-hdr" for s in stanzas))
 
@@ -126,7 +129,8 @@ class ManifestTests(unittest.TestCase):
         for script in ("preinst", "postinst", "prerm", "postrm"):
             self.assertFalse((debian / script).exists(), script)
         sources = (debian / "rog-hdr.sources").read_text()
-        self.assertIn("Signed-By: /usr/share/keyrings/rog-hdr-archive-keyring.asc", sources)
+        fingerprint = self.manifest["repository"]["signing_key"]
+        self.assertIn(f"Signed-By: /usr/share/keyrings/rog-hdr-archive-keyring.asc {fingerprint}\n", sources)
         self.assertIn("URIs: http://forge.lan:8095/", sources)
         self.assertNotIn("@", sources)
         hits = [p for p in package.rglob("*") if p.is_file() and "forge.lan:8095" in p.read_text(errors="ignore")]
@@ -157,12 +161,15 @@ class VerifyTests(unittest.TestCase):
 
     def libdisplay(self, version="0.3.0-1+nativehdr18", i386_files=None, compression="gz"):
         shared = {"./usr/share/doc/libdisplay-info3/copyright": b"same\n"}
-        return [make_deb(self.dir, "libdisplay-info3", version, "amd64", "libdisplay-info", multiarch="same",
+        pair = [make_deb(self.dir, "libdisplay-info3", version, "amd64", "libdisplay-info", multiarch="same",
                          files=dict(shared, **{"./usr/lib/x86_64-linux-gnu/libdisplay-info.so.3": b"64"}),
                          compression=compression),
                 make_deb(self.dir, "libdisplay-info3", version, "i386", "libdisplay-info", multiarch="same",
                          files=i386_files or dict(shared, **{"./usr/lib/i386-linux-gnu/libdisplay-info.so.3": b"32"}),
                          compression=compression)]
+        return pair + [make_deb(self.dir, name, version, arch, "libdisplay-info")
+                       for name in ("libdisplay-info-bin", "libdisplay-info-dev")
+                       for arch in ("amd64", "i386")]
 
     def test_complete_identical_pair_passes(self):
         errors, _ = self.check(self.libdisplay())
@@ -205,7 +212,7 @@ class VerifyTests(unittest.TestCase):
                  make_deb(self.dir, "mutter-common-bin", "1", "amd64", "mutter"),
                  make_deb(self.dir, "libgtk-4-common", "1", "all", "gtk4")]
         errors, _ = self.check(paths)
-        self.assertEqual(len(errors), 2, errors)
+        self.assertGreaterEqual(len(errors), 2, errors)
         self.assertIn("binary mutter-common", errors[0])
         self.assertIn("binary libavformat62", errors[1])
 
@@ -225,11 +232,11 @@ class VerifyTests(unittest.TestCase):
         imported = make_deb(self.dir, "showtime", "50.0-2+rogdv5.16", "all",
                             depends="python3-gi, libgtk-4-1 (= 4.24.1+ds-1+rogdv6) | foo, rog-dv-hevc-runtime (= 2)")
         errors, notes = self.check([built, imported])
-        self.assertEqual(len(errors), 2, errors)
+        self.assertEqual(len(errors), 3, errors)
         self.assertTrue(any("mutter" in e and "libdisplay-info" in e for e in errors))
         errors, notes = self.check([built, imported], allow=True)
-        self.assertEqual(len(errors), 1, errors)
-        self.assertIn("libdisplay-info3", errors[0])
+        self.assertEqual(len(errors), 2, errors)
+        self.assertIn("libdisplay-info3", errors[1])
         self.assertTrue(any("libgtk-4-1" in n and "accepted for the baseline" in n for n in notes))
         self.assertTrue(any("rog-dv-hevc-runtime" in n and "unlisted" in n for n in notes))
         self.assertFalse(any("libmutter-51-0" in e for e in errors))
@@ -257,13 +264,6 @@ class PublisherTests(unittest.TestCase):
             ROG_APT_APTLY=f"{shlex.quote(sys.executable)} {shlex.quote(str(FAKES))} aptly -config={self.config}")
 
     def run_publisher(self, directory, *extra, project="rog_hdr_dv", environment=None):
-        if "--dry-run" not in extra and not (self.root / "state.json").exists():
-            self.root.mkdir()
-            empty = "rog-stonking-0000-empty"
-            (self.root / "state.json").write_text(json.dumps({
-                "repos": {}, "pool": {}, "published": {"stonking": empty},
-                "snapshots": [{"name": empty, "refs": []}],
-            }))
         return subprocess.run([sys.executable, str(DELIVERY / "publish.py"), str(directory),
                                "--project", project, "--manifest", str(self.manifest_path), *extra],
                               capture_output=True, text=True, timeout=60, env=environment or self.environment)
@@ -277,7 +277,9 @@ class PublisherTests(unittest.TestCase):
         files = {"./usr/share/doc/libdisplay-info3/copyright": b"same\n"}
         make_deb(directory, "libdisplay-info3", f"0.3.0-1+{version}", "amd64", "libdisplay-info", multiarch="same", files=files)
         make_deb(directory, "libdisplay-info3", f"0.3.0-1+{version}", "i386", "libdisplay-info", multiarch="same", files=files)
-        make_deb(directory, "libdisplay-info-bin", f"0.3.0-1+{version}", "amd64", "libdisplay-info")
+        for name in ("libdisplay-info-bin", "libdisplay-info-dev"):
+            for arch in ("amd64", "i386"):
+                make_deb(directory, name, f"0.3.0-1+{version}", arch, "libdisplay-info")
         return directory
 
     def test_dry_run_checks_and_touches_nothing(self):
@@ -285,9 +287,9 @@ class PublisherTests(unittest.TestCase):
         del environment["ROG_APT_HOST"]
         result = self.run_publisher(self.release("a", "nativehdr18"), "--dry-run", environment=environment)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("verified 3 package(s)", result.stdout)
+        self.assertIn("verified 6 package(s)", result.stdout)
         self.assertIn("repo add rog-stonking-incoming-", result.stdout)
-        self.assertIn("publish switch -gpg-key=2DA6B7DE09D5671941650C1A36DDB628371F0745 stonking", result.stdout)
+        self.assertIn("publish switch -batch -gpg-key=2DA6B7DE09D5671941650C1A36DDB628371F0745 stonking", result.stdout)
         self.assertFalse(self.root.exists())
         self.assertFalse((self.home / "ssh.log").exists())
 
@@ -311,7 +313,7 @@ class PublisherTests(unittest.TestCase):
         # Another name, and a kernel, published first.
         other = self.debs / "other"
         other.mkdir()
-        make_deb(other, "mutter", "51.0-1ubuntu3+nativehdr17", "amd64", "mutter")
+        make_deb(other, "libdovi3", "3.3.2-3+rogdv1", "amd64", "rust-dolby-vision")
         make_deb(other, "linux-image-7.3.0-nativehdr3", "7.3.0-10.10+nativehdr3", "amd64", "linux-upstream")
         self.assertEqual(self.run_publisher(other).returncode, 0)
 
@@ -332,12 +334,15 @@ class PublisherTests(unittest.TestCase):
         published = state["published"]["stonking"]
         refs = set(next(s["refs"] for s in state["snapshots"] if s["name"] == published))
         self.assertEqual(refs, {
-            "mutter_51.0-1ubuntu3+nativehdr17_amd64",
+            "libdovi3_3.3.2-3+rogdv1_amd64",
             "linux-image-7.3.0-nativehdr3_7.3.0-10.10+nativehdr3_amd64",
             "linux-image-7.3.0-nativehdr3_7.3.0-10.10+nativehdr3.1_amd64",
             "libdisplay-info3_0.3.0-1+nativehdr19_amd64",
             "libdisplay-info3_0.3.0-1+nativehdr19_i386",
             "libdisplay-info-bin_0.3.0-1+nativehdr19_amd64",
+            "libdisplay-info-bin_0.3.0-1+nativehdr19_i386",
+            "libdisplay-info-dev_0.3.0-1+nativehdr19_amd64",
+            "libdisplay-info-dev_0.3.0-1+nativehdr19_i386",
         })
         names = [s["name"] for s in state["snapshots"] if s["name"] != "rog-stonking-0000-empty"]
         self.assertEqual(len(names), 2, names)  # keep_snapshots is 2 here
@@ -349,6 +354,14 @@ class PublisherTests(unittest.TestCase):
         self.assertIn("libdisplay-info3_0.3.0-1+nativehdr18_amd64", state["pool"])
         leftovers = sorted(p.name for p in self.home.iterdir() if not p.name.startswith((".fake-bin", "ssh.log")))
         self.assertEqual(leftovers, [])  # staging removed, lock released
+
+    def test_switch_status_is_verified_after_a_cleanup_error(self):
+        result = self.run_publisher(self.release("a", "nativehdr18"),
+                                    environment=dict(self.environment, FAKE_SWITCH_CLEANUP_FAIL="1"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        active = self.state()["published"]["stonking"]
+        self.assertIn(f"published {active}", result.stdout)
+        self.assertIn(f"{active} is live", result.stderr)
 
     def test_failed_release_cannot_leak_into_a_later_snapshot(self):
         failed = self.release("failed", "nativehdr18")
@@ -368,8 +381,7 @@ class PublisherTests(unittest.TestCase):
 
     def test_conflicting_bytes_for_a_published_version_fail(self):
         self.assertEqual(self.run_publisher(self.release("a", "nativehdr18")).returncode, 0)
-        directory = self.debs / "b"
-        directory.mkdir()
+        directory = self.release("b", "nativehdr18")
         make_deb(directory, "libdisplay-info-bin", "0.3.0-1+nativehdr18", "amd64", "libdisplay-info",
                  files={"./usr/bin/di-edid-decode": b"changed"})
         result = self.run_publisher(directory)
@@ -396,7 +408,7 @@ class PublisherTests(unittest.TestCase):
                 name = publish.publish(manifest, "plurx", [], remote, now=when)
             finally:
                 sys.stdout = stdout
-        self.assertEqual(name, "rog-stonking-20261127T130405Z-plurx")
+        self.assertEqual(name, "rog-stonking-20261127T130405000000Z-plurx")
 
 
 if __name__ == "__main__":

@@ -94,6 +94,23 @@ def verify(manifest, project, debs, allow_baseline_exact=False):
         seen[key] = deb
         accepted.append((deb, entry))
 
+    # A built source is published as one release because its binaries can
+    # depend on sibling binaries at exactly the same version.
+    built = {}
+    for deb, entry in accepted:
+        if entry["class"] == "built":
+            built.setdefault(entry["source"], []).append((deb, entry))
+    for source, items in sorted(built.items()):
+        entry = items[0][1]
+        expected = {(name, arch) for name in entry["binaries"]
+                    for arch in delivery.binary_architectures(entry, name)}
+        present = {(deb.name, deb.architecture) for deb, _ in items}
+        if missing := sorted(expected - present):
+            errors.append(f"{source}: incomplete built release, missing "
+                          + ", ".join(f"{name}:{arch}" for name, arch in missing))
+        if len({deb.version for deb, _ in items}) != 1:
+            errors.append(f"{source}: built release has mixed versions")
+
     # Multi-Arch: same completeness and shared-file identity.
     by_name = {}
     for deb, entry in accepted:
@@ -223,24 +240,43 @@ def publish(manifest, project, debs, remote, now=None):
         finally:
             remote.aptly("repo", "drop", "-force", local_repo)
 
-        remote.aptly("publish", "switch", f"-gpg-key={repo['signing_key']}", distribution, snapshot)
+        switch_options = ["-batch", f"-gpg-key={repo['signing_key']}"]
+        try:
+            remote.aptly("publish", "switch", *switch_options, distribution, snapshot)
+        except RuntimeError as switch_error:
+            try:
+                active = published_snapshot(remote, distribution, component)
+            except RuntimeError as status_error:
+                raise RuntimeError(f"publication outcome unknown for {snapshot}; "
+                                   f"verify the active snapshot before retrying: {status_error}") from switch_error
+            if active != snapshot:
+                raise
+            print(f"warning: {snapshot} is live but aptly reported an error: {switch_error}",
+                  file=sys.stderr)
         print(f"{'would publish' if remote.dry_run else 'published'} {snapshot}")
 
-        if not remote.dry_run:
-            pattern = re.compile(re.escape(prefix) + r"-(\d{8}T\d{6}(?:\d{6})?)Z-[a-z0-9_-]+\Z")
-            ours = sorted((m.group(1).ljust(21, "0"), name)
-                          for name in remote.aptly("snapshot", "list", "-raw").split()
-                          if (m := pattern.fullmatch(name)))
-            for _, name in ours[:-keep]:
-                if name != snapshot:
-                    remote.aptly("snapshot", "drop", name)
-                    print(f"dropped snapshot {name}")
-            remote.aptly("db", "cleanup")
-        else:
+        if remote.dry_run:
             print(f"would keep the newest {keep} {prefix}-<timestamp>-<project> snapshots and clean the pool")
+        else:
+            try:
+                prune_snapshots(remote, prefix, keep, snapshot)
+            except RuntimeError as exc:
+                print(f"warning: {snapshot} is live; retention cleanup failed: {exc}", file=sys.stderr)
     finally:
         remote.run(["rmdir", LOCK])
     return snapshot
+
+
+def prune_snapshots(remote, prefix, keep, active):
+    pattern = re.compile(re.escape(prefix) + r"-(\d{8}T\d{6}(?:\d{6})?)Z-[a-z0-9_-]+\Z")
+    ours = sorted((match.group(1).ljust(21, "0"), name)
+                  for name in remote.aptly("snapshot", "list", "-raw").split()
+                  if (match := pattern.fullmatch(name)))
+    for _, name in ours[:-keep]:
+        if name != active:
+            remote.aptly("snapshot", "drop", name)
+            print(f"dropped snapshot {name}")
+    remote.aptly("db", "cleanup")
 
 
 def prepare_snapshot(remote, local_repo, snapshot, debs, index):

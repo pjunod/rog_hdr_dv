@@ -172,6 +172,12 @@ lab3 now serves an empty published repository; no machine uses it yet.
 | Web server | Ubuntu's nginx on port 8095 only (the stock default site removed), serving `/srv/aptly/data/public` with basic authentication; `www-data` reads the tree through the `aptly` group |
 | Reader | One user, `rog-apt-reader`, in `/etc/nginx/rog-apt.htpasswd` (root:www-data 0640). The password is kept in the operator's secret store as `rog-apt-reader`, never in Git |
 
+The current lab endpoint uses plain HTTP. Signatures authenticate the
+index and package hashes. For HTTP, the APT auth entry must match the
+scheme explicitly with `machine http://<repository-host>:8095/`.
+Before serving private packages, the migration must verify access
+through an encrypted transport.
+
 Anonymous requests get 401. An authenticated fetch of `dists/stonking/InRelease`
 returns the signed release with `Origin: rog-hdr`.
 
@@ -252,6 +258,8 @@ The host comes only from the environment; the repository never names it.
 it contacts the host, when any of these fails:
 
 - the binary name is not listed, or its entry belongs to another project;
+- a source built by this repository is missing a listed binary or combines
+  multiple versions in the same release;
 - its `Source` is not the entry's source, or its architecture is not listed;
 - a name or architecture appears twice;
 - a `multiarch_same` pair is incomplete;
@@ -278,7 +286,8 @@ notes. Those names are Ubuntu binaries or virtual ABI names such as
 
 A failure before step 5 leaves the live snapshot in place. The next
 release starts from that live snapshot, so a failed candidate cannot ride
-along with a later release.
+along with a later release. If the switch reports an error, the publisher
+checks which snapshot is live before reporting the outcome.
 
 A crashed run leaves the lock `~/.rog-apt-publish.lock` behind. The next run then refuses to start until someone removes the lock by hand.
 
@@ -300,7 +309,8 @@ packaging/delivery/pins.py --check   # what scripts/check_repository.py enforces
 
 It has no maintainer scripts, so it runs no apt, and it installs no credential.
 
-The key file is checked in. `fetch-key.py` fetches the public key with the
+The key file is checked in, and the source stanza restricts APT to the
+approved fingerprint. `fetch-key.py` fetches the public key with the
 reader account and checks the fingerprint before writing the file.
 `debian/rules` refuses to build without it, or with any other fingerprint.
 

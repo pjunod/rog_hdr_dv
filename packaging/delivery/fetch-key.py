@@ -31,6 +31,11 @@ def repository_url():
     raise SystemExit(f"{SOURCES}: no URIs line")
 
 
+class RejectRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--url", default=None, help="repository base URL")
@@ -44,7 +49,8 @@ def main():
     request = urllib.request.Request(f"{base}/rog-hdr-archive-keyring.asc")
     token = base64.b64encode(f"{args.user}:{password}".encode()).decode()
     request.add_header("Authorization", f"Basic {token}")
-    with urllib.request.urlopen(request, timeout=30) as response:
+    opener = urllib.request.build_opener(RejectRedirect)
+    with opener.open(request, timeout=30) as response:
         armored = response.read().decode("ascii")
     expected = delivery.load_manifest()["repository"]["signing_key"]
     actual = delivery.openpgp_fingerprint(armored)

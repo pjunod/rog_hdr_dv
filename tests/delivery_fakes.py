@@ -69,8 +69,11 @@ def aptly(args):
         fail("fake aptly needs -config=")
     root = Path(json.loads(Path(config).read_text())["rootDir"])
     state_file = root / "state.json"
+    empty = "rog-stonking-0000-empty"
     state = json.loads(state_file.read_text()) if state_file.exists() else {
-        "repos": {}, "pool": {}, "snapshots": [], "published": {}}
+        "repos": {}, "pool": {}, "published": {"stonking": empty},
+        "snapshots": [{"name": empty, "refs": []}],
+    }
 
     def save():
         root.mkdir(parents=True, exist_ok=True)
@@ -138,16 +141,18 @@ def aptly(args):
         state["snapshots"] = [s for s in state["snapshots"] if s["name"] != name]
         save()
     elif command == ["publish", "switch"]:
-        if not args[2].startswith("-gpg-key="):
+        if args[2] != "-batch" or not args[3].startswith("-gpg-key="):
             fail("fake aptly: publish switch must name the signing key")
-        distribution, name = args[3], args[4]
+        distribution, name = args[4], args[5]
         if os.environ.get("FAKE_SWITCH_FAIL"):
             fail("fake aptly: switch failed")
         if not any(s["name"] == name for s in state["snapshots"]):
             fail(f"ERROR: snapshot {name} not found")
         state["published"][distribution] = name
-        state["signing_key"] = args[2].split("=", 1)[1]
+        state["signing_key"] = args[3].split("=", 1)[1]
         save()
+        if os.environ.get("FAKE_SWITCH_CLEANUP_FAIL"):
+            fail("fake aptly: cleanup after switch failed")
     elif command == ["publish", "show"]:
         name = state["published"].get(args[2])
         if name is None:
