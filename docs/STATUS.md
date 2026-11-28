@@ -195,35 +195,19 @@ candidate run both seeks reached the exact timestamp, and the frozen
 evaluator attributed the viewport difference to GTK client state changed
 by the target round trip. A full-redraw diagnostic then eliminated the
 entire delta and matched normal A2, isolating GTK's damage-dependent path.
-A separate Profile 5 diagnostic completed both held triplets with a
-prospective capture boundary. The full cohort and a GTK source correction
-remain open. The updated runner passed the complete Profile 5 case on
-independent replay. It then stopped on a Profile 7 provider log message
-before evaluating the clipped capture. A private GTK diagnostic applied
-nearest sampling to the exact unit-grid resolve and reproduced the
-original 8,544-pixel difference. The next diagnostic checks the
-intermediate image before the resolve, where the recorded damage
-rectangles produce different image sizes.
-The next browser-only run completed the Profile 7 capture, which passed
-all seven phases on independent replay. The run stopped
-at the Profile 8 loop case when the prospective capture proof could
-not establish that an intervening decoder record was read-ahead. Nine
-later cases remained unattempted, and the same-boot cohort evaluation
-remains unqualified.
-The subsequent run bound the decoder's timestamp diagnostic to the
-actual read-ahead frame before capture. The Profile 8 loop seek and
-Profile 8 source-switch captures each passed all seven phases on
-independent replay. The run stopped in the following Profile 7
-source-switch case before restored capture. Seven later cases
-remain unattempted.
-After correcting two embedded startup digests, a fresh run passed the
-four source-switch cases on independent replay. Eight of twelve cases
-have now passed, covering 50 phases. The current stop is Profile 7
-Clip 20, whose action did not produce the required full
-enhancement-layer proof. Three later clip cases went unattempted.
+A private GTK diagnostic then applied nearest sampling to the unit-grid
+resolve and reproduced the 8,544-pixel difference. A private build is ready
+to compare selected intermediate texels before that resolve.
+
+The paired browser cohort passed all twelve cases and 54 phases on
+November 28. The final window captured four clip cases and independently
+replayed eight retained cases in the same boot. The evaluator verified
+the package and reference pins and clean teardown. The earlier full
+three-phase run still failed, and Showtime caption/target acceptance and
+release qualification remain open.
 [Focused follow-up](RUNTIME_ACCEPTANCE_CORRECTIONS.md#focused-follow-up).
 
-The exact eight-package follow-up is installed: WebKit/JavaScriptCore
+The earlier eight-package follow-up installed WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.
 Forward and inverse simulations passed with eight changes and no removals;
@@ -240,7 +224,8 @@ its application/resources are byte identical. Fresh WebKit source replay
 matches 34,395 paths and modes. The original twenty-eight-case v8 captures
 remain intact. All ten installed-browser core cases now qualify, retaining
 seven initial passes and correcting only three capture analyses without
-recapture. The source/seek transition cohort remains separate. Normal Showtime
+recapture. The source/seek transition cohort has its own same-boot evaluation.
+Normal Showtime
 also removes and restores a paused subtitle with exact image restoration and
 unchanged mapped-video samples. Detailed caption geometry/colour and HDR-target
 acceptance are still in progress. [Bounded core qualification](../evidence/ubuntu-browser-core-20261120.json).
@@ -263,7 +248,7 @@ only exact dependency controls changed. The policy fast lane now qualifies
 The earlier 17 GStreamer cases, 24 API assertions and nineteen native WebKit
 cases retain their actual tested versions and limits. Scoped priority-999
 preferences protect the installed fallback; the existing Mutter 15 local
-exception remains. Publication and normal installed runtime acceptance are
+exception remains. Publication and final installed Showtime acceptance are
 pending. Both installed ordinary-image controls passed once: F16 A/B import
 and a single failed import retaining A before source-bound SHM recovery to B.
 Their actual WebProcess engine was i915; NVIDIA-specific and optical coverage

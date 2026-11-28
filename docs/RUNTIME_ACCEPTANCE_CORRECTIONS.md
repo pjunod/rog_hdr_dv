@@ -396,7 +396,7 @@ then stopped in the Profile 8 loop case when the pre-capture boundary
 could not prove that an intervening decoder record was read-ahead.
 Nine later cases remained unattempted. The browser
 controller was evaluated in the launch boot and all owned processes were
-reaped. The cohort remains unqualified.
+reaped. That run left the cohort unqualified.
 
 The Profile 8 stop came from a decoder timestamp diagnostic immediately
 followed on the same decoder thread by the actual frame record. The audited
@@ -429,7 +429,17 @@ cleared the submission when the decoder forwarded the pending seek
 segment downstream between finishing the frame and pushing it. Three
 later clip cases went unattempted. The aggregate analyzer also rejected
 regular fixture files as unexpected extraction directories. Independent
-replay has passed eight of twelve cases, covering 50 phases. The cohort
-remains unqualified.
+replay passed eight of twelve cases and 50 phases at that point.
 
-Publication awaits runtime qualification. [Current status](STATUS.md).
+The final controller linked the Clip 20 submission through the exact
+pending seek segment to the decoder output and full enhancement-layer
+mapper result. Rate changes and other conflicting decoder activity still
+fail the proof. The analyzer distinguished regular fixture exchange
+files from extraction directories. All four fresh clips passed, and the
+same-boot evaluator also replayed the eight retained captures through
+their exact analyzers. The paired browser result is twelve of twelve
+cases and 54 passing phases with clean teardown. The ten earlier
+installed-browser core checks retain their separate receipt.
+
+Showtime caption/target acceptance and package release remain open.
+[Current status](STATUS.md).

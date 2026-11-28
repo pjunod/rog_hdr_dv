@@ -177,8 +177,9 @@ retains its historical 69-method checkpoint; the
 Authenticated replay, normal compile/package builds, independent review,
 affected fast lane, forward/inverse rehearsal and the exact host installation
 are complete. Scoped priority-999 fallback protection is installed; the
-existing Mutter 15 local exception is preserved. Publication and mirror
-verification, loaded-library checks and normal sandboxed browser/GStreamer
-runtime acceptance remain pending. Preserve the desktop session and rollback
-packages. Optical calibration and panel cadence remain outside software-only
-acceptance.
+existing Mutter 15 local exception is preserved. The twelve paired
+sandboxed browser cases passed evaluation in one boot. Showtime
+caption/target qualification, final installed-package verification and
+whole-family publication remain pending. Preserve the desktop session
+and rollback packages. Optical calibration and panel cadence remain
+outside software-only acceptance.
