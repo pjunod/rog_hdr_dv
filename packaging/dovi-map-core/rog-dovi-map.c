@@ -1060,6 +1060,10 @@ static int render_destination (rog_dovi_mapper *s, const struct source *in,
       }
     }
   }
+  if (profile5 && !apply_dovi) {
+    fail (s, error, ROG_DOVI_FAILURE_CONTENT, "Profile 5 cannot use ordinary base-layer color conversion");
+    goto done;
+  }
   if (!apply_dovi && !(flags & ROG_DOVI_MAP_BASELINE_ON_DECLINE)) { success = true; goto done; }
   if (apply_dovi) {
     source.dovi_rpu = raw;

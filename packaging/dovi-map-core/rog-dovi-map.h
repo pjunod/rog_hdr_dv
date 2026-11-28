@@ -15,9 +15,9 @@
  *   AVCOL_* enums); chroma_location uses FFmpeg's AVChromaLocation values.
  * - One mapper is used by one thread at a time. Different mappers may be used
  *   concurrently; they share one Vulkan device per render node.
- * - Results: 1 mapped; 0 declined (the output holds nothing unless the caller
- *   asked for ROG_DOVI_MAP_BASELINE_ON_DECLINE; never returned for Profile 5);
- *   -1 failure, *error set to a static string. */
+ * - Results: 1 mapped; 0 declined (no output unless the caller asked for
+ *   ROG_DOVI_MAP_BASELINE_ON_DECLINE; never returned for Profile 5); -1
+ *   failure, *error set to a static string. */
 #ifndef ROG_DOVI_MAP_H
 #define ROG_DOVI_MAP_H
 #include <stddef.h>
@@ -167,8 +167,22 @@ struct rog_dovi_output {
   struct rog_dovi_dmabuf_plane planes[4];   /* out */
 };
 
-/* Render the ordinary interpretation of a picture that is not mapped into the
- * output and still return 0 (the GTK element's baseline re-encoding). */
+/* What a declined Profile 8 (or Profile 7) picture produces.
+ *
+ * Flag set (the GTK element): the core renders the picture's ordinary
+ * interpretation, as its decoder declared it, into the output in the
+ * destination's encoding (BT.2020/PQ for DISPLAY_PQ, sRGB for the SDR
+ * destination) and returns 0 with the output filled. The element reports
+ * this as its result 2, "baseline re-encoded to the negotiated output".
+ *
+ * Flag unset (Firefox): the core returns 0 with no output. A host output's
+ * acquire callback is not called, or its memory is left unwritten when the
+ * decline is found after acquisition; a DMABuf output has num_planes 0 and no
+ * fds. The caller presents its own decoded picture.
+ *
+ * Profile 5 never has an ordinary interpretation: with or without the flag,
+ * a Profile 5 picture is mapped (1) or fails (-1, failure class
+ * ROG_DOVI_FAILURE_CONTENT), and no output is produced for a failure. */
 #define ROG_DOVI_MAP_BASELINE_ON_DECLINE 1u
 
 /* Decline reasons (rog_dovi_map_last_decline bits). */
