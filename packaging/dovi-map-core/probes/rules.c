@@ -241,6 +241,10 @@ static void dmabuf_bounds_rules (void)
       !mapper->vk, "out-of-bounds picture fails before any import");
   rog_dovi_mapper_free (mapper);
   close (fd);
+  char path[64];
+  struct stat null_st;
+  require (!stat ("/dev/null", &null_st) && !node_path ((uint64_t) null_st.st_rdev, path, sizeof (path)),
+      "a node that is not a /dev/dri render node is refused");
 }
 
 static void decline_names (void)

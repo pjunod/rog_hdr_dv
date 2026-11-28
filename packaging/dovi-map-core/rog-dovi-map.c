@@ -28,7 +28,6 @@
 #include <libavutil/mem.h>
 #include <gbm.h>
 #include <drm_fourcc.h>
-#include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
@@ -772,19 +771,14 @@ error:
   return NULL;
 }
 
+/* The render node's path from the caller's dev_t, without scanning
+ * /dev/dri (a sandboxed caller may not list it): /dev/dri/renderD<minor>,
+ * accepted only if that path is the same character device. */
 static bool node_path (uint64_t node, char *path, size_t size)
 {
-  DIR *dir = opendir ("/dev/dri");
-  if (!dir) return false;
-  bool found = false;
-  for (struct dirent *e; !found && (e = readdir (dir));) {
-    if (strncmp (e->d_name, "renderD", 7)) continue;
-    snprintf (path, size, "/dev/dri/%s", e->d_name);
-    struct stat st;
-    found = !stat (path, &st) && S_ISCHR (st.st_mode) && (uint64_t) st.st_rdev == node;
-  }
-  closedir (dir);
-  return found;
+  snprintf (path, size, "/dev/dri/renderD%u", minor ((dev_t) node));
+  struct stat st;
+  return !stat (path, &st) && S_ISCHR (st.st_mode) && (uint64_t) st.st_rdev == node;
 }
 
 static bool list_has (const uint64_t *list, uint32_t n, uint64_t value)
@@ -806,8 +800,12 @@ static pl_tex allocate_output (rog_dovi_mapper *s, struct rog_dovi_output *out,
   if (!fmt || !(fmt->caps & PL_FMT_CAP_RENDERABLE) || !(gpu->import_caps.tex & PL_HANDLE_DMA_BUF) ||
       !out->modifiers || !out->num_modifiers) return NULL;
   if (!s->gbm) {
-    char path[288];
-    if (!s->output_node || !node_path (s->output_node, path, sizeof (path))) return NULL;
+    char path[64];
+    if (!s->output_node || !node_path (s->output_node, path, sizeof (path))) {
+      logf_ (ROG_DOVI_LOG_ERROR, "output node %u:%u is not a /dev/dri render node",
+          major ((dev_t) s->output_node), minor ((dev_t) s->output_node));
+      return NULL;
+    }
     s->gbm_fd = open (path, O_RDWR | O_CLOEXEC);
     if (s->gbm_fd < 0) return NULL;
     s->gbm = gbm_create_device (s->gbm_fd);
