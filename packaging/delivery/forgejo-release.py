@@ -53,6 +53,7 @@ def release_commit(api, request, tag, missing_ok=False):
             commit = json.load(response)["commit"]["sha"]
     except HTTPError as error:
         if error.code == 404 and missing_ok:
+            error.close()
             return None
         raise
     if not re.fullmatch(r"[a-f0-9]{40}", commit):
@@ -171,6 +172,7 @@ def attach(manifest, project, directory, revision, server, token):
     except HTTPError as error:
         if error.code != 404:
             raise
+        error.close()
         data = {"tag_name": tag, "target_commitish": revision, "name": tag, "body": body,
                 "draft": True, "prerelease": True}
         with request(f"{api}/releases", "POST", json.dumps(data).encode()) as response:

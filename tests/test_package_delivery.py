@@ -152,10 +152,10 @@ class ReleaseIntakeTests(unittest.TestCase):
                 return io.BytesIO(b'{"private":true}')
             if url == f"{api}/tags/{self.tag}":
                 if draft:
-                    raise HTTPError(url, 404, "not published", {}, None)
+                    raise HTTPError(url, 404, "not published", {}, io.BytesIO())
                 return io.BytesIO(json.dumps({"commit": {"sha": commit}}).encode())
             if url == self.release_url:
-                raise HTTPError(url, 404, "no release", {}, None)
+                raise HTTPError(url, 404, "no release", {}, io.BytesIO())
             if url == f"{api}/releases" and method == "POST":
                 request_body = json.loads(request.data)
                 self.assertEqual(request_body["target_commitish"], commit)
