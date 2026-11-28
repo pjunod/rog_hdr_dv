@@ -58,16 +58,8 @@ GstGtkDoviMapper *gst_gtk_dovi_mapper_new (void)
   }
   rog_dovi_map_set_log (core_log, NULL, core_log_level ());
   GstGtkDoviMapper *s = g_new0 (GstGtkDoviMapper, 1);
-  /* No render node: libplacebo's default device, as this element always used.
-   * The device is kept for the process. Destroying the last one let the
-   * Vulkan loader unload the NVIDIA driver, whose EGL library leaves an exit
-   * handler registered: a process that had created and destroyed a device
-   * crashed in that unmapped handler at exit (installed rogdv12, two mappers
-   * in turn, 10 of 20 runs), and the same unload once released WebKit's
-   * current EGL context. A kept device is never unloaded. */
-  const struct rog_dovi_mapper_params params = {.struct_size = sizeof (params),
-      .flags = ROG_DOVI_MAPPER_KEEP_DEVICE};
-  s->core = rog_dovi_mapper_new (&params);
+  /* No render node: libplacebo's default device, as this element always used. */
+  s->core = rog_dovi_mapper_new (NULL);
   if (!s->core) { g_free (s); return NULL; }
   return s;
 }
