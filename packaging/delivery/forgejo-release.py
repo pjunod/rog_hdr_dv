@@ -3,7 +3,6 @@
 
 import argparse
 import hashlib
-import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,7 +12,7 @@ import sys
 import tempfile
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode, urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 from uuid import uuid4
 
 import delivery
@@ -35,7 +34,7 @@ def project_release_api(manifest, project, server, token):
         raise ValueError("ROG_APT_FORGEJO_URL must name the Forgejo server")
     if origin.scheme != "https" and origin.hostname not in ("localhost", "127.0.0.1", "::1"):
         raise ValueError("Forgejo access requires HTTPS or a local endpoint on an authenticated tunnel")
-    opener = build_opener(RefuseRedirects())
+    opener = build_opener(RefuseRedirects(), ProxyHandler({}))
 
     def request(url, method="GET", payload=None, mime="application/json"):
         actual = urlsplit(url)
