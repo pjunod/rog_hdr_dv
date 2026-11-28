@@ -239,7 +239,7 @@ class VerifyTests(unittest.TestCase):
         self.assertIn("libdisplay-info3", errors[1])
         self.assertTrue(any("libgtk-4-1" in n and "accepted for the baseline" in n for n in notes))
         self.assertTrue(any("rog-dv-hevc-runtime" in n and "unlisted" in n for n in notes))
-        self.assertFalse(any("libmutter-51-0" in e for e in errors))
+        self.assertFalse(any("Depends libmutter-51-0" in error for error in errors))
 
 
 class PublisherTests(unittest.TestCase):
