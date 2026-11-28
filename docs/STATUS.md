@@ -210,6 +210,12 @@ at the Profile 8 loop case when the prospective capture proof could
 not establish that an intervening decoder record was read-ahead. Nine
 later cases remained unattempted, and the same-boot cohort evaluation
 remains unqualified.
+The subsequent run bound the decoder's timestamp diagnostic to the
+actual read-ahead frame before capture. The Profile 8 loop seek and
+Profile 8 source-switch captures each passed all seven phases on
+independent replay. The run stopped in the following Profile 7
+source-switch case before restored capture. Seven later cases
+remain unattempted.
 [Focused follow-up](RUNTIME_ACCEPTANCE_CORRECTIONS.md#focused-follow-up).
 
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore

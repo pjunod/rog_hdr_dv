@@ -370,7 +370,7 @@ passed the counter check and captured the seek, clipped seek, restored
 seek and base phases of the first Profile 5 case. At the original-source
 restoration, normal upstream decoding continued after the selected visible
 picture. The held-picture verifier rejected that activity. The rerun
-produced no qualified case. The other eleven cases remain unattempted.
+produced no qualified case and left the other eleven cases unattempted.
 An offline prototype records the capture boundary before the screenshot
 request and retains strict decoder and mapper checks from that boundary
 through the held phases. It passed six synthetic controls. A fresh
@@ -385,17 +385,28 @@ The twelve-case rerun with the prospective proof captured all seven Profile
 each phase. The cohort stopped in the next case, during the held Profile 7
 clip. The trace shows an exact same-picture redraw preceded by the provider's
 full-enhancement-layer success message. The strict parser rejected that
-message before it could evaluate the redraw. Ten later cases remain
-unattempted. Keep the verified Profile 5 result and the failed Profile 7
-receipt together when rerunning the affected cases.
+message before it could evaluate the redraw. Ten later cases went
+unattempted in that run. The verified Profile 5 result and the failed
+Profile 7 receipt are both retained.
 
 The next browser-only run recognized the Profile 7 provider message only
 when it preceded the bound same-thread, same-picture native redraw. The
 Profile 7 capture passed all seven phases on independent replay. The run
-then stopped in the Profile 8 loop case. The
-pre-capture boundary could not prove that an intervening decoder record was
-future-frame lookahead. Nine later cases remained unattempted. The browser
+then stopped in the Profile 8 loop case when the pre-capture boundary
+could not prove that an intervening decoder record was read-ahead.
+Nine later cases remained unattempted. The browser
 controller was evaluated in the launch boot and all owned processes were
 reaped. The cohort remains unqualified.
+
+The Profile 8 stop came from a decoder timestamp diagnostic immediately
+followed on the same decoder thread by the actual frame record. The audited
+decoder source computes that diagnostic from the same frame's PTS and DTS.
+The updated pre-capture proof binds those records and verifies that the
+actual decoded frame is ahead of the visible picture. The strict held
+interval still rejects decoder activity. Both the Profile 8 loop seek and
+Profile 8 source change passed all seven phases on independent replay. The
+run stopped in the subsequent Profile 7 source-switch case on a mapper
+record before the restored capture. Seven later cases were unattempted.
+The same-boot evaluator reported an unqualified cohort and clean teardown.
 
 Publication awaits runtime qualification. [Current status](STATUS.md).
