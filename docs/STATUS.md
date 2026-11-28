@@ -1,15 +1,28 @@
 # Status — what is working and what remains
 
-**November 27, 2026 — One APT repository for every project package: design accepted, nothing deployed.**
-Only Mutter and libdisplay-info reach the ROG through APT; 54 of our packages there were
-installed from local `.deb` files, so `apt upgrade` never updates them. The owner asked for
-the repository to be the standard way every package is delivered. After an independent
-review, the owner accepted the design: aptly on lab3 publishing atomic snapshots under its own
-key and Origin, read by a machine account; one publisher that holds the only write credential;
-a pin generated from a manifest; no exact cross-source pins; kernels through APT with no meta
-package. Not started: the baseline import and the migration.
+**November 27, 2026 — package delivery through APT is expanding.**
+The interim Forgejo registry delivers Mutter, libdisplay-info, mpv
+`+rogdv5.8` and plurx Player `0.5.7-1`. The planned authenticated aptly
+repository serves an empty signed snapshot. The delivery manifest, publisher,
+pin generator and `rog-apt-config` are in development. Baseline import,
+project CI publishing and migration of the ROG remain open.
 [Design, phases and decisions](PACKAGE_DELIVERY.md).
-Phase 2 built: the manifest (28 sources from the ROG's inventory), the publisher, the pin generator and `rog-apt-config`; tested against a fake aptly only, and nothing published ([phase 2](PACKAGE_DELIVERY.md#manifest-and-publisher-phase-2-november-27)).
+
+**November 27, 2026 — the renderer tells a full enhancement layer from a minimal one; installed.**
+plurx Player's EL pill could say FEL or MEL only after the server's whole-title
+scan, although the renderer decides per frame. Patch 0012 of `mpv-fel-system-dv`
+(`+rogdv5.8`) adds `enhancement-layer-nlq-active` to `native-dovi-target-state`:
+libplacebo's own NLQ decision for the presented, composed frame (true: FEL;
+false: MEL). In private-compositor runs, one MEL title to end of file and the FEL
+and other MEL title through 71% and 84% each reported only their own kind, so plurx Player 0.5.7's pill follows
+the level and keeps the server's scan as a cross-check. `+rogdv5.8` was built on
+the ROG; its relations and files equal the installed `+rogdv5.7+depfix2`. It was
+installed on the ROG through the project APT channel (forge Debian registry),
+not with dpkg; audit and verify are clean, rollback is `+rogdv5.7+depfix2`.
+plurx Player 0.5.7-1 followed through the same channel (rollback 0.5.6-1). The
+attended visual check is the owner's.
+[Design and limits](SYSTEM_DOLBY_VISION.md#one-system-mpv-for-native-launchers)
+· [Receipt](../evidence/mpv-el-nlq-level-20261127.json).
 
 **November 26, 2026 — Dolby titles with a default PGS subtitle track start in Showtime; installed on the ROG.**
 Full Dolby titles whose default subtitle track is PGS never started in
@@ -1182,6 +1195,7 @@ Mutter and matching amd64/i386 library packaging.
 | General colour quality | Audit complete; input defects fixed (nativehdr5); HLG and BT.2390 highlight mapping (nativehdr6); gamut compression (nativehdr7); all reviewed with fast lanes passed | Output characterization (contract defined; needs a measurement, see [HDR mapping](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured)), SDR/HDR consistency and cross-application checks; optical verification (the owner's visual check passed) |
 | Exact-panel tuning | Four factory profiles inspected privately | Obtain measurement equipment and measure this unit, then implement the [output-characterization contract](HDR_MAPPING.md#output-characterization--defined-deferred-until-measured) |
 | Applications | Shared platform path first | Qualify independent consumers; Plurx integration belongs in its separate repository |
+| Browser Dolby Vision | WebKitGTK is patched to put the shared Dolby mapper at the head of its page video sink ([browser change](WEBKIT_NATIVE_HDR.md)). Firefox: effort recorded on 2026-11-27, not started. Chromium: scoped only | **To do, not started:** a Chromium renderer. Scope, costs and the check to make first are in [Chromium renderer](SYSTEM_DOLBY_VISION.md#chromium-renderer--to-do-not-started) |
 
 The owner has no colourimeter or spectrophotometer yet and is open to obtaining
 one. Software work continues independently. Define the measurement procedure
