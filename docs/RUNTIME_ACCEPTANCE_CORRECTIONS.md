@@ -1,6 +1,6 @@
 # Runtime acceptance corrections — caption mask, first-presentation attribution, seek references
 
-**State: implemented, reviewed and frozen; not run · November 27, 2026.** This page
+**State: implemented, reviewed and frozen. Runtime acceptance remains open as of November 28, 2026.** This page
 corrects the three harness defects behind the failed November 20 Showtime
 caption/target attempt and the incomplete browser source/seek cohort
 ([recovery record](UBUNTU_UPDATE_RECOVERY.md#ordinary-video-colour-correction-after-restoration),
@@ -292,15 +292,110 @@ because the painter's first mapper render never completed.
 - the browser's VA decoder errors, which occur at teardown and also occurred
   in the passing November 20 run.
 
-The common failure is a fresh mapper's first render, after GPU setup and
-before the Dolby provider runs. The mapper gives libplacebo no logger, so the
-failing step is unnamed. The next step is a diagnostics-only mapper build
-that routes those messages and per-step reasons to its debug log.
+A diagnostics-only mapper build then forwarded libplacebo's log and identified
+the failures before the Dolby provider ran. Showtime failed at
+`vkCreateDevice` with `VK_ERROR_INITIALIZATION_FAILED`. The browser reported
+`VK_ERROR_OUT_OF_DEVICE_MEMORY`. Concurrent measurements held about 10.8 GiB
+of the 12 GiB GPU. The runtime attempts from that window are invalid.
 
-## Remaining order
+The owner chose to restore the package set used by freeze r4. The mapper and
+core returned to `0.1.0+rogdv11`, with the sink at `+depfix2` and Showtime
+at `+depfix3`. Package audit and verification passed after rollback. The
+November 28 controller retains the r4 package and model bindings and uses
+fresh run names. Its before/after GPU snapshots record the environment for
+each run. The existing acceptance and retry rules still determine the verdict.
 
-1. **Owner test window:** run the attribution phase, then caption/target
-   acceptance with the frozen v2 mask, then the source/seek cohort and the
-   loaded-library check.
-2. Record the results in [status](STATUS.md) and the recovery record, then
-   continue with merge review, the fast lane and publication.
+## November 28 frozen rerun
+
+The headless suite ran in the launch boot with freeze r4 and the restored
+packages. Twenty-seven installed package versions matched the frozen
+manifests and passed package verification. The GPU had 11,888 MiB free
+at launch. The six before/after observations reported 70–81 MiB in use.
+The controller exited after 83 seconds with clean GNOME and browser
+supervisor cleanup.
+
+| Check | Result |
+|---|---|
+| First-presentation attribution | The runner completed its capture sequence. The evaluator rejected the comparison because the original and fresh player PTS differed by 31 ns despite matching mapper RGB hashes at 616 nits. No attribution was assigned. The completed run was ineligible for the predeclared retry. |
+| Caption and target restore | All seven captures were produced. Restored A3 matched the original mapper hash, PTS and sink instance. The frozen exact viewport comparison found 8,544 of 921,600 pixels changed by one RGB10 code, so qualification stopped at the restore assertion. |
+| Paired browser cases | The first Profile 5 case stopped before the explicit seek because the page reported zero played frames through `getVideoPlaybackQuality()`. Its media clock advanced 1.752 s, the last frame callback reported 49 presented frames, and the mapper logged Profile 5 output. The proof produced no qualified capture. Eleven cases remained unattempted, so the paired analyzer could not evaluate the cohort. |
+
+### Focused follow-up
+
+**Showtime seek.** The installed player omitted the loaded track identifier
+from MPRIS metadata. The runner read position in whole microseconds and
+issued a relative seek. Showtime added that offset to its nanosecond
+position. The two seeks reached GStreamer at 30 s plus 54 ns and 30 s plus
+23 ns, before demuxing or mapping. The staged `+rogdv5.16` package reports
+the loaded track and performs integer absolute seeks for that track through
+the normal MPRIS interface. The build and focused source replay checks
+passed. Simulated upgrade and rollback each changed only Showtime. In the
+private diagnostic, both player instances used `SetPosition` and emitted
+exact 30-second seek and segment stream times. Their mapped frames shared
+the same raw PTS, 30.125 s. The lab's installed package stayed at `+depfix3`.
+[MPRIS SetPosition](https://specifications.freedesktop.org/mpris/latest/Player_Interface.html#Method:SetPosition).
+
+**Viewport restore.** Attribution A to A2 and acceptance A to A3 produced
+identical signed pixel deltas across the full capture. Both had the stable
+mapper output recorded within their own player instance. Captioned A2 and
+restored A3 match exactly. Above the caption, both also match the
+uncaptioned captures. The original first presentation differs in this
+region. The isolated absolute-seek run passed the frozen evaluator's
+premises and selected row 3 of the decision table. Fresh A equals the
+original A, and both differ from post-roundtrip A2 by the same 8,544
+one-code changes. The evaluator attributes the difference to GTK client
+state changed by the target round trip. A second private run forced
+full damage in the GTK client as a diagnostic. The Wayland trace recorded
+80 full-surface damage commits. The pre- and post-roundtrip viewports
+matched exactly across all 921,600 pixels and both matched normal A2.
+This isolates the damage-dependent rendering path. A production correction
+must preserve normal damage tracking.
+
+A private GTK build then used nearest sampling on the exact unit-grid
+resolve to the PQ surface. The trace recorded 97 nearest resolves for
+the full video rectangle. Original A, fresh A and restored A2 each
+matched its normal-sampler capture byte for byte, including all 8,544
+changed viewport pixels. This rules out the final resolve's linear
+sampling as the cause. The Wayland commits show that A resolves a
+1,280 × 720 intermediate at (0, 40), while A2 resolves a 1,280 × 800
+intermediate at (0, 0). A sparse raw readback of device-matched texels
+can identify whether their values already differ before that resolve.
+
+**Browser playback counter.** With the installed GStreamer, synthetic
+appsink and fakesink controls both reported 14 rendered frames while
+playing and zero after pausing. The corrected fixture captures the count
+and media clock while playing, then pauses before the explicit seek.
+The positive frame and time checks still apply. The browser-only rerun
+passed the counter check and captured the seek, clipped seek, restored
+seek and base phases of the first Profile 5 case. At the original-source
+restoration, normal upstream decoding continued after the selected visible
+picture. The held-picture verifier rejected that activity. The rerun
+produced no qualified case. The other eleven cases remain unattempted.
+An offline prototype records the capture boundary before the screenshot
+request and retains strict decoder and mapper checks from that boundary
+through the held phases. It passed six synthetic controls. A fresh
+Profile 5 diagnostic completed both held triplets. It recorded two decoder
+activity records and two offscreen preparations before restored capture,
+then observed no decoder mutations during either held triplet. The original
+rerun lacks a prospective witness and remains failed. The single-case
+diagnostic grants no cohort qualification.
+
+The twelve-case rerun with the prospective proof captured all seven Profile
+5 phases. The frozen analyzer replayed that case independently and passed
+each phase. The cohort stopped in the next case, during the held Profile 7
+clip. The trace shows an exact same-picture redraw preceded by the provider's
+full-enhancement-layer success message. The strict parser rejected that
+message before it could evaluate the redraw. Ten later cases remain
+unattempted. Keep the verified Profile 5 result and the failed Profile 7
+receipt together when rerunning the affected cases.
+
+The next browser-only run recognized the Profile 7 provider message only
+when it preceded the bound same-thread, same-picture native redraw. The
+Profile 7 capture passed all seven phases on independent replay. The run
+then stopped in the Profile 8 loop case. The
+pre-capture boundary could not prove that an intervening decoder record was
+future-frame lookahead. Nine later cases remained unattempted. The browser
+controller was evaluated in the launch boot and all owned processes were
+reaped. The cohort remains unqualified.
+
+Publication awaits runtime qualification. [Current status](STATUS.md).

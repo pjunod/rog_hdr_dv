@@ -115,29 +115,73 @@ the mapper that is not yet attributed ([details](UBUNTU_UPDATE_RECOVERY.md#ordin
 On November 26 a source-derived caption mask v2, a staged attribution
 diagnostic and new browser seek-reference times (start 3/2 s) were designed.
 On November 27 all three were implemented, independently reviewed and frozen.
-They have not been run. Review moved the attribution diagnostic's anomalous
-capture to the seek presentation, and moved the p7 still case from 0.5 s to
-2 s; the 0.5 s p7 still picture is now uncovered
+Review moved the attribution diagnostic's anomalous capture to the seek
+presentation and moved the p7 still case from 0.5 s to 2 s. The 0.5 s p7
+still picture is now uncovered
 ([corrections](RUNTIME_ACCEPTANCE_CORRECTIONS.md)).
 
-**November 27 test window: nothing qualified.** The frozen runners were first
+**November 27 test window: invalid GPU environment.** The frozen runners were first
 re-bound to the installed packages (bad family and GTK Dolby at rogdv11, plus
 the sink and Showtime pin repacks). That re-freeze changed only paths, pins
 and versions.
 - **Both Showtime runs stopped on the first frame of the Profile 5 file.** The
   mapper reported its generic "mapping failed" error, so the first-picture
   test was invalid and was correctly not rerun.
-- **The browser cohort first exposed two harness defects, now fixed.** The
-  paired session holder had never matched its runner. The fix then made the
-  runtime path too long for WebKit's proxy sockets.
+- **The browser cohort exposed three harness defects, now fixed.** The
+  controller left the closed GNOME session directory in place, the paired
+  session holder did not match its runner, and the corrected runtime path
+  exceeded WebKit's proxy socket limit.
 - **The browser's first case then played no on-screen frames.** The painter's
   first mapper render never completed.
 
-A read-only diagnosis ruled out the Profile 7 change in the GTK Dolby mapper
-and the PR #76 subtitle change, whose decoder code is byte-identical. The
-common failure is a fresh mapper's first render, which fails before the Dolby
-provider runs. The mapper discards libplacebo's diagnostics, so the failing
-step is not named. A diagnostics-only mapper build awaits owner approval.
+A temporary diagnostics build named the first-render failures. Showtime
+reported `VK_ERROR_INITIALIZATION_FAILED` during device creation. The browser
+reported `VK_ERROR_OUT_OF_DEVICE_MEMORY`. Concurrent measurements occupied
+about 10.8 GiB of the 12 GiB GPU. The window supplies no runtime acceptance.
+The owner chose to restore the frozen `rogdv11` package set and rerun once
+the GPU is free. The rollback passed the package audit and verification.
+The reviewed rerun controller used freeze r4, fresh run names and before/after
+GPU observations. [Run history](RUNTIME_ACCEPTANCE_CORRECTIONS.md#november-27-runs).
+
+**November 28 frozen rerun: runtime acceptance remains open.** The GPU was
+clear at launch and all three phases ran in the same boot. The attribution
+runner captured its sequence, but the evaluator rejected a 31 ns timestamp
+difference between the original and fresh Showtime instances. At 616 nits
+their mapper pixel hashes matched. The caption run recovered the original
+mapper frame, but 8,544 of 921,600 viewport pixels changed by one RGB10 code
+after caption restore. The browser stopped on the first Profile 5 case before
+its explicit seek. The page's playback-quality counter stayed at zero while
+its frame callback reported 49 presented frames. The remaining eleven browser
+cases were unattempted. All owned supervisors reaped their children.
+[Same-boot results](RUNTIME_ACCEPTANCE_CORRECTIONS.md#november-28-frozen-rerun).
+
+The browser counter reset was reproduced with two GStreamer sinks, and the
+corrected fixture passed that check on the lab. The first case then stopped
+at its source-restoration proof because the decoder continued reading ahead.
+The Showtime timestamp difference came from a relative MPRIS seek. The
+staged `+rogdv5.16` package exposes the track identifier needed for an
+absolute seek. The build and exact APT simulations passed. In a private
+candidate run both seeks reached the exact timestamp, and the frozen
+evaluator attributed the viewport difference to GTK client state changed
+by the target round trip. A full-redraw diagnostic then eliminated the
+entire delta and matched normal A2, isolating GTK's damage-dependent path.
+A separate Profile 5 diagnostic completed both held triplets with a
+prospective capture boundary. The full cohort and a GTK source correction
+remain open. The updated runner passed the complete Profile 5 case on
+independent replay. It then stopped on a Profile 7 provider log message
+before evaluating the clipped capture. A private GTK diagnostic applied
+nearest sampling to the exact unit-grid resolve and reproduced the
+original 8,544-pixel difference. The next diagnostic checks the
+intermediate image before the resolve, where the recorded damage
+rectangles produce different image sizes.
+The next browser-only run completed the Profile 7 capture, which passed
+all seven phases on independent replay. The run stopped
+at the Profile 8 loop case when the prospective capture proof could
+not establish that an intervening decoder record was read-ahead. Nine
+later cases remained unattempted, and the same-boot cohort evaluation
+remains unqualified.
+[Focused follow-up](RUNTIME_ACCEPTANCE_CORRECTIONS.md#focused-follow-up).
+
 The exact eight-package follow-up is installed: WebKit/JavaScriptCore
 `2.52.6-1ubuntu1.1+rogdv9`, the five bad-family packages
 `1.28.6-1ubuntu1+rogdv10`, and Showtime `50.0-2+rogdv5.15`.
