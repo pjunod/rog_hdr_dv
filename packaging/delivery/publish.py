@@ -225,7 +225,7 @@ def published_snapshot(remote, distribution, component):
     raise RuntimeError(f"{distribution}/{component} is not published from a snapshot")
 
 
-def release_already_published(remote, local_repo, base, debs):
+def release_already_published(remote, local_repo, base, debs, release_hashes):
     """Check the entire receipt against the current snapshot under the writer lock."""
     present = repository_packages(remote, local_repo)
     unchanged = True
@@ -252,12 +252,12 @@ def release_already_published(remote, local_repo, base, debs):
             hashes = remote.aptly("snapshot", "search", "-format={{.SHA256}}", base, query).split()
             if len(hashes) != 1 or not re.fullmatch(r"[a-f0-9]{64}", hashes[0]):
                 raise RuntimeError(f"cannot verify the published hash of {deb.name}:{deb.architecture}")
-            if hashes[0] != sha256(deb.path):
+            if hashes[0] != release_hashes[deb.path.name]:
                 raise RuntimeError(f"{deb.name}:{deb.architecture} {version} differs from the published bytes")
     return unchanged
 
 
-def publish(manifest, project, debs, remote, now=None, require_release_receipt=False):
+def publish(manifest, project, debs, remote, now=None, release_hashes=None):
     repo = manifest["repository"]
     distribution, component = repo["distribution"], repo["component"]
     prefix, keep = repo["snapshot_prefix"], repo["keep_snapshots"]
@@ -271,13 +271,13 @@ def publish(manifest, project, debs, remote, now=None, require_release_receipt=F
         base = published_snapshot(remote, distribution, component)
         remote.aptly("repo", "create", local_repo, "from", "snapshot", base)
         try:
-            if require_release_receipt:
+            if release_hashes is not None:
                 if remote.dry_run:
                     print("would verify the release is newer than the active snapshot or an exact replay")
-                elif release_already_published(remote, local_repo, base, debs):
+                elif release_already_published(remote, local_repo, base, debs, release_hashes):
                     print(f"release already matches {base}")
                     return base
-            prepare_snapshot(remote, local_repo, snapshot, debs, index)
+            prepare_snapshot(remote, local_repo, snapshot, debs, index, release_hashes)
         finally:
             remote.aptly("repo", "drop", "-force", local_repo)
 
@@ -320,7 +320,7 @@ def prune_snapshots(remote, prefix, keep, active):
     remote.aptly("db", "cleanup")
 
 
-def prepare_snapshot(remote, local_repo, snapshot, debs, index):
+def prepare_snapshot(remote, local_repo, snapshot, debs, index, release_hashes=None):
     staging = remote.run(["mktemp", "-d", "rog-apt-incoming.XXXXXXXX"]).strip() or "rog-apt-incoming.DRYRUN"
     try:
         remote_paths = []
@@ -332,8 +332,10 @@ def prepare_snapshot(remote, local_repo, snapshot, debs, index):
             sums = remote.run(["sha256sum", "--"] + remote_paths)
             actual = {line.split()[1]: line.split()[0] for line in sums.splitlines() if line.strip()}
             for deb, destination in zip(debs, remote_paths):
-                if actual.get(destination) != sha256(deb.path):
-                    raise RuntimeError(f"uploaded {deb.path.name} does not match its local hash")
+                expected = (sha256(deb.path) if release_hashes is None
+                            else release_hashes[deb.path.name])
+                if actual.get(destination) != expected:
+                    raise RuntimeError(f"uploaded {deb.path.name} does not match its expected hash")
         remote.aptly("repo", "add", local_repo, *remote_paths)
     finally:
         remote.run(["rm", "-rf", "--", staging])
@@ -370,6 +372,7 @@ def verify_release_receipt(directory, paths, manifest, project, required=False):
     current = {path.name: sha256(path) for path in paths}
     if current != meta.get("package_sha256"):
         raise ValueError("package files differ from the verified release receipt")
+    return current
 
 
 def main():
@@ -393,7 +396,8 @@ def main():
         print(f"publish.py: no .deb in {args.directory}", file=sys.stderr)
         return 1
     try:
-        verify_release_receipt(directory, paths, manifest, args.project, args.require_release_receipt)
+        release_hashes = verify_release_receipt(directory, paths, manifest, args.project,
+                                               args.require_release_receipt)
     except (OSError, ValueError) as error:
         print(f"publish.py: {error}", file=sys.stderr)
         return 1
@@ -419,7 +423,8 @@ def main():
         return 2
     remote = Remote(host or "<ROG_APT_HOST>", dry_run=args.dry_run)
     try:
-        publish(manifest, args.project, debs, remote, require_release_receipt=args.require_release_receipt)
+        publish(manifest, args.project, debs, remote,
+                release_hashes=release_hashes if args.require_release_receipt else None)
     except RuntimeError as exc:
         print(f"publish.py: {exc}", file=sys.stderr)
         return 1

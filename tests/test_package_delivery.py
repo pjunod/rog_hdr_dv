@@ -387,6 +387,7 @@ class ReleaseReplayTests(unittest.TestCase):
         self.remote = Mock(dry_run=False)
         self.state = (f"Packages:\n plurx-player_{self.deb.version}_amd64\n")
         self.checksum = publish.sha256(self.deb.path)
+        self.receipt_hashes = {self.deb.path.name: self.checksum}
 
         def aptly(*args):
             if args[:2] == ("publish", "show"):
@@ -401,7 +402,7 @@ class ReleaseReplayTests(unittest.TestCase):
 
     def publish(self):
         return publish.publish(self.manifest, "plurx", [self.deb], self.remote,
-                               require_release_receipt=True)
+                               release_hashes=self.receipt_hashes)
 
     def assert_no_switch(self):
         self.assertFalse(any(call.args[:2] == ("publish", "switch")
@@ -431,6 +432,16 @@ class ReleaseReplayTests(unittest.TestCase):
         self.assertEqual(comparison[-2:], ["1:0.5.7-1", "2:0.5.1-1"])
         self.assert_no_switch()
         self.remote.upload.assert_not_called()
+
+    def test_staging_compares_upload_with_the_original_receipt_digest(self):
+        self.deb.path.write_bytes(self.deb.path.read_bytes() + b"replacement")
+        uploaded_hash = publish.sha256(self.deb.path)
+        remote_path = f"staging/{self.deb.path.name}"
+        self.remote.run.side_effect = ["staging", f"{uploaded_hash}  {remote_path}\n", ""]
+        with self.assertRaisesRegex(RuntimeError, "does not match its expected hash"):
+            publish.prepare_snapshot(self.remote, "repo", "snapshot", [self.deb], {},
+                                     self.receipt_hashes)
+        self.remote.aptly.assert_not_called()
 
     def test_newer_release_reaches_snapshot_preparation(self):
         self.state = "Packages:\n plurx-player_0.5.8-1_amd64\n"
