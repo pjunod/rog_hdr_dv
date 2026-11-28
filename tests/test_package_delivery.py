@@ -20,6 +20,7 @@ import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 DELIVERY = REPOSITORY / "packaging" / "delivery"
@@ -131,6 +132,52 @@ class ReleaseIntakeTests(unittest.TestCase):
         package.write_bytes(b"changed after receipt")
         with self.assertRaisesRegex(ValueError, "differ from the verified release receipt"):
             publish.verify_release_receipt(self.output, [package], delivery.load_manifest(), "plurx", required=True)
+
+
+    def test_attach_publishes_only_after_the_package_and_checksum_upload(self):
+        commit = "a" * 40
+        checksums = self.package.parent / "SHA256SUMS"
+        checksums.write_text(f"{publish.sha256(self.package)}  {self.package.name}\n")
+        calls = []
+        api = f"{self.server}/api/v1/repos/noirr/plurx"
+        uploads = []
+        draft = True
+
+        def response(request, timeout):
+            nonlocal draft
+            self.assertEqual(request.get_header("Authorization"), "token local-fixture")
+            url, method = request.full_url, request.get_method()
+            calls.append((method, url))
+            if url == api:
+                return io.BytesIO(b'{"private":true}')
+            if url == f"{api}/tags/{self.tag}":
+                if draft:
+                    raise HTTPError(url, 404, "not published", {}, None)
+                return io.BytesIO(json.dumps({"commit": {"sha": commit}}).encode())
+            if url == self.release_url:
+                raise HTTPError(url, 404, "no release", {}, None)
+            if url == f"{api}/releases" and method == "POST":
+                request_body = json.loads(request.data)
+                self.assertEqual(request_body["target_commitish"], commit)
+                self.assertTrue(request_body["draft"])
+                return io.BytesIO(json.dumps({"id": 1, "assets": [], **request_body}).encode())
+            if url.startswith(f"{api}/releases/1/assets?name=") and method == "POST":
+                uploads.append(url.rsplit("=", 1)[-1])
+                return io.BytesIO()
+            if url == f"{api}/releases/1" and method == "PATCH":
+                self.assertEqual(uploads, [self.package.name, "SHA256SUMS"])
+                self.assertEqual(json.loads(request.data), {"draft": False})
+                draft = False
+                return io.BytesIO()
+            self.fail(f"Unexpected fixture request {method} {url}")
+
+        with patch.dict(os.environ, FORGEJO_SHA=commit, FORGEJO_REPOSITORY="noirr/plurx"):
+            with patch.object(self.fetch, "build_opener") as opener:
+                opener.return_value.open.side_effect = response
+                self.fetch.attach(delivery.load_manifest(), "plurx", self.package.parent, commit,
+                                  self.server, "local-fixture")
+        self.assertFalse(draft)
+        self.assertEqual(calls[-1], ("GET", f"{api}/tags/{self.tag}"))
 
 
 class ManifestTests(unittest.TestCase):
