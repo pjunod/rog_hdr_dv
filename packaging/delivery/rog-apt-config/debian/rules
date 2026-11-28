@@ -1,0 +1,20 @@
+#!/usr/bin/make -f
+# The package installs three data files and has no maintainer scripts: it
+# runs no apt command and installs no credential.
+
+KEY = keyrings/rog-hdr-archive-keyring.asc
+CHECK_HOME = $(CURDIR)/debian/gnupg-check
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	@test -f $(KEY) || { echo "$(KEY) is missing: run packaging/delivery/fetch-key.py" >&2; exit 1; }
+	mkdir -p -m 0700 $(CHECK_HOME)
+	actual=$$(gpg --homedir $(CHECK_HOME) --show-keys --with-colons $(KEY) | awk -F: '$$1 == "fpr" { print $$10; exit }'); \
+	  expected=$$(cat debian/signing-key-fingerprint); \
+	  test "$$actual" = "$$expected" || { echo "$(KEY) is $$actual, expected $$expected" >&2; exit 1; }
+	rm -rf $(CHECK_HOME)
+
+override_dh_auto_clean:
+	rm -rf $(CHECK_HOME)

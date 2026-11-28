@@ -1,0 +1,200 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Claude Agent <claude-agent@invalid>
+Date: Fri, 27 Nov 2026 12:00:00 +0000
+Subject: [PATCH] fix(mpv): report whether the composed layer's NLQ is active
+
+enhancement-layer-composed is true for a full enhancement layer and,
+since libplacebo reports an exactly zero residual as reconstructed, for
+a minimal one too. A client that wants to name the layer had to wait for
+an external whole-title scan, although the renderer decides per frame.
+
+Add enhancement-layer-nlq-active to native-dovi-target-state. When the
+presenting renderer records a frame's composition, it also records
+libplacebo's own condition for sampling the layer's residual: an
+attached layer and repr.dovi's nlq_active, which pl_map_avdovi_metadata
+sets from FFmpeg's Dolby Vision metadata for that frame. The level is the
+covering frame's record and implies enhancement-layer-composed, so it
+follows the same frame, clears in the same places and notifies on
+every change. Nothing re-parses the RPU.
+---
+ DOCS/man/input.rst      | 21 ++++++++++++++++++---
+ player/command.c        |  1 +
+ video/out/vo.h          |  1 +
+ video/out/vo_gpu_next.c | 35 +++++++++++++++++++++++++++--------
+ 4 files changed, 47 insertions(+), 11 deletions(-)
+
+diff --git a/DOCS/man/input.rst b/DOCS/man/input.rst
+index 767923c..a3328e4 100644
+--- a/DOCS/man/input.rst
++++ b/DOCS/man/input.rst
+@@ -3899,8 +3899,9 @@ Property list
+ ``native-dovi-target-state``
+     Read-only native Dolby physical-target eligibility for the active
+     ``gpu-next`` output. Other outputs report this property unavailable.
+-    The map contains ``active`` (boolean), ``generation`` (integer) and
+-    ``enhancement-layer-composed`` (boolean). Generation changes when
++    The map contains ``active`` (boolean), ``generation`` (integer),
++    ``enhancement-layer-composed`` (boolean) and
++    ``enhancement-layer-nlq-active`` (boolean). Generation changes when
+     physical-target eligibility or its display revision changes. Notifications
+     follow those transitions, including paused redraws.
+ 
+@@ -3916,7 +3917,21 @@ Property list
+     paused after interpolation. When the renderer reads a frame without mapping
+     it, every frame of that render not yet attested is treated as not composed,
+     which can under-report next to such a frame. Each change sends a
+-    notification. It does not tell a full enhancement layer from a minimal one.
++    notification. A frame whose RPU enables an exactly zero residual (zero
++    dead-zone slope and threshold, as in a minimal enhancement layer) counts as
++    composed, since the base-layer reshape then is the complete reconstruction.
++
++    ``enhancement-layer-nlq-active`` is a level with the same frame, timing,
++    clearing and notification rules. It is true while
++    ``enhancement-layer-composed`` is true, the frame has an enhancement layer
++    attached, and libplacebo's mapping of the frame's Dolby Vision metadata
++    marked its non-linear quantization (NLQ) active: the conditions under which
++    the renderer samples the layer's residual (a full enhancement layer). It is
++    false for a composed frame whose NLQ libplacebo treats as the identity
++    (zero offset, slope and threshold, and a unit maximum: a minimal
++    enhancement layer), for one composed without an attached layer, and whenever
++    ``enhancement-layer-composed`` is false. It reports one frame at a time; a
++    title can mix both kinds.
+ 
+     Active eligibility alone does not prove that a picture was Dolby mapped.
+     A client reporting successful mapping must also match the generation in
+diff --git a/player/command.c b/player/command.c
+index d788b9f..704a568 100644
+--- a/player/command.c
++++ b/player/command.c
+@@ -3051,6 +3051,7 @@ static int mp_property_native_dovi_target_state(void *ctx, struct m_property *pr
+         {"active", SUB_PROP_BOOL(state.active)},
+         {"generation", SUB_PROP_INT64(state.generation)},
+         {"enhancement-layer-composed", SUB_PROP_BOOL(state.enhancement_layer_composed)},
++        {"enhancement-layer-nlq-active", SUB_PROP_BOOL(state.enhancement_layer_nlq_active)},
+         {0}
+     };
+     return m_property_read_sub(props, action, arg);
+diff --git a/video/out/vo.h b/video/out/vo.h
+index 6f236d0..073de29 100644
+--- a/video/out/vo.h
++++ b/video/out/vo.h
+@@ -162,6 +162,7 @@ struct voctrl_native_dovi_target_state {
+     bool active;
+     uint64_t generation;
+     bool enhancement_layer_composed;
++    bool enhancement_layer_nlq_active;
+ };
+ 
+ // VOCTRL_PERFORMANCE_DATA
+diff --git a/video/out/vo_gpu_next.c b/video/out/vo_gpu_next.c
+index 62eee9e..4f907e3 100644
+--- a/video/out/vo_gpu_next.c
++++ b/video/out/vo_gpu_next.c
+@@ -160,6 +160,9 @@ struct priv {
+     // the physical path with its enhancement layer composed
+     // (native-dovi-target-state's enhancement-layer-composed).
+     bool dovi_el_composed;
++    // Whether that frame's composition used libplacebo's active NLQ mapping
++    // (native-dovi-target-state's enhancement-layer-nlq-active).
++    bool dovi_el_nlq_active;
+     // The frames of the render in progress, so dovi_map can find its frame,
+     // and that render's serial.
+     const struct pl_frame_mix *dovi_mix;
+@@ -624,6 +627,9 @@ struct frame_priv {
+     // privately mapped with its enhancement layer composed. A mixer cache hit
+     // keeps the value from the render that read the frame.
+     bool dovi_el_composed;
++    // With dovi_el_composed: libplacebo mapped this frame's RPU with an active
++    // (non-identity) NLQ, so the composed residual came from the layer.
++    bool dovi_el_nlq_active;
+     uint64_t dovi_el_serial; // the render that last recorded it
+     // Optional Dolby Vision FEL.
+     struct ra_hwdec *el_hwdec;
+@@ -1271,7 +1277,7 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+         dv_provider387_reset(p->dovi_provider);
+         p->dovi_render_generation++;
+         p->dovi_display_signal_valid = p->dovi_physical_logged = false;
+-        p->dovi_el_composed = false;
++        p->dovi_el_composed = p->dovi_el_nlq_active = false;
+     }
+     p->dovi_physical_active = active;
+     p->dovi_physical_generation = generation;
+@@ -1279,12 +1285,16 @@ static void update_dovi_physical_target(struct priv *p, struct vo *vo,
+         vo_event(vo, VO_EVENT_WIN_STATE);
+ }
+ 
+-// Publish the level of native-dovi-target-state's enhancement-layer-composed.
+-static void set_dovi_el_composed(struct priv *p, struct vo *vo, bool composed)
++// Publish the levels of native-dovi-target-state's enhancement-layer-composed
++// and enhancement-layer-nlq-active. The second implies the first.
++static void set_dovi_el_composed(struct priv *p, struct vo *vo, bool composed,
++                                 bool nlq_active)
+ {
+-    if (composed == p->dovi_el_composed)
++    nlq_active = composed && nlq_active;
++    if (composed == p->dovi_el_composed && nlq_active == p->dovi_el_nlq_active)
+         return;
+     p->dovi_el_composed = composed;
++    p->dovi_el_nlq_active = nlq_active;
+     vo_event(vo, VO_EVENT_WIN_STATE);
+ }
+ 
+@@ -1313,6 +1323,13 @@ static void set_dovi_frame_el(struct priv *p, const uint8_t *rpu, bool composed)
+             struct mp_image *mpi = image->user_data;
+             struct frame_priv *fp = mpi->priv;
+             fp->dovi_el_composed = composed;
++            // libplacebo's own condition for sampling the layer's residual:
++            // an attached layer and an active NLQ in its mapping of the
++            // frame's Dolby Vision metadata. A composition from a provably
++            // zero residual alone does not meet it.
++            fp->dovi_el_nlq_active = composed && image->enhancement_layer &&
++                                     image->repr.dovi &&
++                                     image->repr.dovi->nlq_active;
+             fp->dovi_el_serial = p->dovi_render_serial;
+         }
+     }
+@@ -1327,7 +1344,7 @@ static void dovi_reset(void *priv)
+         struct mp_image *mpi = p->dovi_mix->frames[i]->user_data;
+         struct frame_priv *fp = mpi->priv;
+         if (fp->dovi_el_serial != p->dovi_render_serial)
+-            fp->dovi_el_composed = false;
++            fp->dovi_el_composed = fp->dovi_el_nlq_active = false;
+     }
+     dv_provider387_reset(p->dovi_provider);
+ }
+@@ -1693,7 +1710,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+             // next successful private map logs its record again.
+             p->dovi_physical_logged = false;
+             // Nothing from the new source has been mapped yet.
+-            set_dovi_el_composed(p, vo, false);
++            set_dovi_el_composed(p, vo, false, false);
+             p->last_pts = 0.0;
+             p->last_id = 0;
+             p->want_reset = false;
+@@ -1987,7 +2004,7 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+         switch (pl_queue_update(p->queue, &mix, &qparams)) {
+         case PL_QUEUE_ERR:
+             MP_ERR(vo, "Failed updating frames!\n");
+-            set_dovi_el_composed(p, vo, false);
++            set_dovi_el_composed(p, vo, false, false);
+             goto done;
+         case PL_QUEUE_EOF:
+             abort(); // we never signal EOF
+@@ -2071,7 +2088,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
+     const struct pl_frame *covering = render_ok ? dovi_covering_frame(&mix) : NULL;
+     const struct frame_priv *covering_fp = covering
+         ? ((const struct mp_image *) covering->user_data)->priv : NULL;
+-    set_dovi_el_composed(p, vo, covering_fp && covering_fp->dovi_el_composed);
++    set_dovi_el_composed(p, vo, covering_fp && covering_fp->dovi_el_composed,
++                         covering_fp && covering_fp->dovi_el_nlq_active);
+     if (!render_ok) {
+         MP_ERR(vo, "Failed rendering frame!\n");
+         goto done;
+@@ -2566,6 +2584,7 @@ static int control(struct vo *vo, uint32_t request, void *data)
+             .active = p->dovi_physical_active,
+             .generation = p->dovi_render_generation,
+             .enhancement_layer_composed = p->dovi_el_composed,
++            .enhancement_layer_nlq_active = p->dovi_el_nlq_active,
+         };
+         return VO_TRUE;
+     }

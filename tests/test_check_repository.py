@@ -282,6 +282,35 @@ class RepositoryIntegrityTests(unittest.TestCase):
         (self.root / "sources.json").write_bytes(b"\xff")
         self.rejected("Cannot read sources.json:")
 
+    def delivery_manifest(self):
+        path = self.root / "packaging/delivery/manifest.json"
+        return path, json.loads(path.read_text())
+
+    def test_delivery_binary_listed_twice_is_rejected(self):
+        path, manifest = self.delivery_manifest()
+        manifest["packages"][1]["binaries"].append(manifest["packages"][0]["binaries"][0])
+        path.write_text(json.dumps(manifest))
+        self.rejected("is listed by more than one source")
+
+    def test_delivery_pin_out_of_date_is_rejected(self):
+        path, manifest = self.delivery_manifest()
+        entry = next(e for e in manifest["packages"] if not e["shadows_ubuntu"])
+        entry["shadows_ubuntu"] = True
+        path.write_text(json.dumps(manifest))
+        self.rejected("preferences.d/rog-hdr differs from the manifest")
+
+    def test_delivery_schema_error_is_rejected(self):
+        path, manifest = self.delivery_manifest()
+        del manifest["packages"][0]["architectures"]
+        manifest["packages"][1]["class"] = "vendored"
+        path.write_text(json.dumps(manifest))
+        self.rejected("missing fields ['architectures']")
+        self.rejected("class must be one of")
+
+    def test_delivery_config_postinst_running_apt_is_rejected(self):
+        (self.root / "packaging/delivery/rog-apt-config/debian/postinst").write_text("#!/bin/sh\napt-get update\n")
+        self.rejected("must not run apt")
+
 
 if __name__ == "__main__":
     unittest.main()

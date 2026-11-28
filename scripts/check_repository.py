@@ -308,6 +308,54 @@ class Checker:
                 "scripts/check_repository.py --lock-ubuntu-series")
 
 
+    def package_delivery(self):
+        """The delivery manifest is valid, its binaries unique, and the
+        checked-in pin and key agree with it (docs/PACKAGE_DELIVERY.md)."""
+        directory = self.root / "packaging" / "delivery"
+        if not self.safe_path(directory / "delivery.py"):
+            return 0
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("rog_delivery", directory / "delivery.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        text = self.read(directory / "manifest.json")
+        if text is None:
+            return 0
+        try:
+            manifest = json.loads(text, object_pairs_hook=unique_object)
+        except (ValueError, RecursionError) as exc:
+            self.errors.append(f"Malformed packaging/delivery/manifest.json: {exc}")
+            return 0
+        problems = module.validate(manifest, root=self.root)
+        self.errors.extend(f"packaging/delivery/manifest.json: {p}" for p in problems)
+        if problems:
+            return 0
+        package = directory / "rog-apt-config"
+        pins = self.read(package / "preferences.d" / "rog-hdr")
+        if pins is not None and pins != module.generate_pins(manifest):
+            self.errors.append("packaging/delivery/rog-apt-config/preferences.d/rog-hdr differs from the "
+                               "manifest: run packaging/delivery/pins.py --write")
+        expected = manifest["repository"]["signing_key"]
+        recorded = self.read(package / "debian" / "signing-key-fingerprint")
+        if recorded is not None and recorded.strip() != expected:
+            self.errors.append("rog-apt-config/debian/signing-key-fingerprint differs from the manifest's signing_key")
+        key = package / "keyrings" / "rog-hdr-archive-keyring.asc"
+        if key.exists():
+            armored = self.read(key)
+            try:
+                actual = module.openpgp_fingerprint(armored or "")
+            except (ValueError, IndexError, KeyError) as exc:
+                self.errors.append(f"Unreadable repository key {self.label(key)}: {exc}")
+            else:
+                if actual != expected:
+                    self.errors.append(f"{self.label(key)} is {actual}, not the manifest's {expected}")
+        for script in ("preinst", "postinst", "prerm", "postrm"):
+            path = package / "debian" / script
+            if path.exists() and re.search(r"\bapt(-get)?\b", self.read(path) or ""):
+                self.errors.append(f"{self.label(path)} must not run apt")
+        return len(manifest["packages"])
+
+
 def main():
     checker = Checker(Path(__file__).resolve().parents[1])
     patches = checker.files_under(checker.root / "patches", ".patch")
@@ -315,13 +363,15 @@ def main():
     components = checker.sources(patches)
     checker.documentation()
     checker.ubuntu_revision(lock="--lock-ubuntu-series" in sys.argv[1:])
+    delivered = checker.package_delivery()
     if (checker.root / "upstream").is_dir():
         from check_upstream import check
         checker.errors.extend(check(checker.root))
     if checker.errors:
         print("\n".join(checker.errors), file=sys.stderr)
         return 1
-    print(f"PASS: {len(patches)} patches, {len(components)} series, documentation links")
+    print(f"PASS: {len(patches)} patches, {len(components)} series, documentation links, "
+          f"{delivered} delivery sources")
     return 0
 
 
