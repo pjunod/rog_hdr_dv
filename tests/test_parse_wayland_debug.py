@@ -19,6 +19,11 @@ def log(times, surface=7, fb_base=40, refresh=0, flags=0x7, queue=True,
         fb = fb_base + k % 3        # ids are reused, as libwayland does
         lines.append(f"[1234567.{k:03d}] {q} -> wp_presentation#5.feedback("
                      f"wl_surface#{surface}, new id wp_presentation_feedback#{fb})")
+        lines.append(f"[1234567.{k:03d}] {q} -> wl_surface#{surface}.attach(wl_buffer#{70 + k % 3}, 0, 0)")
+        lines.append(f"[1234567.{k:03d}] {q} -> wl_surface#{surface}.commit()")
+        # Mesa's empty FIFO-barrier commit, with feedback that repeats the picture
+        lines.append(f"[1234567.{k:03d}] {q} -> wp_presentation#5.feedback("
+                     f"wl_surface#{surface}, new id wp_presentation_feedback#{fb + 10})")
         lines.append(f"[1234567.{k:03d}] {q} -> wl_surface#{surface}.commit()")
         sec, nsec = int(when), round((when - int(when)) * 1e9)
         if discard_every and k % discard_every == 0:
@@ -60,6 +65,13 @@ class Parse(unittest.TestCase):
     def test_clock_time_prefix(self):
         lines = [l.replace("[1234567.", "[23:53:13.") for l in log([5000 + k / 24 for k in range(100)])]
         self.assertEqual(len(wl.parse(lines)[7]["presented"]), 100)
+
+    def test_empty_barrier_commits_not_counted(self):
+        times = [5000 + k / 24 for k in range(240)]
+        data = wl.parse(log(times))[7]
+        self.assertEqual(len(data["presented"]), 240)
+        self.assertEqual(data["commits"], 480)
+        self.assertEqual(len(data["buffer_commits"]), 240)
 
     def test_no_feedback_is_incomplete(self):
         lines = ["[1.000] {Default Queue}  -> wl_surface#7.commit()"]

@@ -116,6 +116,19 @@ def latched_flips(vblanks, planes):
     return flips
 
 
+def parse_trace_arms(lines, pipe="A"):
+    """(time, plane) of every plane arm on the pipe: when the compositor committed."""
+    arms = []
+    for line in lines:
+        match = LINE.match(line)
+        if match and match["event"] == "intel_plane_update_arm":
+            found = PIPE.search(match["body"])
+            plane = PLANE.search(match["body"])
+            if found and found["pipe"] == pipe:
+                arms.append((float(match["ts"]), plane["plane"].strip() if plane else "?"))
+    return arms
+
+
 def content_flips(flips, planes):
     """Drop flips whose commit touched only cursor planes (no new picture)."""
     kept, cursor_only, index = [], 0, 0
@@ -251,7 +264,8 @@ def decode_patterns(segments, calibration):
 
 def analyze(lines, rate, pipe="A", skip_s=5.0, window_s=None,
             tolerance_ms=DEFAULT_TOLERANCE_MS, calibration=None):
-    flips, planes, crcs = parse_trace(lines, pipe)
+    lines_cache = list(lines)
+    flips, planes, crcs = parse_trace(lines_cache, pipe)
     flips, cursor_only = content_flips(flips, planes)
     decoded = None
     if crcs:
@@ -281,6 +295,14 @@ def analyze(lines, rate, pipe="A", skip_s=5.0, window_s=None,
     report = summarise(starts, refreshes, rate, tolerance_ms, returning, lost, source)
     report["pipe"] = pipe
     report["cursor_only_flips"] = cursor_only
+    arms = [when for when, name in parse_trace_arms(lines_cache) if "cursor" not in name] \
+        if lines_cache else []
+    if len(arms) > 20:
+        trim = arms[len(arms) // 10: -(len(arms) // 10)]
+        gaps = [1000 * (b - a) for a, b in zip(trim, trim[1:])]
+        report["arm_interval_ms"] = {"median": round(statistics.median(gaps), 4),
+                                     "stdev": round(statistics.pstdev(gaps), 4),
+                                     "min": round(min(gaps), 3), "max": round(max(gaps), 3)}
     report["crc_refreshes"] = len(crcs)
     if crcs:
         report["distinct_crcs"] = len({crc for _, _, crc in crcs})

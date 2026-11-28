@@ -15,6 +15,7 @@ import importlib.util
 import json
 from pathlib import Path
 import re
+import statistics
 import sys
 
 _SPEC = importlib.util.spec_from_file_location(
@@ -33,24 +34,50 @@ def numbers(args):
     return [int(value) for value in re.findall(r"(?<![#@\w])-?\d+(?![#@\w])", args)]
 
 
+def wall_seconds(stamp):
+    """The log prefix: [HH:MM:SS.us] (wall clock) or [ms.us] (older libwayland)."""
+    parts = stamp.split(":")
+    if len(parts) == 3:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    return float(stamp) / 1000.0
+
+
 def parse(lines):
-    """Return {surface: {"presented": [(t, refresh_ns, flags)], "discarded": n, "commits": n}}."""
+    """Return {surface: {"presented", "discarded", "commits", "buffer_commits"}}.
+
+    Only feedback requested in a commit that attached a buffer counts as a
+    presentation: Mesa's Vulkan WSI also sends an empty FIFO-barrier commit
+    per frame, whose feedback reports the same picture again. `buffer_commits`
+    holds the client-side time of each buffer commit (wall clock, for
+    intervals only).
+    """
     surfaces = {}
     feedback = {}       # feedback object id -> surface id
+    pending = {}        # surface -> {"attach": bool, "feedback": [ids]}
     for line in lines:
         match = MESSAGE.match(line)
         if not match:
             continue
         iface, obj, msg, args = match["iface"], int(match["id"]), match["msg"], match["args"]
         if match["request"]:
-            if iface == "wl_surface" and msg == "commit":
-                surfaces.setdefault(obj, _empty())["commits"] += 1
+            if iface == "wl_surface" and msg == "attach" and "nil" not in args:
+                pending.setdefault(obj, {"attach": False, "feedback": []})["attach"] = True
+            elif iface == "wl_surface" and msg == "commit":
+                block = pending.pop(obj, {"attach": False, "feedback": []})
+                data = surfaces.setdefault(obj, _empty())
+                data["commits"] += 1
+                if block["attach"]:
+                    data["buffer_commits"].append(wall_seconds(match["ts"]))
+                for fb in block["feedback"]:
+                    if not block["attach"]:
+                        feedback.pop(fb, None)
             elif iface == "wp_presentation" and msg == "feedback":
                 objects = {m["iface"]: int(m["id"]) for m in OBJECT.finditer(args)}
                 surface = objects.get("wl_surface")
                 fb = objects.get("wp_presentation_feedback")
                 if surface is not None and fb is not None:
                     feedback[fb] = surface
+                    pending.setdefault(surface, {"attach": False, "feedback": []})["feedback"].append(fb)
                     surfaces.setdefault(surface, _empty())
             continue
         if iface != "wp_presentation_feedback" or obj not in feedback:
@@ -68,7 +95,7 @@ def parse(lines):
 
 
 def _empty():
-    return {"presented": [], "discarded": 0, "commits": 0}
+    return {"presented": [], "discarded": 0, "commits": 0, "buffer_commits": []}
 
 
 def report(surfaces, rate, surface=None, skip_s=5.0, window_s=None,
@@ -92,6 +119,15 @@ def report(surfaces, rate, surface=None, skip_s=5.0, window_s=None,
         for bit, name in FLAGS.items():
             if value & bit:
                 flags[name] += 1
+    commits = data["buffer_commits"]
+    if len(commits) > 20:
+        trim = commits[len(commits) // 10: -(len(commits) // 10)]
+        gaps = [1000 * (b - a) for a, b in zip(trim, trim[1:]) if 0 < b - a < 3600]
+        if gaps:
+            result["buffer_commit_interval_ms"] = {
+                "median": round(statistics.median(gaps), 4),
+                "stdev": round(statistics.pstdev(gaps), 4),
+                "min": round(min(gaps), 3), "max": round(max(gaps), 3)}
     result.update({
         "surface": surface,
         "commits": data["commits"],
